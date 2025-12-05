@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Buraco – Firebase</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#020617" />
+
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <link rel="manifest" href="manifest.json" />
+
+    <style>
+      :root {
+        --bg-main: #020617;
+        --bg-panel-soft: rgba(15, 23, 42, 0.92);
+        --accent: #22c55e;
+        --accent-soft: rgba(34, 197, 94, 0.15);
+        --accent-strong: #16a34a;
+        --border-soft: #1f2937;
+        --text-main: #e5e7eb;
+        --text-muted: #9ca3af;
+        --warning: #fbbf24;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--text-main);
+        background: radial-gradient(circle at 0 0, #14532d 0, #022c22 40%, #020617 70%), radial-gradient(circle at 100% 100%, #0f172a 0, #020617 45%);
+        min-height: 100vh;
+      }
+
+      .app {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: var(--bg-panel-soft);
+        border-radius: 20px;
+        padding: 16px 18px 20px;
+        box-shadow: 0 18px 35px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(15, 23, 42, 0.8);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .title {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .title-pill {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--accent-soft);
+        background: rgba(15, 118, 110, 0.25);
+        color: var(--accent);
+      }
+
+      .subtitle {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .badge-mode {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid var(--border-soft);
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+
+      .section {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(6, 78, 59, 0.25));
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        border: 1px solid var(--border-soft);
+      }
+
+      .section-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .section h2 {
+        font-size: 15px;
+        margin: 0;
+      }
+
+      .section small {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .flex {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .grow {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+
+      button {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        background: var(--accent-strong);
+        color: #ecfdf5;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 4px 10px rgba(0, 0, 0, 0.35);
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.1s;
+        white-space: nowrap;
+      }
+
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 8px 18px rgba(0, 0, 0, 0.55);
+        background: #22c55e;
+      }
+
+      button:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 3px 6px rgba(0, 0, 0, 0.6);
+      }
+
+      button:disabled {
+        background: #4b5563;
+        color: #9ca3af;
+        box-shadow: none;
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+
+      input,
+      select {
+        background: rgba(15, 23, 42, 0.9);
+        border-radius: 999px;
+        border: 1px solid #4b5563;
+        color: var(--text-main);
+        padding: 5px 9px;
+        font-size: 13px;
+        min-width: 120px;
+      }
+
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3);
+      }
+
+      label {
+        font-size: 13px;
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-right: 10px;
+        margin-bottom: 6px;
+      }
+
+      #gameSection {
+        display: none;
+      }
+
+      /* --------- MESA --------- */
+
+      .board {
+        background: radial-gradient(circle at top, #1a8c4a 0, #10713c 40%, #055030 80%);
+        border-radius: 18px;
+        padding: 10px 16px 14px;
+        border: 2px solid rgba(15, 23, 42, 0.7);
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.4);
+        margin-bottom: 10px;
+      }
+
+      .board-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        margin-bottom: 8px;
+        color: #e2fbe8;
+      }
+
+      .board-top-right {
+        font-size: 12px;
+        color: #dcfce7;
+      }
+
+      .current-player-chip {
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(34, 197, 94, 0.55);
+        background: rgba(4, 120, 87, 0.85);
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .current-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #bbf7d0;
+        box-shadow: 0 0 6px rgba(187, 247, 208, 0.9);
+      }
+
+      .board-middle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 60px;
+        padding: 18px 0;
+      }
+
+      @media (max-width: 768px) {
+        .board-middle {
+          gap: 32px;
+        }
+      }
+
+      .pile-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        color: #e5e7eb;
+      }
+
+      .pile-card {
+        width: 72px;
+        height: 104px;
+        border-radius: 12px;
+        background: linear-gradient(145deg, #b91c1c, #7f1d1d);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+        position: relative;
+      }
+
+      .pile-card::before,
+      .pile-card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        background: linear-gradient(145deg, #991b1b, #7f1d1d);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+      }
+
+      .pile-card::before {
+        transform: translate(4px, -4px);
+        opacity: 0.85;
+      }
+
+      .pile-card::after {
+        transform: translate(8px, -8px);
+        opacity: 0.7;
+      }
+
+      .pile-card-inner {
+        position: absolute;
+        inset: 6px;
+        border-radius: 10px;
+        background: radial-gradient(circle at 20% 20%, #1d4ed8 0, #1e3a8a 35%, #1e293b 75%), repeating-linear-gradient(45deg, rgba(248, 250, 252, 0.18) 0, rgba(248, 250, 252, 0.18) 2px, transparent 2px, transparent 4px);
+        border: 2px solid rgba(248, 250, 252, 0.9);
+        box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.75);
+      }
+
+      /* carta da vez do descarte */
+      .discard-face {
+        position: absolute;
+        inset: 10px;
+        border-radius: 10px;
+        background: #f9fafb;
+        border: 2px solid #111827;
+        padding: 4px 6px;
+        font-size: 16px;
+        font-weight: 600;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .discard-face-top {
+        align-self: flex-start;
+        text-align: left;
+        line-height: 1.1;
+      }
+
+      .discard-face-bottom {
+        align-self: flex-end;
+        font-size: 18px;
+      }
+
+      .pile-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        font-size: 12px;
+      }
+
+      .pile-caption {
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #ecfdf5;
+      }
+
+      .pile-counter {
+        background: rgba(15, 23, 42, 0.85);
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        min-width: 32px;
+        text-align: center;
+      }
+
+      .pile-topcard {
+        background: rgba(15, 23, 42, 0.85);
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        margin-top: 2px;
+        min-width: 40px;
+        text-align: center;
+      }
+
+      .board-bottom {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+
+      .board-bottom button {
+        background: rgba(15, 23, 42, 0.92);
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9), 0 4px 10px rgba(0, 0, 0, 0.55);
+      }
+
+      .board-bottom button.primary {
+        background: #16a34a;
+        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 4px 10px rgba(0, 0, 0, 0.55);
+      }
+
+      /* jogos dentro da mesa */
+
+      .board-melds {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      @media (max-width: 800px) {
+        .board-melds {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      .meld-title {
+        font-size: 13px;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .meld-container {
+        border-radius: 10px;
+        padding: 6px 8px;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px dashed rgba(148, 163, 184, 0.5);
+        min-height: 36px;
+      }
+
+      .meld-line {
+        margin-bottom: 4px;
+        padding: 3px 4px 6px;
+        border-radius: 6px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(31, 41, 55, 0.9);
+      }
+
+      .meld-line-cards {
+        position: relative;
+        height: 88px;
+      }
+
+      .meld-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      .hand-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      .hand-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .pill {
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .hand-container {
+        border-radius: 12px;
+        padding: 10px;
+        background: radial-gradient(circle at 50% 0, rgba(22, 163, 74, 0.3), rgba(15, 23, 42, 0.96));
+        border: 1px solid rgba(34, 197, 94, 0.25);
+        min-height: 46px;
+      }
+
+      .cards-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      #message {
+        font-size: 13px;
+        min-height: 18px;
+        margin-top: 4px;
+        color: var(--warning);
+      }
+
+      #scoreSection {
+        margin-top: 8px;
+      }
+
+      .score-line {
+        font-size: 13px;
+        margin-bottom: 4px;
+        padding: 4px 6px;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(31, 41, 55, 0.9);
+      }
+
+      .score-line strong {
+        color: #f9fafb;
+      }
+
+      .score-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .pill-strong {
+        border-color: rgba(34, 197, 94, 0.4);
+        color: var(--accent);
+        background: rgba(22, 163, 74, 0.1);
+      }
+
+      /* CARTAS */
+
+      .carta {
+        width: 90px;
+        height: 140px;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #181c28, #212638);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+        color: #f7f7f7;
+        border: 2px solid rgba(255, 255, 255, 0.18);
+        padding: 6px;
+        box-sizing: border-box;
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        overflow: hidden;
+      }
+
+      .carta.mini {
+        width: 54px;
+        height: 84px;
+        padding: 4px;
+        border-radius: 8px;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+        cursor: default;
+      }
+
+      .carta:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.8);
+        border-color: rgba(255, 255, 255, 0.6);
+      }
+
+      .carta.selected {
+        border-color: #facc15;
+        box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.9), 0 8px 18px rgba(0, 0, 0, 0.9);
+        transform: translateY(-4px) scale(1.02);
+      }
+
+      .carta-canto {
+        font-size: 14px;
+        line-height: 1.1;
+        text-align: left;
+      }
+
+      .carta.mini .carta-canto {
+        font-size: 11px;
+      }
+
+      .carta-canto div:last-child {
+        font-size: 16px;
+      }
+
+      .carta.mini .carta-canto div:last-child {
+        font-size: 13px;
+      }
+
+      .carta-icone {
+        position: absolute;
+        bottom: 6px;
+        right: 6px;
+        font-size: 22px;
+        opacity: 0.28;
+        pointer-events: none;
+      }
+
+      .carta.mini .carta-icone {
+        font-size: 16px;
+      }
+
+      .hearts,
+      .diamonds {
+        color: #ff6b8b;
+      }
+      .clubs,
+      .spades {
+        color: #f5f5f5;
+      }
+
+      .carta.hearts {
+        border-color: #ff6b8b;
+        background: radial-gradient(circle at top, #2b1624, #241b2b);
+      }
+
+      .carta.diamonds {
+        border-color: #ffd35b;
+        background: radial-gradient(circle at top, #2b2413, #262018);
+      }
+
+      .carta.clubs {
+        border-color: #6bffb8;
+        background: radial-gradient(circle at top, #13261f, #131f1a);
+      }
+
+      .carta.spades {
+        border-color: #7da2ff;
+        background: radial-gradient(circle at top, #151b2b, #111625);
+      }
+
+      .carta.joker-card {
+        border-color: #fde68a;
+        background: radial-gradient(circle at top, #3b2f1a, #1e1b14);
+        color: #fef9c3;
+      }
+
+      /* Pilha de descarte: sem “proteção vermelha” por cima */
+      .discard-pile {
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .discard-pile::before,
+      .discard-pile::after {
+        display: none;
+      }
+
+      .discard-pile .pile-card-inner {
+        display: none; /* não mostra o verso azul dentro quando é descarte */
+      }
+
+      /* garantir que a carta virada fica por cima de tudo */
+      .discard-face {
+        z-index: 3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="topbar">
+        <div>
+          <div class="title">
+            Buraco
+            <span class="title-pill">Firebase Alpha</span>
+          </div>
+          <div class="subtitle">1x1 · 2x2 · 1x2 · Mesa central · Estado compartilhado via Firestore.</div>
+        </div>
+        <div class="badge-mode">
+          Doc:
+          <code style="font-size: 10px">buracoGames/{gameId}</code>
+        </div>
+      </div>
+
+      <div id="configSection" class="section">
+        <div class="section-header">
+          <h2>Configuração & Conexão</h2>
+          <small>Escolha o modo, os nomes e qual jogador você é.</small>
+        </div>
+        <div class="flex" style="align-items: flex-end; margin-bottom: 6px">
+          <div>
+            <label>
+              Modo:
+              <select id="modeSelect">
+                <option value="1x1">1 x 1</option>
+                <option value="2x2">2 x 2</option>
+                <option value="1x2">1 x 2 (Jogador 1 sozinho)</option>
+                <option value="1x1_duploMorto">1 x 1 Humilhação – J2 joga 2x e pode 2 mortos</option>
+              </select>
+            </label>
+          </div>
+          <div>
+            <label>
+              Tipo de jogo:
+              <select id="variantSelect">
+                <option value="aberto">Aberto (pode comprar do descarte)</option>
+                <option value="fechado">Fechado (só compra do monte)</option>
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <label>
+              Sou o jogador:
+              <select id="localPlayerSelect">
+                <option value="0">Jogador 1</option>
+                <option value="1">Jogador 2</option>
+                <option value="2">Jogador 3</option>
+                <option value="3">Jogador 4</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="flex" style="flex-wrap: wrap; gap: 8px">
+          <div class="grow">
+            <label>
+              Jogador 1:
+              <input id="p1Name" value="Jogador 1" />
+            </label>
+          </div>
+          <div class="grow">
+            <label>
+              Jogador 2:
+              <input id="p2Name" value="Jogador 2" />
+            </label>
+          </div>
+          <div class="grow">
+            <label>
+              Jogador 3:
+              <input id="p3Name" value="Jogador 3" />
+            </label>
+          </div>
+          <div class="grow">
+            <label>
+              Jogador 4:
+              <input id="p4Name" value="Jogador 4" />
+            </label>
+          </div>
+        </div>
+        <div class="flex" style="align-items: center; margin-top: 6px">
+          <button id="startBtn">🂡 Iniciar / Resetar partida (escreve no Firebase)</button>
+          <span style="font-size: 11px; color: var(--text-muted)">Abra a mesma página em outros dispositivos para ver a mesa sincronizada.</span>
+        </div>
+      </div>
+
+      <div id="gameSection">
+        <!-- MESA CENTRAL -->
+        <div class="board">
+          <div class="board-top">
+            <div>
+              Vez de:
+              <span class="current-player-chip">
+                <span class="current-dot"></span>
+                <span id="currentPlayerLabel"></span>
+              </span>
+            </div>
+            <div class="board-top-right">
+              Mortos – Equipe 1:
+              <span id="dead1Count"></span>
+              · Equipe 2:
+              <span id="dead2Count"></span>
+            </div>
+          </div>
+
+          <div class="board-middle">
+            <div class="pile-area">
+              <div class="pile-card">
+                <div class="pile-card-inner"></div>
+              </div>
+              <div class="pile-info">
+                <span class="pile-caption">Monte</span>
+                <span class="pile-counter" id="stockCount">0</span>
+              </div>
+            </div>
+
+            <div class="pile-area">
+              <div class="pile-card discard-pile">
+                <div class="pile-card-inner"></div>
+                <div id="discardFace" class="discard-face">
+                  <div class="discard-face-top" id="discardFaceTop"></div>
+                  <div class="discard-face-bottom" id="discardFaceBottom"></div>
+                </div>
+              </div>
+              <div class="pile-info">
+                <span class="pile-caption">Descarte</span>
+                <span class="pile-counter" id="discardCount">0</span>
+                <span class="pile-topcard" id="discardTop">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="board-bottom">
+            <button id="drawStockBtn" class="primary">🃏 Comprar do monte</button>
+            <button id="drawDiscardBtn">📥 Comprar do descarte</button>
+          </div>
+
+          <!-- JOGOS / MELDS DENTRO DA MESA -->
+          <div class="board-melds">
+            <div class="grow">
+              <div class="meld-title">
+                <span><strong>Jogos Equipe 1</strong></span>
+                <span class="pill-strong">
+                  Pontos:
+                  <span id="scoreTeam1">0</span>
+                </span>
+              </div>
+              <div id="meldsP1" class="meld-container"></div>
+            </div>
+            <div class="grow">
+              <div class="meld-title">
+                <span><strong>Jogos Equipe 2</strong></span>
+                <span class="pill">
+                  Pontos:
+                  <span id="scoreTeam2">0</span>
+                </span>
+              </div>
+              <div id="meldsP2" class="meld-container"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AÇÕES E MÃO -->
+        <div class="section">
+          <div class="section-header" style="margin-bottom: 4px">
+            <h2>Ações do turno</h2>
+            <small>Só funcionam quando for a sua vez.</small>
+          </div>
+          <div class="flex" style="align-items: flex-start; gap: 10px">
+            <div class="grow">
+              <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px">
+                1) Compre do
+                <strong>monte</strong>
+                ou
+                <strong>descarte</strong>
+                .
+                <br />
+                2) Clique nas suas cartas para selecionar o jogo ou a carta de descarte.
+                <br />
+                3) Clique em
+                <strong>Baixar jogo</strong>
+                ou em
+                <strong>Descartar carta</strong>
+                para encerrar o turno.
+              </div>
+              <div style="margin-bottom: 4px">
+                <button id="meldBtn">⬇️ Baixar jogo selecionado</button>
+                <button id="discardBtn">🗑️ Descartar carta selecionada</button>
+                <button id="takeDeadBtn">💀 Pegar morto</button>
+              </div>
+              <div>
+                <button id="endGameBtn" style="background: #b91c1c; box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.5), 0 4px 10px rgba(0, 0, 0, 0.4)">⚠️ Forçar fim de jogo</button>
+              </div>
+              <div id="message"></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px">
+            <div class="hand-header">
+              <div>
+                <strong>Sua mão</strong>
+                <div class="hand-sub">
+                  Clique para (de)selecionar · Use
+                  <strong>Descartar carta</strong>
+                  para jogar fora.
+                </div>
+              </div>
+              <div class="pill">
+                Cartas na mão:
+                <span id="handCountLabel">0</span>
+              </div>
+            </div>
+            <div id="handContainer" class="hand-container">
+              <div class="cards-row"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PLACAR FINAL -->
+        <div id="scoreSection" class="section" style="display: none">
+          <div class="section-header">
+            <h2>Placar final</h2>
+            <small>Pontuação da rodada por equipe.</small>
+          </div>
+          <div id="scoreBoard"></div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getFirestore, doc, setDoc, updateDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch((err) => console.error('SW erro:', err));
+        });
+      }
+
+      const firebaseConfig = {
+        apiKey: 'AIzaSyBHvYOK7pWkikA9x5AjrVjuuSmopHisGik',
+        authDomain: 'buraco-27cb3.firebaseapp.com',
+        projectId: 'buraco-27cb3',
+        storageBucket: 'buraco-27cb3.firebasestorage.app',
+        messagingSenderId: '793904091112',
+        appId: '1:793904091112:web:3e9f299f5603ee4b6a5e5d',
+        measurementId: 'G-Q0RRR9714T',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const gameId = urlParams.get('game') || 'teste';
+      let myPlayerIndex = parseInt(urlParams.get('player') || '0', 10);
+
+      const gameRef = doc(db, 'buracoGames', gameId);
+
+      const SUITS = ['♣', '♦', '♥', '♠'];
+      const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      const RANKS_SEQ = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
+      const DEAD_CHUNK_SIZE = 11;
+
+      let state = null;
+      let selectedHandIndexes = new Set();
+
+      function createDeck() {
+        const deck = [];
+        for (let d = 0; d < 2; d++) {
+          for (const s of SUITS) {
+            for (const r of RANKS) {
+              deck.push({ rank: r, suit: s, joker: false });
+            }
+          }
+          deck.push({ rank: '★', suit: '★', joker: true });
+          deck.push({ rank: '★', suit: '★', joker: true });
+        }
+        return deck;
+      }
+
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      function cardLabel(card) {
+        if (card.joker) return 'Coringa';
+        return card.rank + card.suit;
+      }
+
+      function isWildcard(card) {
+        return card.joker || card.rank === '2';
+      }
+
+      function sortHand(hand) {
+        const rankOrder = {};
+        RANKS_SEQ.forEach((r, idx) => (rankOrder[r] = idx));
+        hand.sort((a, b) => {
+          if (a.joker && !b.joker) return 1;
+          if (!a.joker && b.joker) return -1;
+          if (a.suit === b.suit) {
+            return rankOrder[a.rank] - rankOrder[b.rank];
+          }
+          return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+        });
+      }
+
+      function modeLabel(mode) {
+        if (mode === '1x1') return '1 x 1';
+        if (mode === '2x2') return '2 x 2';
+        if (mode === '1x2') return '1 x 2';
+        if (mode === '1x1_duploMorto') return '1 x 1 Humilhação';
+        return mode;
+      }
+
+      async function startGame(mode, names, variant) {
+        if (myPlayerIndex !== 0) {
+          showMessage('Só o Jogador 1 pode iniciar a partida.');
+          return;
+        }
+
+        const players = [];
+        const teams = [];
+
+        let playerConfigs = [];
+        if (mode === '1x1' || mode === '1x1_duploMorto') {
+          playerConfigs = [
+            { name: names[0] || 'Jogador 1', team: 0 },
+            { name: names[1] || 'Jogador 2', team: 1 },
+          ];
+        } else if (mode === '2x2') {
+          playerConfigs = [
+            { name: names[0] || 'Jogador 1', team: 0 },
+            { name: names[1] || 'Jogador 2', team: 1 },
+            { name: names[2] || 'Jogador 3', team: 0 },
+            { name: names[3] || 'Jogador 4', team: 1 },
+          ];
+        } else if (mode === '1x2') {
+          // Jogador 1 sozinho (time 0) vs Jogadores 2 e 3 (time 1)
+          playerConfigs = [
+            { name: names[0] || 'Solo', team: 0 }, // Jogador 1
+            { name: names[1] || 'Dupla 1', team: 1 }, // Jogador 2
+            { name: names[2] || 'Dupla 2', team: 1 }, // Jogador 3
+          ];
+        }
+
+        playerConfigs.forEach((cfg, idx) => {
+          players.push({
+            id: idx,
+            name: cfg.name,
+            teamId: cfg.team,
+            hand: [],
+          });
+        });
+
+        const teamCount = 2;
+        for (let t = 0; t < teamCount; t++) {
+          const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
+
+          const defaultName = mode === '1x1' || mode === '1x1_duploMorto' ? players.find((p) => p.teamId === t)?.name || 'Equipe ' + (t + 1) : t === 0 ? 'Equipe 1' : 'Equipe 2';
+
+          teams.push({
+            id: t,
+            name: defaultName,
+            playerIndexes,
+            melds: [],
+          });
+        }
+
+        let stock = shuffle(createDeck());
+        const discard = [];
+        const deadPiles = [[], []];
+
+        const HAND_SIZE = 11;
+        const playerCount = players.length;
+
+        // mãos
+        for (let i = 0; i < HAND_SIZE; i++) {
+          for (let pIdx = 0; pIdx < playerCount; pIdx++) {
+            players[pIdx].hand.push(stock.pop());
+          }
+        }
+
+        // mortos – ajusta para o modo humilhação
+        if (mode === '1x1_duploMorto') {
+          // Equipe 1: 11 cartas (1 morto)
+          for (let i = 0; i < DEAD_CHUNK_SIZE; i++) {
+            deadPiles[0].push(stock.pop());
+          }
+          // Equipe 2: 22 cartas (2 mortos de 11)
+          for (let i = 0; i < DEAD_CHUNK_SIZE * 2; i++) {
+            deadPiles[1].push(stock.pop());
+          }
+        } else {
+          // padrão: 11 cartas para cada morto
+          for (let i = 0; i < DEAD_CHUNK_SIZE; i++) {
+            deadPiles[0].push(stock.pop());
+            deadPiles[1].push(stock.pop());
+          }
+        }
+
+        players.forEach((p) => sortHand(p.hand));
+
+        discard.push(stock.pop());
+
+        // limites de mortos
+        let deadChunksMax = [1, 1];
+        if (mode === '1x1_duploMorto') {
+          // J1 pode 1 morto, J2 pode 2
+          deadChunksMax = [1, 2];
+        }
+
+        const newState = {
+          mode,
+          variant,
+          players,
+          teams,
+          currentPlayer: 0,
+          stock,
+          discard,
+          deadPiles,
+          deadChunksTaken: [0, 0],
+          deadChunksMax,
+          hasDrawnThisTurn: false,
+          finished: false,
+          winnerTeamId: null,
+          j2ConsecutiveTurns: 0, // para o modo humilhação
+        };
+
+        await setDoc(gameRef, {
+          stateJson: JSON.stringify(newState),
+          createdAt: Date.now(),
+        });
+
+        showMessage('Partida iniciada! Modo: ' + modeLabel(mode) + ' (ID: ' + gameId + ')');
+      }
+
+      function currentPlayer() {
+        return state.players[state.currentPlayer];
+      }
+
+      function currentTeam() {
+        return state.teams[currentPlayer().teamId];
+      }
+
+      function ensureMyTurn() {
+        if (!state) return false;
+        if (state.finished) {
+          showMessage('Jogo já terminou.');
+          return false;
+        }
+        if (state.currentPlayer !== myPlayerIndex) {
+          showMessage('Não é sua vez.');
+          return false;
+        }
+        return true;
+      }
+
+      async function commitState() {
+        await updateDoc(gameRef, { stateJson: JSON.stringify(state) });
+      }
+
+      async function drawFromStock() {
+        if (!ensureMyTurn()) return;
+        if (state.hasDrawnThisTurn) {
+          showMessage('Você já comprou neste turno.');
+          return;
+        }
+        if (!state.stock.length) {
+          showMessage('Monte vazio.');
+          return;
+        }
+        const c = state.stock.pop();
+        currentPlayer().hand.push(c);
+        sortHand(currentPlayer().hand);
+        state.hasDrawnThisTurn = true;
+        await commitState();
+      }
+
+      async function drawFromDiscard() {
+        if (!ensureMyTurn()) return;
+        if (state.variant === 'fechado') {
+          showMessage('Modo fechado: não pode comprar do descarte.');
+          return;
+        }
+        if (state.hasDrawnThisTurn) {
+          showMessage('Você já comprou neste turno.');
+          return;
+        }
+        if (!state.discard.length) {
+          showMessage('Pilha de descarte vazia.');
+          return;
+        }
+        const c = state.discard.pop();
+        currentPlayer().hand.push(c);
+        sortHand(currentPlayer().hand);
+        state.hasDrawnThisTurn = true;
+        await commitState();
+      }
+
+      function isValidSequenceMeld(cards) {
+        const nonWild = cards.filter((c) => !isWildcard(c));
+        if (!nonWild.length) return false;
+
+        const suit = nonWild[0].suit;
+        if (!nonWild.every((c) => c.suit === suit)) return false;
+
+        const seqOrder = {};
+        RANKS_SEQ.forEach((r, idx) => (seqOrder[r] = idx));
+
+        nonWild.sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+
+        let neededWilds = 0;
+        for (let i = 1; i < nonWild.length; i++) {
+          const diff = seqOrder[nonWild[i].rank] - seqOrder[nonWild[i - 1].rank];
+          if (diff <= 0) return false;
+          if (diff > 1) neededWilds += diff - 1;
+        }
+
+        const availableWilds = cards.length - nonWild.length;
+        if (availableWilds < neededWilds) return false;
+
+        return true;
+      }
+
+      async function attemptExtendExistingMeld(cards, indexes) {
+        const team = currentTeam();
+        if (!team.melds || !team.melds.length) return false;
+
+        // quais jogos podem receber essas cartas mantendo sequência válida?
+        const candidateMeldIndexes = [];
+        team.melds.forEach((meld, idx) => {
+          const combined = meld.concat(cards);
+          if (isValidSequenceMeld(combined)) {
+            candidateMeldIndexes.push(idx);
+          }
+        });
+
+        if (!candidateMeldIndexes.length) {
+          // nenhuma canastra aceita essas cartas
+          return false;
+        }
+
+        if (candidateMeldIndexes.length > 1) {
+          // ambíguo: encaixa em mais de um jogo
+          showMessage('Essas cartas encaixariam em mais de um jogo já baixado. Ainda não implementei escolher qual automaticamente.');
+          return false;
+        }
+
+        const meldIndex = candidateMeldIndexes[0];
+        const teamMeld = team.melds[meldIndex];
+        const hand = currentPlayer().hand;
+
+        // mover as cartas da mão para o jogo (índices já vêm em ordem decrescente)
+        for (const idx of indexes) {
+          teamMeld.push(hand[idx]);
+          hand.splice(idx, 1);
+        }
+
+        normalizeMeldOrder(teamMeld);
+        sortHand(hand);
+        selectedHandIndexes.clear();
+        await commitState();
+        showMessage('Cartas encaixadas em um jogo já existente.');
+        return true;
+      }
+
+      async function makeMeldFromSelection() {
+        if (!ensureMyTurn()) return;
+        if (!state.hasDrawnThisTurn) {
+          showMessage('Compre antes de baixar jogo.');
+          return;
+        }
+
+        const hand = currentPlayer().hand;
+        const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
+
+        if (!indexes.length) {
+          showMessage('Selecione pelo menos 1 carta.');
+          return;
+        }
+
+        const cards = indexes.map((i) => hand[i]);
+
+        // 1) TENTATIVA DE ENCAIXAR EM JOGO EXISTENTE (PODE SER 1 OU 2 CARTAS)
+        const extended = await attemptExtendExistingMeld(cards, indexes);
+        if (extended) {
+          // já encaixou num jogo existente, acabou
+          return;
+        }
+
+        // 2) SE NÃO ENCAIXOU EM NENHUM, SÓ ENTÃO TENTA ABRIR JOGO NOVO
+        if (indexes.length < 3) {
+          showMessage('Um novo jogo precisa de pelo menos 3 cartas. Para estender, selecione cartas que realmente encaixem em um jogo já baixado.');
+          return;
+        }
+
+        if (!isValidSequenceMeld(cards)) {
+          showMessage('Jogo inválido. Precisa ser sequência do mesmo naipe, com curingas opcionais (Ás pode estar no topo).');
+          return;
+        }
+
+        // cria jogo novo (lógica antiga)
+        const meld = [];
+        for (const idx of indexes) {
+          meld.unshift(hand[idx]);
+          hand.splice(idx, 1);
+        }
+
+        // arruma a ordem da canastra visualmente
+        normalizeMeldOrder(meld);
+
+        currentTeam().melds.push(meld);
+        selectedHandIndexes.clear();
+        await commitState();
+      }
+
+      async function takeDead() {
+        if (!ensureMyTurn()) return;
+        const p = currentPlayer();
+        const teamId = p.teamId;
+
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+
+        if (taken >= max) {
+          showMessage('Sua equipe já pegou todos os mortos permitidos.');
+          return;
+        }
+        if (p.hand.length > 0) {
+          showMessage('Só pode pegar o morto quando ficar sem cartas na mão (usou todas em jogos).');
+          return;
+        }
+
+        const dead = state.deadPiles[teamId];
+        if (!dead.length) {
+          showMessage('Não há mais morto disponível para sua equipe.');
+          return;
+        }
+
+        // no modo humilhação, o time 2 tem 22 cartas (2 mortos); pega em blocos de 11
+        const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
+        p.hand = dead.splice(0, chunkSize);
+        sortHand(p.hand);
+        state.deadChunksTaken[teamId] = taken + 1;
+        await commitState();
+      }
+
+      async function discardSelectedCard() {
+        if (!ensureMyTurn()) return;
+        if (!state.hasDrawnThisTurn) {
+          showMessage('Compre uma carta antes de descartar.');
+          return;
+        }
+        const hand = currentPlayer().hand;
+        const indexes = Array.from(selectedHandIndexes);
+        if (indexes.length !== 1) {
+          showMessage('Para descartar, selecione exatamente 1 carta.');
+          return;
+        }
+        const index = indexes[0];
+        const card = hand.splice(index, 1)[0];
+        state.discard.push(card);
+        selectedHandIndexes.clear();
+
+        const teamId = currentPlayer().teamId;
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+
+        // Se acabou a mão e já pegou todos os mortos possíveis, fecha o jogo
+        if (hand.length === 0 && taken >= max) {
+          finishGame(teamId);
+          return;
+        }
+
+        // Regras de passar a vez
+        if (state.mode === '1x1_duploMorto') {
+          // Jogador 2 sempre joga duas seguidas
+          if (state.currentPlayer === 1) {
+            if (!state.j2ConsecutiveTurns || state.j2ConsecutiveTurns === 0) {
+              // primeiro turno do "pacote" do J2 -> ele joga de novo
+              state.j2ConsecutiveTurns = 1;
+            } else {
+              // já jogou duas, volta pro J1
+              state.currentPlayer = 0;
+              state.j2ConsecutiveTurns = 0;
+            }
+          } else {
+            // J1 -> sempre passa para J2, resetando o ciclo dele
+            state.currentPlayer = 1;
+            state.j2ConsecutiveTurns = 0;
+          }
+        } else {
+          // modos normais
+          state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+        }
+
+        state.hasDrawnThisTurn = false;
+        await commitState();
+      }
+
+      function computeTeamMeldScore(team) {
+        let meldPoints = 0;
+        let cleanBonus = 0;
+        let dirtyBonus = 0;
+
+        team.melds.forEach((meld) => {
+          meldPoints += meld.length * 10;
+          const hasWild = meld.some(isWildcard);
+          if (meld.length >= 7) {
+            if (hasWild) dirtyBonus += 50;
+            else cleanBonus += 100;
+          }
+        });
+
+        return {
+          meldPoints,
+          cleanBonus,
+          dirtyBonus,
+          total: meldPoints + cleanBonus + dirtyBonus,
+        };
+      }
+
+      function normalizeMeldOrder(meld) {
+        if (!meld || !meld.length) return;
+
+        const nonWild = meld.filter((c) => !isWildcard(c));
+        const wild = meld.filter((c) => isWildcard(c));
+
+        if (!nonWild.length) {
+          // só curingas: tanto faz, mas mantém todos juntos
+          meld.splice(0, meld.length, ...wild);
+          return;
+        }
+
+        const seqOrder = {};
+        RANKS_SEQ.forEach((r, idx) => (seqOrder[r] = idx));
+
+        // ordena as cartas normais pela nossa ordem de sequência
+        nonWild.sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+
+        const result = [];
+
+        // tenta “preencher” gaps entre cartas com curingas
+        for (let i = 0; i < nonWild.length; i++) {
+          result.push(nonWild[i]);
+
+          if (i < nonWild.length - 1) {
+            const curr = nonWild[i];
+            const next = nonWild[i + 1];
+            const diff = seqOrder[next.rank] - seqOrder[curr.rank];
+
+            // se tem buraco (ex: 7 … 10), joga curingas ali visualmente
+            let gap = diff - 1;
+            while (gap > 0 && wild.length) {
+              result.push(wild.shift());
+              gap--;
+            }
+          }
+        }
+
+        // se sobraram curingas, põe nas pontas (visual)
+        while (wild.length) {
+          result.push(wild.shift());
+        }
+
+        // substitui o conteúdo da meld mantendo a mesma referência
+        meld.splice(0, meld.length, ...result);
+      }
+
+      function computeScores() {
+        const results = [];
+        state.teams.forEach((team) => {
+          const players = state.players.filter((p) => p.teamId === team.id);
+
+          let handPenalty = 0;
+          players.forEach((p) => {
+            handPenalty += p.hand.length * 10;
+          });
+
+          const meldInfo = computeTeamMeldScore(team);
+
+          const score = -handPenalty + meldInfo.meldPoints + meldInfo.cleanBonus + meldInfo.dirtyBonus;
+          results.push({
+            team,
+            players,
+            score,
+            handPenalty,
+            meldPoints: meldInfo.meldPoints,
+            cleanBonus: meldInfo.cleanBonus,
+            dirtyBonus: meldInfo.dirtyBonus,
+          });
+        });
+        return results;
+      }
+
+      async function finishGame(winnerTeamId) {
+        if (!state) return;
+        state.finished = true;
+        state.winnerTeamId = winnerTeamId ?? null;
+        await commitState();
+      }
+
+      function renderAll() {
+        if (!state) return;
+        renderState();
+        renderHand();
+        renderMelds();
+        updateButtons();
+      }
+
+      function renderState() {
+        document.getElementById('currentPlayerLabel').textContent = currentPlayer().name + (state.finished ? ' (fim de jogo)' : '');
+        document.getElementById('stockCount').textContent = state.stock.length;
+
+        const discardTop = state.discard[state.discard.length - 1];
+        document.getElementById('discardTop').textContent = discardTop ? cardLabel(discardTop) : '—';
+        document.getElementById('discardCount').textContent = state.discard.length;
+
+        const discardFace = document.getElementById('discardFace');
+        const faceTop = document.getElementById('discardFaceTop');
+        const faceBottom = document.getElementById('discardFaceBottom');
+
+        if (!discardTop) {
+          discardFace.style.display = 'none';
+        } else {
+          discardFace.style.display = 'flex';
+          if (discardTop.joker) {
+            faceTop.textContent = '★';
+            faceBottom.textContent = '★';
+            discardFace.style.color = '#b45309';
+          } else {
+            faceTop.innerHTML = discardTop.rank + '<br>' + discardTop.suit.toString();
+            faceBottom.textContent = discardTop.suit.toString();
+            const red = discardTop.suit === '♥' || discardTop.suit === '♦';
+            discardFace.style.color = red ? '#b91c1c' : '#020617';
+          }
+        }
+
+        document.getElementById('dead1Count').textContent = state.deadPiles[0].length;
+        document.getElementById('dead2Count').textContent = state.deadPiles[1].length;
+
+        if (state.finished) {
+          const scores = computeScores();
+          renderScores(scores, state.winnerTeamId ?? null);
+        }
+      }
+
+      function createCardElement(card, idx) {
+        const div = document.createElement('div');
+
+        if (card.joker) {
+          div.className = 'carta joker-card';
+          const canto = document.createElement('div');
+          canto.className = 'carta-canto';
+          canto.innerHTML = '<div>★</div><div>★</div>';
+          const icone = document.createElement('div');
+          icone.className = 'carta-icone';
+          icone.textContent = '★';
+          div.appendChild(canto);
+          div.appendChild(icone);
+        } else {
+          let suitId;
+          if (card.suit === '♥') suitId = 'hearts';
+          else if (card.suit === '♦') suitId = 'diamonds';
+          else if (card.suit === '♣') suitId = 'clubs';
+          else suitId = 'spades';
+
+          div.className = 'carta ' + suitId;
+          const canto = document.createElement('div');
+          canto.className = 'carta-canto';
+          canto.innerHTML = '<div>' + card.rank + '</div><div>' + card.suit + '</div>';
+          const icone = document.createElement('div');
+          icone.className = 'carta-icone';
+          icone.textContent = card.suit;
+          div.appendChild(canto);
+          div.appendChild(icone);
+        }
+
+        if (selectedHandIndexes.has(idx)) {
+          div.classList.add('selected');
+        }
+
+        div.title = 'Clique para selecionar. Use "Descartar carta" para jogar fora.';
+        div.addEventListener('click', () => {
+          if (!state || state.currentPlayer !== myPlayerIndex || !state.hasDrawnThisTurn) {
+            showMessage('Primeiro compre, e só o jogador da vez pode selecionar.');
+            return;
+          }
+          if (selectedHandIndexes.has(idx)) {
+            selectedHandIndexes.delete(idx);
+          } else {
+            selectedHandIndexes.add(idx);
+          }
+          renderHand();
+        });
+
+        return div;
+      }
+
+      function createCardElementMini(card, indexInMeld) {
+        const div = document.createElement('div');
+
+        if (card.joker) {
+          div.className = 'carta mini joker-card';
+          const canto = document.createElement('div');
+          canto.className = 'carta-canto';
+          canto.innerHTML = '<div>★</div><div>★</div>';
+          const icone = document.createElement('div');
+          icone.className = 'carta-icone';
+          icone.textContent = '★';
+          div.appendChild(canto);
+          div.appendChild(icone);
+        } else {
+          let suitId;
+          if (card.suit === '♥') suitId = 'hearts';
+          else if (card.suit === '♦') suitId = 'diamonds';
+          else if (card.suit === '♣') suitId = 'clubs';
+          else suitId = 'spades';
+
+          div.className = 'carta mini ' + suitId;
+          const canto = document.createElement('div');
+          canto.className = 'carta-canto';
+          canto.innerHTML = '<div>' + card.rank + '</div><div>' + card.suit + '</div>';
+          const icone = document.createElement('div');
+          icone.className = 'carta-icone';
+          icone.textContent = card.suit;
+          div.appendChild(canto);
+          div.appendChild(icone);
+        }
+
+        div.style.position = 'absolute';
+        div.style.left = 12 * indexInMeld + 'px';
+
+        return div;
+      }
+
+      function renderHand() {
+        const container = document.getElementById('handContainer');
+        container.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'cards-row';
+
+        if (!state) return;
+
+        const me = state.players[myPlayerIndex];
+        document.getElementById('handCountLabel').textContent = me.hand.length;
+
+        me.hand.forEach((card, idx) => {
+          const elem = createCardElement(card, idx);
+          row.appendChild(elem);
+        });
+
+        container.appendChild(row);
+      }
+
+      function renderMelds() {
+        const m1 = document.getElementById('meldsP1');
+        const m2 = document.getElementById('meldsP2');
+        m1.innerHTML = '';
+        m2.innerHTML = '';
+
+        let t1Score = 0;
+        let t2Score = 0;
+
+        state.teams.forEach((team, idx) => {
+          const target = idx === 0 ? m1 : m2;
+          const players = state.players.filter((p) => p.teamId === team.id);
+          const playersNames = players.map((p) => p.name).join(' & ');
+
+          const meldInfo = computeTeamMeldScore(team);
+          if (idx === 0) t1Score = meldInfo.total;
+          else t2Score = meldInfo.total;
+
+          if (!team.melds.length) {
+            const empty = document.createElement('div');
+            empty.textContent = 'Nenhum jogo baixado ainda. (' + playersNames + ')';
+            empty.style.fontSize = '12px';
+            empty.style.color = '#9ca3af';
+            target.appendChild(empty);
+            return;
+          }
+
+          const header = document.createElement('div');
+          header.style.fontSize = '11px';
+          header.style.color = '#9ca3af';
+          header.style.marginBottom = '4px';
+          header.textContent = 'Jogadores: ' + playersNames;
+          target.appendChild(header);
+
+          team.melds.forEach((meld, i) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'meld-line';
+
+            const cardsRow = document.createElement('div');
+            cardsRow.className = 'meld-line-cards';
+
+            meld.forEach((card, indexInMeld) => {
+              cardsRow.appendChild(createCardElementMini(card, indexInMeld));
+            });
+
+            const hasWild = meld.some(isWildcard);
+            const isCanastra = meld.length >= 7;
+
+            const meta = document.createElement('div');
+            meta.className = 'meld-meta';
+
+            if (isCanastra) {
+              meta.textContent = hasWild ? 'Canastra suja (+50)' : 'Canastra limpa (+100)';
+            } else {
+              meta.textContent = 'Jogo simples';
+            }
+
+            wrapper.appendChild(cardsRow);
+            wrapper.appendChild(meta);
+            target.appendChild(wrapper);
+          });
+        });
+
+        document.getElementById('scoreTeam1').textContent = t1Score;
+        document.getElementById('scoreTeam2').textContent = t2Score;
+      }
+
+      function renderScores(scores, winnerTeamId) {
+        const section = document.getElementById('scoreSection');
+        const board = document.getElementById('scoreBoard');
+        section.style.display = 'block';
+        board.innerHTML = '';
+
+        scores.sort((a, b) => b.score - a.score);
+        scores.forEach((entry) => {
+          const div = document.createElement('div');
+          div.className = 'score-line';
+          const crown = winnerTeamId !== null && entry.team.id === winnerTeamId ? ' 👑' : '';
+          const teamName = entry.team.name || 'Equipe ' + (entry.team.id + 1);
+          const playersNames = entry.players.map((p) => p.name).join(' & ');
+
+          div.innerHTML = '<strong>' + teamName + '</strong>' + crown + ' — ' + entry.score + ' pts';
+          const meta = document.createElement('div');
+          meta.className = 'score-meta';
+          meta.textContent = 'Jogadores: ' + playersNames + ' · Jogos: +' + entry.meldPoints + ' · Mão: -' + entry.handPenalty + ' · Canastras limpas: +' + entry.cleanBonus + ' · Canastras sujas: +' + entry.dirtyBonus;
+          div.appendChild(meta);
+          board.appendChild(div);
+        });
+      }
+
+      function updateButtons() {
+        const gameOver = state?.finished;
+        const isClosed = state?.variant === 'fechado';
+
+        const drawStockBtn = document.getElementById('drawStockBtn');
+        const drawDiscardBtn = document.getElementById('drawDiscardBtn');
+        const meldBtn = document.getElementById('meldBtn');
+        const discardBtn = document.getElementById('discardBtn');
+        const takeDeadBtn = document.getElementById('takeDeadBtn');
+        const endGameBtn = document.getElementById('endGameBtn');
+
+        drawStockBtn.disabled = !state || gameOver || state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
+
+        drawDiscardBtn.disabled = !state || gameOver || isClosed || state.hasDrawnThisTurn || !state.discard.length || state.currentPlayer !== myPlayerIndex;
+
+        meldBtn.disabled = !state || gameOver || !state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
+
+        discardBtn.disabled = !state || gameOver || !state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
+
+        let canTakeDead = false;
+        if (state && !gameOver && state.currentPlayer === myPlayerIndex) {
+          const teamId = currentPlayer().teamId;
+          const taken = state.deadChunksTaken?.[teamId] ?? 0;
+          const max = state.deadChunksMax?.[teamId] ?? 1;
+          canTakeDead = taken < max;
+        }
+
+        takeDeadBtn.disabled = !state || gameOver || state.currentPlayer !== myPlayerIndex || !canTakeDead;
+
+        endGameBtn.disabled = !state;
+      }
+
+      function showMessage(text) {
+        const el = document.getElementById('message');
+        if (el) el.textContent = text || '';
+      }
+
+      onSnapshot(gameRef, (snap) => {
+        if (!snap.exists()) {
+          state = null;
+          selectedHandIndexes.clear();
+          document.getElementById('configSection').style.display = 'block';
+          document.getElementById('gameSection').style.display = 'none';
+          showMessage('Aguardando o Jogador 1 iniciar a partida (ID: ' + gameId + ').');
+          return;
+        }
+
+        const data = snap.data();
+        state = JSON.parse(data.stateJson);
+        selectedHandIndexes.clear();
+
+        document.getElementById('configSection').style.display = 'none';
+        document.getElementById('gameSection').style.display = 'block';
+        renderAll();
+      });
+
+      // UI
+
+      document.getElementById('startBtn').addEventListener('click', () => {
+        const mode = document.getElementById('modeSelect').value;
+        const variant = document.getElementById('variantSelect').value;
+        const name1 = document.getElementById('p1Name').value.trim();
+        const name2 = document.getElementById('p2Name').value.trim();
+        const name3 = document.getElementById('p3Name').value.trim();
+        const name4 = document.getElementById('p4Name').value.trim();
+        const names = [name1, name2, name3, name4];
+
+        const selectIndex = parseInt(document.getElementById('localPlayerSelect').value, 10);
+        myPlayerIndex = selectIndex;
+
+        startGame(mode, names, variant);
+      });
+
+      document.getElementById('localPlayerSelect').addEventListener('change', (e) => {
+        myPlayerIndex = parseInt(e.target.value, 10);
+        if (state) {
+          selectedHandIndexes.clear();
+          renderAll();
+        }
+      });
+
+      document.getElementById('drawStockBtn').addEventListener('click', drawFromStock);
+      document.getElementById('drawDiscardBtn').addEventListener('click', drawFromDiscard);
+      document.getElementById('meldBtn').addEventListener('click', makeMeldFromSelection);
+      document.getElementById('discardBtn').addEventListener('click', discardSelectedCard);
+      document.getElementById('takeDeadBtn').addEventListener('click', takeDead);
+
+      // Forçar fim = apaga doc e volta pra tela inicial
+      document.getElementById('endGameBtn').addEventListener('click', async () => {
+        try {
+          await deleteDoc(gameRef);
+        } catch (e) {
+          console.error(e);
+        }
+        state = null;
+        selectedHandIndexes.clear();
+        document.getElementById('configSection').style.display = 'block';
+        document.getElementById('gameSection').style.display = 'none';
+        showMessage('Jogo encerrado. Configure uma nova partida.');
+      });
+    </script>
+  </body>
+</html>
