@@ -416,6 +416,11 @@
         border: 1px solid rgba(31, 41, 55, 0.9);
       }
 
+      .meld-line.selected-meld {
+        border-color: #facc15;
+        box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.8);
+      }
+
       .meld-line-cards {
         position: relative;
         height: 88px;
@@ -622,6 +627,43 @@
       .discard-face {
         z-index: 3;
       }
+
+      body.my-turn .hand-container {
+        box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.95), 0 0 30px rgba(250, 204, 21, 0.7);
+      }
+
+      body.my-turn .board {
+        box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.4), 0 18px 40px rgba(0, 0, 0, 0.8);
+      }
+
+      .meld-tag {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 10px;
+        margin-left: 6px;
+        font-weight: 500;
+      }
+
+      .meld-tag.suja {
+        background: #4b5563;
+        color: #e5e7eb;
+      }
+
+      .meld-tag.limpa {
+        background: #16a34a;
+        color: #022c22;
+      }
+
+      .meld-tag.real {
+        background: #1d4ed8;
+        color: #dbeafe;
+      }
+
+      .meld-tag.asas {
+        background: #facc15;
+        color: #78350f;
+      }
     </style>
   </head>
   <body>
@@ -632,7 +674,7 @@
             Buraco
             <span class="title-pill">Firebase Alpha</span>
           </div>
-          <div class="subtitle">1x1 · 2x2 · 1x2 · Mesa central · Estado compartilhado via Firestore.</div>
+          <div class="subtitle" id="subtitleGameInfo">1x1 · 2x2 · 1x2 · Mesa central · Estado compartilhado via Firestore.</div>
         </div>
         <div class="badge-mode">
           Doc:
@@ -721,6 +763,7 @@
                 <span class="current-dot"></span>
                 <span id="currentPlayerLabel"></span>
               </span>
+              <span id="turnTimerLabel" style="margin-left: 8px; font-size: 12px; color: #facc15"></span>
             </div>
             <div class="board-top-right">
               Mortos – Equipe 1:
@@ -885,11 +928,144 @@
 
       const SUITS = ['♣', '♦', '♥', '♠'];
       const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-      const RANKS_SEQ = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
+      const RANKS_SEQ = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
       const DEAD_CHUNK_SIZE = 11;
 
       let state = null;
       let selectedHandIndexes = new Set();
+
+      // Timer de turno (60s) e auto-jogada
+      let turnTimerId = null;
+      let turnTimerRemaining = 0;
+
+      let selectedMeldTarget = null; // "teamId:meldIndex" do jogo que você clicou
+
+      function updateTimerLabel() {
+        const el = document.getElementById('turnTimerLabel');
+        if (!el) return;
+        if (!state || state.finished || state.currentPlayer !== myPlayerIndex) {
+          el.textContent = '';
+          return;
+        }
+        el.textContent = `${turnTimerRemaining}s`;
+      }
+
+      function stopTurnTimer() {
+        if (turnTimerId !== null) {
+          clearInterval(turnTimerId);
+          turnTimerId = null;
+        }
+      }
+
+      async function autoPlayTimeout() {
+        if (!ensureMyTurn()) return;
+
+        // Se ainda não comprou, tenta comprar automaticamente
+        if (!state.hasDrawnThisTurn) {
+          if (state.stock.length) {
+            const c = state.stock.pop();
+            const me = currentPlayer();
+            me.hand.push(c);
+            sortHand(me.hand);
+            state.hasDrawnThisTurn = true;
+          } else if (state.discard.length && state.variant === 'aberto') {
+            const c = state.discard.pop();
+            const me = currentPlayer();
+            me.hand.push(c);
+            sortHand(me.hand);
+            state.hasDrawnThisTurn = true;
+          }
+        }
+
+        const me = currentPlayer();
+        const hand = me.hand;
+        if (!hand.length) {
+          await commitState();
+          return;
+        }
+
+        // descarta carta aleatória
+        const idx = Math.floor(Math.random() * hand.length);
+        const card = hand.splice(idx, 1)[0];
+        state.discard.push(card);
+
+        const teamId = me.teamId;
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+
+        if (hand.length === 0 && taken >= max) {
+          await finishGame(teamId);
+          return;
+        }
+
+        if (state.mode === '1x1_duploMorto') {
+          if (state.currentPlayer === 1) {
+            if (!state.j2ConsecutiveTurns || state.j2ConsecutiveTurns === 0) {
+              state.j2ConsecutiveTurns = 1;
+            } else {
+              state.currentPlayer = 0;
+              state.j2ConsecutiveTurns = 0;
+            }
+          } else {
+            state.currentPlayer = 1;
+            state.j2ConsecutiveTurns = 0;
+          }
+        } else {
+          state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+        }
+
+        state.hasDrawnThisTurn = false;
+        state.requiredDiscardCard = null;
+        showMessage('Tempo esgotado: o jogo descartou uma carta automaticamente.');
+        await commitState();
+      }
+
+      function classifyMeldForUi(meld) {
+        const hasWild = meld.some(isWildcard);
+        if (meld.length < 7) {
+          return { kind: 'simple', base: 'Jogo simples', tag: null };
+        }
+
+        const nonWild = meld.filter((c) => !isWildcard(c));
+        const seqOrder = {};
+        RANKS_SEQ.forEach((r, idx) => (seqOrder[r] = idx));
+        nonWild.sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+
+        const firstRank = nonWild[0]?.rank;
+        const lastRank = nonWild[nonWild.length - 1]?.rank;
+
+        if (!hasWild) {
+          if (firstRank === '2' && lastRank === 'A') {
+            return { kind: 'real', base: 'Canastra', tag: { cls: 'real', text: 'Real' } };
+          }
+          if (lastRank === 'A') {
+            return { kind: 'asas', base: 'Canastra', tag: { cls: 'asas', text: 'Ás a Ás' } };
+          }
+          return { kind: 'limpa', base: 'Canastra', tag: { cls: 'limpa', text: 'Limpa' } };
+        }
+
+        return { kind: 'suja', base: 'Canastra', tag: { cls: 'suja', text: 'Suja' } };
+      }
+
+      function startTurnTimerIfNeeded() {
+        stopTurnTimer();
+        if (!state || state.finished || state.currentPlayer !== myPlayerIndex) {
+          updateTimerLabel();
+          return;
+        }
+        turnTimerRemaining = 60;
+        updateTimerLabel();
+        turnTimerId = setInterval(() => {
+          turnTimerRemaining--;
+          if (turnTimerRemaining <= 0) {
+            stopTurnTimer();
+            autoPlayTimeout().catch(console.error);
+          } else {
+            updateTimerLabel();
+          }
+        }, 1000);
+      }
 
       function createDeck() {
         const deck = [];
@@ -899,8 +1075,8 @@
               deck.push({ rank: r, suit: s, joker: false });
             }
           }
-          deck.push({ rank: '★', suit: '★', joker: true });
-          deck.push({ rank: '★', suit: '★', joker: true });
+          deck.push({ rank: 'JOKER', suit: '★', joker: true });
+          deck.push({ rank: 'JOKER', suit: '★', joker: true });
         }
         return deck;
       }
@@ -914,7 +1090,7 @@
       }
 
       function cardLabel(card) {
-        if (card.joker) return 'Coringa';
+        if (card.joker) return 'JOKER';
         return card.rank + card.suit;
       }
 
@@ -1055,6 +1231,7 @@
           finished: false,
           winnerTeamId: null,
           j2ConsecutiveTurns: 0, // para o modo humilhação
+          requiredDiscardCard: null,
         };
 
         await setDoc(gameRef, {
@@ -1107,12 +1284,57 @@
         await commitState();
       }
 
+      function canUseDiscardInClosed(discardTop, hand, team) {
+        if (!discardTop) return false;
+
+        const n = hand.length;
+
+        // A) Novo jogo com descarte + cartas da mão
+        const pool = hand.concat([discardTop]);
+        const idxTopo = pool.length - 1;
+        const totalMasks = 1 << pool.length;
+
+        for (let mask = 0; mask < totalMasks; mask++) {
+          if (!(mask & (1 << idxTopo))) continue;
+          const subset = [];
+          for (let i = 0; i < pool.length; i++) {
+            if (mask & (1 << i)) subset.push(pool[i]);
+          }
+          if (subset.length >= 3 && isValidSequenceMeld(subset)) {
+            return true;
+          }
+        }
+
+        // B) Estender jogos existentes na mesa
+        if (team && team.melds && team.melds.length) {
+          const maxExtra = 3;
+          for (const meld of team.melds) {
+            const base = meld;
+            const maxMask2 = 1 << n;
+            for (let mask = 0; mask < maxMask2; mask++) {
+              let extraCount = 0;
+              const subset = base.slice();
+              subset.push(discardTop);
+              for (let i = 0; i < n; i++) {
+                if (mask & (1 << i)) {
+                  subset.push(hand[i]);
+                  extraCount++;
+                }
+              }
+              if (extraCount > maxExtra) continue;
+              if (isValidSequenceMeld(subset)) {
+                return true;
+              }
+            }
+          }
+        }
+
+        return false;
+      }
+
       async function drawFromDiscard() {
         if (!ensureMyTurn()) return;
-        if (state.variant === 'fechado') {
-          showMessage('Modo fechado: não pode comprar do descarte.');
-          return;
-        }
+
         if (state.hasDrawnThisTurn) {
           showMessage('Você já comprou neste turno.');
           return;
@@ -1121,10 +1343,32 @@
           showMessage('Pilha de descarte vazia.');
           return;
         }
-        const c = state.discard.pop();
-        currentPlayer().hand.push(c);
-        sortHand(currentPlayer().hand);
+
+        const top = state.discard[state.discard.length - 1];
+        const me = currentPlayer();
+
+        // Buraco fechado: só pode comprar do descarte se essa carta servir pra jogo imediato
+        if (state.variant === 'fechado') {
+          const canUse = canUseDiscardInClosed(top, me.hand, currentTeam());
+          if (!canUse) {
+            showMessage('Buraco fechado: só pode comprar do descarte se essa carta servir para algum jogo imediato (mão ou mesa).');
+            return;
+          }
+        }
+
+        // 👉 LEVA TODO O DESCARTE PRA MÃO
+        const pile = state.discard.splice(0, state.discard.length); // esvazia o descarte
+        me.hand.push(...pile);
+        sortHand(me.hand);
         state.hasDrawnThisTurn = true;
+
+        // no fechado, continua exigindo usar a carta do topo naquele turno
+        if (state.variant === 'fechado') {
+          state.requiredDiscardCard = { rank: top.rank, suit: top.suit, joker: !!top.joker };
+        } else {
+          state.requiredDiscardCard = null;
+        }
+
         await commitState();
       }
 
@@ -1157,7 +1401,44 @@
         const team = currentTeam();
         if (!team.melds || !team.melds.length) return false;
 
-        // quais jogos podem receber essas cartas mantendo sequência válida?
+        const hand = currentPlayer().hand;
+
+        // Se você clicou em um jogo específico, tenta SÓ nele
+        let forcedIndex = null;
+        if (selectedMeldTarget) {
+          const [teamIdStr, meldIdxStr] = selectedMeldTarget.split(':');
+          const teamIdNum = parseInt(teamIdStr, 10);
+          const meldIdxNum = parseInt(meldIdxStr, 10);
+          if (!Number.isNaN(teamIdNum) && !Number.isNaN(meldIdxNum) && teamIdNum === team.id && team.melds[meldIdxNum]) {
+            forcedIndex = meldIdxNum;
+          }
+        }
+
+        if (forcedIndex !== null) {
+          const targetMeld = team.melds[forcedIndex];
+          const combined = targetMeld.concat(cards);
+
+          if (!isValidSequenceMeld(combined)) {
+            showMessage('Essas cartas não encaixam nesse jogo selecionado.');
+            return false;
+          }
+
+          // move as cartas da mão para o jogo
+          for (const idx of indexes) {
+            targetMeld.push(hand[idx]);
+            hand.splice(idx, 1);
+          }
+
+          normalizeMeldOrder(targetMeld);
+          sortHand(hand);
+          selectedHandIndexes.clear();
+          selectedMeldTarget = null; // limpamos a seleção depois de usar
+          await commitState();
+          showMessage('Cartas encaixadas no jogo selecionado.');
+          return true;
+        }
+
+        // Se você NÃO selecionou jogo, volta pro comportamento automático
         const candidateMeldIndexes = [];
         team.melds.forEach((meld, idx) => {
           const combined = meld.concat(cards);
@@ -1172,16 +1453,13 @@
         }
 
         if (candidateMeldIndexes.length > 1) {
-          // ambíguo: encaixa em mais de um jogo
-          showMessage('Essas cartas encaixariam em mais de um jogo já baixado. Ainda não implementei escolher qual automaticamente.');
+          showMessage('Essas cartas encaixam em mais de um jogo. Clique primeiro no jogo desejado na mesa e tente de novo.');
           return false;
         }
 
         const meldIndex = candidateMeldIndexes[0];
         const teamMeld = team.melds[meldIndex];
-        const hand = currentPlayer().hand;
 
-        // mover as cartas da mão para o jogo (índices já vêm em ordem decrescente)
         for (const idx of indexes) {
           teamMeld.push(hand[idx]);
           hand.splice(idx, 1);
@@ -1190,6 +1468,7 @@
         normalizeMeldOrder(teamMeld);
         sortHand(hand);
         selectedHandIndexes.clear();
+        selectedMeldTarget = null;
         await commitState();
         showMessage('Cartas encaixadas em um jogo já existente.');
         return true;
@@ -1282,12 +1561,26 @@
           showMessage('Compre uma carta antes de descartar.');
           return;
         }
+
+        // Regra especial do fechado: se comprou do descarte, é obrigado a usar essa carta antes de encerrar o turno
+        if (state.variant === 'fechado' && state.requiredDiscardCard) {
+          const must = state.requiredDiscardCard;
+          const stillInHand = currentPlayer().hand.some((c) => c.rank === must.rank && c.suit === must.suit && !!c.joker === !!must.joker);
+          if (stillInHand) {
+            showMessage('Você comprou do descarte neste turno. Use essa carta em um jogo antes de descartar para encerrar o turno.');
+            return;
+          } else {
+            state.requiredDiscardCard = null;
+          }
+        }
+
         const hand = currentPlayer().hand;
         const indexes = Array.from(selectedHandIndexes);
         if (indexes.length !== 1) {
           showMessage('Para descartar, selecione exatamente 1 carta.');
           return;
         }
+
         const index = indexes[0];
         const card = hand.splice(index, 1)[0];
         state.discard.push(card);
@@ -1299,7 +1592,7 @@
 
         // Se acabou a mão e já pegou todos os mortos possíveis, fecha o jogo
         if (hand.length === 0 && taken >= max) {
-          finishGame(teamId);
+          await finishGame(teamId);
           return;
         }
 
@@ -1325,6 +1618,7 @@
           state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
         }
 
+        state.requiredDiscardCard = null;
         state.hasDrawnThisTurn = false;
         await commitState();
       }
@@ -1437,6 +1731,9 @@
         renderHand();
         renderMelds();
         updateButtons();
+
+        const itsMyTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+        document.body.classList.toggle('my-turn', itsMyTurn);
       }
 
       function renderState() {
@@ -1456,8 +1753,8 @@
         } else {
           discardFace.style.display = 'flex';
           if (discardTop.joker) {
-            faceTop.textContent = '★';
-            faceBottom.textContent = '★';
+            faceTop.textContent = 'JOKER';
+            faceBottom.textContent = 'JOKER';
             discardFace.style.color = '#b45309';
           } else {
             faceTop.innerHTML = discardTop.rank + '<br>' + discardTop.suit.toString();
@@ -1469,6 +1766,18 @@
 
         document.getElementById('dead1Count').textContent = state.deadPiles[0].length;
         document.getElementById('dead2Count').textContent = state.deadPiles[1].length;
+
+        const subtitle = document.getElementById('subtitleGameInfo');
+        if (subtitle && state) {
+          let modo;
+          if (state.mode === '1x1') modo = '1 x 1';
+          else if (state.mode === '2x2') modo = '2 x 2';
+          else if (state.mode === '1x2') modo = '1 x 2';
+          else if (state.mode === '1x1_duploMorto') modo = '1 x 1 Humilhação';
+          else modo = state.mode || '';
+          const tipo = state.variant === 'fechado' ? 'Buraco fechado' : 'Buraco aberto';
+          subtitle.textContent = `${modo} · ${tipo} · Sala ${gameId}`;
+        }
 
         if (state.finished) {
           const scores = computeScores();
@@ -1483,10 +1792,10 @@
           div.className = 'carta joker-card';
           const canto = document.createElement('div');
           canto.className = 'carta-canto';
-          canto.innerHTML = '<div>★</div><div>★</div>';
+          canto.innerHTML = '<div>JOKER</div>';
           const icone = document.createElement('div');
           icone.className = 'carta-icone';
-          icone.textContent = '★';
+          icone.textContent = 'J';
           div.appendChild(canto);
           div.appendChild(icone);
         } else {
@@ -1598,9 +1907,9 @@
           const players = state.players.filter((p) => p.teamId === team.id);
           const playersNames = players.map((p) => p.name).join(' & ');
 
-          const meldInfo = computeTeamMeldScore(team);
-          if (idx === 0) t1Score = meldInfo.total;
-          else t2Score = meldInfo.total;
+          const meldScoreInfo = computeTeamMeldScore(team);
+          if (idx === 0) t1Score = meldScoreInfo.total;
+          else t2Score = meldScoreInfo.total;
 
           if (!team.melds.length) {
             const empty = document.createElement('div');
@@ -1618,28 +1927,61 @@
           header.textContent = 'Jogadores: ' + playersNames;
           target.appendChild(header);
 
-          team.melds.forEach((meld, i) => {
+          team.melds.forEach((meld, meldIndex) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'meld-line';
+
+            const meldKey = team.id + ':' + meldIndex;
+            if (selectedMeldTarget === meldKey) {
+              wrapper.classList.add('selected-meld');
+            }
 
             const cardsRow = document.createElement('div');
             cardsRow.className = 'meld-line-cards';
 
+            const info = classifyMeldForUi(meld);
+            const isCanastra = info.kind !== 'simple';
+
+            // cartas da canastra
             meld.forEach((card, indexInMeld) => {
               cardsRow.appendChild(createCardElementMini(card, indexInMeld));
             });
 
-            const hasWild = meld.some(isWildcard);
-            const isCanastra = meld.length >= 7;
+            // se for canastra (7+), vira a última carta para mostrar "fechada"
+            if (isCanastra && meld.length >= 7) {
+              const lastCard = meld[meld.length - 1];
+              const closed = createCardElementMini(lastCard, meld.length - 1);
+              closed.style.transform = 'rotate(90deg)';
+              closed.style.top = '26px';
+              closed.style.zIndex = '20';
+              cardsRow.appendChild(closed);
+            }
 
             const meta = document.createElement('div');
             meta.className = 'meld-meta';
+            meta.textContent = info.base; // "Jogo simples" ou "Canastra"
 
-            if (isCanastra) {
-              meta.textContent = hasWild ? 'Canastra suja (+50)' : 'Canastra limpa (+100)';
-            } else {
-              meta.textContent = 'Jogo simples';
+            if (info.tag) {
+              const tag = document.createElement('span');
+              tag.className = 'meld-tag ' + info.tag.cls;
+              tag.textContent = info.tag.text;
+              meta.appendChild(document.createTextNode(' '));
+              meta.appendChild(tag);
             }
+
+            // 👉 clique no jogo para escolher o alvo do Joker / cartas extras
+            wrapper.addEventListener('click', () => {
+              if (!state || state.finished) return;
+              const key = team.id + ':' + meldIndex;
+              if (selectedMeldTarget === key) {
+                selectedMeldTarget = null; // desmarca se clicar de novo
+                showMessage('Nenhum jogo selecionado.');
+              } else {
+                selectedMeldTarget = key;
+                showMessage('Jogo selecionado. Agora selecione cartas na mão e clique em "Baixar jogo".');
+              }
+              renderMelds(); // redesenha só pra atualizar o destaque
+            });
 
             wrapper.appendChild(cardsRow);
             wrapper.appendChild(meta);
@@ -1687,7 +2029,7 @@
 
         drawStockBtn.disabled = !state || gameOver || state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
 
-        drawDiscardBtn.disabled = !state || gameOver || isClosed || state.hasDrawnThisTurn || !state.discard.length || state.currentPlayer !== myPlayerIndex;
+        drawDiscardBtn.disabled = !state || gameOver || state.hasDrawnThisTurn || !state.discard.length || state.currentPlayer !== myPlayerIndex;
 
         meldBtn.disabled = !state || gameOver || !state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
 
@@ -1715,6 +2057,7 @@
         if (!snap.exists()) {
           state = null;
           selectedHandIndexes.clear();
+          stopTurnTimer();
           document.getElementById('configSection').style.display = 'block';
           document.getElementById('gameSection').style.display = 'none';
           showMessage('Aguardando o Jogador 1 iniciar a partida (ID: ' + gameId + ').');
@@ -1728,6 +2071,7 @@
         document.getElementById('configSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'block';
         renderAll();
+        startTurnTimerIfNeeded();
       });
 
       // UI
