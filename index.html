@@ -258,42 +258,58 @@
         color: #e5e7eb;
       }
 
+      /* MONTE – verso igual ao morto (versão grande) */
       .pile-card {
+        position: relative;
         width: 72px;
         height: 104px;
-        border-radius: 12px;
-        background: linear-gradient(145deg, #b91c1c, #7f1d1d);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
-        position: relative;
-      }
-
-      .pile-card::before,
-      .pile-card::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: 12px;
-        background: linear-gradient(145deg, #991b1b, #7f1d1d);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+        border-radius: 10px;
+        background: radial-gradient(circle at center, #b32222 0%, #8f1919 60%, #5e1010 100%);
+        border: 1px solid #3d0a0a;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.15);
+        overflow: hidden;
       }
 
       .pile-card::before {
-        transform: translate(4px, -4px);
-        opacity: 0.85;
-      }
-
-      .pile-card::after {
-        transform: translate(8px, -8px);
-        opacity: 0.7;
-      }
-
-      .pile-card-inner {
+        content: '';
         position: absolute;
-        inset: 6px;
-        border-radius: 10px;
-        background: radial-gradient(circle at 20% 20%, #1d4ed8 0, #1e3a8a 35%, #1e293b 75%), repeating-linear-gradient(45deg, rgba(248, 250, 252, 0.18) 0, rgba(248, 250, 252, 0.18) 2px, transparent 2px, transparent 4px);
-        border: 2px solid rgba(248, 250, 252, 0.9);
-        box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.75);
+        inset: 8px;
+        border-radius: 8px;
+        background-color: #a01d1d;
+        background-image: linear-gradient(45deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12)),
+          linear-gradient(135deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12));
+        background-size: 10px 10px;
+        background-position: 0 0, 5px 5px;
+        border: 1px solid rgba(255, 223, 150, 0.4);
+        box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+      }
+
+      /* MONTE – verso com a foto */
+      /* .pile-card {
+  position: relative;
+  width: 72px;
+  height: 104px;
+  border-radius: 10px;
+  background: #000; 
+  border: 1px solid #111827;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+
+.pile-card::before {
+  content: '';
+  position: absolute;
+  inset: 4px;                  
+  border-radius: 8px;
+  background-image: url('carta-costas.jpg');  
+  background-position: center;
+  background-repeat: no-repeat;
+} */
+
+      /* Monte com mesma “costa” do morto (sem miolo azul) */
+      .pile-card-inner {
+        display: none;
       }
 
       /* carta da vez do descarte */
@@ -409,8 +425,8 @@
       }
 
       .meld-line {
-        margin-bottom: 4px;
-        padding: 3px 4px 6px;
+        margin-bottom: 10px; /* antes 4px */
+        padding: 5px 6px 8px; /* um pouco mais de ar */
         border-radius: 6px;
         background: rgba(15, 23, 42, 0.95);
         border: 1px solid rgba(31, 41, 55, 0.9);
@@ -476,7 +492,39 @@
       }
 
       #scoreSection {
-        margin-top: 8px;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.9);
+        display: none; /* vira flex quando abrir */
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+      }
+
+      #scorePanel {
+        max-width: 720px;
+        width: 95%;
+      }
+
+      .score-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+
+      .score-line {
+        font-size: 13px;
+        margin-bottom: 4px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(31, 41, 55, 0.9);
+      }
+
+      .score-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 4px;
       }
 
       .score-line {
@@ -509,10 +557,10 @@
         width: 90px;
         height: 140px;
         border-radius: 10px;
-        background: linear-gradient(145deg, #181c28, #212638);
+        background: #f9fafb; /* mesmo fundo da carta de descarte */
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-        color: #f7f7f7;
-        border: 2px solid rgba(255, 255, 255, 0.18);
+        color: #020617; /* texto escuro padrão */
+        border: 2px solid #111827; /* borda escura, igual discard */
         padding: 6px;
         box-sizing: border-box;
         position: relative;
@@ -528,6 +576,12 @@
         border-radius: 8px;
         box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
         cursor: default;
+      }
+
+      .carta.mini.canastra-fechada {
+        transform: rotate(90deg);
+        top: 26px;
+        z-index: 20;
       }
 
       .carta:hover {
@@ -565,7 +619,7 @@
         bottom: 6px;
         right: 6px;
         font-size: 22px;
-        opacity: 0.28;
+        opacity: 1;
         pointer-events: none;
       }
 
@@ -573,45 +627,51 @@
         font-size: 16px;
       }
 
-      .hearts,
-      .diamonds {
-        color: #ff6b8b;
-      }
-      .clubs,
-      .spades {
-        color: #f5f5f5;
+      /* coloca a mesma cor do canto no símbolo grande do meio */
+      .carta.hearts .carta-icone,
+      .carta.diamonds .carta-icone {
+        color: #b91c1c; /* vermelho de carta */
       }
 
-      .carta.hearts {
-        border-color: #ff6b8b;
-        background: radial-gradient(circle at top, #2b1624, #241b2b);
+      .carta.clubs .carta-icone,
+      .carta.spades .carta-icone {
+        color: #020617; /* preto bem escuro */
       }
 
-      .carta.diamonds {
-        border-color: #ffd35b;
-        background: radial-gradient(circle at top, #2b2413, #262018);
-      }
-
-      .carta.clubs {
-        border-color: #6bffb8;
-        background: radial-gradient(circle at top, #13261f, #131f1a);
-      }
-
+      /* cartas usam fundo branco padrão; só um toque leve na borda se quiser */
+      .carta.hearts,
+      .carta.diamonds,
+      .carta.clubs,
       .carta.spades {
-        border-color: #7da2ff;
-        background: radial-gradient(circle at top, #151b2b, #111625);
+        background: #f9fafb;
+        border-color: #111827;
       }
 
       .carta.joker-card {
-        border-color: #fde68a;
-        background: radial-gradient(circle at top, #3b2f1a, #1e1b14);
-        color: #fef9c3;
+        background: #f9fafb; /* branco igual às outras cartas */
+        border-color: #111827; /* borda escura */
+        color: #111827; /* texto escuro */
+      }
+
+      /* canto do JOKER mais “clássico” */
+      .carta.joker-card .carta-canto div:first-child {
+        font-family: 'Georgia', 'Times New Roman', serif;
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+      }
+
+      /* bobo da corte / símbolo central */
+      .carta.joker-card .carta-icone {
+        font-size: 42px;
+        line-height: 1;
       }
 
       /* Pilha de descarte: sem “proteção vermelha” por cima */
       .discard-pile {
         background: transparent;
         box-shadow: none;
+        border: none;
       }
 
       .discard-pile::before,
@@ -663,6 +723,94 @@
       .meld-tag.asas {
         background: #facc15;
         color: #78350f;
+      }
+
+      /* --- ESTILO DOS MORTOS (SIMPLES) --- */
+      .morto-area {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+      }
+
+      .morto-container {
+        position: relative;
+        width: 44px;
+        height: 60px;
+        transition: opacity 0.3s, transform 0.3s;
+      }
+
+      .morto-container.used {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .morto-label {
+        position: absolute;
+        bottom: -16px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 10px;
+        color: #9ca3af;
+        white-space: nowrap;
+      }
+
+      /* --- ESTILO DOS MORTOS (VERSO MELHORADO) --- */
+
+      .morto-card-back {
+        position: absolute;
+        width: 40px;
+        height: 58px;
+        border-radius: 6px;
+        background: radial-gradient(circle at center, #b32222 0%, #8f1919 60%, #5e1010 100%);
+        border: 1px solid #3d0a0a;
+        box-shadow: 0 5px 12px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+
+      .morto-card-back::before {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: 4px;
+        background-color: #a01d1d;
+        background-image: linear-gradient(45deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12)),
+          linear-gradient(135deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12));
+        background-size: 8px 8px;
+        background-position: 0 0, 4px 4px;
+        border: 1px solid rgba(255, 223, 150, 0.4);
+        box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+      }
+
+      .morto-card-back.offset {
+        transform: translate(3px, -3px);
+        z-index: 2;
+        box-shadow: 2px 5px 12px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.15);
+      }
+
+      /* Overlay do placar centralizado */
+      #scoreOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.88);
+        z-index: 2000;
+        display: none;
+        justify-content: center;
+        align-items: flex-start;
+        padding-top: 24px;
+      }
+
+      #scoreOverlay.visible {
+        display: flex;
+      }
+
+      #scorePanel {
+        background: rgba(15, 23, 42, 0.97);
+        border-radius: 12px;
+        padding: 10px 14px;
+        max-width: 600px;
+        width: 100%;
+        margin: 0 auto;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(148, 163, 184, 0.4);
       }
     </style>
   </head>
@@ -765,11 +913,18 @@
               </span>
               <span id="turnTimerLabel" style="margin-left: 8px; font-size: 12px; color: #facc15"></span>
             </div>
-            <div class="board-top-right">
-              Mortos – Equipe 1:
-              <span id="dead1Count"></span>
-              · Equipe 2:
-              <span id="dead2Count"></span>
+            <div class="board-top-right morto-area">
+              <div id="mortoSlot0" class="morto-container">
+                <div class="morto-card-back"></div>
+                <div class="morto-card-back offset"></div>
+                <span class="morto-label">Morto</span>
+              </div>
+
+              <div id="mortoSlot1" class="morto-container">
+                <div class="morto-card-back"></div>
+                <div class="morto-card-back offset"></div>
+                <span class="morto-label">Morto</span>
+              </div>
             </div>
           </div>
 
@@ -886,13 +1041,18 @@
           </div>
         </div>
 
-        <!-- PLACAR FINAL -->
-        <div id="scoreSection" class="section" style="display: none">
-          <div class="section-header">
-            <h2>Placar final</h2>
-            <small>Pontuação da rodada por equipe.</small>
+        <!-- PLACAR FINAL (overlay flutuante) -->
+        <div id="scoreSection" style="display: none">
+          <div id="scorePanel" class="section">
+            <div class="section-header">
+              <h2>Placar final</h2>
+              <small>Resumo da rodada por equipe.</small>
+            </div>
+            <div id="scoreBoard"></div>
+            <div style="text-align: right; margin-top: 8px">
+              <button id="closeScoreBtn">Fechar placar</button>
+            </div>
           </div>
-          <div id="scoreBoard"></div>
         </div>
       </div>
     </div>
@@ -929,6 +1089,7 @@
       const SUITS = ['♣', '♦', '♥', '♠'];
       const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
       const RANKS_SEQ = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+      const RANKS_SEQ_LOW = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
       const DEAD_CHUNK_SIZE = 11;
 
@@ -963,6 +1124,9 @@
 
         // Se ainda não comprou, tenta comprar automaticamente
         if (!state.hasDrawnThisTurn) {
+          if (!state.stock.length) {
+            recycleDeadToStockIfPossible();
+          }
           if (state.stock.length) {
             const c = state.stock.pop();
             const me = currentPlayer();
@@ -982,6 +1146,12 @@
         const hand = me.hand;
         if (!hand.length) {
           await commitState();
+          return;
+        }
+
+        // 🚨 REGRA DO FECHADO: se comprou do descarte, NÃO pode descartar no timeout
+        if (state.variant === 'fechado' && state.requiredDiscardCard) {
+          showMessage('Tempo esgotado, mas você é obrigado a usar a carta do descarte antes de descartar.');
           return;
         }
 
@@ -1022,30 +1192,94 @@
       }
 
       function classifyMeldForUi(meld) {
-        const hasWild = meld.some(isWildcard);
-        if (meld.length < 7) {
+        // Menos de 7 cartas → não é canastra pra fins de rótulo
+        if (!meld || meld.length < 7) {
           return { kind: 'simple', base: 'Jogo simples', tag: null };
         }
 
-        const nonWild = meld.filter((c) => !isWildcard(c));
-        const seqOrder = {};
-        RANKS_SEQ.forEach((r, idx) => (seqOrder[r] = idx));
-        nonWild.sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+        // Qualquer coringa "real" (JOKER ou 2 usado como coringa) deixa a canastra suja
+        const hasWild = hasRealWild(meld);
 
-        const firstRank = nonWild[0]?.rank;
-        const lastRank = nonWild[nonWild.length - 1]?.rank;
-
-        if (!hasWild) {
-          if (firstRank === '2' && lastRank === 'A') {
-            return { kind: 'real', base: 'Canastra', tag: { cls: 'real', text: 'Real' } };
-          }
-          if (lastRank === 'A') {
-            return { kind: 'asas', base: 'Canastra', tag: { cls: 'asas', text: 'Ás a Ás' } };
-          }
-          return { kind: 'limpa', base: 'Canastra', tag: { cls: 'limpa', text: 'Limpa' } };
+        // Ignora só os jokers pra analisar a sequência natural
+        const nonJoker = meld.filter((c) => !c.joker);
+        if (!nonJoker.length) {
+          return { kind: 'simple', base: 'Jogo simples', tag: null };
         }
 
-        return { kind: 'suja', base: 'Canastra', tag: { cls: 'suja', text: 'Suja' } };
+        const orderLow = {};
+        RANKS_SEQ_LOW.forEach((r, idx) => (orderLow[r] = idx)); // A,2,3,...,K
+
+        // Ordena pelas posições em A-2-3-...-K
+        const sorted = nonJoker.slice().sort((a, b) => orderLow[a.rank] - orderLow[b.rank]);
+
+        const ranks = sorted.map((c) => c.rank);
+        const aceCount = ranks.filter((r) => r === 'A').length;
+
+        // Índices únicos pra checar “buracos” na sequência
+        const uniqueIdxs = [...new Set(ranks.map((r) => orderLow[r]))];
+        let contiguous = true;
+        for (let i = 1; i < uniqueIdxs.length; i++) {
+          if (uniqueIdxs[i] !== uniqueIdxs[i - 1] + 1) {
+            contiguous = false;
+            break;
+          }
+        }
+
+        const firstRank = ranks[0];
+        const lastRank = ranks[ranks.length - 1];
+
+        const hasAce = aceCount > 0;
+        const hasKing = ranks.includes('K');
+
+        const isSuja = hasWild;
+
+        // Detecção de Real / Ás-a-Ás só vale se NÃO for suja
+        let isReal = false;
+        let isAsAs = false;
+
+        if (!isSuja && contiguous) {
+          // Ás a Ás: A-2-3-...-K-A (pelo menos 2 ases e cobre até K)
+          if (aceCount >= 2 && firstRank === 'A' && hasKing) {
+            isAsAs = true;
+          } else if (aceCount === 1 && hasAce) {
+            // Canastra Real:
+            //   - A-2-3-...-K (começa em A e termina em K)
+            //   - 2-3-4-...-A (começa em 2 e termina em A)
+            if ((firstRank === 'A' && hasKing) || (firstRank === '2' && lastRank === 'A')) {
+              isReal = true;
+            }
+          }
+        }
+
+        if (!isSuja && contiguous) {
+          if (isAsAs) {
+            return {
+              kind: 'asas',
+              base: 'Canastra',
+              tag: { cls: 'asas', text: 'Ás a Ás' },
+            };
+          }
+          if (isReal) {
+            return {
+              kind: 'real',
+              base: 'Canastra',
+              tag: { cls: 'real', text: 'Real' },
+            };
+          }
+          // Sem coringa, sequência contínua, mas não chegou a Real / Ás-a-Ás → limpa
+          return {
+            kind: 'limpa',
+            base: 'Canastra',
+            tag: { cls: 'limpa', text: 'Limpa' },
+          };
+        }
+
+        // Qualquer caso com coringa real → suja
+        return {
+          kind: 'suja',
+          base: 'Canastra',
+          tag: { cls: 'suja', text: 'Suja' },
+        };
       }
 
       function startTurnTimerIfNeeded() {
@@ -1089,13 +1323,96 @@
         return array;
       }
 
+      function recycleDeadToStockIfPossible() {
+        if (!state || state.stock.length) return false;
+
+        let collected = [];
+        if (state.deadPiles && state.deadPiles.length) {
+          state.deadPiles.forEach((pile, idx) => {
+            if (pile && pile.length) {
+              collected = collected.concat(pile);
+              state.deadPiles[idx] = [];
+              if (state.deadChunksTaken && state.deadChunksMax) {
+                state.deadChunksTaken[idx] = state.deadChunksMax[idx] ?? state.deadChunksTaken[idx];
+              }
+            }
+          });
+        }
+
+        if (!collected.length) return false;
+        shuffle(collected);
+        state.stock = collected;
+        return true;
+      }
+
       function cardLabel(card) {
         if (card.joker) return 'JOKER';
         return card.rank + card.suit;
       }
 
-      function isWildcard(card) {
-        return card.joker || card.rank === '2';
+      // card: carta individual
+      // meld: opcional, o grupo de cartas (jogo) em que ela está sendo usada
+      function isWildcard(card, meld = null) {
+        if (!card) return false;
+
+        // Joker sempre é coringa
+        if (card.joker) return true;
+
+        // Qualquer carta que não seja 2 nunca é coringa
+        if (card.rank !== '2') return false;
+
+        // Se não temos contexto de jogo, considera 2 como coringa
+        if (!meld || !Array.isArray(meld)) {
+          return true;
+        }
+
+        // Regra especial: 2 *real* entre A e 3 do MESMO naipe.
+        // Se no mesmo jogo existir A e 3 do mesmo naipe, o 2 vira número real.
+        const sameSuitRanks = meld.filter((c) => !c.joker && c.suit === card.suit).map((c) => c.rank);
+
+        const hasAce = sameSuitRanks.includes('A');
+        const hasThree = sameSuitRanks.includes('3');
+
+        if (hasAce && hasThree) {
+          // Nesta mesa, esse 2 está claramente sendo usado como "2" (A-2-3),
+          // então não conta como coringa.
+          return false;
+        }
+
+        // Em qualquer outro cenário, o 2 continua sendo coringa.
+        return true;
+      }
+
+      // Pontos individuais das cartas
+      // baixas = 5, altas = 10, Ás = 15
+      // (assumindo 2 = 15 e coringa = 20 – se usar outra tabela,
+      // é só trocar aqui)
+      function cardBasePoints(card) {
+        if (card.joker) return 20; // coringa
+        if (card.rank === 'A' || card.rank === '2') return 15; // Ás e 2
+        if (['3', '4', '5', '6', '7'].includes(card.rank)) return 5; // baixas
+        return 10; // 8,9,10,J,Q,K
+      }
+
+      function hasRealWild(meld) {
+        return meld.some((c) => {
+          // JOKER sempre é coringa
+          if (c.joker) return true;
+
+          // Só nos importamos com o 2
+          if (c.rank !== '2') return false;
+
+          const suit = c.suit;
+          const hasAce = meld.some((x) => !x.joker && x.rank === 'A' && x.suit === suit);
+          const hasThree = meld.some((x) => !x.joker && x.rank === '3' && x.suit === suit);
+
+          // se tiver A e 3 do mesmo naipe, esse 2 está na sequência A-2-3
+          // → NÃO conta como coringa para limpeza/sujeira
+          if (hasAce && hasThree) return false;
+
+          // qualquer outro 2 continua sendo coringa
+          return true;
+        });
       }
 
       function sortHand(hand) {
@@ -1274,8 +1591,13 @@
           return;
         }
         if (!state.stock.length) {
-          showMessage('Monte vazio.');
-          return;
+          // tenta virar os mortos restantes em novo monte
+          if (!recycleDeadToStockIfPossible() || !state.stock.length) {
+            showMessage('Monte vazio e nenhum morto restante para virar monte.');
+            return;
+          } else {
+            showMessage('Monte acabou – o morto restante virou novo monte.');
+          }
         }
         const c = state.stock.pop();
         currentPlayer().hand.push(c);
@@ -1289,13 +1611,13 @@
 
         const n = hand.length;
 
-        // A) Novo jogo com descarte + cartas da mão
+        // A) Novo jogo usando a carta do descarte + cartas da mão
         const pool = hand.concat([discardTop]);
         const idxTopo = pool.length - 1;
         const totalMasks = 1 << pool.length;
 
         for (let mask = 0; mask < totalMasks; mask++) {
-          if (!(mask & (1 << idxTopo))) continue;
+          if (!(mask & (1 << idxTopo))) continue; // tem que usar o topo
           const subset = [];
           for (let i = 0; i < pool.length; i++) {
             if (mask & (1 << i)) subset.push(pool[i]);
@@ -1305,23 +1627,19 @@
           }
         }
 
-        // B) Estender jogos existentes na mesa
+        // B) Estender jogo existente na mesa usando a carta do descarte
         if (team && team.melds && team.melds.length) {
-          const maxExtra = 3;
           for (const meld of team.melds) {
             const base = meld;
             const maxMask2 = 1 << n;
             for (let mask = 0; mask < maxMask2; mask++) {
-              let extraCount = 0;
               const subset = base.slice();
               subset.push(discardTop);
+
               for (let i = 0; i < n; i++) {
-                if (mask & (1 << i)) {
-                  subset.push(hand[i]);
-                  extraCount++;
-                }
+                if (mask & (1 << i)) subset.push(hand[i]);
               }
-              if (extraCount > maxExtra) continue;
+
               if (isValidSequenceMeld(subset)) {
                 return true;
               }
@@ -1347,11 +1665,10 @@
         const top = state.discard[state.discard.length - 1];
         const me = currentPlayer();
 
-        // Buraco fechado: só pode comprar do descarte se essa carta servir pra jogo imediato
         if (state.variant === 'fechado') {
           const canUse = canUseDiscardInClosed(top, me.hand, currentTeam());
           if (!canUse) {
-            showMessage('Buraco fechado: só pode comprar do descarte se essa carta servir para algum jogo imediato (mão ou mesa).');
+            showMessage('Buraco fechado: você só pode comprar do descarte se essa carta servir imediatamente para a mão ou para a mesa.');
             return;
           }
         }
@@ -1373,28 +1690,87 @@
       }
 
       function isValidSequenceMeld(cards) {
-        const nonWild = cards.filter((c) => !isWildcard(c));
+        if (!cards || cards.length < 3) return false;
+
+        // 👉 REGRA DO BURACO NORMAL:
+        // no máximo 1 coringa por jogo (Joker OU 2 usado como coringa)
+        const wildCards = cards.filter((c) => isWildcard(c, cards));
+        if (wildCards.length > 1) {
+          return false;
+        }
+
+        // Remove apenas os que são coringas *no contexto desse jogo*
+        const nonWild = cards.filter((c) => !isWildcard(c, cards));
         if (!nonWild.length) return false;
 
+        // Todos os não-coringa precisam ter o mesmo naipe
         const suit = nonWild[0].suit;
         if (!nonWild.every((c) => c.suit === suit)) return false;
 
-        const seqOrder = {};
-        RANKS_SEQ.forEach((r, idx) => (seqOrder[r] = idx));
+        // Quantos coringas temos disponíveis (Joker + 2 usados como coringa)
+        const availableWilds = cards.length - nonWild.length;
 
-        nonWild.sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+        // Ajuda: converte ranks em índices para um dado "order"
+        function neededWildsForOrder(order, aceMode) {
+          const seqOrder = {};
+          order.forEach((r, idx) => (seqOrder[r] = idx));
 
-        let neededWilds = 0;
-        for (let i = 1; i < nonWild.length; i++) {
-          const diff = seqOrder[nonWild[i].rank] - seqOrder[nonWild[i - 1].rank];
-          if (diff <= 0) return false;
-          if (diff > 1) neededWilds += diff - 1;
+          // Ordena os não-coringa pela sequência escolhida
+          const sorted = nonWild.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+
+          // Regra do Ás: não pode ficar no meio
+          const acePosInOrder = seqOrder['A'];
+          const aceIndex = sorted.findIndex((c) => c.rank === 'A');
+          if (aceIndex !== -1) {
+            // aceMode 'high' => Ás só no topo da sequência
+            if (aceMode === 'high' && aceIndex !== sorted.length - 1) {
+              return null;
+            }
+            // aceMode 'low' => Ás só na base da sequência
+            if (aceMode === 'low' && aceIndex !== 0) {
+              return null;
+            }
+            // aceMode 'none' => proibido Ás nesse modo
+            if (aceMode === 'none') {
+              return null;
+            }
+          }
+
+          // Conta buracos entre cartas não-coringa
+          let needed = 0;
+          for (let i = 1; i < sorted.length; i++) {
+            const prevRank = sorted[i - 1].rank;
+            const currRank = sorted[i].rank;
+
+            const prevIdx = seqOrder[prevRank];
+            const currIdx = seqOrder[currRank];
+
+            if (prevIdx == null || currIdx == null) return null;
+
+            const diff = currIdx - prevIdx;
+
+            if (diff === 0) return null; // repetiu rank (ex.: 5 5)
+            if (diff < 0) return null; // voltou na sequência (não é crescente)
+
+            // Se tem gap, precisa de (diff - 1) coringas
+            if (diff > 1) {
+              needed += diff - 1;
+            }
+          }
+
+          return needed;
         }
 
-        const availableWilds = cards.length - nonWild.length;
-        if (availableWilds < neededWilds) return false;
+        // Tenta modo Ás alto (2 3 ... K A)
+        const needHigh = neededWildsForOrder(RANKS_SEQ, 'high');
 
-        return true;
+        // Tenta modo Ás baixo (A 2 3 ... K)
+        const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low');
+
+        const okHigh = needHigh !== null && needHigh <= availableWilds;
+        const okLow = needLow !== null && needLow <= availableWilds;
+
+        return okHigh || okLow;
       }
 
       async function attemptExtendExistingMeld(cards, indexes) {
@@ -1562,12 +1938,11 @@
           return;
         }
 
-        // Regra especial do fechado: se comprou do descarte, é obrigado a usar essa carta antes de encerrar o turno
         if (state.variant === 'fechado' && state.requiredDiscardCard) {
           const must = state.requiredDiscardCard;
           const stillInHand = currentPlayer().hand.some((c) => c.rank === must.rank && c.suit === must.suit && !!c.joker === !!must.joker);
           if (stillInHand) {
-            showMessage('Você comprou do descarte neste turno. Use essa carta em um jogo antes de descartar para encerrar o turno.');
+            showMessage('Você comprou do descarte neste turno (' + cardLabel(must) + '). Use essa carta em um jogo antes de descartar para encerrar o turno.');
             return;
           } else {
             state.requiredDiscardCard = null;
@@ -1590,31 +1965,24 @@
         const taken = state.deadChunksTaken?.[teamId] ?? 0;
         const max = state.deadChunksMax?.[teamId] ?? 1;
 
-        // Se acabou a mão e já pegou todos os mortos possíveis, fecha o jogo
         if (hand.length === 0 && taken >= max) {
           await finishGame(teamId);
           return;
         }
 
-        // Regras de passar a vez
         if (state.mode === '1x1_duploMorto') {
-          // Jogador 2 sempre joga duas seguidas
           if (state.currentPlayer === 1) {
             if (!state.j2ConsecutiveTurns || state.j2ConsecutiveTurns === 0) {
-              // primeiro turno do "pacote" do J2 -> ele joga de novo
               state.j2ConsecutiveTurns = 1;
             } else {
-              // já jogou duas, volta pro J1
               state.currentPlayer = 0;
               state.j2ConsecutiveTurns = 0;
             }
           } else {
-            // J1 -> sempre passa para J2, resetando o ciclo dele
             state.currentPlayer = 1;
             state.j2ConsecutiveTurns = 0;
           }
         } else {
-          // modos normais
           state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
         }
 
@@ -1624,97 +1992,232 @@
       }
 
       function computeTeamMeldScore(team) {
-        let meldPoints = 0;
-        let cleanBonus = 0;
-        let dirtyBonus = 0;
+        let meldPoints = 0; // soma dos pontos das cartas baixadas
+        let sujaBonus = 0; // canastras sujas  = +100
+        let limpaBonus = 0; // canastras limpas = +200
+        let realBonus = 0; // canastras reais  = +500
+        let asasBonus = 0; // Ás a Ás          = +1000
+
+        if (!team || !team.melds) {
+          return {
+            meldPoints: 0,
+            sujaBonus: 0,
+            limpaBonus: 0,
+            realBonus: 0,
+            asasBonus: 0,
+            total: 0,
+          };
+        }
 
         team.melds.forEach((meld) => {
-          meldPoints += meld.length * 10;
-          const hasWild = meld.some(isWildcard);
+          // pontos das cartas do jogo
+          for (const card of meld) {
+            meldPoints += cardBasePoints(card);
+          }
+
+          // bônus de canastra (mínimo 7 cartas)
           if (meld.length >= 7) {
-            if (hasWild) dirtyBonus += 50;
-            else cleanBonus += 100;
+            const info = classifyMeldForUi(meld);
+            switch (info.kind) {
+              case 'suja':
+                sujaBonus += 100;
+                break;
+              case 'limpa':
+                limpaBonus += 200;
+                break;
+              case 'real':
+                realBonus += 500;
+                break;
+              case 'asas':
+                asasBonus += 1000;
+                break;
+            }
           }
         });
 
+        const total = meldPoints + sujaBonus + limpaBonus + realBonus + asasBonus;
+
         return {
           meldPoints,
-          cleanBonus,
-          dirtyBonus,
-          total: meldPoints + cleanBonus + dirtyBonus,
+          sujaBonus,
+          limpaBonus,
+          realBonus,
+          asasBonus,
+          total,
         };
       }
 
       function normalizeMeldOrder(meld) {
         if (!meld || !meld.length) return;
 
-        const nonWild = meld.filter((c) => !isWildcard(c));
-        const wild = meld.filter((c) => isWildcard(c));
+        // Usa o contexto do próprio jogo pra decidir se o 2 é coringa ou não
+        const nonWild = meld.filter((c) => !isWildcard(c, meld));
+        const wild = meld.filter((c) => isWildcard(c, meld));
 
+        // Só tem coringa? Mantém tudo junto
         if (!nonWild.length) {
-          // só curingas: tanto faz, mas mantém todos juntos
           meld.splice(0, meld.length, ...wild);
           return;
         }
 
+        const availableWilds = wild.length;
+
+        // Mesma ideia do isValidSequenceMeld: vê quantos curingas precisa
+        function neededWildsForOrder(order, aceMode) {
+          const seqOrder = {};
+          order.forEach((r, idx) => (seqOrder[r] = idx));
+
+          // Ordena as cartas naturais na ordem escolhida
+          const sorted = nonWild.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+
+          // Regra do Ás: nunca no meio da sequência
+          const aceIndex = sorted.findIndex((c) => c.rank === 'A');
+          if (aceIndex !== -1) {
+            if (aceMode === 'high' && aceIndex !== sorted.length - 1) {
+              return null; // Ás alto tem que ser o último
+            }
+            if (aceMode === 'low' && aceIndex !== 0) {
+              return null; // Ás baixo tem que ser o primeiro
+            }
+            if (aceMode === 'none') {
+              return null;
+            }
+          }
+
+          // Conta buracos entre cartas não-coringa
+          let needed = 0;
+          for (let i = 1; i < sorted.length; i++) {
+            const prevRank = sorted[i - 1].rank;
+            const currRank = sorted[i].rank;
+
+            const prevIdx = seqOrder[prevRank];
+            const currIdx = seqOrder[currRank];
+
+            if (prevIdx == null || currIdx == null) return null;
+
+            const diff = currIdx - prevIdx;
+
+            if (diff === 0) return null; // rank repetido
+            if (diff < 0) return null; // voltou na sequência
+
+            // se tem gap, precisa de (diff - 1) curingas
+            if (diff > 1) {
+              needed += diff - 1;
+            }
+          }
+
+          return needed;
+        }
+
+        // Testa as duas ordens possíveis
+        const needHigh = neededWildsForOrder(RANKS_SEQ, 'high'); // 2 3 ... K A
+        const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low'); // A 2 3 ... K
+
+        const okHigh = needHigh !== null && needHigh <= availableWilds;
+        const okLow = needLow !== null && needLow <= availableWilds;
+
+        let order;
+        let aceMode;
+
+        if (okHigh && okLow) {
+          // Se as duas funcionam, pega a que usa MENOS curingas
+          if (needHigh <= needLow) {
+            order = RANKS_SEQ;
+            aceMode = 'high';
+          } else {
+            order = RANKS_SEQ_LOW;
+            aceMode = 'low';
+          }
+        } else if (okHigh) {
+          order = RANKS_SEQ;
+          aceMode = 'high';
+        } else if (okLow) {
+          order = RANKS_SEQ_LOW;
+          aceMode = 'low';
+        } else {
+          // Se por algum motivo não encaixar em nenhuma, não mexe na ordem
+          return;
+        }
+
         const seqOrder = {};
-        RANKS_SEQ.forEach((r, idx) => (seqOrder[r] = idx));
+        order.forEach((r, idx) => (seqOrder[r] = idx));
 
-        // ordena as cartas normais pela nossa ordem de sequência
-        nonWild.sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+        // Ordena só as cartas naturais
+        const sortedNonWild = nonWild.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
 
-        const result = [];
+        const middle = [];
+        const wildQueue = [...wild];
 
-        // tenta “preencher” gaps entre cartas com curingas
-        for (let i = 0; i < nonWild.length; i++) {
-          result.push(nonWild[i]);
+        // Monta sequência preenchendo os buracos com curingas
+        for (let i = 0; i < sortedNonWild.length; i++) {
+          const curr = sortedNonWild[i];
+          middle.push(curr);
 
-          if (i < nonWild.length - 1) {
-            const curr = nonWild[i];
-            const next = nonWild[i + 1];
+          if (i < sortedNonWild.length - 1) {
+            const next = sortedNonWild[i + 1];
             const diff = seqOrder[next.rank] - seqOrder[curr.rank];
 
-            // se tem buraco (ex: 7 … 10), joga curingas ali visualmente
             let gap = diff - 1;
-            while (gap > 0 && wild.length) {
-              result.push(wild.shift());
+            while (gap > 0 && wildQueue.length) {
+              middle.push(wildQueue.shift());
               gap--;
             }
           }
         }
 
-        // se sobraram curingas, põe nas pontas (visual)
-        while (wild.length) {
-          result.push(wild.shift());
+        // Curingas que sobraram vão pro lado “aberto” da sequência:
+        // - Ás alto: curingas antes (ex.: 2 Q K A)
+        // - Ás baixo: curingas depois (ex.: A 2 3 4 JOKER)
+        const prefix = [];
+        const suffix = [];
+
+        if (aceMode === 'high') {
+          while (wildQueue.length) {
+            prefix.push(wildQueue.shift());
+          }
+        } else {
+          while (wildQueue.length) {
+            suffix.push(wildQueue.shift());
+          }
         }
 
-        // substitui o conteúdo da meld mantendo a mesma referência
-        meld.splice(0, meld.length, ...result);
+        const finalMeld = [...prefix, ...middle, ...suffix];
+
+        // substitui mantendo a mesma referência
+        meld.splice(0, meld.length, ...finalMeld);
       }
 
       function computeScores() {
         const results = [];
+
         state.teams.forEach((team) => {
           const players = state.players.filter((p) => p.teamId === team.id);
 
+          // penalidade: pontos das cartas que ficaram na mão
           let handPenalty = 0;
           players.forEach((p) => {
-            handPenalty += p.hand.length * 10;
+            p.hand.forEach((card) => {
+              handPenalty += cardBasePoints(card);
+            });
           });
 
           const meldInfo = computeTeamMeldScore(team);
 
-          const score = -handPenalty + meldInfo.meldPoints + meldInfo.cleanBonus + meldInfo.dirtyBonus;
+          const score = meldInfo.total - handPenalty;
+
           results.push({
             team,
             players,
             score,
             handPenalty,
             meldPoints: meldInfo.meldPoints,
-            cleanBonus: meldInfo.cleanBonus,
-            dirtyBonus: meldInfo.dirtyBonus,
+            sujaBonus: meldInfo.sujaBonus,
+            limpaBonus: meldInfo.limpaBonus,
+            realBonus: meldInfo.realBonus,
+            asasBonus: meldInfo.asasBonus,
           });
         });
+
         return results;
       }
 
@@ -1764,8 +2267,48 @@
           }
         }
 
-        document.getElementById('dead1Count').textContent = state.deadPiles[0].length;
-        document.getElementById('dead2Count').textContent = state.deadPiles[1].length;
+        // document.getElementById('dead1Count').textContent = state.deadPiles[0].length;
+        // document.getElementById('dead2Count').textContent = state.deadPiles[1].length;
+
+        // --- LÓGICA VISUAL DOS MORTOS ---
+        // Slot 0 representa o morto da Equipe 1 (ou J1)
+        // Slot 1 representa o morto da Equipe 2 (ou J2/Dupla)
+
+        const slot0 = document.getElementById('mortoSlot0');
+        const slot1 = document.getElementById('mortoSlot1');
+
+        if (state.deadPiles && state.deadPiles.length >= 2) {
+          // Verifica morto da equipe 1
+          if (state.deadPiles[0].length === 0) {
+            slot0.classList.add('used');
+          } else {
+            slot0.classList.remove('used');
+            // Opcional: mostrar quantas cartas tem no tooltip
+            slot0.title = state.deadPiles[0].length + ' cartas';
+          }
+
+          // Verifica morto da equipe 2
+          if (state.deadPiles[1].length === 0) {
+            slot1.classList.add('used');
+          } else {
+            slot1.classList.remove('used');
+            slot1.title = state.deadPiles[1].length + ' cartas';
+          }
+        }
+
+        // Se o array do morto estiver vazio, adiciona a classe .used (some)
+        // Se tiver cartas, remove a classe .used (aparece)
+        // if (state.deadPiles[0].length === 0) {
+        //   m1Container.classList.add('used');
+        // } else {
+        //   m1Container.classList.remove('used');
+        // }
+
+        // if (state.deadPiles[1].length === 0) {
+        //   m2Container.classList.add('used');
+        // } else {
+        //   m2Container.classList.remove('used');
+        // }
 
         const subtitle = document.getElementById('subtitleGameInfo');
         if (subtitle && state) {
@@ -1790,12 +2333,15 @@
 
         if (card.joker) {
           div.className = 'carta joker-card';
+
           const canto = document.createElement('div');
           canto.className = 'carta-canto';
           canto.innerHTML = '<div>JOKER</div>';
+
           const icone = document.createElement('div');
           icone.className = 'carta-icone';
-          icone.textContent = 'J';
+          icone.textContent = '🃏'; // bobo da corte no centro
+
           div.appendChild(canto);
           div.appendChild(icone);
         } else {
@@ -1842,12 +2388,15 @@
 
         if (card.joker) {
           div.className = 'carta mini joker-card';
+
           const canto = document.createElement('div');
           canto.className = 'carta-canto';
-          canto.innerHTML = '<div>★</div><div>★</div>';
+          canto.innerHTML = '<div>JOKER</div>';
+
           const icone = document.createElement('div');
           icone.className = 'carta-icone';
-          icone.textContent = '★';
+          icone.textContent = '🃏';
+
           div.appendChild(canto);
           div.appendChild(icone);
         } else {
@@ -1869,7 +2418,7 @@
         }
 
         div.style.position = 'absolute';
-        div.style.left = 12 * indexInMeld + 'px';
+        div.style.left = 20 * indexInMeld + 'px';
 
         return div;
       }
@@ -1941,16 +2490,18 @@
 
             const info = classifyMeldForUi(meld);
             const isCanastra = info.kind !== 'simple';
+            const baseLen = meld.length;
 
-            // cartas da canastra
+            // desenha as cartas; se for canastra, NÃO desenha a última em pé
             meld.forEach((card, indexInMeld) => {
+              if (isCanastra && indexInMeld === baseLen - 1) return;
               cardsRow.appendChild(createCardElementMini(card, indexInMeld));
             });
 
-            // se for canastra (7+), vira a última carta para mostrar "fechada"
-            if (isCanastra && meld.length >= 7) {
-              const lastCard = meld[meld.length - 1];
-              const closed = createCardElementMini(lastCard, meld.length - 1);
+            // se for canastra (7+), desenha só a última deitada
+            if (isCanastra && baseLen >= 7) {
+              const lastCard = meld[baseLen - 1];
+              const closed = createCardElementMini(lastCard, baseLen - 1);
               closed.style.transform = 'rotate(90deg)';
               closed.style.top = '26px';
               closed.style.zIndex = '20';
@@ -1959,7 +2510,7 @@
 
             const meta = document.createElement('div');
             meta.className = 'meld-meta';
-            meta.textContent = info.base; // "Jogo simples" ou "Canastra"
+            meta.textContent = info.base;
 
             if (info.tag) {
               const tag = document.createElement('span');
@@ -1969,18 +2520,17 @@
               meta.appendChild(tag);
             }
 
-            // 👉 clique no jogo para escolher o alvo do Joker / cartas extras
             wrapper.addEventListener('click', () => {
               if (!state || state.finished) return;
               const key = team.id + ':' + meldIndex;
               if (selectedMeldTarget === key) {
-                selectedMeldTarget = null; // desmarca se clicar de novo
+                selectedMeldTarget = null;
                 showMessage('Nenhum jogo selecionado.');
               } else {
                 selectedMeldTarget = key;
                 showMessage('Jogo selecionado. Agora selecione cartas na mão e clique em "Baixar jogo".');
               }
-              renderMelds(); // redesenha só pra atualizar o destaque
+              renderMelds();
             });
 
             wrapper.appendChild(cardsRow);
@@ -2000,17 +2550,35 @@
         board.innerHTML = '';
 
         scores.sort((a, b) => b.score - a.score);
+
         scores.forEach((entry) => {
           const div = document.createElement('div');
           div.className = 'score-line';
+
           const crown = winnerTeamId !== null && entry.team.id === winnerTeamId ? ' 👑' : '';
           const teamName = entry.team.name || 'Equipe ' + (entry.team.id + 1);
           const playersNames = entry.players.map((p) => p.name).join(' & ');
 
           div.innerHTML = '<strong>' + teamName + '</strong>' + crown + ' — ' + entry.score + ' pts';
+
           const meta = document.createElement('div');
           meta.className = 'score-meta';
-          meta.textContent = 'Jogadores: ' + playersNames + ' · Jogos: +' + entry.meldPoints + ' · Mão: -' + entry.handPenalty + ' · Canastras limpas: +' + entry.cleanBonus + ' · Canastras sujas: +' + entry.dirtyBonus;
+          meta.textContent =
+            'Jogadores: ' +
+            playersNames +
+            ' · Jogos (cartas baixadas): +' +
+            entry.meldPoints +
+            ' · Mão: -' +
+            entry.handPenalty +
+            ' · Canastras sujas: +' +
+            entry.sujaBonus +
+            ' · Canastras limpas: +' +
+            entry.limpaBonus +
+            ' · Reais: +' +
+            entry.realBonus +
+            ' · Ás a Ás: +' +
+            entry.asasBonus;
+
           div.appendChild(meta);
           board.appendChild(div);
         });
@@ -2052,6 +2620,150 @@
         const el = document.getElementById('message');
         if (el) el.textContent = text || '';
       }
+
+      // ==========================
+      // MODO TESTE / DEBUG
+      // ==========================
+      window.debugScoreExample = function () {
+        // sempre testar como Jogador 1
+        myPlayerIndex = 0;
+
+        const C = (rank, suit, joker = false) => ({ rank, suit, joker });
+
+        // monta um state COMPLETO só em memória, sem Firebase
+        state = {
+          mode: '1x1',
+          variant: 'fechado',
+          players: [
+            { id: 0, name: 'Jogador 1', teamId: 0, hand: [] },
+            { id: 1, name: 'Jogador 2', teamId: 1, hand: [] },
+          ],
+          teams: [
+            { id: 0, name: 'Equipe 1', playerIndexes: [0], melds: [] },
+            { id: 1, name: 'Equipe 2', playerIndexes: [1], melds: [] },
+          ],
+          currentPlayer: 0,
+          stock: [],
+          discard: [],
+          deadPiles: [[], []],
+          deadChunksTaken: [1, 1],
+          deadChunksMax: [1, 1],
+          hasDrawnThisTurn: true,
+          finished: true, // já marca como fim de jogo
+          winnerTeamId: 0, // vitória da equipe 1
+          j2ConsecutiveTurns: 0,
+          requiredDiscardCard: null,
+        };
+
+        const t1 = state.teams[0].melds;
+        const t2 = state.teams[1].melds;
+
+        // ---------- EQUIPE 1 ----------
+
+        // 1) Canastra REAL (2 ... A do mesmo naipe, sem coringa)
+        t1.push([C('A', '♣'), C('2', '♣'), C('3', '♣'), C('4', '♣'), C('5', '♣'), C('6', '♣'), C('7', '♣'), C('8', '♣'), C('9', '♣'), C('10', '♣'), C('J', '♣'), C('Q', '♣'), C('K', '♣')]);
+
+        // 2) Canastra ÁS A ÁS (começa e termina com Ás)
+        t1.push([C('A', '♦'), C('2', '♦'), C('3', '♦'), C('4', '♦'), C('5', '♦'), C('6', '♦'), C('7', '♦'), C('8', '♦'), C('9', '♦'), C('10', '♦'), C('J', '♦'), C('Q', '♦'), C('K', '♦'), C('A', '♦')]);
+
+        // 3) Canastra LIMPA (sem coringa, sem Ás no topo)
+        t1.push([C('4', '♥'), C('5', '♥'), C('6', '♥'), C('7', '♥'), C('8', '♥'), C('9', '♥'), C('10', '♥')]);
+
+        // ---------- EQUIPE 2 ----------
+
+        // 4) Canastra SUJA (com coringa no meio)
+        t2.push([C('5', '♠'), C('6', '♠'), C('7', '♠'), C('JOKER', '★', true), C('9', '♠'), C('10', '♠'), C('J', '♠')]);
+
+        // ninguém com carta na mão
+        state.players[0].hand = [];
+        state.players[1].hand = [];
+
+        // limpa seleções
+        selectedHandIndexes.clear();
+        selectedMeldTarget = null;
+
+        // renderiza tudo e já força o placar
+        renderAll();
+        const scores = computeScores();
+        renderScores(scores, state.winnerTeamId);
+
+        showMessage('DEBUG: exemplo com canastra real, Ás a Ás, limpa e suja.');
+      };
+
+      // =====================================================
+      // MODO TESTE 2: playground para sequências e coringas
+      // =====================================================
+      window.debugSequenciasCoringas = function () {
+        // garante que você é o Jogador 1
+        myPlayerIndex = 0;
+
+        const C = (rank, suit, joker = false) => ({ rank, suit, joker });
+
+        // state completo, mas jogo NÃO terminado
+        state = {
+          mode: '1x1',
+          variant: 'fechado',
+          players: [
+            { id: 0, name: 'Jogador 1', teamId: 0, hand: [] },
+            { id: 1, name: 'Jogador 2', teamId: 1, hand: [] },
+          ],
+          teams: [
+            { id: 0, name: 'Equipe 1', playerIndexes: [0], melds: [] },
+            { id: 1, name: 'Equipe 2', playerIndexes: [1], melds: [] },
+          ],
+          currentPlayer: 0,
+          stock: [], // pode deixar vazio, foco é mexer nos jogos
+          discard: [], // se quiser testar compra do descarte, põe carta aqui
+          deadPiles: [[], []],
+          deadChunksTaken: [0, 0],
+          deadChunksMax: [1, 1],
+          hasDrawnThisTurn: true, // já “comprou”, pode só baixar / mexer jogo
+          finished: false, // <<< NÃO terminou
+          winnerTeamId: null,
+          j2ConsecutiveTurns: 0,
+          requiredDiscardCard: null,
+        };
+
+        const t1 = state.teams[0].melds;
+        const t2 = state.teams[1].melds;
+
+        // ---------------- EQUIPE 1 (seus jogos) ----------------
+
+        // 1) A♣ 2♣ 3♣ 4♣ 5♣ 6♣ 7♣  -> 2 NÃO é coringa aqui (A-2-3)
+        t1.push([C('A', '♣'), C('2', '♣'), C('3', '♣'), C('4', '♣'), C('5', '♣'), C('6', '♣'), C('7', '♣')]);
+
+        // 2) A♥ JOKER 3♥ 4♥ 5♥ -> buraco A–3 preenchido por coringa (suja)
+        t1.push([C('A', '♥'), C('JOKER', '★', true), C('3', '♥'), C('4', '♥'), C('5', '♥')]);
+
+        // 3) 8♦ 9♦ JOKER J♦ Q♦ -> coringa no meio de sequência normal
+        t1.push([C('8', '♦'), C('9', '♦'), C('JOKER', '★', true), C('J', '♦'), C('Q', '♦')]);
+
+        // 4) Q♠ K♠ A♠ -> sequência com Ás alto
+        t1.push([C('Q', '♠'), C('K', '♠'), C('A', '♠')]);
+
+        // ---------------- EQUIPE 2 (referência) ----------------
+
+        // 5) 4♠ 5♠ 6♠ 7♠ 8♠ 9♠ 10♠ -> canastra limpa simples pra comparar
+        t2.push([C('4', '♠'), C('5', '♠'), C('6', '♠'), C('7', '♠'), C('8', '♠'), C('9', '♠'), C('10', '♠')]);
+
+        // 6) A♦ 2♦ 3♦ 4♦ 5♦ 6♦ 7♦ 8♦ 9♦ 10♦ (Ace baixo com 2 no meio)
+        t2.push([C('A', '♦'), C('2', '♦'), C('3', '♦'), C('4', '♦'), C('5', '♦'), C('6', '♦'), C('7', '♦'), C('8', '♦'), C('9', '♦'), C('10', '♦')]);
+
+        // ---------------- CARTAS NA MÃO ----------------
+
+        // Sua mão: vários 2 e coringas pra você brincar de mover
+        state.players[0].hand = [C('2', '♥'), C('2', '♠'), C('2', '♦'), C('JOKER', '★', true), C('5', '♣'), C('K', '♦'), C('A', '♣')];
+
+        // mão do jogador 2 só pra não ficar vazia
+        state.players[1].hand = [C('7', '♠'), C('8', '♠'), C('9', '♠')];
+
+        // limpa seleções
+        selectedHandIndexes.clear();
+        selectedMeldTarget = null;
+
+        renderAll();
+        showMessage('DEBUG: playground de sequências e coringas carregado.');
+      };
 
       onSnapshot(gameRef, (snap) => {
         if (!snap.exists()) {
@@ -2118,6 +2830,15 @@
         document.getElementById('gameSection').style.display = 'none';
         showMessage('Jogo encerrado. Configure uma nova partida.');
       });
+
+      // Botão para fechar o placar final (overlay)
+      const closeScoreBtn = document.getElementById('closeScoreBtn');
+      if (closeScoreBtn) {
+        closeScoreBtn.addEventListener('click', () => {
+          const overlay = document.getElementById('scoreSection');
+          if (overlay) overlay.style.display = 'none';
+        });
+      }
     </script>
   </body>
 </html>
