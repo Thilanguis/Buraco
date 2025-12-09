@@ -96,6 +96,15 @@
         border: 1px solid var(--border-soft);
       }
 
+      /* Seção de ações + mão encaixada na mesa verde */
+      .section-inline-board {
+        background: transparent;
+        box-shadow: none;
+        padding: 8px 10px 0;
+        margin-top: -6px;
+        border-radius: 0 0 18px 18px;
+      }
+
       .section-header {
         display: flex;
         align-items: baseline;
@@ -196,11 +205,38 @@
 
       .board {
         background: radial-gradient(circle at top, #1a8c4a 0, #10713c 40%, #055030 80%);
-        border-radius: 18px;
-        padding: 10px 16px 14px;
-        border: 2px solid rgba(15, 23, 42, 0.7);
-        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.4);
-        margin-bottom: 10px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative; /* <-- SE NÃO TIVER, ADICIONA ESSA LINHA */
+        padding: 10px;
+        box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+      }
+
+      /* essas três partes não podem encolher */
+      .board-top,
+      .board-middle,
+      .board-bottom {
+        flex-shrink: 0;
+      }
+
+      /* área dos jogos das equipes: scroll vertical interno */
+      .board-melds {
+        margin-top: 10px;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      /* scrollbar fininha dentro da mesa */
+      .board-melds::-webkit-scrollbar {
+        width: 6px;
+      }
+      .board-melds::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.55);
+        border-radius: 999px;
       }
 
       .board-top {
@@ -416,20 +452,37 @@
         gap: 6px;
       }
 
+      /* container de todos os jogos da equipe */
       .meld-container {
+        margin-top: 4px;
         border-radius: 10px;
-        padding: 6px 8px;
-        background: rgba(15, 23, 42, 0.85);
-        border: 1px dashed rgba(148, 163, 184, 0.5);
-        min-height: 36px;
+        padding: 6px;
+        background: rgba(15, 23, 42, 0.82);
+        border: 1px dashed rgba(148, 163, 184, 0.4);
+
+        /* NOVO: jogos lado a lado */
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-content: flex-start;
       }
 
+      /* cada jogo individual */
       .meld-line {
-        margin-bottom: 10px; /* antes 4px */
-        padding: 5px 6px 8px; /* um pouco mais de ar */
-        border-radius: 6px;
+        margin: 0;
+        padding: 4px;
+        border-radius: 8px;
         background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(31, 41, 55, 0.9);
+        border: 1px solid rgba(15, 23, 42, 0.9);
+
+        flex: 0 1 auto; /* bloco compacto que ocupa só o necessário */
+        min-width: 140px; /* largura mínima pra canastra ficar bonita */
+      }
+
+      /* trilho onde as mini-cartas são empilhadas (position:absolute no JS) */
+      .meld-line-cards {
+        position: relative;
+        height: 70px; /* menor pra não “engolir” espaço vertical */
       }
 
       .meld-line.selected-meld {
@@ -437,15 +490,11 @@
         box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.8);
       }
 
-      .meld-line-cards {
-        position: relative;
-        height: 88px;
-      }
-
       .meld-meta {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 2px;
+        font-size: 9px;
+        color: #ccc;
+        margin-top: 10px; /* dá espaço pro “fechada” não encostar */
+        text-align: center;
       }
 
       .hand-header {
@@ -570,17 +619,18 @@
       }
 
       .carta.mini {
-        width: 54px;
-        height: 84px;
-        padding: 4px;
-        border-radius: 8px;
-        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+        width: 40px;
+        height: 64px;
+        padding: 3px;
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
         cursor: default;
       }
 
+      /* última carta girada pra marcar canastra fechada */
       .carta.mini.canastra-fechada {
         transform: rotate(90deg);
-        top: 26px;
+        top: 22px;
         z-index: 20;
       }
 
@@ -627,24 +677,30 @@
         font-size: 16px;
       }
 
-      /* coloca a mesma cor do canto no símbolo grande do meio */
-      .carta.hearts .carta-icone,
-      .carta.diamonds .carta-icone {
-        color: #b91c1c; /* vermelho de carta */
-      }
+      /* --- CORREÇÃO DE CORES DOS NAIPES --- */
 
-      .carta.clubs .carta-icone,
-      .carta.spades .carta-icone {
-        color: #020617; /* preto bem escuro */
-      }
-
-      /* cartas usam fundo branco padrão; só um toque leve na borda se quiser */
+      /* Copas e Ouros: TUDO Vermelho (Texto do canto + Ícone) */
       .carta.hearts,
-      .carta.diamonds,
-      .carta.clubs,
-      .carta.spades {
+      .carta.diamonds {
+        color: #b91c1c; /* Vermelho escuro padrão */
         background: #f9fafb;
         border-color: #111827;
+      }
+
+      /* Paus e Espadas: TUDO Preto (Texto do canto + Ícone) */
+      .carta.clubs,
+      .carta.spades {
+        color: #020617; /* Preto */
+        background: #f9fafb;
+        border-color: #111827;
+      }
+
+      /* Se quiser garantir que o ícone herde a cor (embora o código acima já resolva) */
+      .carta.hearts .carta-icone,
+      .carta.diamonds .carta-icone,
+      .carta.clubs .carta-icone,
+      .carta.spades .carta-icone {
+        color: inherit;
       }
 
       .carta.joker-card {
@@ -767,6 +823,101 @@
         overflow: hidden;
       }
 
+      /* ======================
+   MÃOS DOS OUTROS JOGADORES
+   ====================== */
+
+      .opponent-hand {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        pointer-events: none; /* não atrapalha clique na mesa */
+        font-size: 10px;
+        color: #e5e7eb;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      }
+
+      .opponent-hand-top {
+        top: 32px; /* antes 64 – sobe a barra */
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      /* lados (para 3 e 4 jogadores) */
+      .opponent-hand-left,
+      .opponent-hand-right {
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .opponent-hand-left {
+        left: 10px;
+        align-items: flex-start;
+      }
+
+      .opponent-hand-right {
+        right: 10px;
+        align-items: flex-end;
+      }
+
+      .opponent-label {
+        font-size: 11px;
+        opacity: 0.8;
+        background: rgba(15, 23, 42, 0.9);
+        padding: 2px 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+      }
+
+      .opponent-cards {
+        display: flex;
+        gap: 3px;
+      }
+
+      /* nas laterais fica coluna */
+      .opponent-hand-left .opponent-cards,
+      .opponent-hand-right .opponent-cards {
+        flex-direction: column;
+      }
+
+      /* verso da carta dos oponentes */
+      .opponent-card-back {
+        width: 32px;
+        height: 50px;
+        border-radius: 5px;
+        background: radial-gradient(circle, #b32222, #5e1010);
+        border: 1px solid #3d0a0a;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        flex-shrink: 0;
+      }
+
+      /* deixa as cartas do topo um pouco sobrepostas pra não ocupar tanta largura */
+      .opponent-hand-top .opponent-card-back {
+        margin-left: -8px;
+      }
+      .opponent-hand-top .opponent-card-back:first-child {
+        margin-left: 0;
+      }
+
+      /* mobile: tudo um pouco menor pra não poluir */
+      @media (max-width: 768px) {
+        .opponent-card-back {
+          width: 24px;
+          height: 38px;
+        }
+
+        .opponent-label {
+          font-size: 9px;
+          padding: 1px 5px;
+        }
+
+        .opponent-hand-top {
+          top: 20px;
+        }
+      }
+
       .morto-card-back::before {
         content: '';
         position: absolute;
@@ -811,6 +962,156 @@
         width: 100%;
         margin: 0 auto;
         box-shadow: 0 18px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(148, 163, 184, 0.4);
+      }
+
+      /* ===== NOVO LAYOUT DOS JOGOS NA MESA ===== */
+
+      /* Container de todos os jogos de um time */
+      .meld-container {
+        display: flex;
+        flex-wrap: wrap; /* jogos lado a lado */
+        gap: 8px;
+        align-content: flex-start;
+        border-radius: 10px;
+        padding: 6px 8px;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px dashed rgba(148, 163, 184, 0.5);
+        min-height: 36px;
+      }
+
+      /* Cada jogo individual vira um “cardzinho” */
+      .meld-line {
+        margin: 0; /* o espaçamento vem do gap do container */
+        padding: 3px 4px 6px;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(31, 41, 55, 0.9);
+        flex: 0 1 auto;
+        min-width: fit-content;
+      }
+
+      .meld-line.selected-meld {
+        border-color: #facc15;
+        box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.8);
+      }
+
+      /* Linha de cartas do jogo: flex em vez de posição absoluta */
+      .meld-line-cards {
+        position: relative;
+        display: flex;
+        align-items: center;
+        height: auto;
+        padding-right: 14px; /* espaço pro “fechamento” da canastra */
+        padding-bottom: 18px; /* NOVO: espaço pra carta deitada */
+      }
+
+      /* Texto embaixo do jogo */
+      .meld-meta {
+        font-size: 9px;
+        color: #d1d5db;
+        margin-top: 2px;
+        text-align: center;
+      }
+
+      /* Mini-cartas na mesa (estilo do modelo do Gemini) */
+      .carta.mini {
+        width: 34px;
+        height: 52px;
+        font-size: 10px;
+        padding: 2px;
+        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        margin-right: -18px; /* sobreposição horizontal */
+        flex-shrink: 0;
+        cursor: default;
+      }
+
+      .carta.mini .carta-canto {
+        font-size: 10px;
+      }
+
+      .carta.mini .carta-icone {
+        font-size: 12px;
+        bottom: 1px;
+        right: 1px;
+      }
+
+      /* última carta de canastra “deitada” */
+      .carta.mini.canastra-fechada {
+        transform: rotate(90deg);
+        margin-right: -10px;
+        margin-bottom: -10px;
+      }
+
+      /* ===== MÃO MAIS COMPACTA ===== */
+
+      .player-area-fixed {
+        padding: 6px 10px 8px;
+      }
+
+      #handContainer {
+        min-height: 80px;
+      }
+
+      /* cartas da mão um pouco menores que as da mesa */
+      #handContainer .carta {
+        width: 60px;
+        height: 90px;
+      }
+
+      /* Em tablet / celular, reduz mais um pouco */
+      @media (max-width: 900px) {
+        #handContainer .carta {
+          width: 48px;
+          height: 72px;
+        }
+      }
+
+      @media (max-width: 600px) {
+        #handContainer .carta {
+          width: 42px;
+          height: 64px;
+        }
+      }
+
+      /* Junta visualmente mesa + área do jogador */
+      .board {
+        margin-bottom: 0; /* cola na área da mão */
+        border-radius: 18px 18px 0 0;
+      }
+
+      /* player-area fixa vira o "rodapé" da mesa */
+      .player-area-fixed {
+        margin-top: 0;
+        border-radius: 0 0 18px 18px;
+        background: rgba(15, 23, 42, 0.96); /* continua escuro mas encaixado */
+        border: 1px solid rgba(15, 23, 42, 0.9);
+        border-top: none;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+      }
+
+      /* barra de ações mais baixa pra sobrar espaço pra mão */
+      .actions-bar {
+        margin-bottom: 4px;
+      }
+
+      /* Responsividade Mobile */
+      @media (max-width: 600px) {
+        .board-melds {
+          grid-template-columns: 1fr;
+        } /* Em telas pequenas, uma coluna por equipe (uma em cima da outra) para nao apertar */
+        .board-middle {
+          gap: 20px;
+        }
+        .carta {
+          width: 60px;
+          height: 90px;
+        }
+      }
+
+      /* Jogos da equipe local com destaque suave */
+      .meld-line.my-team-meld {
+        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.4);
+        border-color: rgba(34, 197, 94, 0.5);
       }
     </style>
   </head>
@@ -928,6 +1229,11 @@
             </div>
           </div>
 
+          <!-- MÃOS DOS OUTROS JOGADORES (VERSO DAS CARTAS) -->
+          <div id="opponentTop" class="opponent-hand opponent-hand-top"></div>
+          <div id="opponentLeft" class="opponent-hand opponent-hand-left"></div>
+          <div id="opponentRight" class="opponent-hand opponent-hand-right"></div>
+
           <div class="board-middle">
             <div class="pile-area">
               <div class="pile-card">
@@ -986,7 +1292,7 @@
         </div>
 
         <!-- AÇÕES E MÃO -->
-        <div class="section">
+        <div class="section section-inline-board">
           <div class="section-header" style="margin-bottom: 4px">
             <h2>Ações do turno</h2>
             <small>Só funcionam quando for a sua vez.</small>
@@ -1192,94 +1498,123 @@
       }
 
       function classifyMeldForUi(meld) {
-        // Menos de 7 cartas → não é canastra pra fins de rótulo
+        // Se tiver menos de 7 cartas, não é canastra para fins de rótulo
         if (!meld || meld.length < 7) {
           return { kind: 'simple', base: 'Jogo simples', tag: null };
         }
 
-        // Qualquer coringa "real" (JOKER ou 2 usado como coringa) deixa a canastra suja
+        // Tem coringa real (Joker OU 2 usado como coringa)?
         const hasWild = hasRealWild(meld);
 
-        // Ignora só os jokers pra analisar a sequência natural
+        // Ignora só os jokers para analisar a sequência “natural”
         const nonJoker = meld.filter((c) => !c.joker);
         if (!nonJoker.length) {
           return { kind: 'simple', base: 'Jogo simples', tag: null };
         }
 
+        // Mapas de ordem: Ás baixo e Ás alto
         const orderLow = {};
         RANKS_SEQ_LOW.forEach((r, idx) => (orderLow[r] = idx)); // A,2,3,...,K
 
-        // Ordena pelas posições em A-2-3-...-K
-        const sorted = nonJoker.slice().sort((a, b) => orderLow[a.rank] - orderLow[b.rank]);
+        const orderHigh = {};
+        RANKS_SEQ.forEach((r, idx) => (orderHigh[r] = idx)); // 2,3,...,K,A
 
-        const ranks = sorted.map((c) => c.rank);
-        const aceCount = ranks.filter((r) => r === 'A').length;
+        // ---------- Checa contiguidade em ÁS-BAIXO ----------
+        const sortedLow = nonJoker.slice().sort((a, b) => orderLow[a.rank] - orderLow[b.rank]);
 
-        // Índices únicos pra checar “buracos” na sequência
-        const uniqueIdxs = [...new Set(ranks.map((r) => orderLow[r]))];
-        let contiguous = true;
-        for (let i = 1; i < uniqueIdxs.length; i++) {
-          if (uniqueIdxs[i] !== uniqueIdxs[i - 1] + 1) {
-            contiguous = false;
+        const ranksLow = sortedLow.map((c) => c.rank);
+        const aceCount = ranksLow.filter((r) => r === 'A').length;
+
+        const uniqueIdxsLow = [...new Set(ranksLow.map((r) => orderLow[r]))];
+        let contiguousLow = true;
+        for (let i = 1; i < uniqueIdxsLow.length; i++) {
+          if (uniqueIdxsLow[i] !== uniqueIdxsLow[i - 1] + 1) {
+            contiguousLow = false;
             break;
           }
         }
 
-        const firstRank = ranks[0];
-        const lastRank = ranks[ranks.length - 1];
+        const firstRankLow = ranksLow[0];
+        const lastRankLow = ranksLow[ranksLow.length - 1];
 
-        const hasAce = aceCount > 0;
-        const hasKing = ranks.includes('K');
+        // ---------- Checa contiguidade em ÁS-ALTO ----------
+        const sortedHigh = nonJoker.slice().sort((a, b) => orderHigh[a.rank] - orderHigh[b.rank]);
 
-        const isSuja = hasWild;
-
-        // Detecção de Real / Ás-a-Ás só vale se NÃO for suja
-        let isReal = false;
-        let isAsAs = false;
-
-        if (!isSuja && contiguous) {
-          // Ás a Ás: A-2-3-...-K-A (pelo menos 2 ases e cobre até K)
-          if (aceCount >= 2 && firstRank === 'A' && hasKing) {
-            isAsAs = true;
-          } else if (aceCount === 1 && hasAce) {
-            // Canastra Real:
-            //   - A-2-3-...-K (começa em A e termina em K)
-            //   - 2-3-4-...-A (começa em 2 e termina em A)
-            if ((firstRank === 'A' && hasKing) || (firstRank === '2' && lastRank === 'A')) {
-              isReal = true;
-            }
+        const ranksHigh = sortedHigh.map((c) => c.rank);
+        const uniqueIdxsHigh = [...new Set(ranksHigh.map((r) => orderHigh[r]))];
+        let contiguousHigh = true;
+        for (let i = 1; i < uniqueIdxsHigh.length; i++) {
+          if (uniqueIdxsHigh[i] !== uniqueIdxsHigh[i - 1] + 1) {
+            contiguousHigh = false;
+            break;
           }
         }
 
-        if (!isSuja && contiguous) {
-          if (isAsAs) {
-            return {
-              kind: 'asas',
-              base: 'Canastra',
-              tag: { cls: 'asas', text: 'Ás a Ás' },
-            };
-          }
-          if (isReal) {
-            return {
-              kind: 'real',
-              base: 'Canastra',
-              tag: { cls: 'real', text: 'Real' },
-            };
-          }
-          // Sem coringa, sequência contínua, mas não chegou a Real / Ás-a-Ás → limpa
+        const firstRankHigh = ranksHigh[0];
+        const lastRankHigh = ranksHigh[ranksHigh.length - 1];
+
+        const hasAce = aceCount > 0;
+        const hasKing = ranksLow.includes('K') || ranksHigh.includes('K');
+
+        // Contínua em pelo menos uma das duas ordens
+        const contiguous = contiguousLow || contiguousHigh;
+
+        // ---------- Se tem coringa real: sempre suja ----------
+        if (hasWild) {
           return {
-            kind: 'limpa',
+            kind: 'suja',
             base: 'Canastra',
-            tag: { cls: 'limpa', text: 'Limpa' },
+            tag: { cls: 'suja', text: 'Suja' },
           };
         }
 
-        // Qualquer caso com coringa real → suja
-        return {
-          kind: 'suja',
-          base: 'Canastra',
-          tag: { cls: 'suja', text: 'Suja' },
-        };
+        // Sem coringa real: se não for sequência certinha em nenhuma ordem, é jogo simples
+        if (!contiguous) {
+          return { kind: 'simple', base: 'Jogo simples', tag: null };
+        }
+
+        // ---------- Real / Ás-a-Ás / Limpa ----------
+        let isReal = false;
+        let isAsAs = false;
+
+        // Canastra Ás-a-Ás: A ... K ... A  (pelo menos 2 ases, passando por K)
+        if (
+          aceCount >= 2 && // pelo menos 2 Áses
+          firstRankLow === 'A' && // começa em A (ordem A,2,3,...,K)
+          lastRankHigh === 'A' && // termina em A (ordem 2,3,...,K,A)
+          hasKing && // tem K no meio
+          contiguousLow && // sequência certinha nas duas visões
+          contiguousHigh &&
+          ranksLow.length >= 8 // pelo menos 8 cartas
+        ) {
+          isAsAs = true;
+        }
+        // Canastra Real: de A até K (um único Ás, começa em A e termina em K)
+        else if (
+          aceCount === 1 && // só um Ás
+          firstRankLow === 'A' && // começa em A na ordem A,2,3,...,K
+          lastRankLow === 'K' && // termina em K na ordem A,2,3,...,K
+          contiguousLow && // sequência certinha A-2-3-...-K
+          ranksLow.length >= 7 // 7+ cartas
+        ) {
+          isReal = true;
+        }
+
+        let kind = 'limpa';
+        let base = 'Canastra';
+        let tag = { cls: 'limpa', text: 'Limpa' };
+
+        if (isAsAs) {
+          kind = 'asas';
+          base = 'Canastra Ás a Ás';
+          tag = { cls: 'real', text: 'Ás a Ás' };
+        } else if (isReal) {
+          kind = 'real';
+          base = 'Canastra Real';
+          tag = { cls: 'real', text: 'Real' };
+        }
+
+        return { kind, base, tag };
       }
 
       function startTurnTimerIfNeeded() {
@@ -1361,25 +1696,23 @@
         // Qualquer carta que não seja 2 nunca é coringa
         if (card.rank !== '2') return false;
 
-        // Se não temos contexto de jogo, considera 2 como coringa
+        // Sem contexto de jogo => assume 2 como coringa
         if (!meld || !Array.isArray(meld)) {
           return true;
         }
 
-        // Regra especial: 2 *real* entre A e 3 do MESMO naipe.
-        // Se no mesmo jogo existir A e 3 do mesmo naipe, o 2 vira número real.
+        // Regra: se tiver Ás OU 3 do MESMO naipe, esse 2 é número real
         const sameSuitRanks = meld.filter((c) => !c.joker && c.suit === card.suit).map((c) => c.rank);
 
         const hasAce = sameSuitRanks.includes('A');
         const hasThree = sameSuitRanks.includes('3');
 
-        if (hasAce && hasThree) {
-          // Nesta mesa, esse 2 está claramente sendo usado como "2" (A-2-3),
-          // então não conta como coringa.
+        if (hasAce || hasThree) {
+          // já está “amarrado” em A-2 ou 2-3 (ou A-2-3), então NÃO é coringa
           return false;
         }
 
-        // Em qualquer outro cenário, o 2 continua sendo coringa.
+        // Sem Ás nem 3 desse naipe => 2 continua sendo coringa
         return true;
       }
 
@@ -1395,24 +1728,8 @@
       }
 
       function hasRealWild(meld) {
-        return meld.some((c) => {
-          // JOKER sempre é coringa
-          if (c.joker) return true;
-
-          // Só nos importamos com o 2
-          if (c.rank !== '2') return false;
-
-          const suit = c.suit;
-          const hasAce = meld.some((x) => !x.joker && x.rank === 'A' && x.suit === suit);
-          const hasThree = meld.some((x) => !x.joker && x.rank === '3' && x.suit === suit);
-
-          // se tiver A e 3 do mesmo naipe, esse 2 está na sequência A-2-3
-          // → NÃO conta como coringa para limpeza/sujeira
-          if (hasAce && hasThree) return false;
-
-          // qualquer outro 2 continua sendo coringa
-          return true;
-        });
+        // "coringa real" = qualquer carta que o isWildcard considere coringa NESSE meld
+        return meld.some((c) => isWildcard(c, meld));
       }
 
       function sortHand(hand) {
@@ -1504,22 +1821,10 @@
           }
         }
 
-        // mortos – ajusta para o modo humilhação
-        if (mode === '1x1_duploMorto') {
-          // Equipe 1: 11 cartas (1 morto)
-          for (let i = 0; i < DEAD_CHUNK_SIZE; i++) {
-            deadPiles[0].push(stock.pop());
-          }
-          // Equipe 2: 22 cartas (2 mortos de 11)
-          for (let i = 0; i < DEAD_CHUNK_SIZE * 2; i++) {
-            deadPiles[1].push(stock.pop());
-          }
-        } else {
-          // padrão: 11 cartas para cada morto
-          for (let i = 0; i < DEAD_CHUNK_SIZE; i++) {
-            deadPiles[0].push(stock.pop());
-            deadPiles[1].push(stock.pop());
-          }
+        // mortos – sempre 2 montes de 11 cartas (um pra cada equipe)
+        for (let i = 0; i < DEAD_CHUNK_SIZE; i++) {
+          deadPiles[0].push(stock.pop());
+          deadPiles[1].push(stock.pop());
         }
 
         players.forEach((p) => sortHand(p.hand));
@@ -1917,16 +2222,30 @@
           return;
         }
 
-        const dead = state.deadPiles[teamId];
-        if (!dead.length) {
-          showMessage('Não há mais morto disponível para sua equipe.');
+        // por padrão, cada equipe pega seu próprio morto (índice = teamId)
+        let deadIndex = teamId;
+
+        // Modo humilhação:
+        // - equipe 1 (teamId = 0) continua só pegando o próprio
+        // - equipe 2 (teamId = 1) no SEGUNDO morto pode pegar qualquer morto que sobrou
+        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
+          // tenta primeiro o próprio
+          if (!state.deadPiles[deadIndex].length) {
+            // se o dele já acabou, tenta o do outro time
+            deadIndex = 0;
+          }
+        }
+
+        const dead = state.deadPiles[deadIndex];
+        if (!dead || !dead.length) {
+          showMessage('Não há mais morto disponível para pegar.');
           return;
         }
 
-        // no modo humilhação, o time 2 tem 22 cartas (2 mortos); pega em blocos de 11
         const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
         p.hand = dead.splice(0, chunkSize);
         sortHand(p.hand);
+        // o contador continua por equipe (J2 conta quantos mortos já pegou, não de qual monte)
         state.deadChunksTaken[teamId] = taken + 1;
         await commitState();
       }
@@ -2233,6 +2552,7 @@
         renderState();
         renderHand();
         renderMelds();
+        renderOpponentHands(); // NOVO
         updateButtons();
 
         const itsMyTurn = !state.finished && state.currentPlayer === myPlayerIndex;
@@ -2388,15 +2708,12 @@
 
         if (card.joker) {
           div.className = 'carta mini joker-card';
-
           const canto = document.createElement('div');
           canto.className = 'carta-canto';
-          canto.innerHTML = '<div>JOKER</div>';
-
+          canto.innerHTML = '<div>★</div><div>★</div>';
           const icone = document.createElement('div');
           icone.className = 'carta-icone';
-          icone.textContent = '🃏';
-
+          icone.textContent = '★';
           div.appendChild(canto);
           div.appendChild(icone);
         } else {
@@ -2417,10 +2734,86 @@
           div.appendChild(icone);
         }
 
-        div.style.position = 'absolute';
-        div.style.left = 20 * indexInMeld + 'px';
+        // Não usamos mais position absolute; o layout é via flex + margin-right
+        div.style.position = '';
+        div.style.left = '';
+        div.style.top = '';
+        div.style.zIndex = indexInMeld;
 
         return div;
+      }
+
+      function renderOpponentHands() {
+        const topEl = document.getElementById('opponentTop');
+        const leftEl = document.getElementById('opponentLeft');
+        const rightEl = document.getElementById('opponentRight');
+
+        if (!state || !topEl || !leftEl || !rightEl) return;
+
+        // limpa visual
+        [topEl, leftEl, rightEl].forEach((el) => (el.innerHTML = ''));
+
+        const playerCount = state.players.length;
+        if (!playerCount) return;
+
+        // você sempre embaixo
+        const seats = {
+          bottom: myPlayerIndex,
+          right: null,
+          top: null,
+          left: null,
+        };
+
+        const others = [];
+        for (let i = 1; i < playerCount; i++) {
+          others.push((myPlayerIndex + i) % playerCount);
+        }
+
+        if (playerCount === 2) {
+          // 1x1: outro em cima
+          seats.top = others[0];
+        } else if (playerCount === 3) {
+          // 1x2 / 2x1: lados
+          seats.right = others[0];
+          seats.left = others[1];
+        } else if (playerCount >= 4) {
+          // 2x2: direita, cima, esquerda
+          seats.right = others[0];
+          seats.top = others[1];
+          seats.left = others[2];
+        }
+
+        function buildOpponentSeat(playerIndex, container, orientation) {
+          if (playerIndex == null) return;
+          const player = state.players[playerIndex];
+          if (!player) return;
+
+          const cardsInHand = player.hand ? player.hand.length : 0;
+
+          const label = document.createElement('div');
+          label.className = 'opponent-label';
+          label.textContent = `${player.name} (${cardsInHand})`;
+
+          const cardsWrap = document.createElement('div');
+          cardsWrap.className = 'opponent-cards';
+
+          // não desenhar 40 cartas na tela – usa “amostragem”
+          const maxCards = orientation === 'vertical' ? 8 : 12;
+          const step = cardsInHand > maxCards ? Math.ceil(cardsInHand / maxCards) : 1;
+
+          for (let i = 0; i < cardsInHand; i += step) {
+            const back = document.createElement('div');
+            back.className = 'opponent-card-back';
+            cardsWrap.appendChild(back);
+          }
+
+          container.appendChild(label);
+          container.appendChild(cardsWrap);
+        }
+
+        buildOpponentSeat(seats.top, topEl, 'horizontal');
+        buildOpponentSeat(seats.left, leftEl, 'vertical');
+        buildOpponentSeat(seats.right, rightEl, 'vertical');
       }
 
       function renderHand() {
@@ -2451,6 +2844,9 @@
         let t1Score = 0;
         let t2Score = 0;
 
+        const me = state.players[myPlayerIndex];
+        const myTeamId = me ? me.teamId : 0;
+
         state.teams.forEach((team, idx) => {
           const target = idx === 0 ? m1 : m2;
           const players = state.players.filter((p) => p.teamId === team.id);
@@ -2460,25 +2856,29 @@
           if (idx === 0) t1Score = meldScoreInfo.total;
           else t2Score = meldScoreInfo.total;
 
+          const isMyTeam = team.id === myTeamId;
+
+          // Cabeçalho dos jogadores daquela equipe
+          const header = document.createElement('div');
+          header.style.fontSize = '11px';
+          header.style.color = '#9ca3af';
+          header.style.marginBottom = '4px';
+          header.textContent = 'Jogadores: ' + playersNames + (isMyTeam ? ' (você)' : '');
+          target.appendChild(header);
+
           if (!team.melds.length) {
             const empty = document.createElement('div');
-            empty.textContent = 'Nenhum jogo baixado ainda. (' + playersNames + ')';
+            empty.textContent = (isMyTeam ? 'Sua equipe ainda não baixou jogo.' : 'Nenhum jogo baixado ainda.') + ' (' + playersNames + ')';
             empty.style.fontSize = '12px';
             empty.style.color = '#9ca3af';
             target.appendChild(empty);
             return;
           }
 
-          const header = document.createElement('div');
-          header.style.fontSize = '11px';
-          header.style.color = '#9ca3af';
-          header.style.marginBottom = '4px';
-          header.textContent = 'Jogadores: ' + playersNames;
-          target.appendChild(header);
-
           team.melds.forEach((meld, meldIndex) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'meld-line';
+            if (isMyTeam) wrapper.classList.add('my-team-meld');
 
             const meldKey = team.id + ':' + meldIndex;
             if (selectedMeldTarget === meldKey) {
@@ -2492,19 +2892,17 @@
             const isCanastra = info.kind !== 'simple';
             const baseLen = meld.length;
 
-            // desenha as cartas; se for canastra, NÃO desenha a última em pé
+            // desenha as cartas; se for canastra, não desenha a última em pé
             meld.forEach((card, indexInMeld) => {
               if (isCanastra && indexInMeld === baseLen - 1) return;
               cardsRow.appendChild(createCardElementMini(card, indexInMeld));
             });
 
-            // se for canastra (7+), desenha só a última deitada
+            // última carta deitada pra canastra (limpa/suja/real)
             if (isCanastra && baseLen >= 7) {
               const lastCard = meld[baseLen - 1];
               const closed = createCardElementMini(lastCard, baseLen - 1);
-              closed.style.transform = 'rotate(90deg)';
-              closed.style.top = '26px';
-              closed.style.zIndex = '20';
+              closed.classList.add('canastra-fechada');
               cardsRow.appendChild(closed);
             }
 
