@@ -5,847 +5,199 @@
     <title>Buraco – Firebase</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <meta name="theme-color" content="#020617" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
-    <link rel="manifest" href="manifest.json" />
 
     <style>
       :root {
         --bg-main: #020617;
         --bg-panel-soft: rgba(15, 23, 42, 0.92);
         --accent: #22c55e;
-        --accent-soft: rgba(34, 197, 94, 0.15);
         --accent-strong: #16a34a;
-        --border-soft: #1f2937;
         --text-main: #e5e7eb;
         --text-muted: #9ca3af;
-        --warning: #fbbf24;
       }
 
       * {
         box-sizing: border-box;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent; /* Remove piscar azul no toque */
       }
 
+      html,
       body {
         margin: 0;
-        padding: 16px;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: var(--text-main);
-        background: radial-gradient(circle at 0 0, #14532d 0, #022c22 40%, #020617 70%), radial-gradient(circle at 100% 100%, #0f172a 0, #020617 45%);
-        min-height: 100vh;
+        padding: 0;
+        width: 100%;
+        height: 100%; /* Fallback */
+        height: 100dvh; /* Altura dinâmica real do mobile */
+        overflow: hidden; /* Trava scroll da página inteira */
+        background: #020617;
+        font-family: system-ui, -apple-system, sans-serif;
       }
 
       .app {
-        max-width: 1200px;
-        margin: 0 auto;
-        background: var(--bg-panel-soft);
-        border-radius: 20px;
-        padding: 16px 18px 20px;
-        box-shadow: 0 18px 35px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(15, 23, 42, 0.8);
-      }
-
-      .topbar {
+        width: 100%;
+        height: 100%;
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 12px;
+        flex-direction: column;
       }
 
-      .title {
-        font-size: 22px;
-        font-weight: 600;
-        letter-spacing: 0.03em;
+      /* TELA DE CONFIG (Scrollável se necessário) */
+      #configSection {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: radial-gradient(circle at center, #064e3b 0%, #020617 100%);
         display: flex;
-        align-items: center;
-        gap: 8px;
+        flex-direction: column;
+        justify-content: center;
       }
 
-      .title-pill {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        border: 1px solid var(--accent-soft);
-        background: rgba(15, 118, 110, 0.25);
-        color: var(--accent);
-      }
-
-      .subtitle {
-        font-size: 13px;
-        color: var(--text-muted);
-      }
-
-      .badge-mode {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid var(--border-soft);
-        color: var(--text-muted);
-        white-space: nowrap;
-      }
-
+      /* ESTILOS DE CONFIGURAÇÃO */
       .section {
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(6, 78, 59, 0.25));
-        border-radius: 14px;
-        padding: 12px 14px;
-        margin-bottom: 10px;
-        border: 1px solid var(--border-soft);
+        background: rgba(15, 23, 42, 0.95);
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #1f2937;
+        max-width: 400px;
+        margin: 0 auto;
+        width: 100%;
       }
-
-      /* Seção de ações + mão encaixada na mesa verde */
-      .section-inline-board {
-        background: transparent;
-        box-shadow: none;
-        padding: 8px 10px 0;
-        margin-top: -6px;
-        border-radius: 0 0 18px 18px;
-      }
-
-      .section-header {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 6px;
-      }
-
       .section h2 {
-        font-size: 15px;
-        margin: 0;
+        margin-top: 0;
+        color: #fff;
       }
-
-      .section small {
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .flex {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-
-      .grow {
-        flex: 1 1 0;
-        min-width: 0;
-      }
-
-      button {
-        padding: 6px 12px;
-        border-radius: 999px;
-        border: none;
-        cursor: pointer;
-        font-size: 13px;
-        background: var(--accent-strong);
-        color: #ecfdf5;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 4px 10px rgba(0, 0, 0, 0.35);
-        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.1s;
-        white-space: nowrap;
-      }
-
-      button:hover:not(:disabled) {
-        transform: translateY(-1px);
-        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 8px 18px rgba(0, 0, 0, 0.55);
-        background: #22c55e;
-      }
-
-      button:active:not(:disabled) {
-        transform: translateY(0);
-        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 3px 6px rgba(0, 0, 0, 0.6);
-      }
-
-      button:disabled {
-        background: #4b5563;
-        color: #9ca3af;
-        box-shadow: none;
-        cursor: not-allowed;
-        opacity: 0.7;
-      }
-
       input,
       select {
-        background: rgba(15, 23, 42, 0.9);
-        border-radius: 999px;
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 8px;
         border: 1px solid #4b5563;
-        color: var(--text-main);
-        padding: 5px 9px;
-        font-size: 13px;
-        min-width: 120px;
+        background: rgba(0, 0, 0, 0.3);
+        color: white;
+      }
+      button {
+        width: 100%;
+        padding: 12px;
+        border-radius: 99px;
+        border: none;
+        font-weight: bold;
+        cursor: pointer;
+        background: var(--accent-strong);
+        color: white;
+        margin-top: 5px;
       }
 
-      input:focus,
-      select:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3);
-      }
-
-      label {
-        font-size: 13px;
-        color: var(--text-muted);
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        margin-right: 10px;
-        margin-bottom: 6px;
-      }
-
+      /* ================= JOGO ================= */
       #gameSection {
-        display: none;
+        flex: 1;
+        display: none; /* JS ativa display:flex */
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        background: radial-gradient(circle at center, #15803d 0%, #14532d 100%);
       }
-
-      /* --------- MESA --------- */
 
       .board {
-        background: radial-gradient(circle at top, #1a8c4a 0, #10713c 40%, #055030 80%);
         flex: 1;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
-        position: relative; /* <-- SE NÃO TIVER, ADICIONA ESSA LINHA */
-        padding: 10px;
-        box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+        position: relative;
+        overflow: hidden; /* Garante que nada saia da mesa */
+        padding-bottom: 0;
       }
 
-      /* essas três partes não podem encolher */
-      .board-top,
-      .board-middle,
-      .board-bottom {
-        flex-shrink: 0;
-      }
-
-      /* área dos jogos das equipes: scroll vertical interno */
-      .board-melds {
-        margin-top: 10px;
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-        padding-right: 4px;
-      }
-
-      /* scrollbar fininha dentro da mesa */
-      .board-melds::-webkit-scrollbar {
-        width: 6px;
-      }
-      .board-melds::-webkit-scrollbar-thumb {
-        background: rgba(148, 163, 184, 0.55);
-        border-radius: 999px;
-      }
-
+      /* -- TOPO -- */
       .board-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 13px;
-        margin-bottom: 8px;
-        color: #e2fbe8;
-      }
-
-      .board-top-right {
-        font-size: 12px;
-        color: #dcfce7;
-      }
-
-      .current-player-chip {
-        padding: 3px 9px;
-        border-radius: 999px;
-        border: 1px solid rgba(34, 197, 94, 0.55);
-        background: rgba(4, 120, 87, 0.85);
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .current-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: #bbf7d0;
-        box-shadow: 0 0 6px rgba(187, 247, 208, 0.9);
-      }
-
-      .board-middle {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 60px;
-        padding: 18px 0;
-      }
-
-      @media (max-width: 768px) {
-        .board-middle {
-          gap: 32px;
-        }
-      }
-
-      .pile-area {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 6px;
-        color: #e5e7eb;
-      }
-
-      /* MONTE – verso igual ao morto (versão grande) */
-      .pile-card {
-        position: relative;
-        width: 72px;
-        height: 104px;
-        border-radius: 10px;
-        background: radial-gradient(circle at center, #b32222 0%, #8f1919 60%, #5e1010 100%);
-        border: 1px solid #3d0a0a;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.15);
-        overflow: hidden;
-      }
-
-      .pile-card::before {
-        content: '';
-        position: absolute;
-        inset: 8px;
-        border-radius: 8px;
-        background-color: #a01d1d;
-        background-image: linear-gradient(45deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12)),
-          linear-gradient(135deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12));
-        background-size: 10px 10px;
-        background-position: 0 0, 5px 5px;
-        border: 1px solid rgba(255, 223, 150, 0.4);
-        box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
-      }
-
-      /* MONTE – verso com a foto */
-      /* .pile-card {
-  position: relative;
-  width: 72px;
-  height: 104px;
-  border-radius: 10px;
-  background: #000; 
-  border: 1px solid #111827;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.15);
-  overflow: hidden;
-}
-
-
-.pile-card::before {
-  content: '';
-  position: absolute;
-  inset: 4px;                  
-  border-radius: 8px;
-  background-image: url('carta-costas.jpg');  
-  background-position: center;
-  background-repeat: no-repeat;
-} */
-
-      /* Monte com mesma “costa” do morto (sem miolo azul) */
-      .pile-card-inner {
-        display: none;
-      }
-
-      /* carta da vez do descarte */
-      .discard-face {
-        position: absolute;
-        inset: 10px;
-        border-radius: 10px;
-        background: #f9fafb;
-        border: 2px solid #111827;
-        padding: 4px 6px;
-        font-size: 16px;
-        font-weight: 600;
-        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
-        display: none;
-        flex-direction: column;
-        justify-content: space-between;
-      }
-
-      .discard-face-top {
-        align-self: flex-start;
-        text-align: left;
-        line-height: 1.1;
-      }
-
-      .discard-face-bottom {
-        align-self: flex-end;
-        font-size: 18px;
-      }
-
-      .pile-info {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 2px;
-        font-size: 12px;
-      }
-
-      .pile-caption {
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        color: #ecfdf5;
-      }
-
-      .pile-counter {
-        background: rgba(15, 23, 42, 0.85);
-        padding: 3px 8px;
-        border-radius: 999px;
-        font-size: 12px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-        min-width: 32px;
-        text-align: center;
-      }
-
-      .pile-topcard {
-        background: rgba(15, 23, 42, 0.85);
-        padding: 3px 8px;
-        border-radius: 999px;
-        font-size: 12px;
-        margin-top: 2px;
-        min-width: 40px;
-        text-align: center;
-      }
-
-      .board-bottom {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-top: 4px;
-      }
-
-      .board-bottom button {
-        background: rgba(15, 23, 42, 0.92);
-        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9), 0 4px 10px rgba(0, 0, 0, 0.55);
-      }
-
-      .board-bottom button.primary {
-        background: #16a34a;
-        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 4px 10px rgba(0, 0, 0, 0.55);
-      }
-
-      /* jogos dentro da mesa */
-
-      .board-melds {
-        margin-top: 12px;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: 12px;
-      }
-
-      @media (max-width: 800px) {
-        .board-melds {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-
-      .meld-title {
-        font-size: 13px;
-        margin-bottom: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-      }
-
-      /* container de todos os jogos da equipe */
-      .meld-container {
-        margin-top: 4px;
-        border-radius: 10px;
-        padding: 6px;
-        background: rgba(15, 23, 42, 0.82);
-        border: 1px dashed rgba(148, 163, 184, 0.4);
-
-        /* NOVO: jogos lado a lado */
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-content: flex-start;
-      }
-
-      /* cada jogo individual */
-      .meld-line {
-        margin: 0;
-        padding: 4px;
-        border-radius: 8px;
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(15, 23, 42, 0.9);
-
-        flex: 0 1 auto; /* bloco compacto que ocupa só o necessário */
-        min-width: 140px; /* largura mínima pra canastra ficar bonita */
-      }
-
-      /* trilho onde as mini-cartas são empilhadas (position:absolute no JS) */
-      .meld-line-cards {
-        position: relative;
-        height: 70px; /* menor pra não “engolir” espaço vertical */
-      }
-
-      .meld-line.selected-meld {
-        border-color: #facc15;
-        box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.8);
-      }
-
-      .meld-meta {
-        font-size: 9px;
-        color: #ccc;
-        margin-top: 10px; /* dá espaço pro “fechada” não encostar */
-        text-align: center;
-      }
-
-      .hand-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 13px;
-        margin-bottom: 6px;
-      }
-
-      .hand-sub {
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .pill {
-        padding: 2px 7px;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .hand-container {
-        border-radius: 12px;
         padding: 10px;
-        background: radial-gradient(circle at 50% 0, rgba(22, 163, 74, 0.3), rgba(15, 23, 42, 0.96));
-        border: 1px solid rgba(34, 197, 94, 0.25);
-        min-height: 46px;
-      }
-
-      .cards-row {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: center;
-      }
-
-      #message {
-        font-size: 13px;
-        min-height: 18px;
-        margin-top: 4px;
-        color: var(--warning);
-      }
-
-      #scoreSection {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.9);
-        display: none; /* vira flex quando abrir */
-        align-items: center;
-        justify-content: center;
-        z-index: 999;
-      }
-
-      #scorePanel {
-        max-width: 720px;
-        width: 95%;
-      }
-
-      .score-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 10px;
-      }
-
-      .score-line {
-        font-size: 13px;
-        margin-bottom: 4px;
-        padding: 8px 10px;
-        border-radius: 10px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(31, 41, 55, 0.9);
-      }
-
-      .score-meta {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 4px;
-      }
-
-      .score-line {
-        font-size: 13px;
-        margin-bottom: 4px;
-        padding: 4px 6px;
-        border-radius: 8px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(31, 41, 55, 0.9);
-      }
-
-      .score-line strong {
-        color: #f9fafb;
-      }
-
-      .score-meta {
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .pill-strong {
-        border-color: rgba(34, 197, 94, 0.4);
-        color: var(--accent);
-        background: rgba(22, 163, 74, 0.1);
-      }
-
-      /* CARTAS */
-
-      .carta {
-        width: 90px;
-        height: 140px;
-        border-radius: 10px;
-        background: #f9fafb; /* mesmo fundo da carta de descarte */
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-        color: #020617; /* texto escuro padrão */
-        border: 2px solid #111827; /* borda escura, igual discard */
-        padding: 6px;
-        box-sizing: border-box;
-        position: relative;
-        cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-        overflow: hidden;
-      }
-
-      .carta.mini {
-        width: 40px;
-        height: 64px;
-        padding: 3px;
-        border-radius: 6px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-        cursor: default;
-      }
-
-      /* última carta girada pra marcar canastra fechada */
-      .carta.mini.canastra-fechada {
-        transform: rotate(90deg);
-        top: 22px;
+        justify-content: space-between;
+        align-items: flex-start;
+        height: 50px; /* Altura fixa para não variar */
         z-index: 20;
       }
-
-      .carta:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.8);
-        border-color: rgba(255, 255, 255, 0.6);
+      .current-player-chip {
+        background: rgba(0, 0, 0, 0.5);
+        padding: 4px 10px;
+        border-radius: 20px;
+        color: #fff;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .current-dot {
+        width: 8px;
+        height: 8px;
+        background: #4ade80;
+        border-radius: 50%;
       }
 
-      .carta.selected {
-        border-color: #facc15;
-        box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.9), 0 8px 18px rgba(0, 0, 0, 0.9);
-        transform: translateY(-4px) scale(1.02);
-      }
-
-      .carta-canto {
-        font-size: 14px;
-        line-height: 1.1;
-        text-align: left;
-      }
-
-      .carta.mini .carta-canto {
-        font-size: 11px;
-      }
-
-      .carta-canto div:last-child {
-        font-size: 16px;
-      }
-
-      .carta.mini .carta-canto div:last-child {
-        font-size: 13px;
-      }
-
-      .carta-icone {
-        position: absolute;
-        bottom: 6px;
-        right: 6px;
-        font-size: 22px;
-        opacity: 1;
-        pointer-events: none;
-      }
-
-      .carta.mini .carta-icone {
-        font-size: 16px;
-      }
-
-      /* --- CORREÇÃO DE CORES DOS NAIPES --- */
-
-      /* Copas e Ouros: TUDO Vermelho (Texto do canto + Ícone) */
-      .carta.hearts,
-      .carta.diamonds {
-        color: #b91c1c; /* Vermelho escuro padrão */
-        background: #f9fafb;
-        border-color: #111827;
-      }
-
-      /* Paus e Espadas: TUDO Preto (Texto do canto + Ícone) */
-      .carta.clubs,
-      .carta.spades {
-        color: #020617; /* Preto */
-        background: #f9fafb;
-        border-color: #111827;
-      }
-
-      /* Se quiser garantir que o ícone herde a cor (embora o código acima já resolva) */
-      .carta.hearts .carta-icone,
-      .carta.diamonds .carta-icone,
-      .carta.clubs .carta-icone,
-      .carta.spades .carta-icone {
-        color: inherit;
-      }
-
-      .carta.joker-card {
-        background: #f9fafb; /* branco igual às outras cartas */
-        border-color: #111827; /* borda escura */
-        color: #111827; /* texto escuro */
-      }
-
-      /* canto do JOKER mais “clássico” */
-      .carta.joker-card .carta-canto div:first-child {
-        font-family: 'Georgia', 'Times New Roman', serif;
-        font-weight: 700;
-        font-size: 14px;
-        letter-spacing: 0.04em;
-      }
-
-      /* bobo da corte / símbolo central */
-      .carta.joker-card .carta-icone {
-        font-size: 42px;
-        line-height: 1;
-      }
-
-      /* Pilha de descarte: sem “proteção vermelha” por cima */
-      .discard-pile {
-        background: transparent;
-        box-shadow: none;
-        border: none;
-      }
-
-      .discard-pile::before,
-      .discard-pile::after {
-        display: none;
-      }
-
-      .discard-pile .pile-card-inner {
-        display: none; /* não mostra o verso azul dentro quando é descarte */
-      }
-
-      /* garantir que a carta virada fica por cima de tudo */
-      .discard-face {
-        z-index: 3;
-      }
-
-      body.my-turn .hand-container {
-        box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.95), 0 0 30px rgba(250, 204, 21, 0.7);
-      }
-
-      body.my-turn .board {
-        box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.4), 0 18px 40px rgba(0, 0, 0, 0.8);
-      }
-
-      .meld-tag {
-        display: inline-block;
-        padding: 2px 6px;
-        border-radius: 999px;
-        font-size: 10px;
-        margin-left: 6px;
-        font-weight: 500;
-      }
-
-      .meld-tag.suja {
-        background: #4b5563;
-        color: #e5e7eb;
-      }
-
-      .meld-tag.limpa {
-        background: #16a34a;
-        color: #022c22;
-      }
-
-      .meld-tag.real {
-        background: #1d4ed8;
-        color: #dbeafe;
-      }
-
-      .meld-tag.asas {
-        background: #facc15;
-        color: #78350f;
-      }
-
-      /* --- ESTILO DOS MORTOS (SIMPLES) --- */
+      /* Mortos */
       .morto-area {
         display: flex;
-        gap: 15px;
-        align-items: center;
+        gap: 8px;
       }
-
       .morto-container {
         position: relative;
-        width: 44px;
-        height: 60px;
-        transition: opacity 0.3s, transform 0.3s;
-      }
-
-      .morto-container.used {
-        opacity: 0;
-        pointer-events: none;
+        width: 30px;
+        height: 44px;
+        opacity: 1;
       }
 
       .morto-label {
         position: absolute;
-        bottom: -16px;
+        bottom: -12px;
         left: 50%;
         transform: translateX(-50%);
-        font-size: 10px;
-        color: #9ca3af;
-        white-space: nowrap;
+        font-size: 9px;
+        color: #e5e7eb;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
       }
 
-      /* --- ESTILO DOS MORTOS (VERSO MELHORADO) --- */
-
+      .morto-container.used {
+        opacity: 0;
+      }
       .morto-card-back {
         position: absolute;
-        width: 40px;
-        height: 58px;
-        border-radius: 6px;
-        background: radial-gradient(circle at center, #b32222 0%, #8f1919 60%, #5e1010 100%);
-        border: 1px solid #3d0a0a;
-        box-shadow: 0 5px 12px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.15);
-        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        border-radius: 4px;
+        background: #991b1b;
+        border: 1px solid #fff;
+      }
+      .morto-card-back.offset {
+        transform: translate(3px, -3px);
       }
 
-      /* ======================
-   MÃOS DOS OUTROS JOGADORES
-   ====================== */
-
+      /* -- OPONENTES -- */
       .opponent-hand {
         position: absolute;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 4px;
-        pointer-events: none; /* não atrapalha clique na mesa */
+        pointer-events: none;
         font-size: 10px;
         color: #e5e7eb;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
       }
 
+      /* TOPO – leque horizontal */
       .opponent-hand-top {
-        top: 32px; /* antes 64 – sobe a barra */
+        top: 26px;
         left: 50%;
         transform: translateX(-50%);
       }
 
-      /* lados (para 3 e 4 jogadores) */
+      /* LATERAIS – ficam no meio da mesa */
       .opponent-hand-left,
       .opponent-hand-right {
         top: 50%;
@@ -854,17 +206,18 @@
 
       .opponent-hand-left {
         left: 10px;
-        align-items: flex-start;
+        align-items: center;
       }
 
       .opponent-hand-right {
         right: 10px;
-        align-items: flex-end;
+        align-items: center;
       }
 
+      /* Nome + qtd de cartas */
       .opponent-label {
         font-size: 11px;
-        opacity: 0.8;
+        opacity: 0.85;
         background: rgba(15, 23, 42, 0.9);
         padding: 2px 6px;
         border-radius: 999px;
@@ -876,291 +229,504 @@
         gap: 3px;
       }
 
-      /* nas laterais fica coluna */
-      .opponent-hand-left .opponent-cards,
-      .opponent-hand-right .opponent-cards {
-        flex-direction: column;
-      }
-
-      /* verso da carta dos oponentes */
+      /* Verso das cartas dos oponentes */
       .opponent-card-back {
-        width: 32px;
-        height: 50px;
-        border-radius: 5px;
-        background: radial-gradient(circle, #b32222, #5e1010);
+        width: 30px;
+        height: 44px;
+        border-radius: 6px;
+        background: #7f1d1d;
         border: 1px solid #3d0a0a;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
-        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
       }
 
-      /* deixa as cartas do topo um pouco sobrepostas pra não ocupar tanta largura */
+      /* TOPO – sobreposição leve, tipo leque */
       .opponent-hand-top .opponent-card-back {
-        margin-left: -8px;
+        margin-left: -14px;
       }
       .opponent-hand-top .opponent-card-back:first-child {
         margin-left: 0;
       }
 
-      /* mobile: tudo um pouco menor pra não poluir */
-      @media (max-width: 768px) {
-        .opponent-card-back {
-          width: 24px;
-          height: 38px;
-        }
-
-        .opponent-label {
-          font-size: 9px;
-          padding: 1px 5px;
-        }
-
-        .opponent-hand-top {
-          top: 20px;
-        }
+      /* LATERAIS – coluna, levemente “juntas” */
+      .opponent-hand-left .opponent-cards,
+      .opponent-hand-right .opponent-cards {
+        flex-direction: column;
+        align-items: center;
       }
 
-      .morto-card-back::before {
-        content: '';
-        position: absolute;
-        inset: 4px;
-        border-radius: 4px;
-        background-color: #a01d1d;
-        background-image: linear-gradient(45deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12)),
-          linear-gradient(135deg, rgba(255, 223, 150, 0.12) 25%, transparent 25%, transparent 75%, rgba(255, 223, 150, 0.12) 75%, rgba(255, 223, 150, 0.12));
-        background-size: 8px 8px;
-        background-position: 0 0, 4px 4px;
-        border: 1px solid rgba(255, 223, 150, 0.4);
-        box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+      .opponent-hand-left .opponent-card-back,
+      .opponent-hand-right .opponent-card-back {
+        margin-top: -12px;
       }
 
-      .morto-card-back.offset {
-        transform: translate(3px, -3px);
-        z-index: 2;
-        box-shadow: 2px 5px 12px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.15);
+      .opponent-hand-left .opponent-card-back:first-child,
+      .opponent-hand-right .opponent-card-back:first-child {
+        margin-top: 0;
       }
 
-      /* Overlay do placar centralizado */
-      #scoreOverlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.88);
-        z-index: 2000;
-        display: none;
-        justify-content: center;
-        align-items: flex-start;
-        padding-top: 24px;
+      /* Rotação das laterais (como no layout antigo) */
+      .opponent-hand-left .opponent-card-back {
+        transform: rotate(90deg);
+        transform-origin: center center;
       }
 
-      #scoreOverlay.visible {
+      .opponent-hand-right .opponent-card-back {
+        transform: rotate(-90deg);
+        transform-origin: center center;
+      }
+
+      /* Laterais */
+      .opponent-hand-left {
+        top: 45%;
+        left: 5px;
+        transform: translateY(-50%);
+      }
+      .opponent-hand-left .opponent-card-back {
+        transform: rotate(90deg);
+        margin-bottom: -15px;
+      }
+
+      .opponent-hand-right {
+        top: 45%;
+        right: 5px;
+        transform: translateY(-50%);
+      }
+      .opponent-hand-right .opponent-card-back {
+        transform: rotate(-90deg);
+        margin-bottom: -15px;
+      }
+
+      /* -- JOGOS BAIXADOS (ÁREA DE MELDS) -- */
+      .board-melds {
+        flex: 0 0 auto; /* só o tamanho dos conteúdos */
+        min-height: 60px;
+        max-width: 760px;
+        margin: 70px auto 4px; /* centraliza e deixa espaço do topo */
+        padding: 6px 10px;
         display: flex;
+        gap: 20px; /* espaço entre Time 1 e Time 2 */
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 8px;
+        overflow: visible;
       }
 
-      #scorePanel {
-        background: rgba(15, 23, 42, 0.97);
-        border-radius: 12px;
-        padding: 10px 14px;
-        max-width: 600px;
-        width: 100%;
-        margin: 0 auto;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(148, 163, 184, 0.4);
+      /* bloco de cada equipe dentro da faixa de jogos */
+      .board-melds .grow {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        background: rgba(15, 23, 42, 0.85);
+        border-radius: 10px;
+        padding: 6px 10px;
       }
 
-      /* ===== NOVO LAYOUT DOS JOGOS NA MESA ===== */
+      /* segundo bloco (Time 2) com traço no meio */
+      .board-melds .grow + .grow {
+        padding-left: 16px !important;
+        border-left: 1px dashed rgba(148, 163, 184, 0.5) !important;
+      }
 
-      /* Container de todos os jogos de um time */
+      /* cabeçalho com nome do time + pontos */
+      .meld-title {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #cbd5e1;
+        margin-bottom: 4px;
+      }
+
+      /* área onde os jogos ficam lado a lado */
       .meld-container {
         display: flex;
-        flex-wrap: wrap; /* jogos lado a lado */
-        gap: 8px;
+        flex-wrap: wrap;
+        gap: 6px;
         align-content: flex-start;
-        border-radius: 10px;
-        padding: 6px 8px;
-        background: rgba(15, 23, 42, 0.85);
-        border: 1px dashed rgba(148, 163, 184, 0.5);
-        min-height: 36px;
       }
 
-      /* Cada jogo individual vira um “cardzinho” */
+      /* bloco de UM jogo específico */
       .meld-line {
-        margin: 0; /* o espaçamento vem do gap do container */
-        padding: 3px 4px 6px;
-        border-radius: 8px;
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(31, 41, 55, 0.9);
+        background: rgba(0, 0, 0, 0.45);
+        border-radius: 6px;
+        padding: 4px 6px 6px;
+        display: flex;
+        flex-direction: column; /* cards em cima, texto embaixo */
+        align-items: center;
+        cursor: pointer;
+        border: 1px solid transparent;
         flex: 0 1 auto;
-        min-width: fit-content;
+        min-width: 140px; /* largura mínima de cada jogo */
       }
 
       .meld-line.selected-meld {
         border-color: #facc15;
-        box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.8);
+        background: rgba(250, 204, 21, 0.2);
       }
 
-      /* Linha de cartas do jogo: flex em vez de posição absoluta */
+      /* trilho das mini-cartas – HORIZONTAL */
       .meld-line-cards {
-        position: relative;
         display: flex;
         align-items: center;
-        height: auto;
-        padding-right: 14px; /* espaço pro “fechamento” da canastra */
-        padding-bottom: 18px; /* NOVO: espaço pra carta deitada */
+        height: 42px;
       }
 
-      /* Texto embaixo do jogo */
+      /* legenda (Jogo simples, Canastra limpa, etc.) */
       .meld-meta {
-        font-size: 9px;
-        color: #d1d5db;
-        margin-top: 2px;
+        font-size: 10px;
+        color: #e5e7eb;
+        margin-top: 4px;
         text-align: center;
       }
 
-      /* Mini-cartas na mesa (estilo do modelo do Gemini) */
-      .carta.mini {
-        width: 34px;
-        height: 52px;
-        font-size: 10px;
-        padding: 2px;
-        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
-        margin-right: -18px; /* sobreposição horizontal */
+      /* -- MEIO DA MESA (MONTE E LIXO) -- */
+      .board-middle {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        align-items: center;
+        padding: 10px 0;
         flex-shrink: 0;
-        cursor: default;
+        z-index: 5;
       }
 
-      .carta.mini .carta-canto {
+      .pile-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        cursor: pointer;
+      }
+
+      .pile-card {
+        width: 55px;
+        height: 80px;
+        border-radius: 6px;
+        background: #b91c1c;
+        border: 2px solid #fff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .pile-card.discard-pile {
+        background: transparent;
+        border: 2px dashed rgba(255, 255, 255, 0.4);
+      }
+
+      .discard-face {
+        width: 100%;
+        height: 100%;
+        background: #f3f4f6;
+        border-radius: 4px;
+        color: #000;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 2px;
+        font-weight: bold;
+        font-size: 12px;
+      }
+
+      .pile-info {
         font-size: 10px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-top: -8px;
+        z-index: 10;
+      }
+
+      /* -- ÁREA DO JOGADOR (RODAPÉ) -- */
+      .player-interface {
+        background: linear-gradient(to top, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.8) 60%, transparent 100%);
+        padding: 5px 10px 10px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        z-index: 50;
+        width: 100%;
+        margin-top: auto;
+      }
+
+      #message {
+        text-align: center;
+        font-size: 11px;
+        color: #facc15;
+        font-weight: bold;
+        height: 15px;
+        text-shadow: 0 1px 2px black;
+      }
+
+      .player-actions {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .player-actions button {
+        width: auto;
+        padding: 8px 12px;
+        font-size: 11px;
+        margin: 0;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      #meldBtn {
+        background: #059669;
+      }
+
+      #discardBtn {
+        background: #be123c;
+      }
+
+      #takeDeadBtn {
+        background: #4f46e5;
+      }
+
+      #endGameBtn {
+        background: #333;
+        padding: 8px;
+      }
+
+      /* MÃO DO JOGADOR - LEQUE */
+      .hand-container {
+        display: flex;
+        justify-content: center;
+        overflow-x: auto;
+        padding: 15px 10px 5px 10px;
+        min-height: 90px;
+      }
+
+      .cards-row {
+        display: flex;
+        align-items: flex-end;
+        padding-right: 20px; /* espaço extra pra última carta */
+      }
+
+      /* CARTA PADRÃO */
+      .carta {
+        width: 60px;
+        height: 90px;
+        background: #fff;
+        border-radius: 5px;
+        border: 1px solid #000;
+        position: relative;
+        flex-shrink: 0;
+        cursor: pointer;
+        box-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3);
+        margin-right: -30px; /* sobreposição leque */
+        transition: transform 0.1s, margin-right 0.1s;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 2px 4px;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      .carta:last-child {
+        margin-right: 0;
+      }
+
+      .carta:hover,
+      .carta.selected {
+        transform: translateY(-15px);
+        margin-right: 0;
+        z-index: 100;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      }
+
+      .carta.selected {
+        border: 2px solid #facc15;
+      }
+
+      .hearts,
+      .diamonds {
+        color: #dc2626;
+      }
+
+      .spades,
+      .clubs,
+      .joker-card {
+        color: #000;
+      }
+
+      .carta-icone {
+        font-size: 20px;
+        align-self: flex-end;
+        line-height: 1;
+      }
+
+      /* MINI CARTA (NA MESA) */
+      .carta.mini {
+        width: 28px;
+        height: 40px;
+        margin-right: -14px;
+        margin-bottom: 0;
+        font-size: 10px;
+        padding: 1px;
       }
 
       .carta.mini .carta-icone {
         font-size: 12px;
-        bottom: 1px;
-        right: 1px;
       }
 
-      /* última carta de canastra “deitada” */
       .carta.mini.canastra-fechada {
         transform: rotate(90deg);
-        margin-right: -10px;
-        margin-bottom: -10px;
+        margin-right: -8px;
+        margin-bottom: -8px;
       }
 
-      /* ===== MÃO MAIS COMPACTA ===== */
-
-      .player-area-fixed {
-        padding: 6px 10px 8px;
-      }
-
-      #handContainer {
-        min-height: 80px;
-      }
-
-      /* cartas da mão um pouco menores que as da mesa */
-      #handContainer .carta {
-        width: 60px;
-        height: 90px;
-      }
-
-      /* Em tablet / celular, reduz mais um pouco */
-      @media (max-width: 900px) {
-        #handContainer .carta {
-          width: 48px;
-          height: 72px;
+      /* ============================
+         MOBILE (largura <= 768px)
+         ============================ */
+      @media (max-width: 768px) {
+        body {
+          font-size: 12px;
         }
-      }
 
-      @media (max-width: 600px) {
-        #handContainer .carta {
-          width: 42px;
-          height: 64px;
+        .board-top {
+          padding: 6px;
+          height: 44px;
         }
-      }
 
-      /* Junta visualmente mesa + área do jogador */
-      .board {
-        margin-bottom: 0; /* cola na área da mão */
-        border-radius: 18px 18px 0 0;
-      }
+        /* oponente do topo desce um pouco */
+        .opponent-hand-top {
+          top: 52px;
+        }
 
-      /* player-area fixa vira o "rodapé" da mesa */
-      .player-area-fixed {
-        margin-top: 0;
-        border-radius: 0 0 18px 18px;
-        background: rgba(15, 23, 42, 0.96); /* continua escuro mas encaixado */
-        border: 1px solid rgba(15, 23, 42, 0.9);
-        border-top: none;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
-      }
-
-      /* barra de ações mais baixa pra sobrar espaço pra mão */
-      .actions-bar {
-        margin-bottom: 4px;
-      }
-
-      /* Responsividade Mobile */
-      @media (max-width: 600px) {
         .board-melds {
-          grid-template-columns: 1fr;
-        } /* Em telas pequenas, uma coluna por equipe (uma em cima da outra) para nao apertar */
+          max-width: 100%;
+          margin: 10px 6px 4px;
+          padding: 4px 6px;
+          gap: 10px;
+          border-radius: 6px;
+          min-height: 50px;
+        }
+
+        .board-melds .grow {
+          padding: 4px 6px;
+        }
+
+        .meld-title {
+          font-size: 10px;
+        }
+
+        .meld-line {
+          min-width: 120px;
+          padding: 3px 4px 5px;
+        }
+
+        .meld-line-cards {
+          height: 34px;
+        }
+
+        .meld-meta {
+          font-size: 9px;
+        }
+
         .board-middle {
           gap: 20px;
+          padding: 6px 0;
         }
+
+        .pile-card {
+          width: 45px;
+          height: 65px;
+        }
+
+        .pile-info {
+          font-size: 9px;
+        }
+
+        .morto-container {
+          width: 26px;
+          height: 38px;
+        }
+
+        .morto-card-back {
+          border-radius: 4px;
+        }
+
+        .opponent-card-back {
+          width: 26px;
+          height: 38px;
+          border-radius: 5px;
+        }
+
+        .hand-container {
+          padding: 10px 6px 4px 6px;
+          min-height: 80px;
+        }
+
         .carta {
-          width: 60px;
-          height: 90px;
+          width: 50px;
+          height: 75px;
+          margin-right: -25px;
+          font-size: 12px;
+        }
+
+        .carta-icone {
+          font-size: 16px;
+        }
+
+        .player-actions {
+          gap: 6px;
+        }
+
+        .player-actions button {
+          padding: 6px 10px;
+          font-size: 10px;
+        }
+
+        #scoreSection .section {
+          width: 94%;
+          max-width: 380px;
         }
       }
 
-      /* Jogos da equipe local com destaque suave */
-      .meld-line.my-team-meld {
-        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.4);
-        border-color: rgba(34, 197, 94, 0.5);
+      /* PLACAR OVERLAY */
+      #scoreSection {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
     </style>
   </head>
   <body>
     <div class="app">
-      <div class="topbar">
-        <div>
-          <div class="title">
-            Buraco
-            <span class="title-pill">Firebase Alpha</span>
+      <div id="configSection">
+        <div class="section">
+          <div class="section-header">
+            <h2>Buraco Alpha</h2>
+            <small>Configuração da sala</small>
           </div>
-          <div class="subtitle" id="subtitleGameInfo">1x1 · 2x2 · 1x2 · Mesa central · Estado compartilhado via Firestore.</div>
-        </div>
-        <div class="badge-mode">
-          Doc:
-          <code style="font-size: 10px">buracoGames/{gameId}</code>
-        </div>
-      </div>
-
-      <div id="configSection" class="section">
-        <div class="section-header">
-          <h2>Configuração & Conexão</h2>
-          <small>Escolha o modo, os nomes e qual jogador você é.</small>
-        </div>
-        <div class="flex" style="align-items: flex-end; margin-bottom: 6px">
-          <div>
+          <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px">
             <label>
-              Modo:
+              Modo
               <select id="modeSelect">
-                <option value="1x1">1 x 1</option>
-                <option value="2x2">2 x 2</option>
-                <option value="1x2">1 x 2 (Jogador 1 sozinho)</option>
-                <option value="1x1_duploMorto">1 x 1 Humilhação – J2 joga 2x e pode 2 mortos</option>
+                <option value="1x1">1x1</option>
+                <option value="2x2">2x2</option>
+                <option value="1x2">1x2</option>
+                <option value="1x1_duploMorto">1x1 Humilhação</option>
               </select>
             </label>
-          </div>
-          <div>
             <label>
-              Tipo de jogo:
+              Regra
               <select id="variantSelect">
-                <option value="aberto">Aberto (pode comprar do descarte)</option>
-                <option value="fechado">Fechado (só compra do monte)</option>
+                <option value="aberto">Aberto</option>
+                <option value="fechado">Fechado</option>
               </select>
             </label>
-          </div>
-
-          <div>
             <label>
-              Sou o jogador:
+              Sou
               <select id="localPlayerSelect">
                 <option value="0">Jogador 1</option>
                 <option value="1">Jogador 2</option>
@@ -1168,197 +734,117 @@
                 <option value="3">Jogador 4</option>
               </select>
             </label>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+              <input id="p1Name" value="Jogador 1" placeholder="Nome J1" />
+              <input id="p2Name" value="Jogador 2" placeholder="Nome J2" />
+              <input id="p3Name" value="Jogador 3" placeholder="Nome J3" />
+              <input id="p4Name" value="Jogador 4" placeholder="Nome J4" />
+            </div>
+
+            <button id="startBtn" style="margin-top: 10px">INICIAR JOGO</button>
+            <small style="text-align: center; color: #666">Use o mesmo ID na URL para conectar: ?game=sala1</small>
           </div>
-        </div>
-        <div class="flex" style="flex-wrap: wrap; gap: 8px">
-          <div class="grow">
-            <label>
-              Jogador 1:
-              <input id="p1Name" value="Jogador 1" />
-            </label>
-          </div>
-          <div class="grow">
-            <label>
-              Jogador 2:
-              <input id="p2Name" value="Jogador 2" />
-            </label>
-          </div>
-          <div class="grow">
-            <label>
-              Jogador 3:
-              <input id="p3Name" value="Jogador 3" />
-            </label>
-          </div>
-          <div class="grow">
-            <label>
-              Jogador 4:
-              <input id="p4Name" value="Jogador 4" />
-            </label>
-          </div>
-        </div>
-        <div class="flex" style="align-items: center; margin-top: 6px">
-          <button id="startBtn">🂡 Iniciar / Resetar partida (escreve no Firebase)</button>
-          <span style="font-size: 11px; color: var(--text-muted)">Abra a mesma página em outros dispositivos para ver a mesa sincronizada.</span>
         </div>
       </div>
 
       <div id="gameSection">
-        <!-- MESA CENTRAL -->
         <div class="board">
           <div class="board-top">
             <div>
-              Vez de:
               <span class="current-player-chip">
                 <span class="current-dot"></span>
-                <span id="currentPlayerLabel"></span>
+                <span id="currentPlayerLabel">...</span>
               </span>
-              <span id="turnTimerLabel" style="margin-left: 8px; font-size: 12px; color: #facc15"></span>
+              <span id="turnTimerLabel" style="margin-left: 5px; font-size: 11px; color: #facc15"></span>
             </div>
-            <div class="board-top-right morto-area">
-              <div id="mortoSlot0" class="morto-container">
-                <div class="morto-card-back"></div>
-                <div class="morto-card-back offset"></div>
-                <span class="morto-label">Morto</span>
-              </div>
 
-              <div id="mortoSlot1" class="morto-container">
+            <div class="morto-area">
+              <div id="mortoSlot0" class="morto-container" title="Morto Time 1">
                 <div class="morto-card-back"></div>
                 <div class="morto-card-back offset"></div>
-                <span class="morto-label">Morto</span>
+                <span class="morto-label">Morto 1</span>
+              </div>
+              <div id="mortoSlot1" class="morto-container" title="Morto Time 2">
+                <div class="morto-card-back"></div>
+                <div class="morto-card-back offset"></div>
+                <span class="morto-label">Morto 2</span>
               </div>
             </div>
           </div>
 
-          <!-- MÃOS DOS OUTROS JOGADORES (VERSO DAS CARTAS) -->
           <div id="opponentTop" class="opponent-hand opponent-hand-top"></div>
           <div id="opponentLeft" class="opponent-hand opponent-hand-left"></div>
           <div id="opponentRight" class="opponent-hand opponent-hand-right"></div>
 
-          <div class="board-middle">
-            <div class="pile-area">
-              <div class="pile-card">
-                <div class="pile-card-inner"></div>
-              </div>
-              <div class="pile-info">
-                <span class="pile-caption">Monte</span>
-                <span class="pile-counter" id="stockCount">0</span>
-              </div>
-            </div>
-
-            <div class="pile-area">
-              <div class="pile-card discard-pile">
-                <div class="pile-card-inner"></div>
-                <div id="discardFace" class="discard-face">
-                  <div class="discard-face-top" id="discardFaceTop"></div>
-                  <div class="discard-face-bottom" id="discardFaceBottom"></div>
-                </div>
-              </div>
-              <div class="pile-info">
-                <span class="pile-caption">Descarte</span>
-                <span class="pile-counter" id="discardCount">0</span>
-                <span class="pile-topcard" id="discardTop">—</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="board-bottom">
-            <button id="drawStockBtn" class="primary">🃏 Comprar do monte</button>
-            <button id="drawDiscardBtn">📥 Comprar do descarte</button>
-          </div>
-
-          <!-- JOGOS / MELDS DENTRO DA MESA -->
           <div class="board-melds">
             <div class="grow">
               <div class="meld-title">
-                <span><strong>Jogos Equipe 1</strong></span>
-                <span class="pill-strong">
-                  Pontos:
-                  <span id="scoreTeam1">0</span>
-                </span>
+                <span>Time 1 Pts:</span>
+                <strong id="scoreTeam1">0</strong>
               </div>
               <div id="meldsP1" class="meld-container"></div>
             </div>
-            <div class="grow">
+            <div class="grow" style="border-left: 1px dashed rgba(255, 255, 255, 0.1); padding-left: 5px">
               <div class="meld-title">
-                <span><strong>Jogos Equipe 2</strong></span>
-                <span class="pill">
-                  Pontos:
-                  <span id="scoreTeam2">0</span>
-                </span>
+                <span>Time 2 Pts:</span>
+                <strong id="scoreTeam2">0</strong>
               </div>
               <div id="meldsP2" class="meld-container"></div>
             </div>
           </div>
-        </div>
 
-        <!-- AÇÕES E MÃO -->
-        <div class="section section-inline-board">
-          <div class="section-header" style="margin-bottom: 4px">
-            <h2>Ações do turno</h2>
-            <small>Só funcionam quando for a sua vez.</small>
-          </div>
-          <div class="flex" style="align-items: flex-start; gap: 10px">
-            <div class="grow">
-              <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px">
-                1) Compre do
-                <strong>monte</strong>
-                ou
-                <strong>descarte</strong>
-                .
-                <br />
-                2) Clique nas suas cartas para selecionar o jogo ou a carta de descarte.
-                <br />
-                3) Clique em
-                <strong>Baixar jogo</strong>
-                ou em
-                <strong>Descartar carta</strong>
-                para encerrar o turno.
+          <div class="board-middle">
+            <div class="pile-area" id="drawStockBtn">
+              <div class="pile-card"><div class="pile-card-inner"></div></div>
+              <div class="pile-info">
+                Monte (
+                <span id="stockCount">0</span>
+                )
               </div>
-              <div style="margin-bottom: 4px">
-                <button id="meldBtn">⬇️ Baixar jogo selecionado</button>
-                <button id="discardBtn">🗑️ Descartar carta selecionada</button>
-                <button id="takeDeadBtn">💀 Pegar morto</button>
-              </div>
-              <div>
-                <button id="endGameBtn" style="background: #b91c1c; box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.5), 0 4px 10px rgba(0, 0, 0, 0.4)">⚠️ Forçar fim de jogo</button>
-              </div>
-              <div id="message"></div>
             </div>
-          </div>
 
-          <div style="margin-top: 10px">
-            <div class="hand-header">
-              <div>
-                <strong>Sua mão</strong>
-                <div class="hand-sub">
-                  Clique para (de)selecionar · Use
-                  <strong>Descartar carta</strong>
-                  para jogar fora.
+            <div class="pile-area" id="drawDiscardBtn">
+              <div class="pile-card discard-pile">
+                <div id="discardFace" class="discard-face">
+                  <div id="discardFaceTop"></div>
+                  <div id="discardFaceBottom"></div>
                 </div>
               </div>
-              <div class="pill">
-                Cartas na mão:
-                <span id="handCountLabel">0</span>
+              <div class="pile-info">
+                Lixo (
+                <span id="discardCount">0</span>
+                )
               </div>
+              <span id="discardTop" style="display: none"></span>
             </div>
+          </div>
+
+          <div class="player-interface">
+            <div id="message"></div>
+
+            <div class="player-actions">
+              <button id="meldBtn">⬇️ Baixar</button>
+              <button id="discardBtn">🗑️ Descartar</button>
+              <button id="takeDeadBtn">💀 Morto</button>
+              <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
+            </div>
+
+            <div style="position: absolute; right: 10px; top: 10px; font-size: 10px; color: #aaa">
+              <span id="handCountLabel"></span>
+            </div>
+
             <div id="handContainer" class="hand-container">
               <div class="cards-row"></div>
             </div>
           </div>
         </div>
-
-        <!-- PLACAR FINAL (overlay flutuante) -->
-        <div id="scoreSection" style="display: none">
-          <div id="scorePanel" class="section">
-            <div class="section-header">
-              <h2>Placar final</h2>
-              <small>Resumo da rodada por equipe.</small>
-            </div>
-            <div id="scoreBoard"></div>
-            <div style="text-align: right; margin-top: 8px">
-              <button id="closeScoreBtn">Fechar placar</button>
-            </div>
-          </div>
+      </div>
+      <div id="scoreSection" style="display: none">
+        <div class="section" style="width: 90%; max-width: 500px">
+          <h2>Fim de Jogo</h2>
+          <div id="scoreBoard"></div>
+          <button id="closeScoreBtn" style="width: 100%; margin-top: 10px">Fechar</button>
         </div>
       </div>
     </div>
@@ -1369,7 +855,7 @@
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').catch((err) => console.error('SW erro:', err));
+          // SW opcional
         });
       }
 
@@ -1401,12 +887,9 @@
 
       let state = null;
       let selectedHandIndexes = new Set();
-
-      // Timer de turno (60s) e auto-jogada
       let turnTimerId = null;
       let turnTimerRemaining = 0;
-
-      let selectedMeldTarget = null; // "teamId:meldIndex" do jogo que você clicou
+      let selectedMeldTarget = null;
 
       function updateTimerLabel() {
         const el = document.getElementById('turnTimerLabel');
@@ -1427,12 +910,8 @@
 
       async function autoPlayTimeout() {
         if (!ensureMyTurn()) return;
-
-        // Se ainda não comprou, tenta comprar automaticamente
         if (!state.hasDrawnThisTurn) {
-          if (!state.stock.length) {
-            recycleDeadToStockIfPossible();
-          }
+          if (!state.stock.length) recycleDeadToStockIfPossible();
           if (state.stock.length) {
             const c = state.stock.pop();
             const me = currentPlayer();
@@ -1447,21 +926,16 @@
             state.hasDrawnThisTurn = true;
           }
         }
-
         const me = currentPlayer();
         const hand = me.hand;
         if (!hand.length) {
           await commitState();
           return;
         }
-
-        // 🚨 REGRA DO FECHADO: se comprou do descarte, NÃO pode descartar no timeout
         if (state.variant === 'fechado' && state.requiredDiscardCard) {
-          showMessage('Tempo esgotado, mas você é obrigado a usar a carta do descarte antes de descartar.');
+          showMessage('Tempo esgotado, obrigatório usar descarte (regra fechada).');
           return;
         }
-
-        // descarta carta aleatória
         const idx = Math.floor(Math.random() * hand.length);
         const card = hand.splice(idx, 1)[0];
         state.discard.push(card);
@@ -1493,128 +967,53 @@
 
         state.hasDrawnThisTurn = false;
         state.requiredDiscardCard = null;
-        showMessage('Tempo esgotado: o jogo descartou uma carta automaticamente.');
+        showMessage('Tempo esgotado: auto-play.');
         await commitState();
       }
 
       function classifyMeldForUi(meld) {
-        // Se tiver menos de 7 cartas, não é canastra para fins de rótulo
-        if (!meld || meld.length < 7) {
-          return { kind: 'simple', base: 'Jogo simples', tag: null };
-        }
-
-        // Tem coringa real (Joker OU 2 usado como coringa)?
+        if (!meld || meld.length < 7) return { kind: 'simple', base: 'Jogo', tag: null };
         const hasWild = hasRealWild(meld);
-
-        // Ignora só os jokers para analisar a sequência “natural”
         const nonJoker = meld.filter((c) => !c.joker);
-        if (!nonJoker.length) {
-          return { kind: 'simple', base: 'Jogo simples', tag: null };
-        }
+        if (!nonJoker.length) return { kind: 'simple', base: 'Jogo', tag: null };
 
-        // Mapas de ordem: Ás baixo e Ás alto
         const orderLow = {};
-        RANKS_SEQ_LOW.forEach((r, idx) => (orderLow[r] = idx)); // A,2,3,...,K
-
+        RANKS_SEQ_LOW.forEach((r, i) => (orderLow[r] = i));
         const orderHigh = {};
-        RANKS_SEQ.forEach((r, idx) => (orderHigh[r] = idx)); // 2,3,...,K,A
+        RANKS_SEQ.forEach((r, i) => (orderHigh[r] = i));
 
-        // ---------- Checa contiguidade em ÁS-BAIXO ----------
         const sortedLow = nonJoker.slice().sort((a, b) => orderLow[a.rank] - orderLow[b.rank]);
-
         const ranksLow = sortedLow.map((c) => c.rank);
         const aceCount = ranksLow.filter((r) => r === 'A').length;
-
         const uniqueIdxsLow = [...new Set(ranksLow.map((r) => orderLow[r]))];
         let contiguousLow = true;
-        for (let i = 1; i < uniqueIdxsLow.length; i++) {
-          if (uniqueIdxsLow[i] !== uniqueIdxsLow[i - 1] + 1) {
-            contiguousLow = false;
-            break;
-          }
-        }
+        for (let i = 1; i < uniqueIdxsLow.length; i++) if (uniqueIdxsLow[i] !== uniqueIdxsLow[i - 1] + 1) contiguousLow = false;
 
-        const firstRankLow = ranksLow[0];
-        const lastRankLow = ranksLow[ranksLow.length - 1];
-
-        // ---------- Checa contiguidade em ÁS-ALTO ----------
         const sortedHigh = nonJoker.slice().sort((a, b) => orderHigh[a.rank] - orderHigh[b.rank]);
-
         const ranksHigh = sortedHigh.map((c) => c.rank);
         const uniqueIdxsHigh = [...new Set(ranksHigh.map((r) => orderHigh[r]))];
         let contiguousHigh = true;
-        for (let i = 1; i < uniqueIdxsHigh.length; i++) {
-          if (uniqueIdxsHigh[i] !== uniqueIdxsHigh[i - 1] + 1) {
-            contiguousHigh = false;
-            break;
-          }
-        }
+        for (let i = 1; i < uniqueIdxsHigh.length; i++) if (uniqueIdxsHigh[i] !== uniqueIdxsHigh[i - 1] + 1) contiguousHigh = false;
 
+        const firstRankLow = ranksLow[0];
+        const lastRankLow = ranksLow[ranksLow.length - 1];
         const firstRankHigh = ranksHigh[0];
         const lastRankHigh = ranksHigh[ranksHigh.length - 1];
-
-        const hasAce = aceCount > 0;
         const hasKing = ranksLow.includes('K') || ranksHigh.includes('K');
-
-        // Contínua em pelo menos uma das duas ordens
         const contiguous = contiguousLow || contiguousHigh;
 
-        // ---------- Se tem coringa real: sempre suja ----------
-        if (hasWild) {
-          return {
-            kind: 'suja',
-            base: 'Canastra',
-            tag: { cls: 'suja', text: 'Suja' },
-          };
-        }
+        if (hasWild) return { kind: 'suja', base: 'Canastra', tag: { cls: 'suja', text: 'Suja' } };
+        if (!contiguous) return { kind: 'simple', base: 'Jogo', tag: null };
 
-        // Sem coringa real: se não for sequência certinha em nenhuma ordem, é jogo simples
-        if (!contiguous) {
-          return { kind: 'simple', base: 'Jogo simples', tag: null };
-        }
-
-        // ---------- Real / Ás-a-Ás / Limpa ----------
         let isReal = false;
         let isAsAs = false;
+        if (aceCount >= 2 && firstRankLow === 'A' && lastRankHigh === 'A' && hasKing && contiguousLow && contiguousHigh && ranksLow.length >= 8) isAsAs = true;
+        else if (aceCount === 1 && firstRankLow === 'A' && lastRankLow === 'K' && contiguousLow && ranksLow.length >= 7) isReal = true;
 
-        // Canastra Ás-a-Ás: A ... K ... A  (pelo menos 2 ases, passando por K)
-        if (
-          aceCount >= 2 && // pelo menos 2 Áses
-          firstRankLow === 'A' && // começa em A (ordem A,2,3,...,K)
-          lastRankHigh === 'A' && // termina em A (ordem 2,3,...,K,A)
-          hasKing && // tem K no meio
-          contiguousLow && // sequência certinha nas duas visões
-          contiguousHigh &&
-          ranksLow.length >= 8 // pelo menos 8 cartas
-        ) {
-          isAsAs = true;
-        }
-        // Canastra Real: de A até K (um único Ás, começa em A e termina em K)
-        else if (
-          aceCount === 1 && // só um Ás
-          firstRankLow === 'A' && // começa em A na ordem A,2,3,...,K
-          lastRankLow === 'K' && // termina em K na ordem A,2,3,...,K
-          contiguousLow && // sequência certinha A-2-3-...-K
-          ranksLow.length >= 7 // 7+ cartas
-        ) {
-          isReal = true;
-        }
+        if (isAsAs) return { kind: 'asas', base: 'C. Ás-Ás', tag: { cls: 'real', text: 'Real' } };
+        if (isReal) return { kind: 'real', base: 'C. Real', tag: { cls: 'real', text: 'Real' } };
 
-        let kind = 'limpa';
-        let base = 'Canastra';
-        let tag = { cls: 'limpa', text: 'Limpa' };
-
-        if (isAsAs) {
-          kind = 'asas';
-          base = 'Canastra Ás a Ás';
-          tag = { cls: 'real', text: 'Ás a Ás' };
-        } else if (isReal) {
-          kind = 'real';
-          base = 'Canastra Real';
-          tag = { cls: 'real', text: 'Real' };
-        }
-
-        return { kind, base, tag };
+        return { kind: 'limpa', base: 'Canastra', tag: { cls: 'limpa', text: 'Limpa' } };
       }
 
       function startTurnTimerIfNeeded() {
@@ -1639,11 +1038,7 @@
       function createDeck() {
         const deck = [];
         for (let d = 0; d < 2; d++) {
-          for (const s of SUITS) {
-            for (const r of RANKS) {
-              deck.push({ rank: r, suit: s, joker: false });
-            }
-          }
+          for (const s of SUITS) for (const r of RANKS) deck.push({ rank: r, suit: s, joker: false });
           deck.push({ rank: 'JOKER', suit: '★', joker: true });
           deck.push({ rank: 'JOKER', suit: '★', joker: true });
         }
@@ -1660,20 +1055,16 @@
 
       function recycleDeadToStockIfPossible() {
         if (!state || state.stock.length) return false;
-
         let collected = [];
         if (state.deadPiles && state.deadPiles.length) {
           state.deadPiles.forEach((pile, idx) => {
             if (pile && pile.length) {
               collected = collected.concat(pile);
               state.deadPiles[idx] = [];
-              if (state.deadChunksTaken && state.deadChunksMax) {
-                state.deadChunksTaken[idx] = state.deadChunksMax[idx] ?? state.deadChunksTaken[idx];
-              }
+              if (state.deadChunksTaken && state.deadChunksMax) state.deadChunksTaken[idx] = state.deadChunksMax[idx] ?? state.deadChunksTaken[idx];
             }
           });
         }
-
         if (!collected.length) return false;
         shuffle(collected);
         state.stock = collected;
@@ -1685,50 +1076,26 @@
         return card.rank + card.suit;
       }
 
-      // card: carta individual
-      // meld: opcional, o grupo de cartas (jogo) em que ela está sendo usada
       function isWildcard(card, meld = null) {
         if (!card) return false;
-
-        // Joker sempre é coringa
         if (card.joker) return true;
-
-        // Qualquer carta que não seja 2 nunca é coringa
         if (card.rank !== '2') return false;
-
-        // Sem contexto de jogo => assume 2 como coringa
-        if (!meld || !Array.isArray(meld)) {
-          return true;
-        }
-
-        // Regra: se tiver Ás OU 3 do MESMO naipe, esse 2 é número real
+        if (!meld || !Array.isArray(meld)) return true;
         const sameSuitRanks = meld.filter((c) => !c.joker && c.suit === card.suit).map((c) => c.rank);
-
         const hasAce = sameSuitRanks.includes('A');
         const hasThree = sameSuitRanks.includes('3');
-
-        if (hasAce || hasThree) {
-          // já está “amarrado” em A-2 ou 2-3 (ou A-2-3), então NÃO é coringa
-          return false;
-        }
-
-        // Sem Ás nem 3 desse naipe => 2 continua sendo coringa
+        if (hasAce || hasThree) return false;
         return true;
       }
 
-      // Pontos individuais das cartas
-      // baixas = 5, altas = 10, Ás = 15
-      // (assumindo 2 = 15 e coringa = 20 – se usar outra tabela,
-      // é só trocar aqui)
       function cardBasePoints(card) {
-        if (card.joker) return 20; // coringa
-        if (card.rank === 'A' || card.rank === '2') return 15; // Ás e 2
-        if (['3', '4', '5', '6', '7'].includes(card.rank)) return 5; // baixas
-        return 10; // 8,9,10,J,Q,K
+        if (card.joker) return 20;
+        if (card.rank === 'A' || card.rank === '2') return 15;
+        if (['3', '4', '5', '6', '7'].includes(card.rank)) return 5;
+        return 10;
       }
 
       function hasRealWild(meld) {
-        // "coringa real" = qualquer carta que o isWildcard considere coringa NESSE meld
         return meld.some((c) => isWildcard(c, meld));
       }
 
@@ -1738,106 +1105,58 @@
         hand.sort((a, b) => {
           if (a.joker && !b.joker) return 1;
           if (!a.joker && b.joker) return -1;
-          if (a.suit === b.suit) {
-            return rankOrder[a.rank] - rankOrder[b.rank];
-          }
+          if (a.suit === b.suit) return rankOrder[a.rank] - rankOrder[b.rank];
           return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
         });
       }
 
-      function modeLabel(mode) {
-        if (mode === '1x1') return '1 x 1';
-        if (mode === '2x2') return '2 x 2';
-        if (mode === '1x2') return '1 x 2';
-        if (mode === '1x1_duploMorto') return '1 x 1 Humilhação';
-        return mode;
-      }
-
       async function startGame(mode, names, variant) {
         if (myPlayerIndex !== 0) {
-          showMessage('Só o Jogador 1 pode iniciar a partida.');
+          showMessage('Só Jogador 1 inicia.');
           return;
         }
-
         const players = [];
         const teams = [];
-
         let playerConfigs = [];
         if (mode === '1x1' || mode === '1x1_duploMorto') {
           playerConfigs = [
-            { name: names[0] || 'Jogador 1', team: 0 },
-            { name: names[1] || 'Jogador 2', team: 1 },
+            { name: names[0] || 'J1', team: 0 },
+            { name: names[1] || 'J2', team: 1 },
           ];
         } else if (mode === '2x2') {
           playerConfigs = [
-            { name: names[0] || 'Jogador 1', team: 0 },
-            { name: names[1] || 'Jogador 2', team: 1 },
-            { name: names[2] || 'Jogador 3', team: 0 },
-            { name: names[3] || 'Jogador 4', team: 1 },
+            { name: names[0] || 'J1', team: 0 },
+            { name: names[1] || 'J2', team: 1 },
+            { name: names[2] || 'J3', team: 0 },
+            { name: names[3] || 'J4', team: 1 },
           ];
         } else if (mode === '1x2') {
-          // Jogador 1 sozinho (time 0) vs Jogadores 2 e 3 (time 1)
           playerConfigs = [
-            { name: names[0] || 'Solo', team: 0 }, // Jogador 1
-            { name: names[1] || 'Dupla 1', team: 1 }, // Jogador 2
-            { name: names[2] || 'Dupla 2', team: 1 }, // Jogador 3
+            { name: names[0] || 'Solo', team: 0 },
+            { name: names[1] || 'D1', team: 1 },
+            { name: names[2] || 'D2', team: 1 },
           ];
         }
-
         playerConfigs.forEach((cfg, idx) => {
-          players.push({
-            id: idx,
-            name: cfg.name,
-            teamId: cfg.team,
-            hand: [],
-          });
+          players.push({ id: idx, name: cfg.name, teamId: cfg.team, hand: [] });
         });
-
-        const teamCount = 2;
-        for (let t = 0; t < teamCount; t++) {
+        for (let t = 0; t < 2; t++) {
           const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
-
-          const defaultName = mode === '1x1' || mode === '1x1_duploMorto' ? players.find((p) => p.teamId === t)?.name || 'Equipe ' + (t + 1) : t === 0 ? 'Equipe 1' : 'Equipe 2';
-
-          teams.push({
-            id: t,
-            name: defaultName,
-            playerIndexes,
-            melds: [],
-          });
+          teams.push({ id: t, name: t === 0 ? 'Time 1' : 'Time 2', playerIndexes, melds: [] });
         }
-
         let stock = shuffle(createDeck());
         const discard = [];
         const deadPiles = [[], []];
-
         const HAND_SIZE = 11;
-        const playerCount = players.length;
-
-        // mãos
-        for (let i = 0; i < HAND_SIZE; i++) {
-          for (let pIdx = 0; pIdx < playerCount; pIdx++) {
-            players[pIdx].hand.push(stock.pop());
-          }
-        }
-
-        // mortos – sempre 2 montes de 11 cartas (um pra cada equipe)
+        for (let i = 0; i < HAND_SIZE; i++) for (let pIdx = 0; pIdx < players.length; pIdx++) players[pIdx].hand.push(stock.pop());
         for (let i = 0; i < DEAD_CHUNK_SIZE; i++) {
           deadPiles[0].push(stock.pop());
           deadPiles[1].push(stock.pop());
         }
-
         players.forEach((p) => sortHand(p.hand));
-
         discard.push(stock.pop());
-
-        // limites de mortos
         let deadChunksMax = [1, 1];
-        if (mode === '1x1_duploMorto') {
-          // J1 pode 1 morto, J2 pode 2
-          deadChunksMax = [1, 2];
-        }
-
+        if (mode === '1x1_duploMorto') deadChunksMax = [1, 2];
         const newState = {
           mode,
           variant,
@@ -1852,39 +1171,30 @@
           hasDrawnThisTurn: false,
           finished: false,
           winnerTeamId: null,
-          j2ConsecutiveTurns: 0, // para o modo humilhação
+          j2ConsecutiveTurns: 0,
           requiredDiscardCard: null,
         };
-
-        await setDoc(gameRef, {
-          stateJson: JSON.stringify(newState),
-          createdAt: Date.now(),
-        });
-
-        showMessage('Partida iniciada! Modo: ' + modeLabel(mode) + ' (ID: ' + gameId + ')');
+        await setDoc(gameRef, { stateJson: JSON.stringify(newState), createdAt: Date.now() });
+        showMessage('Partida iniciada!');
       }
 
       function currentPlayer() {
         return state.players[state.currentPlayer];
       }
-
       function currentTeam() {
         return state.teams[currentPlayer().teamId];
       }
-
       function ensureMyTurn() {
-        if (!state) return false;
-        if (state.finished) {
-          showMessage('Jogo já terminou.');
+        if (!state || state.finished) {
+          showMessage('Fim de jogo.');
           return false;
         }
         if (state.currentPlayer !== myPlayerIndex) {
-          showMessage('Não é sua vez.');
+          showMessage('Aguarde sua vez.');
           return false;
         }
         return true;
       }
-
       async function commitState() {
         await updateDoc(gameRef, { stateJson: JSON.stringify(state) });
       }
@@ -1892,17 +1202,14 @@
       async function drawFromStock() {
         if (!ensureMyTurn()) return;
         if (state.hasDrawnThisTurn) {
-          showMessage('Você já comprou neste turno.');
+          showMessage('Já comprou.');
           return;
         }
         if (!state.stock.length) {
-          // tenta virar os mortos restantes em novo monte
           if (!recycleDeadToStockIfPossible() || !state.stock.length) {
-            showMessage('Monte vazio e nenhum morto restante para virar monte.');
+            showMessage('Monte vazio.');
             return;
-          } else {
-            showMessage('Monte acabou – o morto restante virou novo monte.');
-          }
+          } else showMessage('Morto virou monte.');
         }
         const c = state.stock.pop();
         currentPlayer().hand.push(c);
@@ -1913,26 +1220,16 @@
 
       function canUseDiscardInClosed(discardTop, hand, team) {
         if (!discardTop) return false;
-
         const n = hand.length;
-
-        // A) Novo jogo usando a carta do descarte + cartas da mão
         const pool = hand.concat([discardTop]);
         const idxTopo = pool.length - 1;
         const totalMasks = 1 << pool.length;
-
         for (let mask = 0; mask < totalMasks; mask++) {
-          if (!(mask & (1 << idxTopo))) continue; // tem que usar o topo
+          if (!(mask & (1 << idxTopo))) continue;
           const subset = [];
-          for (let i = 0; i < pool.length; i++) {
-            if (mask & (1 << i)) subset.push(pool[i]);
-          }
-          if (subset.length >= 3 && isValidSequenceMeld(subset)) {
-            return true;
-          }
+          for (let i = 0; i < pool.length; i++) if (mask & (1 << i)) subset.push(pool[i]);
+          if (subset.length >= 3 && isValidSequenceMeld(subset)) return true;
         }
-
-        // B) Estender jogo existente na mesa usando a carta do descarte
         if (team && team.melds && team.melds.length) {
           for (const meld of team.melds) {
             const base = meld;
@@ -1940,266 +1237,158 @@
             for (let mask = 0; mask < maxMask2; mask++) {
               const subset = base.slice();
               subset.push(discardTop);
-
-              for (let i = 0; i < n; i++) {
-                if (mask & (1 << i)) subset.push(hand[i]);
-              }
-
-              if (isValidSequenceMeld(subset)) {
-                return true;
-              }
+              for (let i = 0; i < n; i++) if (mask & (1 << i)) subset.push(hand[i]);
+              if (isValidSequenceMeld(subset)) return true;
             }
           }
         }
-
         return false;
       }
 
       async function drawFromDiscard() {
         if (!ensureMyTurn()) return;
-
         if (state.hasDrawnThisTurn) {
-          showMessage('Você já comprou neste turno.');
+          showMessage('Já comprou.');
           return;
         }
         if (!state.discard.length) {
-          showMessage('Pilha de descarte vazia.');
+          showMessage('Lixo vazio.');
           return;
         }
-
         const top = state.discard[state.discard.length - 1];
         const me = currentPlayer();
-
         if (state.variant === 'fechado') {
           const canUse = canUseDiscardInClosed(top, me.hand, currentTeam());
           if (!canUse) {
-            showMessage('Buraco fechado: você só pode comprar do descarte se essa carta servir imediatamente para a mão ou para a mesa.');
+            showMessage('Fechado: a carta deve servir p/ jogo.');
             return;
           }
         }
-
-        // 👉 LEVA TODO O DESCARTE PRA MÃO
-        const pile = state.discard.splice(0, state.discard.length); // esvazia o descarte
+        const pile = state.discard.splice(0, state.discard.length);
         me.hand.push(...pile);
         sortHand(me.hand);
         state.hasDrawnThisTurn = true;
-
-        // no fechado, continua exigindo usar a carta do topo naquele turno
-        if (state.variant === 'fechado') {
-          state.requiredDiscardCard = { rank: top.rank, suit: top.suit, joker: !!top.joker };
-        } else {
-          state.requiredDiscardCard = null;
-        }
-
+        if (state.variant === 'fechado') state.requiredDiscardCard = { rank: top.rank, suit: top.suit, joker: !!top.joker };
+        else state.requiredDiscardCard = null;
         await commitState();
       }
 
       function isValidSequenceMeld(cards) {
         if (!cards || cards.length < 3) return false;
-
-        // 👉 REGRA DO BURACO NORMAL:
-        // no máximo 1 coringa por jogo (Joker OU 2 usado como coringa)
         const wildCards = cards.filter((c) => isWildcard(c, cards));
-        if (wildCards.length > 1) {
-          return false;
-        }
-
-        // Remove apenas os que são coringas *no contexto desse jogo*
+        if (wildCards.length > 1) return false;
         const nonWild = cards.filter((c) => !isWildcard(c, cards));
         if (!nonWild.length) return false;
-
-        // Todos os não-coringa precisam ter o mesmo naipe
         const suit = nonWild[0].suit;
         if (!nonWild.every((c) => c.suit === suit)) return false;
-
-        // Quantos coringas temos disponíveis (Joker + 2 usados como coringa)
         const availableWilds = cards.length - nonWild.length;
 
-        // Ajuda: converte ranks em índices para um dado "order"
         function neededWildsForOrder(order, aceMode) {
           const seqOrder = {};
-          order.forEach((r, idx) => (seqOrder[r] = idx));
-
-          // Ordena os não-coringa pela sequência escolhida
+          order.forEach((r, i) => (seqOrder[r] = i));
           const sorted = nonWild.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
-
-          // Regra do Ás: não pode ficar no meio
           const acePosInOrder = seqOrder['A'];
           const aceIndex = sorted.findIndex((c) => c.rank === 'A');
           if (aceIndex !== -1) {
-            // aceMode 'high' => Ás só no topo da sequência
-            if (aceMode === 'high' && aceIndex !== sorted.length - 1) {
-              return null;
-            }
-            // aceMode 'low' => Ás só na base da sequência
-            if (aceMode === 'low' && aceIndex !== 0) {
-              return null;
-            }
-            // aceMode 'none' => proibido Ás nesse modo
-            if (aceMode === 'none') {
-              return null;
-            }
+            if (aceMode === 'high' && aceIndex !== sorted.length - 1) return null;
+            if (aceMode === 'low' && aceIndex !== 0) return null;
+            if (aceMode === 'none') return null;
           }
-
-          // Conta buracos entre cartas não-coringa
           let needed = 0;
           for (let i = 1; i < sorted.length; i++) {
-            const prevRank = sorted[i - 1].rank;
-            const currRank = sorted[i].rank;
-
-            const prevIdx = seqOrder[prevRank];
-            const currIdx = seqOrder[currRank];
-
-            if (prevIdx == null || currIdx == null) return null;
-
-            const diff = currIdx - prevIdx;
-
-            if (diff === 0) return null; // repetiu rank (ex.: 5 5)
-            if (diff < 0) return null; // voltou na sequência (não é crescente)
-
-            // Se tem gap, precisa de (diff - 1) coringas
-            if (diff > 1) {
-              needed += diff - 1;
-            }
+            const prev = seqOrder[sorted[i - 1].rank];
+            const curr = seqOrder[sorted[i].rank];
+            if (prev == null || curr == null) return null;
+            const diff = curr - prev;
+            if (diff <= 0) return null;
+            if (diff > 1) needed += diff - 1;
           }
-
           return needed;
         }
-
-        // Tenta modo Ás alto (2 3 ... K A)
         const needHigh = neededWildsForOrder(RANKS_SEQ, 'high');
-
-        // Tenta modo Ás baixo (A 2 3 ... K)
         const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low');
-
-        const okHigh = needHigh !== null && needHigh <= availableWilds;
-        const okLow = needLow !== null && needLow <= availableWilds;
-
-        return okHigh || okLow;
+        return (needHigh !== null && needHigh <= availableWilds) || (needLow !== null && needLow <= availableWilds);
       }
 
       async function attemptExtendExistingMeld(cards, indexes) {
         const team = currentTeam();
         if (!team.melds || !team.melds.length) return false;
-
         const hand = currentPlayer().hand;
-
-        // Se você clicou em um jogo específico, tenta SÓ nele
         let forcedIndex = null;
         if (selectedMeldTarget) {
           const [teamIdStr, meldIdxStr] = selectedMeldTarget.split(':');
-          const teamIdNum = parseInt(teamIdStr, 10);
-          const meldIdxNum = parseInt(meldIdxStr, 10);
-          if (!Number.isNaN(teamIdNum) && !Number.isNaN(meldIdxNum) && teamIdNum === team.id && team.melds[meldIdxNum]) {
-            forcedIndex = meldIdxNum;
-          }
+          if (parseInt(teamIdStr) === team.id && team.melds[parseInt(meldIdxStr)]) forcedIndex = parseInt(meldIdxStr);
         }
-
         if (forcedIndex !== null) {
           const targetMeld = team.melds[forcedIndex];
           const combined = targetMeld.concat(cards);
-
           if (!isValidSequenceMeld(combined)) {
-            showMessage('Essas cartas não encaixam nesse jogo selecionado.');
+            showMessage('Não encaixa.');
             return false;
           }
-
-          // move as cartas da mão para o jogo
           for (const idx of indexes) {
             targetMeld.push(hand[idx]);
             hand.splice(idx, 1);
           }
-
           normalizeMeldOrder(targetMeld);
           sortHand(hand);
           selectedHandIndexes.clear();
-          selectedMeldTarget = null; // limpamos a seleção depois de usar
+          selectedMeldTarget = null;
           await commitState();
-          showMessage('Cartas encaixadas no jogo selecionado.');
+          showMessage('Cartas adicionadas!');
           return true;
         }
-
-        // Se você NÃO selecionou jogo, volta pro comportamento automático
         const candidateMeldIndexes = [];
         team.melds.forEach((meld, idx) => {
-          const combined = meld.concat(cards);
-          if (isValidSequenceMeld(combined)) {
-            candidateMeldIndexes.push(idx);
-          }
+          if (isValidSequenceMeld(meld.concat(cards))) candidateMeldIndexes.push(idx);
         });
-
-        if (!candidateMeldIndexes.length) {
-          // nenhuma canastra aceita essas cartas
-          return false;
-        }
-
+        if (!candidateMeldIndexes.length) return false;
         if (candidateMeldIndexes.length > 1) {
-          showMessage('Essas cartas encaixam em mais de um jogo. Clique primeiro no jogo desejado na mesa e tente de novo.');
+          showMessage('Encaixa em vários. Selecione o jogo.');
           return false;
         }
-
-        const meldIndex = candidateMeldIndexes[0];
-        const teamMeld = team.melds[meldIndex];
-
+        const teamMeld = team.melds[candidateMeldIndexes[0]];
         for (const idx of indexes) {
           teamMeld.push(hand[idx]);
           hand.splice(idx, 1);
         }
-
         normalizeMeldOrder(teamMeld);
         sortHand(hand);
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
         await commitState();
-        showMessage('Cartas encaixadas em um jogo já existente.');
         return true;
       }
 
       async function makeMeldFromSelection() {
         if (!ensureMyTurn()) return;
         if (!state.hasDrawnThisTurn) {
-          showMessage('Compre antes de baixar jogo.');
+          showMessage('Compre primeiro.');
           return;
         }
-
         const hand = currentPlayer().hand;
         const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
-
         if (!indexes.length) {
-          showMessage('Selecione pelo menos 1 carta.');
+          showMessage('Selecione cartas.');
           return;
         }
-
         const cards = indexes.map((i) => hand[i]);
-
-        // 1) TENTATIVA DE ENCAIXAR EM JOGO EXISTENTE (PODE SER 1 OU 2 CARTAS)
         const extended = await attemptExtendExistingMeld(cards, indexes);
-        if (extended) {
-          // já encaixou num jogo existente, acabou
-          return;
-        }
-
-        // 2) SE NÃO ENCAIXOU EM NENHUM, SÓ ENTÃO TENTA ABRIR JOGO NOVO
+        if (extended) return;
         if (indexes.length < 3) {
-          showMessage('Um novo jogo precisa de pelo menos 3 cartas. Para estender, selecione cartas que realmente encaixem em um jogo já baixado.');
+          showMessage('Novo jogo: mín 3 cartas.');
           return;
         }
-
         if (!isValidSequenceMeld(cards)) {
-          showMessage('Jogo inválido. Precisa ser sequência do mesmo naipe, com curingas opcionais (Ás pode estar no topo).');
+          showMessage('Sequência inválida.');
           return;
         }
-
-        // cria jogo novo (lógica antiga)
         const meld = [];
         for (const idx of indexes) {
           meld.unshift(hand[idx]);
           hand.splice(idx, 1);
         }
-
-        // arruma a ordem da canastra visualmente
         normalizeMeldOrder(meld);
-
         currentTeam().melds.push(meld);
         selectedHandIndexes.clear();
         await commitState();
@@ -2209,43 +1398,28 @@
         if (!ensureMyTurn()) return;
         const p = currentPlayer();
         const teamId = p.teamId;
-
         const taken = state.deadChunksTaken?.[teamId] ?? 0;
         const max = state.deadChunksMax?.[teamId] ?? 1;
-
         if (taken >= max) {
-          showMessage('Sua equipe já pegou todos os mortos permitidos.');
+          showMessage('Sem mortos p/ sua equipe.');
           return;
         }
         if (p.hand.length > 0) {
-          showMessage('Só pode pegar o morto quando ficar sem cartas na mão (usou todas em jogos).');
+          showMessage('Mão deve estar vazia.');
           return;
         }
-
-        // por padrão, cada equipe pega seu próprio morto (índice = teamId)
         let deadIndex = teamId;
-
-        // Modo humilhação:
-        // - equipe 1 (teamId = 0) continua só pegando o próprio
-        // - equipe 2 (teamId = 1) no SEGUNDO morto pode pegar qualquer morto que sobrou
         if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
-          // tenta primeiro o próprio
-          if (!state.deadPiles[deadIndex].length) {
-            // se o dele já acabou, tenta o do outro time
-            deadIndex = 0;
-          }
+          if (!state.deadPiles[deadIndex].length) deadIndex = 0;
         }
-
         const dead = state.deadPiles[deadIndex];
         if (!dead || !dead.length) {
-          showMessage('Não há mais morto disponível para pegar.');
+          showMessage('Morto vazio.');
           return;
         }
-
         const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
         p.hand = dead.splice(0, chunkSize);
         sortHand(p.hand);
-        // o contador continua por equipe (J2 conta quantos mortos já pegou, não de qual monte)
         state.deadChunksTaken[teamId] = taken + 1;
         await commitState();
       }
@@ -2253,37 +1427,30 @@
       async function discardSelectedCard() {
         if (!ensureMyTurn()) return;
         if (!state.hasDrawnThisTurn) {
-          showMessage('Compre uma carta antes de descartar.');
+          showMessage('Compre primeiro.');
           return;
         }
-
         if (state.variant === 'fechado' && state.requiredDiscardCard) {
           const must = state.requiredDiscardCard;
           const stillInHand = currentPlayer().hand.some((c) => c.rank === must.rank && c.suit === must.suit && !!c.joker === !!must.joker);
           if (stillInHand) {
-            showMessage('Você comprou do descarte neste turno (' + cardLabel(must) + '). Use essa carta em um jogo antes de descartar para encerrar o turno.');
+            showMessage('Use a carta do lixo antes.');
             return;
-          } else {
-            state.requiredDiscardCard = null;
           }
         }
-
         const hand = currentPlayer().hand;
         const indexes = Array.from(selectedHandIndexes);
         if (indexes.length !== 1) {
-          showMessage('Para descartar, selecione exatamente 1 carta.');
+          showMessage('Selecione 1 carta.');
           return;
         }
-
         const index = indexes[0];
         const card = hand.splice(index, 1)[0];
         state.discard.push(card);
         selectedHandIndexes.clear();
-
         const teamId = currentPlayer().teamId;
         const taken = state.deadChunksTaken?.[teamId] ?? 0;
         const max = state.deadChunksMax?.[teamId] ?? 1;
-
         if (hand.length === 0 && taken >= max) {
           await finishGame(teamId);
           return;
@@ -2291,12 +1458,8 @@
 
         if (state.mode === '1x1_duploMorto') {
           if (state.currentPlayer === 1) {
-            if (!state.j2ConsecutiveTurns || state.j2ConsecutiveTurns === 0) {
-              state.j2ConsecutiveTurns = 1;
-            } else {
-              state.currentPlayer = 0;
-              state.j2ConsecutiveTurns = 0;
-            }
+            state.j2ConsecutiveTurns = !state.j2ConsecutiveTurns ? 1 : 0;
+            if (state.j2ConsecutiveTurns === 0) state.currentPlayer = 0;
           } else {
             state.currentPlayer = 1;
             state.j2ConsecutiveTurns = 0;
@@ -2304,142 +1467,66 @@
         } else {
           state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
         }
-
         state.requiredDiscardCard = null;
         state.hasDrawnThisTurn = false;
         await commitState();
       }
 
       function computeTeamMeldScore(team) {
-        let meldPoints = 0; // soma dos pontos das cartas baixadas
-        let sujaBonus = 0; // canastras sujas  = +100
-        let limpaBonus = 0; // canastras limpas = +200
-        let realBonus = 0; // canastras reais  = +500
-        let asasBonus = 0; // Ás a Ás          = +1000
-
-        if (!team || !team.melds) {
-          return {
-            meldPoints: 0,
-            sujaBonus: 0,
-            limpaBonus: 0,
-            realBonus: 0,
-            asasBonus: 0,
-            total: 0,
-          };
-        }
-
+        let meldPoints = 0,
+          sujaBonus = 0,
+          limpaBonus = 0,
+          realBonus = 0,
+          asasBonus = 0;
+        if (!team || !team.melds) return { total: 0 };
         team.melds.forEach((meld) => {
-          // pontos das cartas do jogo
-          for (const card of meld) {
-            meldPoints += cardBasePoints(card);
-          }
-
-          // bônus de canastra (mínimo 7 cartas)
+          meld.forEach((c) => (meldPoints += cardBasePoints(c)));
           if (meld.length >= 7) {
             const info = classifyMeldForUi(meld);
-            switch (info.kind) {
-              case 'suja':
-                sujaBonus += 100;
-                break;
-              case 'limpa':
-                limpaBonus += 200;
-                break;
-              case 'real':
-                realBonus += 500;
-                break;
-              case 'asas':
-                asasBonus += 1000;
-                break;
-            }
+            if (info.kind === 'suja') sujaBonus += 100;
+            if (info.kind === 'limpa') limpaBonus += 200;
+            if (info.kind === 'real') realBonus += 500;
+            if (info.kind === 'asas') asasBonus += 1000;
           }
         });
-
-        const total = meldPoints + sujaBonus + limpaBonus + realBonus + asasBonus;
-
-        return {
-          meldPoints,
-          sujaBonus,
-          limpaBonus,
-          realBonus,
-          asasBonus,
-          total,
-        };
+        return { meldPoints, sujaBonus, limpaBonus, realBonus, asasBonus, total: meldPoints + sujaBonus + limpaBonus + realBonus + asasBonus };
       }
 
       function normalizeMeldOrder(meld) {
+        // (Lógica complexa de ordenação mantida intacta)
         if (!meld || !meld.length) return;
-
-        // Usa o contexto do próprio jogo pra decidir se o 2 é coringa ou não
         const nonWild = meld.filter((c) => !isWildcard(c, meld));
         const wild = meld.filter((c) => isWildcard(c, meld));
-
-        // Só tem coringa? Mantém tudo junto
         if (!nonWild.length) {
           meld.splice(0, meld.length, ...wild);
           return;
         }
-
         const availableWilds = wild.length;
-
-        // Mesma ideia do isValidSequenceMeld: vê quantos curingas precisa
         function neededWildsForOrder(order, aceMode) {
           const seqOrder = {};
-          order.forEach((r, idx) => (seqOrder[r] = idx));
-
-          // Ordena as cartas naturais na ordem escolhida
+          order.forEach((r, i) => (seqOrder[r] = i));
           const sorted = nonWild.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
-
-          // Regra do Ás: nunca no meio da sequência
           const aceIndex = sorted.findIndex((c) => c.rank === 'A');
           if (aceIndex !== -1) {
-            if (aceMode === 'high' && aceIndex !== sorted.length - 1) {
-              return null; // Ás alto tem que ser o último
-            }
-            if (aceMode === 'low' && aceIndex !== 0) {
-              return null; // Ás baixo tem que ser o primeiro
-            }
-            if (aceMode === 'none') {
-              return null;
-            }
+            if (aceMode === 'high' && aceIndex !== sorted.length - 1) return null;
+            if (aceMode === 'low' && aceIndex !== 0) return null;
+            if (aceMode === 'none') return null;
           }
-
-          // Conta buracos entre cartas não-coringa
           let needed = 0;
           for (let i = 1; i < sorted.length; i++) {
-            const prevRank = sorted[i - 1].rank;
-            const currRank = sorted[i].rank;
-
-            const prevIdx = seqOrder[prevRank];
-            const currIdx = seqOrder[currRank];
-
-            if (prevIdx == null || currIdx == null) return null;
-
-            const diff = currIdx - prevIdx;
-
-            if (diff === 0) return null; // rank repetido
-            if (diff < 0) return null; // voltou na sequência
-
-            // se tem gap, precisa de (diff - 1) curingas
-            if (diff > 1) {
-              needed += diff - 1;
-            }
+            const diff = seqOrder[sorted[i].rank] - seqOrder[sorted[i - 1].rank];
+            if (diff <= 0) return null;
+            if (diff > 1) needed += diff - 1;
           }
-
           return needed;
         }
-
-        // Testa as duas ordens possíveis
-        const needHigh = neededWildsForOrder(RANKS_SEQ, 'high'); // 2 3 ... K A
-        const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low'); // A 2 3 ... K
-
+        const needHigh = neededWildsForOrder(RANKS_SEQ, 'high');
+        const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low');
         const okHigh = needHigh !== null && needHigh <= availableWilds;
         const okLow = needLow !== null && needLow <= availableWilds;
 
-        let order;
-        let aceMode;
-
+        let order, aceMode;
         if (okHigh && okLow) {
-          // Se as duas funcionam, pega a que usa MENOS curingas
           if (needHigh <= needLow) {
             order = RANKS_SEQ;
             aceMode = 'high';
@@ -2453,90 +1540,42 @@
         } else if (okLow) {
           order = RANKS_SEQ_LOW;
           aceMode = 'low';
-        } else {
-          // Se por algum motivo não encaixar em nenhuma, não mexe na ordem
-          return;
-        }
+        } else return;
 
         const seqOrder = {};
-        order.forEach((r, idx) => (seqOrder[r] = idx));
-
-        // Ordena só as cartas naturais
+        order.forEach((r, i) => (seqOrder[r] = i));
         const sortedNonWild = nonWild.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
-
         const middle = [];
         const wildQueue = [...wild];
-
-        // Monta sequência preenchendo os buracos com curingas
         for (let i = 0; i < sortedNonWild.length; i++) {
-          const curr = sortedNonWild[i];
-          middle.push(curr);
-
+          middle.push(sortedNonWild[i]);
           if (i < sortedNonWild.length - 1) {
-            const next = sortedNonWild[i + 1];
-            const diff = seqOrder[next.rank] - seqOrder[curr.rank];
-
-            let gap = diff - 1;
+            let gap = seqOrder[sortedNonWild[i + 1].rank] - seqOrder[sortedNonWild[i].rank] - 1;
             while (gap > 0 && wildQueue.length) {
               middle.push(wildQueue.shift());
               gap--;
             }
           }
         }
-
-        // Curingas que sobraram vão pro lado “aberto” da sequência:
-        // - Ás alto: curingas antes (ex.: 2 Q K A)
-        // - Ás baixo: curingas depois (ex.: A 2 3 4 JOKER)
         const prefix = [];
         const suffix = [];
-
         if (aceMode === 'high') {
-          while (wildQueue.length) {
-            prefix.push(wildQueue.shift());
-          }
+          while (wildQueue.length) prefix.push(wildQueue.shift());
         } else {
-          while (wildQueue.length) {
-            suffix.push(wildQueue.shift());
-          }
+          while (wildQueue.length) suffix.push(wildQueue.shift());
         }
-
-        const finalMeld = [...prefix, ...middle, ...suffix];
-
-        // substitui mantendo a mesma referência
-        meld.splice(0, meld.length, ...finalMeld);
+        meld.splice(0, meld.length, ...prefix, ...middle, ...suffix);
       }
 
       function computeScores() {
         const results = [];
-
         state.teams.forEach((team) => {
           const players = state.players.filter((p) => p.teamId === team.id);
-
-          // penalidade: pontos das cartas que ficaram na mão
           let handPenalty = 0;
-          players.forEach((p) => {
-            p.hand.forEach((card) => {
-              handPenalty += cardBasePoints(card);
-            });
-          });
-
+          players.forEach((p) => p.hand.forEach((c) => (handPenalty += cardBasePoints(c))));
           const meldInfo = computeTeamMeldScore(team);
-
-          const score = meldInfo.total - handPenalty;
-
-          results.push({
-            team,
-            players,
-            score,
-            handPenalty,
-            meldPoints: meldInfo.meldPoints,
-            sujaBonus: meldInfo.sujaBonus,
-            limpaBonus: meldInfo.limpaBonus,
-            realBonus: meldInfo.realBonus,
-            asasBonus: meldInfo.asasBonus,
-          });
+          results.push({ team, players, score: meldInfo.total - handPenalty, handPenalty, ...meldInfo });
         });
-
         return results;
       }
 
@@ -2547,480 +1586,91 @@
         await commitState();
       }
 
+      // RENDER
       function renderAll() {
         if (!state) return;
-        renderState();
-        renderHand();
-        renderMelds();
-        renderOpponentHands(); // NOVO
-        updateButtons();
-
-        const itsMyTurn = !state.finished && state.currentPlayer === myPlayerIndex;
-        document.body.classList.toggle('my-turn', itsMyTurn);
-      }
-
-      function renderState() {
-        document.getElementById('currentPlayerLabel').textContent = currentPlayer().name + (state.finished ? ' (fim de jogo)' : '');
+        document.getElementById('currentPlayerLabel').textContent = currentPlayer().name;
         document.getElementById('stockCount').textContent = state.stock.length;
 
+        // Descarte
         const discardTop = state.discard[state.discard.length - 1];
-        document.getElementById('discardTop').textContent = discardTop ? cardLabel(discardTop) : '—';
         document.getElementById('discardCount').textContent = state.discard.length;
-
         const discardFace = document.getElementById('discardFace');
-        const faceTop = document.getElementById('discardFaceTop');
-        const faceBottom = document.getElementById('discardFaceBottom');
-
-        if (!discardTop) {
-          discardFace.style.display = 'none';
-        } else {
+        const fTop = document.getElementById('discardFaceTop');
+        const fBot = document.getElementById('discardFaceBottom');
+        if (!discardTop) discardFace.style.display = 'none';
+        else {
           discardFace.style.display = 'flex';
           if (discardTop.joker) {
-            faceTop.textContent = 'JOKER';
-            faceBottom.textContent = 'JOKER';
+            fTop.textContent = '★';
+            fBot.textContent = '★';
             discardFace.style.color = '#b45309';
           } else {
-            faceTop.innerHTML = discardTop.rank + '<br>' + discardTop.suit.toString();
-            faceBottom.textContent = discardTop.suit.toString();
-            const red = discardTop.suit === '♥' || discardTop.suit === '♦';
-            discardFace.style.color = red ? '#b91c1c' : '#020617';
+            fTop.innerHTML = discardTop.rank + '<br>' + discardTop.suit;
+            fBot.textContent = discardTop.suit;
+            discardFace.style.color = discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
           }
         }
 
-        // document.getElementById('dead1Count').textContent = state.deadPiles[0].length;
-        // document.getElementById('dead2Count').textContent = state.deadPiles[1].length;
-
-        // --- LÓGICA VISUAL DOS MORTOS ---
-        // Slot 0 representa o morto da Equipe 1 (ou J1)
-        // Slot 1 representa o morto da Equipe 2 (ou J2/Dupla)
-
-        const slot0 = document.getElementById('mortoSlot0');
-        const slot1 = document.getElementById('mortoSlot1');
-
-        if (state.deadPiles && state.deadPiles.length >= 2) {
-          // Verifica morto da equipe 1
-          if (state.deadPiles[0].length === 0) {
-            slot0.classList.add('used');
-          } else {
-            slot0.classList.remove('used');
-            // Opcional: mostrar quantas cartas tem no tooltip
-            slot0.title = state.deadPiles[0].length + ' cartas';
-          }
-
-          // Verifica morto da equipe 2
-          if (state.deadPiles[1].length === 0) {
-            slot1.classList.add('used');
-          } else {
-            slot1.classList.remove('used');
-            slot1.title = state.deadPiles[1].length + ' cartas';
-          }
+        // Mortos
+        const s0 = document.getElementById('mortoSlot0');
+        const s1 = document.getElementById('mortoSlot1');
+        if (state.deadPiles.length >= 2) {
+          s0.classList.toggle('used', state.deadPiles[0].length === 0);
+          s1.classList.toggle('used', state.deadPiles[1].length === 0);
         }
 
-        // Se o array do morto estiver vazio, adiciona a classe .used (some)
-        // Se tiver cartas, remove a classe .used (aparece)
-        // if (state.deadPiles[0].length === 0) {
-        //   m1Container.classList.add('used');
-        // } else {
-        //   m1Container.classList.remove('used');
-        // }
+        // Mãos Oponentes
+        renderOpponentHands();
 
-        // if (state.deadPiles[1].length === 0) {
-        //   m2Container.classList.add('used');
-        // } else {
-        //   m2Container.classList.remove('used');
-        // }
+        // Minha Mão
+        renderHand();
 
-        const subtitle = document.getElementById('subtitleGameInfo');
-        if (subtitle && state) {
-          let modo;
-          if (state.mode === '1x1') modo = '1 x 1';
-          else if (state.mode === '2x2') modo = '2 x 2';
-          else if (state.mode === '1x2') modo = '1 x 2';
-          else if (state.mode === '1x1_duploMorto') modo = '1 x 1 Humilhação';
-          else modo = state.mode || '';
-          const tipo = state.variant === 'fechado' ? 'Buraco fechado' : 'Buraco aberto';
-          subtitle.textContent = `${modo} · ${tipo} · Sala ${gameId}`;
-        }
+        // Jogos
+        renderMelds();
 
-        if (state.finished) {
-          const scores = computeScores();
-          renderScores(scores, state.winnerTeamId ?? null);
-        }
-      }
+        // Botões
+        const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+        document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
+        document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn ? '1' : '0.5';
 
-      function createCardElement(card, idx) {
-        const div = document.createElement('div');
+        document.getElementById('drawDiscardBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn && state.discard.length ? 'auto' : 'none';
+        document.getElementById('drawDiscardBtn').style.opacity = myTurn && !state.hasDrawnThisTurn && state.discard.length ? '1' : '0.5';
 
-        if (card.joker) {
-          div.className = 'carta joker-card';
+        document.getElementById('meldBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
+        document.getElementById('discardBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
 
-          const canto = document.createElement('div');
-          canto.className = 'carta-canto';
-          canto.innerHTML = '<div>JOKER</div>';
+        const teamId = currentPlayer().teamId;
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+        document.getElementById('takeDeadBtn').disabled = !myTurn || taken >= max;
+        document.getElementById('endGameBtn').disabled = false;
 
-          const icone = document.createElement('div');
-          icone.className = 'carta-icone';
-          icone.textContent = '🃏'; // bobo da corte no centro
-
-          div.appendChild(canto);
-          div.appendChild(icone);
-        } else {
-          let suitId;
-          if (card.suit === '♥') suitId = 'hearts';
-          else if (card.suit === '♦') suitId = 'diamonds';
-          else if (card.suit === '♣') suitId = 'clubs';
-          else suitId = 'spades';
-
-          div.className = 'carta ' + suitId;
-          const canto = document.createElement('div');
-          canto.className = 'carta-canto';
-          canto.innerHTML = '<div>' + card.rank + '</div><div>' + card.suit + '</div>';
-          const icone = document.createElement('div');
-          icone.className = 'carta-icone';
-          icone.textContent = card.suit;
-          div.appendChild(canto);
-          div.appendChild(icone);
-        }
-
-        if (selectedHandIndexes.has(idx)) {
-          div.classList.add('selected');
-        }
-
-        div.title = 'Clique para selecionar. Use "Descartar carta" para jogar fora.';
-        div.addEventListener('click', () => {
-          if (!state || state.currentPlayer !== myPlayerIndex || !state.hasDrawnThisTurn) {
-            showMessage('Primeiro compre, e só o jogador da vez pode selecionar.');
-            return;
-          }
-          if (selectedHandIndexes.has(idx)) {
-            selectedHandIndexes.delete(idx);
-          } else {
-            selectedHandIndexes.add(idx);
-          }
-          renderHand();
-        });
-
-        return div;
-      }
-
-      function createCardElementMini(card, indexInMeld) {
-        const div = document.createElement('div');
-
-        if (card.joker) {
-          div.className = 'carta mini joker-card';
-          const canto = document.createElement('div');
-          canto.className = 'carta-canto';
-          canto.innerHTML = '<div>★</div><div>★</div>';
-          const icone = document.createElement('div');
-          icone.className = 'carta-icone';
-          icone.textContent = '★';
-          div.appendChild(canto);
-          div.appendChild(icone);
-        } else {
-          let suitId;
-          if (card.suit === '♥') suitId = 'hearts';
-          else if (card.suit === '♦') suitId = 'diamonds';
-          else if (card.suit === '♣') suitId = 'clubs';
-          else suitId = 'spades';
-
-          div.className = 'carta mini ' + suitId;
-          const canto = document.createElement('div');
-          canto.className = 'carta-canto';
-          canto.innerHTML = '<div>' + card.rank + '</div><div>' + card.suit + '</div>';
-          const icone = document.createElement('div');
-          icone.className = 'carta-icone';
-          icone.textContent = card.suit;
-          div.appendChild(canto);
-          div.appendChild(icone);
-        }
-
-        // Não usamos mais position absolute; o layout é via flex + margin-right
-        div.style.position = '';
-        div.style.left = '';
-        div.style.top = '';
-        div.style.zIndex = indexInMeld;
-
-        return div;
-      }
-
-      function renderOpponentHands() {
-        const topEl = document.getElementById('opponentTop');
-        const leftEl = document.getElementById('opponentLeft');
-        const rightEl = document.getElementById('opponentRight');
-
-        if (!state || !topEl || !leftEl || !rightEl) return;
-
-        // limpa visual
-        [topEl, leftEl, rightEl].forEach((el) => (el.innerHTML = ''));
-
-        const playerCount = state.players.length;
-        if (!playerCount) return;
-
-        // você sempre embaixo
-        const seats = {
-          bottom: myPlayerIndex,
-          right: null,
-          top: null,
-          left: null,
-        };
-
-        const others = [];
-        for (let i = 1; i < playerCount; i++) {
-          others.push((myPlayerIndex + i) % playerCount);
-        }
-
-        if (playerCount === 2) {
-          // 1x1: outro em cima
-          seats.top = others[0];
-        } else if (playerCount === 3) {
-          // 1x2 / 2x1: lados
-          seats.right = others[0];
-          seats.left = others[1];
-        } else if (playerCount >= 4) {
-          // 2x2: direita, cima, esquerda
-          seats.right = others[0];
-          seats.top = others[1];
-          seats.left = others[2];
-        }
-
-        function buildOpponentSeat(playerIndex, container, orientation) {
-          if (playerIndex == null) return;
-          const player = state.players[playerIndex];
-          if (!player) return;
-
-          const cardsInHand = player.hand ? player.hand.length : 0;
-
-          const label = document.createElement('div');
-          label.className = 'opponent-label';
-          label.textContent = `${player.name} (${cardsInHand})`;
-
-          const cardsWrap = document.createElement('div');
-          cardsWrap.className = 'opponent-cards';
-
-          // não desenhar 40 cartas na tela – usa “amostragem”
-          const maxCards = orientation === 'vertical' ? 8 : 12;
-          const step = cardsInHand > maxCards ? Math.ceil(cardsInHand / maxCards) : 1;
-
-          for (let i = 0; i < cardsInHand; i += step) {
-            const back = document.createElement('div');
-            back.className = 'opponent-card-back';
-            cardsWrap.appendChild(back);
-          }
-
-          container.appendChild(label);
-          container.appendChild(cardsWrap);
-        }
-
-        buildOpponentSeat(seats.top, topEl, 'horizontal');
-        buildOpponentSeat(seats.left, leftEl, 'vertical');
-        buildOpponentSeat(seats.right, rightEl, 'vertical');
+        if (state.finished) renderScores(computeScores(), state.winnerTeamId);
       }
 
       function renderHand() {
-        const container = document.getElementById('handContainer');
+        const container = document.querySelector('#handContainer .cards-row');
         container.innerHTML = '';
-        const row = document.createElement('div');
-        row.className = 'cards-row';
-
-        if (!state) return;
-
         const me = state.players[myPlayerIndex];
         document.getElementById('handCountLabel').textContent = me.hand.length;
-
         me.hand.forEach((card, idx) => {
-          const elem = createCardElement(card, idx);
-          row.appendChild(elem);
-        });
-
-        container.appendChild(row);
-      }
-
-      function renderMelds() {
-        const m1 = document.getElementById('meldsP1');
-        const m2 = document.getElementById('meldsP2');
-        m1.innerHTML = '';
-        m2.innerHTML = '';
-
-        let t1Score = 0;
-        let t2Score = 0;
-
-        const me = state.players[myPlayerIndex];
-        const myTeamId = me ? me.teamId : 0;
-
-        state.teams.forEach((team, idx) => {
-          const target = idx === 0 ? m1 : m2;
-          const players = state.players.filter((p) => p.teamId === team.id);
-          const playersNames = players.map((p) => p.name).join(' & ');
-
-          const meldScoreInfo = computeTeamMeldScore(team);
-          if (idx === 0) t1Score = meldScoreInfo.total;
-          else t2Score = meldScoreInfo.total;
-
-          const isMyTeam = team.id === myTeamId;
-
-          // Cabeçalho dos jogadores daquela equipe
-          const header = document.createElement('div');
-          header.style.fontSize = '11px';
-          header.style.color = '#9ca3af';
-          header.style.marginBottom = '4px';
-          header.textContent = 'Jogadores: ' + playersNames + (isMyTeam ? ' (você)' : '');
-          target.appendChild(header);
-
-          if (!team.melds.length) {
-            const empty = document.createElement('div');
-            empty.textContent = (isMyTeam ? 'Sua equipe ainda não baixou jogo.' : 'Nenhum jogo baixado ainda.') + ' (' + playersNames + ')';
-            empty.style.fontSize = '12px';
-            empty.style.color = '#9ca3af';
-            target.appendChild(empty);
-            return;
-          }
-
-          team.melds.forEach((meld, meldIndex) => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'meld-line';
-            if (isMyTeam) wrapper.classList.add('my-team-meld');
-
-            const meldKey = team.id + ':' + meldIndex;
-            if (selectedMeldTarget === meldKey) {
-              wrapper.classList.add('selected-meld');
-            }
-
-            const cardsRow = document.createElement('div');
-            cardsRow.className = 'meld-line-cards';
-
-            const info = classifyMeldForUi(meld);
-            const isCanastra = info.kind !== 'simple';
-            const baseLen = meld.length;
-
-            // desenha as cartas; se for canastra, não desenha a última em pé
-            meld.forEach((card, indexInMeld) => {
-              if (isCanastra && indexInMeld === baseLen - 1) return;
-              cardsRow.appendChild(createCardElementMini(card, indexInMeld));
-            });
-
-            // última carta deitada pra canastra (limpa/suja/real)
-            if (isCanastra && baseLen >= 7) {
-              const lastCard = meld[baseLen - 1];
-              const closed = createCardElementMini(lastCard, baseLen - 1);
-              closed.classList.add('canastra-fechada');
-              cardsRow.appendChild(closed);
-            }
-
-            const meta = document.createElement('div');
-            meta.className = 'meld-meta';
-            meta.textContent = info.base;
-
-            if (info.tag) {
-              const tag = document.createElement('span');
-              tag.className = 'meld-tag ' + info.tag.cls;
-              tag.textContent = info.tag.text;
-              meta.appendChild(document.createTextNode(' '));
-              meta.appendChild(tag);
-            }
-
-            wrapper.addEventListener('click', () => {
-              if (!state || state.finished) return;
-              const key = team.id + ':' + meldIndex;
-              if (selectedMeldTarget === key) {
-                selectedMeldTarget = null;
-                showMessage('Nenhum jogo selecionado.');
-              } else {
-                selectedMeldTarget = key;
-                showMessage('Jogo selecionado. Agora selecione cartas na mão e clique em "Baixar jogo".');
-              }
-              renderMelds();
-            });
-
-            wrapper.appendChild(cardsRow);
-            wrapper.appendChild(meta);
-            target.appendChild(wrapper);
-          });
-        });
-
-        document.getElementById('scoreTeam1').textContent = t1Score;
-        document.getElementById('scoreTeam2').textContent = t2Score;
-      }
-
-      function renderScores(scores, winnerTeamId) {
-        const section = document.getElementById('scoreSection');
-        const board = document.getElementById('scoreBoard');
-        section.style.display = 'block';
-        board.innerHTML = '';
-
-        scores.sort((a, b) => b.score - a.score);
-
-        scores.forEach((entry) => {
           const div = document.createElement('div');
-          div.className = 'score-line';
-
-          const crown = winnerTeamId !== null && entry.team.id === winnerTeamId ? ' 👑' : '';
-          const teamName = entry.team.name || 'Equipe ' + (entry.team.id + 1);
-          const playersNames = entry.players.map((p) => p.name).join(' & ');
-
-          div.innerHTML = '<strong>' + teamName + '</strong>' + crown + ' — ' + entry.score + ' pts';
-
-          const meta = document.createElement('div');
-          meta.className = 'score-meta';
-          meta.textContent =
-            'Jogadores: ' +
-            playersNames +
-            ' · Jogos (cartas baixadas): +' +
-            entry.meldPoints +
-            ' · Mão: -' +
-            entry.handPenalty +
-            ' · Canastras sujas: +' +
-            entry.sujaBonus +
-            ' · Canastras limpas: +' +
-            entry.limpaBonus +
-            ' · Reais: +' +
-            entry.realBonus +
-            ' · Ás a Ás: +' +
-            entry.asasBonus;
-
-          div.appendChild(meta);
-          board.appendChild(div);
+          div.className = 'carta ' + (card.joker ? 'joker-card' : card.suit === '♥' || card.suit === '♦' ? 'hearts' : 'spades');
+          div.innerHTML = card.joker ? `<div class="carta-canto">JOKER</div><div class="carta-icone">★</div>` : `<div class="carta-canto">${card.rank}<br>${card.suit}</div><div class="carta-icone">${card.suit}</div>`;
+          if (selectedHandIndexes.has(idx)) div.classList.add('selected');
+          div.onclick = () => {
+            if (state.currentPlayer !== myPlayerIndex) return;
+            if (selectedHandIndexes.has(idx)) selectedHandIndexes.delete(idx);
+            else selectedHandIndexes.add(idx);
+            renderHand();
+          };
+          container.appendChild(div);
         });
-      }
-
-      function updateButtons() {
-        const gameOver = state?.finished;
-        const isClosed = state?.variant === 'fechado';
-
-        const drawStockBtn = document.getElementById('drawStockBtn');
-        const drawDiscardBtn = document.getElementById('drawDiscardBtn');
-        const meldBtn = document.getElementById('meldBtn');
-        const discardBtn = document.getElementById('discardBtn');
-        const takeDeadBtn = document.getElementById('takeDeadBtn');
-        const endGameBtn = document.getElementById('endGameBtn');
-
-        drawStockBtn.disabled = !state || gameOver || state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
-
-        drawDiscardBtn.disabled = !state || gameOver || state.hasDrawnThisTurn || !state.discard.length || state.currentPlayer !== myPlayerIndex;
-
-        meldBtn.disabled = !state || gameOver || !state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
-
-        discardBtn.disabled = !state || gameOver || !state.hasDrawnThisTurn || state.currentPlayer !== myPlayerIndex;
-
-        let canTakeDead = false;
-        if (state && !gameOver && state.currentPlayer === myPlayerIndex) {
-          const teamId = currentPlayer().teamId;
-          const taken = state.deadChunksTaken?.[teamId] ?? 0;
-          const max = state.deadChunksMax?.[teamId] ?? 1;
-          canTakeDead = taken < max;
-        }
-
-        takeDeadBtn.disabled = !state || gameOver || state.currentPlayer !== myPlayerIndex || !canTakeDead;
-
-        endGameBtn.disabled = !state;
-      }
-
-      function showMessage(text) {
-        const el = document.getElementById('message');
-        if (el) el.textContent = text || '';
       }
 
       // ==========================
-      // MODO TESTE / DEBUG
+      // MODO TESTE / DEBUG 1
       // ==========================
       window.debugScoreExample = function () {
         // sempre testar como Jogador 1
@@ -3037,8 +1687,8 @@
             { id: 1, name: 'Jogador 2', teamId: 1, hand: [] },
           ],
           teams: [
-            { id: 0, name: 'Equipe 1', playerIndexes: [0], melds: [] },
-            { id: 1, name: 'Equipe 2', playerIndexes: [1], melds: [] },
+            { id: 0, name: 'Time 1', playerIndexes: [0], melds: [] },
+            { id: 1, name: 'Time 2', playerIndexes: [1], melds: [] },
           ],
           currentPlayer: 0,
           stock: [],
@@ -3056,7 +1706,7 @@
         const t1 = state.teams[0].melds;
         const t2 = state.teams[1].melds;
 
-        // ---------- EQUIPE 1 ----------
+        // ---------- TIME 1 ----------
 
         // 1) Canastra REAL (2 ... A do mesmo naipe, sem coringa)
         t1.push([C('A', '♣'), C('2', '♣'), C('3', '♣'), C('4', '♣'), C('5', '♣'), C('6', '♣'), C('7', '♣'), C('8', '♣'), C('9', '♣'), C('10', '♣'), C('J', '♣'), C('Q', '♣'), C('K', '♣')]);
@@ -3067,7 +1717,7 @@
         // 3) Canastra LIMPA (sem coringa, sem Ás no topo)
         t1.push([C('4', '♥'), C('5', '♥'), C('6', '♥'), C('7', '♥'), C('8', '♥'), C('9', '♥'), C('10', '♥')]);
 
-        // ---------- EQUIPE 2 ----------
+        // ---------- TIME 2 ----------
 
         // 4) Canastra SUJA (com coringa no meio)
         t2.push([C('5', '♠'), C('6', '♠'), C('7', '♠'), C('JOKER', '★', true), C('9', '♠'), C('10', '♠'), C('J', '♠')]);
@@ -3106,8 +1756,8 @@
             { id: 1, name: 'Jogador 2', teamId: 1, hand: [] },
           ],
           teams: [
-            { id: 0, name: 'Equipe 1', playerIndexes: [0], melds: [] },
-            { id: 1, name: 'Equipe 2', playerIndexes: [1], melds: [] },
+            { id: 0, name: 'Time 1', playerIndexes: [0], melds: [] },
+            { id: 1, name: 'Time 2', playerIndexes: [1], melds: [] },
           ],
           currentPlayer: 0,
           stock: [], // pode deixar vazio, foco é mexer nos jogos
@@ -3116,7 +1766,7 @@
           deadChunksTaken: [0, 0],
           deadChunksMax: [1, 1],
           hasDrawnThisTurn: true, // já “comprou”, pode só baixar / mexer jogo
-          finished: false, // <<< NÃO terminou
+          finished: false, // NÃO terminou
           winnerTeamId: null,
           j2ConsecutiveTurns: 0,
           requiredDiscardCard: null,
@@ -3125,7 +1775,7 @@
         const t1 = state.teams[0].melds;
         const t2 = state.teams[1].melds;
 
-        // ---------------- EQUIPE 1 (seus jogos) ----------------
+        // ---------------- TIME 1 (seus jogos) ----------------
 
         // 1) A♣ 2♣ 3♣ 4♣ 5♣ 6♣ 7♣  -> 2 NÃO é coringa aqui (A-2-3)
         t1.push([C('A', '♣'), C('2', '♣'), C('3', '♣'), C('4', '♣'), C('5', '♣'), C('6', '♣'), C('7', '♣')]);
@@ -3139,12 +1789,12 @@
         // 4) Q♠ K♠ A♠ -> sequência com Ás alto
         t1.push([C('Q', '♠'), C('K', '♠'), C('A', '♠')]);
 
-        // ---------------- EQUIPE 2 (referência) ----------------
+        // ---------------- TIME 2 (referência) ----------------
 
         // 5) 4♠ 5♠ 6♠ 7♠ 8♠ 9♠ 10♠ -> canastra limpa simples pra comparar
         t2.push([C('4', '♠'), C('5', '♠'), C('6', '♠'), C('7', '♠'), C('8', '♠'), C('9', '♠'), C('10', '♠')]);
 
-        // 6) A♦ 2♦ 3♦ 4♦ 5♦ 6♦ 7♦ 8♦ 9♦ 10♦ (Ace baixo com 2 no meio)
+        // 6) A♦ 2♦ 3♦ 4♦ 5♦ 6♦ 7♦ 8♦ 9♦ 10♦
         t2.push([C('A', '♦'), C('2', '♦'), C('3', '♦'), C('4', '♦'), C('5', '♦'), C('6', '♦'), C('7', '♦'), C('8', '♦'), C('9', '♦'), C('10', '♦')]);
 
         // ---------------- CARTAS NA MÃO ----------------
@@ -3163,80 +1813,161 @@
         showMessage('DEBUG: playground de sequências e coringas carregado.');
       };
 
+      function renderOpponentHands() {
+        const top = document.getElementById('opponentTop');
+        top.innerHTML = '';
+        const left = document.getElementById('opponentLeft');
+        left.innerHTML = '';
+        const right = document.getElementById('opponentRight');
+        right.innerHTML = '';
+
+        const total = state.players.length;
+        const seats = { top: null, left: null, right: null };
+        const others = [];
+        for (let i = 1; i < total; i++) others.push((myPlayerIndex + i) % total);
+
+        if (total === 2) seats.top = others[0];
+        else if (total === 3) {
+          seats.right = others[0];
+          seats.left = others[1];
+        } else {
+          seats.right = others[0];
+          seats.top = others[1];
+          seats.left = others[2];
+        }
+
+        [
+          { idx: seats.top, el: top },
+          { idx: seats.left, el: left },
+          { idx: seats.right, el: right },
+        ].forEach((obj) => {
+          if (obj.idx === null) return;
+          const p = state.players[obj.idx];
+          const label = document.createElement('div');
+          label.className = 'opponent-label';
+          label.textContent = `${p.name} (${p.hand.length})`;
+          obj.el.appendChild(label);
+
+          const cardsDiv = document.createElement('div');
+          cardsDiv.className = 'opponent-cards';
+          const count = Math.min(p.hand.length, 12);
+          for (let i = 0; i < count; i++) {
+            const c = document.createElement('div');
+            c.className = 'opponent-card-back';
+            cardsDiv.appendChild(c);
+          }
+          obj.el.appendChild(cardsDiv);
+        });
+      }
+
+      function renderMelds() {
+        const m1 = document.getElementById('meldsP1');
+        m1.innerHTML = '';
+        const m2 = document.getElementById('meldsP2');
+        m2.innerHTML = '';
+        let s1 = 0,
+          s2 = 0;
+        state.teams.forEach((t, i) => {
+          const info = computeTeamMeldScore(t);
+          if (i === 0) s1 = info.total;
+          else s2 = info.total;
+          const target = i === 0 ? m1 : m2;
+          t.melds.forEach((meld, midx) => {
+            const div = document.createElement('div');
+            div.className = 'meld-line';
+            const key = t.id + ':' + midx;
+            if (selectedMeldTarget === key) div.classList.add('selected-meld');
+
+            const row = document.createElement('div');
+            row.className = 'meld-line-cards';
+            const mInfo = classifyMeldForUi(meld);
+
+            meld.forEach((c, cidx) => {
+              if (mInfo.kind !== 'simple' && cidx === meld.length - 1) return;
+              const minic = document.createElement('div');
+              minic.className = 'carta mini ' + (c.joker ? 'joker-card' : c.suit === '♥' || c.suit === '♦' ? 'hearts' : 'spades');
+              minic.innerHTML = c.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${c.rank}${c.suit}</div>`;
+              row.appendChild(minic);
+            });
+
+            if (mInfo.kind !== 'simple') {
+              const last = meld[meld.length - 1];
+              const closed = document.createElement('div');
+              closed.className = 'carta mini canastra-fechada ' + (last.joker ? 'joker-card' : last.suit === '♥' || last.suit === '♦' ? 'hearts' : 'spades');
+              closed.innerHTML = last.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${last.rank}${last.suit}</div>`;
+              row.appendChild(closed);
+            }
+
+            const meta = document.createElement('div');
+            meta.className = 'meld-meta';
+            meta.innerHTML = mInfo.base + (mInfo.tag ? ` <span class="meld-tag ${mInfo.tag.cls}">${mInfo.tag.text}</span>` : '');
+
+            div.appendChild(row);
+            div.appendChild(meta);
+            div.onclick = () => {
+              selectedMeldTarget = selectedMeldTarget === key ? null : key;
+              showMessage(selectedMeldTarget ? 'Jogo selecionado.' : 'Seleção limpa.');
+              renderMelds();
+            };
+            target.appendChild(div);
+          });
+        });
+        document.getElementById('scoreTeam1').textContent = s1;
+        document.getElementById('scoreTeam2').textContent = s2;
+      }
+
+      function renderScores(scores, winner) {
+        document.getElementById('scoreSection').style.display = 'flex';
+        const board = document.getElementById('scoreBoard');
+        board.innerHTML = '';
+        scores.sort((a, b) => b.score - a.score);
+        scores.forEach((s) => {
+          board.innerHTML += `<div style="margin-bottom:8px; border-bottom:1px solid #333; padding-bottom:4px;">
+              <strong style="color:${s.team.id === winner ? '#facc15' : '#fff'}">${s.team.name}</strong>: ${s.score} pts
+              <div style="font-size:10px; color:#aaa;">Mão: -${s.handPenalty} | Jogos: +${s.meldPoints} | Bônus: +${s.sujaBonus + s.limpaBonus + s.realBonus + s.asasBonus}</div>
+            </div>`;
+        });
+      }
+
+      function showMessage(msg) {
+        document.getElementById('message').textContent = msg;
+      }
+
       onSnapshot(gameRef, (snap) => {
         if (!snap.exists()) {
           state = null;
           selectedHandIndexes.clear();
-          stopTurnTimer();
           document.getElementById('configSection').style.display = 'block';
           document.getElementById('gameSection').style.display = 'none';
-          showMessage('Aguardando o Jogador 1 iniciar a partida (ID: ' + gameId + ').');
-          return;
-        }
-
-        const data = snap.data();
-        state = JSON.parse(data.stateJson);
-        selectedHandIndexes.clear();
-
-        document.getElementById('configSection').style.display = 'none';
-        document.getElementById('gameSection').style.display = 'block';
-        renderAll();
-        startTurnTimerIfNeeded();
-      });
-
-      // UI
-
-      document.getElementById('startBtn').addEventListener('click', () => {
-        const mode = document.getElementById('modeSelect').value;
-        const variant = document.getElementById('variantSelect').value;
-        const name1 = document.getElementById('p1Name').value.trim();
-        const name2 = document.getElementById('p2Name').value.trim();
-        const name3 = document.getElementById('p3Name').value.trim();
-        const name4 = document.getElementById('p4Name').value.trim();
-        const names = [name1, name2, name3, name4];
-
-        const selectIndex = parseInt(document.getElementById('localPlayerSelect').value, 10);
-        myPlayerIndex = selectIndex;
-
-        startGame(mode, names, variant);
-      });
-
-      document.getElementById('localPlayerSelect').addEventListener('change', (e) => {
-        myPlayerIndex = parseInt(e.target.value, 10);
-        if (state) {
+        } else {
+          state = JSON.parse(snap.data().stateJson);
           selectedHandIndexes.clear();
+          document.getElementById('configSection').style.display = 'none';
+          document.getElementById('gameSection').style.display = 'flex'; // FLEX para o layout funcionar
           renderAll();
+          startTurnTimerIfNeeded();
         }
       });
 
-      document.getElementById('drawStockBtn').addEventListener('click', drawFromStock);
-      document.getElementById('drawDiscardBtn').addEventListener('click', drawFromDiscard);
-      document.getElementById('meldBtn').addEventListener('click', makeMeldFromSelection);
-      document.getElementById('discardBtn').addEventListener('click', discardSelectedCard);
-      document.getElementById('takeDeadBtn').addEventListener('click', takeDead);
+      document.getElementById('startBtn').onclick = () => {
+        startGame(
+          document.getElementById('modeSelect').value,
+          [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
+          document.getElementById('variantSelect').value
+        );
+      };
 
-      // Forçar fim = apaga doc e volta pra tela inicial
-      document.getElementById('endGameBtn').addEventListener('click', async () => {
-        try {
-          await deleteDoc(gameRef);
-        } catch (e) {
-          console.error(e);
-        }
-        state = null;
-        selectedHandIndexes.clear();
-        document.getElementById('configSection').style.display = 'block';
-        document.getElementById('gameSection').style.display = 'none';
-        showMessage('Jogo encerrado. Configure uma nova partida.');
-      });
-
-      // Botão para fechar o placar final (overlay)
-      const closeScoreBtn = document.getElementById('closeScoreBtn');
-      if (closeScoreBtn) {
-        closeScoreBtn.addEventListener('click', () => {
-          const overlay = document.getElementById('scoreSection');
-          if (overlay) overlay.style.display = 'none';
-        });
-      }
+      document.getElementById('localPlayerSelect').onchange = (e) => {
+        myPlayerIndex = parseInt(e.target.value);
+        if (state) renderAll();
+      };
+      document.getElementById('drawStockBtn').onclick = drawFromStock;
+      document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
+      document.getElementById('meldBtn').onclick = makeMeldFromSelection;
+      document.getElementById('discardBtn').onclick = discardSelectedCard;
+      document.getElementById('takeDeadBtn').onclick = takeDead;
+      document.getElementById('endGameBtn').onclick = () => deleteDoc(gameRef);
+      document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
     </script>
   </body>
 </html>
