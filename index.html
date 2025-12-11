@@ -751,6 +751,44 @@
           font-size: 9px;
         }
       }
+
+      /* container da mesa */
+      .mesa {
+        position: relative;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* mão do jogador ativo */
+      .mao-ativa {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 80px; /* altura aproximada da barra de botões */
+        display: flex;
+        gap: 0.4rem;
+        z-index: 15; /* menor que a barra, maior que o resto */
+      }
+
+      /* barra de botões */
+      .barra-acoes {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 20;
+      }
+
+      @media (max-height: 500px) {
+        .pilha-compra .carta,
+        .pilha-descarte .carta {
+          transform: scale(0.8); /* diminui as cartas */
+        }
+
+        .area-centro {
+          margin-bottom: 4.5rem; /* libera espaço pra mão */
+        }
+      }
     </style>
   </head>
   <body>
