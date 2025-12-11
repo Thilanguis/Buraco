@@ -498,6 +498,7 @@
         overflow-x: auto;
         padding: 15px 10px 5px 10px;
         min-height: 90px;
+        flex-shrink: 0;
       }
 
       .cards-row {
@@ -583,7 +584,7 @@
       /* ============================
          MOBILE (largura <= 768px)
          ============================ */
-      @media (max-width: 768px) {
+      @media (max-width: 768px), (max-height: 500px) {
         body {
           font-size: 12px;
         }
@@ -660,6 +661,7 @@
         .hand-container {
           padding: 10px 6px 4px 6px;
           min-height: 80px;
+          flex-shrink: 0;
         }
 
         .carta {
@@ -702,7 +704,7 @@
       /* ============================
    AJUSTE MOBILE (largura <= 768px)
    ============================ */
-      @media (max-width: 768px) {
+      @media (max-width: 768px), (max-height: 500px) {
         /* deixa a mesa poder rolar um pouco em vez de cortar */
         .board {
           overflow-y: auto;
@@ -749,44 +751,6 @@
 
         .meld-meta {
           font-size: 9px;
-        }
-      }
-
-      /* container da mesa */
-      .mesa {
-        position: relative;
-        height: 100vh;
-        overflow: hidden;
-      }
-
-      /* mão do jogador ativo */
-      .mao-ativa {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: 80px; /* altura aproximada da barra de botões */
-        display: flex;
-        gap: 0.4rem;
-        z-index: 15; /* menor que a barra, maior que o resto */
-      }
-
-      /* barra de botões */
-      .barra-acoes {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 20;
-      }
-
-      @media (max-height: 500px) {
-        .pilha-compra .carta,
-        .pilha-descarte .carta {
-          transform: scale(0.8); /* diminui as cartas */
-        }
-
-        .area-centro {
-          margin-bottom: 4.5rem; /* libera espaço pra mão */
         }
       }
     </style>
@@ -981,6 +945,7 @@
       let turnTimerId = null;
       let turnTimerRemaining = 0;
       let selectedMeldTarget = null;
+      let lastMyTurn = false; // NOVO: pra saber quando virou a SUA vez
 
       function updateTimerLabel() {
         const el = document.getElementById('turnTimerLabel');
@@ -1722,13 +1687,22 @@
 
         // Botões
         const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+
+        // 🔔 Vibra quando passa a ser a minha vez
+        if (myTurn && !lastMyTurn && navigator.vibrate) {
+          navigator.vibrate([150, 80, 150]); // vibra, pausa, vibra
+        }
+        lastMyTurn = myTurn;
+
+        document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
+
         document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
         document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn ? '1' : '0.5';
 
         document.getElementById('drawDiscardBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn && state.discard.length ? 'auto' : 'none';
         document.getElementById('drawDiscardBtn').style.opacity = myTurn && !state.hasDrawnThisTurn && state.discard.length ? '1' : '0.5';
 
-        document.getElementById('meldBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
+        document.getElementById('meldBtn').disagbled = !myTurn || !state.hasDrawnThisTurn;
         document.getElementById('discardBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
 
         const teamId = currentPlayer().teamId;
