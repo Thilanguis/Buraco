@@ -698,6 +698,59 @@
         align-items: center;
         justify-content: center;
       }
+
+      /* ============================
+   AJUSTE MOBILE (largura <= 768px)
+   ============================ */
+      @media (max-width: 768px) {
+        /* deixa a mesa poder rolar um pouco em vez de cortar */
+        .board {
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+
+        /* faixa dos jogos mais compacta e sem scroll interno */
+        .board-melds {
+          flex: 0 0 auto;
+          max-width: 100%;
+          margin: 8px 6px 2px;
+          padding: 4px 6px;
+          gap: 10px;
+          min-height: 50px;
+          overflow: visible;
+        }
+
+        .board-melds .grow {
+          padding: 4px 6px;
+        }
+
+        .meld-title {
+          font-size: 10px;
+        }
+
+        .meld-line {
+          min-width: 110px;
+          padding: 3px 4px 4px;
+        }
+
+        /* cartas dos jogos bem baixinhas pra caber tudo */
+        .meld-line-cards {
+          display: flex;
+          align-items: center;
+          height: 30px;
+        }
+
+        .carta.mini {
+          width: 22px;
+          height: 32px;
+          margin-right: -10px;
+          font-size: 9px;
+        }
+
+        .meld-meta {
+          font-size: 9px;
+        }
+      }
     </style>
   </head>
   <body>
