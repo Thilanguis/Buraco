@@ -114,6 +114,13 @@
         padding-bottom: 0;
       }
 
+      .board-center {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* desktop: pontos + monte/lixo bem no meio */
+      }
+
       /* -- TOPO -- */
       .board-top {
         padding: 10px;
@@ -447,7 +454,7 @@
         gap: 5px;
         z-index: 50;
         width: 100%;
-        margin-top: auto;
+        flex-shrink: 0;
       }
 
       #message {
@@ -581,115 +588,6 @@
         margin-bottom: -8px;
       }
 
-      /* ============================
-         MOBILE (largura <= 768px)
-         ============================ */
-      @media (max-width: 768px), (max-height: 500px) {
-        body {
-          font-size: 12px;
-        }
-
-        .board-top {
-          padding: 6px;
-          height: 44px;
-        }
-
-        /* oponente do topo desce um pouco */
-        .opponent-hand-top {
-          top: 52px;
-        }
-
-        .board-melds {
-          max-width: 100%;
-          margin: 10px 6px 4px;
-          padding: 4px 6px;
-          gap: 10px;
-          border-radius: 6px;
-          min-height: 50px;
-        }
-
-        .board-melds .grow {
-          padding: 4px 6px;
-        }
-
-        .meld-title {
-          font-size: 10px;
-        }
-
-        .meld-line {
-          min-width: 120px;
-          padding: 3px 4px 5px;
-        }
-
-        .meld-line-cards {
-          height: 34px;
-        }
-
-        .meld-meta {
-          font-size: 9px;
-        }
-
-        .board-middle {
-          gap: 20px;
-          padding: 6px 0;
-        }
-
-        .pile-card {
-          width: 45px;
-          height: 65px;
-        }
-
-        .pile-info {
-          font-size: 9px;
-        }
-
-        .morto-container {
-          width: 26px;
-          height: 38px;
-        }
-
-        .morto-card-back {
-          border-radius: 4px;
-        }
-
-        .opponent-card-back {
-          width: 26px;
-          height: 38px;
-          border-radius: 5px;
-        }
-
-        .hand-container {
-          padding: 10px 6px 4px 6px;
-          min-height: 80px;
-          flex-shrink: 0;
-        }
-
-        .carta {
-          width: 50px;
-          height: 75px;
-          margin-right: -25px;
-          font-size: 12px;
-        }
-
-        .carta-icone {
-          font-size: 16px;
-        }
-
-        .player-actions {
-          gap: 6px;
-        }
-
-        .player-actions button {
-          padding: 6px 10px;
-          font-size: 10px;
-        }
-
-        #scoreSection .section {
-          width: 94%;
-          max-width: 380px;
-        }
-      }
-
       /* PLACAR OVERLAY */
       #scoreSection {
         position: fixed;
@@ -701,56 +599,127 @@
         justify-content: center;
       }
 
-      /* ============================
-   AJUSTE MOBILE (largura <= 768px)
-   ============================ */
       @media (max-width: 768px), (max-height: 500px) {
-        /* deixa a mesa poder rolar um pouco em vez de cortar */
+        body {
+          font-size: 12px;
+        }
+
         .board {
           overflow-y: auto;
           overflow-x: hidden;
+          display: flex;
+          flex-direction: column;
         }
 
-        /* faixa dos jogos mais compacta e sem scroll interno */
-        .board-melds {
+        /* distribui melhor o centro na horizontal baixa */
+        .board-center {
+          flex: 1;
+          justify-content: space-between; /* pontos mais pro meio, monte/lixo perto dos botões */
+          padding: 2px 0;
+        }
+
+        .board-top {
+          padding: 3px 5px;
+          height: 36px;
+        }
+
+        /* .opponent-hand-top {
+          top: 46px;
+        } */
+
+        /* .board-melds {
           flex: 0 0 auto;
           max-width: 100%;
-          margin: 8px 6px 2px;
-          padding: 4px 6px;
-          gap: 10px;
-          min-height: 50px;
+          margin: 2px 4px 0;
+          padding: 2px 4px;
+          gap: 8px;
+          min-height: 40px;
+          border-radius: 6px;
           overflow: visible;
-        }
+        } */
 
-        .board-melds .grow {
-          padding: 4px 6px;
-        }
+        /* .board-melds .grow {
+          padding: 3px 4px;
+        } */
 
         .meld-title {
-          font-size: 10px;
+          font-size: 9px;
         }
 
         .meld-line {
           min-width: 110px;
-          padding: 3px 4px 4px;
+          padding: 2px 3px 3px;
         }
 
-        /* cartas dos jogos bem baixinhas pra caber tudo */
         .meld-line-cards {
-          display: flex;
-          align-items: center;
-          height: 30px;
+          height: 28px;
         }
 
         .carta.mini {
           width: 22px;
-          height: 32px;
-          margin-right: -10px;
+          height: 30px;
+          margin-right: -9px;
+          font-size: 8.5px;
+        }
+
+        .board-middle {
+          gap: 10px;
+          padding: 0;
+          margin-top: 4px; /* cola mais nos botões */
+        }
+
+        .pile-card {
+          width: 38px;
+          height: 54px;
+        }
+
+        .pile-info {
           font-size: 9px;
         }
 
-        .meld-meta {
+        .hand-container {
+          padding: 4px 2px 2px 2px;
+          min-height: 60px;
+          flex-shrink: 0;
+        }
+
+        .opponent-cards {
+          gap: 1px;
+        }
+
+        .carta {
+          width: 42px;
+          height: 62px;
+          margin-right: -18px;
+          font-size: 10px;
+        }
+
+        .carta-icone {
+          font-size: 13px;
+        }
+
+        .player-interface {
+          padding: 2px 4px 4px 4px;
+          gap: 2px;
+        }
+
+        #message {
+          font-size: 10px;
+          height: 12px;
+        }
+
+        .player-actions {
+          gap: 4px;
+        }
+
+        .player-actions button {
+          padding: 4px 6px;
           font-size: 9px;
+        }
+
+        #scoreSection .section {
+          width: 94%;
+          max-width: 380px;
         }
       }
     </style>
@@ -828,53 +797,60 @@
             </div>
           </div>
 
+          <!-- Oponentes (continuam absolutos por cima da mesa) -->
           <div id="opponentTop" class="opponent-hand opponent-hand-top"></div>
           <div id="opponentLeft" class="opponent-hand opponent-hand-left"></div>
           <div id="opponentRight" class="opponent-hand opponent-hand-right"></div>
 
-          <div class="board-melds">
-            <div class="grow">
-              <div class="meld-title">
-                <span>Time 1 Pts:</span>
-                <strong id="scoreTeam1">0</strong>
+          <!-- Centro da mesa: pontos + monte/lixo -->
+          <div class="board-center">
+            <div class="board-melds">
+              <div class="grow">
+                <div class="meld-title">
+                  <span>Time 1 Pts:</span>
+                  <strong id="scoreTeam1">0</strong>
+                </div>
+                <div id="meldsP1" class="meld-container"></div>
               </div>
-              <div id="meldsP1" class="meld-container"></div>
-            </div>
-            <div class="grow" style="border-left: 1px dashed rgba(255, 255, 255, 0.1); padding-left: 5px">
-              <div class="meld-title">
-                <span>Time 2 Pts:</span>
-                <strong id="scoreTeam2">0</strong>
-              </div>
-              <div id="meldsP2" class="meld-container"></div>
-            </div>
-          </div>
-
-          <div class="board-middle">
-            <div class="pile-area" id="drawStockBtn">
-              <div class="pile-card"><div class="pile-card-inner"></div></div>
-              <div class="pile-info">
-                Monte (
-                <span id="stockCount">0</span>
-                )
+              <div class="grow" style="border-left: 1px dashed rgba(255, 255, 255, 0.1); padding-left: 5px">
+                <div class="meld-title">
+                  <span>Time 2 Pts:</span>
+                  <strong id="scoreTeam2">0</strong>
+                </div>
+                <div id="meldsP2" class="meld-container"></div>
               </div>
             </div>
 
-            <div class="pile-area" id="drawDiscardBtn">
-              <div class="pile-card discard-pile">
-                <div id="discardFace" class="discard-face">
-                  <div id="discardFaceTop"></div>
-                  <div id="discardFaceBottom"></div>
+            <div class="board-middle">
+              <div class="pile-area" id="drawStockBtn">
+                <div class="pile-card">
+                  <div class="pile-card-inner"></div>
+                </div>
+                <div class="pile-info">
+                  Monte (
+                  <span id="stockCount">0</span>
+                  )
                 </div>
               </div>
-              <div class="pile-info">
-                Lixo (
-                <span id="discardCount">0</span>
-                )
+
+              <div class="pile-area" id="drawDiscardBtn">
+                <div class="pile-card discard-pile">
+                  <div id="discardFace" class="discard-face">
+                    <div id="discardFaceTop"></div>
+                    <div id="discardFaceBottom"></div>
+                  </div>
+                </div>
+                <div class="pile-info">
+                  Lixo (
+                  <span id="discardCount">0</span>
+                  )
+                </div>
+                <span id="discardTop" style="display: none"></span>
               </div>
-              <span id="discardTop" style="display: none"></span>
             </div>
           </div>
 
+          <!-- Área do jogador -->
           <div class="player-interface">
             <div id="message"></div>
 
