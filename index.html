@@ -353,6 +353,30 @@
         min-height: 52px;
       }
 
+      /* Wrapper que ocupa o quadrado inteiro (evita o bug do painel vazio encolher) */
+      .team-panel {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Faz o container de melds preencher o resto do painel */
+      .team-panel .meld-container {
+        flex: 1;
+        min-height: 52px;
+      }
+
+      /* Time do outro lado fica de ponta-cabeça (quadrado inteiro) */
+      .view-team0 #teamPanel2 {
+        transform: rotate(180deg);
+        transform-origin: center;
+      }
+      .view-team1 #teamPanel1 {
+        transform: rotate(180deg);
+        transform-origin: center;
+      }
+
       .board-melds .grow {
         overflow: hidden;
       }
@@ -762,8 +786,8 @@
 
       /* MINI CARTA (NA MESA) */
       .carta.mini {
-        width: 28px;
-        height: 40px;
+        width: 38px;
+        height: 50px;
         margin-right: -14px;
         margin-bottom: 0;
         font-size: 10px;
@@ -832,8 +856,8 @@
         }
 
         .carta.mini {
-          width: 22px;
-          height: 30px;
+          width: 32px;
+          height: 40px;
           margin-right: -9px;
           font-size: 8.5px;
         }
@@ -917,6 +941,11 @@
         box-sizing: border-box !important;
         background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(192, 192, 192, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #05071a, #1d4ed8) !important;
+      }
+
+      /* opcional: dá uma pequena suavizada */
+      .meld-line-cards {
+        transition: transform 0.15s ease;
       }
     </style>
   </head>
@@ -1002,18 +1031,23 @@
           <div class="board-center">
             <div class="board-melds">
               <div class="grow">
-                <div class="meld-title">
-                  <span>Time 1 Pts:</span>
-                  <strong id="scoreTeam1">0</strong>
+                <div class="team-panel" id="teamPanel1">
+                  <div class="meld-title">
+                    <span>Time 1 Pts:</span>
+                    <strong id="scoreTeam1">0</strong>
+                  </div>
+                  <div id="meldsP1" class="meld-container"></div>
                 </div>
-                <div id="meldsP1" class="meld-container"></div>
               </div>
+
               <div class="grow" style="border-left: 1px dashed rgba(255, 255, 255, 0.1); padding-left: 5px">
-                <div class="meld-title">
-                  <span>Time 2 Pts:</span>
-                  <strong id="scoreTeam2">0</strong>
+                <div class="team-panel" id="teamPanel2">
+                  <div class="meld-title">
+                    <span>Time 2 Pts:</span>
+                    <strong id="scoreTeam2">0</strong>
+                  </div>
+                  <div id="meldsP2" class="meld-container"></div>
                 </div>
-                <div id="meldsP2" class="meld-container"></div>
               </div>
             </div>
 
@@ -1120,6 +1154,187 @@
       let lastMyTurn = false; // NOVO: pra saber quando virou a SUA vez
       let lastSeenActionId = null;
       let ignoreOwnActionId = null;
+
+      window.getState = () => state;
+      window.setState = (s) => ((state = s), renderAll());
+
+      // ==========================
+      // 🔄 VIEW ORIENTATION (fixo por cliente)
+      // Cada cliente vê APENAS o próprio time "de pé".
+      // NÃO depende de quem está jogando no momento.
+      // ==========================
+      function applyViewTeamClass() {
+        document.body.classList.remove('view-team0', 'view-team1');
+        if (!state?.players?.length) return;
+        const me = state.players[myPlayerIndex];
+        if (!me) return;
+        document.body.classList.add(me.teamId === 0 ? 'view-team0' : 'view-team1');
+      }
+
+      // ==========================
+      // 🔊 SFX CANASTRA (SEM BUGAR SEU CÓDIGO)
+      // Toca quando um meld vira canastra (simple -> limpa/suja/real/asas)
+      // Funciona local+remoto via onSnapshot diff e NÃO toca na entrada (prime)
+      // ==========================
+
+      // ==========================
+      // 🔊 SFX CANASTRA (MP3 do seu projeto)
+      // ==========================
+      let audioUnlocked = false;
+
+      const CANASTRA_SFX = {
+        suja: new Audio('assets/sfx/canastra-suja.mp3'),
+        limpa: new Audio('assets/sfx/canastra-limpa.mp3'),
+        real: new Audio('assets/sfx/canastra-real.mp3'),
+        asas: new Audio('assets/sfx/canastra-as-a-as.mp3'),
+      };
+
+      Object.values(CANASTRA_SFX).forEach((a) => {
+        a.preload = 'auto';
+        a.volume = 0.9;
+      });
+
+      function unlockAudio() {
+        if (audioUnlocked) return;
+        audioUnlocked = true;
+
+        // "prime" silencioso (alguns browsers exigem gesto antes de tocar)
+        for (const a of Object.values(CANASTRA_SFX)) {
+          try {
+            a.pause();
+            a.currentTime = 0;
+            a.play()
+              .then(() => {
+                a.pause();
+                a.currentTime = 0;
+              })
+              .catch(() => {});
+          } catch (e) {}
+        }
+      }
+
+      // desbloqueia no primeiro gesto do usuário
+      document.addEventListener('pointerdown', unlockAudio, { once: true, passive: true });
+      document.addEventListener('keydown', unlockAudio, { once: true });
+
+      function playCanastraSfx(kind) {
+        if (!audioUnlocked) return;
+        const a = CANASTRA_SFX[kind] || CANASTRA_SFX.suja;
+        try {
+          a.pause();
+          a.currentTime = 0;
+        } catch (e) {}
+        a.play().catch(() => {});
+      }
+
+      function playTone(freq, t0, dur, vol = 0.12, type = 'sine') {
+        if (!audioUnlocked || !audioCtx) return;
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, t0);
+
+        // envelope curto (ataque/decay) pra não estourar
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+        o.connect(g).connect(audioCtx.destination);
+        o.start(t0);
+        o.stop(t0 + dur + 0.02);
+      }
+
+      // function playCanastraSfx(kind) {
+      //   // se o navegador ainda não liberou áudio, não faz nada (evita erro)
+      //   if (!audioUnlocked || !audioCtx) return;
+
+      //   const t = audioCtx.currentTime + 0.01;
+
+      //   // sons diferentes por tipo (simples e curto)
+      //   if (kind === 'limpa') {
+      //     playTone(660, t + 0.0, 0.1, 0.12, 'triangle');
+      //     playTone(880, t + 0.11, 0.12, 0.13, 'triangle');
+      //     return;
+      //   }
+
+      //   if (kind === 'suja') {
+      //     playTone(330, t + 0.0, 0.12, 0.13, 'sawtooth');
+      //     playTone(220, t + 0.13, 0.16, 0.11, 'sawtooth');
+      //     return;
+      //   }
+
+      //   if (kind === 'real') {
+      //     playTone(523.25, t + 0.0, 0.1, 0.11, 'sine'); // C
+      //     playTone(659.25, t + 0.1, 0.1, 0.11, 'sine'); // E
+      //     playTone(783.99, t + 0.2, 0.14, 0.13, 'sine'); // G
+      //     return;
+      //   }
+
+      //   if (kind === 'asas') {
+      //     playTone(740, t + 0.0, 0.08, 0.12, 'square');
+      //     playTone(880, t + 0.08, 0.08, 0.12, 'square');
+      //     playTone(1046.5, t + 0.16, 0.16, 0.14, 'square');
+      //     return;
+      //   }
+      // }
+
+      // memória: "teamId:meldIdx" -> kind
+      let canastraMemPrimed = false;
+      const canastraKindMem = new Map();
+
+      function resetCanastraSfxMemory() {
+        canastraKindMem.clear();
+        canastraMemPrimed = false;
+      }
+
+      function computeMeldKindMap() {
+        const m = new Map();
+        if (!state?.teams) return m;
+
+        for (const t of state.teams) {
+          (t.melds || []).forEach((meld, idx) => {
+            m.set(`${t.id}:${idx}`, classifyMeldForUi(meld).kind);
+          });
+        }
+        return m;
+      }
+
+      function syncCanastraSfxFromState() {
+        if (!state?.teams) return;
+
+        const curr = computeMeldKindMap();
+
+        // primeira vez: só prime (NÃO toca)
+        if (!canastraMemPrimed) {
+          canastraKindMem.clear();
+          for (const [k, v] of curr) canastraKindMem.set(k, v);
+          canastraMemPrimed = true;
+          return;
+        }
+
+        // toca quando:
+        // 1) vira canastra (simple -> não-simple)
+        // 2) muda o tipo (suja <-> limpa <-> real <-> asas)
+        for (const [k, kind] of curr) {
+          const prev = canastraKindMem.get(k);
+
+          const isCanastra = kind !== 'simple';
+          const wasSimple = prev === 'simple';
+          const wasMissing = prev == null;
+          const changedKind = prev != null && prev !== kind;
+
+          if ((wasSimple && isCanastra) || (wasMissing && isCanastra) || (changedKind && isCanastra)) {
+            playCanastraSfx(kind);
+          }
+
+          canastraKindMem.set(k, kind);
+        }
+
+        // limpa melds que sumiram
+        for (const key of Array.from(canastraKindMem.keys())) {
+          if (!curr.has(key)) canastraKindMem.delete(key);
+        }
+      }
 
       // ==========================
       // Destaque temporário: carta comprada
@@ -1400,44 +1615,48 @@
 
       function classifyMeldForUi(meld) {
         if (!meld || meld.length < 7) return { kind: 'simple', base: 'Jogo', tag: null };
-        const hasWild = hasRealWild(meld);
-        const nonJoker = meld.filter((c) => !c.joker);
-        if (!nonJoker.length) return { kind: 'simple', base: 'Jogo', tag: null };
+
+        const hasWild = meld.some((c) => c.joker || isWildcard(c, meld));
+
+        // cartas "reais" pra analisar sequência (ignora jokers e coringas)
+        const realCards = meld.filter((c) => !c.joker && !isWildcard(c, meld));
+        if (!realCards.length) return { kind: 'simple', base: 'Jogo', tag: null };
+
+        const sameSuit = realCards.every((c) => c.suit === realCards[0].suit);
 
         const orderLow = {};
         RANKS_SEQ_LOW.forEach((r, i) => (orderLow[r] = i));
         const orderHigh = {};
         RANKS_SEQ.forEach((r, i) => (orderHigh[r] = i));
 
-        const sortedLow = nonJoker.slice().sort((a, b) => orderLow[a.rank] - orderLow[b.rank]);
-        const ranksLow = sortedLow.map((c) => c.rank);
-        const aceCount = ranksLow.filter((r) => r === 'A').length;
-        const uniqueIdxsLow = [...new Set(ranksLow.map((r) => orderLow[r]))];
-        let contiguousLow = true;
-        for (let i = 1; i < uniqueIdxsLow.length; i++) if (uniqueIdxsLow[i] !== uniqueIdxsLow[i - 1] + 1) contiguousLow = false;
+        const ranks = realCards.map((c) => c.rank);
+        const aceCount = ranks.filter((r) => r === 'A').length;
+        const hasKing = ranks.includes('K');
 
-        const sortedHigh = nonJoker.slice().sort((a, b) => orderHigh[a.rank] - orderHigh[b.rank]);
-        const ranksHigh = sortedHigh.map((c) => c.rank);
-        const uniqueIdxsHigh = [...new Set(ranksHigh.map((r) => orderHigh[r]))];
-        let contiguousHigh = true;
-        for (let i = 1; i < uniqueIdxsHigh.length; i++) if (uniqueIdxsHigh[i] !== uniqueIdxsHigh[i - 1] + 1) contiguousHigh = false;
+        function isContiguous(order) {
+          const idxs = [...new Set(ranks.map((r) => order[r]).filter((v) => v != null))].sort((a, b) => a - b);
+          if (idxs.length < 2) return true;
+          for (let i = 1; i < idxs.length; i++) if (idxs[i] !== idxs[i - 1] + 1) return false;
+          return true;
+        }
 
-        const firstRankLow = ranksLow[0];
-        const lastRankLow = ranksLow[ranksLow.length - 1];
-        const firstRankHigh = ranksHigh[0];
-        const lastRankHigh = ranksHigh[ranksHigh.length - 1];
-        const hasKing = ranksLow.includes('K') || ranksHigh.includes('K');
-        const contiguous = contiguousLow || contiguousHigh;
+        const contiguousLow = sameSuit && isContiguous(orderLow);
+        const contiguousHigh = sameSuit && isContiguous(orderHigh);
+        const isSeq = isValidSequenceMeld(meld);
 
+        // Se tem coringa → suja (prioridade)
         if (hasWild) return { kind: 'suja', base: 'Canastra', tag: { cls: 'suja', text: 'Suja' } };
-        if (!contiguous) return { kind: 'simple', base: 'Jogo', tag: null };
+        if (!isSeq) return { kind: 'simple', base: 'Jogo', tag: null };
 
-        let isReal = false;
-        let isAsAs = false;
-        if (aceCount >= 2 && firstRankLow === 'A' && lastRankHigh === 'A' && hasKing && contiguousLow && contiguousHigh && ranksLow.length >= 8) isAsAs = true;
-        else if (aceCount === 1 && firstRankLow === 'A' && lastRankLow === 'K' && contiguousLow && ranksLow.length >= 7) isReal = true;
+        // Ás-a-Ás: A + (2..K) + A (sem coringa)
+        const need = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        const isAsAs = aceCount >= 2 && hasKing && need.every((r) => ranks.includes(r));
 
-        if (isAsAs) return { kind: 'asas', base: 'C. Ás-Ás', tag: { cls: 'real', text: 'Real' } };
+        if (isAsAs) return { kind: 'asas', base: 'C. Ás-Ás', tag: { cls: 'asas', text: 'Ás-Ás' } };
+
+        // Real: A..K (sem coringa)
+        const needReal = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        const isReal = !hasWild && sameSuit && needReal.every((r) => ranks.includes(r)) && realCards.length === 13;
         if (isReal) return { kind: 'real', base: 'C. Real', tag: { cls: 'real', text: 'Real' } };
 
         return { kind: 'limpa', base: 'Canastra', tag: { cls: 'limpa', text: 'Limpa' } };
@@ -1485,19 +1704,18 @@
 
       function recycleDeadToStockIfPossible() {
         if (!state || state.stock.length) return false;
-        let collected = [];
-        if (state.deadPiles && state.deadPiles.length) {
-          state.deadPiles.forEach((pile, idx) => {
-            if (pile && pile.length) {
-              collected = collected.concat(pile);
-              state.deadPiles[idx] = [];
-              if (state.deadChunksTaken && state.deadChunksMax) state.deadChunksTaken[idx] = state.deadChunksMax[idx] ?? state.deadChunksTaken[idx];
-            }
-          });
-        }
-        if (!collected.length) return false;
+        if (!state.deadPiles || !state.deadPiles.length) return false;
+
+        // ✅ pega APENAS 1 morto por vez
+        const idx = state.deadPiles.findIndex((pile) => pile && pile.length);
+        if (idx === -1) return false;
+
+        const collected = state.deadPiles[idx];
+        state.deadPiles[idx] = [];
+
         shuffle(collected);
         state.stock = collected;
+
         return true;
       }
 
@@ -1510,12 +1728,18 @@
         if (!card) return false;
         if (card.joker) return true;
         if (card.rank !== '2') return false;
+
+        // 2 só é "natural" quando estiver imediatamente ANTES do 3 do mesmo naipe
         if (!meld || !Array.isArray(meld)) return true;
-        const sameSuitRanks = meld.filter((c) => !c.joker && c.suit === card.suit).map((c) => c.rank);
-        const hasAce = sameSuitRanks.includes('A');
-        const hasThree = sameSuitRanks.includes('3');
-        if (hasAce && hasThree) return false;
-        return true;
+
+        const idx = meld.indexOf(card);
+        const next = idx >= 0 ? meld[idx + 1] : null;
+
+        if (next && !next.joker && next.rank === '3' && next.suit === card.suit) {
+          return false; // 2 natural
+        }
+
+        return true; // 2 coringa
       }
 
       function cardBasePoints(card) {
@@ -1626,6 +1850,38 @@
         return true;
       }
 
+      function hasAnyDeadToRecycle() {
+        return !!state?.deadPiles?.some((p) => p && p.length);
+      }
+
+      // ✅ morto “disponível” para esta equipe pegar agora (considera humilhação: J2 pode pegar 2)
+      function canTeamTakeDead(teamId) {
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+        if (taken >= max) return false;
+
+        let deadIndex = teamId;
+
+        // 1x1 humilhação: teamId 1 (Jogador 2) pode pegar o 2º morto se ele existir
+        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
+          if (!state.deadPiles?.[deadIndex]?.length) deadIndex = 0;
+        }
+
+        return !!state.deadPiles?.[deadIndex]?.length;
+      }
+
+      // ✅ para bater: precisa ter pelo menos 1 canastra limpa/real/ás-ás na equipe
+      function teamHasGoodCanastra(teamId) {
+        const team = state.teams[teamId];
+        if (!team?.melds?.length) return false;
+
+        return team.melds.some((m) => {
+          if (!m || m.length < 7) return false;
+          const kind = classifyMeldForUi(m).kind;
+          return kind === 'limpa' || kind === 'real' || kind === 'asas';
+        });
+      }
+
       async function drawFromStock() {
         if (!ensureMyTurn()) return;
         if (state.hasDrawnThisTurn) {
@@ -1638,7 +1894,8 @@
 
         if (!state.stock.length) {
           if (!recycleDeadToStockIfPossible() || !state.stock.length) {
-            showMessage('Monte vazio.');
+            showMessage('Monte acabou e não há morto para recolocar. Fim de jogo.');
+            await finishGame(null);
             return;
           } else showMessage('Morto virou monte.');
         }
@@ -1704,6 +1961,13 @@
           showMessage('Já comprou.');
           return;
         }
+        // ✅ regra da casa: se monte acabou e não existe morto -> fim imediato (mesmo com lixo)
+        if (!state.stock.length && !hasAnyDeadToRecycle()) {
+          showMessage('Monte acabou e não há morto para recolocar. Fim de jogo.');
+          await finishGame(null);
+          return;
+        }
+
         if (!state.discard.length) {
           showMessage('Lixo vazio.');
           return;
@@ -1788,7 +2052,47 @@
         }
         const needHigh = neededWildsForOrder(RANKS_SEQ, 'high');
         const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low');
-        return (needHigh !== null && needHigh <= availableWilds) || (needLow !== null && needLow <= availableWilds);
+
+        const baseOk = (needHigh !== null && needHigh <= availableWilds) || (needLow !== null && needLow <= availableWilds);
+        if (baseOk) return true;
+
+        // ✅ SPECIAL: "Ás a Ás" (A-2-3-...-K-A)
+        const aceCount = nonWild.filter((c) => c.rank === 'A').length;
+        const hasKing = nonWild.some((c) => c.rank === 'K');
+        if (aceCount >= 2 && hasKing) {
+          // remove 1 Ás (o de fechamento) e testa como sequência "low" normal
+          const idxAceToRemove = nonWild.findIndex((c, i) => c.rank === 'A' && i !== nonWild.findIndex((x) => x.rank === 'A'));
+          if (idxAceToRemove !== -1) {
+            const test = nonWild.slice();
+            test.splice(idxAceToRemove, 1);
+
+            const seqOrder = {};
+            RANKS_SEQ_LOW.forEach((r, i) => (seqOrder[r] = i));
+            const sorted = test.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
+            const aceIdx = sorted.findIndex((c) => c.rank === 'A');
+            if (aceIdx === 0) {
+              let needed = 0;
+              let ok = true;
+              for (let i = 1; i < sorted.length; i++) {
+                const prev = seqOrder[sorted[i - 1].rank];
+                const curr = seqOrder[sorted[i].rank];
+                if (prev == null || curr == null) {
+                  ok = false;
+                  break;
+                }
+                const diff = curr - prev;
+                if (diff <= 0) {
+                  ok = false;
+                  break;
+                }
+                if (diff > 1) needed += diff - 1;
+              }
+              if (ok && needed <= availableWilds) return true;
+            }
+          }
+        }
+
+        return false;
       }
 
       async function attemptExtendExistingMeld(cards, indexes) {
@@ -1972,6 +2276,35 @@
         await commitState();
       }
 
+      function takeDeadIfAvailableForPlayer(p) {
+        if (!state || !p) return null;
+
+        const teamId = p.teamId;
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+        if (taken >= max) return null;
+
+        // regra: só pega morto com a mão vazia
+        if (p.hand.length !== 0) return null;
+
+        let deadIndex = teamId;
+
+        // 1x1 humilhação: team 1 pode pegar o 2º morto (fallback pro 0)
+        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
+          if (!state.deadPiles?.[deadIndex]?.length) deadIndex = 0;
+        }
+
+        const dead = state.deadPiles?.[deadIndex];
+        if (!dead || !dead.length) return null;
+
+        const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
+        p.hand = dead.splice(0, chunkSize);
+        sortHand(p.hand);
+        state.deadChunksTaken[teamId] = taken + 1;
+
+        return { deadIndex, count: chunkSize };
+      }
+
       async function takeDead() {
         if (!ensureMyTurn()) return;
         const p = currentPlayer();
@@ -2028,6 +2361,21 @@
         await commitState();
       }
 
+      function canTeamTakeDeadNow(teamId) {
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+        if (taken >= max) return false;
+
+        let deadIndex = teamId;
+
+        // 1x1 humilhação: jogador 2 (team 1) pode pegar o 2º morto
+        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
+          deadIndex = 0;
+        }
+
+        return !!state.deadPiles?.[deadIndex]?.length;
+      }
+
       async function discardSelectedCard() {
         if (!ensureMyTurn()) return;
         if (!state.hasDrawnThisTurn) {
@@ -2044,7 +2392,9 @@
           }
         }
 
-        const hand = currentPlayer().hand;
+        const p = currentPlayer();
+        const hand = p.hand;
+
         const indexes = Array.from(selectedHandIndexes);
         if (indexes.length !== 1) {
           showMessage('Selecione 1 carta.');
@@ -2063,21 +2413,28 @@
           const toRect = getRect(toEl);
           fromEl.style.visibility = 'hidden';
           await flyRectToRect(card, fromRect, toRect, 'front');
+          fromEl.style.visibility = '';
         }
 
-        // agora sim: mexe no state
+        // 1) mexe no state
         hand.splice(index, 1);
         state.discard.push(card);
         selectedHandIndexes.clear();
 
-        const teamId = currentPlayer().teamId;
-        const taken = state.deadChunksTaken?.[teamId] ?? 0;
-        const max = state.deadChunksMax?.[teamId] ?? 1;
-        if (hand.length === 0 && taken >= max) {
+        // 2) se ficou sem carta, tenta pegar morto automaticamente
+        let tookDead = null;
+        if (hand.length === 0) {
+          tookDead = takeDeadIfAvailableForPlayer(p); // retorna {deadIndex,count} ou null
+        }
+
+        // 3) se ainda tá sem carta e não tem morto: fim do jogo
+        const teamId = p.teamId;
+        if (hand.length === 0 && !canTeamTakeDeadNow(teamId)) {
           await finishGame(teamId);
           return;
         }
 
+        // 4) passa turno
         if (state.mode === '1x1_duploMorto') {
           if (state.currentPlayer === 1) {
             state.j2ConsecutiveTurns = !state.j2ConsecutiveTurns ? 1 : 0;
@@ -2093,11 +2450,13 @@
         state.requiredDiscardCard = null;
         state.hasDrawnThisTurn = false;
 
+        // 5) publica ação pros outros animarem
         state.lastAction = {
           id: newActionId(),
           type: 'discard',
-          playerId: myPlayerIndex, // quem descartou
+          playerId: myPlayerIndex,
           card: packCard(card),
+          tookDead, // {deadIndex,count} ou null
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
@@ -2134,6 +2493,39 @@
           meld.splice(0, meld.length, ...wild);
           return;
         }
+
+        // ✅ SPECIAL: ordenação de "Ás a Ás" (A-2-3-...-K-A)
+        // Mantém o Ás final como a "carta fechada" no fim do jogo.
+        const aces = nonWild.filter((c) => c.rank === 'A');
+        const hasKing = nonWild.some((c) => c.rank === 'K');
+        if (aces.length >= 2 && hasKing) {
+          const closingAce = aces[1];
+          const baseNonWild = nonWild.filter((c) => c !== closingAce);
+          const seqOrderLow = {};
+          RANKS_SEQ_LOW.forEach((r, i) => (seqOrderLow[r] = i));
+
+          const sortedNonWild = baseNonWild.slice().sort((a, b) => seqOrderLow[a.rank] - seqOrderLow[b.rank]);
+          const middle = [];
+          const wildQueue = [...wild];
+
+          for (let i = 0; i < sortedNonWild.length; i++) {
+            middle.push(sortedNonWild[i]);
+            if (i < sortedNonWild.length - 1) {
+              let gap = seqOrderLow[sortedNonWild[i + 1].rank] - seqOrderLow[sortedNonWild[i].rank] - 1;
+              while (gap > 0 && wildQueue.length) {
+                middle.push(wildQueue.shift());
+                gap--;
+              }
+            }
+          }
+
+          const suffix = [];
+          while (wildQueue.length) suffix.push(wildQueue.shift());
+
+          meld.splice(0, meld.length, ...middle, ...suffix, closingAce);
+          return;
+        }
+
         const availableWilds = wild.length;
         function neededWildsForOrder(order, aceMode) {
           const seqOrder = {};
@@ -2222,8 +2614,13 @@
       // RENDER
       function renderAll() {
         if (!state) return;
+
+        // ✅ orientação fixa por cliente (não muda a cada turno)
+        applyViewTeamClass();
         document.getElementById('currentPlayerLabel').textContent = currentPlayer().name;
         document.getElementById('stockCount').textContent = state.stock.length;
+
+        applyViewTeamClass();
 
         // Descarte
         const discardTop = state.discard[state.discard.length - 1];
@@ -2284,10 +2681,17 @@
 
         document.getElementById('discardBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
 
-        const teamId = currentPlayer().teamId;
-        const taken = state.deadChunksTaken?.[teamId] ?? 0;
-        const max = state.deadChunksMax?.[teamId] ?? 1;
-        document.getElementById('takeDeadBtn').disabled = !myTurn || taken >= max;
+        const me = state.players[myPlayerIndex];
+        const myTeamId = me.teamId;
+
+        const taken = state.deadChunksTaken?.[myTeamId] ?? 0;
+        const max = state.deadChunksMax?.[myTeamId] ?? 1;
+
+        // opcional mas certo: só habilita morto se eu estiver com a mão vazia
+        const canTakeDeadBtn = myTurn && me.hand.length === 0 && canTeamTakeDeadNow(myTeamId);
+
+        document.getElementById('takeDeadBtn').disabled = !canTakeDeadBtn;
+
         document.getElementById('endGameBtn').disabled = false;
 
         if (state.finished) renderScores(computeScores(), state.winnerTeamId);
@@ -2542,6 +2946,68 @@
 
         renderAll();
         showMessage('DEBUG: playground de sequências e coringas carregado.');
+      };
+
+      // =====================================================
+      // MODO TESTE 3: comprar N cartas do monte (rápido p/ testar)
+      // Uso no console:
+      //   await debugBuyStock(30)                    // compra 30 para você (myPlayerIndex)
+      //   await debugBuyStock(30, { playerId: 1 })   // compra 30 para o jogador 2
+      //   await debugBuyStock(30, { bypassTurn: true }) // ignora vez (default)
+      // =====================================================
+      window.debugBuyStock = async function (n = 30, opts = {}) {
+        try {
+          const count = Math.max(0, Number(n) || 0);
+          if (!state) {
+            showMessage('DEBUG: sem partida/state carregado.');
+            return;
+          }
+          if (state.finished) {
+            showMessage('DEBUG: fim de jogo.');
+            return;
+          }
+
+          const bypassTurn = opts.bypassTurn !== false; // default TRUE
+          if (!bypassTurn && state.currentPlayer !== myPlayerIndex) {
+            showMessage('DEBUG: não é sua vez.');
+            return;
+          }
+
+          const playerId = opts.playerId ?? myPlayerIndex ?? state.currentPlayer;
+          const p = state.players?.[playerId];
+          if (!p) {
+            showMessage('DEBUG: playerId inválido.');
+            return;
+          }
+
+          let drew = 0;
+          for (let i = 0; i < count; i++) {
+            if (!state.stock.length) {
+              if (!recycleDeadToStockIfPossible() || !state.stock.length) break;
+            }
+            const c = state.stock.pop();
+            ensureCardId(c);
+            p.hand.push(c);
+            drew++;
+          }
+
+          sortHand(p.hand);
+
+          // deixa o jogo "comprado" pra evitar bloqueios na UI
+          if (playerId === state.currentPlayer) state.hasDrawnThisTurn = true;
+
+          // registra ação só pra sincronizar (e não disparar animações normais)
+          state.lastAction = { id: newActionId(), type: 'debugDrawStock', playerId, count: drew, ts: Date.now() };
+          ignoreOwnActionId = state.lastAction.id;
+
+          renderAll();
+          await commitState();
+
+          showMessage(`DEBUG: jogador ${playerId} comprou ${drew} carta(s) do monte.`);
+        } catch (e) {
+          console.error(e);
+          showMessage('DEBUG: erro ao comprar cartas (veja console).');
+        }
       };
 
       function renderOpponentHands() {
@@ -2809,11 +3275,16 @@
           selectedHandIndexes.clear();
           document.getElementById('configSection').style.display = 'block';
           document.getElementById('gameSection').style.display = 'none';
+
+          resetCanastraSfxMemory();
+
           return;
         }
 
         const newState = JSON.parse(snap.data().stateJson);
         state = newState;
+
+        syncCanastraSfxFromState();
 
         selectedHandIndexes.clear();
         document.getElementById('configSection').style.display = 'none';
