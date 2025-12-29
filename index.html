@@ -947,6 +947,58 @@
       .meld-line-cards {
         transition: transform 0.15s ease;
       }
+
+      /* ===== Tags de canastra (você já renderiza, faltava o CSS) ===== */
+      .meld-tag {
+        display: inline-block;
+        font-size: 9px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        margin-left: 4px;
+        line-height: 1.3;
+      }
+
+      .meld-tag.suja {
+        background: rgba(239, 68, 68, 0.18);
+        color: #fecaca;
+        border-color: rgba(239, 68, 68, 0.35);
+      }
+      .meld-tag.limpa {
+        background: rgba(34, 197, 94, 0.18);
+        color: #bbf7d0;
+        border-color: rgba(34, 197, 94, 0.35);
+      }
+      .meld-tag.real {
+        background: rgba(250, 204, 21, 0.18);
+        color: #fde68a;
+        border-color: rgba(250, 204, 21, 0.35);
+      }
+      .meld-tag.asas {
+        background: rgba(99, 102, 241, 0.18);
+        color: #c7d2fe;
+        border-color: rgba(99, 102, 241, 0.35);
+      }
+
+      /* ===== Botão mover 2/Joker ===== */
+      #moveWildBtn {
+        background: #0ea5e9;
+      }
+      #moveWildBtn:disabled {
+        opacity: 0.5;
+      }
+
+      /* ===== UI de seleção do 2/Joker na mesa ===== */
+      .carta.mini.wild-pickable {
+        cursor: pointer;
+        outline: 1px dashed rgba(250, 204, 21, 0.6);
+        outline-offset: 1px;
+      }
+      .carta.mini.wild-picked {
+        border: 2px solid #facc15 !important;
+        box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.35) !important;
+        transform: translateY(-2px);
+      }
     </style>
   </head>
   <body>
@@ -1040,7 +1092,7 @@
                 </div>
               </div>
 
-              <div class="grow" style="border-left: 1px dashed rgba(255, 255, 255, 0.1); padding-left: 5px">
+              <div class="grow">
                 <div class="team-panel" id="teamPanel2">
                   <div class="meld-title">
                     <span>Time 2 Pts:</span>
@@ -1086,6 +1138,7 @@
 
             <div class="player-actions">
               <button id="meldBtn">⬇️ Baixar</button>
+              <button id="moveWildBtn">↔️ Mover 2/Joker</button>
               <button id="discardBtn">🗑️ Descartar</button>
               <button id="takeDeadBtn">💀 Morto</button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
@@ -1155,6 +1208,9 @@
       let lastSeenActionId = null;
       let ignoreOwnActionId = null;
 
+      let movingWild = null;
+      // { fromTeamId, fromMeldIndex, fromCardIndex, card }
+
       window.getState = () => state;
       window.setState = (s) => ((state = s), renderAll());
 
@@ -1162,6 +1218,92 @@
       // 🔄 VIEW ORIENTATION (fixo por cliente)
       // Cada cliente vê APENAS o próprio time "de pé".
       // NÃO depende de quem está jogando no momento.
+
+      function buildRankIndex(order) {
+        const m = {};
+        order.forEach((r, i) => (m[r] = i));
+        return m;
+      }
+      const IDX_HIGH = buildRankIndex(RANKS_SEQ);
+      const IDX_LOW = buildRankIndex(RANKS_SEQ_LOW);
+
+      function missingRankBetween(a, b) {
+        // retorna o rank que falta quando a e b têm diferença 2 (ex.: 6 e 8 -> 7)
+        const ah = IDX_HIGH[a],
+          bh = IDX_HIGH[b];
+        if (ah != null && bh === ah + 2) return RANKS_SEQ[ah + 1];
+
+        const al = IDX_LOW[a],
+          bl = IDX_LOW[b];
+        if (al != null && bl === al + 2) return RANKS_SEQ_LOW[al + 1];
+
+        return null;
+      }
+
+      // empurra o coringa (2/Joker) pra uma ponta sem quebrar o jogo
+      function pushWildToEdge(meld, wildIdx) {
+        const wild = meld[wildIdx];
+
+        // tenta direita
+        let cand = meld.slice();
+        cand.splice(wildIdx, 1);
+        cand.push(wild);
+        if (isValidSequenceMeld(cand)) return cand;
+
+        // tenta esquerda
+        cand = meld.slice();
+        cand.splice(wildIdx, 1);
+        cand.unshift(wild);
+        if (isValidSequenceMeld(cand)) return cand;
+
+        return null;
+      }
+
+      // caso clássico: 5,6,2,8 + baixa 7 => 5,6,7,8 e 2 vai pra ponta
+      function autoSwapWildWhenFillingGap(meld) {
+        if (!meld || meld.length < 4) return false;
+
+        // acha 1 wild "de verdade" (2 ou joker) no meio
+        const wIdx = meld.findIndex((c, i) => (c?.joker || c?.rank === '2') && isWildcard(c, meld) && i > 0 && i < meld.length - 1);
+        if (wIdx === -1) return false;
+
+        const left = meld[wIdx - 1];
+        const right = meld[wIdx + 1];
+        if (!left || !right) return false;
+        if (left.joker || right.joker) return false;
+        if (left.suit !== right.suit) return false;
+
+        const needed = missingRankBetween(left.rank, right.rank);
+        if (!needed) return false;
+
+        // existe a carta natural needed no meld? (porque o jogador acabou de baixar)
+        const naturalIdx = meld.findIndex((c, i) => i !== wIdx && !c.joker && c.rank === needed && c.suit === left.suit);
+        if (naturalIdx === -1) return false;
+
+        const wild = meld[wIdx];
+        const natural = meld[naturalIdx];
+
+        // ✅ o 2 estava sendo usado como coringa; fixa isso (não deixa virar "natural" por posição)
+        if (!wild.joker && wild.rank === '2') wild.forceWild = true;
+
+        // troca: natural entra no lugar do wild
+        meld[wIdx] = natural;
+
+        // remove a natural da posição antiga
+        meld.splice(naturalIdx, 1);
+
+        // recoloca o wild e tenta empurrar pra ponta
+        const insertAt = naturalIdx < wIdx ? wIdx - 1 : wIdx; // ajuste de índice por causa do splice
+        meld.splice(insertAt, 0, wild);
+
+        const pushed = pushWildToEdge(meld, meld.indexOf(wild));
+        if (pushed) {
+          meld.splice(0, meld.length, ...pushed);
+        }
+
+        return true;
+      }
+
       // ==========================
       function applyViewTeamClass() {
         document.body.classList.remove('view-team0', 'view-team1');
@@ -1211,6 +1353,261 @@
               .catch(() => {});
           } catch (e) {}
         }
+      }
+
+      function isMovableTwoOrJoker(card) {
+        if (!card) return false;
+        return !!card.joker || card.rank === '2';
+      }
+
+      function meldKey(teamId, meldIdx) {
+        return `${teamId}:${meldIdx}`;
+      }
+
+      function parseMeldKey(key) {
+        if (!key) return null;
+        const [t, m] = key.split(':');
+        const teamId = parseInt(t, 10);
+        const meldIdx = parseInt(m, 10);
+        if (Number.isNaN(teamId) || Number.isNaN(meldIdx)) return null;
+        return { teamId, meldIdx };
+      }
+
+      function miniCardElByMeld(teamId, meldIdx, cardIdx) {
+        const key = meldKey(teamId, meldIdx);
+        return document.querySelector(`.meld-line[data-meld-key="${key}"] .carta.mini[data-card-index="${cardIdx}"]`);
+      }
+
+      function meldCardsRect(teamId, meldIdx) {
+        const key = meldKey(teamId, meldIdx);
+        const meldEl = document.querySelector(`.meld-line[data-meld-key="${key}"]`);
+        const row = meldEl ? meldEl.querySelector('.meld-line-cards') : null;
+        const r = row ? row.getBoundingClientRect() : null;
+        if (!r) return null;
+        // um “retângulo pequeno” no meio da linha, pra animar de origem
+        return { left: r.left + r.width * 0.5 - 14, top: r.top + 4, width: 28, height: 40 };
+      }
+
+      function clearMovingWild(msg = null) {
+        movingWild = null;
+        if (msg) showMessage(msg);
+        renderMelds();
+        // botão liga/desliga via renderAll
+        renderAll();
+      }
+
+      function pickWildFromMeld(teamId, meldIdx, cardIdx) {
+        if (!state || state.finished) return;
+
+        const myTurn = state.currentPlayer === myPlayerIndex;
+        if (!myTurn || !state.hasDrawnThisTurn) {
+          showMessage('Só dá pra mover depois de comprar e na sua vez.');
+          return;
+        }
+
+        const me = state.players[myPlayerIndex];
+        if (teamId !== me.teamId) {
+          showMessage('Você só mexe nos jogos do SEU time.');
+          return;
+        }
+
+        const meld = state.teams?.[teamId]?.melds?.[meldIdx];
+        if (!meld || !meld[cardIdx]) return;
+
+        const card = meld[cardIdx];
+        if (!isMovableTwoOrJoker(card)) {
+          showMessage('Só pode mover JOKER ou 2.');
+          return;
+        }
+
+        // toggle: clicou no mesmo -> cancela
+        if (movingWild && movingWild.fromTeamId === teamId && movingWild.fromMeldIndex === meldIdx && movingWild.fromCardIndex === cardIdx) {
+          clearMovingWild('Movimento cancelado.');
+          return;
+        }
+
+        ensureCardId(card);
+        movingWild = {
+          fromTeamId: teamId,
+          fromMeldIndex: meldIdx,
+          fromCardIndex: cardIdx,
+          card: packCard(card),
+        };
+
+        showMessage('Clique em "Mover 2/Joker". (Selecionar destino é opcional)');
+
+        renderMelds();
+        renderAll();
+      }
+
+      async function movePickedWildToSelectedMeld() {
+        if (!state || state.finished) return;
+        if (!ensureMyTurn()) return;
+        if (!state.hasDrawnThisTurn) {
+          showMessage('Compre primeiro.');
+          return;
+        }
+
+        if (!movingWild) {
+          showMessage('Clique num 2/JOKER no jogo pra selecionar.');
+          return;
+        }
+
+        const me = state.players[myPlayerIndex];
+        const myTeamId = me.teamId;
+
+        const destParsed = parseMeldKey(selectedMeldTarget) || { teamId: movingWild.fromTeamId, meldIdx: movingWild.fromMeldIndex };
+
+        if (!destParsed || destParsed.teamId !== myTeamId) {
+          showMessage('Selecione um jogo DESTINO do seu time.');
+          return;
+        }
+
+        const { teamId: toTeamId, meldIdx: toMeldIdx } = destParsed;
+
+        const fromTeamId = movingWild.fromTeamId;
+        const fromMeldIdx = movingWild.fromMeldIndex;
+        const fromCardIdx = movingWild.fromCardIndex;
+
+        if (fromTeamId !== myTeamId) {
+          showMessage('Origem não é do seu time (bug de seleção).');
+          clearMovingWild();
+          return;
+        }
+
+        const team = state.teams[myTeamId];
+        const fromMeld = team?.melds?.[fromMeldIdx];
+        const toMeld = team?.melds?.[toMeldIdx];
+
+        if (!fromMeld || !toMeld) {
+          showMessage('Jogo origem/destino inválido.');
+          clearMovingWild();
+          return;
+        }
+
+        // pega a carta (por índice e, se tiver id, re-localiza por id pra evitar índice "velho")
+        const rawCard = fromMeld[fromCardIdx];
+        if (!rawCard || !isMovableTwoOrJoker(rawCard)) {
+          showMessage('Essa carta não existe mais no jogo origem.');
+          clearMovingWild();
+          return;
+        }
+        ensureCardId(rawCard);
+        const cardId = rawCard.id;
+        const actualFromIdx = fromMeld.findIndex((c) => c && c.id === cardId);
+        const fromIdx = actualFromIdx >= 0 ? actualFromIdx : fromCardIdx;
+        const card = fromMeld[fromIdx];
+
+        const sameMeld = fromMeldIdx === toMeldIdx;
+
+        // ===== validação (SIMULA, sem mexer no state) =====
+        if (sameMeld) {
+          // 🔁 toggle simples: se tá no fim -> vai pro começo; senão -> vai pro fim
+          const targetIndex = fromIdx === fromMeld.length - 1 ? 0 : fromMeld.length - 1;
+
+          const after = fromMeld.slice();
+          const [moved] = after.splice(fromIdx, 1);
+          if (targetIndex === 0) after.unshift(moved);
+          else after.push(moved);
+
+          if (after.length < 3) {
+            showMessage('Não pode quebrar o jogo (mínimo 3 cartas).');
+            return;
+          }
+          if (!isValidSequenceMeld(after)) {
+            showMessage('Mover assim deixa o jogo inválido.');
+            return;
+          }
+        } else {
+          const fromAfter = fromMeld.slice();
+          fromAfter.splice(fromIdx, 1);
+
+          const toAfter = toMeld.slice();
+          toAfter.push(card);
+
+          if (fromAfter.length < 3) {
+            showMessage('Não pode quebrar o jogo origem (mínimo 3 cartas).');
+            return;
+          }
+          if (!isValidSequenceMeld(fromAfter)) {
+            showMessage('Remover isso quebra o jogo origem.');
+            return;
+          }
+          if (!isValidSequenceMeld(toAfter)) {
+            showMessage('Mover pra esse destino deixa o jogo inválido.');
+            return;
+          }
+        }
+
+        // ===== animação =====
+        // origem no DOM
+        const fromEl = miniCardElByMeld(myTeamId, fromMeldIdx, fromIdx);
+        const fromRect = fromEl ? getRect(fromEl) : meldCardsRect(myTeamId, fromMeldIdx);
+
+        // destino no DOM
+        const keyTo = meldKey(myTeamId, toMeldIdx);
+
+        let toRect = null;
+        if (sameMeld) {
+          const targetIndex = fromIdx === fromMeld.length - 1 ? 0 : fromMeld.length - 1;
+          if (targetIndex === 0) {
+            const meldEl = meldElByKey(keyTo);
+            const row = meldEl ? meldEl.querySelector('.meld-line-cards') : null;
+            const r = row ? row.getBoundingClientRect() : null;
+            toRect = r ? { left: r.left + 4, top: r.top + 4, width: 28, height: 40 } : meldCardsRect(myTeamId, toMeldIdx);
+          } else {
+            const baseDrop = meldDropRect(keyTo, 0);
+            toRect = baseDrop || meldCardsRect(myTeamId, toMeldIdx);
+          }
+        } else {
+          const baseDrop = meldDropRect(keyTo, 0);
+          toRect = baseDrop || meldCardsRect(myTeamId, toMeldIdx);
+        }
+
+        if (fromEl) fromEl.style.visibility = 'hidden';
+        if (fromRect && toRect) {
+          await flyRectToRect(card, fromRect, toRect, 'front');
+          impactAtRect(toRect);
+        }
+        if (fromEl) fromEl.style.visibility = '';
+
+        // ===== aplica no state (1x) =====
+        if (sameMeld) {
+          const targetIndex = fromIdx === fromMeld.length - 1 ? 0 : fromMeld.length - 1;
+          const [moved] = fromMeld.splice(fromIdx, 1);
+          if (targetIndex === 0) fromMeld.unshift(moved);
+          else fromMeld.push(moved);
+          // NÃO normalize aqui, senão ele desfaz tua intenção e o 2 muda de papel sozinho
+        } else {
+          const [moved] = fromMeld.splice(fromIdx, 1);
+          toMeld.push(moved);
+          normalizeMeldOrder(fromMeld);
+          normalizeMeldOrder(toMeld);
+        }
+
+        // limpa seleção + avisa
+        const actionCard = packCard(card);
+        const actionId = newActionId();
+
+        state.lastAction = {
+          id: actionId,
+          type: 'meldMoveWild',
+          playerId: myPlayerIndex,
+          teamId: myTeamId,
+          fromMeldIndex: fromMeldIdx,
+          toMeldIndex: toMeldIdx,
+          card: actionCard,
+          ts: Date.now(),
+        };
+        ignoreOwnActionId = actionId;
+
+        movingWild = null;
+        // deixa o destino selecionado (pra facilitar "voltar" sem clicar tudo de novo)
+        // selectedMeldTarget = null;
+
+        renderAll();
+        await commitState();
+        showMessage('Movido.');
       }
 
       // desbloqueia no primeiro gesto do usuário
@@ -1727,7 +2124,11 @@
       function isWildcard(card, meld = null) {
         if (!card) return false;
         if (card.joker) return true;
-        if (card.rank !== '2') return false;
+        if (card.rank !== '2' && card.rank !== 2) return false;
+
+        // ✅ override manual/da engine (não depende da posição)
+        if (card.forceWild) return true;
+        if (card.forceNatural) return false;
 
         // 2 só é "natural" quando estiver imediatamente ANTES do 3 do mesmo naipe
         if (!meld || !Array.isArray(meld)) return true;
@@ -2130,7 +2531,10 @@
             targetMeld.push(hand[idx]);
             hand.splice(idx, 1);
           }
-          normalizeMeldOrder(targetMeld);
+          normalizeMeldOrder(targetMeld); // mantém tua ordenação padrão
+          autoSwapWildWhenFillingGap(targetMeld); // ✅ libera o 2 quando a carta “real” entrou
+          normalizeMeldOrder(targetMeld); // reordena de novo depois do swap (agora com forceWild)
+
           sortHand(hand);
           selectedHandIndexes.clear();
           selectedMeldTarget = null;
@@ -2167,6 +2571,8 @@
           teamMeld.push(hand[idx]);
           hand.splice(idx, 1);
         }
+        normalizeMeldOrder(teamMeld);
+        autoSwapWildWhenFillingGap(teamMeld);
         normalizeMeldOrder(teamMeld);
         sortHand(hand);
         selectedHandIndexes.clear();
@@ -2620,8 +3026,6 @@
         document.getElementById('currentPlayerLabel').textContent = currentPlayer().name;
         document.getElementById('stockCount').textContent = state.stock.length;
 
-        applyViewTeamClass();
-
         // Descarte
         const discardTop = state.discard[state.discard.length - 1];
         document.getElementById('discardCount').textContent = state.discard.length;
@@ -2662,6 +3066,19 @@
         // Botões
         const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
 
+        // botão mover 2/Joker (habilita só quando faz sentido)
+        const moveBtn = document.getElementById('moveWildBtn');
+        if (moveBtn) {
+          const me = state.players[myPlayerIndex];
+          const myTeamId = me?.teamId;
+
+          const dest = parseMeldKey(selectedMeldTarget) || (movingWild ? { teamId: movingWild.fromTeamId, meldIdx: movingWild.fromMeldIndex } : null);
+
+          const can = myTurn && state.hasDrawnThisTurn && !!movingWild && dest && dest.teamId === myTeamId;
+
+          moveBtn.disabled = !can;
+        }
+
         // 🔔 Vibra quando passa a ser a minha vez
         if (myTurn && !lastMyTurn && navigator.vibrate) {
           navigator.vibrate([150, 80, 150]); // vibra, pausa, vibra
@@ -2670,7 +3087,6 @@
 
         document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
 
-        document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
         document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn ? '1' : '0.5';
 
         document.getElementById('drawDiscardBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn && state.discard.length ? 'auto' : 'none';
@@ -3086,7 +3502,24 @@
               if (mInfo.kind !== 'simple' && cidx === meld.length - 1) return;
               const minic = document.createElement('div');
               minic.className = 'carta mini ' + (c.joker ? 'joker-card' : c.suit === '♥' || c.suit === '♦' ? 'hearts' : 'spades');
+              minic.dataset.cardIndex = cidx;
               minic.innerHTML = c.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${c.rank}${c.suit}</div>`;
+
+              const me = state.players[myPlayerIndex];
+              const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+
+              if (me && t.id === me.teamId && myTurn && state.hasDrawnThisTurn && isMovableTwoOrJoker(c)) {
+                minic.classList.add('wild-pickable');
+                if (movingWild && movingWild.fromTeamId === t.id && movingWild.fromMeldIndex === midx && movingWild.fromCardIndex === cidx) {
+                  minic.classList.add('wild-picked');
+                }
+
+                minic.onclick = (ev) => {
+                  ev.stopPropagation(); // não troca selectedMeldTarget ao clicar na carta
+                  pickWildFromMeld(t.id, midx, cidx);
+                };
+              }
+
               row.appendChild(minic);
             });
 
@@ -3094,7 +3527,24 @@
               const last = meld[meld.length - 1];
               const closed = document.createElement('div');
               closed.className = 'carta mini canastra-fechada ' + (last.joker ? 'joker-card' : last.suit === '♥' || last.suit === '♦' ? 'hearts' : 'spades');
+              closed.dataset.cardIndex = meld.length - 1;
               closed.innerHTML = last.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${last.rank}${last.suit}</div>`;
+
+              const me = state.players[myPlayerIndex];
+              const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+
+              if (me && t.id === me.teamId && myTurn && state.hasDrawnThisTurn && isMovableTwoOrJoker(last)) {
+                closed.classList.add('wild-pickable');
+                if (movingWild && movingWild.fromTeamId === t.id && movingWild.fromMeldIndex === midx && movingWild.fromCardIndex === meld.length - 1) {
+                  closed.classList.add('wild-picked');
+                }
+
+                closed.onclick = (ev) => {
+                  ev.stopPropagation();
+                  pickWildFromMeld(t.id, midx, meld.length - 1);
+                };
+              }
+
               row.appendChild(closed);
             }
 
@@ -3267,6 +3717,19 @@
 
           return;
         }
+
+        if (a.type === 'meldMoveWild') {
+          if (a.teamId == null || a.fromMeldIndex == null || a.toMeldIndex == null) return;
+
+          const fromRect = meldCardsRect(a.teamId, a.fromMeldIndex) || meldDropRect(`${a.teamId}:${a.fromMeldIndex}`, 0);
+          const toRect = meldDropRect(`${a.teamId}:${a.toMeldIndex}`, 0) || meldCardsRect(a.teamId, a.toMeldIndex);
+          if (!fromRect || !toRect) return;
+
+          const card = a.card || { rank: '★', suit: '★', joker: true, id: `mw_${Date.now()}` };
+          await flyRectToRect(card, fromRect, toRect, 'front');
+          impactAtRect(toRect);
+          return;
+        }
       }
 
       onSnapshot(gameRef, async (snap) => {
@@ -3283,6 +3746,9 @@
 
         const newState = JSON.parse(snap.data().stateJson);
         state = newState;
+
+        // evita ficar “segurando” carta movível depois de atualização remota
+        movingWild = null;
 
         syncCanastraSfxFromState();
 
@@ -3323,6 +3789,7 @@
       document.getElementById('drawStockBtn').onclick = drawFromStock;
       document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
       document.getElementById('meldBtn').onclick = makeMeldFromSelection;
+      document.getElementById('moveWildBtn').onclick = movePickedWildToSelectedMeld;
       document.getElementById('discardBtn').onclick = discardSelectedCard;
       document.getElementById('takeDeadBtn').onclick = takeDead;
       document.getElementById('endGameBtn').onclick = () => deleteDoc(gameRef);
