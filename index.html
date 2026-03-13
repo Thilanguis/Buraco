@@ -472,6 +472,7 @@
         margin-bottom: -15px;
       }
 
+      /* -- JOGOS BAIXADOS (ÁREA DE MELDS) -- */
       .board-melds {
         flex: 0 0 auto;
         min-height: 60px;
@@ -480,7 +481,7 @@
         margin: 70px auto 4px;
         padding: 6px 10px;
         display: flex;
-        align-items: stretch;
+        align-items: stretch; /* Garante que os dois lados tenham a mesma altura */
         gap: 20px;
         background: rgba(0, 0, 0, 0.15);
         border-radius: 8px;
@@ -489,13 +490,18 @@
 
       .board-melds .grow {
         flex: 1 1 0;
-        width: calc(50% - 10px);
+        width: calc(50% - 10px); /* Força exatos 50% de largura */
         min-width: 0;
         display: flex;
         flex-direction: column;
         background: rgba(15, 23, 42, 0.85);
         border-radius: 10px;
         padding: 6px 10px;
+      }
+
+      /* ADICIONE ISSO: Tira a margem da última carta para não vazar o container */
+      .carta.mini:last-child {
+        margin-right: 0 !important;
       }
 
       .board-melds .grow + .grow {
@@ -1380,24 +1386,23 @@
       const startOverlay = document.getElementById('startOverlay');
       const introVideo = document.getElementById('introVideo');
       const loadingScreen = document.getElementById('loadingScreen');
+      let introFinished = false; // Bloqueia o menu enquanto o vídeo passa
 
       function endIntroSequence() {
         introVideo.style.display = 'none';
         introVideo.pause();
-
-        // Inicia o Loading
         loadingScreen.style.display = 'flex';
         setTimeout(() => {
           loadingScreen.style.opacity = '1';
         }, 50);
 
-        // Quando o Loading terminar...
         setTimeout(() => {
           loadingScreen.style.opacity = '0';
           setTimeout(() => {
             loadingScreen.style.display = 'none';
-            // MOSTRA O MENU APENAS AQUI
-            document.getElementById('configSection').style.display = 'flex';
+            introFinished = true; // Intro acabou!
+            // Só mostra o menu se não estiver dentro de um jogo
+            if (!state) document.getElementById('configSection').style.display = 'flex';
           }, 1000);
         }, 2500);
       }
@@ -3967,11 +3972,15 @@
         if (!snap.exists()) {
           state = null;
           selectedHandIndexes.clear();
-          // Se o vídeo ou loading ainda estiverem passando, não força o menu
-          if (startOverlay.style.display === 'none' && introVideo.style.display === 'none' && loadingScreen.style.display === 'none') {
+
+          // LIMPEZA: Esconde mesa e o Placar (corrige o erro do X)
+          document.getElementById('gameSection').style.display = 'none';
+          document.getElementById('scoreSection').style.display = 'none';
+
+          // SÓ mostra o menu se a introdução já tiver terminado
+          if (introFinished) {
             document.getElementById('configSection').style.display = 'flex';
           }
-          document.getElementById('gameSection').style.display = 'none';
           resetCanastraSfxMemory();
           return;
         }
@@ -3982,29 +3991,24 @@
 
         syncCanastraSfxFromState();
         selectedHandIndexes.clear();
+
+        // Se o jogo existe, pula as intros direto para a mesa
         document.getElementById('configSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'flex';
-
-        // Esconde a tela de introdução e o menu se recarregar a página com o jogo em andamento
-        const startOverlay = document.getElementById('startOverlay');
-        const intro = document.getElementById('introVideo');
-        const loader = document.getElementById('loadingScreen');
-        if (startOverlay) startOverlay.remove();
-        if (intro) intro.remove();
-        if (loader) loader.remove();
+        startOverlay.style.display = 'none';
+        introVideo.style.display = 'none';
+        loadingScreen.style.display = 'none';
 
         renderAll();
         startTurnTimerIfNeeded();
 
         const a = state.lastAction;
         if (!a || a.id === lastSeenActionId) return;
-
         lastSeenActionId = a.id;
         if (a.id === ignoreOwnActionId) {
           ignoreOwnActionId = null;
           return;
         }
-
         await playRemoteAction(a);
       });
 
