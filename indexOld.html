@@ -1983,14 +1983,7 @@
         const taken = state.deadChunksTaken?.[teamId] ?? 0;
         const max = state.deadChunksMax?.[teamId] ?? 1;
 
-        // se ficou sem carta, tenta pegar morto automaticamente
-        let tookDead = null;
-        if (hand.length === 0) {
-          tookDead = takeDeadIfAvailableForPlayer(me);
-        }
-
-        // se ainda tá sem carta e não pegou morto: fim do jogo
-        if (hand.length === 0 && !tookDead && taken >= max) {
+        if (hand.length === 0 && taken >= max) {
           await finishGame(teamId);
           return;
         }
@@ -2579,6 +2572,8 @@
           hand.splice(idx, 1);
         }
         normalizeMeldOrder(teamMeld);
+        autoSwapWildWhenFillingGap(teamMeld);
+        normalizeMeldOrder(teamMeld);
         sortHand(hand);
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
@@ -2709,7 +2704,7 @@
         if (!dead || !dead.length) return null;
 
         const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
-        p.hand.push(...dead.splice(0, chunkSize));
+        p.hand = dead.splice(0, chunkSize);
         sortHand(p.hand);
         state.deadChunksTaken[teamId] = taken + 1;
 
@@ -2755,7 +2750,7 @@
           await flyRectToRect(fakeCard, fromRect, toRect, 'back');
         }
 
-        p.hand.push(...dead.splice(0, chunkSize));
+        p.hand = dead.splice(0, chunkSize);
         sortHand(p.hand);
         state.deadChunksTaken[teamId] = taken + 1;
 
@@ -3010,11 +3005,7 @@
           let handPenalty = 0;
           players.forEach((p) => p.hand.forEach((c) => (handPenalty += cardBasePoints(c))));
           const meldInfo = computeTeamMeldScore(team);
-          const deadTaken = state.deadChunksTaken?.[team.id] ?? 0;
-          const mortoBonus = deadTaken > 0 ? 100 : 0;
-          const mortoPenalty = deadTaken === 0 ? 100 : 0;
-          const batidaBonus = state.finished && state.winnerTeamId === team.id ? 100 : 0;
-          results.push({ team, players, score: meldInfo.total + batidaBonus + mortoBonus - mortoPenalty - handPenalty, handPenalty, batidaBonus, mortoBonus, mortoPenalty, ...meldInfo });
+          results.push({ team, players, score: meldInfo.total - handPenalty, handPenalty, ...meldInfo });
         });
         return results;
       }
@@ -3581,22 +3572,9 @@
         board.innerHTML = '';
         scores.sort((a, b) => b.score - a.score);
         scores.forEach((s) => {
-          const bonusCanastra = (s.sujaBonus + s.limpaBonus + s.realBonus + s.asasBonus) || 0;
-          const batida = s.batidaBonus || 0;
-          const mortoB = s.mortoBonus || 0;
-          const mortoP = s.mortoPenalty || 0;
-
-          board.innerHTML += `<div style="margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:8px;">
-              <strong style="color:${s.team.id === winner ? '#facc15' : '#fff'}">${s.team.name}</strong>: <strong>${s.score}</strong> pts
-              <div style="font-size:11px; color:#aaa; margin-top:4px; line-height:1.35;">
-                <div>Jogos (cartas): +${s.meldPoints}</div>
-                <div>Bônus canastras: +${bonusCanastra}
-                  <span style="color:#888;">(suja ${s.sujaBonus}, limpa ${s.limpaBonus}, real ${s.realBonus}, ás‑ás ${s.asasBonus})</span>
-                </div>
-                <div>Batida: +${batida}</div>
-                <div>Morto: +${mortoB} / -${mortoP}</div>
-                <div>Mão: -${s.handPenalty}</div>
-              </div>
+          board.innerHTML += `<div style="margin-bottom:8px; border-bottom:1px solid #333; padding-bottom:4px;">
+              <strong style="color:${s.team.id === winner ? '#facc15' : '#fff'}">${s.team.name}</strong>: ${s.score} pts
+              <div style="font-size:10px; color:#aaa;">Mão: -${s.handPenalty} | Jogos: +${s.meldPoints} | Bônus: +${s.sujaBonus + s.limpaBonus + s.realBonus + s.asasBonus}</div>
             </div>`;
         });
       }

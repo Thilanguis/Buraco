@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v13';
+const CACHE_NAME = 'buraco-v14';
 
 // Coloca aqui os arquivos estáticos que você quer cachear
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
@@ -8,7 +8,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
-    })
+    }),
   );
   self.skipWaiting();
 });
@@ -30,6 +30,6 @@ self.addEventListener('fetch', (event) => {
     caches.match(req).then((cached) => {
       if (cached) return cached;
       return fetch(req).catch(() => cached);
-    })
+    }),
   );
 });
