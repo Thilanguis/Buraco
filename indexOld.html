@@ -2885,12 +2885,44 @@
 
       function isValidSequenceMeld(cards) {
         if (!cards || cards.length < 3) return false;
-        const wildCards = cards.filter((c) => isWildcard(c, cards));
-        if (wildCards.length > 1) return false;
+
+        let wildCards = cards.filter((c) => isWildcard(c, cards));
+        let modifiedTwo = null;
+
+        // Se detectou 2 curingas (ex: JOKER e um '2'), tenta forçar o '2' do naipe a ser natural
+        if (wildCards.length > 1) {
+          const twos = wildCards.filter((c) => !c.joker && (c.rank === '2' || c.rank === 2));
+          const realCards = cards.filter((c) => !c.joker && !(c.rank === '2' || c.rank === 2));
+          const suit = realCards.length > 0 ? realCards[0].suit : twos.length > 0 ? twos[0].suit : null;
+
+          if (twos.length > 0 && suit) {
+            const twoToNatural = twos.find((t) => t.suit === suit);
+            if (twoToNatural) {
+              twoToNatural.forceNatural = true;
+              modifiedTwo = twoToNatural;
+              // Reavalia a quantidade de curingas reais
+              wildCards = cards.filter((c) => isWildcard(c, cards));
+            }
+          }
+        }
+
+        // Se mesmo assim sobrar mais de 1 curinga real, bloqueia
+        if (wildCards.length > 1) {
+          if (modifiedTwo) modifiedTwo.forceNatural = false;
+          return false;
+        }
+
         const nonWild = cards.filter((c) => !isWildcard(c, cards));
-        if (!nonWild.length) return false;
+        if (!nonWild.length) {
+          if (modifiedTwo) modifiedTwo.forceNatural = false;
+          return false;
+        }
         const suit = nonWild[0].suit;
-        if (!nonWild.every((c) => c.suit === suit)) return false;
+        if (!nonWild.every((c) => c.suit === suit)) {
+          if (modifiedTwo) modifiedTwo.forceNatural = false;
+          return false;
+        }
+
         const availableWilds = cards.length - nonWild.length;
 
         function neededWildsForOrder(order, aceMode) {
@@ -2914,12 +2946,14 @@
           }
           return needed;
         }
+
         const needHigh = neededWildsForOrder(RANKS_SEQ, 'high');
         const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low');
 
         const baseOk = (needHigh !== null && needHigh <= availableWilds) || (needLow !== null && needLow <= availableWilds);
         if (baseOk) return true;
 
+        // Validação da Canastra de Ás a Ás (ás repetido nas pontas)
         const aceCount = nonWild.filter((c) => c.rank === 'A').length;
         const hasKing = nonWild.some((c) => c.rank === 'K');
         if (aceCount >= 2 && hasKing) {
@@ -2954,6 +2988,8 @@
           }
         }
 
+        // Limpeza de segurança caso falhe no final
+        if (modifiedTwo) modifiedTwo.forceNatural = false;
         return false;
       }
 

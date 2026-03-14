@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v17';
+const CACHE_NAME = 'buraco-v18';
 
 // Coloca aqui os arquivos estáticos que você quer cachear
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
