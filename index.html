@@ -679,13 +679,16 @@
         padding: 2px 4px;
         font-size: 14px;
         color: #000;
+        overflow: hidden; /* Corta o que sobrar sem precisar de !important */
       }
 
-      .carta.mini .carta-canto {
-        font-size: 8px;
+      .discard-face .carta-canto {
+        font-size: 11px;
+        padding: 0 2px;
       }
-      .carta.mini .carta-meio {
-        font-size: 14px;
+
+      .discard-face .carta-meio {
+        font-size: 24px;
       }
 
       .pile-info {
@@ -694,7 +697,7 @@
         background: rgba(0, 0, 0, 0.7);
         padding: 2px 6px;
         border-radius: 10px;
-        margin-top: -8px;
+        margin-top: 6px;
         z-index: 10;
       }
 
@@ -785,6 +788,7 @@
         padding: 2px 4px;
         font-size: 14px;
         font-weight: bold;
+        overflow: hidden;
       }
 
       .carta:last-child {
@@ -974,6 +978,16 @@
         margin-bottom: 0;
         font-size: 10px;
         padding: 1px;
+      }
+
+      /* Achata o topo e base para não empurrar o meio para fora */
+      .carta.mini .carta-canto {
+        font-size: 8px;
+        line-height: 0.9;
+      }
+
+      .carta.mini .carta-meio {
+        font-size: 16px;
       }
 
       .carta.mini:last-child,
@@ -1322,6 +1336,114 @@
         border: 2px solid #facc15 !important;
         box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.35) !important;
         transform: translateY(-2px);
+      }
+
+      /* ================= ANIMAÇÃO DE PONTOS VOANDO ================= */
+      .floating-score {
+        position: fixed;
+        font-weight: 900;
+        color: #4ade80; /* Verde vivo */
+        font-size: 28px;
+        text-shadow:
+          0 0 10px rgba(74, 222, 128, 0.6),
+          0 3px 6px rgba(0, 0, 0, 1);
+        pointer-events: none;
+        z-index: 10000;
+        opacity: 1;
+      }
+
+      /* ================= CORREÇÃO LIMPA: MOBILE PAISAGEM ================= */
+      .app .board .board-melds {
+        flex-shrink: 0;
+      }
+      .app .board .board-melds .grow {
+        flex-shrink: 0;
+        min-height: 85px;
+      }
+
+      @media (max-height: 600px) and (orientation: landscape) {
+        .app .board .board-melds {
+          flex-direction: row;
+          margin-top: 35px;
+          width: calc(100% - 140px);
+          margin-left: 70px;
+          margin-right: 70px;
+        }
+        .app .board .board-melds .grow {
+          width: 50%;
+        }
+        .app .board .board-melds .grow + .grow {
+          border-top: none;
+          border-left: 1px dashed rgba(148, 163, 184, 0.5);
+          padding-top: 6px;
+          padding-left: 10px;
+        }
+        .app .board .opponent-hand-left {
+          left: 2px;
+          transform: translateY(-50%) scale(0.65);
+          transform-origin: left center;
+        }
+        .app .board .opponent-hand-right {
+          right: 2px;
+          transform: translateY(-50%) scale(0.65);
+          transform-origin: right center;
+        }
+      }
+
+      /* ================= UPGRADE DE TIPOGRAFIA (UI PREMIUM) ================= */
+      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap');
+
+      body {
+        font-family: 'Montserrat', system-ui, sans-serif !important;
+      }
+
+      /* 1. Topo Esquerdo (Status e Chip do Jogador) */
+      .current-player-chip {
+        font-size: 10px !important; /* Reduzido de 12px */
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      }
+      #gameModeBadge {
+        font-size: 8px !important; /* Reduzido de 10px */
+        letter-spacing: 1px;
+      }
+
+      /* 2. Oponentes (Nomes e Contagem) */
+      .opponent-label {
+        font-size: 9px !important; /* Reduzido de 11px */
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      }
+
+      /* 3. Cabeçalho dos Pontos na Mesa */
+      .meld-title {
+        font-size: 9px !important; /* Reduzido de 11px */
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+      }
+      .meld-title strong {
+        font-size: 11px !important; /* Reduzido de 14px */
+        color: #facc15;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      }
+
+      /* 4. Textos do Monte e Lixo */
+      .pile-info {
+        font-size: 8px !important; /* Reduzido de 10px */
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
       }
     </style>
   </head>
@@ -2591,7 +2713,7 @@
 
       function cardBasePoints(card) {
         if (card.joker) return 20;
-        if (card.rank === 'A' || card.rank === '2') return 15;
+        if (card.rank === 'A') return 15;
         if (['3', '4', '5', '6', '7'].includes(card.rank)) return 5;
         return 10;
       }
@@ -3976,8 +4098,69 @@
             target.appendChild(div);
           });
         });
-        document.getElementById('scoreTeam1').textContent = s1;
-        document.getElementById('scoreTeam2').textContent = s2;
+        // --- ANIMAÇÃO DE PONTUAÇÃO ---
+        if (typeof window.lastScores === 'undefined') window.lastScores = [0, 0];
+
+        function triggerScoreAnim(teamIndex, oldScore, newScore) {
+          const scoreEl = document.getElementById(`scoreTeam${teamIndex + 1}`);
+
+          if (newScore <= oldScore) {
+            scoreEl.textContent = newScore;
+            return;
+          }
+
+          const diff = newScore - oldScore;
+          const panelEl = document.getElementById(`teamPanel${teamIndex + 1}`);
+
+          // 1. Efeito do "+X" voando do centro da mesa para o placar
+          if (panelEl && scoreEl) {
+            const pr = panelEl.getBoundingClientRect();
+            const sr = scoreEl.getBoundingClientRect();
+
+            const flyEl = document.createElement('div');
+            flyEl.className = 'floating-score';
+            flyEl.textContent = `+${diff}`;
+            flyEl.style.left = pr.left + pr.width / 2 + 'px';
+            flyEl.style.top = pr.top + pr.height / 2 + 'px';
+            document.body.appendChild(flyEl);
+
+            // Anima da mesa até o placar, diminuindo o tamanho e sumindo
+            flyEl
+              .animate(
+                [
+                  { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                  { transform: `translate(${sr.left - (pr.left + pr.width / 2)}px, ${sr.top - (pr.top + pr.height / 2)}px) scale(0.5)`, opacity: 0 },
+                ],
+                { duration: 900, easing: 'ease-in' },
+              )
+              .finished.then(() => flyEl.remove());
+          }
+
+          // 2. Efeito do placar rodando/crescendo até o valor final
+          let startTime = null;
+          const duration = 900;
+          const step = (timestamp) => {
+            if (!startTime) startTime = timestamp;
+            const progress = Math.min((timestamp - startTime) / duration, 1);
+            scoreEl.textContent = Math.floor(progress * diff + oldScore);
+
+            if (progress < 1) {
+              window.requestAnimationFrame(step);
+            } else {
+              scoreEl.textContent = newScore;
+              // Dá um leve pulso dourado quando termina de somar
+              scoreEl.style.color = '#facc15';
+              setTimeout(() => (scoreEl.style.color = ''), 300);
+            }
+          };
+          window.requestAnimationFrame(step);
+        }
+
+        triggerScoreAnim(0, window.lastScores[0], s1);
+        triggerScoreAnim(1, window.lastScores[1], s2);
+
+        window.lastScores[0] = s1;
+        window.lastScores[1] = s2;
       }
 
       function renderScores(scores, winner) {
