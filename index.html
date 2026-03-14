@@ -56,7 +56,7 @@
         inset: 0;
         background: #050505;
         z-index: 100001;
-        display: none; /* Controlado pela inteligência do JS */
+        display: none;
         flex-direction: column;
         align-items: center;
         justify-content: center;
@@ -162,7 +162,7 @@
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
-        display: none; /* <-- ADICIONE ISSO: Começa escondido */
+        display: none;
         flex-direction: column;
         justify-content: center;
       }
@@ -258,7 +258,6 @@
         transform: translateY(-2px);
       }
 
-      /* ANIMAÇÃO DE TRANSIÇÃO DO MENU PARA A MESA */
       @keyframes smoothTableReveal {
         0% {
           opacity: 0;
@@ -472,7 +471,6 @@
         margin-bottom: -15px;
       }
 
-      /* -- JOGOS BAIXADOS (ÁREA DE MELDS) -- */
       .board-melds {
         flex: 0 0 auto;
         min-height: 60px;
@@ -481,7 +479,7 @@
         margin: 70px auto 4px;
         padding: 6px 10px;
         display: flex;
-        align-items: stretch; /* Garante que os dois lados tenham a mesma altura */
+        align-items: stretch;
         gap: 20px;
         background: rgba(0, 0, 0, 0.15);
         border-radius: 8px;
@@ -490,7 +488,7 @@
 
       .board-melds .grow {
         flex: 1 1 0;
-        width: calc(50% - 10px); /* Força exatos 50% de largura */
+        width: calc(50% - 10px);
         min-width: 0;
         display: flex;
         flex-direction: column;
@@ -499,7 +497,6 @@
         padding: 6px 10px;
       }
 
-      /* ADICIONE ISSO: Tira a margem da última carta para não vazar o container */
       .carta.mini:last-child {
         margin-right: 0 !important;
       }
@@ -651,18 +648,44 @@
         box-shadow: none;
       }
 
+      /* ================= ESTILO UNIFICADO DE TODAS AS CARTAS ================= */
+      .carta-canto {
+        line-height: 1.1;
+        font-weight: bold;
+      }
+      .carta-canto.top {
+        align-self: flex-start;
+        text-align: center;
+      }
+      .carta-canto.bottom {
+        align-self: flex-end;
+        text-align: center;
+        transform: rotate(180deg);
+      }
+      .carta-meio {
+        font-size: 24px;
+        align-self: center;
+        line-height: 1;
+      }
+
       .discard-face {
         width: 100%;
         height: 100%;
         background: #f3f4f6;
         border-radius: 4px;
-        color: #000;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        padding: 2px;
-        font-weight: bold;
-        font-size: 12px;
+        padding: 2px 4px;
+        font-size: 14px;
+        color: #000;
+      }
+
+      .carta.mini .carta-canto {
+        font-size: 8px;
+      }
+      .carta.mini .carta-meio {
+        font-size: 14px;
       }
 
       .pile-info {
@@ -944,12 +967,6 @@
         color: #000;
       }
 
-      .carta-icone {
-        font-size: 20px;
-        align-self: flex-end;
-        line-height: 1;
-      }
-
       .carta.mini {
         width: 38px;
         height: 50px;
@@ -964,9 +981,6 @@
         margin-right: 0 !important;
       }
 
-      .carta.mini .carta-icone {
-        font-size: 12px;
-      }
       .carta.mini.canastra-fechada {
         transform: rotate(90deg);
         margin-right: -8px;
@@ -1057,6 +1071,32 @@
         font-weight: bold;
       }
 
+      /* EFEITO DE ALERTA DO TIMER (ÚLTIMOS 10s) */
+      @keyframes panicPulse {
+        0% {
+          transform: scale(1);
+          color: #facc15;
+          text-shadow: 0 0 5px rgba(250, 204, 21, 0.5);
+        }
+        50% {
+          transform: scale(1.6);
+          color: #ef4444;
+          text-shadow: 0 0 15px rgba(239, 68, 68, 1);
+        }
+        100% {
+          transform: scale(1);
+          color: #facc15;
+          text-shadow: 0 0 5px rgba(250, 204, 21, 0.5);
+        }
+      }
+      .timer-critical {
+        animation: panicPulse 1s infinite;
+        font-size: 16px !important;
+        font-weight: 900;
+        display: inline-block;
+        margin-left: 15px !important;
+      }
+
       @media (max-width: 768px), (max-height: 500px) {
         body {
           font-size: 12px;
@@ -1069,75 +1109,155 @@
         }
         .board-center {
           flex: 1;
-          justify-content: space-between;
+          justify-content: flex-start;
           padding: 2px 0;
         }
         .board-top {
           padding: 3px 5px;
           height: 36px;
         }
+
+        /* Oponentes ficam ligeiramente menores para não invadirem a mesa central */
         .opponent-hand-top {
           top: 2px;
+          transform: translateX(-50%) scale(0.85);
+          transform-origin: top center;
         }
+        .opponent-hand-left {
+          left: 2px;
+          transform: translateY(-50%) scale(0.85);
+          transform-origin: left center;
+        }
+        .opponent-hand-right {
+          right: 2px;
+          transform: translateY(-50%) scale(0.85);
+          transform-origin: right center;
+        }
+
+        /* MESA DE JOGOS: Empilha as equipas na vertical no mobile */
+        .board-melds {
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 45px; /* Abre espaço para o oponente do topo */
+          padding: 4px;
+        }
+        .board-melds .grow {
+          width: 100%; /* Painel passa a ocupar o ecrã inteiro de uma ponta à outra */
+        }
+        .board-melds .grow + .grow {
+          border-left: none !important;
+          border-top: 1px dashed rgba(148, 163, 184, 0.5) !important;
+          padding-left: 6px !important;
+          padding-top: 12px !important;
+        }
+
         .meld-title {
-          font-size: 9px;
+          font-size: 10px;
         }
         .meld-line {
-          min-width: 110px;
+          min-width: 100px;
           padding: 2px 3px 3px;
         }
         .meld-line-cards {
-          height: 28px;
+          height: 32px;
         }
         .carta.mini {
-          width: 32px;
-          height: 40px;
-          margin-right: -9px;
-          font-size: 8.5px;
+          width: 28px;
+          height: 38px;
+          margin-right: -12px;
+          font-size: 8px;
         }
+        .carta.mini .carta-meio {
+          font-size: 10px;
+        }
+
+        /* MONTE E LIXO */
         .board-middle {
-          gap: 10px;
-          padding: 0;
-          margin-top: 4px;
+          gap: 15px;
+          padding: 5px 0;
+          margin-top: auto;
+          margin-bottom: 5px;
         }
         .pile-card {
-          width: 38px;
-          height: 54px;
+          width: 44px;
+          height: 64px;
         }
         .pile-info {
           font-size: 9px;
         }
+
+        /* MÃO E BOTÕES */
         .hand-container {
           padding: 4px 2px 2px 2px;
-          min-height: 60px;
+          min-height: 65px;
           flex-shrink: 0;
         }
         .opponent-cards {
           gap: 1px;
         }
         .carta {
-          width: 42px;
-          height: 62px;
-          margin-right: -18px;
-          font-size: 10px;
+          width: 46px;
+          height: 68px;
+          margin-right: -22px;
+          font-size: 11px;
         }
-        .carta-icone {
-          font-size: 13px;
+        .carta-meio {
+          font-size: 14px;
         }
         .player-interface {
-          padding: 2px 4px 4px 4px;
-          gap: 2px;
+          padding: 4px;
+          gap: 4px;
         }
         #message {
           font-size: 10px;
           height: 12px;
+          margin-bottom: 2px;
         }
+
+        /* Permite que os botões "quebrem a linha" para caberem sem espremer no telemóvel */
         .player-actions {
           gap: 4px;
+          flex-wrap: wrap;
         }
         .player-actions button {
-          padding: 4px 6px;
-          font-size: 9px;
+          padding: 6px 8px;
+          font-size: 10px;
+          flex: 1 1 auto;
+        }
+
+        /* AJUSTES DO MENU INICIAL MOBILE */
+        #configSection {
+          padding: 10px; /* Menos espaço nas bordas para ganhar área útil */
+          justify-content: flex-start; /* Alinha ao topo para o teclado não tapar os campos */
+          padding-top: 30px;
+        }
+
+        .section {
+          width: 95%; /* Ocupa quase a largura toda no telemóvel */
+          padding: 20px 15px;
+          margin-top: 0;
+        }
+
+        .section-header h2 {
+          font-size: 22px;
+        }
+
+        /* Ajusta o grid dos nomes para não ficarem espremidos */
+        #configSection div[style*='display: grid'] {
+          grid-template-columns: 1fr !important; /* Coloca um nome por baixo do outro no telemóvel */
+          gap: 5px !important;
+        }
+
+        input,
+        select {
+          padding: 10px;
+          margin-bottom: 8px;
+          font-size: 14px; /* Evita que o iPhone dê zoom automático ao clicar */
+        }
+
+        #startBtn {
+          padding: 18px;
+          font-size: 16px;
         }
       }
 
@@ -1275,6 +1395,7 @@
                 <span id="currentPlayerLabel">...</span>
               </span>
               <span id="turnTimerLabel" style="margin-left: 5px; font-size: 11px; color: #facc15"></span>
+              <div id="gameModeBadge" style="margin-top: 5px; font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; padding-left: 4px"></div>
             </div>
 
             <div class="morto-area">
@@ -1332,10 +1453,7 @@
 
               <div class="pile-area" id="drawDiscardBtn">
                 <div class="pile-card discard-pile">
-                  <div id="discardFace" class="discard-face">
-                    <div id="discardFaceTop"></div>
-                    <div id="discardFaceBottom"></div>
-                  </div>
+                  <div id="discardFace" class="discard-face"></div>
                 </div>
                 <div class="pile-info">
                   Lixo (
@@ -1386,7 +1504,7 @@
       const startOverlay = document.getElementById('startOverlay');
       const introVideo = document.getElementById('introVideo');
       const loadingScreen = document.getElementById('loadingScreen');
-      let introFinished = false; // Bloqueia o menu enquanto o vídeo passa
+      let introFinished = false;
 
       function endIntroSequence() {
         introVideo.style.display = 'none';
@@ -1400,8 +1518,7 @@
           loadingScreen.style.opacity = '0';
           setTimeout(() => {
             loadingScreen.style.display = 'none';
-            introFinished = true; // Intro acabou!
-            // Só mostra o menu se não estiver dentro de um jogo
+            introFinished = true;
             if (!state) document.getElementById('configSection').style.display = 'flex';
           }, 1000);
         }, 2500);
@@ -1417,27 +1534,22 @@
       });
 
       window.addEventListener('load', () => {
-        // Tenta tocar o vídeo sem clique (caso o PWA esteja instalado)
         let playPromise = introVideo.play();
 
         if (playPromise !== undefined) {
           playPromise
             .then(() => {
-              // Sucesso! O celular liberou.
               startOverlay.style.display = 'none';
               introVideo.style.display = 'block';
             })
             .catch(() => {
-              // Bloqueado. Exige que o usuário toque na tela preta.
               startOverlay.style.display = 'flex';
             });
         }
       });
 
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          // SW opcional
-        });
+        window.addEventListener('load', () => {});
       }
 
       const firebaseConfig = {
@@ -1568,7 +1680,21 @@
         limpa: new Audio('assets/sfx/canastra-limpa.mp3'),
         real: new Audio('assets/sfx/canastra-real.mp3'),
         asas: new Audio('assets/sfx/canastra-as-a-as.mp3'),
+        fim: new Audio('assets/sfx/fim-de-jogo.mp3'),
       };
+
+      const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');
+      sfxCardMove.preload = 'auto';
+      sfxCardMove.volume = 0.5;
+
+      function playCardMove() {
+        if (!audioUnlocked) return;
+        try {
+          const clone = sfxCardMove.cloneNode();
+          clone.volume = sfxCardMove.volume;
+          clone.play().catch(() => {});
+        } catch (e) {}
+      }
 
       Object.values(CANASTRA_SFX).forEach((a) => {
         a.preload = 'auto';
@@ -1584,7 +1710,8 @@
           if (AudioContext) audioCtx = new AudioContext();
         } catch (e) {}
 
-        for (const a of Object.values(CANASTRA_SFX)) {
+        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove];
+        for (const a of allAudios) {
           try {
             a.pause();
             a.currentTime = 0;
@@ -1968,7 +2095,10 @@
       }
 
       function cardFrontHTML(card) {
-        return card.joker ? `<div class="carta-canto">JOKER</div><div class="carta-icone">★</div>` : `<div class="carta-canto">${card.rank}<br>${card.suit}</div><div class="carta-icone">${card.suit}</div>`;
+        if (card.joker) {
+          return `<div class="carta-canto top">JOKER</div><div class="carta-meio">★</div><div class="carta-canto bottom">JOKER</div>`;
+        }
+        return `<div class="carta-canto top">${card.rank}<br>${card.suit}</div><div class="carta-meio">${card.suit}</div><div class="carta-canto bottom">${card.rank}<br>${card.suit}</div>`;
       }
 
       function getRect(el) {
@@ -1996,6 +2126,8 @@
       }
 
       async function flyRectToRect(card, fromRect, toRect, face = 'front') {
+        playCardMove();
+
         const fly = makeFlyEl(card, face);
         setBox(fly, fromRect);
         const dx = toRect.left - fromRect.left;
@@ -2088,10 +2220,18 @@
         if (!el) return;
         if (!state || state.finished) {
           el.textContent = '';
+          el.classList.remove('timer-critical');
           return;
         }
-        el.textContent = `${turnTimerRemaining}s`;
-        if (turnTimerRemaining > 10) el.style.color = '#facc15';
+
+        if (turnTimerRemaining <= 10) {
+          el.classList.add('timer-critical');
+          el.textContent = `⏳ ${turnTimerRemaining}s`;
+        } else {
+          el.classList.remove('timer-critical');
+          el.textContent = `${turnTimerRemaining}s`;
+          el.style.color = '#facc15';
+        }
       }
 
       function stopTurnTimer() {
@@ -2360,8 +2500,6 @@
               } else if (audioCtx && audioCtx.state === 'suspended') {
                 audioCtx.resume();
               }
-              const el = document.getElementById('turnTimerLabel');
-              if (el) el.style.color = turnTimerRemaining % 2 === 0 ? '#ef4444' : '#facc15';
             }
           }
         }, 1000);
@@ -2411,22 +2549,44 @@
 
       function isWildcard(card, meld = null) {
         if (!card) return false;
+
         if (card.joker) return true;
-        if (card.rank !== '2' && card.rank !== 2) return false;
 
-        if (card.forceWild) return true;
         if (card.forceNatural) return false;
+        if (card.forceWild) return true;
 
-        if (!meld || !Array.isArray(meld)) return true;
-
-        const idx = meld.indexOf(card);
-        const next = idx >= 0 ? meld[idx + 1] : null;
-
-        if (next && !next.joker && next.rank === '3' && next.suit === card.suit) {
-          return false;
+        if (card.rank === '2' || card.rank === 2) {
+          return true;
         }
 
-        return true;
+        return false;
+      }
+
+      function optimizeMeld(meld) {
+        if (!meld || !meld.length) return;
+
+        meld.forEach((c) => {
+          if (!c.joker && (c.rank === '2' || c.rank === 2)) {
+            c.forceWild = false;
+            c.forceNatural = false;
+          }
+        });
+
+        const realCards = meld.filter((c) => !c.joker && c.rank !== '2');
+        if (!realCards.length) return;
+        const suit = realCards[0].suit;
+
+        const twos = meld.filter((c) => !c.joker && (c.rank === '2' || c.rank === 2) && c.suit === suit);
+
+        if (twos.length === 1) {
+          const two = twos[0];
+          two.forceNatural = true;
+          if (isValidSequenceMeld(meld)) {
+            return;
+          }
+          two.forceNatural = false;
+          two.forceWild = true;
+        }
       }
 
       function cardBasePoints(card) {
@@ -2836,8 +2996,12 @@
             targetMeld.push(hand[idx]);
             hand.splice(idx, 1);
           }
+
+          optimizeMeld(targetMeld);
           normalizeMeldOrder(targetMeld);
           autoSwapWildWhenFillingGap(targetMeld);
+
+          optimizeMeld(targetMeld);
           normalizeMeldOrder(targetMeld);
           sortHand(hand);
           selectedHandIndexes.clear();
@@ -2891,8 +3055,11 @@
           teamMeld.push(hand[idx]);
           hand.splice(idx, 1);
         }
+
+        optimizeMeld(teamMeld);
         normalizeMeldOrder(teamMeld);
         autoSwapWildWhenFillingGap(teamMeld);
+        optimizeMeld(teamMeld);
         normalizeMeldOrder(teamMeld);
         sortHand(hand);
         selectedHandIndexes.clear();
@@ -2984,6 +3151,7 @@
           hand.splice(idx, 1);
         }
 
+        optimizeMeld(meld);
         normalizeMeldOrder(meld);
 
         const teamId2 = currentTeam().id;
@@ -3349,6 +3517,12 @@
         if (!state) return;
 
         applyViewTeamClass();
+        const badge = document.getElementById('gameModeBadge');
+        if (badge) {
+          let modeDisplay = state.mode;
+          if (modeDisplay === '1x1_duploMorto') modeDisplay = '1x1 Humilhação';
+          badge.textContent = `${modeDisplay} • Buraco ${state.variant}`;
+        }
         const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex;
         document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? 'Sua Vez!' : `Vez de ${currentPlayer().name}`;
         document.querySelector('.current-player-chip').style.background = isMyTurnRightNow ? 'rgba(22, 163, 74, 0.8)' : 'rgba(0, 0, 0, 0.5)';
@@ -3357,20 +3531,12 @@
         const discardTop = state.discard[state.discard.length - 1];
         document.getElementById('discardCount').textContent = state.discard.length;
         const discardFace = document.getElementById('discardFace');
-        const fTop = document.getElementById('discardFaceTop');
-        const fBot = document.getElementById('discardFaceBottom');
+
         if (!discardTop) discardFace.style.display = 'none';
         else {
           discardFace.style.display = 'flex';
-          if (discardTop.joker) {
-            fTop.textContent = '★';
-            fBot.textContent = '★';
-            discardFace.style.color = '#b45309';
-          } else {
-            fTop.innerHTML = discardTop.rank + '<br>' + discardTop.suit;
-            fBot.textContent = discardTop.suit;
-            discardFace.style.color = discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
-          }
+          discardFace.innerHTML = cardFrontHTML(discardTop);
+          discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
         }
 
         const s0 = document.getElementById('mortoSlot0');
@@ -3437,7 +3603,7 @@
             });
           }
 
-          div.innerHTML = card.joker ? `<div class="carta-canto">JOKER</div><div class="carta-icone">★</div>` : `<div class="carta-canto">${card.rank}<br>${card.suit}</div><div class="carta-icone">${card.suit}</div>`;
+          div.innerHTML = cardFrontHTML(card);
           if (selectedHandIndexes.has(idx)) div.classList.add('selected');
           div.onclick = () => {
             if (state.currentPlayer !== myPlayerIndex) return;
@@ -3562,6 +3728,9 @@
         renderAll();
         const scores = computeScores();
         renderScores(scores, state.winnerTeamId);
+
+        playCanastraSfx('fim');
+
         showMessage('DEBUG: exemplo com canastra real, Ás a Ás, limpa e suja.');
       };
 
@@ -3719,10 +3888,21 @@
         m2.innerHTML = '';
         let s1 = 0,
           s2 = 0;
+
         state.teams.forEach((t, i) => {
           const info = computeTeamMeldScore(t);
           if (i === 0) s1 = info.total;
           else s2 = info.total;
+
+          const pNames = state.players
+            .filter((p) => p.teamId === t.id)
+            .map((p) => p.name)
+            .join(' e ');
+          const titleSpan = document.querySelector(`#teamPanel${i + 1} .meld-title span`);
+          if (titleSpan) {
+            titleSpan.textContent = `${t.name} (${pNames}) Pts:`;
+          }
+
           const target = i === 0 ? m1 : m2;
           t.melds.forEach((meld, midx) => {
             const div = document.createElement('div');
@@ -3740,7 +3920,7 @@
               const minic = document.createElement('div');
               minic.className = 'carta mini ' + (c.joker ? 'joker-card' : c.suit === '♥' || c.suit === '♦' ? 'hearts' : 'spades');
               minic.dataset.cardIndex = cidx;
-              minic.innerHTML = c.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${c.rank}${c.suit}</div>`;
+              minic.innerHTML = cardFrontHTML(c);
 
               const me = state.players[myPlayerIndex];
               const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
@@ -3764,7 +3944,7 @@
               const closed = document.createElement('div');
               closed.className = 'carta mini canastra-fechada ' + (last.joker ? 'joker-card' : last.suit === '♥' || last.suit === '♦' ? 'hearts' : 'spades');
               closed.dataset.cardIndex = meld.length - 1;
-              closed.innerHTML = last.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${last.rank}${last.suit}</div>`;
+              closed.innerHTML = cardFrontHTML(last);
 
               const me = state.players[myPlayerIndex];
               const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
@@ -3802,8 +3982,19 @@
 
       function renderScores(scores, winner) {
         document.getElementById('scoreSection').style.display = 'flex';
+
+        const scoreCard = document.querySelector('.score-card');
+        scoreCard.innerHTML = `
+          <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
+          <div style="font-size: 11px; color: #facc15; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">
+            MODO: ${state.mode === '1x1_duploMorto' ? '1x1 Humilhação' : state.mode} | REGRA: ${state.variant}
+          </div>
+          <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
+          <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
+        `;
+
         const board = document.getElementById('scoreBoard');
-        board.innerHTML = '';
+        document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
 
         scores.sort((a, b) => b.score - a.score);
 
@@ -3811,9 +4002,14 @@
           const isWinner = s.team.id === winner;
           const totalBonus = s.sujaBonus + s.limpaBonus + s.realBonus + s.asasBonus;
 
+          const pNames = s.players.map((p) => p.name).join(' e ');
+
           board.innerHTML += `
             <div class="score-team ${isWinner ? 'winner' : ''}">
-              <div class="score-team-name">${isWinner ? '👑 ' : ''}${s.team.name}</div>
+              <div class="score-team-name">
+                ${isWinner ? '👑 ' : ''}${s.team.name} 
+                <span style="font-size: 12px; color: #9ca3af; font-weight: normal; margin-left: 6px;">(${pNames})</span>
+              </div>
               
               <div class="score-details">
                 <div class="score-row"><span>Cartas Baixadas:</span> <span class="text-green">+${s.meldPoints}</span></div>
@@ -3973,11 +4169,9 @@
           state = null;
           selectedHandIndexes.clear();
 
-          // LIMPEZA: Esconde mesa e o Placar (corrige o erro do X)
           document.getElementById('gameSection').style.display = 'none';
           document.getElementById('scoreSection').style.display = 'none';
 
-          // SÓ mostra o menu se a introdução já tiver terminado
           if (introFinished) {
             document.getElementById('configSection').style.display = 'flex';
           }
@@ -3986,13 +4180,16 @@
         }
 
         const newState = JSON.parse(snap.data().stateJson);
+
+        if (state && !state.finished && newState.finished) {
+          playCanastraSfx('fim');
+        }
+
         state = newState;
         movingWild = null;
 
-        syncCanastraSfxFromState();
         selectedHandIndexes.clear();
 
-        // Se o jogo existe, pula as intros direto para a mesa
         document.getElementById('configSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'flex';
         startOverlay.style.display = 'none';
@@ -4010,6 +4207,7 @@
           return;
         }
         await playRemoteAction(a);
+        syncCanastraSfxFromState();
       });
 
       document.getElementById('startBtn').onclick = () => {

@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <title>Buraco – Firebase</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <meta name="theme-color" content="#020617" />
+    <meta name="theme-color" content="#050505" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
@@ -25,7 +25,7 @@
       * {
         box-sizing: border-box;
         user-select: none;
-        -webkit-tap-highlight-color: transparent; /* Remove piscar azul no toque */
+        -webkit-tap-highlight-color: transparent;
       }
 
       html,
@@ -33,11 +33,14 @@
         margin: 0;
         padding: 0;
         width: 100%;
-        height: 100%; /* Fallback */
-        height: 100dvh; /* Altura dinâmica real do mobile */
-        overflow: hidden; /* Trava scroll da página inteira */
-        background: #020617;
-        font-family: system-ui, -apple-system, sans-serif;
+        height: 100%;
+        height: 100dvh;
+        overflow: hidden;
+        background: #050505;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
       }
 
       .app {
@@ -47,41 +50,180 @@
         flex-direction: column;
       }
 
-      /* TELA DE CONFIG (Scrollável se necessário) */
+      /* ================= OVERLAY DE TOQUE INVISÍVEL ================= */
+      #startOverlay {
+        position: fixed;
+        inset: 0;
+        background: #050505;
+        z-index: 100001;
+        display: none; /* Controlado pela inteligência do JS */
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .tap-text {
+        color: #facc15;
+        font-size: 12px;
+        font-weight: bold;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        animation: pulseTextTap 1.5s infinite alternate;
+        opacity: 0.8;
+      }
+      @keyframes pulseTextTap {
+        0% {
+          opacity: 0.3;
+          transform: scale(0.98);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1.02);
+        }
+      }
+
+      /* ================= VÍDEO DE INTRODUÇÃO ================= */
+      #introVideo {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        z-index: 100000;
+        display: none;
+        background: #000;
+      }
+
+      /* ================= TELA DE CARREGAMENTO (GLITCH) ================= */
+      #loadingScreen {
+        position: fixed;
+        inset: 0;
+        background: #050505;
+        z-index: 99999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .loading-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+      .glitch-title {
+        font-size: 2rem;
+        color: #facc15;
+        letter-spacing: 6px;
+        text-transform: uppercase;
+        font-weight: 900;
+        text-shadow: 0 0 20px rgba(250, 204, 21, 0.4);
+        animation: pulseText 2s infinite alternate;
+      }
+      .loading-bar {
+        width: 150px;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .loading-progress {
+        width: 0%;
+        height: 100%;
+        background: #facc15;
+        animation: loadBar 2s ease-in-out forwards;
+      }
+      @keyframes pulseText {
+        0% {
+          opacity: 0.7;
+          transform: scale(0.98);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1.02);
+        }
+      }
+      @keyframes loadBar {
+        0% {
+          width: 0%;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+
+      /* ================= MENU PRINCIPAL ================= */
       #configSection {
         flex: 1;
         overflow-y: auto;
         padding: 20px;
-        background: radial-gradient(circle at center, #064e3b 0%, #020617 100%);
-        display: flex;
+        background-image: linear-gradient(to bottom, rgba(5, 5, 5, 0.5), rgba(5, 5, 5, 0.95)), url('icon-512.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        display: none; /* <-- ADICIONE ISSO: Começa escondido */
         flex-direction: column;
         justify-content: center;
       }
 
-      /* ESTILOS DE CONFIGURAÇÃO */
       .section {
-        background: rgba(15, 23, 42, 0.95);
-        border-radius: 12px;
-        padding: 20px;
-        border: 1px solid #1f2937;
-        max-width: 400px;
+        background: rgba(10, 10, 15, 0.5);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(250, 204, 21, 0.2);
+        border-radius: 16px;
+        padding: 30px;
+        max-width: 420px;
         margin: 0 auto;
         width: 100%;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
       }
-      .section h2 {
+
+      .section-header h2 {
         margin-top: 0;
-        color: #fff;
+        color: #facc15;
+        text-align: center;
+        font-size: 26px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
       }
+      .section-header small {
+        display: block;
+        text-align: center;
+        color: #9ca3af;
+        margin-bottom: 20px;
+        font-size: 11px;
+      }
+
+      label {
+        font-size: 11px;
+        color: #cbd5e1;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
       input,
       select {
         width: 100%;
-        padding: 10px;
-        margin-bottom: 10px;
+        padding: 12px;
+        margin-top: 4px;
+        margin-bottom: 12px;
         border-radius: 8px;
-        border: 1px solid #4b5563;
-        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.6);
         color: white;
+        transition: all 0.3s;
       }
+
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: #facc15;
+        box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+      }
+
       button {
         width: 100%;
         padding: 12px;
@@ -94,15 +236,50 @@
         margin-top: 5px;
       }
 
+      #startBtn {
+        width: 100%;
+        padding: 15px;
+        border-radius: 12px;
+        border: 1px solid #facc15;
+        font-weight: 900;
+        cursor: pointer;
+        background: linear-gradient(135deg, #b45309 0%, #78350f 100%);
+        color: #facc15;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-top: 15px;
+        transition: all 0.3s;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+      }
+
+      #startBtn:hover {
+        background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+        box-shadow: 0 0 20px rgba(250, 204, 21, 0.4);
+        transform: translateY(-2px);
+      }
+
+      /* ANIMAÇÃO DE TRANSIÇÃO DO MENU PARA A MESA */
+      @keyframes smoothTableReveal {
+        0% {
+          opacity: 0;
+          filter: brightness(0.2);
+        }
+        100% {
+          opacity: 1;
+          filter: brightness(1);
+        }
+      }
+
       /* ================= JOGO ================= */
       #gameSection {
         flex: 1;
-        display: none; /* JS ativa display:flex */
+        display: none;
         flex-direction: column;
         height: 100%;
         width: 100%;
         overflow: hidden;
         background: radial-gradient(circle at center, #15803d 0%, #14532d 100%);
+        animation: smoothTableReveal 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
       }
 
       .board {
@@ -110,7 +287,7 @@
         display: flex;
         flex-direction: column;
         position: relative;
-        overflow: hidden; /* Garante que nada saia da mesa */
+        overflow: hidden;
         padding-bottom: 0;
       }
 
@@ -118,16 +295,15 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        justify-content: center; /* desktop: pontos + monte/lixo bem no meio */
+        justify-content: center;
       }
 
-      /* -- TOPO -- */
       .board-top {
         padding: 10px;
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        height: 50px; /* Altura fixa para não variar */
+        height: 50px;
         z-index: 20;
       }
       .current-player-chip {
@@ -147,7 +323,6 @@
         border-radius: 50%;
       }
 
-      /* Mortos */
       .morto-area {
         display: flex;
         gap: 8px;
@@ -184,7 +359,6 @@
         transform: translate(3px, -3px);
       }
 
-      /* -- OPONENTES -- */
       .opponent-hand {
         position: absolute;
         display: flex;
@@ -197,14 +371,12 @@
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
       }
 
-      /* TOPO – leque horizontal */
       .opponent-hand-top {
         top: 26px;
         left: 50%;
         transform: translateX(-50%);
       }
 
-      /* LATERAIS – ficam no meio da mesa */
       .opponent-hand-left,
       .opponent-hand-right {
         top: 50%;
@@ -221,7 +393,6 @@
         align-items: center;
       }
 
-      /* Nome + qtd de cartas */
       .opponent-label {
         font-size: 11px;
         opacity: 0.85;
@@ -238,7 +409,6 @@
         min-height: 44px;
       }
 
-      /* Verso das cartas dos oponentes */
       .opponent-card-back {
         width: 30px;
         height: 44px;
@@ -248,7 +418,6 @@
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
       }
 
-      /* TOPO – sobreposição leve, tipo leque */
       .opponent-hand-top .opponent-card-back {
         margin-left: -14px;
       }
@@ -256,7 +425,6 @@
         margin-left: 0;
       }
 
-      /* LATERAIS – coluna, levemente “juntas” */
       .opponent-hand-left .opponent-cards,
       .opponent-hand-right .opponent-cards {
         flex-direction: column;
@@ -275,7 +443,6 @@
         margin-top: 0;
       }
 
-      /* Rotação das laterais */
       .opponent-hand-left .opponent-card-back {
         transform: rotate(90deg);
         transform-origin: center center;
@@ -285,7 +452,6 @@
         transform-origin: center center;
       }
 
-      /* Laterais */
       .opponent-hand-left {
         top: 45%;
         left: 5px;
@@ -310,10 +476,12 @@
       .board-melds {
         flex: 0 0 auto;
         min-height: 60px;
+        width: 100%;
         max-width: 760px;
         margin: 70px auto 4px;
         padding: 6px 10px;
         display: flex;
+        align-items: stretch; /* Garante que os dois lados tenham a mesma altura */
         gap: 20px;
         background: rgba(0, 0, 0, 0.15);
         border-radius: 8px;
@@ -321,7 +489,8 @@
       }
 
       .board-melds .grow {
-        flex: 1;
+        flex: 1 1 0;
+        width: calc(50% - 10px); /* Força exatos 50% de largura */
         min-width: 0;
         display: flex;
         flex-direction: column;
@@ -330,8 +499,12 @@
         padding: 6px 10px;
       }
 
+      /* ADICIONE ISSO: Tira a margem da última carta para não vazar o container */
+      .carta.mini:last-child {
+        margin-right: 0 !important;
+      }
+
       .board-melds .grow + .grow {
-        padding-left: 16px !important;
         border-left: 1px dashed rgba(148, 163, 184, 0.5) !important;
       }
 
@@ -351,9 +524,9 @@
         width: 100%;
         justify-content: flex-start;
         min-height: 52px;
+        overflow-x: auto;
       }
 
-      /* Wrapper que ocupa o quadrado inteiro (evita o bug do painel vazio encolher) */
       .team-panel {
         width: 100%;
         height: 100%;
@@ -361,13 +534,11 @@
         flex-direction: column;
       }
 
-      /* Faz o container de melds preencher o resto do painel */
       .team-panel .meld-container {
         flex: 1;
         min-height: 52px;
       }
 
-      /* Time do outro lado fica de ponta-cabeça (quadrado inteiro) */
       .view-team0 #teamPanel2 {
         transform: rotate(180deg);
         transform-origin: center;
@@ -407,6 +578,7 @@
         display: flex;
         align-items: center;
         height: 42px;
+        flex-wrap: nowrap;
       }
 
       .meld-meta {
@@ -416,7 +588,6 @@
         text-align: center;
       }
 
-      /* -- MEIO DA MESA (MONTE E LIXO) -- */
       .board-middle {
         display: flex;
         justify-content: center;
@@ -435,9 +606,6 @@
         cursor: pointer;
       }
 
-      /* =========================
-     MONTE (FIX): não fica vermelho fixo
-     ========================= */
       .pile-card {
         width: 55px;
         height: 80px;
@@ -452,7 +620,6 @@
         overflow: visible;
       }
 
-      /* Só o MONTE (não o lixo): stack 50/50 em CSS */
       #drawStockBtn .pile-card::before,
       #drawStockBtn .pile-card::after {
         content: '';
@@ -464,17 +631,17 @@
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
       }
 
-      /* azul atrás */
       #drawStockBtn .pile-card::before {
         transform: translate(4px, -3px);
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(192, 192, 192, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #05071a, #1d4ed8);
       }
 
-      /* vermelho na frente */
       #drawStockBtn .pile-card::after {
         transform: translate(0px, 0px);
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(255, 215, 0, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #140007, #b91c1c);
       }
 
@@ -484,6 +651,7 @@
         box-shadow: none;
       }
 
+      /* ================= ESTILO DO LIXO CORRIGIDO ================= */
       .discard-face {
         width: 100%;
         height: 100%;
@@ -492,10 +660,26 @@
         color: #000;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        align-items: center; /* Centraliza o símbolo do meio horizontalmente */
+        justify-content: space-between; /* Afasta topo, meio e fundo */
         padding: 2px;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 12px; /* Tamanho uniforme para os cantos */
+      }
+
+      #discardFaceTop {
+        align-self: flex-start; /* Alinha o canto superior à esquerda */
+        text-align: center;
+      }
+
+      #discardFaceMiddle {
+        font-size: 24px; /* Símbolo central maior */
+      }
+
+      #discardFaceBottom {
+        align-self: flex-end; /* Alinha o canto inferior à direita */
+        transform: rotate(180deg); /* Vira o canto de cabeça para baixo */
+        text-align: center;
       }
 
       .pile-info {
@@ -508,7 +692,6 @@
         z-index: 10;
       }
 
-      /* -- ÁREA DO JOGADOR (RODAPÉ) -- */
       .player-interface {
         background: linear-gradient(to top, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.8) 60%, transparent 100%);
         padding: 5px 10px 10px 10px;
@@ -561,7 +744,6 @@
         padding: 8px;
       }
 
-      /* MÃO DO JOGADOR - LEQUE */
       .hand-container {
         display: flex;
         justify-content: center;
@@ -577,7 +759,6 @@
         padding-right: 20px;
       }
 
-      /* CARTA PADRÃO */
       .carta {
         width: 60px;
         height: 90px;
@@ -589,7 +770,9 @@
         cursor: pointer;
         box-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3);
         margin-right: -30px;
-        transition: transform 0.1s, margin-right 0.1s;
+        transition:
+          transform 0.1s,
+          margin-right 0.1s;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -604,7 +787,6 @@
 
       #handContainer .carta:hover,
       #handContainer .carta.selected {
-        /* transform: translateY(-15px); */
         margin-right: 0;
         z-index: 100;
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
@@ -614,9 +796,6 @@
         border: 2px solid #facc15;
       }
 
-      /* ==========================
-     ANIMAÇÃO: carta voadora
-     ========================== */
       .fly-card {
         position: fixed;
         left: 0;
@@ -628,80 +807,79 @@
         will-change: transform, opacity;
       }
 
-      /* costas por cor (FINDOM + borda branca) */
       .back-red {
         border: 2px solid #fff !important;
         box-sizing: border-box;
-
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(255, 215, 0, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #140007, #b91c1c) !important;
       }
 
       .back-blue {
         border: 2px solid #fff !important;
         box-sizing: border-box;
-
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(192, 192, 192, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #05071a, #1d4ed8) !important;
       }
 
-      /* fly-card de costas usa o MESMO visual; e respeita blue se existir */
       .fly-card.back {
         border: 2px solid #fff !important;
         box-sizing: border-box;
       }
       .fly-card.back.back-red {
         background: unset;
-      } /* só pra não “prender” */
+      }
       .fly-card.back.back-blue {
         background: unset;
       }
       .fly-card.back {
-        /* default: vermelho findom */
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(255, 215, 0, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #140007, #b91c1c) !important;
       }
       .fly-card.back.back-blue {
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(192, 192, 192, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #05071a, #1d4ed8) !important;
       }
 
-      /* IMPORTANTÍSSIMO: oponente/morto NÃO podem sobrescrever o back */
       .opponent-card-back.back-red,
       .opponent-card-back.back-blue {
-        border: 2px solid #fff !important; /* volta borda branca */
+        border: 2px solid #fff !important;
         box-sizing: border-box !important;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
       }
       .opponent-card-back.back-red {
-        /* reaplica o mesmo tema do .back-red */
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(255, 215, 0, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #140007, #b91c1c) !important;
       }
       .opponent-card-back.back-blue {
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(192, 192, 192, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #05071a, #1d4ed8) !important;
       }
 
       .morto-card-back.back-red {
         border: 1px solid #fff !important;
         box-sizing: border-box !important;
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(255, 215, 0, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #140007, #b91c1c) !important;
       }
       .morto-card-back.back-blue {
         border: 1px solid #fff !important;
         box-sizing: border-box !important;
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(192, 192, 192, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #05071a, #1d4ed8) !important;
       }
 
-      /* fly-card de costas: só esconde face */
       .fly-card.back * {
         visibility: hidden;
       }
 
-      /* ===== IMPACTO + FAÍSCAS ===== */
       .impact-ring {
         position: fixed;
         left: 0;
@@ -748,10 +926,11 @@
         }
       }
 
-      /* Destaque temporário: carta comprada */
       .carta.just-bought {
         border: 2px solid #facc15 !important;
-        box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.45), 0 10px 22px rgba(0, 0, 0, 0.65) !important;
+        box-shadow:
+          0 0 0 4px rgba(250, 204, 21, 0.45),
+          0 10px 22px rgba(0, 0, 0, 0.65) !important;
         animation: justBoughtGlow 1.2s ease-out forwards;
         z-index: 999;
       }
@@ -759,11 +938,15 @@
       @keyframes justBoughtGlow {
         0% {
           transform: translateY(-18px);
-          box-shadow: 0 0 0 8px rgba(250, 204, 21, 0.65), 0 14px 28px rgba(0, 0, 0, 0.75);
+          box-shadow:
+            0 0 0 8px rgba(250, 204, 21, 0.65),
+            0 14px 28px rgba(0, 0, 0, 0.75);
         }
         100% {
           transform: translateY(0px);
-          box-shadow: 0 0 0 0px rgba(250, 204, 21, 0), 0 10px 22px rgba(0, 0, 0, 0.35);
+          box-shadow:
+            0 0 0 0px rgba(250, 204, 21, 0),
+            0 10px 22px rgba(0, 0, 0, 0.35);
         }
       }
 
@@ -784,7 +967,6 @@
         line-height: 1;
       }
 
-      /* MINI CARTA (NA MESA) */
       .carta.mini {
         width: 38px;
         height: 50px;
@@ -794,17 +976,20 @@
         padding: 1px;
       }
 
+      .carta.mini:last-child,
+      .meld-line-cards > div:last-child {
+        margin-right: 0 !important;
+      }
+
       .carta.mini .carta-icone {
         font-size: 12px;
       }
-
       .carta.mini.canastra-fechada {
         transform: rotate(90deg);
         margin-right: -8px;
         margin-bottom: -8px;
       }
 
-      /* PLACAR OVERLAY */
       #scoreSection {
         position: fixed;
         inset: 0;
@@ -815,140 +1000,287 @@
         justify-content: center;
       }
 
+      /* ===== PLACAR FINAL MODERNO ===== */
+      .score-card {
+        background: rgba(15, 23, 42, 0.98);
+        border: 2px solid #334155;
+        border-radius: 16px;
+        padding: 24px;
+        width: 92%;
+        max-width: 450px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.9);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .score-team {
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid #1e293b;
+      }
+
+      .score-team.winner {
+        border-color: #facc15;
+        background: linear-gradient(180deg, rgba(250, 204, 21, 0.15) 0%, rgba(0, 0, 0, 0.4) 100%);
+        box-shadow: 0 0 15px rgba(250, 204, 21, 0.1);
+      }
+
+      .score-team-name {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 12px;
+        color: #e5e7eb;
+      }
+
+      .score-team.winner .score-team-name {
+        color: #facc15;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+      }
+
+      .score-details {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: #cbd5e1;
+      }
+
+      .score-row {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        padding-bottom: 4px;
+      }
+
+      .score-row.total {
+        font-size: 16px;
+        font-weight: bold;
+        color: #fff;
+        border-top: 1px solid #475569;
+        border-bottom: none;
+        padding-top: 10px;
+        margin-top: 6px;
+      }
+
+      .text-green {
+        color: #4ade80;
+        font-weight: bold;
+      }
+      .text-red {
+        color: #f87171;
+        font-weight: bold;
+      }
+
+      /* EFEITO DE ALERTA DO TIMER (ÚLTIMOS 10s) */
+      @keyframes panicPulse {
+        0% {
+          transform: scale(1);
+          color: #facc15;
+          text-shadow: 0 0 5px rgba(250, 204, 21, 0.5);
+        }
+        50% {
+          transform: scale(1.6);
+          color: #ef4444;
+          text-shadow: 0 0 15px rgba(239, 68, 68, 1);
+        }
+        100% {
+          transform: scale(1);
+          color: #facc15;
+          text-shadow: 0 0 5px rgba(250, 204, 21, 0.5);
+        }
+      }
+      .timer-critical {
+        animation: panicPulse 1s infinite;
+        font-size: 16px !important;
+        font-weight: 900;
+        display: inline-block;
+        margin-left: 15px !important;
+      }
+
       @media (max-width: 768px), (max-height: 500px) {
         body {
           font-size: 12px;
         }
-
         .board {
           overflow-y: auto;
           overflow-x: hidden;
           display: flex;
           flex-direction: column;
         }
-
         .board-center {
           flex: 1;
-          justify-content: space-between;
+          justify-content: flex-start;
           padding: 2px 0;
         }
-
         .board-top {
           padding: 3px 5px;
           height: 36px;
         }
 
+        /* Oponentes ficam ligeiramente menores para não invadirem a mesa central */
         .opponent-hand-top {
           top: 2px;
+          transform: translateX(-50%) scale(0.85);
+          transform-origin: top center;
+        }
+        .opponent-hand-left {
+          left: 2px;
+          transform: translateY(-50%) scale(0.85);
+          transform-origin: left center;
+        }
+        .opponent-hand-right {
+          right: 2px;
+          transform: translateY(-50%) scale(0.85);
+          transform-origin: right center;
+        }
+
+        /* MESA DE JOGOS: Empilha as equipas na vertical no mobile */
+        .board-melds {
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 45px; /* Abre espaço para o oponente do topo */
+          padding: 4px;
+        }
+        .board-melds .grow {
+          width: 100%; /* Painel passa a ocupar o ecrã inteiro de uma ponta à outra */
+        }
+        .board-melds .grow + .grow {
+          border-left: none !important;
+          border-top: 1px dashed rgba(148, 163, 184, 0.5) !important;
+          padding-left: 6px !important;
+          padding-top: 12px !important;
         }
 
         .meld-title {
-          font-size: 9px;
+          font-size: 10px;
         }
-
         .meld-line {
-          min-width: 110px;
+          min-width: 100px;
           padding: 2px 3px 3px;
         }
-
         .meld-line-cards {
-          height: 28px;
+          height: 32px;
         }
-
         .carta.mini {
-          width: 32px;
-          height: 40px;
-          margin-right: -9px;
-          font-size: 8.5px;
+          width: 28px;
+          height: 38px;
+          margin-right: -12px;
+          font-size: 8px;
+        }
+        .carta.mini .carta-icone {
+          font-size: 10px;
         }
 
+        /* MONTE E LIXO */
         .board-middle {
-          gap: 10px;
-          padding: 0;
-          margin-top: 4px;
+          gap: 15px;
+          padding: 5px 0;
+          margin-top: auto;
+          margin-bottom: 5px;
         }
-
         .pile-card {
-          width: 38px;
-          height: 54px;
+          width: 44px;
+          height: 64px;
         }
-
         .pile-info {
           font-size: 9px;
         }
 
+        /* MÃO E BOTÕES */
         .hand-container {
           padding: 4px 2px 2px 2px;
-          min-height: 60px;
+          min-height: 65px;
           flex-shrink: 0;
         }
-
         .opponent-cards {
           gap: 1px;
         }
-
         .carta {
-          width: 42px;
-          height: 62px;
-          margin-right: -18px;
-          font-size: 10px;
+          width: 46px;
+          height: 68px;
+          margin-right: -22px;
+          font-size: 11px;
         }
-
         .carta-icone {
-          font-size: 13px;
+          font-size: 14px;
         }
-
         .player-interface {
-          padding: 2px 4px 4px 4px;
-          gap: 2px;
+          padding: 4px;
+          gap: 4px;
         }
-
         #message {
           font-size: 10px;
           height: 12px;
+          margin-bottom: 2px;
         }
 
+        /* Permite que os botões "quebrem a linha" para caberem sem espremer no telemóvel */
         .player-actions {
           gap: 4px;
+          flex-wrap: wrap;
         }
-
         .player-actions button {
-          padding: 4px 6px;
-          font-size: 9px;
+          padding: 6px 8px;
+          font-size: 10px;
+          flex: 1 1 auto;
         }
 
-        #scoreSection .section {
-          width: 94%;
-          max-width: 380px;
+        /* AJUSTES DO MENU INICIAL MOBILE */
+        #configSection {
+          padding: 10px; /* Menos espaço nas bordas para ganhar área útil */
+          justify-content: flex-start; /* Alinha ao topo para o teclado não tapar os campos */
+          padding-top: 30px;
+        }
+
+        .section {
+          width: 95%; /* Ocupa quase a largura toda no telemóvel */
+          padding: 20px 15px;
+          margin-top: 0;
+        }
+
+        .section-header h2 {
+          font-size: 22px;
+        }
+
+        /* Ajusta o grid dos nomes para não ficarem espremidos */
+        #configSection div[style*='display: grid'] {
+          grid-template-columns: 1fr !important; /* Coloca um nome por baixo do outro no telemóvel */
+          gap: 5px !important;
+        }
+
+        input,
+        select {
+          padding: 10px;
+          margin-bottom: 8px;
+          font-size: 14px; /* Evita que o iPhone dê zoom automático ao clicar */
+        }
+
+        #startBtn {
+          padding: 18px;
+          font-size: 16px;
         }
       }
-
-      /* ===========================
-   MORTOS (FIX CSS ONLY)
-   Morto 1 = vermelho / Morto 2 = azul
-   cole no FINAL do CSS
-   =========================== */
 
       #mortoSlot0 .morto-card-back {
         border: 1px solid #fff !important;
         box-sizing: border-box !important;
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(255, 215, 0, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #140007, #b91c1c) !important;
       }
-
       #mortoSlot1 .morto-card-back {
         border: 1px solid #fff !important;
         box-sizing: border-box !important;
-        background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 42%), radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 55%),
           repeating-linear-gradient(45deg, rgba(192, 192, 192, 0.22) 0 6px, rgba(0, 0, 0, 0) 6px 14px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, rgba(0, 0, 0, 0) 7px 16px), linear-gradient(135deg, #05071a, #1d4ed8) !important;
       }
-
-      /* opcional: dá uma pequena suavizada */
       .meld-line-cards {
         transition: transform 0.15s ease;
       }
-
-      /* ===== Tags de canastra (você já renderiza, faltava o CSS) ===== */
       .meld-tag {
         display: inline-block;
         font-size: 9px;
@@ -958,7 +1290,6 @@
         margin-left: 4px;
         line-height: 1.3;
       }
-
       .meld-tag.suja {
         background: rgba(239, 68, 68, 0.18);
         color: #fecaca;
@@ -979,16 +1310,12 @@
         color: #c7d2fe;
         border-color: rgba(99, 102, 241, 0.35);
       }
-
-      /* ===== Botão mover 2/Joker ===== */
       #moveWildBtn {
         background: #0ea5e9;
       }
       #moveWildBtn:disabled {
         opacity: 0.5;
       }
-
-      /* ===== UI de seleção do 2/Joker na mesa ===== */
       .carta.mini.wild-pickable {
         cursor: pointer;
         outline: 1px dashed rgba(250, 204, 21, 0.6);
@@ -1002,6 +1329,19 @@
     </style>
   </head>
   <body>
+    <div id="startOverlay">
+      <div class="tap-text">Toque na tela para iniciar</div>
+    </div>
+
+    <video id="introVideo" src="Animação_De_Mulheres_Vencendo_Jogo.mp4" playsinline preload="auto"></video>
+
+    <div id="loadingScreen">
+      <div class="loading-content">
+        <div class="glitch-title">BURACO FINDOM</div>
+        <div class="loading-bar"><div class="loading-progress"></div></div>
+      </div>
+    </div>
+
     <div class="app">
       <div id="configSection">
         <div class="section">
@@ -1044,7 +1384,7 @@
             </div>
 
             <button id="startBtn" style="margin-top: 10px">INICIAR JOGO</button>
-            <small style="text-align: center; color: #666">Use o mesmo ID na URL para conectar: ?game=sala1</small>
+            <small style="text-align: center; color: #9ca3af">Use o mesmo ID na URL para conectar: ?game=sala1</small>
           </div>
         </div>
       </div>
@@ -1058,6 +1398,7 @@
                 <span id="currentPlayerLabel">...</span>
               </span>
               <span id="turnTimerLabel" style="margin-left: 5px; font-size: 11px; color: #facc15"></span>
+              <div id="gameModeBadge" style="margin-top: 5px; font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; padding-left: 4px"></div>
             </div>
 
             <div class="morto-area">
@@ -1074,12 +1415,10 @@
             </div>
           </div>
 
-          <!-- Oponentes (continuam absolutos por cima da mesa) -->
           <div id="opponentTop" class="opponent-hand opponent-hand-top"></div>
           <div id="opponentLeft" class="opponent-hand opponent-hand-left"></div>
           <div id="opponentRight" class="opponent-hand opponent-hand-right"></div>
 
-          <!-- Centro da mesa: pontos + monte/lixo -->
           <div class="board-center">
             <div class="board-melds">
               <div class="grow">
@@ -1119,6 +1458,7 @@
                 <div class="pile-card discard-pile">
                   <div id="discardFace" class="discard-face">
                     <div id="discardFaceTop"></div>
+                    <div id="discardFaceMiddle"></div>
                     <div id="discardFaceBottom"></div>
                   </div>
                 </div>
@@ -1132,7 +1472,6 @@
             </div>
           </div>
 
-          <!-- Área do jogador -->
           <div class="player-interface">
             <div id="message"></div>
 
@@ -1154,11 +1493,12 @@
           </div>
         </div>
       </div>
+
       <div id="scoreSection" style="display: none">
-        <div class="section" style="width: 90%; max-width: 500px">
-          <h2>Fim de Jogo</h2>
-          <div id="scoreBoard"></div>
-          <button id="closeScoreBtn" style="width: 100%; margin-top: 10px">Fechar</button>
+        <div class="score-card">
+          <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
+          <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px"></div>
+          <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
         </div>
       </div>
     </div>
@@ -1166,6 +1506,58 @@
     <script type="module">
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
       import { getFirestore, doc, setDoc, updateDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      // ================= LÓGICA DE TRANSIÇÃO DO VÍDEO =================
+      const startOverlay = document.getElementById('startOverlay');
+      const introVideo = document.getElementById('introVideo');
+      const loadingScreen = document.getElementById('loadingScreen');
+      let introFinished = false; // Bloqueia o menu enquanto o vídeo passa
+
+      function endIntroSequence() {
+        introVideo.style.display = 'none';
+        introVideo.pause();
+        loadingScreen.style.display = 'flex';
+        setTimeout(() => {
+          loadingScreen.style.opacity = '1';
+        }, 50);
+
+        setTimeout(() => {
+          loadingScreen.style.opacity = '0';
+          setTimeout(() => {
+            loadingScreen.style.display = 'none';
+            introFinished = true; // Intro acabou!
+            // Só mostra o menu se não estiver dentro de um jogo
+            if (!state) document.getElementById('configSection').style.display = 'flex';
+          }, 1000);
+        }, 2500);
+      }
+
+      introVideo.addEventListener('ended', endIntroSequence);
+
+      startOverlay.addEventListener('click', () => {
+        unlockAudio();
+        startOverlay.style.display = 'none';
+        introVideo.style.display = 'block';
+        introVideo.play().catch(() => endIntroSequence());
+      });
+
+      window.addEventListener('load', () => {
+        // Tenta tocar o vídeo sem clique (caso o PWA esteja instalado)
+        let playPromise = introVideo.play();
+
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              // Sucesso! O celular liberou.
+              startOverlay.style.display = 'none';
+              introVideo.style.display = 'block';
+            })
+            .catch(() => {
+              // Bloqueado. Exige que o usuário toque na tela preta.
+              startOverlay.style.display = 'flex';
+            });
+        }
+      });
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -1204,20 +1596,14 @@
       let turnTimerId = null;
       let turnTimerRemaining = 0;
       let selectedMeldTarget = null;
-      let lastMyTurn = false; // NOVO: pra saber quando virou a SUA vez
+      let lastMyTurn = false;
       let lastSeenActionId = null;
       let ignoreOwnActionId = null;
 
       let movingWild = null;
-      // { fromTeamId, fromMeldIndex, fromCardIndex, card }
 
       window.getState = () => state;
       window.setState = (s) => ((state = s), renderAll());
-
-      // ==========================
-      // 🔄 VIEW ORIENTATION (fixo por cliente)
-      // Cada cliente vê APENAS o próprio time "de pé".
-      // NÃO depende de quem está jogando no momento.
 
       function buildRankIndex(order) {
         const m = {};
@@ -1228,7 +1614,6 @@
       const IDX_LOW = buildRankIndex(RANKS_SEQ_LOW);
 
       function missingRankBetween(a, b) {
-        // retorna o rank que falta quando a e b têm diferença 2 (ex.: 6 e 8 -> 7)
         const ah = IDX_HIGH[a],
           bh = IDX_HIGH[b];
         if (ah != null && bh === ah + 2) return RANKS_SEQ[ah + 1];
@@ -1240,17 +1625,13 @@
         return null;
       }
 
-      // empurra o coringa (2/Joker) pra uma ponta sem quebrar o jogo
       function pushWildToEdge(meld, wildIdx) {
         const wild = meld[wildIdx];
-
-        // tenta direita
         let cand = meld.slice();
         cand.splice(wildIdx, 1);
         cand.push(wild);
         if (isValidSequenceMeld(cand)) return cand;
 
-        // tenta esquerda
         cand = meld.slice();
         cand.splice(wildIdx, 1);
         cand.unshift(wild);
@@ -1259,11 +1640,9 @@
         return null;
       }
 
-      // caso clássico: 5,6,2,8 + baixa 7 => 5,6,7,8 e 2 vai pra ponta
       function autoSwapWildWhenFillingGap(meld) {
         if (!meld || meld.length < 4) return false;
 
-        // acha 1 wild "de verdade" (2 ou joker) no meio
         const wIdx = meld.findIndex((c, i) => (c?.joker || c?.rank === '2') && isWildcard(c, meld) && i > 0 && i < meld.length - 1);
         if (wIdx === -1) return false;
 
@@ -1276,24 +1655,18 @@
         const needed = missingRankBetween(left.rank, right.rank);
         if (!needed) return false;
 
-        // existe a carta natural needed no meld? (porque o jogador acabou de baixar)
         const naturalIdx = meld.findIndex((c, i) => i !== wIdx && !c.joker && c.rank === needed && c.suit === left.suit);
         if (naturalIdx === -1) return false;
 
         const wild = meld[wIdx];
         const natural = meld[naturalIdx];
 
-        // ✅ o 2 estava sendo usado como coringa; fixa isso (não deixa virar "natural" por posição)
         if (!wild.joker && wild.rank === '2') wild.forceWild = true;
 
-        // troca: natural entra no lugar do wild
         meld[wIdx] = natural;
-
-        // remove a natural da posição antiga
         meld.splice(naturalIdx, 1);
 
-        // recoloca o wild e tenta empurrar pra ponta
-        const insertAt = naturalIdx < wIdx ? wIdx - 1 : wIdx; // ajuste de índice por causa do splice
+        const insertAt = naturalIdx < wIdx ? wIdx - 1 : wIdx;
         meld.splice(insertAt, 0, wild);
 
         const pushed = pushWildToEdge(meld, meld.indexOf(wild));
@@ -1304,7 +1677,6 @@
         return true;
       }
 
-      // ==========================
       function applyViewTeamClass() {
         document.body.classList.remove('view-team0', 'view-team1');
         if (!state?.players?.length) return;
@@ -1313,23 +1685,31 @@
         document.body.classList.add(me.teamId === 0 ? 'view-team0' : 'view-team1');
       }
 
-      // ==========================
-      // 🔊 SFX CANASTRA (SEM BUGAR SEU CÓDIGO)
-      // Toca quando um meld vira canastra (simple -> limpa/suja/real/asas)
-      // Funciona local+remoto via onSnapshot diff e NÃO toca na entrada (prime)
-      // ==========================
-
-      // ==========================
-      // 🔊 SFX CANASTRA (MP3 do seu projeto)
-      // ==========================
       let audioUnlocked = false;
+      let audioCtx = null;
 
       const CANASTRA_SFX = {
         suja: new Audio('assets/sfx/canastra-suja.mp3'),
         limpa: new Audio('assets/sfx/canastra-limpa.mp3'),
         real: new Audio('assets/sfx/canastra-real.mp3'),
         asas: new Audio('assets/sfx/canastra-as-a-as.mp3'),
+        fim: new Audio('assets/sfx/fim-de-jogo.mp3'),
       };
+
+      // --- NOVO: SOM DE MOVIMENTO DAS CARTAS ---
+      const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');
+      sfxCardMove.preload = 'auto';
+      sfxCardMove.volume = 0.5; // Ajustado para não abafar os outros sons
+
+      function playCardMove() {
+        if (!audioUnlocked) return;
+        try {
+          // O cloneNode permite que o som se sobreponha se moveres 5 cartas ao mesmo tempo
+          const clone = sfxCardMove.cloneNode();
+          clone.volume = sfxCardMove.volume;
+          clone.play().catch(() => {});
+        } catch (e) {}
+      }
 
       Object.values(CANASTRA_SFX).forEach((a) => {
         a.preload = 'auto';
@@ -1340,8 +1720,14 @@
         if (audioUnlocked) return;
         audioUnlocked = true;
 
-        // "prime" silencioso (alguns browsers exigem gesto antes de tocar)
-        for (const a of Object.values(CANASTRA_SFX)) {
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) audioCtx = new AudioContext();
+        } catch (e) {}
+
+        // Liberta todos os sons no primeiro toque no ecrã, incluindo o das cartas
+        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove];
+        for (const a of allAudios) {
           try {
             a.pause();
             a.currentTime = 0;
@@ -1384,7 +1770,6 @@
         const row = meldEl ? meldEl.querySelector('.meld-line-cards') : null;
         const r = row ? row.getBoundingClientRect() : null;
         if (!r) return null;
-        // um “retângulo pequeno” no meio da linha, pra animar de origem
         return { left: r.left + r.width * 0.5 - 14, top: r.top + 4, width: 28, height: 40 };
       }
 
@@ -1392,7 +1777,6 @@
         movingWild = null;
         if (msg) showMessage(msg);
         renderMelds();
-        // botão liga/desliga via renderAll
         renderAll();
       }
 
@@ -1420,7 +1804,12 @@
           return;
         }
 
-        // toggle: clicou no mesmo -> cancela
+        const isTrapped = cardIdx > 0 && cardIdx < meld.length - 1;
+        if (isTrapped) {
+          showMessage('O coringa está cobrindo um buraco e não pode ser movido.');
+          return;
+        }
+
         if (movingWild && movingWild.fromTeamId === teamId && movingWild.fromMeldIndex === meldIdx && movingWild.fromCardIndex === cardIdx) {
           clearMovingWild('Movimento cancelado.');
           return;
@@ -1485,7 +1874,6 @@
           return;
         }
 
-        // pega a carta (por índice e, se tiver id, re-localiza por id pra evitar índice "velho")
         const rawCard = fromMeld[fromCardIdx];
         if (!rawCard || !isMovableTwoOrJoker(rawCard)) {
           showMessage('Essa carta não existe mais no jogo origem.');
@@ -1500,11 +1888,8 @@
 
         const sameMeld = fromMeldIdx === toMeldIdx;
 
-        // ===== validação (SIMULA, sem mexer no state) =====
         if (sameMeld) {
-          // 🔁 toggle simples: se tá no fim -> vai pro começo; senão -> vai pro fim
           const targetIndex = fromIdx === fromMeld.length - 1 ? 0 : fromMeld.length - 1;
-
           const after = fromMeld.slice();
           const [moved] = after.splice(fromIdx, 1);
           if (targetIndex === 0) after.unshift(moved);
@@ -1539,12 +1924,8 @@
           }
         }
 
-        // ===== animação =====
-        // origem no DOM
         const fromEl = miniCardElByMeld(myTeamId, fromMeldIdx, fromIdx);
         const fromRect = fromEl ? getRect(fromEl) : meldCardsRect(myTeamId, fromMeldIdx);
-
-        // destino no DOM
         const keyTo = meldKey(myTeamId, toMeldIdx);
 
         let toRect = null;
@@ -1571,13 +1952,17 @@
         }
         if (fromEl) fromEl.style.visibility = '';
 
-        // ===== aplica no state (1x) =====
         if (sameMeld) {
           const targetIndex = fromIdx === fromMeld.length - 1 ? 0 : fromMeld.length - 1;
           const [moved] = fromMeld.splice(fromIdx, 1);
-          if (targetIndex === 0) fromMeld.unshift(moved);
-          else fromMeld.push(moved);
-          // NÃO normalize aqui, senão ele desfaz tua intenção e o 2 muda de papel sozinho
+
+          if (targetIndex === 0) {
+            fromMeld.unshift(moved);
+            if (moved.rank === '2' || moved.rank === 2) moved.forceWild = false;
+          } else {
+            fromMeld.push(moved);
+            if (moved.rank === '2' || moved.rank === 2) moved.forceWild = true;
+          }
         } else {
           const [moved] = fromMeld.splice(fromIdx, 1);
           toMeld.push(moved);
@@ -1585,7 +1970,6 @@
           normalizeMeldOrder(toMeld);
         }
 
-        // limpa seleção + avisa
         const actionCard = packCard(card);
         const actionId = newActionId();
 
@@ -1602,15 +1986,11 @@
         ignoreOwnActionId = actionId;
 
         movingWild = null;
-        // deixa o destino selecionado (pra facilitar "voltar" sem clicar tudo de novo)
-        // selectedMeldTarget = null;
-
         renderAll();
         await commitState();
         showMessage('Movido.');
       }
 
-      // desbloqueia no primeiro gesto do usuário
       document.addEventListener('pointerdown', unlockAudio, { once: true, passive: true });
       document.addEventListener('keydown', unlockAudio, { once: true });
 
@@ -1631,7 +2011,6 @@
         o.type = type;
         o.frequency.setValueAtTime(freq, t0);
 
-        // envelope curto (ataque/decay) pra não estourar
         g.gain.setValueAtTime(0.0001, t0);
         g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
         g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
@@ -1641,41 +2020,6 @@
         o.stop(t0 + dur + 0.02);
       }
 
-      // function playCanastraSfx(kind) {
-      //   // se o navegador ainda não liberou áudio, não faz nada (evita erro)
-      //   if (!audioUnlocked || !audioCtx) return;
-
-      //   const t = audioCtx.currentTime + 0.01;
-
-      //   // sons diferentes por tipo (simples e curto)
-      //   if (kind === 'limpa') {
-      //     playTone(660, t + 0.0, 0.1, 0.12, 'triangle');
-      //     playTone(880, t + 0.11, 0.12, 0.13, 'triangle');
-      //     return;
-      //   }
-
-      //   if (kind === 'suja') {
-      //     playTone(330, t + 0.0, 0.12, 0.13, 'sawtooth');
-      //     playTone(220, t + 0.13, 0.16, 0.11, 'sawtooth');
-      //     return;
-      //   }
-
-      //   if (kind === 'real') {
-      //     playTone(523.25, t + 0.0, 0.1, 0.11, 'sine'); // C
-      //     playTone(659.25, t + 0.1, 0.1, 0.11, 'sine'); // E
-      //     playTone(783.99, t + 0.2, 0.14, 0.13, 'sine'); // G
-      //     return;
-      //   }
-
-      //   if (kind === 'asas') {
-      //     playTone(740, t + 0.0, 0.08, 0.12, 'square');
-      //     playTone(880, t + 0.08, 0.08, 0.12, 'square');
-      //     playTone(1046.5, t + 0.16, 0.16, 0.14, 'square');
-      //     return;
-      //   }
-      // }
-
-      // memória: "teamId:meldIdx" -> kind
       let canastraMemPrimed = false;
       const canastraKindMem = new Map();
 
@@ -1701,7 +2045,6 @@
 
         const curr = computeMeldKindMap();
 
-        // primeira vez: só prime (NÃO toca)
         if (!canastraMemPrimed) {
           canastraKindMem.clear();
           for (const [k, v] of curr) canastraKindMem.set(k, v);
@@ -1709,12 +2052,8 @@
           return;
         }
 
-        // toca quando:
-        // 1) vira canastra (simple -> não-simple)
-        // 2) muda o tipo (suja <-> limpa <-> real <-> asas)
         for (const [k, kind] of curr) {
           const prev = canastraKindMem.get(k);
-
           const isCanastra = kind !== 'simple';
           const wasSimple = prev === 'simple';
           const wasMissing = prev == null;
@@ -1723,19 +2062,14 @@
           if ((wasSimple && isCanastra) || (wasMissing && isCanastra) || (changedKind && isCanastra)) {
             playCanastraSfx(kind);
           }
-
           canastraKindMem.set(k, kind);
         }
 
-        // limpa melds que sumiram
         for (const key of Array.from(canastraKindMem.keys())) {
           if (!curr.has(key)) canastraKindMem.delete(key);
         }
       }
 
-      // ==========================
-      // Destaque temporário: carta comprada
-      // ==========================
       let lastBoughtCardId = null;
       let lastBoughtTimer = null;
 
@@ -1760,19 +2094,15 @@
         if (!id) return;
 
         lastBoughtCardId = id;
-
         if (lastBoughtTimer) clearTimeout(lastBoughtTimer);
         lastBoughtTimer = setTimeout(() => {
           lastBoughtCardId = null;
           renderHand();
         }, 1200);
 
-        renderHand(); // renderiza já com o highlight
+        renderHand();
       }
 
-      // ==========================
-      // ANIMAÇÃO: carta voadora (A -> B)
-      // ==========================
       const ANIM_MS = 900;
       const ANIM_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
@@ -1781,7 +2111,10 @@
       }
 
       function cardFrontHTML(card) {
-        return card.joker ? `<div class="carta-canto">JOKER</div><div class="carta-icone">★</div>` : `<div class="carta-canto">${card.rank}<br>${card.suit}</div><div class="carta-icone">${card.suit}</div>`;
+        if (card.joker) {
+          return `<div class="carta-canto top">JOKER</div><div class="carta-meio">★</div><div class="carta-canto bottom">JOKER</div>`;
+        }
+        return `<div class="carta-canto top">${card.rank}<br>${card.suit}</div><div class="carta-meio">${card.suit}</div><div class="carta-canto bottom">${card.rank}<br>${card.suit}</div>`;
       }
 
       function getRect(el) {
@@ -1792,13 +2125,11 @@
       function makeFlyEl(card, face = 'front') {
         const el = document.createElement('div');
         el.className = `carta fly-card ${suitClass(card)}`;
-
         if (face === 'back') {
           el.classList.add('back');
           el.classList.add(card.back === 'blue' ? 'back-blue' : 'back-red');
         }
-
-        el.innerHTML = cardFrontHTML(card); // não importa, porque .back * fica hidden
+        el.innerHTML = cardFrontHTML(card);
         document.body.appendChild(el);
         return el;
       }
@@ -1811,22 +2142,21 @@
       }
 
       async function flyRectToRect(card, fromRect, toRect, face = 'front') {
+        playCardMove(); // <-- INJECÇÃO DO SOM AQUI: Toca sempre que uma carta voar
+
         const fly = makeFlyEl(card, face);
         setBox(fly, fromRect);
-
         const dx = toRect.left - fromRect.left;
         const dy = toRect.top - fromRect.top;
         const sx = toRect.width / fromRect.width;
         const sy = toRect.height / fromRect.height;
-
         const anim = fly.animate(
           [
             { transform: `translate(0px, 0px) scale(1, 1)`, opacity: 1 },
             { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 1 },
           ],
-          { duration: ANIM_MS, easing: ANIM_EASE, fill: 'forwards' }
+          { duration: ANIM_MS, easing: ANIM_EASE, fill: 'forwards' },
         );
-
         try {
           await anim.finished;
         } finally {
@@ -1839,7 +2169,6 @@
         const dist = opts.dist ?? 32;
         const dur = opts.dur ?? 320;
 
-        // anel (pancada)
         const ring = document.createElement('div');
         ring.className = 'impact-ring';
         ring.style.left = x + 'px';
@@ -1852,11 +2181,10 @@
               { transform: 'translate(-50%, -50%) scale(0.15)', opacity: 0.95 },
               { transform: 'translate(-50%, -50%) scale(1.25)', opacity: 0.0 },
             ],
-            { duration: dur, easing: 'cubic-bezier(.2,.9,.2,1)', fill: 'forwards' }
+            { duration: dur, easing: 'cubic-bezier(.2,.9,.2,1)', fill: 'forwards' },
           )
           .finished.finally(() => ring.remove());
 
-        // faíscas
         for (let i = 0; i < particles; i++) {
           const sp = document.createElement('div');
           sp.className = 'spark';
@@ -1875,7 +2203,7 @@
               { transform: `translate(-50%, -50%) rotate(${rot}deg) translate(0px,0px)`, opacity: 1 },
               { transform: `translate(-50%, -50%) rotate(${rot}deg) translate(${dx}px,${dy}px)`, opacity: 0 },
             ],
-            { duration: dur, easing: 'cubic-bezier(.2,.9,.2,1)', fill: 'forwards' }
+            { duration: dur, easing: 'cubic-bezier(.2,.9,.2,1)', fill: 'forwards' },
           ).finished.finally(() => sp.remove());
         }
       }
@@ -1900,19 +2228,27 @@
         const row = meldEl ? meldEl.querySelector('.meld-line-cards') : null;
         const r = row ? row.getBoundingClientRect() : null;
         if (!r) return null;
-
-        // “fim do trilho” + offset pra múltiplas cartas não caírem no mesmo pixel
         return { left: r.left + r.width - 28 - offset, top: r.top, width: 28, height: 40 };
       }
 
       function updateTimerLabel() {
         const el = document.getElementById('turnTimerLabel');
         if (!el) return;
-        if (!state || state.finished || state.currentPlayer !== myPlayerIndex) {
+        if (!state || state.finished) {
           el.textContent = '';
+          el.classList.remove('timer-critical');
           return;
         }
-        el.textContent = `${turnTimerRemaining}s`;
+
+        // Se faltar 10s ou menos, ativa o alerta visual
+        if (turnTimerRemaining <= 10) {
+          el.classList.add('timer-critical');
+          el.textContent = `⏳ ${turnTimerRemaining}s`;
+        } else {
+          el.classList.remove('timer-critical');
+          el.textContent = `${turnTimerRemaining}s`;
+          el.style.color = '#facc15';
+        }
       }
 
       function stopTurnTimer() {
@@ -1927,7 +2263,6 @@
 
       async function commitState() {
         if (!state) return;
-
         pendingCommit = true;
         if (committing) return;
 
@@ -1947,66 +2282,161 @@
         }
       }
 
+      function passTurn() {
+        if (state.mode === '1x1_duploMorto') {
+          if (state.currentPlayer === 1) {
+            state.j2ConsecutiveTurns = !state.j2ConsecutiveTurns ? 1 : 0;
+            if (state.j2ConsecutiveTurns === 0) state.currentPlayer = 0;
+          } else {
+            state.currentPlayer = 1;
+            state.j2ConsecutiveTurns = 0;
+          }
+        } else if (state.mode === '1x2') {
+          if (state.currentPlayer === 0) {
+            state.lastDPlayer = state.lastDPlayer === 1 ? 2 : 1;
+            state.currentPlayer = state.lastDPlayer;
+          } else {
+            state.currentPlayer = 0;
+          }
+        } else {
+          state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+        }
+        state.turnNumber = (state.turnNumber || 0) + 1;
+        state.hasDrawnThisTurn = false;
+        state.requiredDiscardCard = null;
+        state.pickedDiscardCardId = null;
+      }
+
       async function autoPlayTimeout() {
         if (!ensureMyTurn()) return;
+
+        let actionDraw = null;
+
         if (!state.hasDrawnThisTurn) {
           if (!state.stock.length) recycleDeadToStockIfPossible();
+
+          const fromStockEl = document.querySelector('#drawStockBtn .pile-card');
+          const fromStockRect = fromStockEl ? getRect(fromStockEl) : null;
+          const discardFaceEl = document.getElementById('discardFace');
+          const discardRect = discardFaceEl ? getRect(discardFaceEl) : null;
+
           if (state.stock.length) {
             const c = state.stock.pop();
+            ensureCardId(c);
             const me = currentPlayer();
             me.hand.push(c);
             sortHand(me.hand);
             state.hasDrawnThisTurn = true;
+
+            lastBoughtCardId = null;
+            renderHand();
+
+            const toEl = cardElById(c.id);
+            if (fromStockRect && toEl) {
+              const toRect = getRect(toEl);
+              toEl.style.visibility = 'hidden';
+              await flyRectToRect(c, fromStockRect, toRect, 'back');
+              toEl.style.visibility = '';
+            }
+            flashBoughtCard(c);
+
+            actionDraw = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(c), ts: Date.now() };
           } else if (state.discard.length && state.variant === 'aberto') {
-            const c = state.discard.pop();
+            const top = state.discard[state.discard.length - 1];
+            const pile = state.discard.splice(0, state.discard.length);
+            pile.forEach(ensureCardId);
             const me = currentPlayer();
-            me.hand.push(c);
+            me.hand.push(...pile);
             sortHand(me.hand);
             state.hasDrawnThisTurn = true;
+            state.pickedDiscardCardId = top.id;
+
+            lastBoughtCardId = null;
+            renderHand();
+
+            const toEl = cardElById(top.id);
+            if (discardRect && toEl) {
+              const toRect = getRect(toEl);
+              toEl.style.visibility = 'hidden';
+              await flyRectToRect(top, discardRect, toRect, 'front');
+              toEl.style.visibility = '';
+            }
+            flashBoughtCard(top);
+
+            actionDraw = { id: newActionId(), type: 'drawDiscard', playerId: state.currentPlayer, card: packCard(top), ts: Date.now() };
           }
         }
+
+        if (actionDraw) {
+          state.lastAction = actionDraw;
+          ignoreOwnActionId = actionDraw.id;
+          await commitState();
+          await new Promise((r) => setTimeout(r, 600));
+        }
+
         const me = currentPlayer();
         const hand = me.hand;
         if (!hand.length) {
           await commitState();
           return;
         }
-        if (state.variant === 'fechado' && state.requiredDiscardCard) {
-          showMessage('Tempo esgotado, obrigatório usar descarte (regra fechada).');
-          return;
+
+        let validIndexes = [];
+        for (let i = 0; i < hand.length; i++) {
+          if (state.pickedDiscardCardId !== hand[i].id) {
+            validIndexes.push(i);
+          }
         }
-        const idx = Math.floor(Math.random() * hand.length);
-        const card = hand.splice(idx, 1)[0];
+        if (validIndexes.length === 0) validIndexes = [0];
+
+        const idxToPick = validIndexes[Math.floor(Math.random() * validIndexes.length)];
+        const card = hand[idxToPick];
+        ensureCardId(card);
+
+        const fromEl = cardElById(card.id);
+        const toEl = document.getElementById('discardFace');
+        if (fromEl && toEl) {
+          const fromRect = getRect(fromEl);
+          const toRect = getRect(toEl);
+          fromEl.style.visibility = 'hidden';
+          await flyRectToRect(card, fromRect, toRect, 'front');
+          fromEl.style.visibility = '';
+        }
+
+        hand.splice(idxToPick, 1);
         state.discard.push(card);
 
         const teamId = me.teamId;
-        const taken = state.deadChunksTaken?.[teamId] ?? 0;
-        const max = state.deadChunksMax?.[teamId] ?? 1;
 
-        if (hand.length === 0 && taken >= max) {
-          await finishGame(teamId);
+        let tookDead = null;
+        if (hand.length === 0) {
+          tookDead = takeDeadIfAvailableForPlayer(me);
+        }
+
+        if (hand.length === 0 && !canTeamTakeDeadNow(teamId)) {
+          if (teamHasGoodCanastra(teamId)) {
+            await finishGame(teamId);
+          } else {
+            showMessage('Batida falsa automática! Oponente vence.');
+            await finishGame(teamId === 0 ? 1 : 0);
+          }
           return;
         }
 
-        if (state.mode === '1x1_duploMorto') {
-          if (state.currentPlayer === 1) {
-            if (!state.j2ConsecutiveTurns || state.j2ConsecutiveTurns === 0) {
-              state.j2ConsecutiveTurns = 1;
-            } else {
-              state.currentPlayer = 0;
-              state.j2ConsecutiveTurns = 0;
-            }
-          } else {
-            state.currentPlayer = 1;
-            state.j2ConsecutiveTurns = 0;
-          }
-        } else {
-          state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
-        }
+        passTurn();
 
-        state.hasDrawnThisTurn = false;
-        state.requiredDiscardCard = null;
+        state.lastAction = {
+          id: newActionId(),
+          type: 'discard',
+          playerId: myPlayerIndex,
+          card: packCard(card),
+          tookDead,
+          ts: Date.now(),
+        };
+        ignoreOwnActionId = state.lastAction.id;
+
         showMessage('Tempo esgotado: auto-play.');
+        renderAll();
         await commitState();
       }
 
@@ -2014,8 +2444,6 @@
         if (!meld || meld.length < 7) return { kind: 'simple', base: 'Jogo', tag: null };
 
         const hasWild = meld.some((c) => c.joker || isWildcard(c, meld));
-
-        // cartas "reais" pra analisar sequência (ignora jokers e coringas)
         const realCards = meld.filter((c) => !c.joker && !isWildcard(c, meld));
         if (!realCards.length) return { kind: 'simple', base: 'Jogo', tag: null };
 
@@ -2041,17 +2469,13 @@
         const contiguousHigh = sameSuit && isContiguous(orderHigh);
         const isSeq = isValidSequenceMeld(meld);
 
-        // Se tem coringa → suja (prioridade)
         if (hasWild) return { kind: 'suja', base: 'Canastra', tag: { cls: 'suja', text: 'Suja' } };
         if (!isSeq) return { kind: 'simple', base: 'Jogo', tag: null };
 
-        // Ás-a-Ás: A + (2..K) + A (sem coringa)
         const need = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
         const isAsAs = aceCount >= 2 && hasKing && need.every((r) => ranks.includes(r));
-
         if (isAsAs) return { kind: 'asas', base: 'C. Ás-Ás', tag: { cls: 'asas', text: 'Ás-Ás' } };
 
-        // Real: A..K (sem coringa)
         const needReal = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
         const isReal = !hasWild && sameSuit && needReal.every((r) => ranks.includes(r)) && realCards.length === 13;
         if (isReal) return { kind: 'real', base: 'C. Real', tag: { cls: 'real', text: 'Real' } };
@@ -2059,21 +2483,42 @@
         return { kind: 'limpa', base: 'Canastra', tag: { cls: 'limpa', text: 'Limpa' } };
       }
 
+      let activeTurnNumber = -1;
       function startTurnTimerIfNeeded() {
-        stopTurnTimer();
-        if (!state || state.finished || state.currentPlayer !== myPlayerIndex) {
+        if (!state || state.finished) {
+          stopTurnTimer();
           updateTimerLabel();
+          activeTurnNumber = -1;
           return;
         }
+
+        if (activeTurnNumber === state.turnNumber && turnTimerId !== null) {
+          return;
+        }
+
+        stopTurnTimer();
+        activeTurnNumber = state.turnNumber;
         turnTimerRemaining = 60;
         updateTimerLabel();
+
         turnTimerId = setInterval(() => {
           turnTimerRemaining--;
           if (turnTimerRemaining <= 0) {
             stopTurnTimer();
-            autoPlayTimeout().catch(console.error);
+            if (state.currentPlayer === myPlayerIndex) {
+              autoPlayTimeout().catch(console.error);
+            }
           } else {
             updateTimerLabel();
+
+            if (turnTimerRemaining <= 10 && state.currentPlayer === myPlayerIndex) {
+              if (audioCtx && audioCtx.state === 'running') {
+                playTone(880, audioCtx.currentTime, 0.1, 0.05, 'sine');
+              } else if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+              }
+              // O CSS .timer-critical agora cuida de piscar a cor, não precisamos forçar aqui
+            }
           }
         }, 1000);
       }
@@ -2081,7 +2526,7 @@
       function createDeck() {
         const deck = [];
         for (let d = 0; d < 2; d++) {
-          const back = d === 0 ? 'red' : 'blue'; // ✅ 50/50
+          const back = d === 0 ? 'red' : 'blue';
           for (const s of SUITS) {
             for (const r of RANKS) deck.push({ rank: r, suit: s, joker: false, back });
           }
@@ -2103,7 +2548,6 @@
         if (!state || state.stock.length) return false;
         if (!state.deadPiles || !state.deadPiles.length) return false;
 
-        // ✅ pega APENAS 1 morto por vez
         const idx = state.deadPiles.findIndex((pile) => pile && pile.length);
         if (idx === -1) return false;
 
@@ -2123,24 +2567,51 @@
 
       function isWildcard(card, meld = null) {
         if (!card) return false;
+
         if (card.joker) return true;
-        if (card.rank !== '2' && card.rank !== 2) return false;
 
-        // ✅ override manual/da engine (não depende da posição)
-        if (card.forceWild) return true;
+        // Se a nossa inteligência (optimizeMeld) já provou que ele encaixa como natural, não é coringa.
         if (card.forceNatural) return false;
+        if (card.forceWild) return true;
 
-        // 2 só é "natural" quando estiver imediatamente ANTES do 3 do mesmo naipe
-        if (!meld || !Array.isArray(meld)) return true;
-
-        const idx = meld.indexOf(card);
-        const next = idx >= 0 ? meld[idx + 1] : null;
-
-        if (next && !next.joker && next.rank === '3' && next.suit === card.suit) {
-          return false; // 2 natural
+        // POR PADRÃO: Qualquer 2 é coringa, não importa o naipe!
+        if (card.rank === '2' || card.rank === 2) {
+          return true;
         }
 
-        return true; // 2 coringa
+        return false;
+      }
+
+      // --- 2. A TUA FUNÇÃO DE LIMPEZA (agora funciona porque a isWildcard já existe) ---
+      function optimizeMeld(meld) {
+        if (!meld || !meld.length) return;
+
+        // Remove a "amnésia" forçada de todos os 2
+        meld.forEach((c) => {
+          if (!c.joker && (c.rank === '2' || c.rank === 2)) {
+            c.forceWild = false;
+            c.forceNatural = false;
+          }
+        });
+
+        // Procura se existe um 2 do mesmo naipe no jogo
+        const realCards = meld.filter((c) => !c.joker && c.rank !== '2');
+        if (!realCards.length) return;
+        const suit = realCards[0].suit;
+
+        const twos = meld.filter((c) => !c.joker && (c.rank === '2' || c.rank === 2) && c.suit === suit);
+
+        // Se houver apenas um 2 do mesmo naipe, tenta usá-lo como carta natural!
+        if (twos.length === 1) {
+          const two = twos[0];
+          two.forceNatural = true; // Finge que é natural
+          if (isValidSequenceMeld(meld)) {
+            return; // Sucesso! A canastra ficou limpa!
+          }
+          // Se falhar (ex: tem buraco), volta a ser coringa
+          two.forceNatural = false;
+          two.forceWild = true;
+        }
       }
 
       function cardBasePoints(card) {
@@ -2218,6 +2689,7 @@
           players,
           teams,
           currentPlayer: 0,
+          turnNumber: 0,
           stock,
           discard,
           deadPiles,
@@ -2227,7 +2699,9 @@
           finished: false,
           winnerTeamId: null,
           j2ConsecutiveTurns: 0,
+          lastDPlayer: 2,
           requiredDiscardCard: null,
+          pickedDiscardCardId: null,
         };
         await setDoc(gameRef, { stateJson: JSON.stringify(newState), createdAt: Date.now() });
         showMessage('Partida iniciada!');
@@ -2255,27 +2729,20 @@
         return !!state?.deadPiles?.some((p) => p && p.length);
       }
 
-      // ✅ morto “disponível” para esta equipe pegar agora (considera humilhação: J2 pode pegar 2)
       function canTeamTakeDead(teamId) {
         const taken = state.deadChunksTaken?.[teamId] ?? 0;
         const max = state.deadChunksMax?.[teamId] ?? 1;
         if (taken >= max) return false;
-
         let deadIndex = teamId;
-
-        // 1x1 humilhação: teamId 1 (Jogador 2) pode pegar o 2º morto se ele existir
         if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
           if (!state.deadPiles?.[deadIndex]?.length) deadIndex = 0;
         }
-
         return !!state.deadPiles?.[deadIndex]?.length;
       }
 
-      // ✅ para bater: precisa ter pelo menos 1 canastra limpa/real/ás-ás na equipe
       function teamHasGoodCanastra(teamId) {
         const team = state.teams[teamId];
         if (!team?.melds?.length) return false;
-
         return team.melds.some((m) => {
           if (!m || m.length < 7) return false;
           const kind = classifyMeldForUi(m).kind;
@@ -2308,7 +2775,6 @@
         sortHand(currentPlayer().hand);
         state.hasDrawnThisTurn = true;
 
-        // render pra achar o destino no DOM
         lastBoughtCardId = null;
         renderHand();
 
@@ -2316,7 +2782,7 @@
         if (fromRect && toEl) {
           const toRect = getRect(toEl);
           toEl.style.visibility = 'hidden';
-          await flyRectToRect(c, fromRect, toRect, 'back'); // do monte: eu animaria “verso”
+          await flyRectToRect(c, fromRect, toRect, 'back');
           toEl.style.visibility = '';
         }
 
@@ -2325,7 +2791,6 @@
         state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(c), ts: Date.now() };
         ignoreOwnActionId = state.lastAction.id;
 
-        // BUG REAL: antes você não commitava compra do monte (outros players não veem)
         await commitState();
       }
 
@@ -2362,7 +2827,6 @@
           showMessage('Já comprou.');
           return;
         }
-        // ✅ regra da casa: se monte acabou e não existe morto -> fim imediato (mesmo com lixo)
         if (!state.stock.length && !hasAnyDeadToRecycle()) {
           showMessage('Monte acabou e não há morto para recolocar. Fim de jogo.');
           await finishGame(null);
@@ -2396,10 +2860,10 @@
         sortHand(me.hand);
 
         state.hasDrawnThisTurn = true;
+        state.pickedDiscardCardId = top.id;
         if (state.variant === 'fechado') state.requiredDiscardCard = { rank: top.rank, suit: top.suit, joker: !!top.joker };
         else state.requiredDiscardCard = null;
 
-        // render pra achar destino do "top" no DOM
         lastBoughtCardId = null;
         renderHand();
 
@@ -2407,7 +2871,7 @@
         if (fromRect && toEl) {
           const toRect = getRect(toEl);
           toEl.style.visibility = 'hidden';
-          await flyRectToRect(top, fromRect, toRect, 'front'); // do lixo: faz sentido mostrar a face
+          await flyRectToRect(top, fromRect, toRect, 'front');
           toEl.style.visibility = '';
         }
 
@@ -2433,7 +2897,6 @@
           const seqOrder = {};
           order.forEach((r, i) => (seqOrder[r] = i));
           const sorted = nonWild.slice().sort((a, b) => seqOrder[a.rank] - seqOrder[b.rank]);
-          const acePosInOrder = seqOrder['A'];
           const aceIndex = sorted.findIndex((c) => c.rank === 'A');
           if (aceIndex !== -1) {
             if (aceMode === 'high' && aceIndex !== sorted.length - 1) return null;
@@ -2457,11 +2920,9 @@
         const baseOk = (needHigh !== null && needHigh <= availableWilds) || (needLow !== null && needLow <= availableWilds);
         if (baseOk) return true;
 
-        // ✅ SPECIAL: "Ás a Ás" (A-2-3-...-K-A)
         const aceCount = nonWild.filter((c) => c.rank === 'A').length;
         const hasKing = nonWild.some((c) => c.rank === 'K');
         if (aceCount >= 2 && hasKing) {
-          // remove 1 Ás (o de fechamento) e testa como sequência "low" normal
           const idxAceToRemove = nonWild.findIndex((c, i) => c.rank === 'A' && i !== nonWild.findIndex((x) => x.rank === 'A'));
           if (idxAceToRemove !== -1) {
             const test = nonWild.slice();
@@ -2496,21 +2957,50 @@
         return false;
       }
 
+      async function checkPostMeldStatus(player) {
+        if (player.hand.length > 0) return;
+
+        const teamId = player.teamId;
+        const tookDead = takeDeadIfAvailableForPlayer(player);
+
+        if (!tookDead) {
+          if (teamHasGoodCanastra(teamId)) {
+            showMessage('🏆 Batida direta!');
+            await finishGame(teamId);
+          }
+        } else {
+          showMessage('💀 Pegou o morto!');
+          renderAll();
+        }
+      }
+
       async function attemptExtendExistingMeld(cards, indexes) {
         const team = currentTeam();
         if (!team.melds || !team.melds.length) return false;
         const hand = currentPlayer().hand;
         let forcedIndex = null;
+
         if (selectedMeldTarget) {
           const [teamIdStr, meldIdxStr] = selectedMeldTarget.split(':');
           if (parseInt(teamIdStr) === team.id && team.melds[parseInt(meldIdxStr)]) forcedIndex = parseInt(meldIdxStr);
         }
+
         if (forcedIndex !== null) {
           const targetMeld = team.melds[forcedIndex];
           const combined = targetMeld.concat(cards);
           if (!isValidSequenceMeld(combined)) {
             showMessage('Não encaixa.');
             return false;
+          }
+
+          const isLastCards = hand.length === indexes.length;
+          if (isLastCards && !canTeamTakeDeadNow(team.id)) {
+            const hasCanasta = teamHasGoodCanastra(team.id);
+            const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(combined).kind);
+            if (!hasCanasta && !willCreateCanastra) {
+              showMessage('❌ Você não pode esvaziar a mão sem ter uma canastra!');
+              return false;
+            }
           }
 
           const key = team.id + ':' + forcedIndex;
@@ -2531,19 +3021,21 @@
             targetMeld.push(hand[idx]);
             hand.splice(idx, 1);
           }
-          normalizeMeldOrder(targetMeld); // mantém tua ordenação padrão
-          autoSwapWildWhenFillingGap(targetMeld); // ✅ libera o 2 quando a carta “real” entrou
-          normalizeMeldOrder(targetMeld); // reordena de novo depois do swap (agora com forceWild)
-
+          // Tenta limpar a canastra antes de ordenar
+          optimizeMeld(targetMeld);
+          normalizeMeldOrder(targetMeld);
+          autoSwapWildWhenFillingGap(targetMeld);
+          // Tenta limpar novamente caso o Coringa tenha sido expulso para a ponta
+          optimizeMeld(targetMeld);
+          normalizeMeldOrder(targetMeld);
           sortHand(hand);
           selectedHandIndexes.clear();
           selectedMeldTarget = null;
 
-          // 🔥 avisa os outros o que aconteceu
           state.lastAction = {
             id: newActionId(),
             type: 'meldExtend',
-            playerId: myPlayerIndex, // ou state.currentPlayer (os 2 batem na tua vez)
+            playerId: myPlayerIndex,
             teamId: team.id,
             meldIndex: forcedIndex,
             cards: cards.map(packCard),
@@ -2551,34 +3043,53 @@
           };
           ignoreOwnActionId = state.lastAction.id;
 
+          renderAll();
           await commitState();
           showMessage('Cartas adicionadas!');
+          await checkPostMeldStatus(currentPlayer());
           return true;
         }
+
         const candidateMeldIndexes = [];
         team.melds.forEach((meld, idx) => {
           if (isValidSequenceMeld(meld.concat(cards))) candidateMeldIndexes.push(idx);
         });
+
         if (!candidateMeldIndexes.length) return false;
         if (candidateMeldIndexes.length > 1) {
           showMessage('Encaixa em vários. Selecione o jogo.');
           return false;
         }
+
         const teamMeld = team.melds[candidateMeldIndexes[0]];
+        const combinedCheck = teamMeld.concat(cards);
+
+        const isLastCards = hand.length === indexes.length;
+        if (isLastCards && !canTeamTakeDeadNow(team.id)) {
+          const hasCanasta = teamHasGoodCanastra(team.id);
+          const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(combinedCheck).kind);
+          if (!hasCanasta && !willCreateCanastra) {
+            showMessage('❌ Você não pode esvaziar a mão sem ter uma canastra!');
+            return false;
+          }
+        }
+
         const key = team.id + ':' + candidateMeldIndexes[0];
 
         for (const idx of indexes) {
           teamMeld.push(hand[idx]);
           hand.splice(idx, 1);
         }
+        // Aplica a mesma inteligência de limpeza aqui
+        optimizeMeld(teamMeld);
         normalizeMeldOrder(teamMeld);
         autoSwapWildWhenFillingGap(teamMeld);
+        optimizeMeld(teamMeld);
         normalizeMeldOrder(teamMeld);
         sortHand(hand);
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
 
-        // 🔥 avisa os outros o que aconteceu
         state.lastAction = {
           id: newActionId(),
           type: 'meldExtend',
@@ -2590,7 +3101,10 @@
         };
         ignoreOwnActionId = state.lastAction.id;
 
+        renderAll();
         await commitState();
+        showMessage('Cartas adicionadas!');
+        await checkPostMeldStatus(currentPlayer());
         return true;
       }
 
@@ -2624,10 +3138,18 @@
           return;
         }
 
-        // ===== 5.4B: ANIMAÇÃO (mão -> área de jogos do time) =====
-        cards.forEach(ensureCardId);
-
         const teamId = currentTeam().id;
+        const isLastCards = hand.length === indexes.length;
+        if (isLastCards && !canTeamTakeDeadNow(teamId)) {
+          const hasCanasta = teamHasGoodCanastra(teamId);
+          const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(cards).kind);
+          if (!hasCanasta && !willCreateCanastra) {
+            showMessage('❌ Você não pode esvaziar a mão sem ter uma canastra!');
+            return;
+          }
+        }
+
+        cards.forEach(ensureCardId);
         const targetContainer = document.getElementById(teamId === 0 ? 'meldsP1' : 'meldsP2');
 
         if (targetContainer) {
@@ -2647,7 +3169,6 @@
 
           await Promise.all(anims);
         }
-        // ===== fim animação =====
 
         const meld = [];
         for (const idx of indexes) {
@@ -2655,23 +3176,21 @@
           hand.splice(idx, 1);
         }
 
+        // Se você já baixar um jogo com o 2 natural, ele já nasce limpo
+        optimizeMeld(meld);
         normalizeMeldOrder(meld);
 
-        // adiciona o jogo no state
         const teamId2 = currentTeam().id;
         currentTeam().melds.push(meld);
 
-        // calcula a key do meld recém criado (importante pro meldDropRect funcionar)
         const meldIdx = currentTeam().melds.length - 1;
-        const meldKey = teamId2 + ':' + meldIdx;
 
-        // 🔥 PUBLICA A AÇÃO PROS OUTROS ANIMAREM
         state.lastAction = {
           id: newActionId(),
           type: 'meldNew',
           playerId: myPlayerIndex,
           teamId: currentTeam().id,
-          meldIndex: meldIdx, // ✅ ADICIONA ISSO
+          meldIndex: meldIdx,
           cards: cards.map(packCard),
           ts: Date.now(),
         };
@@ -2679,7 +3198,9 @@
         ignoreOwnActionId = state.lastAction.id;
 
         selectedHandIndexes.clear();
+        renderAll();
         await commitState();
+        await checkPostMeldStatus(currentPlayer());
       }
 
       function takeDeadIfAvailableForPlayer(p) {
@@ -2690,12 +3211,10 @@
         const max = state.deadChunksMax?.[teamId] ?? 1;
         if (taken >= max) return null;
 
-        // regra: só pega morto com a mão vazia
         if (p.hand.length !== 0) return null;
 
         let deadIndex = teamId;
 
-        // 1x1 humilhação: team 1 pode pegar o 2º morto (fallback pro 0)
         if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
           if (!state.deadPiles?.[deadIndex]?.length) deadIndex = 0;
         }
@@ -2704,7 +3223,8 @@
         if (!dead || !dead.length) return null;
 
         const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
-        p.hand = dead.splice(0, chunkSize);
+        p.hand.length = 0;
+        p.hand.push(...dead.splice(0, chunkSize));
         sortHand(p.hand);
         state.deadChunksTaken[teamId] = taken + 1;
 
@@ -2742,7 +3262,6 @@
           const fr = fromSlot.getBoundingClientRect();
           const hr = handArea.getBoundingClientRect();
 
-          // anima só “uma carta” do morto (stack fake)
           const fakeCard = { rank: '★', suit: '★', joker: true, id: `dead_${Date.now()}` };
           const fromRect = { left: fr.left, top: fr.top, width: fr.width, height: fr.height };
           const toRect = { left: hr.left + hr.width * 0.5, top: hr.top + 10, width: 60, height: 90 };
@@ -2750,7 +3269,8 @@
           await flyRectToRect(fakeCard, fromRect, toRect, 'back');
         }
 
-        p.hand = dead.splice(0, chunkSize);
+        p.hand.length = 0;
+        p.hand.push(...dead.splice(0, chunkSize));
         sortHand(p.hand);
         state.deadChunksTaken[teamId] = taken + 1;
 
@@ -2774,7 +3294,6 @@
 
         let deadIndex = teamId;
 
-        // 1x1 humilhação: jogador 2 (team 1) pode pegar o 2º morto
         if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
           deadIndex = 0;
         }
@@ -2811,6 +3330,13 @@
         const card = hand[index];
         ensureCardId(card);
 
+        if (state.pickedDiscardCardId === card.id) {
+          showMessage('Você não pode descartar a carta que acabou de pegar do lixo.');
+          return;
+        }
+
+        const teamId = p.teamId;
+
         const fromEl = cardElById(card.id);
         const toEl = document.getElementById('discardFace');
 
@@ -2822,51 +3348,33 @@
           fromEl.style.visibility = '';
         }
 
-        // 1) mexe no state
         hand.splice(index, 1);
         state.discard.push(card);
         selectedHandIndexes.clear();
 
-        // 2) se ficou sem carta, tenta pegar morto automaticamente
         let tookDead = null;
-        if (hand.length === 0) {
-          tookDead = takeDeadIfAvailableForPlayer(p); // retorna {deadIndex,count} ou null
+        if (p.hand.length === 0) {
+          tookDead = takeDeadIfAvailableForPlayer(p);
         }
 
-        // 3) se ainda tá sem carta e não tem morto: fim do jogo
-        const teamId = p.teamId;
-        if (hand.length === 0 && !canTeamTakeDeadNow(teamId)) {
+        if (p.hand.length === 0 && !canTeamTakeDeadNow(teamId)) {
           await finishGame(teamId);
           return;
         }
 
-        // 4) passa turno
-        if (state.mode === '1x1_duploMorto') {
-          if (state.currentPlayer === 1) {
-            state.j2ConsecutiveTurns = !state.j2ConsecutiveTurns ? 1 : 0;
-            if (state.j2ConsecutiveTurns === 0) state.currentPlayer = 0;
-          } else {
-            state.currentPlayer = 1;
-            state.j2ConsecutiveTurns = 0;
-          }
-        } else {
-          state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
-        }
+        passTurn();
 
-        state.requiredDiscardCard = null;
-        state.hasDrawnThisTurn = false;
-
-        // 5) publica ação pros outros animarem
         state.lastAction = {
           id: newActionId(),
           type: 'discard',
           playerId: myPlayerIndex,
           card: packCard(card),
-          tookDead, // {deadIndex,count} ou null
+          tookDead,
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
 
+        renderAll();
         await commitState();
       }
 
@@ -2883,7 +3391,7 @@
             const info = classifyMeldForUi(meld);
             if (info.kind === 'suja') sujaBonus += 100;
             if (info.kind === 'limpa') limpaBonus += 200;
-            if (info.kind === 'real') realBonus += 500;
+            if (info.kind === 'real') realBonus += 1000;
             if (info.kind === 'asas') asasBonus += 1000;
           }
         });
@@ -2891,7 +3399,6 @@
       }
 
       function normalizeMeldOrder(meld) {
-        // (Lógica complexa de ordenação mantida intacta)
         if (!meld || !meld.length) return;
         const nonWild = meld.filter((c) => !isWildcard(c, meld));
         const wild = meld.filter((c) => isWildcard(c, meld));
@@ -2900,8 +3407,6 @@
           return;
         }
 
-        // ✅ SPECIAL: ordenação de "Ás a Ás" (A-2-3-...-K-A)
-        // Mantém o Ás final como a "carta fechada" no fim do jogo.
         const aces = nonWild.filter((c) => c.rank === 'A');
         const hasKing = nonWild.some((c) => c.rank === 'K');
         if (aces.length >= 2 && hasKing) {
@@ -2956,14 +3461,24 @@
         const okHigh = needHigh !== null && needHigh <= availableWilds;
         const okLow = needLow !== null && needLow <= availableWilds;
 
+        const isWildAtEnd = wild.length > 0 && meld.length > 0 && isWildcard(meld[meld.length - 1], meld);
+
         let order, aceMode;
         if (okHigh && okLow) {
-          if (needHigh <= needLow) {
+          if (needHigh < needLow) {
             order = RANKS_SEQ;
             aceMode = 'high';
-          } else {
+          } else if (needLow < needHigh) {
             order = RANKS_SEQ_LOW;
             aceMode = 'low';
+          } else {
+            if (isWildAtEnd) {
+              order = RANKS_SEQ_LOW;
+              aceMode = 'low';
+            } else {
+              order = RANKS_SEQ;
+              aceMode = 'high';
+            }
           }
         } else if (okHigh) {
           order = RANKS_SEQ;
@@ -3005,7 +3520,14 @@
           let handPenalty = 0;
           players.forEach((p) => p.hand.forEach((c) => (handPenalty += cardBasePoints(c))));
           const meldInfo = computeTeamMeldScore(team);
-          results.push({ team, players, score: meldInfo.total - handPenalty, handPenalty, ...meldInfo });
+
+          const mortosPegos = state.deadChunksTaken?.[team.id] ?? 0;
+          const penaltyMorto = mortosPegos === 0 ? 100 : 0;
+          const bonusBatida = state.winnerTeamId === team.id ? 100 : 0;
+
+          const finalScore = meldInfo.total - handPenalty - penaltyMorto + bonusBatida;
+
+          results.push({ team, players, score: finalScore, handPenalty, penaltyMorto, bonusBatida, ...meldInfo });
         });
         return results;
       }
@@ -3017,36 +3539,34 @@
         await commitState();
       }
 
-      // RENDER
       function renderAll() {
         if (!state) return;
 
-        // ✅ orientação fixa por cliente (não muda a cada turno)
         applyViewTeamClass();
-        document.getElementById('currentPlayerLabel').textContent = currentPlayer().name;
+        // --- NOVO: MOSTRAR MODO E REGRA NA MESA ---
+        const badge = document.getElementById('gameModeBadge');
+        if (badge) {
+          let modeDisplay = state.mode;
+          if (modeDisplay === '1x1_duploMorto') modeDisplay = '1x1 Humilhação';
+          badge.textContent = `${modeDisplay} • Buraco ${state.variant}`;
+        }
+        const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex;
+        document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? 'Sua Vez!' : `Vez de ${currentPlayer().name}`;
+        document.querySelector('.current-player-chip').style.background = isMyTurnRightNow ? 'rgba(22, 163, 74, 0.8)' : 'rgba(0, 0, 0, 0.5)';
         document.getElementById('stockCount').textContent = state.stock.length;
 
-        // Descarte
         const discardTop = state.discard[state.discard.length - 1];
         document.getElementById('discardCount').textContent = state.discard.length;
         const discardFace = document.getElementById('discardFace');
-        const fTop = document.getElementById('discardFaceTop');
-        const fBot = document.getElementById('discardFaceBottom');
+
         if (!discardTop) discardFace.style.display = 'none';
         else {
           discardFace.style.display = 'flex';
-          if (discardTop.joker) {
-            fTop.textContent = '★';
-            fBot.textContent = '★';
-            discardFace.style.color = '#b45309';
-          } else {
-            fTop.innerHTML = discardTop.rank + '<br>' + discardTop.suit;
-            fBot.textContent = discardTop.suit;
-            discardFace.style.color = discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
-          }
+          // O lixo agora usa exatamente o mesmo HTML da mão e da mesa
+          discardFace.innerHTML = cardFrontHTML(discardTop);
+          discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
         }
 
-        // Mortos
         const s0 = document.getElementById('mortoSlot0');
         const s1 = document.getElementById('mortoSlot1');
         if (state.deadPiles.length >= 2) {
@@ -3054,58 +3574,39 @@
           s1.classList.toggle('used', state.deadPiles[1].length === 0);
         }
 
-        // Mãos Oponentes
         renderOpponentHands();
-
-        // Minha Mão
         renderHand();
-
-        // Jogos
         renderMelds();
 
-        // Botões
         const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
 
-        // botão mover 2/Joker (habilita só quando faz sentido)
         const moveBtn = document.getElementById('moveWildBtn');
         if (moveBtn) {
           const me = state.players[myPlayerIndex];
           const myTeamId = me?.teamId;
-
           const dest = parseMeldKey(selectedMeldTarget) || (movingWild ? { teamId: movingWild.fromTeamId, meldIdx: movingWild.fromMeldIndex } : null);
-
           const can = myTurn && state.hasDrawnThisTurn && !!movingWild && dest && dest.teamId === myTeamId;
-
           moveBtn.disabled = !can;
         }
 
-        // 🔔 Vibra quando passa a ser a minha vez
         if (myTurn && !lastMyTurn && navigator.vibrate) {
-          navigator.vibrate([150, 80, 150]); // vibra, pausa, vibra
+          navigator.vibrate([150, 80, 150]);
         }
         lastMyTurn = myTurn;
 
         document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
-
         document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn ? '1' : '0.5';
 
         document.getElementById('drawDiscardBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn && state.discard.length ? 'auto' : 'none';
         document.getElementById('drawDiscardBtn').style.opacity = myTurn && !state.hasDrawnThisTurn && state.discard.length ? '1' : '0.5';
 
-        // document.getElementById('meldBtn').disagbled = !myTurn || !state.hasDrawnThisTurn;
         document.getElementById('meldBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
-
         document.getElementById('discardBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
 
         const me = state.players[myPlayerIndex];
         const myTeamId = me.teamId;
 
-        const taken = state.deadChunksTaken?.[myTeamId] ?? 0;
-        const max = state.deadChunksMax?.[myTeamId] ?? 1;
-
-        // opcional mas certo: só habilita morto se eu estiver com a mão vazia
         const canTakeDeadBtn = myTurn && me.hand.length === 0 && canTeamTakeDeadNow(myTeamId);
-
         document.getElementById('takeDeadBtn').disabled = !canTakeDeadBtn;
 
         document.getElementById('endGameBtn').disabled = false;
@@ -3145,7 +3646,6 @@
       function seatForPlayer(pid) {
         const total = state.players.length;
         if (pid === myPlayerIndex) return 'self';
-
         const others = [];
         for (let i = 1; i < total; i++) others.push((myPlayerIndex + i) % total);
 
@@ -3155,7 +3655,6 @@
           seats.right = others[0];
           seats.left = others[1];
         } else {
-          // 4
           seats.right = others[0];
           seats.top = others[1];
           seats.left = others[2];
@@ -3170,21 +3669,17 @@
       function fallbackSeatRect(seat) {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-
         if (seat === 'top') return { left: vw * 0.5 - 20, top: 40, width: 40, height: 60 };
         if (seat === 'left') return { left: 12, top: vh * 0.5 - 30, width: 40, height: 60 };
         if (seat === 'right') return { left: vw - 52, top: vh * 0.5 - 30, width: 40, height: 60 };
-
         return null;
       }
 
       function opponentAnchorRect(pid) {
         const seat = seatForPlayer(pid);
-
         if (seat === 'top') return getOpponentAnchorRectById('opponentTop', 'top');
         if (seat === 'left') return getOpponentAnchorRectById('opponentLeft', 'left');
         if (seat === 'right') return getOpponentAnchorRectById('opponentRight', 'right');
-
         return null;
       }
 
@@ -3192,7 +3687,6 @@
         const root = document.getElementById(rootId);
         if (!root) return fallbackSeatRect(seatFallback);
 
-        // tenta primeiro no container das cartas
         const cards = root.querySelector('.opponent-cards');
         const r1 = cards ? cards.getBoundingClientRect() : null;
 
@@ -3205,7 +3699,6 @@
           };
         }
 
-        // fallback: usa o root todo (label + área)
         const r2 = root.getBoundingClientRect();
         if (r2 && r2.width > 0 && r2.height > 0) {
           return {
@@ -3216,20 +3709,13 @@
           };
         }
 
-        // fallback final (coordenada fixa na tela)
         return fallbackSeatRect(seatFallback);
       }
 
-      // ==========================
-      // MODO TESTE / DEBUG 1
-      // ==========================
       window.debugScoreExample = function () {
-        // sempre testar como Jogador 1
         myPlayerIndex = 0;
-
         const C = (rank, suit, joker = false) => ({ rank, suit, joker });
 
-        // monta um state COMPLETO só em memória, sem Firebase
         state = {
           mode: '1x1',
           variant: 'fechado',
@@ -3248,8 +3734,8 @@
           deadChunksTaken: [1, 1],
           deadChunksMax: [1, 1],
           hasDrawnThisTurn: true,
-          finished: true, // já marca como fim de jogo
-          winnerTeamId: 0, // vitória da equipe 1
+          finished: true,
+          winnerTeamId: 0,
           j2ConsecutiveTurns: 0,
           requiredDiscardCard: null,
         };
@@ -3257,48 +3743,29 @@
         const t1 = state.teams[0].melds;
         const t2 = state.teams[1].melds;
 
-        // ---------- TIME 1 ----------
-
-        // 1) Canastra REAL (2 ... A do mesmo naipe, sem coringa)
         t1.push([C('A', '♣'), C('2', '♣'), C('3', '♣'), C('4', '♣'), C('5', '♣'), C('6', '♣'), C('7', '♣'), C('8', '♣'), C('9', '♣'), C('10', '♣'), C('J', '♣'), C('Q', '♣'), C('K', '♣')]);
-
-        // 2) Canastra ÁS A ÁS (começa e termina com Ás)
         t1.push([C('A', '♦'), C('2', '♦'), C('3', '♦'), C('4', '♦'), C('5', '♦'), C('6', '♦'), C('7', '♦'), C('8', '♦'), C('9', '♦'), C('10', '♦'), C('J', '♦'), C('Q', '♦'), C('K', '♦'), C('A', '♦')]);
-
-        // 3) Canastra LIMPA (sem coringa, sem Ás no topo)
         t1.push([C('4', '♥'), C('5', '♥'), C('6', '♥'), C('7', '♥'), C('8', '♥'), C('9', '♥'), C('10', '♥')]);
-
-        // ---------- TIME 2 ----------
-
-        // 4) Canastra SUJA (com coringa no meio)
         t2.push([C('5', '♠'), C('6', '♠'), C('7', '♠'), C('JOKER', '★', true), C('9', '♠'), C('10', '♠'), C('J', '♠')]);
 
-        // ninguém com carta na mão
         state.players[0].hand = [];
         state.players[1].hand = [];
-
-        // limpa seleções
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
 
-        // renderiza tudo e já força o placar
         renderAll();
         const scores = computeScores();
         renderScores(scores, state.winnerTeamId);
 
+        // FORÇA O SOM NO MODO DE TESTE
+        playCanastraSfx('fim');
+
         showMessage('DEBUG: exemplo com canastra real, Ás a Ás, limpa e suja.');
       };
 
-      // =====================================================
-      // MODO TESTE 2: playground para sequências e coringas
-      // =====================================================
       window.debugSequenciasCoringas = function () {
-        // garante que você é o Jogador 1
         myPlayerIndex = 0;
-
         const C = (rank, suit, joker = false) => ({ rank, suit, joker });
-
-        // state completo, mas jogo NÃO terminado
         state = {
           mode: '1x1',
           variant: 'fechado',
@@ -3311,13 +3778,13 @@
             { id: 1, name: 'Time 2', playerIndexes: [1], melds: [] },
           ],
           currentPlayer: 0,
-          stock: [], // pode deixar vazio, foco é mexer nos jogos
-          discard: [], // se quiser testar compra do descarte, põe carta aqui
+          stock: [],
+          discard: [],
           deadPiles: [[], []],
           deadChunksTaken: [0, 0],
           deadChunksMax: [1, 1],
-          hasDrawnThisTurn: true, // já “comprou”, pode só baixar / mexer jogo
-          finished: false, // NÃO terminou
+          hasDrawnThisTurn: true,
+          finished: false,
           winnerTeamId: null,
           j2ConsecutiveTurns: 0,
           requiredDiscardCard: null,
@@ -3326,51 +3793,22 @@
         const t1 = state.teams[0].melds;
         const t2 = state.teams[1].melds;
 
-        // ---------------- TIME 1 (seus jogos) ----------------
-
-        // 1) A♣ 2♣ 3♣ 4♣ 5♣ 6♣ 7♣  -> 2 NÃO é coringa aqui (A-2-3)
         t1.push([C('A', '♣'), C('2', '♣'), C('3', '♣'), C('4', '♣'), C('5', '♣'), C('6', '♣'), C('7', '♣')]);
-
-        // 2) A♥ JOKER 3♥ 4♥ 5♥ -> buraco A–3 preenchido por coringa (suja)
         t1.push([C('A', '♥'), C('JOKER', '★', true), C('3', '♥'), C('4', '♥'), C('5', '♥')]);
-
-        // 3) 8♦ 9♦ JOKER J♦ Q♦ -> coringa no meio de sequência normal
         t1.push([C('8', '♦'), C('9', '♦'), C('JOKER', '★', true), C('J', '♦'), C('Q', '♦')]);
-
-        // 4) Q♠ K♠ A♠ -> sequência com Ás alto
         t1.push([C('Q', '♠'), C('K', '♠'), C('A', '♠')]);
-
-        // ---------------- TIME 2 (referência) ----------------
-
-        // 5) 4♠ 5♠ 6♠ 7♠ 8♠ 9♠ 10♠ -> canastra limpa simples pra comparar
         t2.push([C('4', '♠'), C('5', '♠'), C('6', '♠'), C('7', '♠'), C('8', '♠'), C('9', '♠'), C('10', '♠')]);
-
-        // 6) A♦ 2♦ 3♦ 4♦ 5♦ 6♦ 7♦ 8♦ 9♦ 10♦
         t2.push([C('A', '♦'), C('2', '♦'), C('3', '♦'), C('4', '♦'), C('5', '♦'), C('6', '♦'), C('7', '♦'), C('8', '♦'), C('9', '♦'), C('10', '♦')]);
 
-        // ---------------- CARTAS NA MÃO ----------------
-
-        // Sua mão: vários 2 e coringas pra você brincar de mover
         state.players[0].hand = [C('2', '♥'), C('2', '♠'), C('2', '♦'), C('JOKER', '★', true), C('5', '♣'), C('K', '♦'), C('A', '♣')];
-
-        // mão do jogador 2 só pra não ficar vazia
         state.players[1].hand = [C('7', '♠'), C('8', '♠'), C('9', '♠')];
 
-        // limpa seleções
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
-
         renderAll();
         showMessage('DEBUG: playground de sequências e coringas carregado.');
       };
 
-      // =====================================================
-      // MODO TESTE 3: comprar N cartas do monte (rápido p/ testar)
-      // Uso no console:
-      //   await debugBuyStock(30)                    // compra 30 para você (myPlayerIndex)
-      //   await debugBuyStock(30, { playerId: 1 })   // compra 30 para o jogador 2
-      //   await debugBuyStock(30, { bypassTurn: true }) // ignora vez (default)
-      // =====================================================
       window.debugBuyStock = async function (n = 30, opts = {}) {
         try {
           const count = Math.max(0, Number(n) || 0);
@@ -3383,7 +3821,7 @@
             return;
           }
 
-          const bypassTurn = opts.bypassTurn !== false; // default TRUE
+          const bypassTurn = opts.bypassTurn !== false;
           if (!bypassTurn && state.currentPlayer !== myPlayerIndex) {
             showMessage('DEBUG: não é sua vez.');
             return;
@@ -3409,10 +3847,8 @@
 
           sortHand(p.hand);
 
-          // deixa o jogo "comprado" pra evitar bloqueios na UI
           if (playerId === state.currentPlayer) state.hasDrawnThisTurn = true;
 
-          // registra ação só pra sincronizar (e não disparar animações normais)
           state.lastAction = { id: newActionId(), type: 'debugDrawStock', playerId, count: drew, ts: Date.now() };
           ignoreOwnActionId = state.lastAction.id;
 
@@ -3465,12 +3901,11 @@
           cardsDiv.className = 'opponent-cards';
           const count = Math.min(p.hand.length, 12);
           for (let i = 0; i < count; i++) {
-            const cdata = p.hand[i]; // existe no state hoje
+            const cdata = p.hand[i];
             const c = document.createElement('div');
             c.className = 'opponent-card-back ' + (cdata?.back === 'blue' ? 'back-blue' : 'back-red');
             cardsDiv.appendChild(c);
           }
-
           obj.el.appendChild(cardsDiv);
         });
       }
@@ -3482,10 +3917,22 @@
         m2.innerHTML = '';
         let s1 = 0,
           s2 = 0;
+
         state.teams.forEach((t, i) => {
           const info = computeTeamMeldScore(t);
           if (i === 0) s1 = info.total;
           else s2 = info.total;
+
+          // --- ATUALIZA OS NOMES NA MESA ---
+          const pNames = state.players
+            .filter((p) => p.teamId === t.id)
+            .map((p) => p.name)
+            .join(' e ');
+          const titleSpan = document.querySelector(`#teamPanel${i + 1} .meld-title span`);
+          if (titleSpan) {
+            titleSpan.textContent = `${t.name} (${pNames}) Pts:`;
+          }
+
           const target = i === 0 ? m1 : m2;
           t.melds.forEach((meld, midx) => {
             const div = document.createElement('div');
@@ -3503,23 +3950,22 @@
               const minic = document.createElement('div');
               minic.className = 'carta mini ' + (c.joker ? 'joker-card' : c.suit === '♥' || c.suit === '♦' ? 'hearts' : 'spades');
               minic.dataset.cardIndex = cidx;
-              minic.innerHTML = c.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${c.rank}${c.suit}</div>`;
+              minic.innerHTML = cardFrontHTML(c);
 
               const me = state.players[myPlayerIndex];
               const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+              const isTrapped = cidx > 0 && cidx < meld.length - 1;
 
-              if (me && t.id === me.teamId && myTurn && state.hasDrawnThisTurn && isMovableTwoOrJoker(c)) {
+              if (me && t.id === me.teamId && myTurn && state.hasDrawnThisTurn && isMovableTwoOrJoker(c) && !isTrapped) {
                 minic.classList.add('wild-pickable');
                 if (movingWild && movingWild.fromTeamId === t.id && movingWild.fromMeldIndex === midx && movingWild.fromCardIndex === cidx) {
                   minic.classList.add('wild-picked');
                 }
-
                 minic.onclick = (ev) => {
-                  ev.stopPropagation(); // não troca selectedMeldTarget ao clicar na carta
+                  ev.stopPropagation();
                   pickWildFromMeld(t.id, midx, cidx);
                 };
               }
-
               row.appendChild(minic);
             });
 
@@ -3528,7 +3974,8 @@
               const closed = document.createElement('div');
               closed.className = 'carta mini canastra-fechada ' + (last.joker ? 'joker-card' : last.suit === '♥' || last.suit === '♦' ? 'hearts' : 'spades');
               closed.dataset.cardIndex = meld.length - 1;
-              closed.innerHTML = last.joker ? `<div class="carta-canto">★</div>` : `<div class="carta-canto">${last.rank}${last.suit}</div>`;
+              // Substitui o closed.innerHTML antigo por:
+              closed.innerHTML = cardFrontHTML(last);
 
               const me = state.players[myPlayerIndex];
               const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
@@ -3538,13 +3985,11 @@
                 if (movingWild && movingWild.fromTeamId === t.id && movingWild.fromMeldIndex === midx && movingWild.fromCardIndex === meld.length - 1) {
                   closed.classList.add('wild-picked');
                 }
-
                 closed.onclick = (ev) => {
                   ev.stopPropagation();
                   pickWildFromMeld(t.id, midx, meld.length - 1);
                 };
               }
-
               row.appendChild(closed);
             }
 
@@ -3568,14 +4013,51 @@
 
       function renderScores(scores, winner) {
         document.getElementById('scoreSection').style.display = 'flex';
+
+        // Reescreve o cabeçalho para incluir o modo de jogo
+        const scoreCard = document.querySelector('.score-card');
+        scoreCard.innerHTML = `
+          <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
+          <div style="font-size: 11px; color: #facc15; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">
+            MODO: ${state.mode === '1x1_duploMorto' ? '1x1 Humilhação' : state.mode} | REGRA: ${state.variant}
+          </div>
+          <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
+          <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
+        `;
+
         const board = document.getElementById('scoreBoard');
-        board.innerHTML = '';
+        document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
+
         scores.sort((a, b) => b.score - a.score);
+
         scores.forEach((s) => {
-          board.innerHTML += `<div style="margin-bottom:8px; border-bottom:1px solid #333; padding-bottom:4px;">
-              <strong style="color:${s.team.id === winner ? '#facc15' : '#fff'}">${s.team.name}</strong>: ${s.score} pts
-              <div style="font-size:10px; color:#aaa;">Mão: -${s.handPenalty} | Jogos: +${s.meldPoints} | Bônus: +${s.sujaBonus + s.limpaBonus + s.realBonus + s.asasBonus}</div>
-            </div>`;
+          const isWinner = s.team.id === winner;
+          const totalBonus = s.sujaBonus + s.limpaBonus + s.realBonus + s.asasBonus;
+
+          // Agrupa os nomes dos jogadores da equipa (ex: Biel e João)
+          const pNames = s.players.map((p) => p.name).join(' e ');
+
+          board.innerHTML += `
+            <div class="score-team ${isWinner ? 'winner' : ''}">
+              <div class="score-team-name">
+                ${isWinner ? '👑 ' : ''}${s.team.name} 
+                <span style="font-size: 12px; color: #9ca3af; font-weight: normal; margin-left: 6px;">(${pNames})</span>
+              </div>
+              
+              <div class="score-details">
+                <div class="score-row"><span>Cartas Baixadas:</span> <span class="text-green">+${s.meldPoints}</span></div>
+                <div class="score-row"><span>Bônus de Canastras:</span> <span class="text-green">+${totalBonus}</span></div>
+                ${s.bonusBatida > 0 ? `<div class="score-row"><span>Bônus de Batida:</span> <span class="text-green">+${s.bonusBatida}</span></div>` : ''}
+                
+                ${s.handPenalty > 0 ? `<div class="score-row"><span>Cartas na Mão:</span> <span class="text-red">-${s.handPenalty}</span></div>` : ''}
+                ${s.penaltyMorto > 0 ? `<div class="score-row"><span>Não pegou morto:</span> <span class="text-red">-${s.penaltyMorto}</span></div>` : ''}
+              </div>
+              
+              <div class="score-row total">
+                <span>PONTUAÇÃO FINAL:</span> <span>${s.score} pts</span>
+              </div>
+            </div>
+          `;
         });
       }
 
@@ -3585,20 +4067,16 @@
 
       function seatElForPlayer(pid) {
         if (pid === myPlayerIndex) return document.getElementById('handContainer');
-
         const total = state.players.length;
         const others = [];
         for (let i = 1; i < total; i++) others.push((myPlayerIndex + i) % total);
 
-        // mesmo mapeamento do renderOpponentHands()
         if (total === 2) return pid === others[0] ? document.getElementById('opponentTop') : null;
-
         if (total === 3) {
           if (pid === others[0]) return document.getElementById('opponentRight');
           if (pid === others[1]) return document.getElementById('opponentLeft');
           return null;
         }
-
         if (pid === others[0]) return document.getElementById('opponentRight');
         if (pid === others[1]) return document.getElementById('opponentTop');
         if (pid === others[2]) return document.getElementById('opponentLeft');
@@ -3609,7 +4087,6 @@
         const el = seatElForPlayer(pid);
         if (!el) return null;
         const r = el.getBoundingClientRect();
-        // um “ponto” de onde sai/entra carta no seat
         return { left: r.left + r.width * 0.5 - 20, top: r.top + 18, width: 40, height: 60 };
       }
 
@@ -3629,7 +4106,6 @@
 
         const fallbackCard = a.card || { rank: '★', suit: '★', joker: true, id: `rf_${Date.now()}` };
 
-        // helper pra “cair” várias com offsets
         const dropRects = (baseRect, count) => {
           const out = [];
           for (let i = 0; i < count; i++) {
@@ -3640,19 +4116,19 @@
 
         if (a.type === 'drawStock') {
           if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
-          impactAtRect(handRect); // ✅ era toRect inexistente
+          impactAtRect(handRect);
           return;
         }
 
         if (a.type === 'drawDiscard') {
           if (discardRect) await flyRectToRect(fallbackCard, discardRect, handRect, 'front');
-          impactAtRect(handRect); // ✅ era toRect inexistente
+          impactAtRect(handRect);
           return;
         }
 
         if (a.type === 'discard') {
           if (discardRect) await flyRectToRect(fallbackCard, handRect, discardRect, 'front');
-          impactAtRect(discardRect); // ✅ faísca onde caiu (no lixo)
+          impactAtRect(discardRect);
           return;
         }
 
@@ -3660,45 +4136,37 @@
           const fromEl = a.deadIndex === 1 || a.teamId === 1 ? dead1El : dead0El;
           const fromRect = fromEl ? getRect(fromEl) : null;
           if (fromRect) await flyRectToRect(fallbackCard, fromRect, handRect, 'back');
-          impactAtRect(handRect); // ✅
+          impactAtRect(handRect);
           return;
         }
 
         if (a.type === 'meldNew') {
-          // ✅ tenta cair no MELD CERTO se veio meldIndex
           let base = null;
-
           if (a.meldIndex != null && a.teamId != null) {
             const key = `${a.teamId}:${a.meldIndex}`;
-            base = meldDropRect(key, 0); // usa a trilha do jogo
+            base = meldDropRect(key, 0);
           }
-
-          // fallback se ainda não existir no DOM (raro)
           if (!base) {
             const container = document.getElementById((a.teamId ?? 0) === 0 ? 'meldsP1' : 'meldsP2');
             if (!container) return;
             const tr = container.getBoundingClientRect();
             base = { left: tr.left + tr.width - 30, top: tr.top + 10, width: 22, height: 30 };
           }
-
           const cards = a.cards && a.cards.length ? a.cards : [fallbackCard];
           const targets = dropRects(base, cards.length);
 
-          // ✅ ao mesmo tempo + faísca por carta
           await Promise.all(
             cards.map((c, i) => {
               c.id ||= `rm_${Date.now()}_${i}`;
               const toRect = targets[i];
               return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
-            })
+            }),
           );
-
           return;
         }
 
         if (a.type === 'meldExtend') {
           if (a.meldIndex == null || a.teamId == null) return;
-
           const key = `${a.teamId}:${a.meldIndex}`;
           const base = meldDropRect(key, 0);
           if (!base) return;
@@ -3706,21 +4174,18 @@
           const cards = a.cards && a.cards.length ? a.cards : [fallbackCard];
           const targets = dropRects(base, cards.length);
 
-          // ✅ ao mesmo tempo + faísca
           await Promise.all(
             cards.map((c, i) => {
               c.id ||= `re_${Date.now()}_${i}`;
               const toRect = targets[i];
               return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
-            })
+            }),
           );
-
           return;
         }
 
         if (a.type === 'meldMoveWild') {
           if (a.teamId == null || a.fromMeldIndex == null || a.toMeldIndex == null) return;
-
           const fromRect = meldCardsRect(a.teamId, a.fromMeldIndex) || meldDropRect(`${a.teamId}:${a.fromMeldIndex}`, 0);
           const toRect = meldDropRect(`${a.teamId}:${a.toMeldIndex}`, 0) || meldCardsRect(a.teamId, a.toMeldIndex);
           if (!fromRect || !toRect) return;
@@ -3736,49 +4201,57 @@
         if (!snap.exists()) {
           state = null;
           selectedHandIndexes.clear();
-          document.getElementById('configSection').style.display = 'block';
+
+          // LIMPEZA: Esconde mesa e o Placar (corrige o erro do X)
           document.getElementById('gameSection').style.display = 'none';
+          document.getElementById('scoreSection').style.display = 'none';
 
+          // SÓ mostra o menu se a introdução já tiver terminado
+          if (introFinished) {
+            document.getElementById('configSection').style.display = 'flex';
+          }
           resetCanastraSfxMemory();
-
           return;
         }
 
         const newState = JSON.parse(snap.data().stateJson);
-        state = newState;
 
-        // evita ficar “segurando” carta movível depois de atualização remota
+        //TOCA O SOM SE O JOGO ACABOU AGORA ---
+        if (state && !state.finished && newState.finished) {
+          playCanastraSfx('fim');
+        }
+
+        state = newState;
         movingWild = null;
 
-        syncCanastraSfxFromState();
-
         selectedHandIndexes.clear();
+
+        // Se o jogo existe, pula as intros direto para a mesa
         document.getElementById('configSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'flex';
+        startOverlay.style.display = 'none';
+        introVideo.style.display = 'none';
+        loadingScreen.style.display = 'none';
 
         renderAll();
         startTurnTimerIfNeeded();
 
         const a = state.lastAction;
         if (!a || a.id === lastSeenActionId) return;
-
         lastSeenActionId = a.id;
-
-        // evita “re-animar” no próprio client (porque você já animou localmente)
         if (a.id === ignoreOwnActionId) {
           ignoreOwnActionId = null;
           return;
         }
-
-        // anima pros outros
         await playRemoteAction(a);
+        syncCanastraSfxFromState();
       });
 
       document.getElementById('startBtn').onclick = () => {
         startGame(
           document.getElementById('modeSelect').value,
           [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
-          document.getElementById('variantSelect').value
+          document.getElementById('variantSelect').value,
         );
       };
 
