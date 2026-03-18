@@ -780,6 +780,93 @@
         visibility: hidden !important;
       }
 
+      /* ================= ESTÉTICA FINDOM (VALENDO PIX) - PREMIUM ================= */
+
+      /* REGRAS BASE DO LUXO (Deck Preto) */
+      body.is-betting .back-red,
+      body.is-betting .fly-card.back:not(.back-blue),
+      body.is-betting .opponent-card-back:not(.back-blue),
+      body.is-betting #mortoSlot0 .morto-card-back,
+      body.is-betting .morto-card-back:not(.back-blue),
+      body.is-betting .pile-card:not(.discard-pile):not(.back-blue),
+      body.is-betting .carta.mini.back:not(.back-blue) {
+        background-color: #0a0a0a !important;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230a0a0a' stroke='%23d4af37' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='65' fill='%23d4af37' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3E%24%3C/text%3E%3C/svg%3E"),
+          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px),
+          repeating-linear-gradient(-45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px) !important;
+        background-position:
+          center,
+          center,
+          0 0,
+          0 0 !important;
+        background-size:
+          85% auto,
+          100% 100%,
+          8px 8px,
+          8px 8px !important;
+        background-repeat: no-repeat, no-repeat, repeat, repeat !important;
+        border: 2px solid #d4af37 !important;
+        box-shadow:
+          inset 0 0 10px #000,
+          0 2px 5px rgba(0, 0, 0, 0.8) !important;
+      }
+
+      /* REGRAS BASE DO PIX (Deck Verde) */
+      body.is-betting .back-blue,
+      body.is-betting .fly-card.back.back-blue,
+      body.is-betting .opponent-card-back.back-blue,
+      body.is-betting #mortoSlot1 .morto-card-back,
+      body.is-betting .morto-card-back.back-blue,
+      body.is-betting .pile-card.back-blue,
+      body.is-betting .carta.mini.back.back-blue {
+        background-color: #022c22 !important;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,2 98,50 50,98 2,50' fill='%23022c22' stroke='%2310b981' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='35' fill='%2310b981' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPIX%3C/text%3E%3C/svg%3E"),
+          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px),
+          repeating-linear-gradient(-45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px) !important;
+        background-position:
+          center,
+          center,
+          0 0,
+          0 0 !important;
+        background-size:
+          85% auto,
+          100% 100%,
+          8px 8px,
+          8px 8px !important;
+        background-repeat: no-repeat, no-repeat, repeat, repeat !important;
+        border: 2px solid #10b981 !important;
+        box-shadow:
+          inset 0 0 10px #000,
+          0 2px 5px rgba(0, 0, 0, 0.8) !important;
+      }
+
+      /* SOBREPOSIÇÃO BLINDADA PARA O MONTE */
+      body.is-betting #drawStockBtn .pile-card {
+        background-size:
+          85% auto,
+          100% 100%,
+          8px 8px,
+          8px 8px !important;
+      }
+      body.is-betting #drawStockBtn .pile-card.back-blue {
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,2 98,50 50,98 2,50' fill='%23022c22' stroke='%2310b981' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='35' fill='%2310b981' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPIX%3C/text%3E%3C/svg%3E"),
+          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px),
+          repeating-linear-gradient(-45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px) !important;
+        background-color: #022c22 !important;
+        border: 2px solid #10b981 !important;
+      }
+      body.is-betting #drawStockBtn .pile-card:not(.back-blue) {
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230a0a0a' stroke='%23d4af37' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='65' fill='%23d4af37' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3E%24%3C/text%3E%3C/svg%3E"),
+          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px),
+          repeating-linear-gradient(-45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px) !important;
+        background-color: #0a0a0a !important;
+        border: 2px solid #d4af37 !important;
+      }
+
       /* Efeitos Especiais */
       .impact-ring {
         position: fixed;
@@ -3432,6 +3519,14 @@
         if (!state) return;
 
         applyViewTeamClass();
+
+        // Liga o visual FinDom se a partida estiver valendo PIX
+        if (state.isBetting) {
+          document.body.classList.add('is-betting');
+        } else {
+          document.body.classList.remove('is-betting');
+        }
+
         const badge = document.getElementById('gameModeBadge');
         if (badge) {
           let modeDisplay = state.mode;
