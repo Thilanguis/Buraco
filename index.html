@@ -136,17 +136,43 @@
         flex-direction: column;
         justify-content: center;
       }
+      /* Animação da carta sendo comprada/jogada */
+      @keyframes dealMenuCard {
+        0% { transform: translateY(-60px) rotateX(45deg); opacity: 0; }
+        100% { transform: translateY(0) rotateX(0); opacity: 1; }
+      }
+
       .section {
-        background: rgba(10, 10, 15, 0.5);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(250, 204, 21, 0.2);
-        border-radius: 16px;
+        position: relative;
+        background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+        border: 2px solid #d4af37; /* Borda dourada de carta premium */
+        border-radius: 12px;
         padding: 30px;
         max-width: 420px;
         margin: 0 auto;
         width: 100%;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), inset 0 0 15px rgba(0,0,0,0.8);
+        overflow: hidden;
+        animation: dealMenuCard 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      }
+
+      /* Marca d'água de Espadas gigante no fundo */
+      .section::before {
+        content: '♠';
+        position: absolute;
+        font-size: 400px;
+        color: rgba(212, 175, 55, 0.03);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* Traz os elementos pra cima da marca d'água */
+      .section-header, .section > div {
+        position: relative;
+        z-index: 1;
       }
       .section-header h2 {
         margin-top: 0;
@@ -156,6 +182,38 @@
         text-transform: uppercase;
         letter-spacing: 2px;
         text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      
+      .naipes {
+        display: flex;
+        gap: 5px;
+        font-size: 20px;
+      }
+      
+      .n-preto {
+        color: #000000; /* Preto sólido clássico */
+        /* Contorno branco rígido de 1px, sem desfoque (mata o efeito neon) */
+        text-shadow: 
+          -1px -1px 0 #ffffff,
+           1px -1px 0 #ffffff,
+          -1px  1px 0 #ffffff,
+           1px  1px 0 #ffffff,
+           0px  4px 6px rgba(0, 0, 0, 0.9); /* Sombra de profundidade */
+      }
+      
+      .n-vermelho {
+        color: #dc2626; 
+        /* Contorno branco bem sutil para manter a consistência com os pretos */
+        text-shadow: 
+          -1px -1px 0 rgba(255, 255, 255, 0.7),
+           1px -1px 0 rgba(255, 255, 255, 0.7),
+          -1px  1px 0 rgba(255, 255, 255, 0.7),
+           1px  1px 0 rgba(255, 255, 255, 0.7),
+           0px  4px 6px rgba(0, 0, 0, 0.9);
       }
       .section-header small {
         display: block;
@@ -169,7 +227,18 @@
         color: #cbd5e1;
         text-transform: uppercase;
         letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
+      
+      /* Adiciona um mini losango dourado do lado de cada label do menu */
+      label::before {
+        content: '♦';
+        color: #d4af37;
+        font-size: 10px;
+      }
+
       input,
       select {
         width: 100%;
@@ -177,16 +246,28 @@
         margin-top: 4px;
         margin-bottom: 12px;
         border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(0, 0, 0, 0.6);
+        /* Troca a borda branca por um ouro fosco */
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        /* Escurece o fundo e dá efeito de baixo-relevo (afundado no painel) */
+        background: rgba(0, 0, 0, 0.8);
+        box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.9);
         color: white;
         transition: all 0.3s;
+        color-scheme: dark; 
       }
+      
+      option {
+        background-color: #0f172a; 
+        color: #facc15; 
+        font-weight: 600;
+      }
+
       input:focus,
       select:focus {
         outline: none;
-        border-color: #facc15;
-        box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+        /* Acende o ouro quando o jogador clica na caixa */
+        border-color: #d4af37;
+        box-shadow: 0 0 12px rgba(212, 175, 55, 0.3), inset 0 3px 6px rgba(0, 0, 0, 0.9);
       }
       button {
         width: 100%;
@@ -1333,13 +1414,17 @@
       <div id="configSection">
         <div class="section">
           <div class="section-header">
-            <h2>Buraco</h2>
+            <h2>
+              <span class="naipes"><span class="n-preto">♠</span><span class="n-vermelho">♦</span></span>
+              BURACO
+              <span class="naipes"><span class="n-preto">♣</span><span class="n-vermelho">♦</span></span>
+            </h2>
             <small>Configuração da sala</small>
           </div>
           <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px">
             <div id="menuError" style="color: #ef4444; font-size: 12px; font-weight: bold; text-align: center; display: none"></div>
 
-            <label>
+           <label>
               Modo
               <select
                 id="modeSelect"
@@ -1355,6 +1440,25 @@
                 <option value="1x1_duploMorto">1x1 Humilhação</option>
               </select>
             </label>
+
+            <div id="humiliationRules" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; font-size: 11px; color: #fca5a5; line-height: 1.4">
+              <strong>Regras do 1x1 Humilhação:</strong>
+              <br />
+              - O
+              <strong style="color: #cbd5e1">Escravo (J1)</strong>
+              joga o buraco normal com 1 morto.
+              <br />
+              - O
+              <strong style="color: #facc15">Dominador (J2)</strong>
+              tem privilégios: possui
+              <strong>2 mortos</strong>
+              e puxa
+              <strong>2 cartas</strong>
+              de cada vez do monte!
+              <br />
+              - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
+            </div>
+
             <label>
               Regra
               <select id="variantSelect" required onchange="pushLobby()">
@@ -1401,24 +1505,6 @@
 
               <input id="betBase" type="hidden" value="5" />
               <input id="betPerPoint" type="hidden" value="0.01" />
-            </div>
-
-            <div id="humiliationRules" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; font-size: 11px; color: #fca5a5; line-height: 1.4">
-              <strong>Regras do 1x1 Humilhação:</strong>
-              <br />
-              - O
-              <strong style="color: #cbd5e1">Escravo (J1)</strong>
-              joga o buraco normal com 1 morto.
-              <br />
-              - O
-              <strong style="color: #facc15">Dominador (J2)</strong>
-              tem privilégios: possui
-              <strong>2 mortos</strong>
-              e puxa
-              <strong>2 cartas</strong>
-              de cada vez do monte!
-              <br />
-              - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
             </div>
 
             <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
@@ -4774,6 +4860,9 @@
           opt2.disabled = true;
           opt3.hidden = true;
           opt3.disabled = true;
+          
+          // Reativa o quadro de aviso de regras
+          humiliationRules.style.display = 'block';
         }
 
         // 3. Se a opção que o usuário já tinha escolhido foi desativada, limpa a seleção
