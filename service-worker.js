@@ -1,7 +1,7 @@
-const CACHE_NAME = 'buraco-v26';
+const CACHE_NAME = 'buraco-v27';
 
-// Coloca aqui os arquivos estáticos que você quer cachear
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
+// Removido o "/icons/" do caminho das imagens
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 // Instala: faz pré-cache dos assets
 self.addEventListener('install', (event) => {

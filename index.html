@@ -1050,8 +1050,10 @@
         background: rgba(0, 0, 0, 0.95);
         z-index: 200;
         display: flex;
-        align-items: center;
+        align-items: flex-start; /* Mudado de center para permitir rolagem */
         justify-content: center;
+        overflow-y: auto; /* Ativa a barra de rolagem */
+        padding: 40px 0; /* Desgruda do topo e do fundo */
       }
       .score-card {
         background: rgba(15, 23, 42, 0.98);
@@ -1065,6 +1067,7 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+        margin: auto; /* Centraliza a caixa automaticamente se a tela for grande */
       }
       .score-team {
         padding: 12px 16px;
@@ -1480,6 +1483,19 @@
       </div>
 
       <div id="gameSection">
+        
+        <div id="debugPanel" style="display: none; position: absolute; top: 60px; left: 10px; background: rgba(0,0,0,0.9); border: 1px dashed #facc15; padding: 10px; z-index: 99999; border-radius: 8px; flex-direction: column; gap: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.8);">
+           <div style="color: #facc15; font-weight: 900; font-size: 10px; text-transform: uppercase; margin-bottom: 5px; text-align: center;">🔧 Dev Tools</div>
+           <button onclick="debugDraw30()" style="font-size: 10px; padding: 6px; background: #3b82f6;">+30 Cartas</button>
+           <button onclick="debugMeld('suja')" style="font-size: 10px; padding: 6px; background: #ef4444;">Canastra Suja</button>
+           <button onclick="debugMeld('limpa')" style="font-size: 10px; padding: 6px; background: #22c55e;">Canastra Limpa</button>
+           <button onclick="debugMeld('real')" style="font-size: 10px; padding: 6px; background: #eab308; color: #000;">Canastra Real</button>
+           <button onclick="debugMeld('asas')" style="font-size: 10px; padding: 6px; background: #8b5cf6;">Canastra Ás-a-Ás</button>
+           <button onclick="debugSetupDead()" style="font-size: 10px; padding: 6px; background: #0f766e;">Prep: Pegar Morto</button>
+           <button onclick="debugSetupWin()" style="font-size: 10px; padding: 6px; background: #1d4ed8;">Prep: Bater</button>
+           <button onclick="debugEndGame()" style="font-size: 10px; padding: 6px; background: #000; border: 1px solid #ef4444; margin-top: 5px;">Terminar Jogo</button>
+        </div>
+
         <div class="board">
           <div class="board-top">
             <div>
@@ -1570,6 +1586,7 @@
               <button id="moveWildBtn">↔️ Mover 2/Joker</button>
               <button id="discardBtn">🗑️ Descartar</button>
               <button id="takeDeadBtn">💀 Morto</button>
+              <button id="showScoreBtn" style="display: none; background: #facc15; color: #000; font-weight: 900">🏆 PLACAR</button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
             </div>
 
@@ -1577,8 +1594,6 @@
               <div class="cards-row"></div>
             </div>
           </div>
-        </div>
-      </div>
 
       <div id="scoreSection" style="display: none">
         <div class="score-card">
@@ -2531,10 +2546,31 @@
         updateTimerLabel();
 
         turnTimerId = setInterval(() => {
+          if (window.isAutoPlaying) return; // Pausa o relógio se estiver processando
+          
           turnTimerRemaining--;
+          
           if (turnTimerRemaining <= 0) {
             stopTurnTimer();
-            if (state.currentPlayer === myPlayerIndex) autoPlayTimeout().catch(console.error);
+            if (state.currentPlayer === myPlayerIndex) {
+              
+              // TRAVA DE 2.5s PARA EVITAR RACE CONDITION (DUPLO DESCARTE)
+              window.isAutoPlaying = true;
+              showMessage('Tempo esgotado. Processando Auto-play...');
+              document.querySelector('.player-interface').style.pointerEvents = 'none';
+              document.querySelector('.board-middle').style.pointerEvents = 'none';
+              
+              setTimeout(() => {
+                // Checa se ainda é a vez dele depois do delay (pode ter jogado no milissegundo final)
+                if (!state.finished && state.currentPlayer === myPlayerIndex) {
+                   autoPlayTimeout().catch(console.error);
+                } else {
+                   window.isAutoPlaying = false;
+                   renderAll(); // Restaura a UI
+                }
+              }, 2500);
+
+            }
           } else {
             updateTimerLabel();
             if (turnTimerRemaining <= 10 && state.currentPlayer === myPlayerIndex) {
@@ -2667,7 +2703,15 @@
         });
         for (let t = 0; t < 2; t++) {
           const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
-          teams.push({ id: t, name: t === 0 ? 'Time 1' : 'Time 2', playerIndexes, melds: [] });
+          let tName = t === 0 ? 'Time 1' : 'Time 2';
+          
+          if (mode === '1x1_duploMorto') {
+            tName = t === 0 ? 'Escravo' : '👑 Dominador';
+          } else if (mode === '1x2') {
+            tName = t === 0 ? 'Solo' : 'Dupla';
+          }
+          
+          teams.push({ id: t, name: tName, playerIndexes, melds: [] });
         }
         let stock = shuffle(createDeck());
         const discard = [];
@@ -2848,10 +2892,17 @@
 
       async function drawFromDiscard() {
         if (!ensureMyTurn()) return;
+
+        // NOVO: Se já comprou, o clique no lixo funciona como botão de Descartar
         if (state.hasDrawnThisTurn) {
-          showMessage('Já comprou.');
+          if (selectedHandIndexes.size === 1) {
+            discardSelectedCard();
+          } else {
+            showMessage('Selecione 1 carta na mão para descartar no lixo.');
+          }
           return;
         }
+
         if (!state.stock.length && !hasAnyDeadToRecycle()) {
           showMessage('Monte acabou. Fim de jogo.');
           await finishGame(null);
@@ -2869,13 +2920,12 @@
         const hand = me.hand;
 
         // =========================================================
-        // NOVA LÓGICA: BURACO FECHADO DIRETO DA MESA
+        // LÓGICA: BURACO FECHADO DIRETO DA MESA
         // =========================================================
         if (state.variant === 'fechado') {
           const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
           const selectedCards = indexes.map((i) => hand[i]);
 
-          // Limpa qualquer sujeira de coringa das cartas selecionadas
           selectedCards.forEach((c) => {
             c.forceNatural = false;
             c.forceWild = false;
@@ -2884,48 +2934,47 @@
           let isNewMeld = false;
           let extendedMeldIndex = -1;
 
-          // 1. Tenta formar um NOVO JOGO (Mínimo 2 cartas da mão + Topo do Lixo)
+          // 1. Tenta formar um NOVO JOGO
           if (selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
             isNewMeld = true;
-          } else {
-            // 2. Tenta adicionar a um JOGO EXISTENTE
-            let targetIndexes = [];
-            if (selectedMeldTarget) {
-              const [tId, mIdx] = selectedMeldTarget.split(':');
-              if (parseInt(tId) === team.id) targetIndexes.push(parseInt(mIdx));
-            } else {
-              team.melds.forEach((m, i) => targetIndexes.push(i));
-            }
-
-            for (const mIdx of targetIndexes) {
-              const testMeld = [...team.melds[mIdx], ...selectedCards, top];
-              if (isValidSequenceMeld(testMeld)) {
-                extendedMeldIndex = mIdx;
-                break;
-              }
-            }
           }
 
-          // Se não encaixa em nada, avisa e bloqueia a compra
-          if (!isNewMeld && extendedMeldIndex === -1) {
-            showMessage('FECHADO: Selecione na mão as cartas que formam jogo com o lixo!');
-            return;
+          // 2. Tenta adicionar a um JOGO EXISTENTE
+          let validExtensions = [];
+          let targetIndexes = [];
+
+          if (selectedMeldTarget) {
+            const [tId, mIdx] = selectedMeldTarget.split(':');
+            if (parseInt(tId) === team.id) targetIndexes.push(parseInt(mIdx));
+          } else {
+            team.melds.forEach((m, i) => targetIndexes.push(i));
+          }
+
+          for (const mIdx of targetIndexes) {
+            const testMeld = [...team.melds[mIdx], ...selectedCards, top];
+            if (isValidSequenceMeld(testMeld)) validExtensions.push(mIdx);
+          }
+
+          if (!isNewMeld) {
+            if (validExtensions.length === 0) {
+              showMessage('FECHADO: Selecione na mão as cartas que formam jogo com o lixo!');
+              return;
+            } else if (validExtensions.length > 1 && !selectedMeldTarget) {
+              // NOVO: Trava de ambiguidade se houver múltiplos jogos compatíveis
+              showMessage('Encaixa em vários jogos. Selecione o destino na mesa primeiro!');
+              return;
+            } else {
+              extendedMeldIndex = validExtensions[0];
+            }
           }
 
           // --- SE ENCAIXOU, FAZ A MÁGICA ---
-          // Arranca o lixo todo da mesa
           const pile = state.discard.splice(0, state.discard.length);
           pile.forEach(ensureCardId);
-
-          // Separa o topo (que vai pra mesa) do resto do lixo (que vai pra mão)
           const topCard = pile.pop();
 
-          // Tira as cartas selecionadas da mão do jogador
-          for (const idx of indexes) {
-            hand.splice(idx, 1);
-          }
+          for (const idx of indexes) hand.splice(idx, 1);
 
-          // Monta o jogo na mesa!
           const finalMeldCards = [...selectedCards, topCard];
           if (isNewMeld) {
             optimizeMeld(finalMeldCards);
@@ -2940,13 +2989,11 @@
             normalizeMeldOrder(team.melds[extendedMeldIndex]);
           }
 
-          // O que sobrou embaixo do lixo vai pra mão do jogador
           if (pile.length > 0) {
             hand.push(...pile);
             sortHand(hand);
           }
 
-          // Regra da Puxada Parcial (1x1 Humilhação)
           if (state.mode === '1x1_duploMorto' && state.currentPlayer === 1 && !state.partialDraw) {
             state.partialDraw = true;
             showMessage('Lixo baixado direto! Compre 1 carta do monte!');
@@ -2955,13 +3002,11 @@
             state.partialDraw = false;
           }
 
-          // Reseta todas as travas e seleções. O BUG DA CARTA GÊMEA MORRE AQUI!
           state.pickedDiscardCardId = null;
           state.requiredDiscardCard = null;
           selectedHandIndexes.clear();
           selectedMeldTarget = null;
 
-          // Brilha as cartas que vieram de baixo do lixo pra mão
           if (!state.boughtCardIds) state.boughtCardIds = [];
           pile.forEach((c) => state.boughtCardIds.push(c.id));
 
@@ -2981,7 +3026,7 @@
         }
 
         // =========================================================
-        // LÓGICA: BURACO ABERTO (Pega tudo pra mão)
+        // LÓGICA: BURACO ABERTO
         // =========================================================
         const pile = state.discard.splice(0, state.discard.length);
         pile.forEach(ensureCardId);
@@ -3000,7 +3045,6 @@
           state.partialDraw = false;
         }
 
-        // No modo aberto, ele trava apenas a carta do topo para não ser descartada na mesma rodada
         state.pickedDiscardCardId = top.id;
         state.requiredDiscardCard = null;
         selectedHandIndexes.clear();
@@ -3159,12 +3203,12 @@
             return false;
           }
 
-          const isLastCards = hand.length === indexes.length;
-          if (isLastCards && !canTeamTakeDeadNow(team.id)) {
+          const cardsLeft = hand.length - indexes.length;
+          if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(team.id)) {
             const hasCanasta = teamHasGoodCanastra(team.id);
             const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(combined).kind);
             if (!hasCanasta && !willCreateCanastra) {
-              showMessage('❌ Você não pode esvaziar a mão sem ter uma canastra!');
+              showMessage(`❌ Você não pode ficar com ${cardsLeft} carta(s) sem ter canastra limpa!`);
               return false;
             }
           }
@@ -3229,12 +3273,12 @@
         const teamMeld = team.melds[candidateMeldIndexes[0]];
         const combinedCheck = teamMeld.concat(cards);
 
-        const isLastCards = hand.length === indexes.length;
-        if (isLastCards && !canTeamTakeDeadNow(team.id)) {
+        const cardsLeft = hand.length - indexes.length;
+        if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(team.id)) {
           const hasCanasta = teamHasGoodCanastra(team.id);
           const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(combinedCheck).kind);
           if (!hasCanasta && !willCreateCanastra) {
-            showMessage('❌ Você não pode esvaziar a mão sem ter uma canastra!');
+            showMessage(`❌ Você não pode ficar com ${cardsLeft} carta(s) sem ter canastra limpa!`);
             return false;
           }
         }
@@ -3308,12 +3352,12 @@
         }
 
         const teamId = currentTeam().id;
-        const isLastCards = hand.length === indexes.length;
-        if (isLastCards && !canTeamTakeDeadNow(teamId)) {
+        const cardsLeft = hand.length - indexes.length;
+        if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(teamId)) {
           const hasCanasta = teamHasGoodCanastra(teamId);
           const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(cards).kind);
           if (!hasCanasta && !willCreateCanastra) {
-            showMessage('❌ Você não pode esvaziar a mão sem ter uma canastra!');
+            showMessage(`❌ Você não pode ficar com ${cardsLeft} carta(s) sem ter canastra limpa!`);
             return;
           }
         }
@@ -3477,6 +3521,14 @@
 
         const index = indexes[0];
         const card = hand[index];
+        
+        // TRAVA ANTI-GHOST CLICK: Se a carta não existir, aborta sem dar erro
+        if (!card) {
+          selectedHandIndexes.clear();
+          renderHand();
+          return;
+        }
+        
         ensureCardId(card);
 
         // TRAVA ANTI-CLONE: Limpa a seleção na mesma hora para ignorar cliques extras
@@ -3487,7 +3539,20 @@
           return;
         }
 
-        const teamId = p.teamId;
+       const teamId = p.teamId;
+
+        // ==============================================================
+        // TRAVA DA BATIDA: Bloqueia o descarte da última carta sem canastra
+        // ==============================================================
+        if (hand.length === 1 && !canTeamTakeDeadNow(teamId)) {
+          if (!teamHasGoodCanastra(teamId)) {
+            showMessage('❌ Você não pode bater sem ter uma canastra limpa!');
+            selectedHandIndexes.clear();
+            renderHand();
+            return; // Aborta o descarte
+          }
+        }
+
         const fromEl = cardElById(card.id);
         const toEl = document.querySelector('#drawDiscardBtn .pile-card');
 
@@ -3680,18 +3745,44 @@
         });
         return results;
       }
-
+      
+      // Função que encerra a partida
       async function finishGame(winnerTeamId) {
-        if (!state) return;
+        if (!state || state.finished) return;
         state.finished = true;
-        state.winnerTeamId = winnerTeamId ?? null;
+        state.winnerTeamId = winnerTeamId;
+
+        state.lastAction = {
+          id: newActionId(),
+          type: 'endGame',
+          playerId: myPlayerIndex,
+          ts: Date.now(),
+        };
+        ignoreOwnActionId = state.lastAction.id;
+
+        renderAll();
         await commitState();
       }
 
       function renderAll() {
         if (!state) return;
 
+        // Garante que a UI sempre destrave ao receber novo estado
+        window.isAutoPlaying = false;
+        const pi = document.querySelector('.player-interface');
+        const bm = document.querySelector('.board-middle');
+        if (pi) pi.style.pointerEvents = 'auto';
+        if (bm) bm.style.pointerEvents = 'auto';
+
+        // TRAVA DO DEVTOOLS: Força a exibição sempre que renderizar a mesa
+        const debugPanel = document.getElementById('debugPanel');
+        if (debugPanel) {
+          const isDebug = window.location.search.includes('debug=1') || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+          debugPanel.style.display = isDebug ? 'flex' : 'none';
+        }
+
         applyViewTeamClass();
+        // ... (resto da função continua igual)
 
         // Liga o visual FinDom se a partida estiver valendo PIX
         if (state.isBetting) {
@@ -3787,8 +3878,11 @@
         document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
         document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn ? '1' : '0.5';
 
-        document.getElementById('drawDiscardBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn && state.discard.length ? 'auto' : 'none';
-        document.getElementById('drawDiscardBtn').style.opacity = myTurn && !state.hasDrawnThisTurn && state.discard.length ? '1' : '0.5';
+        // NOVO: Libera o clique no lixo tanto para comprar quanto para descartar
+        const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && state.discard.length;
+        const canDiscardToPile = myTurn && state.hasDrawnThisTurn;
+        document.getElementById('drawDiscardBtn').style.pointerEvents = canDrawDiscard || canDiscardToPile ? 'auto' : 'none';
+        document.getElementById('drawDiscardBtn').style.opacity = canDrawDiscard || canDiscardToPile ? '1' : '0.5';
 
         document.getElementById('meldBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
         document.getElementById('discardBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
@@ -3800,6 +3894,14 @@
         const canTakeDeadBtn = myTurn && me && me.hand.length === 0 && canTeamTakeDeadNow(myTeamId);
         document.getElementById('takeDeadBtn').disabled = !canTakeDeadBtn;
         document.getElementById('endGameBtn').disabled = false;
+
+        // Oculta os botões de ação e exibe o botão de Placar se o jogo acabou
+        const isFin = !!state.finished;
+        document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
+        document.getElementById('meldBtn').style.display = isFin ? 'none' : 'block';
+        document.getElementById('discardBtn').style.display = isFin ? 'none' : 'block';
+        document.getElementById('takeDeadBtn').style.display = isFin ? 'none' : 'block';
+        document.getElementById('moveWildBtn').style.display = isFin ? 'none' : 'block';
 
         if (state.finished) renderScores(computeScores(), state.winnerTeamId);
 
@@ -4134,6 +4236,19 @@
       function renderScores(scores, winner) {
         document.getElementById('scoreSection').style.display = 'flex';
 
+        // Motor de Criptografia do Banco Central (BR Code)
+        const generatePixPayload = (key, amount) => {
+          const f = (id, val) => id + String(val.length).padStart(2, '0') + val;
+          const payloadKey = f('00', 'BR.GOV.BCB.PIX') + f('01', key);
+          let p = f('00', '01') + f('01', '11') + f('26', payloadKey) + f('52', '0000') + f('53', '986') + f('54', parseFloat(amount).toFixed(2)) + f('58', 'BR') + f('59', 'Buraco Findom') + f('60', 'Brasil') + f('62', f('05', '***')) + '6304';
+          let crc = 0xffff;
+          for (let i = 0; i < p.length; i++) {
+            crc ^= p.charCodeAt(i) << 8;
+            for (let j = 0; j < 8; j++) crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
+          }
+          return p + (crc & 0xffff).toString(16).toUpperCase().padStart(4, '0');
+        };
+
         const scoreCard = document.querySelector('.score-card');
         scoreCard.innerHTML = `
           <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
@@ -4182,15 +4297,21 @@
               // Tela de quem perdeu (A Fatura)
               let pixHtml = '';
               if (winnerPix) {
-                // Monta o texto pronto para o WhatsApp
+                // Gera o Payload Oficial e puxa a imagem da API
+                const pixBRCode = generatePixPayload(winnerPix, totalMoney);
+                const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(pixBRCode)}`;
+
                 const zapText = encodeURIComponent(`Fatura do Buraco Findom! 👑 Você perdeu e me deve R$ ${moneyStr}. Faz o PIX aí na chave: ${winnerPix}`);
 
                 pixHtml = `
-                  <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid #334155;">
-                    <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Chave PIX do Vencedor:</div>
-                    <div style="color: #facc15; font-weight: 900; font-size: 14px; letter-spacing: 1px; user-select: all; cursor: copy;" title="Selecionar para copiar">${winnerPix}</div>
+                  <div style="margin-top: 10px; padding: 15px 10px 10px 10px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid #334155; display: flex; flex-direction: column; align-items: center;">
                     
-                    <a href="https://wa.me/?text=${zapText}" target="_blank" style="display: block; margin-top: 10px; background: #25D366; color: #fff; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: 900; font-size: 12px; text-transform: uppercase; transition: 0.3s; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
+                    <img src="${qrCodeUrl}" style="border-radius: 8px; border: 4px solid #fff; margin-bottom: 12px; width: 140px; height: 140px; box-shadow: 0 4px 10px rgba(0,0,0,0.8);" alt="QR Code PIX">
+                    
+                    <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Ou copie a Chave PIX:</div>
+                    <div style="color: #facc15; font-weight: 900; font-size: 14px; letter-spacing: 1px; user-select: all; cursor: copy; margin-bottom: 15px; padding: 4px 8px; background: rgba(250, 204, 21, 0.1); border: 1px dashed #facc15; border-radius: 4px;" title="Selecionar para copiar">${winnerPix}</div>
+                    
+                    <a href="https://wa.me/?text=${zapText}" target="_blank" style="width: 100%; text-align: center; display: block; background: #25D366; color: #fff; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: 900; font-size: 12px; text-transform: uppercase; transition: 0.3s; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
                       📲 Cobrar pelo WhatsApp
                     </a>
                   </div>
@@ -4199,9 +4320,15 @@
                 pixHtml = `<div style="margin-top: 10px; font-size: 10px; color: #9ca3af; font-style: italic;">O vencedor não cadastrou chave PIX. Calote liberado?</div>`;
               }
 
+              // Define o título da fatura dinamicamente com base em quem perdeu
+              let titleFatura = 'FATURA';
+              if (s.team.name === 'Escravo') titleFatura = 'FATURA DO ESCRAVO';
+              else if (s.team.name.includes('Dominador')) titleFatura = 'FATURA DO DOMINADOR';
+              else titleFatura = `FATURA DO ${s.team.name.toUpperCase()}`;
+
               financialHtml = `
                 <div style="margin-top: 15px; padding: 12px; background: rgba(239, 68, 68, 0.15); border: 1px dashed #ef4444; border-radius: 8px;">
-                  <div style="color: #ef4444; font-size: 10px; letter-spacing: 2px; margin-bottom: 5px; font-weight: bold;">FATURA DO CAPACHO</div>
+                  <div style="color: #ef4444; font-size: 10px; letter-spacing: 2px; margin-bottom: 5px; font-weight: bold;">${titleFatura}</div>
                   <span style="color: #fca5a5; font-weight: 900; font-size: 20px;">PAGUE: R$ ${moneyStr}</span>
                   ${pixHtml}
                 </div>
@@ -4516,7 +4643,7 @@
         await playRemoteAction(a);
       });
 
-      function pushLobby() {
+      window.pushLobby = function () {
         const mode = document.getElementById('modeSelect').value;
         const resetReady = currentLobby && currentLobby.mode !== mode;
         const lobby = {
@@ -4534,7 +4661,7 @@
         else if (resetReady) lobby.ready = [false, false, false, false];
 
         setDoc(gameRef, { lobby: lobby, updatedAt: Date.now() }, { merge: true });
-      }
+      };
 
       document.querySelectorAll('#configSection input, #configSection select').forEach((el) => {
         if (el.id !== 'localPlayerSelect') {
@@ -4663,6 +4790,93 @@
         document.getElementById('p4Pix').style.display = isBetting ? 'block' : 'none';
       };
 
+      // ==========================================
+      // MOTOR DE DEBUG / DEVTOOLS
+      // ==========================================
+      const isDebugMode = urlParams.get('debug') === '1' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+      if (isDebugMode) document.getElementById('debugPanel').style.display = 'flex';
+
+      window.debugDraw30 = async () => {
+        if (!ensureMyTurn()) return;
+        const me = currentPlayer();
+        // Compra 30 ou o que sobrar no monte
+        const limit = Math.min(30, state.stock.length);
+        for (let i = 0; i < limit; i++) {
+          const c = state.stock.pop();
+          ensureCardId(c);
+          me.hand.push(c);
+        }
+        sortHand(me.hand);
+        renderAll();
+        await commitState();
+      };
+
+      window.debugEndGame = async () => {
+        if (!ensureMyTurn()) return;
+        await finishGame(currentTeam().id);
+      };
+
+      window.debugMeld = async (type) => {
+        if (!ensureMyTurn()) return;
+        const team = currentTeam();
+        let meld = [];
+        const mkCard = (r, s, j) => ({ rank: r, suit: s, joker: j, id: `db_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, back: 'red' });
+
+        if (type === 'suja') {
+          meld = [mkCard('4', '♥', false), mkCard('5', '♥', false), mkCard('6', '♥', false), mkCard('7', '♥', false), mkCard('8', '♥', false), mkCard('9', '♥', false), mkCard('JOKER', '★', true)];
+        } else if (type === 'limpa') {
+          meld = [mkCard('4', '♠', false), mkCard('5', '♠', false), mkCard('6', '♠', false), mkCard('7', '♠', false), mkCard('8', '♠', false), mkCard('9', '♠', false), mkCard('10', '♠', false)];
+        } else if (type === 'real') {
+          ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'].forEach((r) => meld.push(mkCard(r, '♦', false)));
+        } else if (type === 'asas') {
+          ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'].forEach((r) => meld.push(mkCard(r, '♣', false)));
+        }
+
+        optimizeMeld(meld);
+        normalizeMeldOrder(meld);
+        team.melds.push(meld);
+        renderAll();
+        await commitState();
+      };
+
+      window.debugSetupDead = async () => {
+        if (!ensureMyTurn()) return;
+        const me = currentPlayer();
+        const teamId = me.teamId;
+        
+        // Trava para respeitar as regras do jogo fora do debug
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+        if (taken >= max) {
+          showMessage('SEU TIME JÁ PEGOU O MÁXIMO DE MORTOS!');
+          return;
+        }
+
+        // Esvazia a mão e deixa 1 carta. Marca que já comprou pra liberar o descarte.
+        me.hand = [ { rank: '4', suit: '♣', joker: false, id: `db_${Date.now()}`, back: 'red' } ];
+        state.hasDrawnThisTurn = true;
+        renderAll();
+        await commitState();
+        showMessage('Descarte a única carta para pegar o morto.');
+      };
+
+      window.debugSetupWin = async () => {
+        if (!ensureMyTurn()) return;
+        const me = currentPlayer();
+        const team = currentTeam();
+
+        // 1. Trava o sistema dizendo que a equipe já pegou o morto máximo permitido
+        state.deadChunksTaken[team.id] = state.deadChunksMax[team.id];
+
+        // 2. Deixa só 1 carta na mão e libera o botão de descarte
+        me.hand = [{ rank: 'K', suit: '♥', joker: false, id: `db_${Date.now()}_k`, back: 'red' }];
+        state.hasDrawnThisTurn = true;
+
+        renderAll();
+        await commitState();
+        showMessage('Tente bater sem canastra para ver o bloqueio!');
+      };
+
       // VALIDAÇÃO E ENVIO DO "ESTOU PRONTO"
       document.getElementById('startBtn').onclick = () => {
         const errorDiv = document.getElementById('menuError');
@@ -4763,6 +4977,8 @@
       document.getElementById('takeDeadBtn').onclick = takeDead;
       document.getElementById('endGameBtn').onclick = () => deleteDoc(gameRef);
       document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
+      // Abre o placar manualmente pela mesa
+      document.getElementById('showScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'flex');
 
       // Ação do botão de convite
       document.getElementById('inviteBtn').onclick = async () => {
