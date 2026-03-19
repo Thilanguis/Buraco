@@ -1333,25 +1333,36 @@
             <small>Configuração da sala</small>
           </div>
           <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px">
+            <div id="menuError" style="color: #ef4444; font-size: 12px; font-weight: bold; text-align: center; display: none"></div>
+
             <label>
               Modo
-              <select id="modeSelect">
-                <option value="1x1">1x1</option>
-                <option value="2x2">2x2</option>
-                <option value="1x2">1x2</option>
+              <select
+                id="modeSelect"
+                required
+                onchange="
+                  updateMenuDynamic();
+                  pushLobby();
+                ">
+                <option value="" disabled selected>Selecione...</option>
+                <option value="1x1">1x1 Clássico</option>
+                <option value="2x2">2x2 Clássico</option>
+                <option value="1x2">1x2 (Solo vs Dupla)</option>
                 <option value="1x1_duploMorto">1x1 Humilhação</option>
               </select>
             </label>
             <label>
               Regra
-              <select id="variantSelect">
+              <select id="variantSelect" required onchange="pushLobby()">
+                <option value="" disabled selected>Selecione...</option>
                 <option value="aberto">Aberto</option>
                 <option value="fechado">Fechado</option>
               </select>
             </label>
             <label>
               Sou
-              <select id="localPlayerSelect">
+              <select id="localPlayerSelect" required>
+                <option value="" disabled selected>Selecione...</option>
                 <option value="0">Jogador 1</option>
                 <option value="1">Jogador 2</option>
                 <option value="2">Jogador 3</option>
@@ -1361,43 +1372,100 @@
 
             <label style="margin-top: 10px; color: #facc15; font-weight: bold">
               Valendo dinheiro?
-              <select id="betToggle" onchange="document.getElementById('betConfig').style.display = this.value === 'sim' ? 'grid' : 'none'">
+              <select
+                id="betToggle"
+                required
+                onchange="
+                  document.getElementById('betConfig').style.display = this.value === 'sim' ? 'block' : 'none';
+                  pushLobby();
+                ">
+                <option value="" disabled selected>Selecione...</option>
                 <option value="nao">Não</option>
                 <option value="sim">Sim</option>
               </select>
             </label>
 
-            <div id="betConfig" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; margin-top: 5px">
-              <label>
-                Prémio Vitória (R$)
-                <input id="betBase" type="number" step="1" value="5" />
-              </label>
-              <label>
-                Valor por Ponto (R$)
-                <input id="betPerPoint" type="number" step="0.01" value="0.01" />
-              </label>
+            <div id="betConfig" style="display: none; background: rgba(34, 197, 94, 0.15); border: 1px dashed #22c55e; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; text-align: center; line-height: 1.5">
+              <strong style="color: #4ade80; font-size: 12px; text-transform: uppercase; letter-spacing: 1px">💰 Valores Oficiais da Mesa</strong>
+              <br />
+              <span style="color: #bbf7d0; font-size: 11px">
+                Vitória:
+                <strong>R$ 5,00</strong>
+                | Diferença:
+                <strong>R$ 0,01 / pt</strong>
+              </span>
+
+              <input id="betBase" type="hidden" value="5" />
+              <input id="betPerPoint" type="hidden" value="0.01" />
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
-              <div style="position: relative; margin-top: 4px; margin-bottom: 12px">
-                <input id="p1Name" value="Jogador 1" placeholder="Nome J1" style="margin: 0; padding-right: 35px" />
-                <span id="ready0" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; font-size: 16px">✅</span>
+            <div id="humiliationRules" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; font-size: 11px; color: #fca5a5; line-height: 1.4">
+              <strong>Regras do 1x1 Humilhação:</strong>
+              <br />
+              - O
+              <strong style="color: #cbd5e1">Escravo (J1)</strong>
+              joga o buraco normal com 1 morto.
+              <br />
+              - O
+              <strong style="color: #facc15">Dominador (J2)</strong>
+              tem privilégios: possui
+              <strong>2 mortos</strong>
+              e puxa
+              <strong>2 cartas</strong>
+              de cada vez do monte!
+              <br />
+              - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
+            </div>
+
+            <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
+              <div id="boxP1" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                <label id="lblP1" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 1</label>
+                <input id="p1Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                <input id="p1Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
+                <span id="ready0" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
-              <div style="position: relative; margin-top: 4px; margin-bottom: 12px">
-                <input id="p2Name" value="Jogador 2" placeholder="Nome J2" style="margin: 0; padding-right: 35px" />
-                <span id="ready1" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; font-size: 16px">✅</span>
+              <div id="boxP2" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                <label id="lblP2" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 2</label>
+                <input id="p2Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                <input id="p2Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
+                <span id="ready1" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
-              <div style="position: relative; margin-top: 4px; margin-bottom: 12px">
-                <input id="p3Name" value="Jogador 3" placeholder="Nome J3" style="margin: 0; padding-right: 35px" />
-                <span id="ready2" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; font-size: 16px">✅</span>
+              <div id="boxP3" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                <label id="lblP3" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 3</label>
+                <input id="p3Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                <input id="p3Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
+                <span id="ready2" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
-              <div style="position: relative; margin-top: 4px; margin-bottom: 12px">
-                <input id="p4Name" value="Jogador 4" placeholder="Nome J4" style="margin: 0; padding-right: 35px" />
-                <span id="ready3" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; font-size: 16px">✅</span>
+              <div id="boxP4" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                <label id="lblP4" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 4</label>
+                <input id="p4Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                <input id="p4Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
+                <span id="ready3" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
             </div>
 
-            <button id="startBtn" style="margin-top: 10px">INICIAR JOGO</button>
+            <button
+              id="inviteBtn"
+              style="
+                width: 100%;
+                padding: 12px;
+                border-radius: 12px;
+                border: 1px dashed #3b82f6;
+                font-weight: 900;
+                cursor: pointer;
+                background: rgba(37, 99, 235, 0.15);
+                color: #60a5fa;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                margin-top: 15px;
+                transition: all 0.3s;
+              ">
+              📲 CONVIDAR JOGADOR
+            </button>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px">
+              <button id="startBtn" style="flex: 1; margin-top: 0">ESTOU PRONTO</button>
+            </div>
           </div>
         </div>
 
@@ -1573,8 +1641,14 @@
       const db = getFirestore(app);
 
       const urlParams = new URLSearchParams(window.location.search);
-      const gameId = urlParams.get('game') || 'teste';
-      let myPlayerIndex = parseInt(urlParams.get('player') || '0', 10);
+      let gameId = urlParams.get('game');
+      if (!gameId) {
+        // Se não tem sala na URL, gera um código aleatório (ex: a1b2c3) e redireciona
+        gameId = Math.random().toString(36).substring(2, 8);
+        window.location.replace(`?game=${gameId}`);
+      }
+      let myPlayerIndex = parseInt(urlParams.get('player'), 10);
+      if (isNaN(myPlayerIndex)) myPlayerIndex = -1; // -1 significa que ainda não escolheu quem ele é
 
       const gameRef = doc(db, 'buracoGames', gameId);
 
@@ -2564,31 +2638,31 @@
         });
       }
 
-      async function startGame(mode, names, variant) {
+      async function startGame(mode, names, variant, pixKeys = []) {
         const players = [];
         const teams = [];
         let playerConfigs = [];
         if (mode === '1x1' || mode === '1x1_duploMorto') {
           playerConfigs = [
-            { name: names[0] || 'J1', team: 0 },
-            { name: names[1] || 'J2', team: 1 },
+            { name: names[0] || 'J1', team: 0, pix: pixKeys[0] || '' },
+            { name: names[1] || 'J2', team: 1, pix: pixKeys[1] || '' },
           ];
         } else if (mode === '2x2') {
           playerConfigs = [
-            { name: names[0] || 'J1', team: 0 },
-            { name: names[1] || 'J2', team: 1 },
-            { name: names[2] || 'J3', team: 0 },
-            { name: names[3] || 'J4', team: 1 },
+            { name: names[0] || 'J1', team: 0, pix: pixKeys[0] || '' },
+            { name: names[1] || 'J2', team: 1, pix: pixKeys[1] || '' },
+            { name: names[2] || 'J3', team: 0, pix: pixKeys[2] || '' },
+            { name: names[3] || 'J4', team: 1, pix: pixKeys[3] || '' },
           ];
         } else if (mode === '1x2') {
           playerConfigs = [
-            { name: names[0] || 'Solo', team: 0 },
-            { name: names[1] || 'D1', team: 1 },
-            { name: names[2] || 'D2', team: 1 },
+            { name: names[0] || 'Solo', team: 0, pix: pixKeys[0] || '' },
+            { name: names[1] || 'D1', team: 1, pix: pixKeys[1] || '' },
+            { name: names[2] || 'D2', team: 1, pix: pixKeys[2] || '' },
           ];
         }
         playerConfigs.forEach((cfg, idx) => {
-          players.push({ id: idx, name: cfg.name, teamId: cfg.team, hand: [] });
+          players.push({ id: idx, name: cfg.name, teamId: cfg.team, pix: cfg.pix, hand: [] });
         });
         for (let t = 0; t < 2; t++) {
           const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
@@ -3989,6 +4063,10 @@
             const totalMoney = state.betBase + diff * state.betPerPoint;
             const moneyStr = totalMoney.toFixed(2).replace('.', ',');
 
+            // Recupera a chave PIX do time vencedor (pega o primeiro jogador do time que preencheu)
+            const winnerTeamPlayers = scores.find((s) => s.team.id === winner)?.players || [];
+            const winnerPix = winnerTeamPlayers.find((p) => p.pix)?.pix || '';
+
             if (highestScore === lowestScore) {
               financialHtml = `
                 <div style="margin-top: 15px; padding: 10px; background: rgba(100, 116, 139, 0.2); border: 1px solid #94a3b8; border-radius: 8px;">
@@ -4002,10 +4080,31 @@
                 </div>
               `;
             } else {
+              // Tela de quem perdeu (A Fatura)
+              let pixHtml = '';
+              if (winnerPix) {
+                // Monta o texto pronto para o WhatsApp
+                const zapText = encodeURIComponent(`Fatura do Buraco Findom! 👑 Você perdeu e me deve R$ ${moneyStr}. Faz o PIX aí na chave: ${winnerPix}`);
+
+                pixHtml = `
+                  <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid #334155;">
+                    <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Chave PIX do Vencedor:</div>
+                    <div style="color: #facc15; font-weight: 900; font-size: 14px; letter-spacing: 1px; user-select: all; cursor: copy;" title="Selecionar para copiar">${winnerPix}</div>
+                    
+                    <a href="https://wa.me/?text=${zapText}" target="_blank" style="display: block; margin-top: 10px; background: #25D366; color: #fff; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: 900; font-size: 12px; text-transform: uppercase; transition: 0.3s; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
+                      📲 Cobrar pelo WhatsApp
+                    </a>
+                  </div>
+                `;
+              } else {
+                pixHtml = `<div style="margin-top: 10px; font-size: 10px; color: #9ca3af; font-style: italic;">O vencedor não cadastrou chave PIX. Calote liberado?</div>`;
+              }
+
               financialHtml = `
-                <div style="margin-top: 15px; padding: 10px; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; border-radius: 8px;">
-                  <div style="color: #ef4444; font-size: 10px; letter-spacing: 2px;">FATURA DO CAPACHO</div>
-                  <span style="color: #fca5a5; font-weight: 900; font-size: 18px;">PAGUE: R$ ${moneyStr}</span>
+                <div style="margin-top: 15px; padding: 12px; background: rgba(239, 68, 68, 0.15); border: 1px dashed #ef4444; border-radius: 8px;">
+                  <div style="color: #ef4444; font-size: 10px; letter-spacing: 2px; margin-bottom: 5px; font-weight: bold;">FATURA DO CAPACHO</div>
+                  <span style="color: #fca5a5; font-weight: 900; font-size: 20px;">PAGUE: R$ ${moneyStr}</span>
+                  ${pixHtml}
                 </div>
               `;
             }
@@ -4218,9 +4317,9 @@
             if (document.activeElement !== el && el.value !== String(val)) el.value = val;
           };
 
-          setIfUnfocused('modeSelect', l.mode || '1x1');
-          setIfUnfocused('variantSelect', l.variant || 'fechado');
-          setIfUnfocused('betToggle', l.betToggle || 'nao');
+          setIfUnfocused('modeSelect', l.mode || '');
+          setIfUnfocused('variantSelect', l.variant || '');
+          setIfUnfocused('betToggle', l.betToggle || '');
           setIfUnfocused('betBase', l.betBase || 5);
           setIfUnfocused('betPerPoint', l.betPerPoint || 0.01);
           if (l.names) {
@@ -4230,7 +4329,17 @@
             setIfUnfocused('p4Name', l.names[3] || '');
           }
 
-          document.getElementById('betConfig').style.display = l.betToggle === 'sim' ? 'grid' : 'none';
+          if (l.pixKeys) {
+            setIfUnfocused('p1Pix', l.pixKeys[0] || '');
+            setIfUnfocused('p2Pix', l.pixKeys[1] || '');
+            setIfUnfocused('p3Pix', l.pixKeys[2] || '');
+            setIfUnfocused('p4Pix', l.pixKeys[3] || '');
+          }
+
+          // CHAMA A FUNÇÃO NOVA AQUI PARA ATUALIZAR A TELA COM OS DADOS DO BANCO
+          window.updateMenuDynamic();
+
+          document.getElementById('betConfig').style.display = l.betToggle === 'sim' ? 'block' : 'none';
 
           const ready = l.ready || [false, false, false, false];
           document.getElementById('ready0').style.display = ready[0] ? 'inline' : 'none';
@@ -4267,7 +4376,7 @@
                 if (timeLeft <= 0) {
                   clearInterval(window.startTimer);
                   window.startTimer = null;
-                  if (myPlayerIndex === 0) startGame(l.mode, l.names, l.variant);
+                  if (myPlayerIndex === 0) startGame(l.mode, l.names, l.variant, l.pixKeys);
                 }
               }, 1000);
             }
@@ -4318,6 +4427,7 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
+          pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
         };
 
         if (currentLobby && currentLobby.ready && !resetReady) lobby.ready = currentLobby.ready;
@@ -4336,19 +4446,179 @@
         }
       });
 
+      // Função que atualiza a quantidade de inputs e os labels do menu
+      window.updateMenuDynamic = function () {
+        const mode = document.getElementById('modeSelect').value;
+        const playersContainer = document.getElementById('playersContainer');
+        const humiliationRules = document.getElementById('humiliationRules');
+
+        const p1 = document.getElementById('boxP1');
+        const lbl1 = document.getElementById('lblP1');
+        const p2 = document.getElementById('boxP2');
+        const lbl2 = document.getElementById('lblP2');
+        const p3 = document.getElementById('boxP3');
+        const lbl3 = document.getElementById('lblP3');
+        const p4 = document.getElementById('boxP4');
+        const lbl4 = document.getElementById('lblP4');
+
+        // Pega as opções do dropdown "Sou"
+        const localSelect = document.getElementById('localPlayerSelect');
+        const opt0 = localSelect.querySelector('option[value="0"]');
+        const opt1 = localSelect.querySelector('option[value="1"]');
+        const opt2 = localSelect.querySelector('option[value="2"]');
+        const opt3 = localSelect.querySelector('option[value="3"]');
+
+        if (!mode) {
+          playersContainer.style.display = 'none';
+          humiliationRules.style.display = 'none';
+          return;
+        }
+
+        playersContainer.style.display = 'grid';
+        humiliationRules.style.display = 'none';
+
+        // 1. Reseta os labels para o padrão
+        lbl1.textContent = 'Jogador 1';
+        lbl1.style.color = '#cbd5e1';
+        lbl2.textContent = 'Jogador 2';
+        lbl2.style.color = '#cbd5e1';
+        lbl3.textContent = 'Jogador 3';
+        lbl3.style.color = '#cbd5e1';
+        lbl4.textContent = 'Jogador 4';
+        lbl4.style.color = '#cbd5e1';
+
+        // 2. Reseta as opções do "Sou" para o padrão e garante que estão visíveis
+        opt0.hidden = false;
+        opt0.disabled = false;
+        opt0.textContent = 'Jogador 1';
+        opt1.hidden = false;
+        opt1.disabled = false;
+        opt1.textContent = 'Jogador 2';
+        opt2.hidden = false;
+        opt2.disabled = false;
+        opt2.textContent = 'Jogador 3';
+        opt3.hidden = false;
+        opt3.disabled = false;
+        opt3.textContent = 'Jogador 4';
+
+        if (mode === '1x1') {
+          p1.style.display = 'block';
+          p2.style.display = 'block';
+          p3.style.display = 'none';
+          p4.style.display = 'none';
+
+          opt2.hidden = true;
+          opt2.disabled = true;
+          opt3.hidden = true;
+          opt3.disabled = true;
+        } else if (mode === '2x2') {
+          p1.style.display = 'block';
+          p2.style.display = 'block';
+          p3.style.display = 'block';
+          p4.style.display = 'block';
+        } else if (mode === '1x2') {
+          p1.style.display = 'block';
+          p2.style.display = 'block';
+          p3.style.display = 'block';
+          p4.style.display = 'none';
+
+          lbl1.textContent = 'Solo';
+          lbl2.textContent = 'Dupla 1';
+          lbl3.textContent = 'Dupla 2';
+          opt0.textContent = 'Solo';
+          opt1.textContent = 'Dupla 1';
+          opt2.textContent = 'Dupla 2';
+          opt3.hidden = true;
+          opt3.disabled = true;
+        } else if (mode === '1x1_duploMorto') {
+          p1.style.display = 'block';
+          p2.style.display = 'block';
+          p3.style.display = 'none';
+          p4.style.display = 'none';
+
+          lbl1.textContent = 'Escravo';
+          lbl1.style.color = '#94a3b8';
+          lbl2.textContent = '👑 Dominador';
+          lbl2.style.color = '#facc15';
+
+          opt0.textContent = 'Escravo';
+          opt1.textContent = '👑 Dominador';
+          opt2.hidden = true;
+          opt2.disabled = true;
+          opt3.hidden = true;
+          opt3.disabled = true;
+        }
+
+        // 3. Se a opção que o usuário já tinha escolhido foi desativada, limpa a seleção
+        if (localSelect.selectedIndex > 0 && localSelect.options[localSelect.selectedIndex].disabled) {
+          localSelect.value = '';
+          myPlayerIndex = -1;
+        }
+      };
+
+      // VALIDAÇÃO E ENVIO DO "ESTOU PRONTO"
       document.getElementById('startBtn').onclick = () => {
+        const errorDiv = document.getElementById('menuError');
+        const mode = document.getElementById('modeSelect').value;
+        const variant = document.getElementById('variantSelect').value;
+        const localPlayer = document.getElementById('localPlayerSelect').value;
+        const betToggle = document.getElementById('betToggle').value;
+
+        // 1. Verifica Seleções do Menu
+        if (!mode || !variant || !localPlayer || !betToggle) {
+          errorDiv.textContent = 'Selecione todas as opções (Modo, Regra, Sou, Dinheiro).';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        // 2. Verifica se assumiu uma cadeira
+        if (myPlayerIndex === -1 || isNaN(myPlayerIndex)) {
+          errorDiv.textContent = "Selecione quem você é na mesa (Campo 'Sou').";
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        const p1 = document.getElementById('p1Name').value.trim();
+        const p2 = document.getElementById('p2Name').value.trim();
+        const p3 = document.getElementById('p3Name').value.trim();
+        const p4 = document.getElementById('p4Name').value.trim();
+
+        // 3. Verifica se os nomes visíveis estão preenchidos
+        if (mode.startsWith('1x1')) {
+          if (!p1 || !p2) {
+            errorDiv.textContent = 'Preencha o nome dos 2 jogadores.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+        } else if (mode === '1x2') {
+          if (!p1 || !p2 || !p3) {
+            errorDiv.textContent = 'Preencha o nome dos 3 jogadores.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+        } else if (mode === '2x2') {
+          if (!p1 || !p2 || !p3 || !p4) {
+            errorDiv.textContent = 'Preencha o nome de todos os 4 jogadores.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+        }
+
+        errorDiv.style.display = 'none'; // Passou na validação
+
         const l = currentLobby || {};
         const readyArray = l.ready ? [...l.ready] : [false, false, false, false];
         readyArray[myPlayerIndex] = !readyArray[myPlayerIndex];
 
-        // Reconstrói o lobby inteiro com o que está na tela antes de mandar pro banco
+        // AQUI ESTÁ A MUDANÇA: adicionado o pixKeys
         const fullLobby = {
-          mode: document.getElementById('modeSelect').value,
-          variant: document.getElementById('variantSelect').value,
-          betToggle: document.getElementById('betToggle').value,
+          mode: mode,
+          variant: variant,
+          betToggle: betToggle,
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
-          names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
+          names: [p1, p2, p3, p4],
+          pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
           ready: readyArray,
         };
 
@@ -4360,25 +4630,18 @@
         const readyArray = [...currentLobby.ready];
         readyArray[myPlayerIndex] = false;
 
-        // Mantém a sincronia total ao cancelar também
+        // AQUI ESTÁ A MUDANÇA: adicionado o pixKeys
         const fullLobby = {
           mode: document.getElementById('modeSelect').value,
           variant: document.getElementById('variantSelect').value,
           betToggle: document.getElementById('betToggle').value,
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
-          names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
+          names: [document.getElementById('p1Name').value.trim(), document.getElementById('p2Name').value.trim(), document.getElementById('p3Name').value.trim(), document.getElementById('p4Name').value.trim()],
+          pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
           ready: readyArray,
         };
-
         setDoc(gameRef, { lobby: fullLobby, updatedAt: Date.now() }, { merge: true });
-      };
-
-      document.getElementById('cancelReadyBtn').onclick = () => {
-        if (!currentLobby) return;
-        const readyArray = [...currentLobby.ready];
-        readyArray[myPlayerIndex] = false;
-        setDoc(gameRef, { lobby: { ready: readyArray }, updatedAt: Date.now() }, { merge: true });
       };
 
       document.getElementById('localPlayerSelect').onchange = (e) => {
@@ -4393,6 +4656,41 @@
       document.getElementById('takeDeadBtn').onclick = takeDead;
       document.getElementById('endGameBtn').onclick = () => deleteDoc(gameRef);
       document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
+
+      // Ação do botão de convite
+      document.getElementById('inviteBtn').onclick = async () => {
+        const inviteUrl = window.location.href;
+        const btn = document.getElementById('inviteBtn');
+        const originalText = btn.innerHTML;
+
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: 'Buraco Findom',
+              text: 'Vem jogar na minha mesa!',
+              url: inviteUrl,
+            });
+          } catch (err) {
+            console.log('Compartilhamento cancelado ou falhou:', err);
+          }
+        } else {
+          try {
+            await navigator.clipboard.writeText(inviteUrl);
+            btn.innerHTML = '✅ LINK COPIADO!';
+            btn.style.background = 'rgba(34, 197, 94, 0.2)';
+            btn.style.color = '#4ade80';
+            btn.style.borderColor = '#22c55e';
+            setTimeout(() => {
+              btn.innerHTML = originalText;
+              btn.style.background = 'rgba(37, 99, 235, 0.15)';
+              btn.style.color = '#60a5fa';
+              btn.style.borderColor = '#3b82f6';
+            }, 2500);
+          } catch (err) {
+            console.error('Erro ao copiar link:', err);
+          }
+        }
+      };
     </script>
   </body>
 </html>
