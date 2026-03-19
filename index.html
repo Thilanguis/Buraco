@@ -686,7 +686,7 @@
       /* Mão */
       .hand-container {
         display: flex;
-        justify-content: center;
+        justify-content: flex-start; /* Mudou de center para flex-start */
         overflow-x: auto;
         padding: 15px 10px 5px 10px;
         min-height: 90px;
@@ -696,6 +696,7 @@
         display: flex;
         align-items: flex-end;
         padding-right: 20px;
+        margin: 0 auto; /* Isso garante que fique centralizado quando tiver pouca carta */
       }
       .carta {
         width: 60px;
@@ -2861,21 +2862,127 @@
           return;
         }
 
-        const fromEl = document.querySelector('#drawDiscardBtn .pile-card');
-        const fromRect = fromEl ? getRect(fromEl) : null;
-
         const top = state.discard[state.discard.length - 1];
         ensureCardId(top);
         const me = currentPlayer();
+        const team = currentTeam();
+        const hand = me.hand;
 
+        // =========================================================
+        // NOVA LÓGICA: BURACO FECHADO DIRETO DA MESA
+        // =========================================================
         if (state.variant === 'fechado') {
-          const canUse = canUseDiscardInClosed(top, me.hand, currentTeam());
-          if (!canUse) {
-            showMessage('Fechado: a carta deve servir p/ jogo.');
+          const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
+          const selectedCards = indexes.map((i) => hand[i]);
+
+          // Limpa qualquer sujeira de coringa das cartas selecionadas
+          selectedCards.forEach((c) => {
+            c.forceNatural = false;
+            c.forceWild = false;
+          });
+
+          let isNewMeld = false;
+          let extendedMeldIndex = -1;
+
+          // 1. Tenta formar um NOVO JOGO (Mínimo 2 cartas da mão + Topo do Lixo)
+          if (selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
+            isNewMeld = true;
+          } else {
+            // 2. Tenta adicionar a um JOGO EXISTENTE
+            let targetIndexes = [];
+            if (selectedMeldTarget) {
+              const [tId, mIdx] = selectedMeldTarget.split(':');
+              if (parseInt(tId) === team.id) targetIndexes.push(parseInt(mIdx));
+            } else {
+              team.melds.forEach((m, i) => targetIndexes.push(i));
+            }
+
+            for (const mIdx of targetIndexes) {
+              const testMeld = [...team.melds[mIdx], ...selectedCards, top];
+              if (isValidSequenceMeld(testMeld)) {
+                extendedMeldIndex = mIdx;
+                break;
+              }
+            }
+          }
+
+          // Se não encaixa em nada, avisa e bloqueia a compra
+          if (!isNewMeld && extendedMeldIndex === -1) {
+            showMessage('FECHADO: Selecione na mão as cartas que formam jogo com o lixo!');
             return;
           }
+
+          // --- SE ENCAIXOU, FAZ A MÁGICA ---
+          // Arranca o lixo todo da mesa
+          const pile = state.discard.splice(0, state.discard.length);
+          pile.forEach(ensureCardId);
+
+          // Separa o topo (que vai pra mesa) do resto do lixo (que vai pra mão)
+          const topCard = pile.pop();
+
+          // Tira as cartas selecionadas da mão do jogador
+          for (const idx of indexes) {
+            hand.splice(idx, 1);
+          }
+
+          // Monta o jogo na mesa!
+          const finalMeldCards = [...selectedCards, topCard];
+          if (isNewMeld) {
+            optimizeMeld(finalMeldCards);
+            normalizeMeldOrder(finalMeldCards);
+            team.melds.push(finalMeldCards);
+          } else {
+            team.melds[extendedMeldIndex].push(...finalMeldCards);
+            optimizeMeld(team.melds[extendedMeldIndex]);
+            normalizeMeldOrder(team.melds[extendedMeldIndex]);
+            autoSwapWildWhenFillingGap(team.melds[extendedMeldIndex]);
+            optimizeMeld(team.melds[extendedMeldIndex]);
+            normalizeMeldOrder(team.melds[extendedMeldIndex]);
+          }
+
+          // O que sobrou embaixo do lixo vai pra mão do jogador
+          if (pile.length > 0) {
+            hand.push(...pile);
+            sortHand(hand);
+          }
+
+          // Regra da Puxada Parcial (1x1 Humilhação)
+          if (state.mode === '1x1_duploMorto' && state.currentPlayer === 1 && !state.partialDraw) {
+            state.partialDraw = true;
+            showMessage('Lixo baixado direto! Compre 1 carta do monte!');
+          } else {
+            state.hasDrawnThisTurn = true;
+            state.partialDraw = false;
+          }
+
+          // Reseta todas as travas e seleções. O BUG DA CARTA GÊMEA MORRE AQUI!
+          state.pickedDiscardCardId = null;
+          state.requiredDiscardCard = null;
+          selectedHandIndexes.clear();
+          selectedMeldTarget = null;
+
+          // Brilha as cartas que vieram de baixo do lixo pra mão
+          if (!state.boughtCardIds) state.boughtCardIds = [];
+          pile.forEach((c) => state.boughtCardIds.push(c.id));
+
+          renderAll();
+
+          state.lastAction = {
+            id: newActionId(),
+            type: 'drawDiscardFechado',
+            playerId: state.currentPlayer,
+            ts: Date.now(),
+          };
+          ignoreOwnActionId = state.lastAction.id;
+
+          await commitState();
+          await checkPostMeldStatus(me);
+          return;
         }
 
+        // =========================================================
+        // LÓGICA: BURACO ABERTO (Pega tudo pra mão)
+        // =========================================================
         const pile = state.discard.splice(0, state.discard.length);
         pile.forEach(ensureCardId);
 
@@ -2883,9 +2990,8 @@
         sortHand(me.hand);
 
         if (!state.boughtCardIds) state.boughtCardIds = [];
-        state.boughtCardIds.push(top.id); // Salva para brilhar até o fim do turno
+        pile.forEach((c) => state.boughtCardIds.push(c.id));
 
-        // Regra do 1x1 Humilhação (Puxada Parcial)
         if (state.mode === '1x1_duploMorto' && state.currentPlayer === 1 && !state.partialDraw) {
           state.partialDraw = true;
           showMessage('Lixo recolhido. Compre 1 carta do monte!');
@@ -2894,19 +3000,13 @@
           state.partialDraw = false;
         }
 
+        // No modo aberto, ele trava apenas a carta do topo para não ser descartada na mesma rodada
         state.pickedDiscardCardId = top.id;
-        if (state.variant === 'fechado') state.requiredDiscardCard = { rank: top.rank, suit: top.suit, joker: !!top.joker };
-        else state.requiredDiscardCard = null;
+        state.requiredDiscardCard = null;
+        selectedHandIndexes.clear();
 
         renderHand();
-
-        const toEl = cardElById(top.id);
-        if (fromRect && toEl) {
-          const toRect = getRect(toEl);
-          toEl.style.visibility = 'hidden';
-          await flyRectToRect(top, fromRect, toRect, 'front');
-          toEl.style.visibility = '';
-        }
+        renderAll();
 
         state.lastAction = {
           id: newActionId(),
@@ -3187,6 +3287,9 @@
         }
         const cards = indexes.map((i) => hand[i]);
 
+        // TRAVA ANTI-CLONE: Limpa a seleção imediatamente
+        selectedHandIndexes.clear();
+
         cards.forEach((c) => {
           c.forceNatural = false;
           c.forceWild = false;
@@ -3270,15 +3373,13 @@
         if (taken >= max) return null;
         if (p.hand.length !== 0) return null;
 
-        let deadIndex = teamId;
-        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
-          if (!state.deadPiles?.[deadIndex]?.length) deadIndex = 0;
-        }
+        // Pega o índice do primeiro morto que achar na mesa
+        const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
+        if (deadIndex === -1) return null;
 
-        const dead = state.deadPiles?.[deadIndex];
-        if (!dead || !dead.length) return null;
-
+        const dead = state.deadPiles[deadIndex];
         const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
+
         p.hand.length = 0;
         p.hand.push(...dead.splice(0, chunkSize));
         sortHand(p.hand);
@@ -3303,17 +3404,14 @@
           return;
         }
 
-        let deadIndex = teamId;
-        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
-          if (!state.deadPiles[deadIndex].length) deadIndex = 0;
-        }
-
-        const dead = state.deadPiles[deadIndex];
-        if (!dead || !dead.length) {
-          showMessage('Morto vazio.');
+        // Pega o índice do primeiro morto disponível
+        const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
+        if (deadIndex === -1) {
+          showMessage('Nenhum morto na mesa.');
           return;
         }
 
+        const dead = state.deadPiles[deadIndex];
         const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
         const fromSlot = document.getElementById(deadIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
         const handArea = document.getElementById('handContainer');
@@ -3350,10 +3448,8 @@
         const max = state.deadChunksMax?.[teamId] ?? 1;
         if (taken >= max) return false;
 
-        let deadIndex = teamId;
-        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) deadIndex = 0;
-
-        return !!state.deadPiles?.[deadIndex]?.length;
+        // Procura se existe QUALQUER morto disponível na mesa
+        return state.deadPiles.some((pile) => pile && pile.length > 0);
       }
 
       async function discardSelectedCard() {
@@ -3382,6 +3478,9 @@
         const index = indexes[0];
         const card = hand[index];
         ensureCardId(card);
+
+        // TRAVA ANTI-CLONE: Limpa a seleção na mesma hora para ignorar cliques extras
+        selectedHandIndexes.clear();
 
         if (state.pickedDiscardCardId === card.id) {
           showMessage('Você não pode descartar a carta que acabou de pegar do lixo.');
@@ -4427,6 +4526,7 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
+          // AQUI SALVA AS CHAVES DE VERDADE
           pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
         };
 
@@ -4554,6 +4654,13 @@
           localSelect.value = '';
           myPlayerIndex = -1;
         }
+
+        // Esconde ou mostra as chaves PIX dependendo da aposta
+        const isBetting = document.getElementById('betToggle').value === 'sim';
+        document.getElementById('p1Pix').style.display = isBetting ? 'block' : 'none';
+        document.getElementById('p2Pix').style.display = isBetting ? 'block' : 'none';
+        document.getElementById('p3Pix').style.display = isBetting ? 'block' : 'none';
+        document.getElementById('p4Pix').style.display = isBetting ? 'block' : 'none';
       };
 
       // VALIDAÇÃO E ENVIO DO "ESTOU PRONTO"
