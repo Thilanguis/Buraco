@@ -1690,6 +1690,21 @@
       </div>
     </div>
 
+    <div id="surrenderSection" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); z-index: 300; align-items: center; justify-content: center; flex-direction: column;">
+        <div class="score-card" style="max-width: 350px;">
+          <h2 style="color: #facc15; font-size: 20px; margin-bottom: 15px;">Votação: Encerrar Jogo</h2>
+          <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 20px;">Todos os jogadores precisam concordar para voltar ao Lobby.</p>
+          
+          <div id="surrenderVotesList" style="display: flex; flex-direction: column; gap: 10px; text-align: left; margin-bottom: 20px;">
+            </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button id="voteYesBtn" style="background: #22c55e;">Votar SIM</button>
+            <button id="voteNoBtn" style="background: #ef4444;">Votar NÃO</button>
+          </div>
+        </div>
+      </div>
+
     <script type="module">
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
       import { getFirestore, doc, setDoc, updateDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -3992,6 +4007,9 @@
         if (state.finished) renderScores(computeScores(), state.winnerTeamId);
 
         syncCanastraSfxFromState();
+        
+        // CHAMA A TELA DE VOTAÇÃO AQUI
+        renderSurrender();
       }
 
       function renderHand() {
@@ -4599,6 +4617,13 @@
           for (let i = 0; i < 4; i++) {
             const r = document.getElementById('ready' + i);
             if (r) r.style.display = 'none';
+            const nameInput = document.getElementById(`p${i + 1}Name`);
+            if (nameInput) {
+              nameInput.style.backgroundColor = '';
+              nameInput.style.borderColor = '';
+              nameInput.style.color = '';
+              nameInput.style.boxShadow = '';
+            }
           }
           const startBtn = document.getElementById('startBtn');
           if (startBtn) {
@@ -4654,10 +4679,29 @@
           document.getElementById('betConfig').style.display = l.betToggle === 'sim' ? 'block' : 'none';
 
           const ready = l.ready || [false, false, false, false];
-          document.getElementById('ready0').style.display = ready[0] ? 'inline' : 'none';
-          document.getElementById('ready1').style.display = ready[1] ? 'inline' : 'none';
-          document.getElementById('ready2').style.display = ready[2] ? 'inline' : 'none';
-          document.getElementById('ready3').style.display = ready[3] ? 'inline' : 'none';
+          
+          for (let i = 0; i < 4; i++) {
+            const nameInput = document.getElementById(`p${i + 1}Name`);
+            const oldCheck = document.getElementById(`ready${i}`);
+            
+            if (oldCheck) oldCheck.style.display = 'none'; // Esconde o emoji definitivamente
+            
+            if (nameInput) {
+              if (ready[i]) {
+                // Acende o input com a cor verde harmoniosa
+                nameInput.style.backgroundColor = 'rgba(34, 197, 94, 0.15)'; 
+                nameInput.style.borderColor = '#22c55e'; 
+                nameInput.style.color = '#4ade80'; 
+                nameInput.style.boxShadow = 'inset 0 0 15px rgba(34, 197, 94, 0.2)'; 
+              } else {
+                // Devolve para a cor padrão do CSS
+                nameInput.style.backgroundColor = '';
+                nameInput.style.borderColor = '';
+                nameInput.style.color = '';
+                nameInput.style.boxShadow = '';
+              }
+            }
+          }
 
           const btn = document.getElementById('startBtn');
           if (ready[myPlayerIndex]) {
@@ -5064,7 +5108,72 @@
       document.getElementById('moveWildBtn').onclick = movePickedWildToSelectedMeld;
       document.getElementById('discardBtn').onclick = discardSelectedCard;
       document.getElementById('takeDeadBtn').onclick = takeDead;
-      document.getElementById('endGameBtn').onclick = () => deleteDoc(gameRef);
+      // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
+      document.getElementById('endGameBtn').onclick = async () => {
+        if (!state) return;
+        const currentSurrender = state.surrender || { active: true, votes: {} };
+        currentSurrender.active = true;
+        currentSurrender.votes[myPlayerIndex] = true; // Já vota SIM ao clicar no X
+
+        await updateDoc(gameRef, { 
+          'stateJson': JSON.stringify({ ...state, surrender: currentSurrender }),
+          updatedAt: Date.now() 
+        });
+      };
+
+      document.getElementById('voteYesBtn').onclick = async () => {
+        if (!state || !state.surrender) return;
+        state.surrender.votes[myPlayerIndex] = true;
+        await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
+      };
+
+      document.getElementById('voteNoBtn').onclick = async () => {
+        if (!state || !state.surrender) return;
+        state.surrender.active = false; // Cancela a votação
+        state.surrender.votes = {};
+        await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
+      };
+
+      // Adicione esta função para desenhar a tela de votos
+      function renderSurrender() {
+        const section = document.getElementById('surrenderSection');
+        if (!state || !state.surrender || !state.surrender.active) {
+          section.style.display = 'none';
+          return;
+        }
+
+        section.style.display = 'flex';
+        const list = document.getElementById('surrenderVotesList');
+        list.innerHTML = '';
+
+        let yesCount = 0;
+        state.players.forEach(p => {
+          const votedYes = state.surrender.votes[p.id] === true;
+          if (votedYes) yesCount++;
+          
+          // Define a cor e o estilo dependendo do voto
+          const statusHtml = votedYes 
+            ? '<span style="color: #4ade80; font-weight: bold;">✅ Sim</span>' 
+            : '<span style="color: #9ca3af; font-style: italic;">⏳ Aguardando...</span>';
+          
+          list.innerHTML += `
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid #334155;">
+              <span style="color: #f8fafc; font-weight: 900; font-size: 14px;">${p.name}</span>
+              ${statusHtml}
+            </div>
+          `;
+        });
+
+        // Oculta os botões se o jogador já votou
+        const alreadyVoted = state.surrender.votes[myPlayerIndex] === true;
+        document.getElementById('voteYesBtn').style.display = alreadyVoted ? 'none' : 'block';
+        document.getElementById('voteNoBtn').style.display = alreadyVoted ? 'none' : 'block';
+
+        // Se todo mundo votou SIM, apaga a sala (voltando pro lobby)
+        if (yesCount === state.players.length && state.players.length > 0) {
+          if (myPlayerIndex === 0) deleteDoc(gameRef); // Apenas o Host deleta para evitar concorrência
+        }
+      }
       document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
       // Abre o placar manualmente pela mesa
       document.getElementById('showScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'flex');
