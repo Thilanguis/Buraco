@@ -122,17 +122,28 @@
         }
       }
 
-      /* ================= VÍDEO DE FUNDO ================= */
-      #bgVideo {
+      /* ================= VÍDEO DE FUNDO (SISTEMA TRIPLO) ================= */
+      #videoContainer {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+        top: 0; left: 0; width: 100%; height: 100%;
         z-index: 0;
-        filter: brightness(0.35); /* Escurece o vídeo para o menu brilhar por cima */
+        background: #020617; /* Fundo escuro para a transição */
+        overflow: hidden;
+      }
+      
+      .bg-video {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        filter: brightness(0.55) contrast(1.1); /* Deixa as luzes mais vivas */
+        transition: opacity 3s ease-in-out; /* Fica APENAS o fade lento de 3 segundos */
         pointer-events: none;
+      }
+      
+      .bg-video.active {
+        opacity: 1;
+        z-index: 1;
       }
 
       /* ================= MENU PRINCIPAL ================= */
@@ -1426,9 +1437,11 @@
     </div>
 
     <div class="app">
-      <video id="bgVideo" autoplay loop muted playsinline>
-        <source src="bg-menu.mp4" type="video/mp4">
-      </video>
+      <div id="videoContainer">
+        <video id="bgVid1" class="bg-video active" autoplay muted playsinline src="bg-menu1.mp4"></video>
+        <video id="bgVid2" class="bg-video" muted playsinline src="bg-menu2.mp4"></video>
+        <video id="bgVid3" class="bg-video" muted playsinline src="bg-menu3.mp4"></video>
+      </div>
 
       <div id="configSection">
         <div class="section">
@@ -1488,8 +1501,8 @@
             </label>
             <label>
               Sou
-              <select id="localPlayerSelect" required>
-                <option value="" disabled selected>Selecione...</option>
+              <select id="localPlayerSelect">
+                <option value="" selected>Espectador (Apenas Bots)</option>
                 <option value="0">Jogador 1</option>
                 <option value="1">Jogador 2</option>
                 <option value="2">Jogador 3</option>
@@ -1524,31 +1537,32 @@
 
               <input id="betBase" type="hidden" value="5" />
               <input id="betPerPoint" type="hidden" value="0.01" />
+
+              <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px;">
+                <input id="pixTeam1" value="" placeholder="Chave PIX do Time 1 (Recebedor)" style="margin: 0; padding: 10px; font-size: 11px; border-color: #10b981; background: rgba(16, 185, 129, 0.1); color: #fff;" />
+                <input id="pixTeam2" value="" placeholder="Chave PIX do Time 2 (Recebedor)" style="margin: 0; padding: 10px; font-size: 11px; border-color: #10b981; background: rgba(16, 185, 129, 0.1); color: #fff;" />
+              </div>
             </div>
 
             <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
               <div id="boxP1" style="position: relative; margin-top: 4px; margin-bottom: 5px">
                 <label id="lblP1" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 1</label>
                 <input id="p1Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <input id="p1Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
                 <span id="ready0" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
               <div id="boxP2" style="position: relative; margin-top: 4px; margin-bottom: 5px">
                 <label id="lblP2" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 2</label>
                 <input id="p2Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <input id="p2Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
                 <span id="ready1" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
               <div id="boxP3" style="position: relative; margin-top: 4px; margin-bottom: 5px">
                 <label id="lblP3" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 3</label>
                 <input id="p3Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <input id="p3Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
                 <span id="ready2" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
               <div id="boxP4" style="position: relative; margin-top: 4px; margin-bottom: 5px">
                 <label id="lblP4" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 4</label>
                 <input id="p4Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <input id="p4Pix" value="" placeholder="Chave PIX (opcional)" style="margin: 4px 0 0 0; padding: 8px; font-size: 10px; border-color: #10b981; background: rgba(16, 185, 129, 0.1)" />
                 <span id="ready3" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
               </div>
             </div>
@@ -1731,11 +1745,32 @@
       // Importa a IA do Bot
       import { BuracoBot } from './bot.js';
 
-      // --- LÓGICA DE LOADING (COM VÍDEO NATIVO DE FUNDO) ---
+      // --- LÓGICA DE LOADING E ROTAÇÃO DE VÍDEOS ---
       const loadingScreen = document.getElementById('loadingScreen');
       let introFinished = false;
 
       window.addEventListener('load', () => {
+        // Inicia a rotação dos vídeos
+        const videos = [document.getElementById('bgVid1'), document.getElementById('bgVid2'), document.getElementById('bgVid3')];
+        
+        videos.forEach((vid, idx) => {
+          if (!vid) return;
+          vid.addEventListener('ended', () => {
+            vid.classList.remove('active'); // Esconde o atual com fade out
+            
+            const nextIdx = (idx + 1) % videos.length;
+            const nextVid = videos[nextIdx];
+            
+            nextVid.currentTime = 0; // Zera o próximo
+            nextVid.play().catch(() => {});
+            nextVid.classList.add('active'); // Mostra o próximo com fade in
+          });
+        });
+
+        // Força o play do primeiro (fallback para navegadores chatos)
+        if (videos[0]) Object.assign(videos[0], {currentTime: 0}).play().catch(()=>{});
+
+        // Lógica de sumir a tela de loading
         loadingScreen.style.display = 'flex';
         loadingScreen.style.opacity = '1';
 
@@ -2805,25 +2840,25 @@
         let playerConfigs = [];
         if (mode === '1x1' || mode === '1x1_duploMorto') {
           playerConfigs = [
-            { name: names[0] || 'J1', team: 0, pix: pixKeys[0] || '' },
-            { name: names[1] || 'J2', team: 1, pix: pixKeys[1] || '' },
+            { name: names[0] || 'J1', team: 0 },
+            { name: names[1] || 'J2', team: 1 },
           ];
         } else if (mode === '2x2') {
           playerConfigs = [
-            { name: names[0] || 'J1', team: 0, pix: pixKeys[0] || '' },
-            { name: names[1] || 'J2', team: 1, pix: pixKeys[1] || '' },
-            { name: names[2] || 'J3', team: 0, pix: pixKeys[2] || '' },
-            { name: names[3] || 'J4', team: 1, pix: pixKeys[3] || '' },
+            { name: names[0] || 'J1', team: 0 },
+            { name: names[1] || 'J2', team: 1 },
+            { name: names[2] || 'J3', team: 0 },
+            { name: names[3] || 'J4', team: 1 },
           ];
         } else if (mode === '1x2') {
           playerConfigs = [
-            { name: names[0] || 'Solo', team: 0, pix: pixKeys[0] || '' },
-            { name: names[1] || 'D1', team: 1, pix: pixKeys[1] || '' },
-            { name: names[2] || 'D2', team: 1, pix: pixKeys[2] || '' },
+            { name: names[0] || 'Solo', team: 0 },
+            { name: names[1] || 'D1', team: 1 },
+            { name: names[2] || 'D2', team: 1 },
           ];
         }
         playerConfigs.forEach((cfg, idx) => {
-          players.push({ id: idx, name: cfg.name, teamId: cfg.team, pix: cfg.pix, hand: [] });
+          players.push({ id: idx, name: cfg.name, teamId: cfg.team, hand: [] });
         });
         for (let t = 0; t < 2; t++) {
           const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
@@ -2835,7 +2870,8 @@
             tName = t === 0 ? 'Solo' : 'Dupla';
           }
           
-          teams.push({ id: t, name: tName, playerIndexes, melds: [] });
+          // O PIX AGORA PERTENCE AO TIME, NÃO AO JOGADOR!
+          teams.push({ id: t, name: tName, playerIndexes, melds: [], pix: pixKeys[t] || '' });
         }
         let stock = shuffle(createDeck());
         const discard = [];
@@ -4446,9 +4482,9 @@
             const totalMoney = state.betBase + diff * state.betPerPoint;
             const moneyStr = totalMoney.toFixed(2).replace('.', ',');
 
-            // Recupera a chave PIX do time vencedor (pega o primeiro jogador do time que preencheu)
-            const winnerTeamPlayers = scores.find((s) => s.team.id === winner)?.players || [];
-            const winnerPix = winnerTeamPlayers.find((p) => p.pix)?.pix || '';
+            // Recupera a chave PIX direto do Cofre do Time
+            const winnerTeam = scores.find((s) => s.team.id === winner)?.team || {};
+            const winnerPix = winnerTeam.pix || '';
 
             if (highestScore === lowestScore) {
               financialHtml = `
@@ -4900,10 +4936,8 @@
           }
 
           if (l.pixKeys) {
-            setIfUnfocused('p1Pix', l.pixKeys[0] || '');
-            setIfUnfocused('p2Pix', l.pixKeys[1] || '');
-            setIfUnfocused('p3Pix', l.pixKeys[2] || '');
-            setIfUnfocused('p4Pix', l.pixKeys[3] || '');
+            setIfUnfocused('pixTeam1', l.pixKeys[0] || '');
+            setIfUnfocused('pixTeam2', l.pixKeys[1] || '');
           }
 
           // CHAMA A FUNÇÃO NOVA AQUI PARA ATUALIZAR A TELA COM OS DADOS DO BANCO
@@ -5068,7 +5102,7 @@
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
           // AQUI SALVA AS CHAVES DE VERDADE
-          pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
+          pixKeys: [document.getElementById('pixTeam1').value.trim(), document.getElementById('pixTeam2').value.trim()],
         };
 
         // Garante que o array sempre exista, clonando o anterior para evitar erro de referência
@@ -5211,13 +5245,22 @@
           myPlayerIndex = -1;
         }
 
-        // Esconde ou mostra as chaves PIX dependendo da aposta
-        const isBetting = document.getElementById('betToggle').value === 'sim';
-        document.getElementById('p1Pix').style.display = isBetting ? 'block' : 'none';
-        document.getElementById('p2Pix').style.display = isBetting ? 'block' : 'none';
-        document.getElementById('p3Pix').style.display = isBetting ? 'block' : 'none';
-        document.getElementById('p4Pix').style.display = isBetting ? 'block' : 'none';
-      };
+        const pt1 = document.getElementById('pixTeam1');
+        const pt2 = document.getElementById('pixTeam2');
+        if (mode === '1x1') {
+            pt1.placeholder = 'Chave PIX do Jogador 1 (Recebedor)';
+            pt2.placeholder = 'Chave PIX do Jogador 2 (Recebedor)';
+        } else if (mode === '1x1_duploMorto') {
+            pt1.placeholder = 'Chave PIX do Escravo (Recebedor)';
+            pt2.placeholder = 'Chave PIX do Dominador (Recebedor)';
+        } else if (mode === '1x2') {
+            pt1.placeholder = 'Chave PIX do Solo (Recebedor)';
+            pt2.placeholder = 'Chave PIX da Dupla (Recebedor)';
+        } else {
+            pt1.placeholder = 'Chave PIX do Time 1 (Recebedor)';
+            pt2.placeholder = 'Chave PIX do Time 2 (Recebedor)';
+        }
+        };
 
       // ==========================================
       // MOTOR DE DEBUG / DEVTOOLS
@@ -5314,16 +5357,9 @@
         const localPlayer = document.getElementById('localPlayerSelect').value;
         const betToggle = document.getElementById('betToggle').value;
 
-        // 1. Verifica Seleções do Menu
-        if (!mode || !variant || !localPlayer || !betToggle) {
-          errorDiv.textContent = 'Selecione todas as opções (Modo, Regra, Sou, Dinheiro).';
-          errorDiv.style.display = 'block';
-          return;
-        }
-
-        // 2. Verifica se assumiu uma cadeira
-        if (myPlayerIndex === -1 || isNaN(myPlayerIndex)) {
-          errorDiv.textContent = "Selecione quem você é na mesa (Campo 'Sou').";
+        // 1. Verifica Seleções Básicas do Menu
+        if (!mode || !variant || !betToggle) {
+          errorDiv.textContent = 'Selecione todas as opções (Modo, Regra e Dinheiro).';
           errorDiv.style.display = 'block';
           return;
         }
@@ -5332,36 +5368,54 @@
         const p2 = document.getElementById('p2Name').value.trim();
         const p3 = document.getElementById('p3Name').value.trim();
         const p4 = document.getElementById('p4Name').value.trim();
+        const namesArray = [p1, p2, p3, p4];
 
-        // 3. Verifica se os nomes visíveis estão preenchidos
-        if (mode.startsWith('1x1')) {
-          if (!p1 || !p2) {
-            errorDiv.textContent = 'Preencha o nome dos 2 jogadores.';
-            errorDiv.style.display = 'block';
-            return;
-          }
-        } else if (mode === '1x2') {
-          if (!p1 || !p2 || !p3) {
-            errorDiv.textContent = 'Preencha o nome dos 3 jogadores.';
-            errorDiv.style.display = 'block';
-            return;
-          }
-        } else if (mode === '2x2') {
-          if (!p1 || !p2 || !p3 || !p4) {
-            errorDiv.textContent = 'Preencha o nome de todos os 4 jogadores.';
-            errorDiv.style.display = 'block';
-            return;
+        // 2. Verifica se a mesa é 100% Bot
+        let reqPlayers = 2;
+        if (mode === '1x2') reqPlayers = 3;
+        if (mode === '2x2') reqPlayers = 4;
+
+        let allBots = true;
+        for (let i = 0; i < reqPlayers; i++) {
+          if (!namesArray[i] || !namesArray[i].toUpperCase().includes('BOT')) {
+            allBots = false;
+            break;
           }
         }
 
-        errorDiv.style.display = 'none'; // Passou na validação
+        // 3. Verifica se assumiu uma cadeira (SÓ EXIGE SE TIVER HUMANO JOGANDO)
+        if (!allBots && (myPlayerIndex === -1 || isNaN(myPlayerIndex))) {
+          errorDiv.textContent = "Tem humano na mesa! Selecione quem você é (Campo 'Sou').";
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        // 4. Verifica se os nomes visíveis estão preenchidos
+        if (mode.startsWith('1x1') && (!p1 || !p2)) {
+          errorDiv.textContent = 'Preencha o nome dos 2 jogadores.';
+          errorDiv.style.display = 'block';
+          return;
+        } else if (mode === '1x2' && (!p1 || !p2 || !p3)) {
+          errorDiv.textContent = 'Preencha o nome dos 3 jogadores.';
+          errorDiv.style.display = 'block';
+          return;
+        } else if (mode === '2x2' && (!p1 || !p2 || !p3 || !p4)) {
+          errorDiv.textContent = 'Preencha o nome de todos os 4 jogadores.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        errorDiv.style.display = 'none'; // Passou na validação completa
 
         const l = currentLobby || {};
         const readyArray = l.ready ? [...l.ready] : [false, false, false, false];
-        readyArray[myPlayerIndex] = !readyArray[myPlayerIndex];
+        
+        // Evita que o Espectador (-1) tente dar ready e quebre o array do Firebase
+        if (myPlayerIndex !== -1 && !isNaN(myPlayerIndex)) {
+          readyArray[myPlayerIndex] = !readyArray[myPlayerIndex];
+        }
 
         // Trava de segurança: Força o Ready dos Bots na hora do clique
-        const namesArray = [p1, p2, p3, p4];
         for (let i = 0; i < 4; i++) {
           if (namesArray[i] && namesArray[i].toUpperCase().includes('BOT')) {
             readyArray[i] = true;
@@ -5376,7 +5430,7 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [p1, p2, p3, p4],
-          pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
+          pixKeys: [document.getElementById('pixTeam1').value.trim(), document.getElementById('pixTeam2').value.trim()],
           ready: readyArray,
         };
 
@@ -5423,7 +5477,7 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: namesArray,
-          pixKeys: currentLobby.pixKeys || ['', '', '', ''],
+          pixKeys: currentLobby.pixKeys || ['', ''],
           ready: readyArray,
         };
         setDoc(gameRef, { lobby: fullLobby, updatedAt: Date.now() }, { merge: true });
@@ -5431,6 +5485,7 @@
 
       document.getElementById('localPlayerSelect').onchange = (e) => {
         myPlayerIndex = parseInt(e.target.value);
+        if (isNaN(myPlayerIndex)) myPlayerIndex = -1; // Proteção contra valores nulos
         if (state) renderAll();
       };
       document.getElementById('drawStockBtn').onclick = drawFromStock;

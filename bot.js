@@ -126,22 +126,22 @@ export class BuracoBot {
     let madeMove = true;
     let loops = 0;
 
-    // A lógica de prioridade define a qualidade do jogo do Bot.
-    while (madeMove && loops < 30) {
+    while (madeMove && loops < 25) {
       madeMove = false;
       loops++;
 
-      const state = engine.getState();
-      const me = state.players[botIndex];
-      const team = state.teams[me.teamId];
+      const s = engine.getState();
+      const me = s.players[botIndex];
+      const team = s.teams[me.teamId];
 
-      // --- PASSO 1: EXTENSÃO LIMPA (100% Segura e prioritária) ---
+      // --- PASSO 1: EXTENSÃO 100% LIMPA (Prioridade Máxima) ---
+      // Nunca usa coringas nesta etapa, apenas desce cartas naturais.
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           for (let i = 0; i < me.hand.length; i++) {
             if (!this.canMeldSafely(me, team, 1, engine)) continue;
             const c = me.hand[i];
-            if (c.joker || c.rank === '2') continue; // Ignora coringas nesta fase
+            if (c.joker || c.rank === '2') continue;
 
             const testMeld = [...team.melds[mIdx], c];
             if (engine.isValidSequenceMeld(testMeld)) {
@@ -156,7 +156,34 @@ export class BuracoBot {
       }
       if (madeMove) continue;
 
-      // --- PASSO 2: FORMAR NOVOS JOGOS LIMPOS (Base da estrutura) ---
+      // --- PASSO 2: O CORINGA PERFEITO ---
+      // Usa APENAS o '2' que seja do exato MESMO NAIPE do jogo.
+      // Isso não estraga a canastra, pois ela pode ser limpa depois.
+      if (team.melds && team.melds.length > 0) {
+        for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+          const meld = team.melds[mIdx];
+          if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue;
+
+          for (let i = 0; i < me.hand.length; i++) {
+            if (!this.canMeldSafely(me, team, 1, engine)) continue;
+            const c = me.hand[i];
+
+            if (c.rank === '2' && c.suit === meld[0].suit) {
+              const testMeld = [...meld, c];
+              if (engine.isValidSequenceMeld(testMeld)) {
+                await engine.executeMeldExtend(botIndex, mIdx, [i]);
+                madeMove = true;
+                await this.sleep(300);
+                break;
+              }
+            }
+          }
+          if (madeMove) break;
+        }
+      }
+      if (madeMove) continue;
+
+      // --- PASSO 3: FORMAR NOVOS JOGOS LIMPOS ---
       let n = me.hand.length;
       if (n >= 3) {
         for (let i = 0; i < n - 2; i++) {
@@ -165,6 +192,13 @@ export class BuracoBot {
               if (!this.canMeldSafely(me, team, 3, engine)) continue;
               const combo = [me.hand[i], me.hand[j], me.hand[k]];
               if (combo.some((c) => c.joker || c.rank === '2')) continue;
+
+              // === MALÍCIA DE DUPLA (POKER FACE) ===
+              // Se está em dupla, tem mais de 7 cartas na mão e não está em desespero,
+              // ele não abre jogo novo de apenas 3 cartas. Segura na mão para esconder o jogo do adversário.
+              if (ctx.isDuo && !ctx.isDesperate && !ctx.isRushingMorto && me.hand.length > 7) {
+                continue;
+              }
 
               if (engine.isValidSequenceMeld(combo)) {
                 await engine.executeMeldNew(botIndex, [i, j, k]);
@@ -180,65 +214,15 @@ export class BuracoBot {
       }
       if (madeMove) continue;
 
-      // --- PASSO 3: O CORINGA PERFEITO (2 do MESMO naipe) ---
-      if (team.melds && team.melds.length > 0) {
-        for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
-          const meld = team.melds[mIdx];
-          // Evita poluir um jogo que já tem coringa
-          if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue;
-
-          for (let i = 0; i < me.hand.length; i++) {
-            if (!this.canMeldSafely(me, team, 1, engine)) continue;
-            const c = me.hand[i];
-
-            // Só libera o '2' aqui se o naipe bater com o jogo, garantindo que vai virar limpa no futuro
-            if (c.rank === '2' && c.suit === meld[0].suit) {
-              const testMeld = [...meld, c];
-              if (engine.isValidSequenceMeld(testMeld)) {
-                await engine.executeMeldExtend(botIndex, mIdx, [i]);
-                madeMove = true;
-                await this.sleep(400);
-                break;
-              }
-            }
-          }
-          if (madeMove) break;
-        }
-      }
-      if (madeMove) continue;
-
-      // --- PASSO 4: FORÇAR CANASTRA SUJA (Apenas se tiver 6 cartas na mesa) ---
-      if (team.melds && team.melds.length > 0) {
-        for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
-          const meld = team.melds[mIdx];
-          if (meld.length < 6) continue; // Só faz isso para matar a canastra e pegar pontos
-          if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue; // Ignora se já for suja
-
-          for (let i = 0; i < me.hand.length; i++) {
-            if (!this.canMeldSafely(me, team, 1, engine)) continue;
-            const c = me.hand[i];
-            if (!c.joker && c.rank !== '2') continue;
-
-            const testMeld = [...meld, c];
-            if (engine.isValidSequenceMeld(testMeld)) {
-              await engine.executeMeldExtend(botIndex, mIdx, [i]);
-              madeMove = true;
-              await this.sleep(400);
-              break;
-            }
-          }
-          if (madeMove) break;
-        }
-      }
-      if (madeMove) continue;
-
-      // --- PASSO 5: RUSH PARA O MORTO / MODO DESESPERO (Libera sujeira total) ---
-      if (ctx.isRushingMorto || ctx.isDesperate) {
-        // Estende sujo os jogos da mesa para desovar a mão
+      // --- PASSO 4: USO DE CORINGA SUJO (TRAVA DE SEGURANÇA ATIVADA) ---
+      // O bot está TERMINANTEMENTE PROIBIDO de queimar Jokers ou 2 de naipes errados,
+      // EXCETO se o monte estiver no fim (< 15) ou se precisar zerar a mão para o morto.
+      if (ctx.isRushingMorto || ctx.isDesperate || s.stock.length <= 15) {
+        // 4.1 Tenta fechar/estender jogos já existentes com sujeira
         if (team.melds && team.melds.length > 0) {
           for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
             const meld = team.melds[mIdx];
-            if (meld.some((c) => c.joker || c.forceWild || c.rank === '2')) continue;
+            if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue;
 
             for (let i = 0; i < me.hand.length; i++) {
               if (!this.canMeldSafely(me, team, 1, engine)) continue;
@@ -258,16 +242,16 @@ export class BuracoBot {
         }
         if (madeMove) continue;
 
-        // Cria jogos novos sujos rasgando as regras (Ex: 8, 9, Coringa)
-        if (me.hand.length >= 3) {
+        // 4.2 Cria jogo novo sujo (último recurso absoluto para esvaziar a mão)
+        if (me.hand.length >= 3 && me.hand.length <= 6) {
           n = me.hand.length;
           for (let i = 0; i < n - 2; i++) {
             for (let j = i + 1; j < n - 1; j++) {
               for (let k = j + 1; k < n; k++) {
                 if (!this.canMeldSafely(me, team, 3, engine)) continue;
                 const combo = [me.hand[i], me.hand[j], me.hand[k]];
-                const wildCount = combo.filter((c) => c.joker || c.rank === '2').length;
-                if (wildCount > 1) continue; // Continua proibido meter 2 coringas no mesmo jogo
+                const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
+                if (wilds !== 1) continue;
 
                 if (engine.isValidSequenceMeld(combo)) {
                   await engine.executeMeldNew(botIndex, [i, j, k]);
