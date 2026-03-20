@@ -1709,6 +1709,9 @@
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
       import { getFirestore, doc, setDoc, updateDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+      // Importa a IA do Bot
+      import { BuracoBot } from './bot.js';
+
       // --- LÓGICA DE LOADING (SEM VÍDEO) ---
       const loadingScreen = document.getElementById('loadingScreen');
       let introFinished = false;
@@ -2255,6 +2258,7 @@
       }
 
       function cardFrontHTML(card) {
+        if (!card) return ''; // Retorna vazio se for fantasma
         if (card.joker) {
           return `<div class="carta-canto top">JOKER</div><div class="carta-meio">★</div><div class="carta-canto bottom">JOKER</div>`;
         }
@@ -2485,8 +2489,10 @@
             if (fromStockRect && toEl) {
               const toRect = getRect(toEl);
               toEl.style.visibility = 'hidden';
-              await flyRectToRect(c, fromStockRect, toRect, 'back');
-              toEl.style.visibility = '';
+              // Roda livre: Não espera a animação acabar para prosseguir com a lógica
+              flyRectToRect(c, fromStockRect, toRect, 'back').then(() => {
+                if (toEl) toEl.style.visibility = '';
+              });
             }
 
             actionDraw = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(c), ts: Date.now() };
@@ -2506,8 +2512,9 @@
             if (discardRect && toEl) {
               const toRect = getRect(toEl);
               toEl.style.visibility = 'hidden';
-              await flyRectToRect(top, discardRect, toRect, 'front');
-              toEl.style.visibility = '';
+              flyRectToRect(top, discardRect, toRect, 'front').then(() => {
+                 if (toEl) toEl.style.visibility = '';
+              });
             }
 
             actionDraw = { id: newActionId(), type: 'drawDiscard', playerId: state.currentPlayer, card: packCard(top), ts: Date.now() };
@@ -2521,7 +2528,8 @@
           await new Promise((r) => setTimeout(r, 600));
         }
 
-        const me = currentPlayer();
+        // Puxa o estado MAIS FRESCO possível caso o Firebase tenha atualizado na linha de cima
+        const me = state.players[state.currentPlayer];
         const hand = me.hand;
         if (!hand.length) {
           await commitState();
@@ -2546,26 +2554,25 @@
           const fromRect = getRect(fromEl);
           const toRect = getRect(toEl);
           fromEl.style.visibility = 'hidden';
-          await flyRectToRect(card, fromRect, toRect, 'front');
-          fromEl.style.visibility = '';
+          flyRectToRect(card, fromRect, toRect, 'front').then(() => {
+             if (fromEl) fromEl.style.visibility = '';
+          });
         }
 
-        hand.splice(idxToPick, 1);
+        // Mutação segura no Array blindado
+        const actualIdx = hand.findIndex(c => c.id === card.id);
+        if (actualIdx !== -1) hand.splice(actualIdx, 1);
         state.discard.push(card);
 
-        const teamId = me.teamId;
-
         let tookDead = null;
-        if (hand.length === 0) {
-          tookDead = takeDeadIfAvailableForPlayer(me);
-        }
+        if (hand.length === 0) tookDead = takeDeadIfAvailableForPlayer(me);
 
-        if (hand.length === 0 && !canTeamTakeDeadNow(teamId)) {
-          if (teamHasGoodCanastra(teamId)) {
-            await finishGame(teamId);
+        if (hand.length === 0 && !canTeamTakeDeadNow(me.teamId)) {
+          if (teamHasGoodCanastra(me.teamId)) {
+            await finishGame(me.teamId);
           } else {
             showMessage('Batida falsa automática! Oponente vence.');
-            await finishGame(teamId === 0 ? 1 : 0);
+            await finishGame(me.teamId === 0 ? 1 : 0);
           }
           return;
         }
@@ -2588,7 +2595,9 @@
       }
 
       function classifyMeldForUi(meld) {
-        if (!meld || meld.length < 7) return { kind: 'simple', base: 'Jogo', tag: null };
+        if (!meld) return { kind: 'simple', base: 'Jogo', tag: null };
+        meld = meld.filter((c) => c != null); // Limpa a sujeira do Firebase
+        if (meld.length < 7) return { kind: 'simple', base: 'Jogo', tag: null };
 
         const hasWild = meld.some((c) => c.joker || isWildcard(c, meld));
         const realCards = meld.filter((c) => !c.joker && !isWildcard(c, meld));
@@ -2723,7 +2732,7 @@
       }
 
       function isWildcard(card, meld = null) {
-        if (!card) return false;
+        if (!card) return false; // Escudo Anti-Ghost
         if (card.joker) return true;
         if (card.forceNatural) return false;
         if (card.forceWild) return true;
@@ -2755,6 +2764,7 @@
       }
 
       function cardBasePoints(card) {
+        if (!card) return 0; // Escudo Anti-Ghost
         if (card.joker) return 20;
         if (card.rank === 'A') return 15;
         if (['3', '4', '5', '6', '7'].includes(card.rank)) return 5;
@@ -3035,12 +3045,7 @@
           let isNewMeld = false;
           let extendedMeldIndex = -1;
 
-          // 1. Tenta formar um NOVO JOGO
-          if (selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
-            isNewMeld = true;
-          }
-
-          // 2. Tenta adicionar a um JOGO EXISTENTE
+          // 1. PRIORIDADE ABSOLUTA: Tenta adicionar a um JOGO EXISTENTE
           let validExtensions = [];
           let targetIndexes = [];
 
@@ -3056,17 +3061,19 @@
             if (isValidSequenceMeld(testMeld)) validExtensions.push(mIdx);
           }
 
-          if (!isNewMeld) {
-            if (validExtensions.length === 0) {
-              showMessage('FECHADO: Selecione na mão as cartas que formam jogo com o lixo!');
-              return;
-            } else if (validExtensions.length > 1 && !selectedMeldTarget) {
-              // NOVO: Trava de ambiguidade se houver múltiplos jogos compatíveis
+          if (validExtensions.length > 0) {
+            if (validExtensions.length > 1 && !selectedMeldTarget) {
               showMessage('Encaixa em vários jogos. Selecione o destino na mesa primeiro!');
               return;
-            } else {
-              extendedMeldIndex = validExtensions[0];
             }
+            extendedMeldIndex = validExtensions[0];
+          } 
+          // 2. Se não encaixou na mesa, tenta formar um NOVO JOGO
+          else if (selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
+            isNewMeld = true;
+          } else {
+            showMessage('FECHADO: Selecione na mão as cartas que formam jogo com o lixo!');
+            return;
           }
 
           // --- SE ENCAIXOU, FAZ A MÁGICA ---
@@ -3167,7 +3174,9 @@
       }
 
       function isValidSequenceMeld(cards) {
-        if (!cards || cards.length < 3) return false;
+        if (!cards) return false;
+        cards = cards.filter((c) => c != null); // Remove os fantasmas da matemática
+        if (cards.length < 3) return false;
 
         let wildCards = cards.filter((c) => isWildcard(c, cards));
         let modifiedTwo = null;
@@ -3612,18 +3621,15 @@
           }
         }
 
-        const p = currentPlayer();
-        const hand = p.hand;
+        const pInitial = currentPlayer();
         const indexes = Array.from(selectedHandIndexes);
         if (indexes.length !== 1) {
           showMessage('Selecione 1 carta.');
           return;
         }
 
-        const index = indexes[0];
-        const card = hand[index];
+        const card = pInitial.hand[indexes[0]];
         
-        // TRAVA ANTI-GHOST CLICK: Se a carta não existir, aborta sem dar erro
         if (!card) {
           selectedHandIndexes.clear();
           renderHand();
@@ -3631,8 +3637,6 @@
         }
         
         ensureCardId(card);
-
-        // TRAVA ANTI-CLONE: Limpa a seleção na mesma hora para ignorar cliques extras
         selectedHandIndexes.clear();
 
         if (state.pickedDiscardCardId === card.id) {
@@ -3640,17 +3644,11 @@
           return;
         }
 
-       const teamId = p.teamId;
-
-        // ==============================================================
-        // TRAVA DA BATIDA: Bloqueia o descarte da última carta sem canastra
-        // ==============================================================
-        if (hand.length === 1 && !canTeamTakeDeadNow(teamId)) {
-          if (!teamHasGoodCanastra(teamId)) {
+        if (pInitial.hand.length === 1 && !canTeamTakeDeadNow(pInitial.teamId)) {
+          if (!teamHasGoodCanastra(pInitial.teamId)) {
             showMessage('❌ Você não pode bater sem ter uma canastra limpa!');
-            selectedHandIndexes.clear();
             renderHand();
-            return; // Aborta o descarte
+            return; 
           }
         }
 
@@ -3665,15 +3663,22 @@
           fromEl.style.visibility = '';
         }
 
-        hand.splice(index, 1);
+        // --- PROTEÇÃO ANTI-CORRUPÇÃO DE ESTADO ---
+        // Recupera o estado NOVO caso o Firebase tenha atualizado durante o 1 segundo de animação
+        const p = state.players[myPlayerIndex];
+        const hand = p.hand;
+        
+        const actualIndex = hand.findIndex(c => c.id === card.id);
+        if (actualIndex !== -1) {
+           hand.splice(actualIndex, 1);
+        }
         state.discard.push(card);
-        selectedHandIndexes.clear();
 
         let tookDead = null;
         if (p.hand.length === 0) tookDead = takeDeadIfAvailableForPlayer(p);
 
-        if (p.hand.length === 0 && !canTeamTakeDeadNow(teamId)) {
-          await finishGame(teamId);
+        if (p.hand.length === 0 && !canTeamTakeDeadNow(p.teamId)) {
+          await finishGame(p.teamId);
           return;
         }
 
@@ -4187,6 +4192,10 @@
 
             meld.forEach((c, cidx) => {
               if (mInfo.kind !== 'simple' && cidx === meld.length - 1) return;
+
+              // >>> ESCUDO ANTI-GHOST AQUI <<<
+              if (!c) return;
+
               const minic = document.createElement('div');
               minic.className = 'carta mini ' + (c.joker ? 'joker-card' : c.suit === '♥' || c.suit === '♦' ? 'hearts' : 'spades');
               minic.dataset.cardIndex = cidx;
@@ -4211,6 +4220,10 @@
 
             if (mInfo.kind !== 'simple') {
               const last = meld[meld.length - 1];
+
+              // >>> ESCUDO ANTI-GHOST AQUI TAMBÉM <<<
+              if (!last) return;
+
               const closed = document.createElement('div');
               closed.className = 'carta mini canastra-fechada ' + (last.joker ? 'joker-card' : last.suit === '♥' || last.suit === '♦' ? 'hearts' : 'spades');
               closed.dataset.cardIndex = meld.length - 1;
@@ -4505,10 +4518,31 @@
 
         if (a.type === 'discard') {
           const df = document.getElementById('discardFace');
-          if (df) df.style.visibility = 'hidden';
+          let prevHtml = null;
+          let prevColor = null;
+          
+          // Se o lixo já tinha carta, mostra a carta antiga enquanto a nova voa
+          if (df && state.discard.length > 1) {
+             const prevCard = state.discard[state.discard.length - 2];
+             prevHtml = df.innerHTML;
+             prevColor = df.style.color;
+             df.innerHTML = cardFrontHTML(prevCard);
+             df.style.color = prevCard.joker ? '#000' : (prevCard.suit === '♥' || prevCard.suit === '♦' ? '#b91c1c' : '#000');
+          } else if (df) {
+             df.style.visibility = 'hidden';
+          }
+
           if (discardRect) await flyRectToRect(fallbackCard, handRect, discardRect, 'front');
           impactAtRect(discardRect);
-          if (df) df.style.visibility = '';
+          
+          if (df) {
+             // Devolve a carta que acabou de cair para o topo do visual
+             if (prevHtml) {
+               df.innerHTML = prevHtml;
+               df.style.color = prevColor;
+             }
+             df.style.visibility = '';
+          }
           return;
         }
 
@@ -4576,6 +4610,152 @@
           return;
         }
       }
+// ==========================================
+      // MOTOR DE EXECUÇÃO DA IA (BOT ENGINE)
+      // ==========================================
+      const botEngine = {
+        getState: () => state,
+        showMessage: (msg) => showMessage(msg),
+        computeTeamMeldScore: (team) => computeTeamMeldScore(team),
+        isValidSequenceMeld: (cards) => isValidSequenceMeld(cards),
+        canTeamTakeDeadNow: (teamId) => canTeamTakeDeadNow(teamId),
+        teamHasGoodCanastra: (teamId) => teamHasGoodCanastra(teamId),
+        
+        normalizeMeld: (meld) => {
+          optimizeMeld(meld);
+          normalizeMeldOrder(meld);
+          autoSwapWildWhenFillingGap(meld);
+          optimizeMeld(meld);
+          normalizeMeldOrder(meld);
+        },
+
+        _checkBotMortoOrWin: async (botIndex) => {
+          const me = state.players[botIndex];
+          if (me.hand.length === 0) {
+            const tookDead = takeDeadIfAvailableForPlayer(me);
+            if (!tookDead) {
+              if (teamHasGoodCanastra(me.teamId)) await finishGame(me.teamId);
+            } else {
+              showMessage(`🤖 Bot ${me.name} pegou o Morto!`);
+            }
+          }
+        },
+
+        executeMeldNew: async (botIndex, handIndexes) => {
+          const me = state.players[botIndex];
+          const team = state.teams[me.teamId];
+          const cards = handIndexes.map(i => me.hand[i]);
+          
+          handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
+          
+          botEngine.normalizeMeld(cards);
+          team.melds.push(cards);
+          const meldIdx = team.melds.length - 1;
+
+          await botEngine._checkBotMortoOrWin(botIndex);
+
+          state.lastAction = { id: newActionId(), type: 'meldNew', playerId: botIndex, teamId: team.id, meldIndex: meldIdx, cards: cards.map(packCard), ts: Date.now() };
+          renderAll();
+          await commitState();
+        },
+
+        executeMeldExtend: async (botIndex, meldIndex, handIndexes) => {
+          const me = state.players[botIndex];
+          const team = state.teams[me.teamId];
+          const cards = handIndexes.map(i => me.hand[i]);
+          
+          handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
+          
+          team.melds[meldIndex].push(...cards);
+          botEngine.normalizeMeld(team.melds[meldIndex]);
+          
+          await botEngine._checkBotMortoOrWin(botIndex);
+
+          state.lastAction = { id: newActionId(), type: 'meldExtend', playerId: botIndex, teamId: team.id, meldIndex: meldIndex, cards: cards.map(packCard), ts: Date.now() };
+          renderAll();
+          await commitState();
+        },
+
+        executeDrawStock: async (botIndex) => {
+          const me = state.players[botIndex];
+          // Trava do Dominador
+          const drawCount = (state.mode === '1x1_duploMorto' && botIndex === 1 && !state.partialDraw) ? 2 : 1;
+          const drawnCards = [];
+
+          for (let i = 0; i < drawCount; i++) {
+            if (!state.stock.length) {
+              if (!recycleDeadToStockIfPossible() || !state.stock.length) {
+                if (i === 0) {
+                  await finishGame(null);
+                  return;
+                } else break;
+              }
+            }
+            const c = state.stock.pop();
+            ensureCardId(c);
+            me.hand.push(c);
+            drawnCards.push(c);
+          }
+
+          sortHand(me.hand);
+          state.hasDrawnThisTurn = true;
+          state.partialDraw = false;
+
+          if (drawnCards.length > 0) {
+            state.lastAction = { id: newActionId(), type: 'drawStock', playerId: botIndex, card: packCard(drawnCards[drawnCards.length - 1]), ts: Date.now() };
+          }
+          renderAll();
+          await commitState();
+        },
+
+        executeDrawDiscard: async (botIndex) => {
+          const me = state.players[botIndex];
+          const pile = state.discard.splice(0, state.discard.length);
+          pile.forEach(ensureCardId);
+          const topCard = pile[pile.length - 1]; 
+          
+          me.hand.push(...pile);
+          sortHand(me.hand);
+          
+          // Trava do Dominador
+          if (state.mode === '1x1_duploMorto' && botIndex === 1 && !state.partialDraw) {
+            state.partialDraw = true;
+          } else {
+            state.hasDrawnThisTurn = true;
+            state.partialDraw = false;
+          }
+
+          state.pickedDiscardCardId = topCard.id; 
+
+          state.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
+          renderAll();
+          await commitState();
+        },
+
+        // A FUNÇÃO QUE FALTAVA E DERRUBAVA O SISTEMA:
+        executeDiscard: async (botIndex, cardIndex) => {
+          const me = state.players[botIndex];
+          const card = me.hand[cardIndex];
+          
+          me.hand.splice(cardIndex, 1);
+          state.discard.push(card);
+
+          let tookDead = null;
+          if (me.hand.length === 0) tookDead = takeDeadIfAvailableForPlayer(me);
+
+          if (me.hand.length === 0 && !canTeamTakeDeadNow(me.teamId)) {
+            if (teamHasGoodCanastra(me.teamId)) await finishGame(me.teamId);
+            else await finishGame(me.teamId === 0 ? 1 : 0); 
+            return;
+          }
+
+          passTurn(); // DEVOLVE A VEZ PARA VOCÊ
+
+          state.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
+          renderAll();
+          await commitState();
+        }
+      };
 
       onSnapshot(gameRef, async (snap) => {
         if (!snap.exists()) {
@@ -4604,6 +4784,7 @@
 
           document.getElementById('gameSection').style.display = 'none';
           document.getElementById('scoreSection').style.display = 'none';
+          document.getElementById('surrenderSection').style.display = 'none'; // <- MATA O MODAL DE VOTAÇÃO AQUI
 
           // --- CORREÇÃO DO OVERLAY E RESET DO LOBBY ---
           const overlay = document.getElementById('countdownOverlay');
@@ -4763,14 +4944,40 @@
         startTurnTimerIfNeeded();
 
         const a = state.lastAction;
-        if (!a || a.id === lastSeenActionId) return;
-        lastSeenActionId = a.id;
-        if (a.id === ignoreOwnActionId) {
-          ignoreOwnActionId = null;
-          return;
+        if (a && a.id !== lastSeenActionId) {
+          lastSeenActionId = a.id;
+          if (a.id === ignoreOwnActionId) {
+            ignoreOwnActionId = null;
+          } else {
+            await playRemoteAction(a);
+          }
         }
 
-        await playRemoteAction(a);
+        // --- GATILHO DA INTELIGÊNCIA ARTIFICIAL ---
+        if (!state.finished) {
+          const currentPlayerObj = state.players[state.currentPlayer];
+          
+          // Verifica se é a vez de um bot e se EU sou o Host (myPlayerIndex === 0)
+          if (currentPlayerObj && currentPlayerObj.name.toUpperCase().includes('BOT')) {
+            if (myPlayerIndex === 0) {
+              
+              // Trava de concorrência para o Host não rodar o bot 2x no mesmo turno
+              if (!window.botIsPlaying) {
+                window.botIsPlaying = true;
+                
+                // Dispara a IA passando o estado, quem é o bot, e os motores de ação
+                BuracoBot.playTurn(state, state.currentPlayer, botEngine)
+                  .then(() => {
+                    window.botIsPlaying = false;
+                  })
+                  .catch(err => {
+                    console.error("Erro na Matrix (Falha no Bot):", err);
+                    window.botIsPlaying = false;
+                  });
+              }
+            }
+          }
+        }
       });
 
       window.pushLobby = function () {
@@ -4787,8 +4994,20 @@
           pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
         };
 
-        if (currentLobby && currentLobby.ready && !resetReady) lobby.ready = currentLobby.ready;
-        else if (resetReady) lobby.ready = [false, false, false, false];
+        // Garante que o array sempre exista, clonando o anterior para evitar erro de referência
+        let readyArray = [false, false, false, false];
+        if (currentLobby && currentLobby.ready && !resetReady) {
+          readyArray = [...currentLobby.ready];
+        }
+
+        // Auto-ready imediato para qualquer nome que contenha "BOT"
+        for (let i = 0; i < 4; i++) {
+          if (lobby.names[i] && lobby.names[i].toUpperCase().includes('BOT')) {
+            readyArray[i] = true;
+          }
+        }
+        
+        lobby.ready = readyArray;
 
         setDoc(gameRef, { lobby: lobby, updatedAt: Date.now() }, { merge: true });
       };
@@ -5064,6 +5283,14 @@
         const readyArray = l.ready ? [...l.ready] : [false, false, false, false];
         readyArray[myPlayerIndex] = !readyArray[myPlayerIndex];
 
+        // Trava de segurança: Força o Ready dos Bots na hora do clique
+        const namesArray = [p1, p2, p3, p4];
+        for (let i = 0; i < 4; i++) {
+          if (namesArray[i] && namesArray[i].toUpperCase().includes('BOT')) {
+            readyArray[i] = true;
+          }
+        }
+
         // AQUI ESTÁ A MUDANÇA: adicionado o pixKeys
         const fullLobby = {
           mode: mode,
@@ -5108,12 +5335,19 @@
       document.getElementById('moveWildBtn').onclick = movePickedWildToSelectedMeld;
       document.getElementById('discardBtn').onclick = discardSelectedCard;
       document.getElementById('takeDeadBtn').onclick = takeDead;
-      // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
+     // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
       document.getElementById('endGameBtn').onclick = async () => {
         if (!state) return;
         const currentSurrender = state.surrender || { active: true, votes: {} };
         currentSurrender.active = true;
         currentSurrender.votes[myPlayerIndex] = true; // Já vota SIM ao clicar no X
+
+        // O Bot sempre concorda em sair da sala na mesma hora
+        state.players.forEach(p => {
+          if (p.name.toUpperCase().includes('BOT')) {
+            currentSurrender.votes[p.id] = true;
+          }
+        });
 
         await updateDoc(gameRef, { 
           'stateJson': JSON.stringify({ ...state, surrender: currentSurrender }),
@@ -5124,6 +5358,14 @@
       document.getElementById('voteYesBtn').onclick = async () => {
         if (!state || !state.surrender) return;
         state.surrender.votes[myPlayerIndex] = true;
+
+        // Garante o voto do Bot caso alguém vote sim depois
+        state.players.forEach(p => {
+          if (p.name.toUpperCase().includes('BOT')) {
+            state.surrender.votes[p.id] = true;
+          }
+        });
+
         await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
       };
 
