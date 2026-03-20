@@ -122,19 +122,33 @@
         }
       }
 
+      /* ================= VÍDEO DE FUNDO ================= */
+      #bgVideo {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+        filter: brightness(0.35); /* Escurece o vídeo para o menu brilhar por cima */
+        pointer-events: none;
+      }
+
       /* ================= MENU PRINCIPAL ================= */
       #configSection {
+        position: relative;
+        z-index: 1; /* Garante que o menu fica acima do vídeo */
         flex: 1;
         overflow-y: auto;
-        padding: 20px;
-        background-color: #050505;
-        background-image: linear-gradient(to bottom, rgba(5, 5, 5, 0.3), rgba(5, 5, 5, 0.95)), url('icon-512.png');
-        background-size: cover;
-        background-position: center center;
-        background-repeat: no-repeat;
-        display: none;
+        padding: 40px 20px;
+        background-color: transparent; /* Remove o fundo preto sólido */
+        
+        display: none; /* A MÁGICA AQUI: Começa escondido para animar na hora certa! */
+        
         flex-direction: column;
-        justify-content: center;
+        align-items: center;
+        justify-content: flex-start;
       }
       /* Animação da carta sendo comprada/jogada */
       @keyframes dealMenuCard {
@@ -145,12 +159,13 @@
       .section {
         position: relative;
         background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
-        border: 2px solid #d4af37; /* Borda dourada de carta premium */
+        border: 2px solid #d4af37;
         border-radius: 12px;
         padding: 30px;
         max-width: 420px;
-        margin: 0 auto;
+        margin: auto; /* Centraliza verticalmente APENAS se houver espaço de sobra */
         width: 100%;
+        flex-shrink: 0; /* A MÁGICA AQUI: Impede o navegador de esmagar o menu! */
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), inset 0 0 15px rgba(0,0,0,0.8);
         overflow: hidden;
         animation: dealMenuCard 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
@@ -1411,6 +1426,10 @@
     </div>
 
     <div class="app">
+      <video id="bgVideo" autoplay loop muted playsinline>
+        <source src="bg-menu.mp4" type="video/mp4">
+      </video>
+
       <div id="configSection">
         <div class="section">
           <div class="section-header">
@@ -1712,7 +1731,7 @@
       // Importa a IA do Bot
       import { BuracoBot } from './bot.js';
 
-      // --- LÓGICA DE LOADING (SEM VÍDEO) ---
+      // --- LÓGICA DE LOADING (COM VÍDEO NATIVO DE FUNDO) ---
       const loadingScreen = document.getElementById('loadingScreen');
       let introFinished = false;
 
@@ -2444,14 +2463,8 @@
       function passTurn() {
         if (state.mode === '1x1_duploMorto' || state.mode === '1x1') {
           state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
-        } else if (state.mode === '1x2') {
-          if (state.currentPlayer === 0) {
-            state.lastDPlayer = state.lastDPlayer === 1 ? 2 : 1;
-            state.currentPlayer = state.lastDPlayer;
-          } else {
-            state.currentPlayer = 0;
-          }
         } else {
+          // Roda sequencial limpo para 1x2 (3 jogadores: 0 -> 1 -> 2) e 2x2 (4 jogadores: 0 -> 1 -> 2 -> 3)
           state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
         }
         state.turnNumber = (state.turnNumber || 0) + 1;
@@ -4001,13 +4014,24 @@
         document.getElementById('takeDeadBtn').disabled = !canTakeDeadBtn;
         document.getElementById('endGameBtn').disabled = false;
 
-        // Oculta os botões de ação e exibe o botão de Placar se o jogo acabou
+        // Oculta botões se o jogo acabou OU se for o Espectador (-1)
         const isFin = !!state.finished;
+        const isSpec = myPlayerIndex === -1;
         document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
-        document.getElementById('meldBtn').style.display = isFin ? 'none' : 'block';
-        document.getElementById('discardBtn').style.display = isFin ? 'none' : 'block';
-        document.getElementById('takeDeadBtn').style.display = isFin ? 'none' : 'block';
-        document.getElementById('moveWildBtn').style.display = isFin ? 'none' : 'block';
+        document.getElementById('meldBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
+        document.getElementById('discardBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
+        document.getElementById('takeDeadBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
+        document.getElementById('moveWildBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
+
+        let specBadge = document.getElementById('specBadgeInfo');
+        if (!specBadge) {
+           specBadge = document.createElement('div');
+           specBadge.id = 'specBadgeInfo';
+           specBadge.style = "color: #94a3b8; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; font-size: 11px; padding: 8px;";
+           specBadge.textContent = "👀 MODO ESPECTADOR";
+           document.querySelector('.player-actions').appendChild(specBadge);
+        }
+        specBadge.style.display = (isSpec && !isFin) ? 'block' : 'none';
 
         if (state.finished) renderScores(computeScores(), state.winnerTeamId);
 
@@ -4020,9 +4044,25 @@
       function renderHand() {
         const container = document.querySelector('#handContainer .cards-row');
         container.innerHTML = '';
-        const me = state.players[myPlayerIndex];
 
-        if (!me) return; // <--- TRAVA DE SEGURANÇA AQUI
+        // --- MODO ESPECTADOR ---
+        if (myPlayerIndex === -1) {
+          const p0 = state.players[0];
+          if (!p0) return;
+          
+          p0.hand.forEach((card) => {
+            ensureCardId(card);
+            const div = document.createElement('div');
+            div.dataset.cardId = card.id;
+            div.className = 'carta back ' + (card.back === 'blue' ? 'back-blue' : 'back-red');
+            container.appendChild(div);
+          });
+          return;
+        }
+
+        // --- JOGADOR NORMAL ---
+        const me = state.players[myPlayerIndex];
+        if (!me) return;
 
         me.hand.forEach((card, idx) => {
           ensureCardId(card);
@@ -4056,9 +4096,13 @@
 
       function seatForPlayer(pid) {
         const total = state.players.length;
-        if (pid === myPlayerIndex) return 'self';
+        // Se for espectador, finge que a cadeira de baixo é do Jogador 0
+        const baseIdx = myPlayerIndex !== -1 ? myPlayerIndex : 0; 
+        
+        if (pid === baseIdx) return 'self';
+        
         const others = [];
-        for (let i = 1; i < total; i++) others.push((myPlayerIndex + i) % total);
+        for (let i = 1; i < total; i++) others.push((baseIdx + i) % total);
 
         const seats = { top: null, left: null, right: null };
         if (total === 2) seats.top = others[0];
@@ -4088,6 +4132,12 @@
 
       function opponentAnchorRect(pid) {
         const seat = seatForPlayer(pid);
+        if (seat === 'self') {
+           const hc = document.getElementById('handContainer');
+           if (!hc) return fallbackSeatRect('top');
+           const r = hc.getBoundingClientRect();
+           return { left: r.left + r.width / 2 - 30, top: r.top + 10, width: 60, height: 90 };
+        }
         if (seat === 'top') return getOpponentAnchorRectById('opponentTop', 'top');
         if (seat === 'left') return getOpponentAnchorRectById('opponentLeft', 'left');
         if (seat === 'right') return getOpponentAnchorRectById('opponentRight', 'right');
@@ -4119,7 +4169,9 @@
         const total = state.players.length;
         const seats = { top: null, left: null, right: null };
         const others = [];
-        for (let i = 1; i < total; i++) others.push((myPlayerIndex + i) % total);
+        const baseIdx = myPlayerIndex !== -1 ? myPlayerIndex : 0; // Finge que o P0 é a base
+        
+        for (let i = 1; i < total; i++) others.push((baseIdx + i) % total);
 
         if (total === 2) seats.top = others[0];
         else if (total === 3) {
@@ -4903,17 +4955,44 @@
           for (let i = 0; i < req; i++) if (ready[i]) readyCount++;
 
           if (readyCount === req) {
+            // Verifica se a sala é 100% bot
+            let allBots = true;
+            for(let i = 0; i < req; i++) {
+               if (!currentLobby.names[i] || !currentLobby.names[i].toUpperCase().includes('BOT')) {
+                   allBots = false;
+                   break;
+               }
+            }
+
+            // Trava de segurança: Exige cadeira APENAS se tiver algum humano jogando
+            if (!allBots && (myPlayerIndex === -1 || isNaN(myPlayerIndex))) {
+              if (window.startTimer) { clearInterval(window.startTimer); window.startTimer = null; }
+              document.getElementById('countdownOverlay').style.display = 'flex';
+              document.getElementById('countdownText').textContent = '⚠️';
+              document.getElementById('countdownText').nextElementSibling.textContent = 'Selecione quem você é (Sou) para iniciar!';
+              return;
+            }
+
             if (!window.startTimer) {
               let timeLeft = 5;
               document.getElementById('countdownOverlay').style.display = 'flex';
               document.getElementById('countdownText').textContent = timeLeft;
+              document.getElementById('countdownText').nextElementSibling.textContent = 'A partida vai começar!';
+              
               window.startTimer = setInterval(() => {
                 timeLeft--;
                 document.getElementById('countdownText').textContent = timeLeft;
                 if (timeLeft <= 0) {
                   clearInterval(window.startTimer);
                   window.startTimer = null;
-                  if (myPlayerIndex === 0) startGame(l.mode, l.names, l.variant, l.pixKeys);
+                  
+                  let hostIdx = currentLobby.names.findIndex(n => n && !n.toUpperCase().includes('BOT'));
+                  // Se for 100% bot, o observador (-1) vira o Host
+                  if (hostIdx === -1) hostIdx = myPlayerIndex; 
+                  
+                  if (myPlayerIndex === hostIdx) {
+                     startGame(currentLobby.mode, currentLobby.names, currentLobby.variant, currentLobby.pixKeys);
+                  }
                 }
               }, 1000);
             }
@@ -4957,22 +5036,20 @@
         if (!state.finished) {
           const currentPlayerObj = state.players[state.currentPlayer];
           
-          // Verifica se é a vez de um bot e se EU sou o Host (myPlayerIndex === 0)
           if (currentPlayerObj && currentPlayerObj.name.toUpperCase().includes('BOT')) {
-            if (myPlayerIndex === 0) {
-              
-              // Trava de concorrência para o Host não rodar o bot 2x no mesmo turno
-              if (!window.botIsPlaying) {
-                window.botIsPlaying = true;
+            
+            let hostIdx = state.players.findIndex(p => p && !p.name.toUpperCase().includes('BOT'));
+            if (hostIdx === -1) hostIdx = myPlayerIndex; 
+
+            // REMOVIDA a trava de Espectador! Agora, se você for o "-1", você roda a matemática deles.
+            if (myPlayerIndex === hostIdx) {
+              if (window.lastBotTurnPlayed !== state.turnNumber) {
+                window.lastBotTurnPlayed = state.turnNumber;
                 
-                // Dispara a IA passando o estado, quem é o bot, e os motores de ação
                 BuracoBot.playTurn(state, state.currentPlayer, botEngine)
-                  .then(() => {
-                    window.botIsPlaying = false;
-                  })
                   .catch(err => {
-                    console.error("Erro na Matrix (Falha no Bot):", err);
-                    window.botIsPlaying = false;
+                    console.error("Erro na Matrix:", err);
+                    window.lastBotTurnPlayed = null; 
                   });
               }
             }
@@ -5309,17 +5386,44 @@
       document.getElementById('cancelReadyBtn').onclick = () => {
         if (!currentLobby) return;
         const readyArray = [...currentLobby.ready];
-        readyArray[myPlayerIndex] = false;
 
-        // AQUI ESTÁ A MUDANÇA: adicionado o pixKeys
+        // 1. Tira o seu "Pronto" (se você tiver um)
+        if (myPlayerIndex !== -1 && !isNaN(myPlayerIndex)) {
+          readyArray[myPlayerIndex] = false;
+        }
+
+        // 2. QUEBRA O LOOP DE AUTO-READY: Apaga o nome dos bots!
+        // Se a gente não apagar a palavra "BOT", o sistema dá auto-ready no mesmo segundo.
+        const namesArray = [...currentLobby.names];
+        for (let i = 0; i < 4; i++) {
+          if (namesArray[i] && namesArray[i].toUpperCase().includes('BOT')) {
+            readyArray[i] = false;
+            namesArray[i] = ''; // Limpa no banco de dados
+            
+            const input = document.getElementById(`p${i+1}Name`);
+            if (input) {
+              input.value = ''; // Limpa na sua tela
+              input.style.backgroundColor = '';
+              input.style.boxShadow = '';
+            }
+          }
+        }
+
+        // 3. Esconde o aviso de erro e reseta os textos originais
+        const overlay = document.getElementById('countdownOverlay');
+        if (overlay) overlay.style.display = 'none';
+        document.getElementById('countdownText').textContent = '5';
+        document.getElementById('countdownText').nextElementSibling.textContent = 'A partida vai começar!';
+
+        // 4. Salva a fuga no Firebase
         const fullLobby = {
           mode: document.getElementById('modeSelect').value,
           variant: document.getElementById('variantSelect').value,
           betToggle: document.getElementById('betToggle').value,
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
-          names: [document.getElementById('p1Name').value.trim(), document.getElementById('p2Name').value.trim(), document.getElementById('p3Name').value.trim(), document.getElementById('p4Name').value.trim()],
-          pixKeys: [document.getElementById('p1Pix').value.trim(), document.getElementById('p2Pix').value.trim(), document.getElementById('p3Pix').value.trim(), document.getElementById('p4Pix').value.trim()],
+          names: namesArray,
+          pixKeys: currentLobby.pixKeys || ['', '', '', ''],
           ready: readyArray,
         };
         setDoc(gameRef, { lobby: fullLobby, updatedAt: Date.now() }, { merge: true });
@@ -5413,7 +5517,11 @@
 
         // Se todo mundo votou SIM, apaga a sala (voltando pro lobby)
         if (yesCount === state.players.length && state.players.length > 0) {
-          if (myPlayerIndex === 0) deleteDoc(gameRef); // Apenas o Host deleta para evitar concorrência
+          // Usa o Host Dinâmico para deletar a sala! Se for 100% bot, o Espectador (-1) chuta a porta.
+          let hostIdx = state.players.findIndex(p => p && !p.name.toUpperCase().includes('BOT'));
+          if (hostIdx === -1) hostIdx = myPlayerIndex; 
+          
+          if (myPlayerIndex === hostIdx) deleteDoc(gameRef); 
         }
       }
       document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
