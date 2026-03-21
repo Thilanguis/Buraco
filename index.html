@@ -3226,6 +3226,9 @@
         if (!cards) return false;
         cards = cards.filter((c) => c != null); // Remove os fantasmas da matemática
         if (cards.length < 3) return false;
+        
+        // TRAVA ANTI-ABERRAÇÃO: Nenhuma canastra no Buraco pode passar de 14 cartas (Ás a Ás).
+        if (cards.length > 14) return false;
 
         let wildCards = cards.filter((c) => isWildcard(c, cards));
         let modifiedTwo = null;
@@ -4820,6 +4823,47 @@
           await commitState();
         },
 
+        executeDrawDiscardFechado: async (botIndex, intent) => {
+          const me = state.players[botIndex];
+          const team = state.teams[me.teamId];
+          const pile = state.discard.splice(0, state.discard.length);
+          pile.forEach(ensureCardId);
+          const topCard = pile.pop(); // Separa a carta do topo à força
+          
+          // Executa a obrigação do Buraco Fechado imediatamente
+          if (intent.action === 'extend') {
+             team.melds[intent.meldIndex].push(topCard);
+             botEngine.normalizeMeld(team.melds[intent.meldIndex]);
+          } else if (intent.action === 'new') {
+             const cardsFromHand = intent.handIndexes.map(i => me.hand[i]);
+             intent.handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
+             const newMeld = [...cardsFromHand, topCard];
+             botEngine.normalizeMeld(newMeld);
+             team.melds.push(newMeld);
+          }
+          
+          // Guarda o resto do lixo na mão
+          if (pile.length > 0) {
+             me.hand.push(...pile);
+             sortHand(me.hand);
+          }
+
+          if (state.mode === '1x1_duploMorto' && botIndex === 1 && !state.partialDraw) {
+            state.partialDraw = true;
+          } else {
+            state.hasDrawnThisTurn = true;
+            state.partialDraw = false;
+          }
+
+          state.pickedDiscardCardId = null; // Zera a obrigação de descarte
+
+          await botEngine._checkBotMortoOrWin(botIndex);
+
+          state.lastAction = { id: newActionId(), type: 'drawDiscardFechado', playerId: botIndex, ts: Date.now() };
+          renderAll();
+          await commitState();
+        },
+
         // A FUNÇÃO QUE FALTAVA E DERRUBAVA O SISTEMA:
         executeDiscard: async (botIndex, cardIndex) => {
           const me = state.players[botIndex];
@@ -4989,6 +5033,15 @@
           for (let i = 0; i < req; i++) if (ready[i]) readyCount++;
 
           if (readyCount === req) {
+            // TRAVA NOVA: Impede de iniciar se faltar a Regra ou o Dinheiro
+            if (!currentLobby.variant || !currentLobby.betToggle) {
+               document.getElementById('menuError').textContent = '⚠️ Escolha a Regra e Valendo Dinheiro antes de iniciar!';
+               document.getElementById('menuError').style.display = 'block';
+               return; // Para tudo aqui e não deixa começar
+            } else {
+               document.getElementById('menuError').style.display = 'none';
+            }
+
             // Verifica se a sala é 100% bot
             let allBots = true;
             for(let i = 0; i < req; i++) {
@@ -5101,34 +5154,39 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
-          // AQUI SALVA AS CHAVES DE VERDADE
           pixKeys: [document.getElementById('pixTeam1').value.trim(), document.getElementById('pixTeam2').value.trim()],
         };
 
-        // Garante que o array sempre exista, clonando o anterior para evitar erro de referência
         let readyArray = [false, false, false, false];
         if (currentLobby && currentLobby.ready && !resetReady) {
           readyArray = [...currentLobby.ready];
         }
 
-        // Auto-ready imediato para qualquer nome que contenha "BOT"
-        for (let i = 0; i < 4; i++) {
-          if (lobby.names[i] && lobby.names[i].toUpperCase().includes('BOT')) {
-            readyArray[i] = true;
-          }
-        }
-        
+        // AUTO-READY REMOVIDO DAQUI! O botão "Estou Pronto" é quem vai comandar isso agora.
         lobby.ready = readyArray;
 
         setDoc(gameRef, { lobby: lobby, updatedAt: Date.now() }, { merge: true });
       };
 
-      document.querySelectorAll('#configSection input, #configSection select').forEach((el) => {
+      document.querySelectorAll('#configSection input').forEach((el) => {
         if (el.id !== 'localPlayerSelect') {
-          el.addEventListener('change', pushLobby);
           el.addEventListener('keyup', (e) => {
             clearTimeout(el.syncTimer);
-            el.syncTimer = setTimeout(pushLobby, 400);
+            // PONTO 3 RESOLVIDO: Se detectar "BOT", espera 5 segundos para dar tempo de terminar o complemento
+            const delay = el.value.toUpperCase().includes('BOT') ? 5000 : 400;
+            el.syncTimer = setTimeout(() => {
+                updateMenuDynamic();
+                pushLobby();
+            }, delay);
+          });
+        }
+      });
+      
+      document.querySelectorAll('#configSection select').forEach((el) => {
+        if (el.id !== 'localPlayerSelect') {
+          el.addEventListener('change', () => {
+              updateMenuDynamic();
+              pushLobby();
           });
         }
       });
@@ -5259,6 +5317,35 @@
         } else {
             pt1.placeholder = 'Chave PIX do Time 1 (Recebedor)';
             pt2.placeholder = 'Chave PIX do Time 2 (Recebedor)';
+        }
+
+        // PONTO 4 (Parte A) RESOLVIDO: Verifica se todos os nomes são Bots para sumir com o campo SOU
+        const namesArray = [
+            document.getElementById('p1Name').value,
+            document.getElementById('p2Name').value,
+            document.getElementById('p3Name').value,
+            document.getElementById('p4Name').value
+        ];
+        
+        let reqPlayers = 2;
+        if (mode === '1x2') reqPlayers = 3;
+        if (mode === '2x2') reqPlayers = 4;
+
+        let allBots = mode ? true : false;
+        for (let i = 0; i < reqPlayers; i++) {
+          if (!namesArray[i] || !namesArray[i].toUpperCase().includes('BOT')) {
+            allBots = false;
+            break;
+          }
+        }
+
+        const souContainer = document.getElementById('localPlayerSelect').parentElement;
+        if (allBots) {
+           souContainer.style.display = 'none'; // Some com a opção
+           document.getElementById('localPlayerSelect').value = ""; // Vira espectador
+           myPlayerIndex = -1;
+        } else {
+           souContainer.style.display = 'flex'; // Volta se tiver humano
         }
         };
 
@@ -5446,20 +5533,11 @@
           readyArray[myPlayerIndex] = false;
         }
 
-        // 2. QUEBRA O LOOP DE AUTO-READY: Apaga o nome dos bots!
-        // Se a gente não apagar a palavra "BOT", o sistema dá auto-ready no mesmo segundo.
+        // 2. Desmarca os Bots sem apagar os nomes deles!
         const namesArray = [...currentLobby.names];
         for (let i = 0; i < 4; i++) {
           if (namesArray[i] && namesArray[i].toUpperCase().includes('BOT')) {
             readyArray[i] = false;
-            namesArray[i] = ''; // Limpa no banco de dados
-            
-            const input = document.getElementById(`p${i+1}Name`);
-            if (input) {
-              input.value = ''; // Limpa na sua tela
-              input.style.backgroundColor = '';
-              input.style.boxShadow = '';
-            }
           }
         }
 

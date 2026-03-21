@@ -7,74 +7,66 @@ export class BuracoBot {
     let team = state.teams[me.teamId];
     let oppTeam = state.teams[me.teamId === 0 ? 1 : 0];
 
-    // ==========================================
-    // MÓDULO DE INTELIGÊNCIA DE CONTEXTO
-    // ==========================================
     const myScore = engine.computeTeamMeldScore(team).total;
     const oppScore = engine.computeTeamMeldScore(oppTeam).total;
     const stockCount = state.stock.length;
     const tookMorto = (state.deadChunksTaken[team.id] || 0) > 0;
     const oppTookMorto = (state.deadChunksTaken[oppTeam.id] || 0) > 0;
 
-    // 1. Desespero: Tomando surra de pontos ou o oponente pegou o morto e as cartas estão acabando
     const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25);
-
-    // 2. Rush Mode: Mão pequena e o morto ainda está na mesa
     const isRushingMorto = !tookMorto && me.hand.length <= 5;
-
-    // 3. Estratégia de Dupla
     const isDuo = state.mode === '2x2' || (state.mode === '1x2' && team.playerIndexes.length === 2);
-
     const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto };
 
-    engine.showMessage(`🤖 Bot ${me.name} analisando a mesa...`);
-    await this.sleep(1200);
+    // PONTO 1 RESOLVIDO: Tira o "Bot" redundante, usa só o nome que você digitou
+    engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
+
+    // PONTO 2 RESOLVIDO: Tempo randômico entre 2 e 8 segundos para simular pensamento
+    await this.sleep(Math.floor(Math.random() * 6000) + 2000);
 
     try {
-      // ==========================================
-      // FASE 1: DECISÃO DE COMPRA
-      // ==========================================
       let boughtFromDiscard = false;
       if (state.discard.length > 0) {
-        const wantsDiscard = this.evaluateDiscard(state, me.hand, team, engine, ctx);
-        if (wantsDiscard) {
+        const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
+        if (intent && intent.wants) {
           boughtFromDiscard = true;
-          engine.showMessage(`🤖 Bot ${me.name} puxou o Lixo!`);
-          await engine.executeDrawDiscard(botIndex);
+          engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
+
+          if (state.variant === 'fechado') {
+            await engine.executeDrawDiscardFechado(botIndex, intent);
+          } else {
+            await engine.executeDrawDiscard(botIndex);
+          }
         }
       }
 
-      state = engine.getState(); // Atualiza a mente após a compra!
+      state = engine.getState();
 
       if (!boughtFromDiscard || state.partialDraw) {
         await engine.executeDrawStock(botIndex);
       }
-      await this.sleep(800);
 
-      // ==========================================
-      // FASE 2: BAIXAR JOGOS (CÉREBRO TÁTICO)
-      // ==========================================
+      await this.sleep(1500);
+
       state = engine.getState();
       me = state.players[botIndex];
-      engine.showMessage(`🤖 Bot ${me.name} organizando as cartas...`);
+      engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
 
       await this.processMelds(botIndex, ctx, engine);
       await this.sleep(1000);
     } catch (error) {
-      console.error('Erro interno do Bot (Curto-circuito):', error);
+      console.error('Erro interno:', error);
       let s = engine.getState();
-      engine.showMessage(`🤖 Bot ${s.players[botIndex].name} deu curto-circuito!`);
+      engine.showMessage(`🤖 ${s.players[botIndex].name} deu curto-circuito!`);
     }
 
-    // ==========================================
-    // FASE 3: DESCARTE
-    // ==========================================
     try {
       let s = engine.getState();
-      engine.showMessage(`🤖 Bot ${s.players[botIndex].name} descartando...`);
+      engine.showMessage(`🤖 ${s.players[botIndex].name} descartando...`);
+      await this.sleep(1500);
       await this.processDiscard(botIndex, me.teamId === 0 ? 1 : 0, engine);
     } catch (error) {
-      console.error('Erro fatal no descarte do Bot:', error);
+      console.error('Erro fatal:', error);
       await engine.executeDiscard(botIndex, 0);
     }
   }
@@ -83,12 +75,14 @@ export class BuracoBot {
     const topCard = state.discard[state.discard.length - 1];
 
     if (team.melds && team.melds.length > 0) {
-      for (let meld of team.melds) {
+      for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+        const meld = team.melds[mIdx];
         const testMeld = [...meld, topCard];
         if (engine.isValidSequenceMeld(testMeld)) {
           const needsWild = testMeld.some((c) => c.joker || c.rank === '2');
-          // Só suja puxando do lixo se fechar canastra, se for o 2 do mesmo naipe, ou se estiver rushando pro morto
-          if (!needsWild || meld.length >= 6 || ctx.isRushingMorto || (topCard.rank === '2' && topCard.suit === meld[0].suit)) return true;
+          if (!needsWild || meld.length >= 6 || ctx.isRushingMorto || (topCard.rank === '2' && topCard.suit === meld[0].suit)) {
+            return { wants: true, action: 'extend', meldIndex: mIdx };
+          }
         }
       }
     }
@@ -98,18 +92,19 @@ export class BuracoBot {
         for (let j = i + 1; j < hand.length; j++) {
           const combo = [hand[i], hand[j], topCard];
           const hasWild = combo.some((c) => c.joker || c.rank === '2');
-          if (!hasWild && engine.isValidSequenceMeld(combo)) return true;
+          if (!hasWild && engine.isValidSequenceMeld(combo)) {
+            return { wants: true, action: 'new', handIndexes: [i, j] };
+          }
         }
       }
     }
 
+    // Se a mesa for FECHADO e ele não declarou jogo exato acima, ELE NÃO COMPRA!
     if (state.variant === 'fechado') return false;
 
-    // Se tá rushando o morto, vira uma máquina de catar lixo se tiver coringa pra ajudar a desovar a mão
-    if (ctx.isRushingMorto && (topCard.joker || topCard.rank === '2')) return true;
-
-    // Em jogo solo, pega lixo gordo para ganhar volume de cartas
-    if (state.variant === 'aberto' && state.discard.length >= 4 && !ctx.isDuo) return true;
+    // Regras exclusivas para Buraco ABERTO abaixo:
+    if (ctx.isRushingMorto && (topCard.joker || topCard.rank === '2')) return { wants: true, action: 'open' };
+    if (state.variant === 'aberto' && state.discard.length >= 4 && !ctx.isDuo) return { wants: true, action: 'open' };
 
     return false;
   }
@@ -184,6 +179,7 @@ export class BuracoBot {
       if (madeMove) continue;
 
       // --- PASSO 3: FORMAR NOVOS JOGOS LIMPOS ---
+      // Desce trincas naturais sem envolver nenhum coringa.
       let n = me.hand.length;
       if (n >= 3) {
         for (let i = 0; i < n - 2; i++) {
@@ -192,13 +188,6 @@ export class BuracoBot {
               if (!this.canMeldSafely(me, team, 3, engine)) continue;
               const combo = [me.hand[i], me.hand[j], me.hand[k]];
               if (combo.some((c) => c.joker || c.rank === '2')) continue;
-
-              // === MALÍCIA DE DUPLA (POKER FACE) ===
-              // Se está em dupla, tem mais de 7 cartas na mão e não está em desespero,
-              // ele não abre jogo novo de apenas 3 cartas. Segura na mão para esconder o jogo do adversário.
-              if (ctx.isDuo && !ctx.isDesperate && !ctx.isRushingMorto && me.hand.length > 7) {
-                continue;
-              }
 
               if (engine.isValidSequenceMeld(combo)) {
                 await engine.executeMeldNew(botIndex, [i, j, k]);
