@@ -80,19 +80,21 @@ export class BuracoBot {
         const testMeld = [...meld, topCard];
 
         if (engine.isValidSequenceMeld(testMeld)) {
-          // 🛡️ TRAVA ANTI-SABOTAGEM INTELIGENTE
+          // 🛡️ TRAVA DO DUPLO 2 E ANTI-SABOTAGEM
           const isCanastra = meld.length >= 7;
-          const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit));
+          const hasDirtyWild = meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit));
+          const isLimpa = !hasDirtyWild;
+          const hasTwo = meld.some((c) => c.rank === '2');
 
           if (isCanastra && isLimpa) {
-            // Se a canastra é limpa, PROÍBE comprar Joker ou 2 de naipe diferente para jogar nela
-            if (topCard.joker || (topCard.rank === '2' && topCard.suit !== meld[0].suit)) {
+            // Se já for canastra limpa, proíbe Joker, 2 de outro naipe, ou um SEGUNDO 2 do mesmo naipe.
+            if (topCard.joker || (topCard.rank === '2' && topCard.suit !== meld[0].suit) || (topCard.rank === '2' && hasTwo)) {
               continue;
             }
           }
 
-          const needsWild = testMeld.some((c) => c.joker || c.rank === '2');
-          if (!needsWild || meld.length >= 6 || ctx.isRushingMorto || (topCard.rank === '2' && topCard.suit === meld[0].suit)) {
+          const needsWild = testMeld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== testMeld[0].suit));
+          if (!needsWild || meld.length >= 6 || ctx.isRushingMorto || (topCard.rank === '2' && topCard.suit === meld[0].suit && !hasTwo)) {
             return { wants: true, action: 'extend', meldIndex: mIdx };
           }
         }
@@ -164,7 +166,8 @@ export class BuracoBot {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           const meld = team.melds[mIdx];
 
-          if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue;
+          // 🛡️ TRAVA DO DUPLO 2: Se o jogo já tem um '2', colocar outro '2' vai sujar. Pula!
+          if (meld.some((c) => c.joker || c.forceWild || c.rank === '2')) continue;
 
           for (let i = 0; i < me.hand.length; i++) {
             if (!this.canMeldSafely(me, team, 1, engine)) continue;
@@ -209,22 +212,25 @@ export class BuracoBot {
       }
       if (madeMove) continue;
 
-      // --- PASSO 4: USO DE CORINGA SUJO (TRAVA DE SEGURANÇA ATIVADA) ---
-      if (ctx.isRushingMorto || ctx.isDesperate || s.stock.length <= 15) {
+      // --- PASSO 4: USO DE CORINGA SUJO (TRAVA DE SEGURANÇA E EQUILÍBRIO) ---
+      // NOVO EQUILÍBRIO: Libera a sujeira se o monte chegar em 22 ou se já pegou o morto e a mão tá secando (<= 6)
+      const isEndgame = s.stock.length <= 22 || (ctx.tookMorto && me.hand.length <= 6);
+
+      if (ctx.isRushingMorto || ctx.isDesperate || isEndgame) {
         // 4.1 Tenta fechar/estender jogos já existentes com sujeira
         if (team.melds && team.melds.length > 0) {
           for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
             const meld = team.melds[mIdx];
 
-            // 🛡️ TRAVA ANTI-SABOTAGEM INTELIGENTE
             const isCanastra = meld.length >= 7;
-            const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit));
+            const hasDirtyWild = meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit));
+            const isLimpa = !hasDirtyWild;
 
             if (isCanastra && isLimpa) {
-              continue; // É limpa e sagrada! Proibido jogar Joker ou 2 errado aqui.
+              continue; // É limpa e sagrada! Proibido jogar Joker ou 2 extra aqui.
             }
 
-            if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue;
+            if (hasDirtyWild) continue; // Se o jogo já tem um coringa sujo, não gasta processamento
 
             for (let i = 0; i < me.hand.length; i++) {
               if (!this.canMeldSafely(me, team, 1, engine)) continue;
