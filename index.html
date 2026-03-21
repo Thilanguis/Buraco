@@ -1583,24 +1583,18 @@
               </select>
             </label>
 
-            <div id="betConfig" style="display: none; background: rgba(34, 197, 94, 0.15); border: 1px dashed #22c55e; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; text-align: center; line-height: 1.5">
-              <strong style="color: #4ade80; font-size: 12px; text-transform: uppercase; letter-spacing: 1px">💰 Valores Oficiais da Mesa</strong>
-              <br />
-              <span style="color: #bbf7d0; font-size: 11px">
-                Vitória:
-                <strong>R$ 5,00</strong>
-                | Diferença:
-                <strong>R$ 0,01 / pt</strong>
-              </span>
+            <div id="betConfig" style="display: none; background: rgba(0, 0, 0, 0.4); border: 1px dashed rgba(212, 175, 55, 0.3); padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; text-align: center; line-height: 1.5">
+  <strong style="color: #facc15; font-size: 11px; text-transform: uppercase; letter-spacing: 1px">💰 VALORES OFICIAIS DA MESA</strong>
+  <br />
+  <span style="color: #94a3b8; font-size: 10px">
+    Vitória: <strong>R$ 5,00</strong> | Diferença: <strong>R$ 0,01 / pt</strong>
+  </span>
 
-              <input id="betBase" type="hidden" value="5" />
-              <input id="betPerPoint" type="hidden" value="0.01" />
-
-              <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px;">
-                <input id="pixTeam1" value="" placeholder="Chave PIX do Time 1 (Recebedor)" style="margin: 0; padding: 10px; font-size: 11px; border-color: #10b981; background: rgba(16, 185, 129, 0.1); color: #fff;" />
-                <input id="pixTeam2" value="" placeholder="Chave PIX do Time 2 (Recebedor)" style="margin: 0; padding: 10px; font-size: 11px; border-color: #10b981; background: rgba(16, 185, 129, 0.1); color: #fff;" />
-              </div>
-            </div>
+  <div id="pixContainer" style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+    <input id="pixTeam1" value="" placeholder="PIX Time 1" style="margin: 0; font-size: 11px;" />
+    <input id="pixTeam2" value="" placeholder="PIX Time 2" style="margin: 0; font-size: 11px;" />
+  </div>
+</div>
 
             <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
               <div id="boxP1" style="position: relative; margin-top: 4px; margin-bottom: 5px">
@@ -1902,6 +1896,28 @@
       let ignoreOwnActionId = null;
 
       let movingWild = null;
+
+      // --- CONTROLE DE TELA VIVA (WAKE LOCK) ---
+      let wakeLock = null;
+      async function keepScreenAlive() {
+        if ('wakeLock' in navigator) {
+          try {
+            wakeLock = await navigator.wakeLock.request('screen');
+          } catch (err) {}
+        }
+      }
+      function releaseScreen() {
+        if (wakeLock !== null) {
+          wakeLock.release().catch(()=>{});
+          wakeLock = null;
+        }
+      }
+      // Se a pessoa minimizar o navegador e voltar, a API derruba a trava. Isso garante que ela reative.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && state && document.getElementById('gameSection').style.display === 'flex') {
+          keepScreenAlive();
+        }
+      });
 
       window.getState = () => state;
       window.setState = (s) => ((state = s), renderAll());
@@ -4966,9 +4982,22 @@
 
       onSnapshot(gameRef, async (snap) => {
         if (!snap.exists()) {
+          releaseScreen(); // 🛡️ Libera a tela para apagar no Lobby
+
+          // 🛡️ Limpeza direcionada (sem matar a tela de loading)
+          if (window.startTimer) {
+            clearInterval(window.startTimer);
+            window.startTimer = null;
+          }
+
           state = null;
           selectedHandIndexes.clear();
           movingWild = null;
+          
+          // 🛡️ RESET DE CADEIRA: Garante que você não fique preso no corpo de um bot
+          myPlayerIndex = -1; 
+          const localSelect = document.getElementById('localPlayerSelect');
+          if (localSelect) localSelect.value = "";
 
           lastSeenActionId = null;
           ignoreOwnActionId = null;
@@ -5054,11 +5083,6 @@
             setIfUnfocused('p4Name', l.names[3] || '');
           }
 
-          if (l.pixKeys) {
-            setIfUnfocused('pixTeam1', l.pixKeys[0] || '');
-            setIfUnfocused('pixTeam2', l.pixKeys[1] || '');
-          }
-
           // CHAMA A FUNÇÃO NOVA AQUI PARA ATUALIZAR A TELA COM OS DADOS DO BANCO
           window.updateMenuDynamic();
 
@@ -5142,6 +5166,9 @@
               document.getElementById('countdownText').nextElementSibling.textContent = 'A partida vai começar!';
               
               window.startTimer = setInterval(() => {
+                // 🛡️ TRAVA ANTI-FANTASMA: Se a aba estiver minimizada, pausa a contagem
+                if (document.hidden) return; 
+
                 timeLeft--;
                 document.getElementById('countdownText').textContent = timeLeft;
                 if (timeLeft <= 0) {
@@ -5180,6 +5207,7 @@
 
         document.getElementById('configSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'flex';
+        keepScreenAlive(); // 🛡️ Trava a tela acesa durante a partida inteira
 
         renderAll();
         startTurnTimerIfNeeded();
@@ -5229,7 +5257,12 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
-          pixKeys: [document.getElementById('pixTeam1').value.trim(), document.getElementById('pixTeam2').value.trim()],
+          names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
+          // 🛡️ Salva apenas o PIX que o jogador tem permissão de editar. O do oponente ele puxa do cache.
+          pixKeys: [
+            document.getElementById('pixTeam1').disabled && currentLobby ? currentLobby.pixKeys[0] : document.getElementById('pixTeam1').value.trim(),
+            document.getElementById('pixTeam2').disabled && currentLobby ? currentLobby.pixKeys[1] : document.getElementById('pixTeam2').value.trim()
+          ],
         };
 
         let readyArray = [false, false, false, false];
@@ -5297,78 +5330,69 @@
         playersContainer.style.display = 'grid';
         humiliationRules.style.display = 'none';
 
-        // 1. Reseta os labels para o padrão
-        lbl1.textContent = 'Jogador 1';
-        lbl1.style.color = '#cbd5e1';
-        lbl2.textContent = 'Jogador 2';
-        lbl2.style.color = '#cbd5e1';
-        lbl3.textContent = 'Jogador 3';
-        lbl3.style.color = '#cbd5e1';
-        lbl4.textContent = 'Jogador 4';
-        lbl4.style.color = '#cbd5e1';
+        // 1. Cores e Estilos dos Times para facilitar a visualização (Identidade visual da mesa)
+        const styleT1 = "position: relative; border-left: 4px solid #22c55e; background: rgba(34, 197, 94, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;";
+        const styleT2 = "position: relative; border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;";
+        const styleNone = "display: none;";
 
         // 2. Reseta as opções do "Sou" para o padrão e garante que estão visíveis
-        opt0.hidden = false;
-        opt0.disabled = false;
-        opt0.textContent = 'Jogador 1';
-        opt1.hidden = false;
-        opt1.disabled = false;
-        opt1.textContent = 'Jogador 2';
-        opt2.hidden = false;
-        opt2.disabled = false;
-        opt2.textContent = 'Jogador 3';
-        opt3.hidden = false;
-        opt3.disabled = false;
-        opt3.textContent = 'Jogador 4';
+        opt0.hidden = false; opt0.disabled = false; opt0.textContent = 'Jogador 1';
+        opt1.hidden = false; opt1.disabled = false; opt1.textContent = 'Jogador 2';
+        opt2.hidden = false; opt2.disabled = false; opt2.textContent = 'Jogador 3';
+        opt3.hidden = false; opt3.disabled = false; opt3.textContent = 'Jogador 4';
 
         if (mode === '1x1') {
-          p1.style.display = 'block';
-          p2.style.display = 'block';
-          p3.style.display = 'none';
-          p4.style.display = 'none';
+          p1.style.cssText = styleT1;
+          p2.style.cssText = styleT2;
+          p3.style.cssText = styleNone;
+          p4.style.cssText = styleNone;
 
-          opt2.hidden = true;
-          opt2.disabled = true;
-          opt3.hidden = true;
-          opt3.disabled = true;
+          lbl1.innerHTML = 'Jogador 1 <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
+          lbl2.innerHTML = 'Jogador 2 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
+
+          opt2.hidden = true; opt2.disabled = true;
+          opt3.hidden = true; opt3.disabled = true;
+          
         } else if (mode === '2x2') {
-          p1.style.display = 'block';
-          p2.style.display = 'block';
-          p3.style.display = 'block';
-          p4.style.display = 'block';
-        } else if (mode === '1x2') {
-          p1.style.display = 'block';
-          p2.style.display = 'block';
-          p3.style.display = 'block';
-          p4.style.display = 'none';
+          p1.style.cssText = styleT1;
+          p2.style.cssText = styleT2;
+          p3.style.cssText = styleT1;
+          p4.style.cssText = styleT2;
 
-          lbl1.textContent = 'Solo';
-          lbl2.textContent = 'Dupla 1';
-          lbl3.textContent = 'Dupla 2';
+          lbl1.innerHTML = 'Jogador 1 <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
+          lbl2.innerHTML = 'Jogador 2 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
+          lbl3.innerHTML = 'Jogador 3 <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
+          lbl4.innerHTML = 'Jogador 4 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
+
+        } else if (mode === '1x2') {
+          p1.style.cssText = styleT1;
+          p2.style.cssText = styleT2;
+          p3.style.cssText = styleT2;
+          p4.style.cssText = styleNone;
+
+          lbl1.innerHTML = 'Solo <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
+          lbl2.innerHTML = 'Dupla 1 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
+          lbl3.innerHTML = 'Dupla 2 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
+          
           opt0.textContent = 'Solo';
           opt1.textContent = 'Dupla 1';
           opt2.textContent = 'Dupla 2';
-          opt3.hidden = true;
-          opt3.disabled = true;
-        } else if (mode === '1x1_duploMorto') {
-          p1.style.display = 'block';
-          p2.style.display = 'block';
-          p3.style.display = 'none';
-          p4.style.display = 'none';
+          opt3.hidden = true; opt3.disabled = true;
 
-          lbl1.textContent = 'Escravo';
-          lbl1.style.color = '#94a3b8';
-          lbl2.textContent = '👑 Dominador';
-          lbl2.style.color = '#facc15';
+        } else if (mode === '1x1_duploMorto') {
+          p1.style.cssText = styleT1;
+          p2.style.cssText = styleT2;
+          p3.style.cssText = styleNone;
+          p4.style.cssText = styleNone;
+
+          lbl1.innerHTML = 'Escravo <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
+          lbl2.innerHTML = '👑 Dominador <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
 
           opt0.textContent = 'Escravo';
           opt1.textContent = '👑 Dominador';
-          opt2.hidden = true;
-          opt2.disabled = true;
-          opt3.hidden = true;
-          opt3.disabled = true;
+          opt2.hidden = true; opt2.disabled = true;
+          opt3.hidden = true; opt3.disabled = true;
           
-          // Reativa o quadro de aviso de regras
           humiliationRules.style.display = 'block';
         }
 
@@ -5393,6 +5417,50 @@
             pt1.placeholder = 'Chave PIX do Time 1 (Recebedor)';
             pt2.placeholder = 'Chave PIX do Time 2 (Recebedor)';
         }
+
+        // -----------------------------------------------------------------
+        // 🛡️ TRAVA DE VISÃO DO PIX: Oculta a chave do time adversário
+        // -----------------------------------------------------------------
+        let myTeam = -1;
+        if (myPlayerIndex === 0 || myPlayerIndex === 2) myTeam = 0; // Time 1
+        if (myPlayerIndex === 1 || myPlayerIndex === 3) myTeam = 1; // Time 2
+
+        const realPix1 = (currentLobby && currentLobby.pixKeys) ? currentLobby.pixKeys[0] : '';
+        const realPix2 = (currentLobby && currentLobby.pixKeys) ? currentLobby.pixKeys[1] : '';
+
+        if (myTeam === 0) {
+            pt1.disabled = false;
+            pt2.disabled = true;
+            if (document.activeElement !== pt1) pt1.value = realPix1;
+            pt2.value = realPix2 ? '•••••••••••••••• (Oculto)' : '';
+        } else if (myTeam === 1) {
+            pt1.disabled = true;
+            pt2.disabled = false;
+            pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
+            if (document.activeElement !== pt2) pt2.value = realPix2;
+        } else {
+            // Espectador (-1) não vê nada
+            pt1.disabled = true;
+            pt2.disabled = true;
+            pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
+            pt2.value = realPix2 ? '•••••••••••••••• (Oculto)' : '';
+        }
+
+        // Estética Refinada (Identidade de Time sem clashing)
+        const pixBaseStyle = "margin: 0; font-size: 11px; transition: all 0.3s; border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.1);";
+        
+        // Time 1: Verde sutil apenas na borda de destaque
+        pt1.style.cssText = pixBaseStyle + "border-left: 4px solid #22c55e; background: rgba(34, 197, 94, 0.05); color: #e5e7eb;";
+        
+        // Time 2: Vermelho sutil apenas na borda de destaque
+        pt2.style.cssText = pixBaseStyle + "border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.05); color: #e5e7eb;";
+
+        // Mantém as travas de opacidade e cursor
+        pt1.style.opacity = pt1.disabled ? '0.3' : '1';
+        pt2.style.opacity = pt2.disabled ? '0.3' : '1';
+        pt1.style.cursor = pt1.disabled ? 'not-allowed' : 'text';
+        pt2.style.cursor = pt2.disabled ? 'not-allowed' : 'text';
+        // -----------------------------------------------------------------
 
         // PONTO 4 (Parte A) RESOLVIDO: Verifica se todos os nomes são Bots para sumir com o campo SOU
         const namesArray = [
@@ -5569,6 +5637,52 @@
 
         errorDiv.style.display = 'none'; // Passou na validação completa
 
+        // Função interna para validar os formatos oficiais do PIX (com cálculo de CPF)
+          const isValidPix = (chave) => {
+            if (!chave) return false;
+            
+            // 1. Valida E-mail
+            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chave)) return true;
+            
+            // 2. Valida Chave Aleatória (UUID)
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chave)) return true;
+            
+            // Extrai apenas os números
+            const num = chave.replace(/\D/g, '');
+            
+            // 3. CNPJ (14 dígitos), Celular com DDI (12 a 13) ou Fixo (10)
+            if (num.length === 10 || num.length === 12 || num.length === 13 || num.length === 14) return true;
+            
+            // 4. CPF ou Celular com DDD (11 dígitos)
+            if (num.length === 11) {
+              // Se tiver parênteses ou o 3º dígito for '9' (sem pontos de CPF), assume que é Celular
+              if (chave.includes('(') || (num.substring(2, 3) === '9' && !chave.includes('.'))) {
+                return true; 
+              }
+
+              // Validação matemática pesada dos Dígitos Verificadores do CPF
+              if (/^(\d)\1+$/.test(num)) return false; // Bloqueia 111.111.111-11
+              
+              let sum = 0, remainder;
+              // Cálculo do 1º dígito
+              for (let i = 1; i <= 9; i++) sum += parseInt(num.substring(i - 1, i)) * (11 - i);
+              remainder = (sum * 10) % 11;
+              if (remainder === 10 || remainder === 11) remainder = 0;
+              if (remainder !== parseInt(num.substring(9, 10))) return false;
+              
+              // Cálculo do 2º dígito
+              sum = 0;
+              for (let i = 1; i <= 10; i++) sum += parseInt(num.substring(i - 1, i)) * (12 - i);
+              remainder = (sum * 10) % 11;
+              if (remainder === 10 || remainder === 11) remainder = 0;
+              if (remainder !== parseInt(num.substring(10, 11))) return false;
+              
+              return true; // Passou no cálculo, é um CPF válido
+            }
+            
+            return false; // Não encaixou em nada
+          };
+
         const l = currentLobby || {};
         const readyArray = l.ready ? [...l.ready] : [false, false, false, false];
         
@@ -5639,6 +5753,7 @@
       document.getElementById('localPlayerSelect').onchange = (e) => {
         myPlayerIndex = parseInt(e.target.value);
         if (isNaN(myPlayerIndex)) myPlayerIndex = -1; // Proteção contra valores nulos
+        window.updateMenuDynamic(); // 🛡️ Atualiza a máscara do PIX na hora
         if (state) renderAll();
       };
       document.getElementById('drawStockBtn').onclick = drawFromStock;
