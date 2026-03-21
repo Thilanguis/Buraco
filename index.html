@@ -490,6 +490,18 @@
         padding: 2px 6px;
         border-radius: 999px;
       }
+
+      .opponent-hand-left .opponent-label {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        margin-bottom: 8px;
+        border-radius: 8px;
+      }
+      .opponent-hand-right .opponent-label {
+        writing-mode: vertical-rl;
+        margin-bottom: 8px;
+        border-radius: 8px;
+      }
       .opponent-cards {
         display: flex;
         gap: 3px;
@@ -611,7 +623,7 @@
         cursor: pointer;
         border: 1px solid transparent;
         flex: 0 0 auto;
-        min-width: 140px;
+        min-width: 90px; /* Reduzido de 140px para a caixa abraçar os jogos */
         max-width: 100%;
       }
       .meld-line.selected-meld {
@@ -624,6 +636,18 @@
         height: 85px;
         flex-wrap: nowrap;
         transition: transform 0.15s ease;
+        position: relative; /* <- ADICIONE ESTA LINHA */
+      }
+
+      .carta.mini.canastra-fechada {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        /* O -35% assenta a carta exatamente na linha de base das outras */
+        transform: translate(-50%, -35%) rotate(90deg) !important;
+        margin: 0 !important;
+        z-index: 10;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6) !important;
       }
       .meld-meta {
         font-size: 10px;
@@ -1087,7 +1111,7 @@
       .carta.mini {
         width: 55px;
         height: 80px;
-        margin-right: -25px;
+        margin-right: -38px; /* <- AQUI: Cartas mais juntas */
         margin-bottom: 0;
         font-size: 13px;
         padding: 2px 4px;
@@ -1099,8 +1123,10 @@
       .carta.mini .carta-meio {
         font-size: 22px;
       }
+      /* Esta regra com :has resolve o vazamento puxando o freio da última carta em pé */
       .carta.mini:last-child,
-      .meld-line-cards > div:last-child {
+      .meld-line-cards > div:last-child,
+      .carta.mini:has(+ .canastra-fechada) {
         margin-right: 0 !important;
       }
       .carta.mini.canastra-fechada {
@@ -1253,6 +1279,33 @@
         margin-left: 15px !important;
       }
 
+      /* ================= STATUS DO MORTO (BADGE) ================= */
+      .morto-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 8px !important;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 6px;
+        margin-left: 10px;
+        vertical-align: middle;
+        transition: all 0.3s ease;
+      }
+      .morto-badge.pending {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px dashed #475569;
+        color: #64748b;
+      }
+      .morto-badge.taken {
+        background: rgba(22, 163, 74, 0.15);
+        border: 1px solid #22c55e;
+        color: #4ade80;
+        box-shadow: inset 0 0 8px rgba(34, 197, 94, 0.2), 0 0 8px rgba(34, 197, 94, 0.4);
+        text-shadow: 0 0 5px rgba(34, 197, 94, 0.6);
+      }
+
       /* ================= MEDIA QUERIES (Mobile / Paisagem) ================= */
       @media (max-width: 768px), (max-height: 500px) {
         body {
@@ -1315,8 +1368,13 @@
         .carta.mini {
           width: 44px;
           height: 64px;
-          margin-right: -20px;
+          margin-right: -30px;
           font-size: 11px;
+        }
+
+       /* Adicione este bloco para corrigir a altura da carta no celular também */
+        .carta.mini.canastra-fechada {
+          transform: translate(-50%, -35%) rotate(90deg) !important;
         }
         .carta.mini .carta-meio {
           font-size: 16px;
@@ -4266,8 +4324,25 @@
             .filter((p) => p.teamId === t.id)
             .map((p) => p.name)
             .join(' e ');
+            
+          // Lógica do Badge do Morto
+          const mortosPegos = state.deadChunksTaken?.[t.id] ?? 0;
+          const maxMortos = state.deadChunksMax?.[t.id] ?? 1;
+          
+          let mortoHtml = '';
+          if (mortosPegos >= maxMortos) {
+            mortoHtml = `<span class="morto-badge taken">💀 Morto (OK)</span>`;
+          } else if (mortosPegos > 0) {
+            mortoHtml = `<span class="morto-badge taken">💀 Morto (${mortosPegos}/${maxMortos})</span>`;
+          } else {
+            mortoHtml = `<span class="morto-badge pending">💀 Sem Morto</span>`;
+          }
+
           const titleSpan = document.querySelector(`#teamPanel${i + 1} .meld-title span`);
-          if (titleSpan) titleSpan.textContent = `${t.name} (${pNames}) Pts:`;
+          if (titleSpan) {
+            // Usa innerHTML para processar o badge e deixa os nomes cinza sutil para destacar o status
+            titleSpan.innerHTML = `${t.name} <span style="font-size: 9px; color: #9ca3af; font-weight: normal; text-transform: none;">(${pNames})</span> ${mortoHtml}`;
+          }
 
           const target = i === 0 ? m1 : m2;
           t.melds.forEach((meld, midx) => {

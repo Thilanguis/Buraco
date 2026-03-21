@@ -72,29 +72,33 @@ export class BuracoBot {
   }
 
   static evaluateDiscard(state, hand, team, engine, ctx) {
-    const topCard = state.discard[state.discard.length - 1];
+    const pileSize = state.discard.length;
+    if (pileSize === 0) return false;
 
+    const topCard = state.discard[pileSize - 1];
+    const isJuicyPile = pileSize >= 8;
+    const isEndgame = state.stock.length <= 22 || (ctx.tookMorto && hand.length <= 6);
+    const allowDirty = isJuicyPile || ctx.isRushingMorto || ctx.isDesperate || isEndgame;
+
+    const topIsWildOrTwo = topCard.joker || topCard.rank === '2';
+
+    // =========================================================
+    // FASE 1: PRIORIDADE ABSOLUTA - PEGAR LIMPO
+    // =========================================================
     if (team.melds && team.melds.length > 0) {
       for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
         const meld = team.melds[mIdx];
+
+        // 🛡️ TRAVA DO DESPERDÍCIO: Não junta coringa com coringa (nem 2 com 2)
+        if (topIsWildOrTwo && meld.some((c) => c.joker || c.rank === '2')) continue;
+
         const testMeld = [...meld, topCard];
-
         if (engine.isValidSequenceMeld(testMeld)) {
-          // 🛡️ TRAVA DO DUPLO 2 E ANTI-SABOTAGEM
-          const isCanastra = meld.length >= 7;
-          const hasDirtyWild = meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit));
-          const isLimpa = !hasDirtyWild;
           const hasTwo = meld.some((c) => c.rank === '2');
-
-          if (isCanastra && isLimpa) {
-            // Se já for canastra limpa, proíbe Joker, 2 de outro naipe, ou um SEGUNDO 2 do mesmo naipe.
-            if (topCard.joker || (topCard.rank === '2' && topCard.suit !== meld[0].suit) || (topCard.rank === '2' && hasTwo)) {
-              continue;
-            }
-          }
-
           const needsWild = testMeld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== testMeld[0].suit));
-          if (!needsWild || meld.length >= 6 || ctx.isRushingMorto || (topCard.rank === '2' && topCard.suit === meld[0].suit && !hasTwo)) {
+          const isPerfectTwo = topCard.rank === '2' && topCard.suit === meld[0].suit && !hasTwo;
+
+          if (!needsWild || isPerfectTwo) {
             return { wants: true, action: 'extend', meldIndex: mIdx };
           }
         }
@@ -106,6 +110,7 @@ export class BuracoBot {
         for (let j = i + 1; j < hand.length; j++) {
           const combo = [hand[i], hand[j], topCard];
           const hasWild = combo.some((c) => c.joker || c.rank === '2');
+
           if (!hasWild && engine.isValidSequenceMeld(combo)) {
             return { wants: true, action: 'new', handIndexes: [i, j] };
           }
@@ -113,9 +118,60 @@ export class BuracoBot {
       }
     }
 
+    // =========================================================
+    // FASE 2: PAGANDO O PREÇO (Sujando por necessidade)
+    // =========================================================
+    if (allowDirty) {
+      if (team.melds && team.melds.length > 0) {
+        for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+          const meld = team.melds[mIdx];
+
+          // 🛡️ TRAVA DO DESPERDÍCIO: Não junta coringa com coringa (nem 2 com 2)
+          if (topIsWildOrTwo && meld.some((c) => c.joker || c.rank === '2')) continue;
+
+          const testMeld = [...meld, topCard];
+          if (engine.isValidSequenceMeld(testMeld)) {
+            const isCanastra = meld.length >= 7;
+            const hasTwo = meld.some((c) => c.rank === '2');
+            const hasThree = meld.some((c) => c.rank === '3');
+            const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit) || (c.rank === '2' && !hasThree));
+
+            if (isCanastra && isLimpa) {
+              const isPlayingNaturalTwo = topCard.rank === '2' && topCard.suit === meld[0].suit && hasThree && !hasTwo;
+              if (topCard.joker || (topCard.rank === '2' && !isPlayingNaturalTwo)) {
+                continue;
+              }
+            }
+
+            return { wants: true, action: 'extend', meldIndex: mIdx };
+          }
+        }
+      }
+
+      if (hand.length >= 2) {
+        for (let i = 0; i < hand.length - 1; i++) {
+          for (let j = i + 1; j < hand.length; j++) {
+            const combo = [hand[i], hand[j], topCard];
+            const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
+
+            if (wilds === 1 && engine.isValidSequenceMeld(combo)) {
+              return { wants: true, action: 'new', handIndexes: [i, j] };
+            }
+          }
+        }
+      }
+    }
+
+    // =========================================================
+    // FASE 3: BURACO ABERTO
+    // =========================================================
     if (state.variant === 'fechado') return false;
-    if (ctx.isRushingMorto && (topCard.joker || topCard.rank === '2')) return { wants: true, action: 'open' };
-    if (state.variant === 'aberto' && state.discard.length >= 4 && !ctx.isDuo) return { wants: true, action: 'open' };
+
+    const hasWildInPile = state.discard.some((c) => c.joker || c.rank === '2');
+    if (hasWildInPile) return { wants: true, action: 'open' };
+    if (ctx.isRushingMorto && pileSize >= 3) return { wants: true, action: 'open' };
+    if (pileSize >= 4 && !ctx.isDuo) return { wants: true, action: 'open' };
+    if (pileSize >= 5 && ctx.isDuo) return { wants: true, action: 'open' };
 
     return false;
   }
@@ -140,7 +196,7 @@ export class BuracoBot {
       const me = s.players[botIndex];
       const team = s.teams[me.teamId];
 
-      // --- PASSO 1: EXTENSÃO 100% LIMPA (Prioridade Máxima) ---
+      // --- PASSO 1: EXTENSÃO 100% LIMPA ---
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           for (let i = 0; i < me.hand.length; i++) {
@@ -166,8 +222,8 @@ export class BuracoBot {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           const meld = team.melds[mIdx];
 
-          // 🛡️ TRAVA DO DUPLO 2: Se o jogo já tem um '2', colocar outro '2' vai sujar. Pula!
-          if (meld.some((c) => c.joker || c.forceWild || c.rank === '2')) continue;
+          // 🛡️ TRAVA DO DESPERDÍCIO: Se já tem Joker ou 2 na mesa, não baixa outro!
+          if (meld.some((c) => c.joker || c.rank === '2')) continue;
 
           for (let i = 0; i < me.hand.length; i++) {
             if (!this.canMeldSafely(me, team, 1, engine)) continue;
@@ -212,8 +268,7 @@ export class BuracoBot {
       }
       if (madeMove) continue;
 
-      // --- PASSO 4: USO DE CORINGA SUJO (TRAVA DE SEGURANÇA E EQUILÍBRIO) ---
-      // NOVO EQUILÍBRIO: Libera a sujeira se o monte chegar em 22 ou se já pegou o morto e a mão tá secando (<= 6)
+      // --- PASSO 4: USO DE CORINGA SUJO (Fim de Jogo) ---
       const isEndgame = s.stock.length <= 22 || (ctx.tookMorto && me.hand.length <= 6);
 
       if (ctx.isRushingMorto || ctx.isDesperate || isEndgame) {
@@ -222,15 +277,27 @@ export class BuracoBot {
           for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
             const meld = team.melds[mIdx];
 
-            const isCanastra = meld.length >= 7;
-            const hasDirtyWild = meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit));
-            const isLimpa = !hasDirtyWild;
+            // 🛡️ TRAVA DO DESPERDÍCIO: Se já tem Joker ou 2 na mesa, procura outro jogo!
+            if (meld.some((c) => c.joker || c.rank === '2')) continue;
 
-            if (isCanastra && isLimpa) {
-              continue; // É limpa e sagrada! Proibido jogar Joker ou 2 extra aqui.
+            const isCanastra = meld.length >= 7;
+            const hasTwo = meld.some((c) => c.rank === '2');
+            const hasThree = meld.some((c) => c.rank === '3');
+            const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit) || (c.rank === '2' && !hasThree));
+
+            // 🛡️ PROTEÇÃO DA CANASTRA E DA "QUASE LIMPA"
+            if (isLimpa) {
+              if (isCanastra) continue; // Cofre trancado: Já é limpa, sagrada.
+              // Se o jogo limpo já tem 5 ou 6 cartas, está a 1 ou 2 cartas da glória. Não suja!
+              if (meld.length >= 5 && !ctx.isDesperate) continue;
             }
 
-            if (hasDirtyWild) continue; // Se o jogo já tem um coringa sujo, não gasta processamento
+            // Se o jogo já tem um coringa atuando, ignora.
+            if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit) || (c.rank === '2' && !hasThree))) continue;
+
+            if (isCanastra && isLimpa) {
+              continue;
+            }
 
             for (let i = 0; i < me.hand.length; i++) {
               if (!this.canMeldSafely(me, team, 1, engine)) continue;
