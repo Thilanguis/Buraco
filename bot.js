@@ -78,7 +78,19 @@ export class BuracoBot {
       for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
         const meld = team.melds[mIdx];
         const testMeld = [...meld, topCard];
+
         if (engine.isValidSequenceMeld(testMeld)) {
+          // 🛡️ TRAVA ANTI-SABOTAGEM INTELIGENTE
+          const isCanastra = meld.length >= 7;
+          const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit));
+
+          if (isCanastra && isLimpa) {
+            // Se a canastra é limpa, PROÍBE comprar Joker ou 2 de naipe diferente para jogar nela
+            if (topCard.joker || (topCard.rank === '2' && topCard.suit !== meld[0].suit)) {
+              continue;
+            }
+          }
+
           const needsWild = testMeld.some((c) => c.joker || c.rank === '2');
           if (!needsWild || meld.length >= 6 || ctx.isRushingMorto || (topCard.rank === '2' && topCard.suit === meld[0].suit)) {
             return { wants: true, action: 'extend', meldIndex: mIdx };
@@ -99,10 +111,7 @@ export class BuracoBot {
       }
     }
 
-    // Se a mesa for FECHADO e ele não declarou jogo exato acima, ELE NÃO COMPRA!
     if (state.variant === 'fechado') return false;
-
-    // Regras exclusivas para Buraco ABERTO abaixo:
     if (ctx.isRushingMorto && (topCard.joker || topCard.rank === '2')) return { wants: true, action: 'open' };
     if (state.variant === 'aberto' && state.discard.length >= 4 && !ctx.isDuo) return { wants: true, action: 'open' };
 
@@ -130,7 +139,6 @@ export class BuracoBot {
       const team = s.teams[me.teamId];
 
       // --- PASSO 1: EXTENSÃO 100% LIMPA (Prioridade Máxima) ---
-      // Nunca usa coringas nesta etapa, apenas desce cartas naturais.
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           for (let i = 0; i < me.hand.length; i++) {
@@ -152,11 +160,10 @@ export class BuracoBot {
       if (madeMove) continue;
 
       // --- PASSO 2: O CORINGA PERFEITO ---
-      // Usa APENAS o '2' que seja do exato MESMO NAIPE do jogo.
-      // Isso não estraga a canastra, pois ela pode ser limpa depois.
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           const meld = team.melds[mIdx];
+
           if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue;
 
           for (let i = 0; i < me.hand.length; i++) {
@@ -179,7 +186,6 @@ export class BuracoBot {
       if (madeMove) continue;
 
       // --- PASSO 3: FORMAR NOVOS JOGOS LIMPOS ---
-      // Desce trincas naturais sem envolver nenhum coringa.
       let n = me.hand.length;
       if (n >= 3) {
         for (let i = 0; i < n - 2; i++) {
@@ -204,13 +210,20 @@ export class BuracoBot {
       if (madeMove) continue;
 
       // --- PASSO 4: USO DE CORINGA SUJO (TRAVA DE SEGURANÇA ATIVADA) ---
-      // O bot está TERMINANTEMENTE PROIBIDO de queimar Jokers ou 2 de naipes errados,
-      // EXCETO se o monte estiver no fim (< 15) ou se precisar zerar a mão para o morto.
       if (ctx.isRushingMorto || ctx.isDesperate || s.stock.length <= 15) {
         // 4.1 Tenta fechar/estender jogos já existentes com sujeira
         if (team.melds && team.melds.length > 0) {
           for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
             const meld = team.melds[mIdx];
+
+            // 🛡️ TRAVA ANTI-SABOTAGEM INTELIGENTE
+            const isCanastra = meld.length >= 7;
+            const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit));
+
+            if (isCanastra && isLimpa) {
+              continue; // É limpa e sagrada! Proibido jogar Joker ou 2 errado aqui.
+            }
+
             if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit))) continue;
 
             for (let i = 0; i < me.hand.length; i++) {
@@ -231,7 +244,7 @@ export class BuracoBot {
         }
         if (madeMove) continue;
 
-        // 4.2 Cria jogo novo sujo (último recurso absoluto para esvaziar a mão)
+        // 4.2 Cria jogo novo sujo (último recurso)
         if (me.hand.length >= 3 && me.hand.length <= 6) {
           n = me.hand.length;
           for (let i = 0; i < n - 2; i++) {
