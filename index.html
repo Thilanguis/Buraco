@@ -1618,25 +1618,22 @@
                 <option value="2x2">2x2 Clássico</option>
                 <option value="1x2">1x2 (Solo vs Dupla)</option>
                 <option value="1x1_duploMorto">1x1 Humilhação</option>
+                <option value="1x1_dominacao">1x1 Dominação Completa</option>
               </select>
             </label>
 
             <div id="humiliationRules" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; font-size: 11px; color: #fca5a5; line-height: 1.4">
-              <strong>Regras do 1x1 Humilhação:</strong>
+              <strong id="humiliationTitle">Regras Especiais:</strong>
               <br />
-              - O
-              <strong style="color: #cbd5e1">Escravo (J1)</strong>
-              joga o buraco normal com 1 morto.
+              - O <strong style="color: #cbd5e1">Escravo (J1)</strong> joga o buraco normal com 1 morto.
               <br />
-              - O
-              <strong style="color: #facc15">Dominador (J2)</strong>
-              tem privilégios: possui
-              <strong>2 mortos</strong>
-              e puxa
-              <strong>2 cartas</strong>
-              de cada vez do monte!
+              - O <strong style="color: #facc15">Dominador (J2)</strong> tem privilégios: possui <strong>2 mortos</strong> e puxa <strong>2 cartas</strong> de cada vez do monte!
               <br />
               - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
+              <br />
+              <span id="dominacaoExtra" style="display: none; color: #facc15; font-weight: bold; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px; display: block;">
+                🔥 PLUS DOMINAÇÃO: Toda vez que o Dominador fizer uma canastra Ás-a-Ás, ele puxa um morto IMEDIATAMENTE para a mão (se houver morto na mesa)!
+              </span>
             </div>
 
             <label>
@@ -2678,7 +2675,7 @@
       }
 
       function passTurn() {
-        if (state.mode === '1x1_duploMorto' || state.mode === '1x1') {
+        if (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao' || state.mode === '1x1') {
           state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
         } else {
           // Roda sequencial limpo para 1x2 (3 jogadores: 0 -> 1 -> 2) e 2x2 (4 jogadores: 0 -> 1 -> 2 -> 3)
@@ -3020,7 +3017,7 @@
         const players = [];
         const teams = [];
         let playerConfigs = [];
-        if (mode === '1x1' || mode === '1x1_duploMorto') {
+        if (mode === '1x1' || mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
           playerConfigs = [
             { name: names[0] || 'J1', team: 0 },
             { name: names[1] || 'J2', team: 1 },
@@ -3046,7 +3043,7 @@
           const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
           let tName = t === 0 ? 'Time 1' : 'Time 2';
           
-          if (mode === '1x1_duploMorto') {
+          if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
             tName = t === 0 ? 'Escravo' : '👑 Dominador';
           } else if (mode === '1x2') {
             tName = t === 0 ? 'Solo' : 'Dupla';
@@ -3068,7 +3065,7 @@
         discard.push(stock.pop());
 
         let deadChunksMax = [1, 1];
-        if (mode === '1x1_duploMorto') deadChunksMax = [1, 2];
+        if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') deadChunksMax = [1, 2];
         const isBetting = document.getElementById('betToggle').value === 'sim';
         const betBase = parseFloat(document.getElementById('betBase').value) || 0;
         const betPerPoint = parseFloat(document.getElementById('betPerPoint').value) || 0;
@@ -3135,7 +3132,7 @@
         const max = state.deadChunksMax?.[teamId] ?? 1;
         if (taken >= max) return false;
         let deadIndex = teamId;
-        if (state.mode === '1x1_duploMorto' && teamId === 1 && taken >= 1) {
+        if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && teamId === 1 && taken >= 1) {
           if (!state.deadPiles?.[deadIndex]?.length) deadIndex = 0;
         }
         return !!state.deadPiles?.[deadIndex]?.length;
@@ -3161,8 +3158,9 @@
         const fromEl = document.querySelector('#drawStockBtn .pile-card');
         const fromRect = fromEl ? getRect(fromEl) : null;
 
-        // Se for J2 na Humilhação, puxa 2 (se já puxou do lixo, puxa só mais 1)
-        const drawCount = state.mode === '1x1_duploMorto' && state.currentPlayer === 1 ? (state.partialDraw ? 1 : 2) : 1;
+        // Se for J2 na Humilhação ou Dominação, puxa 2 (se já puxou do lixo, puxa só mais 1)
+        const isDominador = (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1;
+        const drawCount = isDominador ? (state.partialDraw ? 1 : 2) : 1;
         const drawnCards = [];
 
         for (let i = 0; i < drawCount; i++) {
@@ -3322,6 +3320,9 @@
 
           for (const idx of indexes) hand.splice(idx, 1);
 
+          let kindBeforeFechado = '';
+          if (!isNewMeld) kindBeforeFechado = classifyMeldForUi(team.melds[extendedMeldIndex]).kind;
+
           const finalMeldCards = [...selectedCards, topCard];
           if (isNewMeld) {
             optimizeMeld(finalMeldCards);
@@ -3341,7 +3342,7 @@
             sortHand(hand);
           }
 
-          if (state.mode === '1x1_duploMorto' && state.currentPlayer === 1 && !state.partialDraw) {
+          if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1 && !state.partialDraw) {
             state.partialDraw = true;
             showMessage('Lixo baixado direto! Compre 1 carta do monte!');
           } else {
@@ -3359,8 +3360,16 @@
 
           renderAll();
 
+          let specialDeadFechado = null;
+          if (state.mode === '1x1_dominacao' && myPlayerIndex === 1) {
+              const meldFechadoCheck = isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex];
+              if (kindBeforeFechado !== 'asas' && classifyMeldForUi(meldFechadoCheck).kind === 'asas') {
+                  specialDeadFechado = triggerDominacaoReward(me);
+              }
+          }
+
          // Substitua o final deste bloco:
-          const tookDead = await checkPostMeldStatus(me);
+          const tookDead = specialDeadFechado || await checkPostMeldStatus(me);
 
           state.lastAction = {
             id: newActionId(),
@@ -3388,7 +3397,7 @@
         if (!state.boughtCardIds) state.boughtCardIds = [];
         pile.forEach((c) => state.boughtCardIds.push(c.id));
 
-        if (state.mode === '1x1_duploMorto' && state.currentPlayer === 1 && !state.partialDraw) {
+        if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1 && !state.partialDraw) {
           state.partialDraw = true;
           showMessage('Lixo recolhido. Compre 1 carta do monte!');
         } else {
@@ -3485,7 +3494,7 @@
         const needHigh = neededWildsForOrder(RANKS_SEQ, 'high');
         const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low');
         const baseOk = (needHigh !== null && needHigh <= availableWilds) || (needLow !== null && needLow <= availableWilds);
-        if (baseOk) return true;
+        if (baseOk) { if (modifiedTwo) modifiedTwo.forceNatural = false; return true; }
 
         const aceCount = nonWild.filter((c) => c.rank === 'A').length;
         const hasKing = nonWild.some((c) => c.rank === 'K');
@@ -3515,13 +3524,34 @@
                 }
                 if (diff > 1) needed += diff - 1;
               }
-              if (ok && needed <= availableWilds) return true;
+              if (ok && needed <= availableWilds) { if (modifiedTwo) modifiedTwo.forceNatural = false; return true; }
             }
           }
         }
 
         if (modifiedTwo) modifiedTwo.forceNatural = false;
         return false;
+      }
+
+      function triggerDominacaoReward(p) {
+        if (!state || !p) return null;
+        const teamId = p.teamId;
+        const taken = state.deadChunksTaken?.[teamId] ?? 0;
+        const max = state.deadChunksMax?.[teamId] ?? 1;
+        if (taken >= max) return null;
+
+        const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
+        if (deadIndex === -1) return null;
+
+        const dead = state.deadPiles[deadIndex];
+        const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
+
+        p.hand.push(...dead.splice(0, chunkSize));
+        sortHand(p.hand);
+        state.deadChunksTaken[teamId] = taken + 1;
+        
+        showMessage('👑 DOMINAÇÃO: Ás-a-Ás formou! Pegou um morto extra direto para a mão!');
+        return { deadIndex, count: chunkSize };
       }
 
       async function checkPostMeldStatus(player) {
@@ -3584,6 +3614,8 @@
             await Promise.all(anims);
           }
 
+          const kindBefore1 = classifyMeldForUi(targetMeld).kind;
+
           for (const idx of indexes) {
             targetMeld.push(hand[idx]);
             hand.splice(idx, 1);
@@ -3598,8 +3630,13 @@
           selectedHandIndexes.clear();
           selectedMeldTarget = null;
 
+          let specialDead1 = null;
+          if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && kindBefore1 !== 'asas' && classifyMeldForUi(targetMeld).kind === 'asas') {
+              specialDead1 = triggerDominacaoReward(currentPlayer());
+          }
+
           // Substitua o final deste bloco:
-          const tookDead = await checkPostMeldStatus(currentPlayer());
+          const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer());
 
           state.lastAction = {
             id: newActionId(),
@@ -3643,6 +3680,8 @@
           }
         }
 
+        const kindBefore2 = classifyMeldForUi(teamMeld).kind;
+
         for (const idx of indexes) {
           teamMeld.push(hand[idx]);
           hand.splice(idx, 1);
@@ -3657,8 +3696,13 @@
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
 
+        let specialDead2 = null;
+        if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && kindBefore2 !== 'asas' && classifyMeldForUi(teamMeld).kind === 'asas') {
+            specialDead2 = triggerDominacaoReward(currentPlayer());
+        }
+
         // Substitua o final da função:
-        const tookDead = await checkPostMeldStatus(currentPlayer());
+        const tookDead = specialDead2 || await checkPostMeldStatus(currentPlayer());
 
         state.lastAction = {
           id: newActionId(),
@@ -3754,8 +3798,13 @@
         currentTeam().melds.push(meld);
         const meldIdx = currentTeam().melds.length - 1;
 
+        let specialDead = null;
+        if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && classifyMeldForUi(meld).kind === 'asas') {
+             specialDead = triggerDominacaoReward(currentPlayer());
+        }
+
         // Puxa o morto ANTES de avisar o Firebase
-        const tookDead = await checkPostMeldStatus(currentPlayer());
+        const tookDead = specialDead || await checkPostMeldStatus(currentPlayer());
 
         state.lastAction = {
           id: newActionId(),
@@ -4157,6 +4206,7 @@
         if (badge) {
           let modeDisplay = state.mode;
           if (modeDisplay === '1x1_duploMorto') modeDisplay = '1x1 Humilhação';
+          if (modeDisplay === '1x1_dominacao') modeDisplay = '1x1 Dominação';
           badge.textContent = `${modeDisplay} • Buraco ${state.variant}`;
         }
 
@@ -4689,7 +4739,7 @@
         scoreCard.innerHTML = `
           <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
           <div style="font-size: 11px; color: #facc15; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">
-            MODO: ${state.mode === '1x1_duploMorto' ? '1x1 Humilhação' : state.mode} | REGRA: ${state.variant}
+            MODO: ${state.mode === '1x1_duploMorto' ? '1x1 Humilhação' : state.mode === '1x1_dominacao' ? '1x1 Dominação' : state.mode} | REGRA: ${state.variant}
           </div>
           <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
           <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
@@ -5205,18 +5255,22 @@
 
       onSnapshot(gameRef, async (snap) => {
         if (!snap.exists()) {
-          releaseScreen(); // 🛡️ Libera a tela para apagar no Lobby
+          releaseScreen(); 
+          toggleMenuVideos(true); 
 
-          toggleMenuVideos(true); // 🔋 Reativa os vídeos no menu
-
-          // 🛡️ Limpeza direcionada (sem matar a tela de loading)
           if (window.startTimer) {
             clearInterval(window.startTimer);
             window.startTimer = null;
           }
 
+          // --- ADICIONE ESTAS DUAS LINHAS AQUI ---
+          const playerUI = document.querySelector('.player-interface');
+          if (playerUI) playerUI.classList.remove('active-turn-glow');
+          // --------------------------------------
+
           state = null;
           selectedHandIndexes.clear();
+          // ... (resto do bloco continua igual)
           movingWild = null;
           
           // 🛡️ RESET DE CADEIRA: Garante que você não fique preso no corpo de um bot
@@ -5650,7 +5704,7 @@
           opt2.textContent = 'Dupla 2';
           opt3.hidden = true; opt3.disabled = true;
 
-        } else if (mode === '1x1_duploMorto') {
+        } else if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
           p1.style.cssText = styleT1;
           p2.style.cssText = styleT2;
           p3.style.cssText = styleNone;
@@ -5665,6 +5719,10 @@
           opt3.hidden = true; opt3.disabled = true;
           
           humiliationRules.style.display = 'block';
+          const extraRules = document.getElementById('dominacaoExtra');
+          if (extraRules) extraRules.style.display = (mode === '1x1_dominacao') ? 'block' : 'none';
+          const humTitle = document.getElementById('humiliationTitle');
+          if (humTitle) humTitle.textContent = (mode === '1x1_dominacao') ? 'Regras do 1x1 Dominação:' : 'Regras do 1x1 Humilhação:';
         }
 
         // 3. Se a opção que o usuário já tinha escolhido foi desativada, limpa a seleção
@@ -5678,7 +5736,7 @@
         if (mode === '1x1') {
             pt1.placeholder = 'Chave PIX do Jogador 1 (Recebedor)';
             pt2.placeholder = 'Chave PIX do Jogador 2 (Recebedor)';
-        } else if (mode === '1x1_duploMorto') {
+        } else if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
             pt1.placeholder = 'Chave PIX do Escravo (Recebedor)';
             pt2.placeholder = 'Chave PIX do Dominador (Recebedor)';
         } else if (mode === '1x2') {
@@ -5808,6 +5866,12 @@
         optimizeMeld(meld);
         normalizeMeldOrder(meld);
         team.melds.push(meld);
+
+        // Dispara a recompensa no debug se for o J2 no modo Dominação
+        if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && type === 'asas') {
+            triggerDominacaoReward(currentPlayer());
+        }
+
         renderAll();
         await commitState();
       };
@@ -6047,19 +6111,20 @@
      // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
       document.getElementById('endGameBtn').onclick = async () => {
         if (!state) return;
-        const currentSurrender = state.surrender || { active: true, votes: {} };
-        currentSurrender.active = true;
-        currentSurrender.votes[myPlayerIndex] = true; // Já vota SIM ao clicar no X
+        
+        // Altera o estado REAL da sessão antes de enviar, evitando clonagem e race condition
+        if (!state.surrender) state.surrender = { active: true, votes: {} };
+        state.surrender.active = true;
+        state.surrender.votes[myPlayerIndex] = true;
 
-        // O Bot sempre concorda em sair da sala na mesma hora
         state.players.forEach(p => {
           if (p.name.toUpperCase().includes('BOT')) {
-            currentSurrender.votes[p.id] = true;
+            state.surrender.votes[p.id] = true;
           }
         });
 
         await updateDoc(gameRef, { 
-          'stateJson': JSON.stringify({ ...state, surrender: currentSurrender }),
+          'stateJson': JSON.stringify(state), 
           updatedAt: Date.now() 
         });
       };
@@ -6080,7 +6145,7 @@
 
       document.getElementById('voteNoBtn').onclick = async () => {
         if (!state || !state.surrender) return;
-        state.surrender.active = false; // Cancela a votação
+        state.surrender.active = false; 
         state.surrender.votes = {};
         await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
       };
