@@ -1503,6 +1503,77 @@
         color: #fff !important;
         opacity: 1 !important;
       }
+
+ /* ================================================================= */
+      /* 🎲 DADO 3D FÍSICO (Obsidiana e Ouro - FinDom)                     */
+      /* ================================================================= */
+     /* ================== DADO 3D FÍSICO (TAMANHO 40px - 20% MENOR) ================== */
+      :root {
+        --dice-size: 40px; 
+        --face-color: #0a0a0a;
+        --pip-color: #facc15;
+      }
+      .dice-scene {
+        position: absolute;
+        width: var(--dice-size); height: var(--dice-size);
+        perspective: 1000px;
+        z-index: 10000;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+      }
+      .dice-bounce {
+        width: 100%; height: 100%;
+        transform-style: preserve-3d;
+      }
+      .dice-cube {
+        width: 100%; height: 100%;
+        position: relative;
+        transform-style: preserve-3d;
+        /* Selo de vácuo: o núcleo impede que se veja a mesa através das quinas */
+        background: #000; 
+        border-radius: 4px;
+      }
+      .face {
+        position: absolute;
+        /* Overlap de 102% para as faces "morderem" umas às outras e sumirem com a fresta */
+        width: 102%; 
+        height: 102%;
+        top: -1%;
+        left: -1%;
+        background: linear-gradient(135deg, #1c1c1c 0%, #000000 100%);
+        border: 1px solid #d4af37;
+        /* Raio reduzido para 4px para fechar o buraco físico das quinas */
+        border-radius: 4px; 
+        box-shadow: inset 0 0 12px rgba(212, 175, 55, 0.15), inset 0 0 2px rgba(255, 255, 255, 0.1);
+        display: grid;
+        grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+        padding: 6px; /* Proporcional ao tamanho menor */
+        box-sizing: border-box;
+        backface-visibility: hidden;
+      }
+      .pip {
+        display: block; width: 8px; height: 8px; /* Reduzido de 10px para 8px */
+        background: radial-gradient(circle at top left, #fff 0%, var(--pip-color) 40%, #b45309 100%);
+        border-radius: 50%;
+        justify-self: center; align-self: center;
+        box-shadow: inset 0 2px 3px rgba(0,0,0,0.8), 0 0 4px rgba(250, 204, 21, 0.5);
+      }
+      
+      /* Geometria de encaixe perfeito (20px + 0.1px de folga anti-fresta) */
+      .face-1 { transform: rotateY(0deg) translateZ(20.1px); }
+      .face-6 { transform: rotateY(180deg) translateZ(20.1px); }
+      .face-3 { transform: rotateY(90deg) translateZ(20.1px); }
+      .face-4 { transform: rotateY(-90deg) translateZ(20.1px); }
+      .face-5 { transform: rotateX(90deg) translateZ(20.1px); }
+      .face-2 { transform: rotateX(-90deg) translateZ(20.1px); }
+      
+      /* Furos nas Faces */
+      .face-1 .pip-1 { grid-area: 2 / 2; }
+      .face-2 .pip-1 { grid-area: 1 / 1; } .face-2 .pip-2 { grid-area: 3 / 3; }
+      .face-3 .pip-1 { grid-area: 1 / 1; } .face-3 .pip-2 { grid-area: 2 / 2; } .face-3 .pip-3 { grid-area: 3 / 3; }
+      .face-4 .pip-1 { grid-area: 1 / 1; } .face-4 .pip-2 { grid-area: 1 / 3; } .face-4 .pip-3 { grid-area: 3 / 1; } .face-4 .pip-4 { grid-area: 3 / 3; }
+      .face-5 .pip-1 { grid-area: 1 / 1; } .face-5 .pip-2 { grid-area: 1 / 3; } .face-5 .pip-3 { grid-area: 2 / 2; } .face-5 .pip-4 { grid-area: 3 / 1; } .face-5 .pip-5 { grid-area: 3 / 3; }
+      .face-6 .pip-1 { grid-area: 1 / 1; } .face-6 .pip-2 { grid-area: 1 / 3; } .face-6 .pip-3 { grid-area: 2 / 1; } .face-6 .pip-4 { grid-area: 2 / 3; } .face-6 .pip-5 { grid-area: 3 / 1; } .face-6 .pip-6 { grid-area: 3 / 3; }
     </style>
   </head>
   <body>
@@ -3002,12 +3073,20 @@
         const betBase = parseFloat(document.getElementById('betBase').value) || 0;
         const betPerPoint = parseFloat(document.getElementById('betPerPoint').value) || 0;
 
+        // 🎲 Sorteio de Início (Maior Dado Começa)
+        const possibleRolls = shuffle([1, 2, 3, 4, 5, 6]);
+        const diceRolls = [];
+        for (let i = 0; i < players.length; i++) diceRolls.push(possibleRolls[i]);
+        const maxRoll = Math.max(...diceRolls);
+        const starterIdx = diceRolls.indexOf(maxRoll);
+
         const newState = {
           mode,
           variant,
           players,
           teams,
-          currentPlayer: 0,
+          currentPlayer: starterIdx,
+          diceRolls: diceRolls, // Guarda os dados no banco
           turnNumber: 0,
           stock,
           discard,
@@ -4364,9 +4443,9 @@
           // 🛡️ TRAVA DE DESTAQUE: Aplica o brilho se for a vez deste bot/jogador
           obj.el.classList.toggle('active-turn-glow', state.currentPlayer === obj.idx);
 
-          const label = document.createElement('div');
+         const label = document.createElement('div');
           label.className = 'opponent-label';
-          label.textContent = `${p.name} (${p.hand.length})`;
+          label.innerHTML = `${p.name} (${p.hand.length})`;
           obj.el.appendChild(label);
           const cardsDiv = document.createElement('div');
           cardsDiv.className = 'opponent-cards';
@@ -5038,6 +5117,92 @@
         }
       };
 
+  function getDiceSpawnPosition(pid) {
+        const seat = seatForPlayer(pid);
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        if (seat === 'self') return { x: vw / 2 - 80, y: vh - 220 };
+        if (seat === 'top') return { x: vw / 2 - 80, y: 180 };
+        if (seat === 'left') return { x: 180, y: vh / 2 };
+        if (seat === 'right') return { x: vw - 220, y: vh / 2 };
+        return { x: vw / 2, y: vh / 2 };
+      }
+
+      function create3DDiceElement(roll, endX, endY) {
+        const scene = document.createElement('div');
+        scene.className = 'dice-scene';
+        scene.style.left = endX + 'px';
+        scene.style.top = endY + 'px';
+
+        const bounce = document.createElement('div');
+        bounce.className = 'dice-bounce';
+        const cube = document.createElement('div');
+        cube.className = 'dice-cube';
+
+        for (let i = 1; i <= 6; i++) {
+          const face = document.createElement('div');
+          face.className = `face face-${i}`;
+          for (let p = 0; p < i; p++) {
+            const pip = document.createElement('span');
+            pip.className = `pip pip-${p + 1}`;
+            face.appendChild(pip);
+          }
+          cube.appendChild(face);
+        }
+        bounce.appendChild(cube);
+        scene.appendChild(bounce);
+
+        let rx = 0, ry = 0;
+        switch (roll) {
+          case 1: rx = 0; ry = 0; break;
+          case 6: rx = 0; ry = 180; break;
+          case 2: rx = 90; ry = 0; break;
+          case 5: rx = -90; ry = 0; break;
+          case 3: rx = 0; ry = -90; break;
+          case 4: rx = 0; ry = 90; break;
+        }
+
+        // ALINHAMENTO PERFEITO: Trava chapado na mesa
+        const orthoZ = [0, 90, 180, -90];
+        const finalRx = rx;
+        const finalRy = ry;
+        const finalRz = orthoZ[Math.floor(Math.random() * orthoZ.length)];
+
+        // VETOR DE ARREMESSO: Vem de mais alto e mais longe
+        const throwDirX = (endX > window.innerWidth / 2) ? -450 : 450;
+        const throwDirY = 350;
+
+        // 1. ANIMAÇÃO DE ROLAMENTO E IMPACTO (2.5s)
+        bounce.animate([
+          { transform: `translate(${throwDirX}px, ${throwDirY}px) scale(2)` }, 
+          { transform: `translate(${throwDirX * 0.6}px, ${throwDirY * 0.6}px) scale(1.2)`, offset: 0.25, easing: 'ease-out' }, 
+          { transform: `translate(${throwDirX * 0.3}px, ${throwDirY * 0.3 - 80}px) scale(1.15)`, offset: 0.40, easing: 'ease-in' }, 
+          { transform: `translate(${throwDirX * 0.15}px, ${throwDirY * 0.15}px) scale(1.08)`, offset: 0.55, easing: 'ease-out' }, 
+          { transform: `translate(${throwDirX * 0.05}px, ${throwDirY * 0.05 - 30}px) scale(1.03)`, offset: 0.70, easing: 'ease-in' }, 
+          { transform: `translate(${throwDirX * 0.01}px, ${throwDirY * 0.01}px) scale(1)`, offset: 0.85, easing: 'ease-out' }, 
+          { transform: `translate(0px, 0px) scale(1)` } 
+        ], { duration: 3500, fill: 'forwards' });
+
+        // 2. ANIMAÇÃO DE ATRITO E ROTAÇÃO (Giros caóticos até travar reto)
+        const startRx = finalRx + 1440 * (Math.random() > 0.5 ? 1 : -1);
+        const startRy = finalRy + 1800 * (Math.random() > 0.5 ? 1 : -1);
+        const startRz = finalRz + 720 * (Math.random() > 0.5 ? 1 : -1);
+
+        cube.animate([
+          { transform: `rotateX(${startRx}deg) rotateY(${startRy}deg) rotateZ(${startRz}deg)` },
+          { transform: `rotateX(${finalRx}deg) rotateY(${finalRy}deg) rotateZ(${finalRz}deg)` }
+        ], { duration: 3500, easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)', fill: 'forwards' });
+
+        // 3. FADE OUT
+        scene.animate([
+          { opacity: 1 },
+          { opacity: 1, offset: 0.85 },
+          { opacity: 0 }
+        ], { duration: 6000, fill: 'forwards' });
+
+        return scene;
+      }
+
       onSnapshot(gameRef, async (snap) => {
         if (!snap.exists()) {
           releaseScreen(); // 🛡️ Libera a tela para apagar no Lobby
@@ -5062,6 +5227,7 @@
           lastSeenActionId = null;
           ignoreOwnActionId = null;
           window.lastScores = [0, 0];
+          window.diceAnnounced = false; // Reseta o anúncio do dado
           activeTurnNumber = -1;
           stopTurnTimer();
 
@@ -5274,6 +5440,42 @@
         renderAll();
         startTurnTimerIfNeeded();
 
+      // 🎲 Anuncia quem venceu no dado assim que a mesa carrega
+        if (state.turnNumber === 0 && !state.hasDrawnThisTurn && state.diceRolls && !window.diceAnnounced) {
+           window.diceAnnounced = true;
+           const starterName = state.players[state.currentPlayer].name;
+           const maxRoll = Math.max(...state.diceRolls);
+           
+           const pi = document.querySelector('.player-interface');
+           const bm = document.querySelector('.board-middle');
+           if (pi) pi.style.pointerEvents = 'none';
+           if (bm) bm.style.pointerEvents = 'none';
+
+          // Gera e lança um dado 3D físico para cada jogador na mesa
+           state.players.forEach(p => {
+             const roll = state.diceRolls[p.id];
+             if (!roll) return;
+             
+             // Define a posição de queda na mesa green perto do jogador 
+             const pos = getDiceSpawnPosition(p.id);
+             
+             // Cria o cubo 3D já passando a posição final para a física de arremesso!
+             const diceScene = create3DDiceElement(roll, pos.x, pos.y);
+             
+             document.body.appendChild(diceScene);
+             
+             // Limpa o lixo da memória depois que a animação sumir
+             setTimeout(() => diceScene.remove(), 6000);
+           });
+
+           // Espera a física de impacto e atrito terminar (2.6s) para destravar o jogo
+           setTimeout(() => {
+              showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
+              if (pi) pi.style.pointerEvents = 'auto';
+              if (bm) bm.style.pointerEvents = 'auto';
+           }, 3700);
+        }
+
         const a = state.lastAction;
         if (a && a.id !== lastSeenActionId) {
           lastSeenActionId = a.id;
@@ -5284,25 +5486,32 @@
           }
         }
 
-        // --- GATILHO DA INTELIGÊNCIA ARTIFICIAL ---
+        // --- GATILHO DA INTELIGÊNCIA ARTIFICIAL (SINCRONIZADO) ---
         if (!state.finished) {
           const currentPlayerObj = state.players[state.currentPlayer];
           
           if (currentPlayerObj && currentPlayerObj.name.toUpperCase().includes('BOT')) {
-            
             let hostIdx = state.players.findIndex(p => p && !p.name.toUpperCase().includes('BOT'));
             if (hostIdx === -1) hostIdx = myPlayerIndex; 
 
-            // REMOVIDA a trava de Espectador! Agora, se você for o "-1", você roda a matemática deles.
             if (myPlayerIndex === hostIdx) {
               if (window.lastBotTurnPlayed !== state.turnNumber) {
-                window.lastBotTurnPlayed = state.turnNumber;
                 
-                BuracoBot.playTurn(state, state.currentPlayer, botEngine)
-                  .catch(err => {
-                    console.error("Erro na Matrix:", err);
-                    window.lastBotTurnPlayed = null; 
-                  });
+                // 🛡️ TRAVA DE SINCRONIA: Se for o sorteio inicial (Turno 0), espera o dado parar (4s)
+                // Caso contrário, espera apenas o delay normal de processamento (0.6s)
+                const botDelay = (state.turnNumber === 0) ? 4000 : 600;
+
+                setTimeout(() => {
+                  // Re-checa se ainda é a vez do bot após o tempo de espera
+                  if (!state.finished && state.currentPlayer === currentPlayerObj.id) {
+                    window.lastBotTurnPlayed = state.turnNumber;
+                    BuracoBot.playTurn(state, state.currentPlayer, botEngine)
+                      .catch(err => {
+                        console.error("Erro na Matrix:", err);
+                        window.lastBotTurnPlayed = null; 
+                      });
+                  }
+                }, botDelay);
               }
             }
           }
@@ -5814,8 +6023,19 @@
 
       document.getElementById('localPlayerSelect').onchange = (e) => {
         myPlayerIndex = parseInt(e.target.value);
-        if (isNaN(myPlayerIndex)) myPlayerIndex = -1; // Proteção contra valores nulos
-        window.updateMenuDynamic(); // 🛡️ Atualiza a máscara do PIX na hora
+        if (isNaN(myPlayerIndex)) myPlayerIndex = -1; 
+        
+        // 🛡️ TRAVA DE AMNÉSIA (Persistência de Sessão na URL)
+        // Salva a sua cadeira silenciosamente no link. Se o celular matar a aba, você volta no mesmo corpo.
+        const url = new URL(window.location);
+        if (myPlayerIndex === -1) {
+          url.searchParams.delete('player');
+        } else {
+          url.searchParams.set('player', myPlayerIndex);
+        }
+        window.history.replaceState({}, '', url);
+
+        window.updateMenuDynamic(); 
         if (state) renderAll();
       };
       document.getElementById('drawStockBtn').onclick = drawFromStock;
@@ -5914,8 +6134,14 @@
       document.getElementById('showScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'flex');
 
       // Ação do botão de convite
+      // Ação do botão de convite
       document.getElementById('inviteBtn').onclick = async () => {
-        const inviteUrl = window.location.href;
+        
+        // 🛡️ TRAVA ANTI-CLONE: Limpa a sua cadeira do link para o convidado não nascer no seu corpo
+        const urlObj = new URL(window.location.href);
+        urlObj.searchParams.delete('player');
+        const inviteUrl = urlObj.toString();
+        
         const btn = document.getElementById('inviteBtn');
         const originalText = btn.innerHTML;
 
