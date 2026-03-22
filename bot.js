@@ -176,11 +176,22 @@ export class BuracoBot {
     return false;
   }
 
-  static canMeldSafely(me, team, cardsToMeldCount, engine) {
-    const cardsLeft = me.hand.length - cardsToMeldCount;
+  static canMeldSafely(me, team, cardsToUse, engine) {
+    const cardsLeft = me.hand.length - cardsToUse;
+
+    // Se após a jogada sobrar 2 ou mais cartas na mão, ele está seguro pra jogar e descartar depois.
     if (cardsLeft > 1) return true;
+
+    // A CORDA APERTOU: Vai sobrar 0 cartas (bater direto) ou 1 carta (ficar pro descarte).
+
+    // Regra 1: Tem morto na mesa pra ele pegar? Se sim, a jogada suicida tá liberada porque ele ressuscita.
     if (engine.canTeamTakeDeadNow(team.id)) return true;
+
+    // Regra 2: Não tem morto. Ele TEM que ter uma canastra válida (Limpa, Real ou Ás-a-Ás) pra poder bater.
     if (engine.teamHasGoodCanastra(team.id)) return true;
+
+    // Se chegou aqui: Não tem morto, não tem canastra e ele ia se matar ficando com 0 ou 1 carta.
+    // TRAVA O BOT! Ele é forçado a segurar as cartas na mão e passar a vez igual um humano.
     return false;
   }
 
