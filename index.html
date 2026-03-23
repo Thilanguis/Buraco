@@ -3313,6 +3313,26 @@
             return;
           }
 
+          // 🛡️ TRAVA DA MATEMÁTICA: O cálculo exato que você descreveu
+          const futureHandSize = hand.length - selectedCards.length + (state.discard.length - 1);
+          if ((futureHandSize === 0 || futureHandSize === 1) && !canTeamTakeDeadNow(team.id)) {
+            const hasCanasta = teamHasGoodCanastra(team.id);
+            let willCreateCanastra = false;
+            
+            if (isNewMeld) {
+               willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi([...selectedCards, top]).kind);
+            } else {
+               willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi([...team.melds[extendedMeldIndex], ...selectedCards, top]).kind);
+            }
+            
+            if (!hasCanasta && !willCreateCanastra) {
+              showMessage(`❌ Matemática inválida: Vai sobrar ${futureHandSize} carta(s) sem ter canastra limpa!`);
+              selectedHandIndexes.clear();
+              renderHand();
+              return;
+            }
+          }
+
           // --- SE ENCAIXOU, FAZ A MÁGICA ---
           const pile = state.discard.splice(0, state.discard.length);
           pile.forEach(ensureCardId);
