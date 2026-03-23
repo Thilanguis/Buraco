@@ -82,14 +82,24 @@ export class BuracoBot {
 
     const topIsWildOrTwo = topCard.joker || topCard.rank === '2';
 
+    // 🛡️ MOTOR DE PREVISÃO DE SUICÍDIO: Garante que o bot não zere a mão acidentalmente ao usar o lixo
+    const checkSafe = (cardsUsedFromHand) => {
+      // Calcula quantas cartas vão sobrar na mão do bot caso ele faça a jogada
+      const cardsAdded = state.variant === 'fechado' ? pileSize - 1 : pileSize;
+      const predictedHandSize = hand.length - cardsUsedFromHand + cardsAdded;
+
+      if (predictedHandSize > 1) return true;
+      if (engine.canTeamTakeDeadNow(team.id)) return true;
+      if (engine.teamHasGoodCanastra(team.id)) return true;
+      return false; // Trava o bot!
+    };
+
     // =========================================================
     // FASE 1: PRIORIDADE ABSOLUTA - PEGAR LIMPO
     // =========================================================
     if (team.melds && team.melds.length > 0) {
       for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
         const meld = team.melds[mIdx];
-
-        // 🛡️ TRAVA DO DESPERDÍCIO: Não junta coringa com coringa (nem 2 com 2)
         if (topIsWildOrTwo && meld.some((c) => c.joker || c.rank === '2')) continue;
 
         const testMeld = [...meld, topCard];
@@ -99,6 +109,7 @@ export class BuracoBot {
           const isPerfectTwo = topCard.rank === '2' && topCard.suit === meld[0].suit && !hasTwo;
 
           if (!needsWild || isPerfectTwo) {
+            if (!checkSafe(0)) continue; // 🔒 TRAVA DE SEGURANÇA APLICADA
             return { wants: true, action: 'extend', meldIndex: mIdx };
           }
         }
@@ -112,6 +123,7 @@ export class BuracoBot {
           const hasWild = combo.some((c) => c.joker || c.rank === '2');
 
           if (!hasWild && engine.isValidSequenceMeld(combo)) {
+            if (!checkSafe(2)) continue; // 🔒 TRAVA DE SEGURANÇA APLICADA
             return { wants: true, action: 'new', handIndexes: [i, j] };
           }
         }
@@ -125,8 +137,6 @@ export class BuracoBot {
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           const meld = team.melds[mIdx];
-
-          // 🛡️ TRAVA DO DESPERDÍCIO: Não junta coringa com coringa (nem 2 com 2)
           if (topIsWildOrTwo && meld.some((c) => c.joker || c.rank === '2')) continue;
 
           const testMeld = [...meld, topCard];
@@ -143,6 +153,7 @@ export class BuracoBot {
               }
             }
 
+            if (!checkSafe(0)) continue; // 🔒 TRAVA DE SEGURANÇA APLICADA
             return { wants: true, action: 'extend', meldIndex: mIdx };
           }
         }
@@ -155,6 +166,7 @@ export class BuracoBot {
             const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
 
             if (wilds === 1 && engine.isValidSequenceMeld(combo)) {
+              if (!checkSafe(2)) continue; // 🔒 TRAVA DE SEGURANÇA APLICADA
               return { wants: true, action: 'new', handIndexes: [i, j] };
             }
           }
@@ -166,6 +178,8 @@ export class BuracoBot {
     // FASE 3: BURACO ABERTO
     // =========================================================
     if (state.variant === 'fechado') return false;
+
+    if (!checkSafe(0)) return false; // 🔒 TRAVA NO ABERTO TAMBÉM
 
     const hasWildInPile = state.discard.some((c) => c.joker || c.rank === '2');
     if (hasWildInPile) return { wants: true, action: 'open' };
