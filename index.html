@@ -797,9 +797,6 @@
       #meldBtn {
         background: #059669;
       }
-      #discardBtn {
-        background: #be123c;
-      }
       #takeDeadBtn {
         background: #4f46e5;
       }
@@ -1684,6 +1681,11 @@
                 <input id="pixTeam1" value="" placeholder="PIX Time 1" style="margin: 0; font-size: 11px;" />
                 <input id="pixTeam2" value="" placeholder="PIX Time 2" style="margin: 0; font-size: 11px;" />
               </div>
+              
+              <div style="margin-top: 8px; font-size: 9px; color: #9ca3af; text-align: left; line-height: 1.4; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <strong style="color: #cbd5e1;">Formatos aceitos:</strong> CPF/CNPJ, E-mail ou Chave Aleatória.<br>
+                <span style="color: #facc15;">⚠️ Para Celular:</span> Use o código do país (ex: <strong>+55</strong>) ou parênteses <strong>( )</strong> no DDD para o sistema não confundir com CPF.
+              </div>
             </div>
 
             <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
@@ -1845,7 +1847,6 @@
             <div class="player-actions">
               <button id="meldBtn">⬇️ Baixar</button>
               <button id="moveWildBtn">↔️ Mover 2/Joker</button>
-              <button id="discardBtn">🗑️ Descartar</button>
               <button id="takeDeadBtn">💀 Morto</button>
               <button id="showScoreBtn" style="display: none; background: #facc15; color: #000; font-weight: 900">🏆 PLACAR</button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
@@ -1964,7 +1965,12 @@
         window.location.replace(`?game=${gameId}`);
       }
       let myPlayerIndex = parseInt(urlParams.get('player'), 10);
-      if (isNaN(myPlayerIndex)) myPlayerIndex = -1; // -1 significa que ainda não escolheu quem ele é
+      if (isNaN(myPlayerIndex)) {
+        const savedSeat = localStorage.getItem(`buraco_seat_${gameId}`);
+        myPlayerIndex = savedSeat !== null ? parseInt(savedSeat, 10) : -1;
+      } else {
+        localStorage.setItem(`buraco_seat_${gameId}`, myPlayerIndex);
+      }
 
       const gameRef = doc(db, 'buracoGames', gameId);
 
@@ -2004,8 +2010,27 @@
       }
       // Se a pessoa minimizar o navegador e voltar, a API derruba a trava. Isso garante que ela reative.
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && state && document.getElementById('gameSection').style.display === 'flex') {
-          keepScreenAlive();
+        if (document.visibilityState === 'visible') {
+          if (state && document.getElementById('gameSection').style.display === 'flex') {
+            keepScreenAlive();
+          }
+          
+          // 🛡️ CHUTE DE EMERGÊNCIA NO BOT: Se o celular congelou o timer ao minimizar
+          if (state && !state.finished) {
+            const currP = state.players[state.currentPlayer];
+            if (currP && currP.name.toUpperCase().includes('BOT')) {
+              let hostIdx = state.players.findIndex(p => p && !p.name.toUpperCase().includes('BOT'));
+              if (hostIdx === -1) hostIdx = myPlayerIndex; 
+              
+              if (myPlayerIndex === hostIdx) {
+                // Se a aba foi suspensa e o tempo esgotou ou o bot perdeu o próprio turno, força a jogada
+                if (turnTimerRemaining <= 0 || window.lastBotTurnPlayed !== state.turnNumber) {
+                   window.lastBotTurnPlayed = state.turnNumber;
+                   BuracoBot.playTurn(state, state.currentPlayer, botEngine).catch(()=>{});
+                }
+              }
+            }
+          }
         }
       });
 
@@ -2092,6 +2117,7 @@
         const pushed = pushWildToEdge(meld, meld.indexOf(wild));
         if (pushed) meld.splice(0, meld.length, ...pushed);
 
+        showMessage('🔄 Coringa deslocado automaticamente para a ponta.');
         return true;
       }
 
@@ -2199,13 +2225,13 @@
 
         const myTurn = state.currentPlayer === myPlayerIndex;
         if (!myTurn || !state.hasDrawnThisTurn) {
-          showMessage('Só dá pra mover depois de comprar e na sua vez.');
+          showMessage('⚠️ Ação bloqueada: Compre uma carta antes de mexer na mesa.');
           return;
         }
 
         const me = state.players[myPlayerIndex];
         if (teamId !== me.teamId) {
-          showMessage('Você só mexe nos jogos do SEU time.');
+          showMessage('❌ Acesso negado: Você não pode alterar os jogos do adversário.');
           return;
         }
 
@@ -2214,13 +2240,13 @@
 
         const card = meld[cardIdx];
         if (!isMovableTwoOrJoker(card)) {
-          showMessage('Só pode mover JOKER ou 2.');
+          showMessage('⚠️ Movimento inválido: Apenas Coringas (2 ou Joker) podem ser movidos.');
           return;
         }
 
         const isTrapped = cardIdx > 0 && cardIdx < meld.length - 1;
         if (isTrapped) {
-          showMessage('O coringa está cobrindo um buraco e não pode ser movido.');
+          showMessage('❌ Coringa preso: A carta está conectando o jogo e não pode ser retirada.');
           return;
         }
 
@@ -2392,7 +2418,7 @@
         movingWild = null;
         renderAll();
         await commitState();
-        showMessage('Movido.');
+        showMessage('✅ Coringa reposicionado com sucesso.');
       }
 
       function playCanastraSfx(kind) {
@@ -2816,7 +2842,7 @@
         };
         ignoreOwnActionId = state.lastAction.id;
 
-        showMessage('Tempo esgotado: auto-play.');
+        showMessage('⚠️ Tempo esgotado! Jogada automática executada.');
         renderAll();
         await commitState();
       }
@@ -2940,17 +2966,31 @@
       }
 
       function recycleDeadToStockIfPossible() {
-        if (!state || state.stock.length) return false;
-        if (!state.deadPiles || !state.deadPiles.length) return false;
+        if (!state || state.stock.length) return null;
+        if (!state.deadPiles || !state.deadPiles.length) return null;
 
         const idx = state.deadPiles.findIndex((pile) => pile && pile.length);
-        if (idx === -1) return false;
+        if (idx === -1) return null;
 
         const collected = state.deadPiles[idx];
         state.deadPiles[idx] = [];
         shuffle(collected);
         state.stock = collected;
-        return true;
+        return idx;
+      }
+
+      async function animateDeadToHandLocal(deadIndex) {
+        const fromSlot = document.getElementById(deadIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
+        const handArea = document.getElementById('handContainer');
+        if (fromSlot && handArea) {
+          const fr = fromSlot.getBoundingClientRect();
+          const hr = handArea.getBoundingClientRect();
+          const fakeCard = { rank: '★', suit: '★', joker: true, id: `dead_${Date.now()}`, back: 'red' };
+          const fromRect = { left: fr.left, top: fr.top, width: fr.width, height: fr.height };
+          const toRect = { left: hr.left + hr.width * 0.5 - 30, top: hr.top + 10, width: 60, height: 90 };
+          await flyRectToRect(fakeCard, fromRect, toRect, 'back');
+          impactAtRect(toRect);
+        }
       }
 
       function cardLabel(card) {
@@ -3151,7 +3191,7 @@
       async function drawFromStock() {
         if (!ensureMyTurn()) return;
         if (state.hasDrawnThisTurn) {
-          showMessage('Já comprou.');
+          showMessage('⚠️ Compra bloqueada: Você já puxou carta neste turno.');
           return;
         }
 
@@ -3163,15 +3203,26 @@
         const drawCount = isDominador ? (state.partialDraw ? 1 : 2) : 1;
         const drawnCards = [];
 
+        let recycledIndex = null;
         for (let i = 0; i < drawCount; i++) {
           if (!state.stock.length) {
-            if (!recycleDeadToStockIfPossible() || !state.stock.length) {
+            recycledIndex = recycleDeadToStockIfPossible();
+            if (recycledIndex === null || !state.stock.length) {
               if (i === 0) {
-                showMessage('Monte acabou e não há morto para recolocar. Fim de jogo.');
+                showMessage('⚠️ O Monte esgotou e não há mortos. Fim de jogo por exaustão!');
                 await finishGame(null);
                 return;
               } else break;
-            } else showMessage('Morto virou monte.');
+            } else {
+               const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
+               const toEl = document.querySelector('#drawStockBtn .pile-card');
+               if (fromEl && toEl) {
+                 const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
+                 await flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back');
+                 impactAtRect(getRect(toEl));
+               }
+               showMessage('🔄 O Morto virou Monte!');
+            }
           }
           const c = state.stock.pop();
           ensureCardId(c);
@@ -3205,10 +3256,11 @@
         showMessage(''); // Limpa a mensagem da puxada parcial
         renderAll(); // Atualiza a tela e DESTRAVA os botões na hora!
 
-        state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), ts: Date.now() };
+        state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), recycledDeadIndex: recycledIndex, ts: Date.now() };
         ignoreOwnActionId = state.lastAction.id;
 
         await commitState();
+        if (!state.partialDraw) showMessage('✅ Compra realizada.');
       }
 
       function canUseDiscardInClosed(discardTop, hand, team) {
@@ -3246,18 +3298,18 @@
           if (selectedHandIndexes.size === 1) {
             discardSelectedCard();
           } else {
-            showMessage('Selecione 1 carta na mão para descartar no lixo.');
+            showMessage('⚠️ Selecione exatamente 1 carta da sua mão para descartar.');
           }
           return;
         }
 
         if (!state.stock.length && !hasAnyDeadToRecycle()) {
-          showMessage('Monte acabou. Fim de jogo.');
+          showMessage('⚠️ O Monte esgotou e não há mortos. Fim de jogo por exaustão!');
           await finishGame(null);
           return;
         }
         if (!state.discard.length) {
-          showMessage('Lixo vazio.');
+          showMessage('⚠️ O Lixo está vazio.');
           return;
         }
 
@@ -3309,7 +3361,7 @@
           else if (selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
             isNewMeld = true;
           } else {
-            showMessage('FECHADO: Selecione na mão as cartas que formam jogo com o lixo!');
+            showMessage('🔒 FECHADO: Selecione na mão as cartas que justificam a compra do lixo!');
             return;
           }
 
@@ -3390,6 +3442,7 @@
 
          // Substitua o final deste bloco:
           const tookDead = specialDeadFechado || await checkPostMeldStatus(me);
+          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
             id: newActionId(),
@@ -3443,6 +3496,7 @@
         ignoreOwnActionId = state.lastAction.id;
 
         await commitState();
+        if (!state.partialDraw) showMessage('✅ Lixo recolhido.');
       }
 
       function isValidSequenceMeld(cards) {
@@ -3606,7 +3660,7 @@
           const targetMeld = team.melds[forcedIndex];
           const combined = targetMeld.concat(cards);
           if (!isValidSequenceMeld(combined)) {
-            showMessage('Não encaixa.');
+            showMessage('❌ Combinação inválida: As cartas selecionadas não encaixam neste jogo.');
             return false;
           }
 
@@ -3656,7 +3710,8 @@
           }
 
           // Substitua o final deste bloco:
-          const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer());
+          const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer()); // Mantenha specialDead2 no bloco de baixo!
+          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
             id: newActionId(),
@@ -3722,9 +3777,10 @@
         }
 
         // Substitua o final da função:
-        const tookDead = specialDead2 || await checkPostMeldStatus(currentPlayer());
+        const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer()); // Mantenha specialDead2 no bloco de baixo!
+          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
-        state.lastAction = {
+          state.lastAction = {
           id: newActionId(),
           type: 'meldExtend',
           playerId: myPlayerIndex,
@@ -3770,11 +3826,11 @@
         if (extended) return;
 
         if (indexes.length < 3) {
-          showMessage('Novo jogo: mín 3 cartas.');
+          showMessage('⚠️ Um novo jogo exige no mínimo 3 cartas em sequência.');
           return;
         }
         if (!isValidSequenceMeld(cards)) {
-          showMessage('Sequência inválida.');
+          showMessage('❌ Sequência inválida: As cartas não formam um jogo estruturado.');
           return;
         }
 
@@ -3825,6 +3881,7 @@
 
         // Puxa o morto ANTES de avisar o Firebase
         const tookDead = specialDead || await checkPostMeldStatus(currentPlayer());
+        if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
         state.lastAction = {
           id: newActionId(),
@@ -3841,6 +3898,7 @@
         selectedHandIndexes.clear();
         renderAll();
         await commitState();
+        if (!tookDead) showMessage('✅ Jogo baixado com sucesso na mesa.');
       }
 
       function takeDeadIfAvailableForPlayer(p) {
@@ -3875,18 +3933,18 @@
         const max = state.deadChunksMax?.[teamId] ?? 1;
 
         if (taken >= max) {
-          showMessage('Sem mortos p/ sua equipe.');
+          showMessage('💀 O morto da sua equipe já foi recolhido.');
           return;
         }
         if (p.hand.length > 0) {
-          showMessage('Mão deve estar vazia.');
+          showMessage('⚠️ Esvazie sua mão completamente para pegar o morto.');
           return;
         }
 
         // Pega o índice do primeiro morto disponível
         const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
         if (deadIndex === -1) {
-          showMessage('Nenhum morto na mesa.');
+          showMessage('💀 Não há mais mortos disponíveis na mesa.');
           return;
         }
 
@@ -3895,14 +3953,7 @@
         const fromSlot = document.getElementById(deadIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
         const handArea = document.getElementById('handContainer');
 
-        if (fromSlot && handArea) {
-          const fr = fromSlot.getBoundingClientRect();
-          const hr = handArea.getBoundingClientRect();
-          const fakeCard = { rank: '★', suit: '★', joker: true, id: `dead_${Date.now()}` };
-          const fromRect = { left: fr.left, top: fr.top, width: fr.width, height: fr.height };
-          const toRect = { left: hr.left + hr.width * 0.5, top: hr.top + 10, width: 60, height: 90 };
-          await flyRectToRect(fakeCard, fromRect, toRect, 'back');
-        }
+        await animateDeadToHandLocal(deadIndex);
 
         p.hand.length = 0;
         p.hand.push(...dead.splice(0, chunkSize));
@@ -3920,6 +3971,7 @@
         ignoreOwnActionId = state.lastAction.id;
 
         await commitState();
+        showMessage('💀 Morto recolhido com sucesso!');
       }
 
       function canTeamTakeDeadNow(teamId) {
@@ -3941,7 +3993,7 @@
         if (state.variant === 'fechado' && state.pickedDiscardCardId) {
           const stillInHand = currentPlayer().hand.some((c) => c.id === state.pickedDiscardCardId);
           if (stillInHand) {
-            showMessage('Use a carta do lixo em um jogo antes de descartar.');
+            showMessage('🔒 FECHADO: A carta comprada do lixo precisa ser baixada na mesa obrigatoriamente.');
             return;
           }
         }
@@ -4007,6 +4059,8 @@
           return;
         }
 
+        if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
+
         passTurn();
 
         state.lastAction = {
@@ -4021,6 +4075,7 @@
 
         renderAll();
         await commitState();
+        showMessage('✅ Carta descartada. Turno encerrado.');
       }
 
       function computeTeamMeldScore(team) {
@@ -4322,7 +4377,6 @@
         document.getElementById('drawDiscardBtn').style.opacity = canDrawDiscard || canDiscardToPile ? '1' : '0.5';
 
         document.getElementById('meldBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
-        document.getElementById('discardBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
 
         const me = state.players[myPlayerIndex];
         const myTeamId = me ? me.teamId : null; // Protege o Team ID
@@ -4337,7 +4391,6 @@
         const isSpec = myPlayerIndex === -1;
         document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
         document.getElementById('meldBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
-        document.getElementById('discardBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
         document.getElementById('takeDeadBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
         document.getElementById('moveWildBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
 
@@ -4887,7 +4940,26 @@
           return out;
         };
 
+        // Injetor universal para morto automático remoto (incluindo IA)
+        const animateRemoteDeadIfAny = async () => {
+          if (a.tookDead) {
+            const fromEl = a.tookDead.deadIndex === 1 ? dead1El : dead0El;
+            const fromR = fromEl ? getRect(fromEl) : null;
+            if (fromR && handRect) {
+              await flyRectToRect(fallbackCard, fromR, handRect, 'back');
+              impactAtRect(handRect);
+            }
+          }
+        };
+
         if (a.type === 'drawStock') {
+          if (a.recycledDeadIndex !== null && a.recycledDeadIndex !== undefined) {
+             const deadEl = a.recycledDeadIndex === 1 ? dead1El : dead0El;
+             if (deadEl && stockRect) {
+                await flyRectToRect(fallbackCard, getRect(deadEl), stockRect, 'back');
+                impactAtRect(stockRect);
+             }
+          }
           if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
           impactAtRect(handRect);
           return;
@@ -4910,7 +4982,6 @@
           let prevHtml = null;
           let prevColor = null;
           
-          // Se o lixo já tinha carta, mostra a carta antiga enquanto a nova voa
           if (df && state.discard.length > 1) {
              const prevCard = state.discard[state.discard.length - 2];
              prevHtml = df.innerHTML;
@@ -4925,13 +4996,14 @@
           impactAtRect(discardRect);
           
           if (df) {
-             // Devolve a carta que acabou de cair para o topo do visual
              if (prevHtml) {
                df.innerHTML = prevHtml;
                df.style.color = prevColor;
              }
              df.style.visibility = '';
           }
+          
+          await animateRemoteDeadIfAny();
           return;
         }
 
@@ -4941,6 +5013,11 @@
           if (fromRect) await flyRectToRect(fallbackCard, fromRect, handRect, 'back');
           impactAtRect(handRect);
           return;
+        }
+
+        if (a.type === 'drawDiscardFechado') {
+           await animateRemoteDeadIfAny();
+           return;
         }
 
         if (a.type === 'meldNew') {
@@ -4965,6 +5042,8 @@
               return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
             }),
           );
+          
+          await animateRemoteDeadIfAny();
           return;
         }
 
@@ -4984,6 +5063,8 @@
               return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
             }),
           );
+          
+          await animateRemoteDeadIfAny();
           return;
         }
 
@@ -5091,7 +5172,7 @@
           state.partialDraw = false;
 
           if (drawnCards.length > 0) {
-            state.lastAction = { id: newActionId(), type: 'drawStock', playerId: botIndex, card: packCard(drawnCards[drawnCards.length - 1]), ts: Date.now() };
+            state.lastAction = { id: newActionId(), type: 'drawStock', playerId: botIndex, card: packCard(drawnCards[drawnCards.length - 1]), recycledDeadIndex: recycledIndex, ts: Date.now() };
           }
           renderAll();
           await commitState();
@@ -5293,10 +5374,11 @@
           // ... (resto do bloco continua igual)
           movingWild = null;
           
-          // 🛡️ RESET DE CADEIRA: Garante que você não fique preso no corpo de um bot
-          myPlayerIndex = -1; 
+          // 🛡️ PRESERVAÇÃO DE CADEIRA: Mantém você na mesma posição no Lobby caso a sala reinicie
           const localSelect = document.getElementById('localPlayerSelect');
-          if (localSelect) localSelect.value = "";
+          if (localSelect) {
+             localSelect.value = myPlayerIndex !== -1 ? myPlayerIndex.toString() : "";
+          }
 
           lastSeenActionId = null;
           ignoreOwnActionId = null;
@@ -5754,17 +5836,17 @@
         const pt1 = document.getElementById('pixTeam1');
         const pt2 = document.getElementById('pixTeam2');
         if (mode === '1x1') {
-            pt1.placeholder = 'Chave PIX do Jogador 1 (Recebedor)';
-            pt2.placeholder = 'Chave PIX do Jogador 2 (Recebedor)';
+            pt1.placeholder = 'Chave PIX';
+            pt2.placeholder = 'Chave PIX';
         } else if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
-            pt1.placeholder = 'Chave PIX do Escravo (Recebedor)';
-            pt2.placeholder = 'Chave PIX do Dominador (Recebedor)';
+            pt1.placeholder = 'Chave PIX';
+            pt2.placeholder = 'Chave PIX';
         } else if (mode === '1x2') {
-            pt1.placeholder = 'Chave PIX do Solo (Recebedor)';
-            pt2.placeholder = 'Chave PIX da Dupla (Recebedor)';
+            pt1.placeholder = 'Chave PIX';
+            pt2.placeholder = 'Chave PIX';
         } else {
-            pt1.placeholder = 'Chave PIX do Time 1 (Recebedor)';
-            pt2.placeholder = 'Chave PIX do Time 2 (Recebedor)';
+            pt1.placeholder = 'Chave PIX';
+            pt2.placeholder = 'Chave PIX';
         }
 
         // -----------------------------------------------------------------
@@ -5992,51 +6074,90 @@
 
         errorDiv.style.display = 'none'; // Passou na validação completa
 
-        // Função interna para validar os formatos oficiais do PIX (com cálculo de CPF)
-          const isValidPix = (chave) => {
-            if (!chave) return false;
-            
-            // 1. Valida E-mail
-            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chave)) return true;
-            
-            // 2. Valida Chave Aleatória (UUID)
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chave)) return true;
-            
-            // Extrai apenas os números
-            const num = chave.replace(/\D/g, '');
-            
-            // 3. CNPJ (14 dígitos), Celular com DDI (12 a 13) ou Fixo (10)
-            if (num.length === 10 || num.length === 12 || num.length === 13 || num.length === 14) return true;
-            
-            // 4. CPF ou Celular com DDD (11 dígitos)
-            if (num.length === 11) {
-              // Se tiver parênteses ou o 3º dígito for '9' (sem pontos de CPF), assume que é Celular
-              if (chave.includes('(') || (num.substring(2, 3) === '9' && !chave.includes('.'))) {
-                return true; 
-              }
+       // Motor Rigoroso de Validação de PIX (Respostas Diretas)
+        const validatePixDetailed = (chave) => {
+          if (!chave) return { valid: false, msg: 'Chave vazia.' };
+          chave = chave.trim();
+          
+          if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chave)) return { valid: true };
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chave)) return { valid: true };
+          
+          const hasPhoneChars = chave.includes('+') || chave.includes('(') || chave.includes(')');
+          const hasDocChars = chave.includes('.') || chave.includes('-') || chave.includes('/');
+          const num = chave.replace(/\D/g, '');
+          
+          if (hasPhoneChars) {
+             if (num.length >= 10 && num.length <= 14) return { valid: true };
+             return { valid: false, msg: `Telefone inválido (contém ${num.length} números, exige de 10 a 14).` };
+          }
 
-              // Validação matemática pesada dos Dígitos Verificadores do CPF
-              if (/^(\d)\1+$/.test(num)) return false; // Bloqueia 111.111.111-11
-              
-              let sum = 0, remainder;
-              // Cálculo do 1º dígito
-              for (let i = 1; i <= 9; i++) sum += parseInt(num.substring(i - 1, i)) * (11 - i);
-              remainder = (sum * 10) % 11;
-              if (remainder === 10 || remainder === 11) remainder = 0;
-              if (remainder !== parseInt(num.substring(9, 10))) return false;
-              
-              // Cálculo do 2º dígito
-              sum = 0;
-              for (let i = 1; i <= 10; i++) sum += parseInt(num.substring(i - 1, i)) * (12 - i);
-              remainder = (sum * 10) % 11;
-              if (remainder === 10 || remainder === 11) remainder = 0;
-              if (remainder !== parseInt(num.substring(10, 11))) return false;
-              
-              return true; // Passou no cálculo, é um CPF válido
-            }
-            
-            return false; // Não encaixou em nada
+          const isCPF = (cpf) => {
+            if (/^(\d)\1+$/.test(cpf)) return false;
+            let sum = 0, rem;
+            for (let i = 1; i <= 9; i++) sum += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+            rem = (sum * 10) % 11; if (rem === 10 || rem === 11) rem = 0;
+            if (rem !== parseInt(cpf.substring(9, 10))) return false;
+            sum = 0;
+            for (let i = 1; i <= 10; i++) sum += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+            rem = (sum * 10) % 11; if (rem === 10 || rem === 11) rem = 0;
+            if (rem !== parseInt(cpf.substring(10, 11))) return false;
+            return true;
           };
+
+          const isCNPJ = (cnpj) => {
+            if (/^(\d)\1+$/.test(cnpj)) return false;
+            let size = cnpj.length - 2, numbers = cnpj.substring(0, size), digits = cnpj.substring(size), sum = 0, pos = size - 7;
+            for (let i = size; i >= 1; i--) { sum += numbers.charAt(size - i) * pos--; if (pos < 2) pos = 9; }
+            let result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+            if (result !== parseInt(digits.charAt(0))) return false;
+            size = size + 1; numbers = cnpj.substring(0, size); sum = 0; pos = size - 7;
+            for (let i = size; i >= 1; i--) { sum += numbers.charAt(size - i) * pos--; if (pos < 2) pos = 9; }
+            result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+            if (result !== parseInt(digits.charAt(1))) return false;
+            return true;
+          };
+
+          if (hasDocChars) {
+             if (num.length === 11) return isCPF(num) ? { valid: true } : { valid: false, msg: 'CPF inválido.' };
+             if (num.length === 14) return isCNPJ(num) ? { valid: true } : { valid: false, msg: 'CNPJ inválido.' };
+             return { valid: false, msg: `Documento incompleto (CPF=11, CNPJ=14, digitado=${num.length}).` };
+          }
+
+          if (num.length === 11) return isCPF(num) ? { valid: true } : { valid: false, msg: 'CPF inválido.' };
+          if (num.length === 14) return isCNPJ(num) ? { valid: true } : { valid: false, msg: 'CNPJ inválido.' };
+
+          return { valid: false, msg: `Formato não reconhecido (${num.length} números digitados). Leia a regra abaixo.` };
+        };
+
+        // 🛡️ TRAVA FRONTEND: Executa a validação e bloqueia a tela se for inválido
+        if (betToggle === 'sim') {
+           const p1PixCheck = document.getElementById('pixTeam1').disabled && currentLobby ? currentLobby.pixKeys[0] : document.getElementById('pixTeam1').value.trim();
+           const p2PixCheck = document.getElementById('pixTeam2').disabled && currentLobby ? currentLobby.pixKeys[1] : document.getElementById('pixTeam2').value.trim();
+           
+           const t1IsBot = mode === '2x2' ? (namesArray[0].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT')) : namesArray[0].toUpperCase().includes('BOT');
+           
+           let t2IsBot = false;
+           if (mode.startsWith('1x1')) t2IsBot = namesArray[1].toUpperCase().includes('BOT');
+           else if (mode === '1x2') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT');
+           else if (mode === '2x2') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[3].toUpperCase().includes('BOT');
+
+           if (!t1IsBot) {
+              const res1 = validatePixDetailed(p1PixCheck);
+              if (!res1.valid) {
+                 errorDiv.innerHTML = `❌ <strong>PIX Time 1:</strong> ${res1.msg}`;
+                 errorDiv.style.display = 'block';
+                 return;
+              }
+           }
+           if (!t2IsBot) {
+              const res2 = validatePixDetailed(p2PixCheck);
+              if (!res2.valid) {
+                 errorDiv.innerHTML = `❌ <strong>PIX Time 2:</strong> ${res2.msg}`;
+                 errorDiv.style.display = 'block';
+                 return;
+              }
+           }
+        }
 
         const l = currentLobby || {};
         const readyArray = l.ready ? [...l.ready] : [false, false, false, false];
@@ -6053,7 +6174,7 @@
           }
         }
 
-        // AQUI ESTÁ A MUDANÇA: adicionado o pixKeys
+        // AQUI ESTÁ A MUDANÇA: adicionado o pixKeys (Proteção do Oculto)
         const fullLobby = {
           mode: mode,
           variant: variant,
@@ -6061,7 +6182,10 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [p1, p2, p3, p4],
-          pixKeys: [document.getElementById('pixTeam1').value.trim(), document.getElementById('pixTeam2').value.trim()],
+          pixKeys: [
+            document.getElementById('pixTeam1').disabled && currentLobby ? currentLobby.pixKeys[0] : document.getElementById('pixTeam1').value.trim(),
+            document.getElementById('pixTeam2').disabled && currentLobby ? currentLobby.pixKeys[1] : document.getElementById('pixTeam2').value.trim()
+          ],
           ready: readyArray,
         };
 
@@ -6109,15 +6233,16 @@
         myPlayerIndex = parseInt(e.target.value);
         if (isNaN(myPlayerIndex)) myPlayerIndex = -1; 
         
-        // 🛡️ TRAVA DE AMNÉSIA (Persistência de Sessão na URL)
-        // Salva a sua cadeira silenciosamente no link. Se o celular matar a aba, você volta no mesmo corpo.
-        const url = new URL(window.location);
-        if (myPlayerIndex === -1) {
-          url.searchParams.delete('player');
-        } else {
-          url.searchParams.set('player', myPlayerIndex);
-        }
-        window.history.replaceState({}, '', url);
+        // 🛡️ TRAVA DE AMNÉSIA ABSOLUTA (URL + LocalStorage)
+              const url = new URL(window.location);
+              if (myPlayerIndex === -1) {
+                url.searchParams.delete('player');
+                localStorage.removeItem(`buraco_seat_${gameId}`);
+              } else {
+                url.searchParams.set('player', myPlayerIndex);
+                localStorage.setItem(`buraco_seat_${gameId}`, myPlayerIndex);
+              }
+              window.history.replaceState({}, '', url);
 
         window.updateMenuDynamic(); 
         if (state) renderAll();
@@ -6126,7 +6251,6 @@
       document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
       document.getElementById('meldBtn').onclick = makeMeldFromSelection;
       document.getElementById('moveWildBtn').onclick = movePickedWildToSelectedMeld;
-      document.getElementById('discardBtn').onclick = discardSelectedCard;
       document.getElementById('takeDeadBtn').onclick = takeDead;
      // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
       document.getElementById('endGameBtn').onclick = async () => {
