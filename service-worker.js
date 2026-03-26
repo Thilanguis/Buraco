@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v46';
+const CACHE_NAME = 'buraco-v47';
 
 // Removido o "/icons/" do caminho das imagens
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];

@@ -15,7 +15,8 @@ export class BuracoBot {
 
     const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25);
     const isRushingMorto = !tookMorto && me.hand.length <= 5;
-    const isDuo = state.mode === '2x2' || (state.mode === '1x2' && team.playerIndexes.length === 2);
+    // O cérebro agora entende que o Trio também exige estratégia de equipe
+    const isDuo = state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes.length > 1);
     const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto };
 
     engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
@@ -211,6 +212,10 @@ export class BuracoBot {
       const me = s.players[botIndex];
       const team = s.teams[me.teamId];
 
+      // 🧠 MODO SNIPER (Ganância Segura): VIPs jogam para humilhar, mas só APÓS garantir uma canastra limpa.
+      const isVip = ((s.mode === '1x1_dominacao' || s.mode === '1x1_duploMorto') && botIndex === 1) || ((s.mode === '1x2' || s.mode === '1x3') && me.teamId === 1);
+      const isVipSniper = isVip && engine.teamHasGoodCanastra(team.id) && s.stock.length > 15 && !ctx.isDesperate;
+
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           for (let i = 0; i < me.hand.length; i++) {
@@ -266,6 +271,13 @@ export class BuracoBot {
 
               if (combo.some((c) => c.joker || c.rank === '2')) continue;
 
+              // 🛑 TRAVA DO SNIPER (Anti-Canibalismo): Se for VIP, não cria jogo novo do mesmo naipe de uma canastra limpa/real que já existe. Segura pra colar nela!
+              if (isVipSniper) {
+                const suit = combo[0].suit;
+                const hasLimpaOfSameSuit = team.melds.some((m) => m.length >= 7 && m[0].suit === suit && !m.some((c) => c.joker || (c.rank === '2' && c.suit !== suit) || c.forceWild));
+                if (hasLimpaOfSameSuit) continue;
+              }
+
               if (engine.isValidSequenceMeld(combo)) {
                 await engine.executeMeldNew(botIndex, [i, j, k]);
                 madeMove = true;
@@ -282,10 +294,15 @@ export class BuracoBot {
 
       const isEndgame = s.stock.length <= 22 || (ctx.tookMorto && me.hand.length <= 6);
 
-      // 🧠 LÓGICA DE PACIÊNCIA (TEAMPLAY): Se tem parceiro, segura a emoção e não suja!
+      // 🧠 LÓGICA DE PACIÊNCIA (TEAMPLAY) E MODO SNIPER
       let allowDirty = ctx.isRushingMorto || ctx.isDesperate || isEndgame;
       if (ctx.isDuo && !ctx.isDesperate && s.stock.length > 16) {
-        allowDirty = false; // Confia no parceiro, não gasta o coringa e espera.
+        allowDirty = false;
+      }
+
+      // 🛑 TRAVA DO SNIPER: Cancela completamente a sujeira para focar na Ás-a-Ás.
+      if (isVipSniper) {
+        allowDirty = false;
       }
 
       if (allowDirty) {
@@ -302,10 +319,8 @@ export class BuracoBot {
             if (isLimpa) {
               if (isCanastra) continue;
 
-              // 🛡️ PROTEÇÃO DE DUPLA: Só suja uma limpa se o monte tiver acabando (menos de 10 cartas) ou for desespero total
               if (ctx.isDuo && !ctx.isDesperate && s.stock.length > 10) continue;
 
-              // 🛡️ PROTEÇÃO SOLO: Segura a limpa se já tiver 5+ cartas (como antes)
               if (!ctx.isDuo && meld.length >= 5 && !ctx.isDesperate) continue;
             }
 
