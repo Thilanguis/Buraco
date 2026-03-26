@@ -3673,9 +3673,23 @@
           if (parseInt(teamIdStr) === team.id && team.melds[parseInt(meldIdxStr)]) forcedIndex = parseInt(meldIdxStr);
         }
 
+        // 🧠 Simulador Limpo: Clona as cartas e arranca a armadura do "2" natural
+        // Isso permite que o motor matemático enxergue o 2 como coringa novamente!
+        const simulateMeld = (baseMeld, newCards) => {
+          const combined = [...baseMeld, ...newCards].map(c => c ? { ...c } : null);
+          combined.forEach(c => {
+            if (c && !c.joker && (c.rank === '2' || c.rank === 2)) {
+              c.forceNatural = false;
+              c.forceWild = false;
+            }
+          });
+          return combined;
+        };
+
         if (forcedIndex !== null) {
           const targetMeld = team.melds[forcedIndex];
-          const combined = targetMeld.concat(cards);
+          const combined = simulateMeld(targetMeld, cards);
+          
           if (!isValidSequenceMeld(combined)) {
             showMessage('❌ Combinação inválida: As cartas selecionadas não encaixam neste jogo.');
             return false;
@@ -3684,6 +3698,7 @@
           const cardsLeft = hand.length - indexes.length;
           if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(team.id)) {
             const hasCanasta = teamHasGoodCanastra(team.id);
+            optimizeMeld(combined); // Re-calcula se virou suja ou limpa no simulador
             const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(combined).kind);
             if (!hasCanasta && !willCreateCanastra) {
               showMessage(`❌ Você não pode ficar com ${cardsLeft} carta(s) sem ter canastra limpa!`);
@@ -3726,8 +3741,7 @@
               specialDead1 = triggerDominacaoReward(currentPlayer());
           }
 
-          // Substitua o final deste bloco:
-          const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer()); // Mantenha specialDead2 no bloco de baixo!
+          const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer());
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
@@ -3750,7 +3764,8 @@
 
         const candidateMeldIndexes = [];
         team.melds.forEach((meld, idx) => {
-          if (isValidSequenceMeld(meld.concat(cards))) candidateMeldIndexes.push(idx);
+          const combinedCheck = simulateMeld(meld, cards);
+          if (isValidSequenceMeld(combinedCheck)) candidateMeldIndexes.push(idx);
         });
 
         if (!candidateMeldIndexes.length) return false;
@@ -3760,11 +3775,12 @@
         }
 
         const teamMeld = team.melds[candidateMeldIndexes[0]];
-        const combinedCheck = teamMeld.concat(cards);
+        const combinedCheck = simulateMeld(teamMeld, cards);
 
         const cardsLeft = hand.length - indexes.length;
         if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(team.id)) {
           const hasCanasta = teamHasGoodCanastra(team.id);
+          optimizeMeld(combinedCheck); // Re-calcula se virou suja ou limpa no simulador
           const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(combinedCheck).kind);
           if (!hasCanasta && !willCreateCanastra) {
             showMessage(`❌ Você não pode ficar com ${cardsLeft} carta(s) sem ter canastra limpa!`);
@@ -3793,7 +3809,6 @@
             specialDead2 = triggerDominacaoReward(currentPlayer());
         }
 
-        // 🐛 BUG CORRIGIDO: A variável correta agora é chamada, o código não morre mais no meio!
         const tookDead = specialDead2 || await checkPostMeldStatus(currentPlayer()); 
         if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
