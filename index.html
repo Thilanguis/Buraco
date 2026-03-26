@@ -2144,6 +2144,11 @@
       sfxCardMove.preload = 'auto';
       sfxCardMove.volume = 0.5;
 
+      // 🔊 NOVO ÁUDIO DO SEU TURNO
+      const sfxMyTurn = new Audio('assets/sfx/seu-turno.mp3'); 
+      sfxMyTurn.preload = 'auto';
+      sfxMyTurn.volume = 0.8;
+
       function playCardMove() {
         if (!audioUnlocked) return;
         try {
@@ -2166,7 +2171,8 @@
           if (AudioContext) audioCtx = new AudioContext();
         } catch (e) {}
 
-        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove];
+        // Injeta o sfxMyTurn aqui para navegadores mobile não bloquearem ele
+        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn];
         for (const a of allAudios) {
           try {
             a.pause();
@@ -2937,7 +2943,8 @@
           } else {
             updateTimerLabel();
             if (turnTimerRemaining <= 10 && state.currentPlayer === myPlayerIndex) {
-              if (audioCtx && audioCtx.state === 'running') playTone(880, audioCtx.currentTime, 0.1, 0.05, 'sine');
+              // Aumentei o volume de 0.05 para 0.25 (5x mais alto)
+              if (audioCtx && audioCtx.state === 'running') playTone(880, audioCtx.currentTime, 0.1, 0.25, 'sine');
               else if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
             }
           }
@@ -3256,7 +3263,7 @@
         showMessage(''); // Limpa a mensagem da puxada parcial
         renderAll(); // Atualiza a tela e DESTRAVA os botões na hora!
 
-        state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), recycledDeadIndex: recycledIndex, ts: Date.now() };
+        state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), count: drawnCards.length, recycledDeadIndex: recycledIndex, ts: Date.now() };
         ignoreOwnActionId = state.lastAction.id;
 
         await commitState();
@@ -3776,11 +3783,11 @@
             specialDead2 = triggerDominacaoReward(currentPlayer());
         }
 
-        // Substitua o final da função:
-        const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer()); // Mantenha specialDead2 no bloco de baixo!
-          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
+        // 🐛 BUG CORRIGIDO: A variável correta agora é chamada, o código não morre mais no meio!
+        const tookDead = specialDead2 || await checkPostMeldStatus(currentPlayer()); 
+        if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
-          state.lastAction = {
+        state.lastAction = {
           id: newActionId(),
           type: 'meldExtend',
           playerId: myPlayerIndex,
@@ -3799,106 +3806,115 @@
       }
 
       async function makeMeldFromSelection() {
+        if (window.isMelding) return; // 🛡️ TRAVA ANTI-SPAM: Impede duplo-clique
         if (!ensureMyTurn()) return;
         if (!state.hasDrawnThisTurn) {
           showMessage('Compre primeiro.');
           return;
         }
 
-        const hand = currentPlayer().hand;
-        const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
+        window.isMelding = true; // 🔒 TRANCA A FUNÇÃO
 
-        if (!indexes.length) {
-          showMessage('Selecione cartas.');
-          return;
-        }
-        const cards = indexes.map((i) => hand[i]);
+        try {
+          const hand = currentPlayer().hand;
+          const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
 
-        // TRAVA ANTI-CLONE: Limpa a seleção imediatamente
-        selectedHandIndexes.clear();
-
-        cards.forEach((c) => {
-          c.forceNatural = false;
-          c.forceWild = false;
-        });
-
-        const extended = await attemptExtendExistingMeld(cards, indexes);
-        if (extended) return;
-
-        if (indexes.length < 3) {
-          showMessage('⚠️ Um novo jogo exige no mínimo 3 cartas em sequência.');
-          return;
-        }
-        if (!isValidSequenceMeld(cards)) {
-          showMessage('❌ Sequência inválida: As cartas não formam um jogo estruturado.');
-          return;
-        }
-
-        const teamId = currentTeam().id;
-        const cardsLeft = hand.length - indexes.length;
-        if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(teamId)) {
-          const hasCanasta = teamHasGoodCanastra(teamId);
-          const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(cards).kind);
-          if (!hasCanasta && !willCreateCanastra) {
-            showMessage(`❌ Você não pode ficar com ${cardsLeft} carta(s) sem ter canastra limpa!`);
+          if (!indexes.length) {
+            showMessage('Selecione cartas.');
             return;
           }
-        }
+          const cards = indexes.map((i) => hand[i]);
 
-        cards.forEach(ensureCardId);
-        const targetContainer = document.getElementById(teamId === 0 ? 'meldsP1' : 'meldsP2');
+          // TRAVA ANTI-CLONE: Limpa a seleção imediatamente e renderiza
+          selectedHandIndexes.clear();
+          renderHand(); 
 
-        if (targetContainer) {
-          const tr = targetContainer.getBoundingClientRect();
-          const dropBase = { left: tr.left + tr.width - 30, top: tr.top + 10, width: 22, height: 30 };
-          const anims = cards.map((c, i) => {
-            const from = cardElById(c.id);
-            if (!from) return Promise.resolve();
-            const fromRect = getRect(from);
-            from.style.visibility = 'hidden';
-            const toRect = { ...dropBase, left: dropBase.left - i * 10, top: dropBase.top + i * 2 };
-            return flyRectToRect(c, fromRect, toRect, 'front').then(() => impactAtRect(toRect));
+          cards.forEach((c) => {
+            c.forceNatural = false;
+            c.forceWild = false;
           });
-          await Promise.all(anims);
+
+          const extended = await attemptExtendExistingMeld(cards, indexes);
+          if (extended) return;
+
+          if (indexes.length < 3) {
+            showMessage('⚠️ Um novo jogo exige no mínimo 3 cartas em sequência.');
+            return;
+          }
+          if (!isValidSequenceMeld(cards)) {
+            showMessage('❌ Sequência inválida: As cartas não formam um jogo estruturado.');
+            return;
+          }
+
+          const teamId = currentTeam().id;
+          const cardsLeft = hand.length - indexes.length;
+          if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(teamId)) {
+            const hasCanasta = teamHasGoodCanastra(teamId);
+            const willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi(cards).kind);
+            if (!hasCanasta && !willCreateCanastra) {
+              showMessage(`❌ Você não pode ficar com ${cardsLeft} carta(s) sem ter canastra limpa!`);
+              return;
+            }
+          }
+
+          cards.forEach(ensureCardId);
+          const targetContainer = document.getElementById(teamId === 0 ? 'meldsP1' : 'meldsP2');
+
+          if (targetContainer) {
+            const tr = targetContainer.getBoundingClientRect();
+            const dropBase = { left: tr.left + tr.width - 30, top: tr.top + 10, width: 22, height: 30 };
+            const anims = cards.map((c, i) => {
+              const from = cardElById(c.id);
+              if (!from) return Promise.resolve();
+              const fromRect = getRect(from);
+              from.style.visibility = 'hidden';
+              const toRect = { ...dropBase, left: dropBase.left - i * 10, top: dropBase.top + i * 2 };
+              return flyRectToRect(c, fromRect, toRect, 'front').then(() => impactAtRect(toRect));
+            });
+            await Promise.all(anims);
+          }
+
+          const meld = [];
+          for (const idx of indexes) {
+            meld.unshift(hand[idx]);
+            hand.splice(idx, 1);
+          }
+
+          optimizeMeld(meld);
+          normalizeMeldOrder(meld);
+
+          currentTeam().melds.push(meld);
+          const meldIdx = currentTeam().melds.length - 1;
+
+          let specialDead = null;
+          if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && classifyMeldForUi(meld).kind === 'asas') {
+               specialDead = triggerDominacaoReward(currentPlayer());
+          }
+
+          // Puxa o morto ANTES de avisar o Firebase
+          const tookDead = specialDead || await checkPostMeldStatus(currentPlayer());
+          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
+
+          state.lastAction = {
+            id: newActionId(),
+            type: 'meldNew',
+            playerId: myPlayerIndex,
+            teamId: currentTeam().id,
+            meldIndex: meldIdx,
+            cards: cards.map(packCard),
+            tookDead: tookDead, 
+            ts: Date.now(),
+          };
+
+          ignoreOwnActionId = state.lastAction.id;
+          selectedHandIndexes.clear();
+          renderAll();
+          await commitState();
+          if (!tookDead) showMessage('✅ Jogo baixado com sucesso na mesa.');
+          
+        } finally {
+          window.isMelding = false; // 🔓 DESTRAVA A FUNÇÃO (Independente de sucesso ou erro)
         }
-
-        const meld = [];
-        for (const idx of indexes) {
-          meld.unshift(hand[idx]);
-          hand.splice(idx, 1);
-        }
-
-        optimizeMeld(meld);
-        normalizeMeldOrder(meld);
-
-        currentTeam().melds.push(meld);
-        const meldIdx = currentTeam().melds.length - 1;
-
-        let specialDead = null;
-        if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && classifyMeldForUi(meld).kind === 'asas') {
-             specialDead = triggerDominacaoReward(currentPlayer());
-        }
-
-        // Puxa o morto ANTES de avisar o Firebase
-        const tookDead = specialDead || await checkPostMeldStatus(currentPlayer());
-        if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
-
-        state.lastAction = {
-          id: newActionId(),
-          type: 'meldNew',
-          playerId: myPlayerIndex,
-          teamId: currentTeam().id,
-          meldIndex: meldIdx,
-          cards: cards.map(packCard),
-          tookDead: tookDead, // Anexa o morto na ação
-          ts: Date.now(),
-        };
-
-        ignoreOwnActionId = state.lastAction.id;
-        selectedHandIndexes.clear();
-        renderAll();
-        await commitState();
-        if (!tookDead) showMessage('✅ Jogo baixado com sucesso na mesa.');
       }
 
       function takeDeadIfAvailableForPlayer(p) {
@@ -4287,10 +4303,6 @@
 
         const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex;
         
-        // 🛡️ DESTAQUE NA SUA MÃO
-        const playerUI = document.querySelector('.player-interface');
-        if (playerUI) playerUI.classList.toggle('active-turn-glow', isMyTurnRightNow);
-        
         const currP = currentPlayer();
         const pName = currP ? currP.name : 'Aguardando...';
 
@@ -4359,11 +4371,22 @@
           moveBtn.disabled = !can;
         }
 
-        // Só tenta vibrar se o usuário já tiver interagido com a tela (audioUnlocked)
-        if (myTurn && !lastMyTurn && navigator.vibrate && audioUnlocked) {
-          try {
-            navigator.vibrate([150, 80, 150]);
-          } catch (e) {}
+        // Toca o som e vibra o celular SOMENTE na virada pro seu turno (Ignora turno 0 para não dar spoiler do Dado)
+        const isDicePhase = state.turnNumber === 0 && !state.hasDrawnThisTurn;
+        
+        if (myTurn && !lastMyTurn) {
+          if (!isDicePhase) {
+             if (navigator.vibrate && audioUnlocked) {
+               try { navigator.vibrate([150, 80, 150]); } catch (e) {}
+             }
+             if (audioUnlocked) {
+               try {
+                 sfxMyTurn.pause();
+                 sfxMyTurn.currentTime = 0;
+                 sfxMyTurn.play().catch(() => {});
+               } catch (e) {}
+             }
+          }
         }
         lastMyTurn = myTurn;
 
@@ -4622,6 +4645,12 @@
 
           const target = i === 0 ? m1 : m2;
           t.melds.forEach((meld, midx) => {
+            
+            // 🛡️ RE-HIDRATAÇÃO DA FÍSICA: Como o Firebase apaga as flags ao salvar, 
+            // precisamos reavaliar a matemática do jogo antes de desenhá-lo.
+            // Isso garante que o sistema lembre que o "2" está atuando como carta natural!
+            optimizeMeld(meld);
+
             const div = document.createElement('div');
             div.className = 'meld-line';
             const key = t.id + ':' + midx;
@@ -4960,8 +4989,13 @@
                 impactAtRect(stockRect);
              }
           }
-          if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
-          impactAtRect(handRect);
+          
+          const drawCount = a.count || 1;
+          for (let i = 0; i < drawCount; i++) {
+             if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
+             impactAtRect(handRect);
+             if (i < drawCount - 1) await new Promise(r => setTimeout(r, 180)); // Pequeno delay pra ver as cartas separadas
+          }
           return;
         }
 
@@ -5148,17 +5182,27 @@
 
         executeDrawStock: async (botIndex) => {
           const me = state.players[botIndex];
-          // Trava do Dominador
-          const drawCount = (state.mode === '1x1_duploMorto' && botIndex === 1 && !state.partialDraw) ? 2 : 1;
+          // Trava do Dominador (Serve para Humilhação e Dominação)
+          const drawCount = ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && botIndex === 1 && !state.partialDraw) ? 2 : 1;
           const drawnCards = [];
+          let recycledIndex = null; // A variável que estava quebrando o código!
 
           for (let i = 0; i < drawCount; i++) {
             if (!state.stock.length) {
-              if (!recycleDeadToStockIfPossible() || !state.stock.length) {
+              recycledIndex = recycleDeadToStockIfPossible();
+              if (recycledIndex === null || !state.stock.length) {
                 if (i === 0) {
                   await finishGame(null);
                   return;
                 } else break;
+              } else {
+                 // Anima localmente para o Host o morto virando monte
+                 const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
+                 const toEl = document.querySelector('#drawStockBtn .pile-card');
+                 if (fromEl && toEl) {
+                   const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
+                   flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back').then(() => impactAtRect(getRect(toEl)));
+                 }
               }
             }
             const c = state.stock.pop();
@@ -5172,10 +5216,18 @@
           state.partialDraw = false;
 
           if (drawnCards.length > 0) {
-            state.lastAction = { id: newActionId(), type: 'drawStock', playerId: botIndex, card: packCard(drawnCards[drawnCards.length - 1]), recycledDeadIndex: recycledIndex, ts: Date.now() };
+            state.lastAction = { 
+              id: newActionId(), 
+              type: 'drawStock', 
+              playerId: botIndex, 
+              card: packCard(drawnCards[drawnCards.length - 1]), 
+              count: drawnCards.length, 
+              recycledDeadIndex: recycledIndex, 
+              ts: Date.now() 
+            };
           }
-          renderAll();
-          await commitState();
+          renderAll(); // Atualiza os números do monte instantaneamente
+          await commitState(); // Firebase recebe a ação correta e dispara as cartas voando
         },
 
         executeDrawDiscard: async (botIndex) => {
@@ -5187,8 +5239,8 @@
           me.hand.push(...pile);
           sortHand(me.hand);
           
-          // Trava do Dominador
-          if (state.mode === '1x1_duploMorto' && botIndex === 1 && !state.partialDraw) {
+          // Trava do Dominador (Serve para Humilhação e Dominação)
+          if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && botIndex === 1 && !state.partialDraw) {
             state.partialDraw = true;
           } else {
             state.hasDrawnThisTurn = true;
@@ -5227,7 +5279,8 @@
              sortHand(me.hand);
           }
 
-          if (state.mode === '1x1_duploMorto' && botIndex === 1 && !state.partialDraw) {
+          // Trava do Dominador (Serve para Humilhação e Dominação)
+          if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && botIndex === 1 && !state.partialDraw) {
             state.partialDraw = true;
           } else {
             state.hasDrawnThisTurn = true;
@@ -5339,9 +5392,10 @@
         const startRy = finalRy + 1800 * (Math.random() > 0.5 ? 1 : -1);
         const startRz = finalRz + 720 * (Math.random() > 0.5 ? 1 : -1);
 
+        // A MÁGICA AQUI: O rotateZ precisa ser o primeiro da string para girar o dado em relação à câmera e não se auto-tombar.
         cube.animate([
-          { transform: `rotateX(${startRx}deg) rotateY(${startRy}deg) rotateZ(${startRz}deg)` },
-          { transform: `rotateX(${finalRx}deg) rotateY(${finalRy}deg) rotateZ(${finalRz}deg)` }
+          { transform: `rotateZ(${startRz}deg) rotateX(${startRx}deg) rotateY(${startRy}deg)` },
+          { transform: `rotateZ(${finalRz}deg) rotateX(${finalRx}deg) rotateY(${finalRy}deg)` }
         ], { duration: 3500, easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)', fill: 'forwards' });
 
         // 3. FADE OUT
@@ -5629,6 +5683,18 @@
               showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
               if (pi) pi.style.pointerEvents = 'auto';
               if (bm) bm.style.pointerEvents = 'auto';
+              
+              // 🔊 Toca o som e vibra APÓS o dado rolar, mantendo o suspense!
+              if (state.currentPlayer === myPlayerIndex) {
+                 if (navigator.vibrate && audioUnlocked) { try { navigator.vibrate([150, 80, 150]); } catch (e) {} }
+                 if (audioUnlocked) {
+                    try {
+                      sfxMyTurn.pause();
+                      sfxMyTurn.currentTime = 0;
+                      sfxMyTurn.play().catch(() => {});
+                    } catch (e) {}
+                 }
+              }
            }, 3700);
         }
 
