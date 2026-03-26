@@ -3362,8 +3362,20 @@
             team.melds.forEach((m, i) => targetIndexes.push(i));
           }
 
+          // 🧠 Simulador Fantasma Injetado na validação da compra do Lixo
+          const simulateMeldDiscard = (baseMeld, newCards, topC) => {
+            const combined = [...baseMeld, ...newCards, topC].map(c => c ? { ...c } : null);
+            combined.forEach(c => {
+              if (c && !c.joker && (c.rank === '2' || c.rank === 2)) {
+                c.forceNatural = false;
+                c.forceWild = false;
+              }
+            });
+            return combined;
+          };
+
           for (const mIdx of targetIndexes) {
-            const testMeld = [...team.melds[mIdx], ...selectedCards, top];
+            const testMeld = simulateMeldDiscard(team.melds[mIdx], selectedCards, top);
             if (isValidSequenceMeld(testMeld)) validExtensions.push(mIdx);
           }
 

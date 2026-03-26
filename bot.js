@@ -69,6 +69,18 @@ export class BuracoBot {
     }
   }
 
+  // 🧠 SIMULADOR FANTASMA DA IA: Arranca a armadura do 2 para o bot ver as possibilidades reais
+  static simulateMeld(baseMeld, newCards) {
+    const combined = [...baseMeld, ...newCards].map((c) => (c ? { ...c } : null));
+    combined.forEach((c) => {
+      if (c && !c.joker && (c.rank === '2' || c.rank === 2)) {
+        c.forceNatural = false;
+        c.forceWild = false;
+      }
+    });
+    return combined;
+  }
+
   static evaluateDiscard(state, hand, team, engine, ctx) {
     const pileSize = state.discard.length;
     if (pileSize === 0) return false;
@@ -102,7 +114,7 @@ export class BuracoBot {
         const meld = team.melds[mIdx];
         if (topIsWildOrTwo && meld.some((c) => c.joker || c.rank === '2')) continue;
 
-        const testMeld = [...meld, topCard];
+        const testMeld = this.simulateMeld(meld, [topCard]);
         if (engine.isValidSequenceMeld(testMeld)) {
           const hasTwo = meld.some((c) => c.rank === '2');
           const needsWild = testMeld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== testMeld[0].suit));
@@ -221,7 +233,9 @@ export class BuracoBot {
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
             if (c.joker || c.rank === '2') continue;
-            const testMeld = [...team.melds[mIdx], c];
+
+            // CORREÇÃO 1: Usa o simulador para ignorar a armadura do 2
+            const testMeld = this.simulateMeld(team.melds[mIdx], [c]);
 
             if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
 
@@ -245,7 +259,9 @@ export class BuracoBot {
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
             if (c.rank === '2' && c.suit === meld[0].suit) {
-              const testMeld = [...meld, c];
+              // CORREÇÃO 2: Usa o simulador para o Coringa Perfeito
+              const testMeld = this.simulateMeld(meld, [c]);
+
               if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
 
               if (engine.isValidSequenceMeld(testMeld)) {
@@ -331,7 +347,9 @@ export class BuracoBot {
               const c = me.hand[i];
               if (!c.joker && c.rank !== '2') continue;
 
-              const testMeld = [...meld, c];
+              // CORREÇÃO 3: Usa o simulador para sujeira no endgame
+              const testMeld = this.simulateMeld(meld, [c]);
+
               if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
 
               if (engine.isValidSequenceMeld(testMeld)) {
