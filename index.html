@@ -691,13 +691,7 @@
       #drawStockBtn .pile-card::after {
         display: none !important;
       }
-      #drawStockBtn .pile-card {
-        border: 2px solid #fff !important;
-        box-shadow:
-          -2px 2px 0 rgba(255, 255, 255, 0.1),
-          -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
-        background-size: 10px 10px !important;
-      }
+      
       .pile-card.discard-pile {
         background: transparent;
         border: 2px dashed rgba(255, 255, 255, 0.4);
@@ -851,17 +845,27 @@
       .carta:last-child {
         margin-right: 0;
       }
+      /* FÍSICA 3D (PARALLAX) NO HOVER */
+      #handContainer .carta {
+        transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), margin-right 0.2s, box-shadow 0.25s;
+        transform-style: preserve-3d;
+      }
       #handContainer .carta:hover {
         margin-right: 0;
         z-index: 100;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        /* Efeito 3D puxando a carta pra câmera e rotacionando levemente */
+        transform: translateY(-15px) scale(1.08) rotateX(12deg) rotateY(-4deg) !important;
+        box-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7);
       }
+
+      /* CARTA SELECIONADA (Fica travada no alto, sem pular e com altura reduzida) */
       #handContainer .carta.selected {
         margin-right: 0;
         z-index: 100;
-        transform: translateY(-15px) !important; /* Faz a carta pular pra cima */
+        /* A Mágica: Reduzi o deslocamento de -20px para -12px. A carta sobe bem menos! */
+        transform: translateY(-12px) scale(1.05) !important; 
         border: 2px solid #facc15 !important;
-        box-shadow: 0 15px 25px rgba(0, 0, 0, 0.6) !important;
+        box-shadow: 0 15px 30px rgba(250, 204, 21, 0.8) !important;
       }
       .fly-card {
         position: fixed;
@@ -874,126 +878,154 @@
         will-change: transform, opacity;
       }
 
-      /* Costas unificadas */
-      .back-red,
-      .fly-card.back,
-      .opponent-card-back.back-red,
-      #mortoSlot0 .morto-card-back,
-      .morto-card-back.back-red {
-        border: 2px solid #fff !important;
+     /* ================================================================= */
+      /* SISTEMA MESTRE DE BARALHOS (CORREÇÃO DEFINITIVA)                  */
+      /* ================================================================= */
+
+      /* 1. TRAVAS ESTRUTURAIS (Blinda a mesa contra vazamento de luz) */
+      .opponent-card-back, .pile-card, .carta.mini, .morto-card-back { 
+        overflow: hidden !important; 
+        position: relative; 
+      }
+      /* Trava Inquebrável: Garante que a carta de compra SEMPRE consiga voar na tela */
+      .fly-card { 
+        position: fixed !important; 
+      }
+      .fly-card.back * { visibility: hidden !important; }
+
+      /* 2. GEOMETRIA DO MORTO (Trava em Cruz Perfeita, nunca mais fica torto) */
+      .morto-area { position: relative; width: 80px; height: 80px; margin-right: 15px; }
+      .morto-container { position: absolute; width: 55px; height: 80px; top: 0; left: 12.5px; transition: opacity 0.3s; transform-origin: center center !important; }
+      #mortoSlot0 { z-index: 2; transform: none !important; }
+      #mortoSlot1 { z-index: 1; transform: rotate(90deg) !important; }
+      .morto-card-back { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 6px; }
+      .morto-card-back:nth-child(1) { z-index: 2; }
+      .morto-card-back.offset { transform: translate(3px, -3px) !important; z-index: 1; }
+
+      /* 3. ESTRUTURA BASE DOS BARALHOS */
+      .back-red, .fly-card.back:not(.back-blue), .opponent-card-back:not(.back-blue), #mortoSlot0 .morto-card-back, .morto-card-back:not(.back-blue), #drawStockBtn .pile-card:not(.back-blue), .carta.mini.back:not(.back-blue),
+      .back-blue, .fly-card.back.back-blue, .opponent-card-back.back-blue, #mortoSlot1 .morto-card-back, .morto-card-back.back-blue, #drawStockBtn .pile-card.back-blue, .carta.mini.back.back-blue {
         box-sizing: border-box !important;
+        color: transparent !important;
+        background-repeat: no-repeat !important;
+      }
+
+      /* 4. TEMA: CLÁSSICO */
+      body[data-deck-theme="classico"] .back-red, body[data-deck-theme="classico"] .fly-card.back:not(.back-blue), body[data-deck-theme="classico"] .opponent-card-back:not(.back-blue), body[data-deck-theme="classico"] #mortoSlot0 .morto-card-back, body[data-deck-theme="classico"] .morto-card-back:not(.back-blue), body[data-deck-theme="classico"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="classico"] .carta.mini.back:not(.back-blue) {
+        border: 2px solid #fff !important;
         background: var(--bg-card-red) !important;
         background-size: 10px 10px !important;
-        box-shadow:
-          -2px 2px 0 rgba(255, 255, 255, 0.1),
-          -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
-        color: transparent !important;
+        background-position: center center !important; 
+        box-shadow: -2px 2px 0 rgba(255, 255, 255, 0.1), -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
       }
-
-      .back-blue,
-      .fly-card.back.back-blue,
-      .opponent-card-back.back-blue,
-      #mortoSlot1 .morto-card-back,
-      .morto-card-back.back-blue {
+      body[data-deck-theme="classico"] .back-blue, body[data-deck-theme="classico"] .fly-card.back.back-blue, body[data-deck-theme="classico"] .opponent-card-back.back-blue, body[data-deck-theme="classico"] #mortoSlot1 .morto-card-back, body[data-deck-theme="classico"] .morto-card-back.back-blue, body[data-deck-theme="classico"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="classico"] .carta.mini.back.back-blue {
         border: 2px solid #fff !important;
-        box-sizing: border-box !important;
         background: var(--bg-card-blue) !important;
         background-size: 10px 10px !important;
-        box-shadow:
-          -2px 2px 0 rgba(255, 255, 255, 0.1),
-          -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
-        color: transparent !important;
+        background-position: center center !important; 
+        box-shadow: -2px 2px 0 rgba(255, 255, 255, 0.1), -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
       }
 
-      .fly-card.back * {
-        visibility: hidden !important;
-      }
-
-      /* ================= ESTÉTICA FINDOM (VALENDO PIX) - PREMIUM ================= */
-
-      /* REGRAS BASE DO LUXO (Deck Preto) */
-      body.is-betting .back-red,
-      body.is-betting .fly-card.back:not(.back-blue),
-      body.is-betting .opponent-card-back:not(.back-blue),
-      body.is-betting #mortoSlot0 .morto-card-back,
-      body.is-betting .morto-card-back:not(.back-blue),
-      body.is-betting .pile-card:not(.discard-pile):not(.back-blue),
-      body.is-betting .carta.mini.back:not(.back-blue) {
+      /* 5. TEMAS PREMIUM */
+      body[data-deck-theme="cassino"] .back-red, body[data-deck-theme="cassino"] .fly-card.back:not(.back-blue), body[data-deck-theme="cassino"] .opponent-card-back:not(.back-blue), body[data-deck-theme="cassino"] #mortoSlot0 .morto-card-back, body[data-deck-theme="cassino"] .morto-card-back:not(.back-blue), body[data-deck-theme="cassino"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="cassino"] .carta.mini.back:not(.back-blue) {
         background-color: #0a0a0a !important;
-        background-image:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230a0a0a' stroke='%23d4af37' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='65' fill='%23d4af37' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3E%24%3C/text%3E%3C/svg%3E"),
-          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px),
-          repeating-linear-gradient(-45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px) !important;
-        background-position:
-          center,
-          center,
-          0 0,
-          0 0 !important;
-        background-size:
-          85% auto,
-          100% 100%,
-          8px 8px,
-          8px 8px !important;
-        background-repeat: no-repeat, no-repeat, repeat, repeat !important;
-        border: 2px solid #d4af37 !important;
-        box-shadow:
-          inset 0 0 10px #000,
-          0 2px 5px rgba(0, 0, 0, 0.8) !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72.5' r='35' fill='%230a0a0a' stroke='%23d4af37' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='45' fill='%23d4af37' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3E%24%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #d4af37 !important; box-shadow: inset 0 0 10px #000 !important;
       }
-
-      /* REGRAS BASE DO PIX (Deck Verde) */
-      body.is-betting .back-blue,
-      body.is-betting .fly-card.back.back-blue,
-      body.is-betting .opponent-card-back.back-blue,
-      body.is-betting #mortoSlot1 .morto-card-back,
-      body.is-betting .morto-card-back.back-blue,
-      body.is-betting .pile-card.back-blue,
-      body.is-betting .carta.mini.back.back-blue {
+      body[data-deck-theme="cassino"] .back-blue, body[data-deck-theme="cassino"] .fly-card.back.back-blue, body[data-deck-theme="cassino"] .opponent-card-back.back-blue, body[data-deck-theme="cassino"] #mortoSlot1 .morto-card-back, body[data-deck-theme="cassino"] .morto-card-back.back-blue, body[data-deck-theme="cassino"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="cassino"] .carta.mini.back.back-blue {
         background-color: #022c22 !important;
-        background-image:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,2 98,50 50,98 2,50' fill='%23022c22' stroke='%2310b981' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='35' fill='%2310b981' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPIX%3C/text%3E%3C/svg%3E"),
-          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px),
-          repeating-linear-gradient(-45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px) !important;
-        background-position:
-          center,
-          center,
-          0 0,
-          0 0 !important;
-        background-size:
-          85% auto,
-          100% 100%,
-          8px 8px,
-          8px 8px !important;
-        background-repeat: no-repeat, no-repeat, repeat, repeat !important;
-        border: 2px solid #10b981 !important;
-        box-shadow:
-          inset 0 0 10px #000,
-          0 2px 5px rgba(0, 0, 0, 0.8) !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpolygon points='50,37.5 85,72.5 50,107.5 15,72.5' fill='%23022c22' stroke='%2310b981' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='24' fill='%2310b981' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPIX%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #10b981 !important; box-shadow: inset 0 0 10px #000 !important;
       }
-
-      /* SOBREPOSIÇÃO BLINDADA PARA O MONTE */
-      body.is-betting #drawStockBtn .pile-card {
-        background-size:
-          85% auto,
-          100% 100%,
-          8px 8px,
-          8px 8px !important;
+      body[data-deck-theme="minimal"] .back-red, body[data-deck-theme="minimal"] .fly-card.back:not(.back-blue), body[data-deck-theme="minimal"] .opponent-card-back:not(.back-blue), body[data-deck-theme="minimal"] #mortoSlot0 .morto-card-back, body[data-deck-theme="minimal"] .morto-card-back:not(.back-blue), body[data-deck-theme="minimal"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="minimal"] .carta.mini.back:not(.back-blue) {
+        background-color: #b91c1c !important; background-image: none !important; border: 2px solid #ef4444 !important; box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #7f1d1d !important;
       }
-      body.is-betting #drawStockBtn .pile-card.back-blue {
-        background-image:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,2 98,50 50,98 2,50' fill='%23022c22' stroke='%2310b981' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='35' fill='%2310b981' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPIX%3C/text%3E%3C/svg%3E"),
-          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px),
-          repeating-linear-gradient(-45deg, rgba(16, 185, 129, 0.15) 0, rgba(16, 185, 129, 0.15) 1px, transparent 1px, transparent 6px) !important;
-        background-color: #022c22 !important;
-        border: 2px solid #10b981 !important;
+      body[data-deck-theme="minimal"] .back-blue, body[data-deck-theme="minimal"] .fly-card.back.back-blue, body[data-deck-theme="minimal"] .opponent-card-back.back-blue, body[data-deck-theme="minimal"] #mortoSlot1 .morto-card-back, body[data-deck-theme="minimal"] .morto-card-back.back-blue, body[data-deck-theme="minimal"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="minimal"] .carta.mini.back.back-blue {
+        background-color: #1d4ed8 !important; background-image: none !important; border: 2px solid #3b82f6 !important; box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #1e3a8a !important;
       }
-      body.is-betting #drawStockBtn .pile-card:not(.back-blue) {
-        background-image:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230a0a0a' stroke='%23d4af37' stroke-width='4'/%3E%3Ctext x='50' y='55' font-size='65' fill='%23d4af37' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3E%24%3C/text%3E%3C/svg%3E"),
-          radial-gradient(circle at center, transparent 30%, #000 100%), repeating-linear-gradient(45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px),
-          repeating-linear-gradient(-45deg, rgba(212, 175, 55, 0.15) 0, rgba(212, 175, 55, 0.15) 1px, transparent 1px, transparent 6px) !important;
+      body[data-deck-theme="royale"] .back-red, body[data-deck-theme="royale"] .fly-card.back:not(.back-blue), body[data-deck-theme="royale"] .opponent-card-back:not(.back-blue), body[data-deck-theme="royale"] #mortoSlot0 .morto-card-back, body[data-deck-theme="royale"] .morto-card-back:not(.back-blue), body[data-deck-theme="royale"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="royale"] .carta.mini.back:not(.back-blue) {
+        background-color: #4c1d95 !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M25 80 L50 40 L75 80 Z' fill='%23facc15'/%3E%3Crect x='35' y='85' width='30' height='10' fill='%23facc15'/%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #facc15 !important; box-shadow: inset 0 0 15px #000 !important;
+      }
+      body[data-deck-theme="royale"] .back-blue, body[data-deck-theme="royale"] .fly-card.back.back-blue, body[data-deck-theme="royale"] .opponent-card-back.back-blue, body[data-deck-theme="royale"] #mortoSlot1 .morto-card-back, body[data-deck-theme="royale"] .morto-card-back.back-blue, body[data-deck-theme="royale"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="royale"] .carta.mini.back.back-blue {
+        background-color: #1e1b4b !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M25 80 L50 40 L75 80 Z' fill='%23cbd5e1'/%3E%3Crect x='35' y='85' width='30' height='10' fill='%23cbd5e1'/%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #cbd5e1 !important; box-shadow: inset 0 0 15px #000 !important;
+      }
+      body[data-deck-theme="elite"] .back-red, body[data-deck-theme="elite"] .fly-card.back:not(.back-blue), body[data-deck-theme="elite"] .opponent-card-back:not(.back-blue), body[data-deck-theme="elite"] #mortoSlot0 .morto-card-back, body[data-deck-theme="elite"] .morto-card-back:not(.back-blue), body[data-deck-theme="elite"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="elite"] .carta.mini.back:not(.back-blue) {
         background-color: #0a0a0a !important;
-        border: 2px solid #d4af37 !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='15' y='47.5' width='70' height='50' rx='6' fill='%23000' stroke='%23facc15' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='22' fill='%23facc15' font-family='serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EVIP%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #facc15 !important; box-shadow: inset 0 0 15px #000 !important;
+      }
+      body[data-deck-theme="elite"] .back-blue, body[data-deck-theme="elite"] .fly-card.back.back-blue, body[data-deck-theme="elite"] .opponent-card-back.back-blue, body[data-deck-theme="elite"] #mortoSlot1 .morto-card-back, body[data-deck-theme="elite"] .morto-card-back.back-blue, body[data-deck-theme="elite"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="elite"] .carta.mini.back.back-blue {
+        background-color: #0a0a0a !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='15' y='47.5' width='70' height='50' rx='6' fill='%23000' stroke='%23e2e8f0' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='22' fill='%23e2e8f0' font-family='serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPRO%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #e2e8f0 !important; box-shadow: inset 0 0 15px #000 !important;
+      }
+      body[data-deck-theme="arcade"] .back-red, body[data-deck-theme="arcade"] .fly-card.back:not(.back-blue), body[data-deck-theme="arcade"] .opponent-card-back:not(.back-blue), body[data-deck-theme="arcade"] #mortoSlot0 .morto-card-back, body[data-deck-theme="arcade"] .morto-card-back:not(.back-blue), body[data-deck-theme="arcade"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="arcade"] .carta.mini.back:not(.back-blue) {
+        background-color: #050505 !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ctext x='50' y='77.5' font-size='35' fill='%23ef4444' font-family='monospace' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EP1%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #ef4444 !important; box-shadow: inset 0 0 15px rgba(239, 68, 68, 0.4), 0 2px 5px rgba(0, 0, 0, 0.8) !important;
+      }
+      body[data-deck-theme="arcade"] .back-blue, body[data-deck-theme="arcade"] .fly-card.back.back-blue, body[data-deck-theme="arcade"] .opponent-card-back.back-blue, body[data-deck-theme="arcade"] #mortoSlot1 .morto-card-back, body[data-deck-theme="arcade"] .morto-card-back.back-blue, body[data-deck-theme="arcade"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="arcade"] .carta.mini.back.back-blue {
+        background-color: #050505 !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ctext x='50' y='77.5' font-size='35' fill='%230ea5e9' font-family='monospace' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EP2%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important; border: 2px solid #0ea5e9 !important; box-shadow: inset 0 0 15px rgba(14, 165, 233, 0.4), 0 2px 5px rgba(0, 0, 0, 0.8) !important;
+      }
+
+     /* ================================================================= */
+      /* 6. TEMA: MÍTICO (COURO PREMIUM E BRILHO 100% FUNCIONAL)           */
+      /* ================================================================= */
+
+      /* O primeiro valor move a luz, os outros dois cravam o couro e o fundo no lugar */
+      @keyframes mythicShineBg {
+        0% { background-position: 250% 50%, center center, center center; }
+        100% { background-position: -150% 50%, center center, center center; }
+      }
+
+      /* MÍTICO - VERMELHO (Couro Ouro Imperial) */
+      body[data-deck-theme="mythic"] .back-red, body[data-deck-theme="mythic"] .fly-card.back:not(.back-blue), body[data-deck-theme="mythic"] .opponent-card-back:not(.back-blue), body[data-deck-theme="mythic"] #mortoSlot0 .morto-card-back, body[data-deck-theme="mythic"] .morto-card-back:not(.back-blue), body[data-deck-theme="mythic"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="mythic"] .carta.mini.back:not(.back-blue) {
+        background-color: #1a1505 !important;
+        background-image: 
+          /* 1. Feixe de Luz */
+          linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.1) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0.1) 60%, transparent 100%),
+          /* 2. Textura Couro (Ruído Fractal direto no navegador) */
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E"),
+          /* 3. Fundo Ouro Base */
+          radial-gradient(circle at 30% 30%, #4a3a00 0%, #1a1505 80%) !important;
+        
+        background-size: 200% 100%, 100px 100px, 100% 100% !important;
+        background-blend-mode: normal, soft-light, normal !important;
+        animation: mythicShineBg 12s infinite linear !important;
+        border: 2px solid #facc15 !important;
+        box-shadow: inset 0 0 15px #000, 0 0 8px rgba(250, 204, 21, 0.4) !important;
+      }
+
+      /* MÍTICO - AZUL (Couro Esmeralda Jade) */
+      body[data-deck-theme="mythic"] .back-blue, body[data-deck-theme="mythic"] .fly-card.back.back-blue, body[data-deck-theme="mythic"] .opponent-card-back.back-blue, body[data-deck-theme="mythic"] #mortoSlot1 .morto-card-back, body[data-deck-theme="mythic"] .morto-card-back.back-blue, body[data-deck-theme="mythic"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="mythic"] .carta.mini.back.back-blue {
+        background-color: #022018 !important;
+        background-image: 
+          /* 1. Feixe de Luz */
+          linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.1) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0.1) 60%, transparent 100%),
+          /* 2. Textura Couro (Ruído Fractal direto no navegador) */
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E"),
+          /* 3. Fundo Jade Base */
+          radial-gradient(circle at 30% 30%, #1a5c4a 0%, #022018 80%) !important;
+          
+        background-size: 200% 100%, 100px 100px, 100% 100% !important;
+        background-blend-mode: normal, soft-light, normal !important;
+        animation: mythicShineBg 12s infinite linear !important;
+        border: 2px solid #34d399 !important;
+        box-shadow: inset 0 0 15px #000, 0 0 8px rgba(52, 211, 153, 0.4) !important;
+      }
+
+      /* Humilhação do Perdedor */
+      .loser-humiliated {
+        filter: grayscale(100%) opacity(0.5);
+        transform: scale(0.95);
+        transition: all 0.5s;
+        border-color: #333 !important;
       }
 
       /* Efeitos Especiais */
@@ -1642,6 +1674,23 @@
                 <option value="fechado">Fechado</option>
               </select>
             </label>
+            <label style="margin-bottom: 2px;">Baralho</label>
+            <div style="position: relative; width: 100%; margin-bottom: 12px;">
+              
+              <div class="back-red" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 24px; height: 34px; border-radius: 3px; box-shadow: -2px 2px 5px rgba(0,0,0,0.8); pointer-events: none; z-index: 2;"></div>
+              
+              <div class="back-blue" style="position: absolute; left: 24px; top: 50%; transform: translateY(-50%) rotate(8deg); width: 24px; height: 34px; border-radius: 3px; box-shadow: 2px 2px 6px rgba(0,0,0,0.9); pointer-events: none; z-index: 1;"></div>
+              
+              <select id="deckThemeSelect" style="margin: 0; padding-left: 62px; width: 100%;" onchange="updateMenuDynamic(); pushLobby();">
+                <option value="classico" selected>Clássico (Vermelho / Azul)</option>
+                <option value="cassino">Cassino (Ouro Negro / Verde PIX)</option>
+                <option value="minimal">Minimalista (Sólido Liso)</option>
+                <option value="royale">Royale (Roxo e Ouro)</option>
+                <option value="elite">Elite (VIP / PRO)</option>
+                <option value="arcade">Arcade (Player 1 / Player 2)</option>
+                <option value="mythic">✨ Mítico (Findom Animado)</option>
+              </select>
+            </div>
             <label>
               Sou
               <select id="localPlayerSelect">
@@ -3123,6 +3172,7 @@
 
         let deadChunksMax = [1, 1];
         if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') deadChunksMax = [1, 2];
+        const deckTheme = document.getElementById('deckThemeSelect').value || 'classico';
         const isBetting = document.getElementById('betToggle').value === 'sim';
         const betBase = parseFloat(document.getElementById('betBase').value) || 0;
         const betPerPoint = parseFloat(document.getElementById('betPerPoint').value) || 0;
@@ -3137,6 +3187,7 @@
         const newState = {
           mode,
           variant,
+          deckTheme,
           players,
           teams,
           currentPlayer: starterIdx,
@@ -3254,7 +3305,8 @@
         if (!state.boughtCardIds) state.boughtCardIds = [];
         drawnCards.forEach((c) => state.boughtCardIds.push(c.id)); // Salva todas para brilhar
 
-        renderHand();
+        // Atualiza a mesa IMEDIATAMENTE (o número do monte cai na hora do clique)
+        renderAll(); 
 
         if (fromRect) {
           const anims = drawnCards.map((c) => {
@@ -3271,7 +3323,6 @@
         }
 
         showMessage(''); // Limpa a mensagem da puxada parcial
-        renderAll(); // Atualiza a tela e DESTRAVA os botões na hora!
 
         state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), count: drawnCards.length, recycledDeadIndex: recycledIndex, ts: Date.now() };
         ignoreOwnActionId = state.lastAction.id;
@@ -4323,7 +4374,10 @@
         applyViewTeamClass();
         // ... (resto da função continua igual)
 
-        // Liga o visual FinDom se a partida estiver valendo PIX
+        // Aplica o Estilo de Baralho (Theme) selecionado
+        document.body.dataset.deckTheme = state.deckTheme || 'classico';
+
+        // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
         if (state.isBetting) {
           document.body.classList.add('is-betting');
         } else {
@@ -4961,10 +5015,13 @@
             }
           }
 
+          // Se o jogo acabou com vitória definida (não foi empate/zero a zero), humilha o perdedor
+          const isLoser = !isWinner && winner !== null;
+
           board.innerHTML += `
-            <div class="score-team ${isWinner ? 'winner' : ''}">
+            <div class="score-team ${isWinner ? 'winner' : ''} ${isLoser ? 'loser-humiliated' : ''}">
               <div class="score-team-name">
-                ${isWinner ? '👑 ' : ''}${s.team.name} 
+                ${isWinner ? '👑 ' : ''}${s.team.name} ${isLoser ? '🤡 (Humilhado)' : ''}
                 <span style="font-size: 12px; color: #9ca3af; font-weight: normal; margin-left: 6px;">(${pNames})</span>
               </div>
               <div class="score-details">
@@ -5151,7 +5208,7 @@
           return;
         }
       }
-// ==========================================
+      // ==========================================
       // MOTOR DE EXECUÇÃO DA IA (BOT ENGINE)
       // ==========================================
       const botEngine = {
@@ -5171,20 +5228,26 @@
         },
 
         _checkBotMortoOrWin: async (botIndex) => {
-          const me = state.players[botIndex];
+          const s = botEngine.getState();
+          if (!s) return null;
+          const me = s.players[botIndex];
           if (me.hand.length === 0) {
             const tookDead = takeDeadIfAvailableForPlayer(me);
             if (!tookDead) {
               if (teamHasGoodCanastra(me.teamId)) await finishGame(me.teamId);
             } else {
               showMessage(`🤖 Bot ${me.name} pegou o Morto!`);
+              return tookDead;
             }
           }
+          return null;
         },
 
         executeMeldNew: async (botIndex, handIndexes) => {
-          const me = state.players[botIndex];
-          const team = state.teams[me.teamId];
+          const s = botEngine.getState();
+          if (!s) return;
+          const me = s.players[botIndex];
+          const team = s.teams[me.teamId];
           const cards = handIndexes.map(i => me.hand[i]);
           
           handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
@@ -5193,16 +5256,28 @@
           team.melds.push(cards);
           const meldIdx = team.melds.length - 1;
 
-          await botEngine._checkBotMortoOrWin(botIndex);
+          // Recompensa de Dominação para o BOT
+          let specialDead = null;
+          if (s.mode === '1x1_dominacao' && botIndex === 1 && classifyMeldForUi(cards).kind === 'asas') {
+             specialDead = triggerDominacaoReward(me);
+          }
 
-          state.lastAction = { id: newActionId(), type: 'meldNew', playerId: botIndex, teamId: team.id, meldIndex: meldIdx, cards: cards.map(packCard), ts: Date.now() };
-          renderAll();
-          await commitState();
+          const tookDead = specialDead || await botEngine._checkBotMortoOrWin(botIndex);
+          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
+
+          const freshS = botEngine.getState();
+          if (freshS) {
+             freshS.lastAction = { id: newActionId(), type: 'meldNew', playerId: botIndex, teamId: team.id, meldIndex: meldIdx, cards: cards.map(packCard), tookDead, ts: Date.now() };
+             renderAll();
+             await commitState();
+          }
         },
 
         executeMeldExtend: async (botIndex, meldIndex, handIndexes) => {
-          const me = state.players[botIndex];
-          const team = state.teams[me.teamId];
+          const s = botEngine.getState();
+          if (!s) return;
+          const me = s.players[botIndex];
+          const team = s.teams[me.teamId];
           const cards = handIndexes.map(i => me.hand[i]);
           
           handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
@@ -5210,30 +5285,41 @@
           team.melds[meldIndex].push(...cards);
           botEngine.normalizeMeld(team.melds[meldIndex]);
           
-          await botEngine._checkBotMortoOrWin(botIndex);
+          // Recompensa de Dominação para o BOT
+          let specialDead = null;
+          const kindBefore = classifyMeldForUi(team.melds[meldIndex]).kind;
+          if (s.mode === '1x1_dominacao' && botIndex === 1 && kindBefore !== 'asas' && classifyMeldForUi(team.melds[meldIndex]).kind === 'asas') {
+             specialDead = triggerDominacaoReward(me);
+          }
 
-          state.lastAction = { id: newActionId(), type: 'meldExtend', playerId: botIndex, teamId: team.id, meldIndex: meldIndex, cards: cards.map(packCard), ts: Date.now() };
-          renderAll();
-          await commitState();
+          const tookDead = specialDead || await botEngine._checkBotMortoOrWin(botIndex);
+          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
+
+          const freshS = botEngine.getState();
+          if (freshS) {
+             freshS.lastAction = { id: newActionId(), type: 'meldExtend', playerId: botIndex, teamId: team.id, meldIndex: meldIndex, cards: cards.map(packCard), tookDead, ts: Date.now() };
+             renderAll();
+             await commitState();
+          }
         },
 
         executeDrawStock: async (botIndex) => {
-          const me = state.players[botIndex];
-          // Trava do Dominador (Serve para Humilhação e Dominação)
-          const drawCount = ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && botIndex === 1 && !state.partialDraw) ? 2 : 1;
+          const s = botEngine.getState();
+          if (!s) return;
+          const me = s.players[botIndex];
+          const drawCount = ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw) ? 2 : 1;
           const drawnCards = [];
-          let recycledIndex = null; // A variável que estava quebrando o código!
+          let recycledIndex = null; 
 
           for (let i = 0; i < drawCount; i++) {
-            if (!state.stock.length) {
+            if (!s.stock.length) {
               recycledIndex = recycleDeadToStockIfPossible();
-              if (recycledIndex === null || !state.stock.length) {
+              if (recycledIndex === null || !s.stock.length) {
                 if (i === 0) {
                   await finishGame(null);
                   return;
                 } else break;
               } else {
-                 // Anima localmente para o Host o morto virando monte
                  const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
                  const toEl = document.querySelector('#drawStockBtn .pile-card');
                  if (fromEl && toEl) {
@@ -5242,18 +5328,19 @@
                  }
               }
             }
-            const c = state.stock.pop();
+            const c = s.stock.pop();
             ensureCardId(c);
             me.hand.push(c);
             drawnCards.push(c);
           }
 
           sortHand(me.hand);
-          state.hasDrawnThisTurn = true;
-          state.partialDraw = false;
+          s.hasDrawnThisTurn = true;
+          s.partialDraw = false;
 
-          if (drawnCards.length > 0) {
-            state.lastAction = { 
+          const freshS = botEngine.getState();
+          if (freshS && drawnCards.length > 0) {
+            freshS.lastAction = { 
               id: newActionId(), 
               type: 'drawStock', 
               playerId: botIndex, 
@@ -5262,43 +5349,52 @@
               recycledDeadIndex: recycledIndex, 
               ts: Date.now() 
             };
+             renderAll(); 
+             await commitState();
           }
-          renderAll(); // Atualiza os números do monte instantaneamente
-          await commitState(); // Firebase recebe a ação correta e dispara as cartas voando
         },
 
         executeDrawDiscard: async (botIndex) => {
-          const me = state.players[botIndex];
-          const pile = state.discard.splice(0, state.discard.length);
+          const s = botEngine.getState();
+          if (!s) return;
+          const me = s.players[botIndex];
+          const pile = s.discard.splice(0, s.discard.length);
           pile.forEach(ensureCardId);
           const topCard = pile[pile.length - 1]; 
           
           me.hand.push(...pile);
-          sortHand(me.hand);
           
-          // Trava do Dominador (Serve para Humilhação e Dominação)
-          if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && botIndex === 1 && !state.partialDraw) {
-            state.partialDraw = true;
-          } else {
-            state.hasDrawnThisTurn = true;
-            state.partialDraw = false;
+          // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
+          if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
+            if (s.stock.length > 0) {
+              const extraCard = s.stock.pop();
+              ensureCardId(extraCard);
+              me.hand.push(extraCard);
+            }
           }
 
-          state.pickedDiscardCardId = topCard.id; 
+          sortHand(me.hand);
+          s.hasDrawnThisTurn = true;
+          s.partialDraw = false;
+          s.pickedDiscardCardId = topCard.id; 
 
-          state.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
-          renderAll();
-          await commitState();
+          const freshS = botEngine.getState();
+          if (freshS) {
+             freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
+             renderAll();
+             await commitState();
+          }
         },
 
         executeDrawDiscardFechado: async (botIndex, intent) => {
-          const me = state.players[botIndex];
-          const team = state.teams[me.teamId];
-          const pile = state.discard.splice(0, state.discard.length);
+          const s = botEngine.getState();
+          if (!s) return;
+          const me = s.players[botIndex];
+          const team = s.teams[me.teamId];
+          const pile = s.discard.splice(0, s.discard.length);
           pile.forEach(ensureCardId);
-          const topCard = pile.pop(); // Separa a carta do topo à força
+          const topCard = pile.pop(); 
           
-          // Executa a obrigação do Buraco Fechado imediatamente
           if (intent.action === 'extend') {
              team.melds[intent.meldIndex].push(topCard);
              botEngine.normalizeMeld(team.melds[intent.meldIndex]);
@@ -5310,36 +5406,42 @@
              team.melds.push(newMeld);
           }
           
-          // Guarda o resto do lixo na mão
           if (pile.length > 0) {
              me.hand.push(...pile);
-             sortHand(me.hand);
           }
 
-          // Trava do Dominador (Serve para Humilhação e Dominação)
-          if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && botIndex === 1 && !state.partialDraw) {
-            state.partialDraw = true;
-          } else {
-            state.hasDrawnThisTurn = true;
-            state.partialDraw = false;
+          // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
+          if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
+            if (s.stock.length > 0) {
+              const extraCard = s.stock.pop();
+              ensureCardId(extraCard);
+              me.hand.push(extraCard);
+            }
           }
 
-          state.pickedDiscardCardId = null; // Zera a obrigação de descarte
+          sortHand(me.hand);
+          s.hasDrawnThisTurn = true;
+          s.partialDraw = false;
+          s.pickedDiscardCardId = null; 
 
           await botEngine._checkBotMortoOrWin(botIndex);
 
-          state.lastAction = { id: newActionId(), type: 'drawDiscardFechado', playerId: botIndex, ts: Date.now() };
-          renderAll();
-          await commitState();
+          const freshS = botEngine.getState();
+          if (freshS) {
+             freshS.lastAction = { id: newActionId(), type: 'drawDiscardFechado', playerId: botIndex, ts: Date.now() };
+             renderAll();
+             await commitState();
+          }
         },
 
-        // A FUNÇÃO QUE FALTAVA E DERRUBAVA O SISTEMA:
         executeDiscard: async (botIndex, cardIndex) => {
-          const me = state.players[botIndex];
+          const s = botEngine.getState();
+          if (!s) return;
+          const me = s.players[botIndex];
           const card = me.hand[cardIndex];
           
           me.hand.splice(cardIndex, 1);
-          state.discard.push(card);
+          s.discard.push(card);
 
           let tookDead = null;
           if (me.hand.length === 0) tookDead = takeDeadIfAvailableForPlayer(me);
@@ -5350,11 +5452,14 @@
             return;
           }
 
-          passTurn(); // DEVOLVE A VEZ PARA VOCÊ
+          passTurn(); 
 
-          state.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
-          renderAll();
-          await commitState();
+          const freshS = botEngine.getState();
+          if (freshS) {
+             freshS.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
+             renderAll();
+             await commitState();
+          }
         }
       };
 
@@ -5523,7 +5628,12 @@
           }
           // --------------------------------------------
 
-          if (introFinished) document.getElementById('configSection').style.display = 'flex';
+          if (introFinished) {
+             document.getElementById('configSection').style.display = 'flex';
+             // ⚡ RESSUSCITADOR DE SALAS: Se o Firebase deletou o jogo, recriamos um lobby vazio imediatamente
+             // Isso previne que os jogadores fiquem numa 'sala fantasma' que não reage a cliques.
+             if (typeof window.pushLobby === 'function') window.pushLobby();
+          }
           resetCanastraSfxMemory();
           return;
         }
@@ -5546,6 +5656,7 @@
 
           setIfUnfocused('modeSelect', l.mode || '');
           setIfUnfocused('variantSelect', l.variant || '');
+          setIfUnfocused('deckThemeSelect', l.deckTheme || 'classico');
           setIfUnfocused('betToggle', l.betToggle || '');
           setIfUnfocused('betBase', l.betBase || 5);
           setIfUnfocused('betPerPoint', l.betPerPoint || 0.01);
@@ -5780,18 +5891,25 @@
       window.pushLobby = function () {
         const mode = document.getElementById('modeSelect').value;
         const resetReady = currentLobby && currentLobby.mode !== mode;
+        
+        const pt1 = document.getElementById('pixTeam1');
+        const pt2 = document.getElementById('pixTeam2');
+
+        // Atualiza o cache seguro APENAS se o jogador tiver permissão para digitar
+        if (!pt1.disabled) pt1.dataset.rawPix = pt1.value.trim();
+        if (!pt2.disabled) pt2.dataset.rawPix = pt2.value.trim();
+
         const lobby = {
           mode: mode,
           variant: document.getElementById('variantSelect').value,
+          deckTheme: document.getElementById('deckThemeSelect').value,
           betToggle: document.getElementById('betToggle').value,
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
-          names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
-          // 🛡️ Salva apenas o PIX que o jogador tem permissão de editar. O do oponente ele puxa do cache.
           pixKeys: [
-            document.getElementById('pixTeam1').disabled && currentLobby ? currentLobby.pixKeys[0] : document.getElementById('pixTeam1').value.trim(),
-            document.getElementById('pixTeam2').disabled && currentLobby ? currentLobby.pixKeys[1] : document.getElementById('pixTeam2').value.trim()
+            pt1.dataset.rawPix || '',
+            pt2.dataset.rawPix || ''
           ],
         };
 
@@ -5800,9 +5918,7 @@
           readyArray = [...currentLobby.ready];
         }
 
-        // AUTO-READY REMOVIDO DAQUI! O botão "Estou Pronto" é quem vai comandar isso agora.
         lobby.ready = readyArray;
-
         setDoc(gameRef, { lobby: lobby, updatedAt: Date.now() }, { merge: true });
       };
 
@@ -5832,6 +5948,11 @@
       // Função que atualiza a quantidade de inputs e os labels do menu
       window.updateMenuDynamic = function () {
         const mode = document.getElementById('modeSelect').value;
+        
+        // 🎨 ATUALIZA A MINIATURA DO BARALHO NO LOBBY
+        const themeSelect = document.getElementById('deckThemeSelect');
+        if (themeSelect) document.body.dataset.deckTheme = themeSelect.value || 'classico';
+
         const playersContainer = document.getElementById('playersContainer');
         const humiliationRules = document.getElementById('humiliationRules');
 
@@ -5975,8 +6096,17 @@
         if (myPlayerIndex === 0 || myPlayerIndex === 2) myTeam = 0; // Time 1
         if (myPlayerIndex === 1 || myPlayerIndex === 3) myTeam = 1; // Time 2
 
-        const realPix1 = (currentLobby && currentLobby.pixKeys) ? currentLobby.pixKeys[0] : '';
-        const realPix2 = (currentLobby && currentLobby.pixKeys) ? currentLobby.pixKeys[1] : '';
+        // Sincroniza o Cache Imutável (Dataset) com o Banco de Dados
+        if (currentLobby && currentLobby.pixKeys) {
+            pt1.dataset.rawPix = currentLobby.pixKeys[0] || '';
+            pt2.dataset.rawPix = currentLobby.pixKeys[1] || '';
+        } else {
+            pt1.dataset.rawPix = pt1.dataset.rawPix || '';
+            pt2.dataset.rawPix = pt2.dataset.rawPix || '';
+        }
+
+        const realPix1 = pt1.dataset.rawPix;
+        const realPix2 = pt2.dataset.rawPix;
 
         if (myTeam === 0) {
             pt1.disabled = false;
@@ -5989,7 +6119,6 @@
             pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
             if (document.activeElement !== pt2) pt2.value = realPix2;
         } else {
-            // Espectador (-1) não vê nada
             pt1.disabled = true;
             pt2.disabled = true;
             pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
@@ -6376,33 +6505,37 @@
       document.getElementById('endGameBtn').onclick = async () => {
         if (!state) return;
         
-        // Altera o estado REAL da sessão antes de enviar, evitando clonagem e race condition
-        if (!state.surrender) state.surrender = { active: true, votes: {} };
-        state.surrender.active = true;
+        // ZERA a votação completamente para não herdar fantasmas de votações antigas
+        state.surrender = { active: true, votes: {} };
         state.surrender.votes[myPlayerIndex] = true;
 
         state.players.forEach(p => {
-          if (p.name.toUpperCase().includes('BOT')) {
-            state.surrender.votes[p.id] = true;
-          }
+          if (p.name.toUpperCase().includes('BOT')) state.surrender.votes[p.id] = true;
         });
 
-        await updateDoc(gameRef, { 
-          'stateJson': JSON.stringify(state), 
-          updatedAt: Date.now() 
-        });
+        // Se for jogo Solo ou só com bots, não precisa de aprovação, destrói direto
+        let yesCount = Object.values(state.surrender.votes).filter(v => v).length;
+        if (yesCount >= state.players.length && state.players.length > 0) {
+           await deleteDoc(gameRef);
+           return;
+        }
+
+        await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
       };
 
       document.getElementById('voteYesBtn').onclick = async () => {
         if (!state || !state.surrender) return;
         state.surrender.votes[myPlayerIndex] = true;
 
-        // Garante o voto do Bot caso alguém vote sim depois
         state.players.forEach(p => {
-          if (p.name.toUpperCase().includes('BOT')) {
-            state.surrender.votes[p.id] = true;
-          }
+          if (p.name.toUpperCase().includes('BOT')) state.surrender.votes[p.id] = true;
         });
+
+        let yesCount = Object.values(state.surrender.votes).filter(v => v).length;
+        if (yesCount >= state.players.length && state.players.length > 0) {
+           await deleteDoc(gameRef); // Quem deu o último sim destrói a sala instantaneamente
+           return;
+        }
 
         await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
       };
@@ -6414,7 +6547,6 @@
         await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
       };
 
-      // Adicione esta função para desenhar a tela de votos
       function renderSurrender() {
         const section = document.getElementById('surrenderSection');
         if (!state || !state.surrender || !state.surrender.active) {
@@ -6426,12 +6558,8 @@
         const list = document.getElementById('surrenderVotesList');
         list.innerHTML = '';
 
-        let yesCount = 0;
         state.players.forEach(p => {
           const votedYes = state.surrender.votes[p.id] === true;
-          if (votedYes) yesCount++;
-          
-          // Define a cor e o estilo dependendo do voto
           const statusHtml = votedYes 
             ? '<span style="color: #4ade80; font-weight: bold;">✅ Sim</span>' 
             : '<span style="color: #9ca3af; font-style: italic;">⏳ Aguardando...</span>';
@@ -6444,19 +6572,9 @@
           `;
         });
 
-        // Oculta os botões se o jogador já votou
         const alreadyVoted = state.surrender.votes[myPlayerIndex] === true;
         document.getElementById('voteYesBtn').style.display = alreadyVoted ? 'none' : 'block';
         document.getElementById('voteNoBtn').style.display = alreadyVoted ? 'none' : 'block';
-
-        // Se todo mundo votou SIM, apaga a sala (voltando pro lobby)
-        if (yesCount === state.players.length && state.players.length > 0) {
-          // Usa o Host Dinâmico para deletar a sala! Se for 100% bot, o Espectador (-1) chuta a porta.
-          let hostIdx = state.players.findIndex(p => p && !p.name.toUpperCase().includes('BOT'));
-          if (hostIdx === -1) hostIdx = myPlayerIndex; 
-          
-          if (myPlayerIndex === hostIdx) deleteDoc(gameRef); 
-        }
       }
       document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
       // Abre o placar manualmente pela mesa
