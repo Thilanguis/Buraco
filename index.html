@@ -943,26 +943,34 @@
       body[data-deck-theme="minimal"] .back-blue, body[data-deck-theme="minimal"] .fly-card.back.back-blue, body[data-deck-theme="minimal"] .opponent-card-back.back-blue, body[data-deck-theme="minimal"] #mortoSlot1 .morto-card-back, body[data-deck-theme="minimal"] .morto-card-back.back-blue, body[data-deck-theme="minimal"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="minimal"] .carta.mini.back.back-blue {
         background-color: #1d4ed8 !important; background-image: none !important; border: 2px solid #3b82f6 !important; box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #1e3a8a !important;
       }
-      body[data-deck-theme="royale"] .back-red, body[data-deck-theme="royale"] .fly-card.back:not(.back-blue), body[data-deck-theme="royale"] .opponent-card-back:not(.back-blue), body[data-deck-theme="royale"] #mortoSlot0 .morto-card-back, body[data-deck-theme="royale"] .morto-card-back:not(.back-blue), body[data-deck-theme="royale"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="royale"] .carta.mini.back:not(.back-blue) {
-        background-color: #4c1d95 !important;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M25 80 L50 40 L75 80 Z' fill='%23facc15'/%3E%3Crect x='35' y='85' width='30' height='10' fill='%23facc15'/%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #facc15 !important; box-shadow: inset 0 0 15px #000 !important;
+      /* ================================================================= */
+      /* TEMA: DOMINAÇÃO (TECH-GILDED / REFINED FINDOM)                   */
+      /* ================================================================= */
+
+    /* Deck 1 (Dominação Premium - ELITE: Chicote Rosa Neon) */
+      body[data-deck-theme="dominacao"] .back-red, body[data-deck-theme="dominacao"] .fly-card.back:not(.back-blue), body[data-deck-theme="dominacao"] .opponent-card-back:not(.back-blue), body[data-deck-theme="dominacao"] #mortoSlot0 .morto-card-back, body[data-deck-theme="dominacao"] .morto-card-back:not(.back-blue), body[data-deck-theme="dominacao"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="dominacao"] .carta.mini.back:not(.back-blue) {
+        background-color: #030303 !important;
+        background-image: 
+          repeating-linear-gradient(45deg, rgba(255, 20, 147, 0.05) 0px, rgba(255, 20, 147, 0.05) 2px, transparent 2px, transparent 6px),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M 20 120 L 35 90' stroke='%23ff1493' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M 20 115 L 28 118 M 24 107 L 32 110 M 28 99 L 36 102' stroke='%23030303' stroke-width='1.5'/%3E%3Ccircle cx='18' cy='124' r='3' fill='%23ff1493'/%3E%3Cpath d='M 35 90 C 45 70, 80 90, 80 50 C 80 20, 40 10, 30 35 C 20 60, 50 65, 60 45 C 70 25, 40 25, 40 40' fill='none' stroke='%23ff1493' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M 38 42 L 32 38 M 41 45 L 35 48' stroke='%23ff1493' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 20 Q50 0, 90 20 Q95 40, 90 60 L75 110 L25 110 Q10 130, 10 110 Z' fill='none'  stroke-width='1' stroke-dasharray='3,3'/%3E%3Ctext x='50' y='130' font-size='10' fill='%23ff1493' font-family='sans-serif' font-weight='900' text-anchor='middle'%3EELITE%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100%, 100% 100% !important; 
+        border: 2px solid rgba(255, 20, 147, 0.7) !important; 
+        box-shadow: inset 0 0 2px rgba(255, 20, 147, 0.2), 0 0 2px rgba(255, 20, 147, 0.4) !important;
+        filter: drop-shadow(0 0 3px #ff1493);
       }
-      body[data-deck-theme="royale"] .back-blue, body[data-deck-theme="royale"] .fly-card.back.back-blue, body[data-deck-theme="royale"] .opponent-card-back.back-blue, body[data-deck-theme="royale"] #mortoSlot1 .morto-card-back, body[data-deck-theme="royale"] .morto-card-back.back-blue, body[data-deck-theme="royale"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="royale"] .carta.mini.back.back-blue {
-        background-color: #1e1b4b !important;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M25 80 L50 40 L75 80 Z' fill='%23cbd5e1'/%3E%3Crect x='35' y='85' width='30' height='10' fill='%23cbd5e1'/%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #cbd5e1 !important; box-shadow: inset 0 0 15px #000 !important;
+
+      /* Deck 2 (Cyan - ROYALE: Chicote Realista) */
+      body[data-deck-theme="dominacao"] .back-blue, body[data-deck-theme="dominacao"] .fly-card.back.back-blue, body[data-deck-theme="dominacao"] .opponent-card-back.back-blue, body[data-deck-theme="dominacao"] #mortoSlot1 .morto-card-back, body[data-deck-theme="dominacao"] .morto-card-back.back-blue, body[data-deck-theme="dominacao"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="dominacao"] .carta.mini.back.back-blue {
+        background-color: #030303 !important;
+        background-image: 
+          repeating-linear-gradient(-45deg, rgba(0, 255, 255, 0.03) 0px, rgba(0, 255, 255, 0.03) 2px, transparent 2px, transparent 6px),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M 20 120 L 35 90' stroke='%2300ffff' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M 20 115 L 28 118 M 24 107 L 32 110 M 28 99 L 36 102' stroke='%23030303' stroke-width='1.5'/%3E%3Ccircle cx='18' cy='124' r='3' fill='%2300ffff'/%3E%3Cpath d='M 35 90 C 45 70, 80 90, 80 50 C 80 20, 40 10, 30 35 C 20 60, 50 65, 60 45 C 70 25, 40 25, 40 40' fill='none' stroke='%2300ffff' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M 38 42 L 32 38 M 41 45 L 35 48' stroke='%2300ffff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 20 Q50 0, 90 20 Q95 40, 90 60 L75 110 L25 110 Q10 130, 10 110 Z' fill='none'  stroke-width='1' stroke-dasharray='3,3'/%3E%3Ctext x='50' y='130' font-size='10' fill='%2300ffff' font-family='sans-serif' font-weight='900' text-anchor='middle'%3EROYALE%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100%, 100% 100% !important; 
+        border: 2px solid rgba(0, 255, 255, 0.6) !important; 
+        box-shadow: inset 0 0 2px rgba(0, 255, 255, 0.1), 0 0 2px rgba(0, 255, 255, 0.3) !important;
+        filter: drop-shadow(0 0 2px #00ffff);
       }
-      body[data-deck-theme="elite"] .back-red, body[data-deck-theme="elite"] .fly-card.back:not(.back-blue), body[data-deck-theme="elite"] .opponent-card-back:not(.back-blue), body[data-deck-theme="elite"] #mortoSlot0 .morto-card-back, body[data-deck-theme="elite"] .morto-card-back:not(.back-blue), body[data-deck-theme="elite"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="elite"] .carta.mini.back:not(.back-blue) {
-        background-color: #0a0a0a !important;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='15' y='47.5' width='70' height='50' rx='6' fill='%23000' stroke='%23facc15' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='22' fill='%23facc15' font-family='serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EVIP%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #facc15 !important; box-shadow: inset 0 0 15px #000 !important;
-      }
-      body[data-deck-theme="elite"] .back-blue, body[data-deck-theme="elite"] .fly-card.back.back-blue, body[data-deck-theme="elite"] .opponent-card-back.back-blue, body[data-deck-theme="elite"] #mortoSlot1 .morto-card-back, body[data-deck-theme="elite"] .morto-card-back.back-blue, body[data-deck-theme="elite"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="elite"] .carta.mini.back.back-blue {
-        background-color: #0a0a0a !important;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='15' y='47.5' width='70' height='50' rx='6' fill='%23000' stroke='%23e2e8f0' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='22' fill='%23e2e8f0' font-family='serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPRO%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #e2e8f0 !important; box-shadow: inset 0 0 15px #000 !important;
-      }
+      
       body[data-deck-theme="arcade"] .back-red, body[data-deck-theme="arcade"] .fly-card.back:not(.back-blue), body[data-deck-theme="arcade"] .opponent-card-back:not(.back-blue), body[data-deck-theme="arcade"] #mortoSlot0 .morto-card-back, body[data-deck-theme="arcade"] .morto-card-back:not(.back-blue), body[data-deck-theme="arcade"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="arcade"] .carta.mini.back:not(.back-blue) {
         background-color: #050505 !important;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ctext x='50' y='77.5' font-size='35' fill='%23ef4444' font-family='monospace' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EP1%3C/text%3E%3C/svg%3E") !important;
@@ -1018,14 +1026,6 @@
         animation: mythicShineBg 12s infinite linear !important;
         border: 2px solid #34d399 !important;
         box-shadow: inset 0 0 15px #000, 0 0 8px rgba(52, 211, 153, 0.4) !important;
-      }
-
-      /* Humilhação do Perdedor */
-      .loser-humiliated {
-        filter: grayscale(100%) opacity(0.5);
-        transform: scale(0.95);
-        transition: all 0.5s;
-        border-color: #333 !important;
       }
 
       /* Efeitos Especiais */
@@ -1685,8 +1685,7 @@
                 <option value="classico" selected>Clássico (Vermelho / Azul)</option>
                 <option value="cassino">Cassino (Ouro Negro / Verde PIX)</option>
                 <option value="minimal">Minimalista (Sólido Liso)</option>
-                <option value="royale">Royale (Roxo e Ouro)</option>
-                <option value="elite">Elite (VIP / PRO)</option>
+                <option value="dominacao">Dominação (Neon Tech / FinDom)</option>
                 <option value="arcade">Arcade (Player 1 / Player 2)</option>
                 <option value="mythic">✨ Mítico (Findom Animado)</option>
               </select>
@@ -4943,6 +4942,11 @@
 
         scores.sort((a, b) => b.score - a.score);
 
+        // A MÁGICA AQUI: O vencedor financeiro é SEMPRE o time com mais pontos (índice 0), 
+        // mesmo se a partida acabar por exaustão (sem ninguém bater oficialmente).
+        const financialWinnerTeam = scores[0].team || {};
+        const winnerPix = financialWinnerTeam.pix || '';
+
         scores.forEach((s, index) => {
           const isWinner = s.team.id === winner;
           const totalBonus = s.sujaBonus + s.limpaBonus + s.realBonus + s.asasBonus;
@@ -4955,10 +4959,6 @@
             const diff = Math.max(0, highestScore - lowestScore);
             const totalMoney = state.betBase + diff * state.betPerPoint;
             const moneyStr = totalMoney.toFixed(2).replace('.', ',');
-
-            // Recupera a chave PIX direto do Cofre do Time
-            const winnerTeam = scores.find((s) => s.team.id === winner)?.team || {};
-            const winnerPix = winnerTeam.pix || '';
 
             if (highestScore === lowestScore) {
               financialHtml = `
@@ -5015,13 +5015,10 @@
             }
           }
 
-          // Se o jogo acabou com vitória definida (não foi empate/zero a zero), humilha o perdedor
-          const isLoser = !isWinner && winner !== null;
-
           board.innerHTML += `
-            <div class="score-team ${isWinner ? 'winner' : ''} ${isLoser ? 'loser-humiliated' : ''}">
+            <div class="score-team ${isWinner ? 'winner' : ''}">
               <div class="score-team-name">
-                ${isWinner ? '👑 ' : ''}${s.team.name} ${isLoser ? '🤡 (Humilhado)' : ''}
+                ${isWinner ? '👑 ' : ''}${s.team.name}
                 <span style="font-size: 12px; color: #9ca3af; font-weight: normal; margin-left: 6px;">(${pNames})</span>
               </div>
               <div class="score-details">
@@ -6423,20 +6420,19 @@
           }
         }
 
-        // AQUI ESTÁ A MUDANÇA: adicionado o pixKeys (Proteção do Oculto)
         const fullLobby = {
-          mode: mode,
-          variant: variant,
-          betToggle: betToggle,
-          betBase: document.getElementById('betBase').value,
-          betPerPoint: document.getElementById('betPerPoint').value,
-          names: [p1, p2, p3, p4],
-          pixKeys: [
-            document.getElementById('pixTeam1').disabled && currentLobby ? currentLobby.pixKeys[0] : document.getElementById('pixTeam1').value.trim(),
-            document.getElementById('pixTeam2').disabled && currentLobby ? currentLobby.pixKeys[1] : document.getElementById('pixTeam2').value.trim()
-          ],
-          ready: readyArray,
-        };
+            mode: mode,
+            variant: variant,
+            betToggle: betToggle,
+            betBase: document.getElementById('betBase').value,
+            betPerPoint: document.getElementById('betPerPoint').value,
+            names: [p1, p2, p3, p4],
+            pixKeys: [
+              document.getElementById('pixTeam1').disabled ? (document.getElementById('pixTeam1').dataset.rawPix || '') : document.getElementById('pixTeam1').value.trim(),
+              document.getElementById('pixTeam2').disabled ? (document.getElementById('pixTeam2').dataset.rawPix || '') : document.getElementById('pixTeam2').value.trim()
+            ],
+            ready: readyArray,
+          };
 
         setDoc(gameRef, { lobby: fullLobby, updatedAt: Date.now() }, { merge: true });
       };
