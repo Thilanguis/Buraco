@@ -4972,10 +4972,22 @@
         const stockEl = document.querySelector('#drawStockBtn .pile-card');
         if (state.stock.length > 0) {
           const topCard = state.stock[state.stock.length - 1];
-          stockEl.className = 'pile-card ' + (topCard.back === 'blue' ? 'back-blue' : 'back-red');
+          const wantedClass = topCard.back === 'blue' ? 'back-blue' : 'back-red';
+          const keepArcadeRun = stockEl.classList.contains('arcade-car-run');
+
+          stockEl.classList.add('pile-card');
+          stockEl.classList.remove('back-red', 'back-blue');
+          stockEl.classList.add(wantedClass);
+
+          if (document.body.dataset.deckTheme === 'arcade' && keepArcadeRun) {
+            stockEl.classList.add('arcade-car-run');
+          }
+
           stockEl.style.background = '';
+          stockEl.style.boxShadow = '';
         } else {
-          stockEl.className = 'pile-card';
+          stockEl.classList.remove('back-red', 'back-blue', 'arcade-car-run');
+          stockEl.classList.add('pile-card');
           stockEl.style.background = 'transparent';
           stockEl.style.boxShadow = 'none';
         }
@@ -5227,23 +5239,85 @@
         return fallbackSeatRect(seatFallback);
       }
 
+      function renderOpponentSeat(rootEl, playerIdx) {
+        if (!rootEl) return;
+
+        if (playerIdx === null || playerIdx === undefined) {
+          rootEl.innerHTML = '';
+          rootEl.classList.remove('active-turn-glow');
+          return;
+        }
+
+        const p = state.players[playerIdx];
+        if (!p) {
+          rootEl.innerHTML = '';
+          rootEl.classList.remove('active-turn-glow');
+          return;
+        }
+
+        rootEl.classList.toggle('active-turn-glow', state.currentPlayer === playerIdx);
+
+        let label = rootEl.querySelector('.opponent-label');
+        if (!label) {
+          label = document.createElement('div');
+          label.className = 'opponent-label';
+          rootEl.appendChild(label);
+        }
+        label.innerHTML = `${p.name} (${p.hand.length})`;
+
+        let cardsDiv = rootEl.querySelector('.opponent-cards');
+        if (!cardsDiv) {
+          cardsDiv = document.createElement('div');
+          cardsDiv.className = 'opponent-cards';
+          rootEl.appendChild(cardsDiv);
+        }
+
+        const desiredCount = Math.min(p.hand.length, 12);
+        const currentCount = cardsDiv.children.length;
+
+        for (let i = 0; i < desiredCount; i++) {
+          const cdata = p.hand[i];
+          let cardEl = cardsDiv.children[i];
+
+          if (!cardEl) {
+            cardEl = document.createElement('div');
+            cardEl.className = 'opponent-card-back';
+            cardsDiv.appendChild(cardEl);
+          }
+
+          const wantedClass = cdata?.back === 'blue' ? 'back-blue' : 'back-red';
+          const keepArcadeRun = cardEl.classList.contains('arcade-car-run');
+
+          cardEl.classList.add('opponent-card-back');
+          setBackClassIfChanged(cardEl, wantedClass);
+
+          if (document.body.dataset.deckTheme === 'arcade' && keepArcadeRun) {
+            cardEl.classList.add('arcade-car-run');
+          }
+        }
+
+        while (cardsDiv.children.length > desiredCount) {
+          cardsDiv.removeChild(cardsDiv.lastChild);
+        }
+      }
+
       function renderOpponentHands() {
         const top = document.getElementById('opponentTop');
-        top.innerHTML = '';
         const left = document.getElementById('opponentLeft');
-        left.innerHTML = '';
         const right = document.getElementById('opponentRight');
-        right.innerHTML = '';
 
         const total = state.players.length;
         const seats = { top: null, left: null, right: null };
         const others = [];
-        const baseIdx = myPlayerIndex !== -1 ? myPlayerIndex : 0; // Finge que o P0 é a base
+        const baseIdx = myPlayerIndex !== -1 ? myPlayerIndex : 0;
 
-        for (let i = 1; i < total; i++) others.push((baseIdx + i) % total);
+        for (let i = 1; i < total; i++) {
+          others.push((baseIdx + i) % total);
+        }
 
-        if (total === 2) seats.top = others[0];
-        else if (total === 3) {
+        if (total === 2) {
+          seats.top = others[0];
+        } else if (total === 3) {
           seats.right = others[0];
           seats.left = others[1];
         } else {
@@ -5252,33 +5326,79 @@
           seats.left = others[2];
         }
 
-        [
-          { idx: seats.top, el: top },
-          { idx: seats.left, el: left },
-          { idx: seats.right, el: right },
-        ].forEach((obj) => {
-          if (obj.idx === null) return;
-          const p = state.players[obj.idx];
-          if (!p) return;
+        function updateSeat(rootEl, playerIdx) {
+          if (!rootEl) return;
 
-          // 🛡️ TRAVA DE DESTAQUE: Aplica o brilho se for a vez deste bot/jogador
-          obj.el.classList.toggle('active-turn-glow', state.currentPlayer === obj.idx);
+          if (playerIdx === null || playerIdx === undefined) {
+            rootEl.innerHTML = '';
+            rootEl.classList.remove('active-turn-glow');
+            return;
+          }
 
-          const label = document.createElement('div');
-          label.className = 'opponent-label';
+          const p = state.players[playerIdx];
+          if (!p) {
+            rootEl.innerHTML = '';
+            rootEl.classList.remove('active-turn-glow');
+            return;
+          }
+
+          // mantém o brilho do turno exatamente como antes
+          rootEl.classList.toggle('active-turn-glow', state.currentPlayer === playerIdx);
+
+          // mantém o label do jogador
+          let label = rootEl.querySelector('.opponent-label');
+          if (!label) {
+            label = document.createElement('div');
+            label.className = 'opponent-label';
+            rootEl.appendChild(label);
+          }
           label.innerHTML = `${p.name} (${p.hand.length})`;
-          obj.el.appendChild(label);
-          const cardsDiv = document.createElement('div');
-          cardsDiv.className = 'opponent-cards';
-          const count = Math.min(p.hand.length, 12);
-          for (let i = 0; i < count; i++) {
-            const cdata = p.hand[i];
+
+          // mantém o container das cartas
+          let cardsDiv = rootEl.querySelector('.opponent-cards');
+          if (!cardsDiv) {
+            cardsDiv = document.createElement('div');
+            cardsDiv.className = 'opponent-cards';
+            rootEl.appendChild(cardsDiv);
+          }
+
+          const desiredCount = Math.min(p.hand.length, 12);
+
+          // cria só o que faltar
+          while (cardsDiv.children.length < desiredCount) {
             const c = document.createElement('div');
-            c.className = 'opponent-card-back ' + (cdata?.back === 'blue' ? 'back-blue' : 'back-red');
+            c.className = 'opponent-card-back';
             cardsDiv.appendChild(c);
           }
-          obj.el.appendChild(cardsDiv);
-        });
+
+          // remove só o excedente
+          while (cardsDiv.children.length > desiredCount) {
+            cardsDiv.removeChild(cardsDiv.lastChild);
+          }
+
+          // atualiza as cartas existentes sem destruir tudo
+          for (let i = 0; i < desiredCount; i++) {
+            const cdata = p.hand[i];
+            const cardEl = cardsDiv.children[i];
+            const wantedClass = cdata?.back === 'blue' ? 'back-blue' : 'back-red';
+            const keepArcadeRun = cardEl.classList.contains('arcade-car-run');
+
+            cardEl.classList.add('opponent-card-back');
+            cardEl.classList.remove('back-red', 'back-blue');
+            cardEl.classList.add(wantedClass);
+
+            if (document.body.dataset.deckTheme === 'arcade' && keepArcadeRun) {
+              cardEl.classList.add('arcade-car-run');
+            } else if (document.body.dataset.deckTheme !== 'arcade') {
+              cardEl.classList.remove('arcade-car-run');
+            }
+          }
+        }
+
+        updateSeat(top, seats.top);
+        updateSeat(left, seats.left);
+        updateSeat(right, seats.right);
+
         if (document.body.dataset.deckTheme === 'mythic') {
           syncMythicPhase();
         }
