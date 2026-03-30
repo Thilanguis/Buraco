@@ -1,71 +1,109 @@
 // bot.js
 
 export class BuracoBot {
+  static _turnLocks = new Set();
+
   static async playTurn(stateIgnored, botIndex, engine) {
     let state = engine.getState();
-    let me = state.players[botIndex];
-    let team = state.teams[me.teamId];
-    let oppTeam = state.teams[me.teamId === 0 ? 1 : 0];
-
-    const myScore = engine.computeTeamMeldScore(team).total;
-    const oppScore = engine.computeTeamMeldScore(oppTeam).total;
-    const stockCount = state.stock.length;
-    const tookMorto = (state.deadChunksTaken[team.id] || 0) > 0;
-    const oppTookMorto = (state.deadChunksTaken[oppTeam.id] || 0) > 0;
-
-    const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25);
-    const isRushingMorto = !tookMorto && me.hand.length <= 5;
-    // O cérebro agora entende que o Trio também exige estratégia de equipe
-    const isDuo = state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes.length > 1);
-    const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto };
-
-    engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
-    await this.sleep(Math.floor(Math.random() * 4000) + 1500);
-
-    try {
-      let boughtFromDiscard = false;
-      if (state.discard.length > 0) {
-        const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
-        if (intent && intent.wants) {
-          boughtFromDiscard = true;
-          engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
-
-          if (state.variant === 'fechado') {
-            await engine.executeDrawDiscardFechado(botIndex, intent);
-          } else {
-            await engine.executeDrawDiscard(botIndex);
-          }
-        }
-      }
-
-      state = engine.getState();
-
-      if (!boughtFromDiscard || state.partialDraw) {
-        await engine.executeDrawStock(botIndex);
-      }
-
-      await this.sleep(1000);
-
-      state = engine.getState();
-      me = state.players[botIndex];
-      engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
-
-      await this.processMelds(botIndex, ctx, engine);
-      await this.sleep(1000);
-    } catch (error) {
-      console.error('Erro interno:', error);
-      let s = engine.getState();
-      engine.showMessage(`🤖 ${s.players[botIndex].name} deu curto-circuito!`);
+    if (!state || !state.players || !state.players[botIndex] || !state.teams) {
+      if (typeof window !== 'undefined' && window.isClosingGame) return;
+      console.error('[BOT] Estado inicial inválido em playTurn:', state);
+      return;
     }
 
+    const turnKey = `${state.turnNumber}:${state.currentPlayer}:${botIndex}`;
+    if (this._turnLocks.has(turnKey)) {
+      console.warn('[BOT] Jogada duplicada bloqueada para o mesmo turno:', turnKey);
+      return;
+    }
+    this._turnLocks.add(turnKey);
+
     try {
-      let s = engine.getState();
-      engine.showMessage(`🤖 ${s.players[botIndex].name} descartando...`);
-      await this.sleep(1200);
-      await this.processDiscard(botIndex, me.teamId === 0 ? 1 : 0, engine);
-    } catch (error) {
-      console.error('Erro fatal:', error);
-      await engine.executeDiscard(botIndex, 0);
+      let me = state.players[botIndex];
+      let team = state.teams[me.teamId];
+      let oppTeam = state.teams[me.teamId === 0 ? 1 : 0];
+
+      if (!team || !oppTeam) {
+        console.error('[BOT] Times inválidos em playTurn:', { state, botIndex, me });
+        return;
+      }
+
+      const myScore = engine.computeTeamMeldScore(team).total;
+      const oppScore = engine.computeTeamMeldScore(oppTeam).total;
+      const stockCount = state.stock.length;
+      const tookMorto = (state.deadChunksTaken[team.id] || 0) > 0;
+      const oppTookMorto = (state.deadChunksTaken[oppTeam.id] || 0) > 0;
+
+      const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25);
+      const isRushingMorto = !tookMorto && me.hand.length <= 5;
+      // O cérebro agora entende que o Trio também exige estratégia de equipe
+      const isDuo = state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes.length > 1);
+      const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto };
+
+      engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
+      await this.sleep(Math.floor(Math.random() * 4000) + 1500);
+
+      try {
+        let boughtFromDiscard = false;
+        if (state.discard.length > 0) {
+          const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
+          if (intent && intent.wants) {
+            engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
+
+            const drawOk = state.variant === 'fechado' ? await engine.executeDrawDiscardFechado(botIndex, intent) : await engine.executeDrawDiscard(botIndex);
+            boughtFromDiscard = drawOk !== false;
+          }
+        }
+
+        state = engine.getState();
+        if (!state || !state.players || !state.players[botIndex]) {
+          if (typeof window !== 'undefined' && window.isClosingGame) return;
+          console.error('[BOT] Estado inválido após compra do lixo/antes do monte:', state);
+          return;
+        }
+
+        if (!boughtFromDiscard || state.partialDraw) {
+          await engine.executeDrawStock(botIndex);
+        }
+
+        await this.sleep(1000);
+
+        state = engine.getState();
+        if (!state || !state.players || !state.players[botIndex]) {
+          if (typeof window !== 'undefined' && window.isClosingGame) return;
+          console.error('[BOT] Estado inválido antes de organizar as cartas:', state);
+          return;
+        }
+
+        me = state.players[botIndex];
+        engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
+
+        await this.processMelds(botIndex, ctx, engine);
+        await this.sleep(1000);
+      } catch (error) {
+        console.error('Erro interno:', error);
+        let s = engine.getState();
+        const botName = s && s.players && s.players[botIndex] ? s.players[botIndex].name : 'BOT';
+        engine.showMessage(`🤖 ${botName} deu curto-circuito!`);
+      }
+
+      try {
+        let s = engine.getState();
+        const botName = s && s.players && s.players[botIndex] ? s.players[botIndex].name : 'BOT';
+
+        engine.showMessage(`🤖 ${botName} descartando...`);
+        await this.sleep(1200);
+        await this.processDiscard(botIndex, me.teamId === 0 ? 1 : 0, engine);
+      } catch (error) {
+        console.error('Erro fatal:', error);
+
+        const s = engine.getState();
+        if (s && s.players && s.players[botIndex]) {
+          await engine.executeDiscard(botIndex, 0);
+        }
+      }
+    } finally {
+      this._turnLocks.delete(turnKey);
     }
   }
 
@@ -221,8 +259,17 @@ export class BuracoBot {
       loops++;
 
       const s = engine.getState();
+      if (!s || !s.players || !s.players[botIndex] || !s.teams) {
+        console.error('[BOT] Estado inválido em processMelds:', s);
+        return;
+      }
+
       const me = s.players[botIndex];
       const team = s.teams[me.teamId];
+      if (!team) {
+        console.error('[BOT] Team inválido em processMelds:', { s, me, botIndex });
+        return;
+      }
 
       // 🧠 MODO SNIPER (Ganância Segura): VIPs jogam para humilhar, mas só APÓS garantir uma canastra limpa.
       const isVip = ((s.mode === '1x1_dominacao' || s.mode === '1x1_duploMorto') && botIndex === 1) || ((s.mode === '1x2' || s.mode === '1x3') && me.teamId === 1);
@@ -393,8 +440,18 @@ export class BuracoBot {
 
   static async processDiscard(botIndex, oppTeamId, engine) {
     const state = engine.getState();
+    if (!state || !state.players || !state.players[botIndex] || !state.teams) {
+      if (typeof window !== 'undefined' && window.isClosingGame) return;
+      console.error('[BOT] Estado inválido em processDiscard:', state);
+      return;
+    }
+
     const me = state.players[botIndex];
     const oppTeam = state.teams[oppTeamId];
+    if (!oppTeam) {
+      console.error('[BOT] Time oponente inválido em processDiscard:', { state, oppTeamId });
+      return;
+    }
 
     if (me.hand.length === 0) return;
 

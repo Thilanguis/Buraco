@@ -125,22 +125,28 @@
       /* ================= VÍDEO DE FUNDO (SISTEMA TRIPLO) ================= */
       #videoContainer {
         position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         z-index: 0;
         background: #020617; /* Fundo escuro para a transição */
         overflow: hidden;
       }
-      
+
       .bg-video {
         position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         object-fit: cover;
         opacity: 0;
         filter: brightness(0.55) contrast(1.1); /* Deixa as luzes mais vivas */
         transition: opacity 3s ease-in-out; /* Fica APENAS o fade lento de 3 segundos */
         pointer-events: none;
       }
-      
+
       .bg-video.active {
         opacity: 1;
         z-index: 1;
@@ -154,17 +160,23 @@
         overflow-y: auto;
         padding: 40px 20px;
         background-color: transparent; /* Remove o fundo preto sólido */
-        
+
         display: none; /* A MÁGICA AQUI: Começa escondido para animar na hora certa! */
-        
+
         flex-direction: column;
         align-items: center;
         justify-content: flex-start;
       }
       /* Animação da carta sendo comprada/jogada */
       @keyframes dealMenuCard {
-        0% { transform: translateY(-60px) rotateX(45deg); opacity: 0; }
-        100% { transform: translateY(0) rotateX(0); opacity: 1; }
+        0% {
+          transform: translateY(-60px) rotateX(45deg);
+          opacity: 0;
+        }
+        100% {
+          transform: translateY(0) rotateX(0);
+          opacity: 1;
+        }
       }
 
       .section {
@@ -177,7 +189,9 @@
         margin: auto; /* Centraliza verticalmente APENAS se houver espaço de sobra */
         width: 100%;
         flex-shrink: 0; /* A MÁGICA AQUI: Impede o navegador de esmagar o menu! */
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), inset 0 0 15px rgba(0,0,0,0.8);
+        box-shadow:
+          0 25px 50px -12px rgba(0, 0, 0, 0.9),
+          inset 0 0 15px rgba(0, 0, 0, 0.8);
         overflow: hidden;
         animation: dealMenuCard 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
       }
@@ -196,7 +210,8 @@
       }
 
       /* Traz os elementos pra cima da marca d'água */
-      .section-header, .section > div {
+      .section-header,
+      .section > div {
         position: relative;
         z-index: 1;
       }
@@ -213,33 +228,33 @@
         justify-content: center;
         gap: 12px;
       }
-      
+
       .naipes {
         display: flex;
         gap: 5px;
         font-size: 20px;
       }
-      
+
       .n-preto {
         color: #000000; /* Preto sólido clássico */
         /* Contorno branco rígido de 1px, sem desfoque (mata o efeito neon) */
-        text-shadow: 
+        text-shadow:
           -1px -1px 0 #ffffff,
-           1px -1px 0 #ffffff,
-          -1px  1px 0 #ffffff,
-           1px  1px 0 #ffffff,
-           0px  4px 6px rgba(0, 0, 0, 0.9); /* Sombra de profundidade */
+          1px -1px 0 #ffffff,
+          -1px 1px 0 #ffffff,
+          1px 1px 0 #ffffff,
+          0px 4px 6px rgba(0, 0, 0, 0.9); /* Sombra de profundidade */
       }
-      
+
       .n-vermelho {
-        color: #dc2626; 
+        color: #dc2626;
         /* Contorno branco bem sutil para manter a consistência com os pretos */
-        text-shadow: 
+        text-shadow:
           -1px -1px 0 rgba(255, 255, 255, 0.7),
-           1px -1px 0 rgba(255, 255, 255, 0.7),
-          -1px  1px 0 rgba(255, 255, 255, 0.7),
-           1px  1px 0 rgba(255, 255, 255, 0.7),
-           0px  4px 6px rgba(0, 0, 0, 0.9);
+          1px -1px 0 rgba(255, 255, 255, 0.7),
+          -1px 1px 0 rgba(255, 255, 255, 0.7),
+          1px 1px 0 rgba(255, 255, 255, 0.7),
+          0px 4px 6px rgba(0, 0, 0, 0.9);
       }
       .section-header small {
         display: block;
@@ -257,7 +272,7 @@
         align-items: center;
         gap: 6px;
       }
-      
+
       /* Adiciona um mini losango dourado do lado de cada label do menu */
       label::before {
         content: '♦';
@@ -279,12 +294,12 @@
         box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.9);
         color: white;
         transition: all 0.3s;
-        color-scheme: dark; 
+        color-scheme: dark;
       }
-      
+
       option {
-        background-color: #0f172a; 
-        color: #facc15; 
+        background-color: #0f172a;
+        color: #facc15;
         font-weight: 600;
       }
 
@@ -293,7 +308,9 @@
         outline: none;
         /* Acende o ouro quando o jogador clica na caixa */
         border-color: #d4af37;
-        box-shadow: 0 0 12px rgba(212, 175, 55, 0.3), inset 0 3px 6px rgba(0, 0, 0, 0.9);
+        box-shadow:
+          0 0 12px rgba(212, 175, 55, 0.3),
+          inset 0 3px 6px rgba(0, 0, 0, 0.9);
       }
       button {
         width: 100%;
@@ -325,6 +342,44 @@
         background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
         box-shadow: 0 0 20px rgba(250, 204, 21, 0.4);
         transform: translateY(-2px);
+      }
+
+      /* ================= PREVIEW DO BARALHO NO MENU ================= */
+
+      .deck-preview-wrap {
+        position: relative;
+        width: 100%;
+        margin-bottom: 12px;
+      }
+
+      .deck-preview-select {
+        width: 100% !important;
+        margin: 0 !important;
+        padding-left: 62px !important;
+      }
+
+      .deck-preview-card {
+        position: absolute;
+        top: 50%;
+        width: 24px;
+        height: 34px;
+        border-radius: 3px;
+        pointer-events: none;
+        overflow: hidden;
+        isolation: isolate;
+        z-index: 0;
+      }
+
+      .deck-preview-card-red {
+        left: 12px;
+        transform: translateY(-50%);
+        z-index: 2;
+      }
+
+      .deck-preview-card-blue {
+        left: 24px;
+        transform: translateY(-50%) rotate(8deg);
+        z-index: 1;
       }
 
       /* ================= JOGO MESA ================= */
@@ -435,9 +490,9 @@
         height: 100%;
         border-radius: 6px;
       }
-      .morto-card-back.offset {
+      /* .morto-card-back.offset {
         transform: translate(2px, -2px);
-      }
+      } */
 
       /* Oponentes */
       .opponent-hand {
@@ -687,11 +742,10 @@
         position: relative;
         overflow: visible;
       }
-      #drawStockBtn .pile-card::before,
-      #drawStockBtn .pile-card::after {
+      #drawStockBtn .pile-card::before {
         display: none !important;
       }
-      
+
       .pile-card.discard-pile {
         background: transparent;
         border: 2px dashed rgba(255, 255, 255, 0.4);
@@ -827,6 +881,8 @@
         border-radius: 5px;
         border: 1px solid #000;
         position: relative;
+        z-index: 0;
+        isolation: isolate;
         flex-shrink: 0;
         cursor: pointer;
         box-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3);
@@ -847,7 +903,10 @@
       }
       /* FÍSICA 3D (PARALLAX) NO HOVER */
       #handContainer .carta {
-        transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), margin-right 0.2s, box-shadow 0.25s;
+        transition:
+          transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+          margin-right 0.2s,
+          box-shadow 0.25s;
         transform-style: preserve-3d;
       }
       #handContainer .carta:hover {
@@ -863,7 +922,7 @@
         margin-right: 0;
         z-index: 100;
         /* A Mágica: Reduzi o deslocamento de -20px para -12px. A carta sobe bem menos! */
-        transform: translateY(-12px) scale(1.05) !important; 
+        transform: translateY(-12px) scale(1.05) !important;
         border: 2px solid #facc15 !important;
         box-shadow: 0 15px 30px rgba(250, 204, 21, 0.8) !important;
       }
@@ -878,154 +937,489 @@
         will-change: transform, opacity;
       }
 
-     /* ================================================================= */
+      /* ================================================================= */
       /* SISTEMA MESTRE DE BARALHOS (CORREÇÃO DEFINITIVA)                  */
       /* ================================================================= */
 
       /* 1. TRAVAS ESTRUTURAIS (Blinda a mesa contra vazamento de luz) */
-      .opponent-card-back, .pile-card, .carta.mini, .morto-card-back { 
-        overflow: hidden !important; 
-        position: relative; 
+      .opponent-card-back,
+      .pile-card,
+      .carta.mini,
+      .morto-card-back {
+        overflow: hidden !important;
+        position: relative;
+        z-index: 0;
+        isolation: isolate;
       }
       /* Trava Inquebrável: Garante que a carta de compra SEMPRE consiga voar na tela */
-      .fly-card { 
-        position: fixed !important; 
+      .fly-card {
+        position: fixed !important;
       }
-      .fly-card.back * { visibility: hidden !important; }
+      .fly-card.back * {
+        visibility: hidden !important;
+      }
 
       /* 2. GEOMETRIA DO MORTO (Trava em Cruz Perfeita, nunca mais fica torto) */
-      .morto-area { position: relative; width: 80px; height: 80px; margin-right: 15px; }
-      .morto-container { position: absolute; width: 55px; height: 80px; top: 0; left: 12.5px; transition: opacity 0.3s; transform-origin: center center !important; }
-      #mortoSlot0 { z-index: 2; transform: none !important; }
-      #mortoSlot1 { z-index: 1; transform: rotate(90deg) !important; }
-      .morto-card-back { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 6px; }
-      .morto-card-back:nth-child(1) { z-index: 2; }
-      .morto-card-back.offset { transform: translate(3px, -3px) !important; z-index: 1; }
+      .morto-area {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        margin-right: 15px;
+      }
+      .morto-container {
+        position: absolute;
+        width: 55px;
+        height: 80px;
+        top: 0;
+        left: 12.5px;
+        transition: opacity 0.3s;
+        transform-origin: center center !important;
+      }
+      #mortoSlot0 {
+        z-index: 2;
+        transform: none !important;
+      }
+      #mortoSlot1 {
+        z-index: 1;
+        transform: rotate(90deg) !important;
+      }
+      .morto-card-back {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+      }
+      .morto-card-back:nth-child(1) {
+        z-index: 2;
+      }
+      .morto-card-back.offset {
+        transform: translate(3px, -3px) !important;
+        z-index: 1;
+      }
 
       /* 3. ESTRUTURA BASE DOS BARALHOS */
-      .back-red, .fly-card.back:not(.back-blue), .opponent-card-back:not(.back-blue), #mortoSlot0 .morto-card-back, .morto-card-back:not(.back-blue), #drawStockBtn .pile-card:not(.back-blue), .carta.mini.back:not(.back-blue),
-      .back-blue, .fly-card.back.back-blue, .opponent-card-back.back-blue, #mortoSlot1 .morto-card-back, .morto-card-back.back-blue, #drawStockBtn .pile-card.back-blue, .carta.mini.back.back-blue {
+      .back-red,
+      .fly-card.back:not(.back-blue),
+      .opponent-card-back:not(.back-blue),
+      #mortoSlot0 .morto-card-back,
+      .morto-card-back:not(.back-blue),
+      #drawStockBtn .pile-card:not(.back-blue),
+      .carta.mini.back:not(.back-blue),
+      .back-blue,
+      .fly-card.back.back-blue,
+      .opponent-card-back.back-blue,
+      #mortoSlot1 .morto-card-back,
+      .morto-card-back.back-blue,
+      #drawStockBtn .pile-card.back-blue,
+      .carta.mini.back.back-blue {
         box-sizing: border-box !important;
         color: transparent !important;
         background-repeat: no-repeat !important;
       }
 
       /* 4. TEMA: CLÁSSICO */
-      body[data-deck-theme="classico"] .back-red, body[data-deck-theme="classico"] .fly-card.back:not(.back-blue), body[data-deck-theme="classico"] .opponent-card-back:not(.back-blue), body[data-deck-theme="classico"] #mortoSlot0 .morto-card-back, body[data-deck-theme="classico"] .morto-card-back:not(.back-blue), body[data-deck-theme="classico"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="classico"] .carta.mini.back:not(.back-blue) {
+      body[data-deck-theme='classico'] .back-red,
+      body[data-deck-theme='classico'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='classico'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='classico'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='classico'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='classico'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='classico'] .carta.mini.back:not(.back-blue) {
         border: 2px solid #fff !important;
         background: var(--bg-card-red) !important;
         background-size: 10px 10px !important;
-        background-position: center center !important; 
-        box-shadow: -2px 2px 0 rgba(255, 255, 255, 0.1), -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
+        background-position: center center !important;
+        box-shadow:
+          -2px 2px 0 rgba(255, 255, 255, 0.1),
+          -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
       }
-      body[data-deck-theme="classico"] .back-blue, body[data-deck-theme="classico"] .fly-card.back.back-blue, body[data-deck-theme="classico"] .opponent-card-back.back-blue, body[data-deck-theme="classico"] #mortoSlot1 .morto-card-back, body[data-deck-theme="classico"] .morto-card-back.back-blue, body[data-deck-theme="classico"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="classico"] .carta.mini.back.back-blue {
+      body[data-deck-theme='classico'] .back-blue,
+      body[data-deck-theme='classico'] .fly-card.back.back-blue,
+      body[data-deck-theme='classico'] .opponent-card-back.back-blue,
+      body[data-deck-theme='classico'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='classico'] .morto-card-back.back-blue,
+      body[data-deck-theme='classico'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='classico'] .carta.mini.back.back-blue {
         border: 2px solid #fff !important;
         background: var(--bg-card-blue) !important;
         background-size: 10px 10px !important;
-        background-position: center center !important; 
-        box-shadow: -2px 2px 0 rgba(255, 255, 255, 0.1), -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
+        background-position: center center !important;
+        box-shadow:
+          -2px 2px 0 rgba(255, 255, 255, 0.1),
+          -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
       }
 
       /* 5. TEMAS PREMIUM */
-      body[data-deck-theme="cassino"] .back-red, body[data-deck-theme="cassino"] .fly-card.back:not(.back-blue), body[data-deck-theme="cassino"] .opponent-card-back:not(.back-blue), body[data-deck-theme="cassino"] #mortoSlot0 .morto-card-back, body[data-deck-theme="cassino"] .morto-card-back:not(.back-blue), body[data-deck-theme="cassino"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="cassino"] .carta.mini.back:not(.back-blue) {
+      body[data-deck-theme='cassino'] .back-red,
+      body[data-deck-theme='cassino'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='cassino'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='cassino'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='cassino'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='cassino'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='cassino'] .carta.mini.back:not(.back-blue) {
         background-color: #0a0a0a !important;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72.5' r='35' fill='%230a0a0a' stroke='%23d4af37' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='45' fill='%23d4af37' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3E%24%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #d4af37 !important; box-shadow: inset 0 0 10px #000 !important;
+        background-size: 100% 100% !important;
+        border: 2px solid #d4af37 !important;
+        box-shadow: inset 0 0 10px #000 !important;
       }
-      body[data-deck-theme="cassino"] .back-blue, body[data-deck-theme="cassino"] .fly-card.back.back-blue, body[data-deck-theme="cassino"] .opponent-card-back.back-blue, body[data-deck-theme="cassino"] #mortoSlot1 .morto-card-back, body[data-deck-theme="cassino"] .morto-card-back.back-blue, body[data-deck-theme="cassino"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="cassino"] .carta.mini.back.back-blue {
+      body[data-deck-theme='cassino'] .back-blue,
+      body[data-deck-theme='cassino'] .fly-card.back.back-blue,
+      body[data-deck-theme='cassino'] .opponent-card-back.back-blue,
+      body[data-deck-theme='cassino'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='cassino'] .morto-card-back.back-blue,
+      body[data-deck-theme='cassino'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='cassino'] .carta.mini.back.back-blue {
         background-color: #022c22 !important;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpolygon points='50,37.5 85,72.5 50,107.5 15,72.5' fill='%23022c22' stroke='%2310b981' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='24' fill='%2310b981' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPIX%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #10b981 !important; box-shadow: inset 0 0 10px #000 !important;
+        background-size: 100% 100% !important;
+        border: 2px solid #10b981 !important;
+        box-shadow: inset 0 0 10px #000 !important;
       }
-      body[data-deck-theme="minimal"] .back-red, body[data-deck-theme="minimal"] .fly-card.back:not(.back-blue), body[data-deck-theme="minimal"] .opponent-card-back:not(.back-blue), body[data-deck-theme="minimal"] #mortoSlot0 .morto-card-back, body[data-deck-theme="minimal"] .morto-card-back:not(.back-blue), body[data-deck-theme="minimal"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="minimal"] .carta.mini.back:not(.back-blue) {
-        background-color: #b91c1c !important; background-image: none !important; border: 2px solid #ef4444 !important; box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #7f1d1d !important;
+      body[data-deck-theme='minimal'] .back-red,
+      body[data-deck-theme='minimal'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='minimal'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='minimal'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='minimal'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='minimal'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='minimal'] .carta.mini.back:not(.back-blue) {
+        background-color: #b91c1c !important;
+        background-image: none !important;
+        border: 2px solid #ef4444 !important;
+        box-shadow:
+          inset 0 0 0 2px #fff,
+          inset 0 0 0 4px #7f1d1d !important;
       }
-      body[data-deck-theme="minimal"] .back-blue, body[data-deck-theme="minimal"] .fly-card.back.back-blue, body[data-deck-theme="minimal"] .opponent-card-back.back-blue, body[data-deck-theme="minimal"] #mortoSlot1 .morto-card-back, body[data-deck-theme="minimal"] .morto-card-back.back-blue, body[data-deck-theme="minimal"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="minimal"] .carta.mini.back.back-blue {
-        background-color: #1d4ed8 !important; background-image: none !important; border: 2px solid #3b82f6 !important; box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #1e3a8a !important;
+      body[data-deck-theme='minimal'] .back-blue,
+      body[data-deck-theme='minimal'] .fly-card.back.back-blue,
+      body[data-deck-theme='minimal'] .opponent-card-back.back-blue,
+      body[data-deck-theme='minimal'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='minimal'] .morto-card-back.back-blue,
+      body[data-deck-theme='minimal'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='minimal'] .carta.mini.back.back-blue {
+        background-color: #1d4ed8 !important;
+        background-image: none !important;
+        border: 2px solid #3b82f6 !important;
+        box-shadow:
+          inset 0 0 0 2px #fff,
+          inset 0 0 0 4px #1e3a8a !important;
       }
       /* ================================================================= */
-      /* TEMA: DOMINAÇÃO (TECH-GILDED / REFINED FINDOM)                   */
+      /* TEMA: DOMINAÇÃO (LUXO TECH / CLEAN NEON)                          */
       /* ================================================================= */
 
-    /* Deck 1 (Dominação Premium - ELITE: Chicote Rosa Neon) */
-      body[data-deck-theme="dominacao"] .back-red, body[data-deck-theme="dominacao"] .fly-card.back:not(.back-blue), body[data-deck-theme="dominacao"] .opponent-card-back:not(.back-blue), body[data-deck-theme="dominacao"] #mortoSlot0 .morto-card-back, body[data-deck-theme="dominacao"] .morto-card-back:not(.back-blue), body[data-deck-theme="dominacao"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="dominacao"] .carta.mini.back:not(.back-blue) {
-        background-color: #030303 !important;
-        background-image: 
-          repeating-linear-gradient(45deg, rgba(255, 20, 147, 0.05) 0px, rgba(255, 20, 147, 0.05) 2px, transparent 2px, transparent 6px),
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M 20 120 L 35 90' stroke='%23ff1493' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M 20 115 L 28 118 M 24 107 L 32 110 M 28 99 L 36 102' stroke='%23030303' stroke-width='1.5'/%3E%3Ccircle cx='18' cy='124' r='3' fill='%23ff1493'/%3E%3Cpath d='M 35 90 C 45 70, 80 90, 80 50 C 80 20, 40 10, 30 35 C 20 60, 50 65, 60 45 C 70 25, 40 25, 40 40' fill='none' stroke='%23ff1493' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M 38 42 L 32 38 M 41 45 L 35 48' stroke='%23ff1493' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 20 Q50 0, 90 20 Q95 40, 90 60 L75 110 L25 110 Q10 130, 10 110 Z' fill='none'  stroke-width='1' stroke-dasharray='3,3'/%3E%3Ctext x='50' y='130' font-size='10' fill='%23ff1493' font-family='sans-serif' font-weight='900' text-anchor='middle'%3EELITE%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100%, 100% 100% !important; 
-        border: 2px solid rgba(255, 20, 147, 0.7) !important; 
-        box-shadow: inset 0 0 2px rgba(255, 20, 147, 0.2), 0 0 2px rgba(255, 20, 147, 0.4) !important;
-        filter: drop-shadow(0 0 3px #ff1493);
-      }
-
-      /* Deck 2 (Cyan - ROYALE: Chicote Realista) */
-      body[data-deck-theme="dominacao"] .back-blue, body[data-deck-theme="dominacao"] .fly-card.back.back-blue, body[data-deck-theme="dominacao"] .opponent-card-back.back-blue, body[data-deck-theme="dominacao"] #mortoSlot1 .morto-card-back, body[data-deck-theme="dominacao"] .morto-card-back.back-blue, body[data-deck-theme="dominacao"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="dominacao"] .carta.mini.back.back-blue {
-        background-color: #030303 !important;
-        background-image: 
-          repeating-linear-gradient(-45deg, rgba(0, 255, 255, 0.03) 0px, rgba(0, 255, 255, 0.03) 2px, transparent 2px, transparent 6px),
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M 20 120 L 35 90' stroke='%2300ffff' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M 20 115 L 28 118 M 24 107 L 32 110 M 28 99 L 36 102' stroke='%23030303' stroke-width='1.5'/%3E%3Ccircle cx='18' cy='124' r='3' fill='%2300ffff'/%3E%3Cpath d='M 35 90 C 45 70, 80 90, 80 50 C 80 20, 40 10, 30 35 C 20 60, 50 65, 60 45 C 70 25, 40 25, 40 40' fill='none' stroke='%2300ffff' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M 38 42 L 32 38 M 41 45 L 35 48' stroke='%2300ffff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 20 Q50 0, 90 20 Q95 40, 90 60 L75 110 L25 110 Q10 130, 10 110 Z' fill='none'  stroke-width='1' stroke-dasharray='3,3'/%3E%3Ctext x='50' y='130' font-size='10' fill='%2300ffff' font-family='sans-serif' font-weight='900' text-anchor='middle'%3EROYALE%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100%, 100% 100% !important; 
-        border: 2px solid rgba(0, 255, 255, 0.6) !important; 
-        box-shadow: inset 0 0 2px rgba(0, 255, 255, 0.1), 0 0 2px rgba(0, 255, 255, 0.3) !important;
-        filter: drop-shadow(0 0 2px #00ffff);
-      }
-      
-      body[data-deck-theme="arcade"] .back-red, body[data-deck-theme="arcade"] .fly-card.back:not(.back-blue), body[data-deck-theme="arcade"] .opponent-card-back:not(.back-blue), body[data-deck-theme="arcade"] #mortoSlot0 .morto-card-back, body[data-deck-theme="arcade"] .morto-card-back:not(.back-blue), body[data-deck-theme="arcade"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="arcade"] .carta.mini.back:not(.back-blue) {
+      /* Deck 1 — Magenta */
+      body[data-deck-theme='dominacao'] .back-red,
+      body[data-deck-theme='dominacao'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='dominacao'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='dominacao'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='dominacao'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='dominacao'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='dominacao'] .carta.mini.back:not(.back-blue) {
         background-color: #050505 !important;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ctext x='50' y='77.5' font-size='35' fill='%23ef4444' font-family='monospace' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EP1%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #ef4444 !important; box-shadow: inset 0 0 15px rgba(239, 68, 68, 0.4), 0 2px 5px rgba(0, 0, 0, 0.8) !important;
-      }
-      body[data-deck-theme="arcade"] .back-blue, body[data-deck-theme="arcade"] .fly-card.back.back-blue, body[data-deck-theme="arcade"] .opponent-card-back.back-blue, body[data-deck-theme="arcade"] #mortoSlot1 .morto-card-back, body[data-deck-theme="arcade"] .morto-card-back.back-blue, body[data-deck-theme="arcade"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="arcade"] .carta.mini.back.back-blue {
-        background-color: #050505 !important;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ctext x='50' y='77.5' font-size='35' fill='%230ea5e9' font-family='monospace' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EP2%3C/text%3E%3C/svg%3E") !important;
-        background-size: 100% 100% !important; border: 2px solid #0ea5e9 !important; box-shadow: inset 0 0 15px rgba(14, 165, 233, 0.4), 0 2px 5px rgba(0, 0, 0, 0.8) !important;
+        background-image:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 45%, rgba(255, 20, 147, 0.04) 100%),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' ry='10' fill='none' stroke='%23ff1493' stroke-opacity='0.18' stroke-width='1.2'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' ry='8' fill='none' stroke='%23ff1493' stroke-opacity='0.55' stroke-width='1.8'/%3E%3Cpath d='M50 40 L66 56 L50 72 L34 56 Z' fill='none' stroke='%23ff1493' stroke-width='2.2' stroke-opacity='0.9'/%3E%3Ccircle cx='50' cy='56' r='10' fill='none' stroke='%23ff1493' stroke-width='1.2' stroke-opacity='0.45'/%3E%3Cpath d='M28 28 L36 36 M64 36 L72 28 M28 117 L36 109 M64 109 L72 117' stroke='%23ff1493' stroke-width='1.2' stroke-opacity='0.35' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='56' r='2.8' fill='%23ff1493' fill-opacity='0.95'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid rgba(255, 20, 147, 0.75) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+          inset 0 0 18px rgba(255, 20, 147, 0.1),
+          0 0 8px rgba(255, 20, 147, 0.16) !important;
+        filter: none !important;
       }
 
-     /* ================================================================= */
-      /* 6. TEMA: MÍTICO (COURO PREMIUM E BRILHO 100% FUNCIONAL)           */
+      /* Deck 2 — Cyan */
+      body[data-deck-theme='dominacao'] .back-blue,
+      body[data-deck-theme='dominacao'] .fly-card.back.back-blue,
+      body[data-deck-theme='dominacao'] .opponent-card-back.back-blue,
+      body[data-deck-theme='dominacao'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='dominacao'] .morto-card-back.back-blue,
+      body[data-deck-theme='dominacao'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='dominacao'] .carta.mini.back.back-blue {
+        background-color: #050505 !important;
+        background-image:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 45%, rgba(0, 255, 255, 0.04) 100%),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' ry='10' fill='none' stroke='%2300ffff' stroke-opacity='0.16' stroke-width='1.2'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' ry='8' fill='none' stroke='%2300ffff' stroke-opacity='0.50' stroke-width='1.8'/%3E%3Cpath d='M50 40 L66 56 L50 72 L34 56 Z' fill='none' stroke='%2300ffff' stroke-width='2.2' stroke-opacity='0.85'/%3E%3Ccircle cx='50' cy='56' r='10' fill='none' stroke='%2300ffff' stroke-width='1.2' stroke-opacity='0.40'/%3E%3Cpath d='M28 28 L36 36 M64 36 L72 28 M28 117 L36 109 M64 109 L72 117' stroke='%2300ffff' stroke-width='1.2' stroke-opacity='0.30' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='56' r='2.8' fill='%2300ffff' fill-opacity='0.92'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid rgba(0, 255, 255, 0.68) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          inset 0 0 18px rgba(0, 255, 255, 0.08),
+          0 0 8px rgba(0, 255, 255, 0.14) !important;
+        filter: none !important;
+      }
+
+      /* ================================================================= */
+      /* TEMA: ARCADE (FLIPERAMA NEON / RETRÔ TECH)                        */
       /* ================================================================= */
 
-      /* O primeiro valor move a luz, os outros dois cravam o couro e o fundo no lugar */
+      body[data-deck-theme='arcade'] .back-red,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue) {
+        background-color: #050505 !important;
+        background-image:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 8%, transparent 8%, transparent 100%),
+          repeating-linear-gradient(180deg, rgba(255, 255, 255, 0) 0px, rgba(255, 255, 255, 0) 3px, rgba(255, 255, 255, 0.035) 4px, rgba(255, 255, 255, 0) 5px),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%23ff355e' stroke-width='2.2' stroke-opacity='0.9'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' fill='none' stroke='%23ffd60a' stroke-width='1.4' stroke-opacity='0.7'/%3E%3Cpath d='M24 30 H76 M24 115 H76' stroke='%23ff355e' stroke-width='1.2' stroke-opacity='0.35'/%3E%3Cpath d='M20 40 L30 40 M70 40 L80 40 M20 105 L30 105 M70 105 L80 105' stroke='%23ffd60a' stroke-width='2' stroke-linecap='round' stroke-opacity='0.7'/%3E%3Ctext x='50' y='60' font-size='14' fill='%23ffd60a' font-family='monospace' font-weight='900' text-anchor='middle'%3EPLAYER%3C/text%3E%3Ctext x='50' y='88' font-size='30' fill='%23ff355e' font-family='monospace' font-weight='900' text-anchor='middle'%3E1%3C/text%3E%3Ccircle cx='30' cy='72' r='3' fill='%23ff355e'/%3E%3Ccircle cx='70' cy='72' r='3' fill='%23ff355e'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid #ff355e !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 214, 10, 0.25),
+          inset 0 0 16px rgba(255, 53, 94, 0.18),
+          0 0 8px rgba(255, 53, 94, 0.22) !important;
+        filter: none !important;
+      }
+
+      body[data-deck-theme='arcade'] .back-blue,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue {
+        background-color: #050505 !important;
+        background-image:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 8%, transparent 8%, transparent 100%),
+          repeating-linear-gradient(180deg, rgba(255, 255, 255, 0) 0px, rgba(255, 255, 255, 0) 3px, rgba(255, 255, 255, 0.035) 4px, rgba(255, 255, 255, 0) 5px),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%2300d9ff' stroke-width='2.2' stroke-opacity='0.9'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' fill='none' stroke='%23a3ff12' stroke-width='1.4' stroke-opacity='0.7'/%3E%3Cpath d='M24 30 H76 M24 115 H76' stroke='%2300d9ff' stroke-width='1.2' stroke-opacity='0.35'/%3E%3Cpath d='M20 40 L30 40 M70 40 L80 40 M20 105 L30 105 M70 105 L80 105' stroke='%23a3ff12' stroke-width='2' stroke-linecap='round' stroke-opacity='0.7'/%3E%3Ctext x='50' y='60' font-size='14' fill='%23a3ff12' font-family='monospace' font-weight='900' text-anchor='middle'%3EPLAYER%3C/text%3E%3Ctext x='50' y='88' font-size='30' fill='%2300d9ff' font-family='monospace' font-weight='900' text-anchor='middle'%3E2%3C/text%3E%3Ccircle cx='30' cy='72' r='3' fill='%2300d9ff'/%3E%3Ccircle cx='70' cy='72' r='3' fill='%2300d9ff'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid #00d9ff !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(163, 255, 18, 0.22),
+          inset 0 0 16px rgba(0, 217, 255, 0.16),
+          0 0 8px rgba(0, 217, 255, 0.18) !important;
+        filter: none !important;
+      }
+
+      /* ================================================================= */
+      /* TEMA: ARCADE - CARRINHO ANIMADO                                   */
+      /* ================================================================= */
+
+      @keyframes arcadeCarPassRight {
+        0% {
+          left: -22px;
+          opacity: 0;
+        }
+        8% {
+          opacity: 1;
+        }
+        92% {
+          opacity: 1;
+        }
+        100% {
+          left: calc(100% + 4px);
+          opacity: 0;
+        }
+      }
+
+      @keyframes arcadeCarPassLeft {
+        0% {
+          right: -22px;
+          opacity: 0;
+        }
+        8% {
+          opacity: 1;
+        }
+        92% {
+          opacity: 1;
+        }
+        100% {
+          right: calc(100% + 4px);
+          opacity: 0;
+        }
+      }
+
+      body[data-deck-theme='arcade'] .back-red::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .back-blue::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue::after {
+        content: '';
+        position: absolute;
+        top: 77%;
+        width: 18px;
+        height: 9px;
+        pointer-events: none;
+        z-index: 1;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+        opacity: 0;
+      }
+
+      body[data-deck-theme='arcade'] .back-red::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue)::after {
+        left: -22px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 12'%3E%3Cpath d='M3 8 L6 5 H13 L17 6.5 H20 L21 9 H18.5 L17 11 H8 L7 9 H3 Z' fill='none' stroke='%23ff355e' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='10' r='1.4' fill='%23ffd60a'/%3E%3Ccircle cx='16' cy='10' r='1.4' fill='%23ffd60a'/%3E%3C/svg%3E");
+      }
+
+      body[data-deck-theme='arcade'] .back-red.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue).arcade-car-run::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue).arcade-car-run::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue).arcade-car-run::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card:not(.back-blue).arcade-car-run::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue).arcade-car-run::after {
+        animation: arcadeCarPassRight 1.55s linear 1;
+      }
+
+      body[data-deck-theme='arcade'] .back-blue::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue::after {
+        right: -22px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 12'%3E%3Cpath d='M21 8 L18 5 H11 L7 6.5 H4 L3 9 H5.5 L7 11 H16 L17 9 H21 Z' fill='none' stroke='%2300d9ff' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='10' r='1.4' fill='%23a3ff12'/%3E%3Ccircle cx='15' cy='10' r='1.4' fill='%23a3ff12'/%3E%3C/svg%3E");
+      }
+
+      body[data-deck-theme='arcade'] .back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue.arcade-car-run::after {
+        animation: arcadeCarPassLeft 1.55s linear 1;
+      }
+
+      /* ajuste fino da faixa onde o carro passa */
+      body[data-deck-theme='arcade'] .back-red::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .back-blue::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue::after {
+        top: 76%;
+      }
+
+      /* ================================================================= */
+      /* 6. TEMA: MÍTICO (RITUAL FINDOM / BDSM LUXO ANIMADO)               */
+      /* ================================================================= */
+
       @keyframes mythicShineBg {
-        0% { background-position: 250% 50%, center center, center center; }
-        100% { background-position: -150% 50%, center center, center center; }
+        0% {
+          background-position:
+            240% 50%,
+            center center,
+            center center,
+            center center;
+        }
+        100% {
+          background-position:
+            -160% 50%,
+            center center,
+            center center,
+            center center;
+        }
       }
 
-      /* MÍTICO - VERMELHO (Couro Ouro Imperial) */
-      body[data-deck-theme="mythic"] .back-red, body[data-deck-theme="mythic"] .fly-card.back:not(.back-blue), body[data-deck-theme="mythic"] .opponent-card-back:not(.back-blue), body[data-deck-theme="mythic"] #mortoSlot0 .morto-card-back, body[data-deck-theme="mythic"] .morto-card-back:not(.back-blue), body[data-deck-theme="mythic"] #drawStockBtn .pile-card:not(.back-blue), body[data-deck-theme="mythic"] .carta.mini.back:not(.back-blue) {
-        background-color: #1a1505 !important;
-        background-image: 
-          /* 1. Feixe de Luz */
-          linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.1) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0.1) 60%, transparent 100%),
-          /* 2. Textura Couro (Ruído Fractal direto no navegador) */
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E"),
-          /* 3. Fundo Ouro Base */
-          radial-gradient(circle at 30% 30%, #4a3a00 0%, #1a1505 80%) !important;
-        
-        background-size: 200% 100%, 100px 100px, 100% 100% !important;
-        background-blend-mode: normal, soft-light, normal !important;
-        animation: mythicShineBg 12s infinite linear !important;
-        border: 2px solid #facc15 !important;
-        box-shadow: inset 0 0 15px #000, 0 0 8px rgba(250, 204, 21, 0.4) !important;
+      /* MÍTICO - VERMELHO (Dominação / Ouro Rosa / Ritual) */
+      body[data-deck-theme='mythic'] .back-red,
+      body[data-deck-theme='mythic'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='mythic'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='mythic'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='mythic'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='mythic'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='mythic'] .carta.mini.back:not(.back-blue) {
+        background-color: #12070a !important;
+        background-image:
+          linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0) 36%, rgba(255, 240, 245, 0.16) 45%, rgba(255, 255, 255, 0.68) 50%, rgba(255, 240, 245, 0.16) 55%, rgba(255, 255, 255, 0) 64%, transparent 100%),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.24'/%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%23f9a8d4' stroke-width='1.1' stroke-opacity='0.18'/%3E%3Crect x='11' y='11' width='78' height='123' rx='8' fill='none' stroke='%23f472b6' stroke-width='1.4' stroke-opacity='0.34'/%3E%3Crect x='15' y='15' width='70' height='115' rx='7' fill='none' stroke='%23facc15' stroke-width='1.6' stroke-opacity='0.55'/%3E%3Ccircle cx='50' cy='56' r='16' fill='none' stroke='%23f9a8d4' stroke-width='1.5' stroke-opacity='0.55'/%3E%3Cpath d='M59 43 C56 41 53 40 49 40 C43 40 39 44 39 49 C39 54 43 57 50 59 C57 61 61 64 61 69 C61 75 56 79 50 79 C46 79 43 78 40 76' fill='none' stroke='%23f472b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' stroke-opacity='0.92'/%3E%3Cpath d='M50 37 L50 82' stroke='%23facc15' stroke-width='1.7' stroke-linecap='round' stroke-opacity='0.95'/%3E%3Ccircle cx='50' cy='84.5' r='2.2' fill='%23facc15' fill-opacity='0.95'/%3E%3Cpath d='M24 24 L31 31 M69 31 L76 24 M24 121 L31 114 M69 114 L76 121' stroke='%23f9a8d4' stroke-width='1' stroke-opacity='0.28' stroke-linecap='round'/%3E%3C/svg%3E"),
+          radial-gradient(circle at 30% 25%, #4a1026 0%, #24060f 42%, #12070a 88%) !important;
+
+        background-size:
+          210% 100%,
+          100px 100px,
+          100% 100%,
+          100% 100% !important;
+        background-blend-mode: screen, soft-light, normal, normal !important;
+        animation: mythicShineBg 9.5s linear infinite !important;
+        animation-delay: var(--mythic-delay, 0ms) !important;
+        border: 2px solid rgba(250, 204, 21, 0.82) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          inset 0 0 14px rgba(244, 114, 182, 0.12),
+          inset 0 0 26px rgba(0, 0, 0, 0.72),
+          0 0 10px rgba(250, 204, 21, 0.2) !important;
+        filter: none !important;
       }
 
-      /* MÍTICO - AZUL (Couro Esmeralda Jade) */
-      body[data-deck-theme="mythic"] .back-blue, body[data-deck-theme="mythic"] .fly-card.back.back-blue, body[data-deck-theme="mythic"] .opponent-card-back.back-blue, body[data-deck-theme="mythic"] #mortoSlot1 .morto-card-back, body[data-deck-theme="mythic"] .morto-card-back.back-blue, body[data-deck-theme="mythic"] #drawStockBtn .pile-card.back-blue, body[data-deck-theme="mythic"] .carta.mini.back.back-blue {
-        background-color: #022018 !important;
-        background-image: 
-          /* 1. Feixe de Luz */
-          linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.1) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0.1) 60%, transparent 100%),
-          /* 2. Textura Couro (Ruído Fractal direto no navegador) */
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E"),
-          /* 3. Fundo Jade Base */
-          radial-gradient(circle at 30% 30%, #1a5c4a 0%, #022018 80%) !important;
-          
-        background-size: 200% 100%, 100px 100px, 100% 100% !important;
-        background-blend-mode: normal, soft-light, normal !important;
-        animation: mythicShineBg 12s infinite linear !important;
-        border: 2px solid #34d399 !important;
-        box-shadow: inset 0 0 15px #000, 0 0 8px rgba(52, 211, 153, 0.4) !important;
+      /* MÍTICO - AZUL (Submissão / Gelo / Luxo Ritual) */
+      body[data-deck-theme='mythic'] .back-blue,
+      body[data-deck-theme='mythic'] .fly-card.back.back-blue,
+      body[data-deck-theme='mythic'] .opponent-card-back.back-blue,
+      body[data-deck-theme='mythic'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='mythic'] .morto-card-back.back-blue,
+      body[data-deck-theme='mythic'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='mythic'] .carta.mini.back.back-blue {
+        background-color: #071017 !important;
+        background-image:
+          linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0) 36%, rgba(220, 245, 255, 0.14) 45%, rgba(255, 255, 255, 0.64) 50%, rgba(220, 245, 255, 0.14) 55%, rgba(255, 255, 255, 0) 64%, transparent 100%),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.24'/%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%2399f6e4' stroke-width='1.1' stroke-opacity='0.16'/%3E%3Crect x='11' y='11' width='78' height='123' rx='8' fill='none' stroke='%2322d3ee' stroke-width='1.4' stroke-opacity='0.30'/%3E%3Crect x='15' y='15' width='70' height='115' rx='7' fill='none' stroke='%2367e8f9' stroke-width='1.6' stroke-opacity='0.50'/%3E%3Ccircle cx='50' cy='56' r='16' fill='none' stroke='%2399f6e4' stroke-width='1.5' stroke-opacity='0.50'/%3E%3Cpath d='M59 43 C56 41 53 40 49 40 C43 40 39 44 39 49 C39 54 43 57 50 59 C57 61 61 64 61 69 C61 75 56 79 50 79 C46 79 43 78 40 76' fill='none' stroke='%2322d3ee' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' stroke-opacity='0.92'/%3E%3Cpath d='M50 37 L50 82' stroke='%2399f6e4' stroke-width='1.7' stroke-linecap='round' stroke-opacity='0.95'/%3E%3Ccircle cx='50' cy='84.5' r='2.2' fill='%2367e8f9' fill-opacity='0.92'/%3E%3Cpath d='M24 24 L31 31 M69 31 L76 24 M24 121 L31 114 M69 114 L76 121' stroke='%2399f6e4' stroke-width='1' stroke-opacity='0.24' stroke-linecap='round'/%3E%3C/svg%3E"),
+          radial-gradient(circle at 30% 25%, #0f3b4a 0%, #081d27 42%, #071017 88%) !important;
+
+        background-size:
+          210% 100%,
+          100px 100px,
+          100% 100%,
+          100% 100% !important;
+        background-blend-mode: screen, soft-light, normal, normal !important;
+        animation: mythicShineBg 9.5s linear infinite !important;
+        animation-delay: var(--mythic-delay, 0ms) !important;
+        border: 2px solid rgba(103, 232, 249, 0.76) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          inset 0 0 14px rgba(34, 211, 238, 0.1),
+          inset 0 0 26px rgba(0, 0, 0, 0.74),
+          0 0 10px rgba(103, 232, 249, 0.18) !important;
+        filter: none !important;
       }
 
       /* Efeitos Especiais */
@@ -1331,7 +1725,9 @@
         background: rgba(22, 163, 74, 0.15);
         border: 1px solid #22c55e;
         color: #4ade80;
-        box-shadow: inset 0 0 8px rgba(34, 197, 94, 0.2), 0 0 8px rgba(34, 197, 94, 0.4);
+        box-shadow:
+          inset 0 0 8px rgba(34, 197, 94, 0.2),
+          0 0 8px rgba(34, 197, 94, 0.4);
         text-shadow: 0 0 5px rgba(34, 197, 94, 0.6);
       }
 
@@ -1401,7 +1797,7 @@
           font-size: 11px;
         }
 
-       /* Adicione este bloco para corrigir a altura da carta no celular também */
+        /* Adicione este bloco para corrigir a altura da carta no celular também */
         .carta.mini.canastra-fechada {
           transform: translate(-50%, -35%) rotate(90deg) !important;
         }
@@ -1516,9 +1912,18 @@
 
       /* ================= ANIMAÇÃO DE TURNO ATIVO ================= */
       @keyframes turnPulse {
-        0% { box-shadow: 0 0 5px rgba(34, 197, 94, 0.4); border-color: rgba(34, 197, 94, 0.4); }
-        50% { box-shadow: 0 0 25px rgba(34, 197, 94, 0.8); border-color: #4ade80; }
-        100% { box-shadow: 0 0 5px rgba(34, 197, 94, 0.4); border-color: rgba(34, 197, 94, 0.4); }
+        0% {
+          box-shadow: 0 0 5px rgba(34, 197, 94, 0.4);
+          border-color: rgba(34, 197, 94, 0.4);
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(34, 197, 94, 0.8);
+          border-color: #4ade80;
+        }
+        100% {
+          box-shadow: 0 0 5px rgba(34, 197, 94, 0.4);
+          border-color: rgba(34, 197, 94, 0.4);
+        }
       }
       .active-turn-glow {
         animation: turnPulse 1.5s infinite ease-in-out !important;
@@ -1533,47 +1938,52 @@
         opacity: 1 !important;
       }
 
- /* ================================================================= */
+      /* ================================================================= */
       /* 🎲 DADO 3D FÍSICO (Obsidiana e Ouro - FinDom)                     */
       /* ================================================================= */
-     /* ================== DADO 3D FÍSICO (TAMANHO 40px - 20% MENOR) ================== */
+      /* ================== DADO 3D FÍSICO (TAMANHO 40px - 20% MENOR) ================== */
       :root {
-        --dice-size: 40px; 
+        --dice-size: 40px;
         --face-color: #0a0a0a;
         --pip-color: #facc15;
       }
       .dice-scene {
         position: absolute;
-        width: var(--dice-size); height: var(--dice-size);
+        width: var(--dice-size);
+        height: var(--dice-size);
         perspective: 1000px;
         z-index: 10000;
         pointer-events: none;
         transform: translate(-50%, -50%);
       }
       .dice-bounce {
-        width: 100%; height: 100%;
+        width: 100%;
+        height: 100%;
         transform-style: preserve-3d;
       }
       .dice-cube {
-        width: 100%; height: 100%;
+        width: 100%;
+        height: 100%;
         position: relative;
         transform-style: preserve-3d;
         /* Selo de vácuo: o núcleo impede que se veja a mesa através das quinas */
-        background: #000; 
+        background: #000;
         border-radius: 4px;
       }
       .face {
         position: absolute;
         /* Overlap de 102% para as faces "morderem" umas às outras e sumirem com a fresta */
-        width: 102%; 
+        width: 102%;
         height: 102%;
         top: -1%;
         left: -1%;
         background: linear-gradient(135deg, #1c1c1c 0%, #000000 100%);
         border: 1px solid #d4af37;
         /* Raio reduzido para 4px para fechar o buraco físico das quinas */
-        border-radius: 4px; 
-        box-shadow: inset 0 0 12px rgba(212, 175, 55, 0.15), inset 0 0 2px rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        box-shadow:
+          inset 0 0 12px rgba(212, 175, 55, 0.15),
+          inset 0 0 2px rgba(255, 255, 255, 0.1);
         display: grid;
         grid-template: repeat(3, 1fr) / repeat(3, 1fr);
         padding: 6px; /* Proporcional ao tamanho menor */
@@ -1581,28 +1991,102 @@
         backface-visibility: hidden;
       }
       .pip {
-        display: block; width: 8px; height: 8px; /* Reduzido de 10px para 8px */
+        display: block;
+        width: 8px;
+        height: 8px; /* Reduzido de 10px para 8px */
         background: radial-gradient(circle at top left, #fff 0%, var(--pip-color) 40%, #b45309 100%);
         border-radius: 50%;
-        justify-self: center; align-self: center;
-        box-shadow: inset 0 2px 3px rgba(0,0,0,0.8), 0 0 4px rgba(250, 204, 21, 0.5);
+        justify-self: center;
+        align-self: center;
+        box-shadow:
+          inset 0 2px 3px rgba(0, 0, 0, 0.8),
+          0 0 4px rgba(250, 204, 21, 0.5);
       }
-      
+
       /* Geometria de encaixe perfeito (20px + 0.1px de folga anti-fresta) */
-      .face-1 { transform: rotateY(0deg) translateZ(20.1px); }
-      .face-6 { transform: rotateY(180deg) translateZ(20.1px); }
-      .face-3 { transform: rotateY(90deg) translateZ(20.1px); }
-      .face-4 { transform: rotateY(-90deg) translateZ(20.1px); }
-      .face-5 { transform: rotateX(90deg) translateZ(20.1px); }
-      .face-2 { transform: rotateX(-90deg) translateZ(20.1px); }
-      
+      .face-1 {
+        transform: rotateY(0deg) translateZ(20.1px);
+      }
+      .face-6 {
+        transform: rotateY(180deg) translateZ(20.1px);
+      }
+      .face-3 {
+        transform: rotateY(90deg) translateZ(20.1px);
+      }
+      .face-4 {
+        transform: rotateY(-90deg) translateZ(20.1px);
+      }
+      .face-5 {
+        transform: rotateX(90deg) translateZ(20.1px);
+      }
+      .face-2 {
+        transform: rotateX(-90deg) translateZ(20.1px);
+      }
+
       /* Furos nas Faces */
-      .face-1 .pip-1 { grid-area: 2 / 2; }
-      .face-2 .pip-1 { grid-area: 1 / 1; } .face-2 .pip-2 { grid-area: 3 / 3; }
-      .face-3 .pip-1 { grid-area: 1 / 1; } .face-3 .pip-2 { grid-area: 2 / 2; } .face-3 .pip-3 { grid-area: 3 / 3; }
-      .face-4 .pip-1 { grid-area: 1 / 1; } .face-4 .pip-2 { grid-area: 1 / 3; } .face-4 .pip-3 { grid-area: 3 / 1; } .face-4 .pip-4 { grid-area: 3 / 3; }
-      .face-5 .pip-1 { grid-area: 1 / 1; } .face-5 .pip-2 { grid-area: 1 / 3; } .face-5 .pip-3 { grid-area: 2 / 2; } .face-5 .pip-4 { grid-area: 3 / 1; } .face-5 .pip-5 { grid-area: 3 / 3; }
-      .face-6 .pip-1 { grid-area: 1 / 1; } .face-6 .pip-2 { grid-area: 1 / 3; } .face-6 .pip-3 { grid-area: 2 / 1; } .face-6 .pip-4 { grid-area: 2 / 3; } .face-6 .pip-5 { grid-area: 3 / 1; } .face-6 .pip-6 { grid-area: 3 / 3; }
+      .face-1 .pip-1 {
+        grid-area: 2 / 2;
+      }
+      .face-2 .pip-1 {
+        grid-area: 1 / 1;
+      }
+      .face-2 .pip-2 {
+        grid-area: 3 / 3;
+      }
+      .face-3 .pip-1 {
+        grid-area: 1 / 1;
+      }
+      .face-3 .pip-2 {
+        grid-area: 2 / 2;
+      }
+      .face-3 .pip-3 {
+        grid-area: 3 / 3;
+      }
+      .face-4 .pip-1 {
+        grid-area: 1 / 1;
+      }
+      .face-4 .pip-2 {
+        grid-area: 1 / 3;
+      }
+      .face-4 .pip-3 {
+        grid-area: 3 / 1;
+      }
+      .face-4 .pip-4 {
+        grid-area: 3 / 3;
+      }
+      .face-5 .pip-1 {
+        grid-area: 1 / 1;
+      }
+      .face-5 .pip-2 {
+        grid-area: 1 / 3;
+      }
+      .face-5 .pip-3 {
+        grid-area: 2 / 2;
+      }
+      .face-5 .pip-4 {
+        grid-area: 3 / 1;
+      }
+      .face-5 .pip-5 {
+        grid-area: 3 / 3;
+      }
+      .face-6 .pip-1 {
+        grid-area: 1 / 1;
+      }
+      .face-6 .pip-2 {
+        grid-area: 1 / 3;
+      }
+      .face-6 .pip-3 {
+        grid-area: 2 / 1;
+      }
+      .face-6 .pip-4 {
+        grid-area: 2 / 3;
+      }
+      .face-6 .pip-5 {
+        grid-area: 3 / 1;
+      }
+      .face-6 .pip-6 {
+        grid-area: 3 / 3;
+      }
     </style>
   </head>
   <body>
@@ -1624,16 +2108,22 @@
         <div class="section">
           <div class="section-header">
             <h2>
-              <span class="naipes"><span class="n-preto">♠</span><span class="n-vermelho">♦</span></span>
+              <span class="naipes">
+                <span class="n-preto">♠</span>
+                <span class="n-vermelho">♦</span>
+              </span>
               BURACO
-              <span class="naipes"><span class="n-preto">♣</span><span class="n-vermelho">♦</span></span>
+              <span class="naipes">
+                <span class="n-preto">♣</span>
+                <span class="n-vermelho">♦</span>
+              </span>
             </h2>
             <small>Configuração da sala</small>
           </div>
           <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px">
             <div id="menuError" style="color: #ef4444; font-size: 12px; font-weight: bold; text-align: center; display: none"></div>
 
-           <label>
+            <label>
               Modo
               <select
                 id="modeSelect"
@@ -1655,13 +2145,21 @@
             <div id="humiliationRules" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; font-size: 11px; color: #fca5a5; line-height: 1.4">
               <strong id="humiliationTitle">Regras Especiais:</strong>
               <br />
-              - O <strong style="color: #cbd5e1">Escravo (J1)</strong> joga o buraco normal com 1 morto.
+              - O
+              <strong style="color: #cbd5e1">Escravo (J1)</strong>
+              joga o buraco normal com 1 morto.
               <br />
-              - O <strong style="color: #facc15">Dominador (J2)</strong> tem privilégios: possui <strong>2 mortos</strong> e puxa <strong>2 cartas</strong> de cada vez do monte!
+              - O
+              <strong style="color: #facc15">Dominador (J2)</strong>
+              tem privilégios: possui
+              <strong>2 mortos</strong>
+              e puxa
+              <strong>2 cartas</strong>
+              de cada vez do monte!
               <br />
               - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
               <br />
-              <span id="dominacaoExtra" style="display: none; color: #facc15; font-weight: bold; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px; display: block;">
+              <span id="dominacaoExtra" style="display: none; color: #facc15; font-weight: bold; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px; display: block">
                 🔥 PLUS DOMINAÇÃO: Toda vez que o Dominador fizer uma canastra Ás-a-Ás, ele puxa um morto IMEDIATAMENTE para a mão (se houver morto na mesa)!
               </span>
             </div>
@@ -1674,14 +2172,18 @@
                 <option value="fechado">Fechado</option>
               </select>
             </label>
-            <label style="margin-bottom: 2px;">Baralho</label>
-            <div style="position: relative; width: 100%; margin-bottom: 12px;">
-              
-              <div class="back-red" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 24px; height: 34px; border-radius: 3px; box-shadow: -2px 2px 5px rgba(0,0,0,0.8); pointer-events: none; z-index: 2;"></div>
-              
-              <div class="back-blue" style="position: absolute; left: 24px; top: 50%; transform: translateY(-50%) rotate(8deg); width: 24px; height: 34px; border-radius: 3px; box-shadow: 2px 2px 6px rgba(0,0,0,0.9); pointer-events: none; z-index: 1;"></div>
-              
-              <select id="deckThemeSelect" style="margin: 0; padding-left: 62px; width: 100%;" onchange="updateMenuDynamic(); pushLobby();">
+            <label style="margin-bottom: 2px">Baralho</label>
+            <div class="deck-preview-wrap">
+              <div class="back-red deck-preview-card deck-preview-card-red"></div>
+              <div class="back-blue deck-preview-card deck-preview-card-blue"></div>
+
+              <select
+                id="deckThemeSelect"
+                class="deck-preview-select"
+                onchange="
+                  updateMenuDynamic();
+                  pushLobby();
+                ">
                 <option value="classico" selected>Clássico (Vermelho / Azul)</option>
                 <option value="cassino">Cassino (Ouro Negro / Verde PIX)</option>
                 <option value="minimal">Minimalista (Sólido Liso)</option>
@@ -1720,20 +2222,30 @@
               <strong style="color: #facc15; font-size: 11px; text-transform: uppercase; letter-spacing: 1px">💰 VALORES OFICIAIS DA MESA</strong>
               <br />
               <span style="color: #94a3b8; font-size: 10px">
-                Vitória: <strong>R$ 5,00</strong> | Diferença: <strong>R$ 0,01 / pt</strong>
+                Vitória:
+                <strong>R$ 5,00</strong>
+                | Diferença:
+                <strong>R$ 0,01 / pt</strong>
               </span>
 
               <input id="betBase" type="hidden" value="5" />
               <input id="betPerPoint" type="hidden" value="0.01" />
 
-              <div id="pixContainer" style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <input id="pixTeam1" value="" placeholder="PIX Time 1" style="margin: 0; font-size: 11px;" />
-                <input id="pixTeam2" value="" placeholder="PIX Time 2" style="margin: 0; font-size: 11px;" />
+              <div id="pixContainer" style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+                <input id="pixTeam1" value="" placeholder="PIX Time 1" style="margin: 0; font-size: 11px" />
+                <input id="pixTeam2" value="" placeholder="PIX Time 2" style="margin: 0; font-size: 11px" />
               </div>
-              
-              <div style="margin-top: 8px; font-size: 9px; color: #9ca3af; text-align: left; line-height: 1.4; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-                <strong style="color: #cbd5e1;">Formatos aceitos:</strong> CPF/CNPJ, E-mail ou Chave Aleatória.<br>
-                <span style="color: #facc15;">⚠️ Para Celular:</span> Use o código do país (ex: <strong>+55</strong>) ou parênteses <strong>( )</strong> no DDD para o sistema não confundir com CPF.
+
+              <div style="margin-top: 8px; font-size: 9px; color: #9ca3af; text-align: left; line-height: 1.4; background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05)">
+                <strong style="color: #cbd5e1">Formatos aceitos:</strong>
+                CPF/CNPJ, E-mail ou Chave Aleatória.
+                <br />
+                <span style="color: #facc15">⚠️ Para Celular:</span>
+                Use o código do país (ex:
+                <strong>+55</strong>
+                ) ou parênteses
+                <strong>( )</strong>
+                no DDD para o sistema não confundir com CPF.
               </div>
             </div>
 
@@ -1795,17 +2307,31 @@
       </div>
 
       <div id="gameSection">
-        
-        <div id="debugPanel" style="display: none; position: absolute; top: 60px; left: 10px; background: rgba(0,0,0,0.9); border: 1px dashed #facc15; padding: 10px; z-index: 99999; border-radius: 8px; flex-direction: column; gap: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.8);">
-           <div style="color: #facc15; font-weight: 900; font-size: 10px; text-transform: uppercase; margin-bottom: 5px; text-align: center;">🔧 Dev Tools</div>
-           <button onclick="debugDraw30()" style="font-size: 10px; padding: 6px; background: #3b82f6;">+30 Cartas</button>
-           <button onclick="debugMeld('suja')" style="font-size: 10px; padding: 6px; background: #ef4444;">Canastra Suja</button>
-           <button onclick="debugMeld('limpa')" style="font-size: 10px; padding: 6px; background: #22c55e;">Canastra Limpa</button>
-           <button onclick="debugMeld('real')" style="font-size: 10px; padding: 6px; background: #eab308; color: #000;">Canastra Real</button>
-           <button onclick="debugMeld('asas')" style="font-size: 10px; padding: 6px; background: #8b5cf6;">Canastra Ás-a-Ás</button>
-           <button onclick="debugSetupDead()" style="font-size: 10px; padding: 6px; background: #0f766e;">Prep: Pegar Morto</button>
-           <button onclick="debugSetupWin()" style="font-size: 10px; padding: 6px; background: #1d4ed8;">Prep: Bater</button>
-           <button onclick="debugEndGame()" style="font-size: 10px; padding: 6px; background: #000; border: 1px solid #ef4444; margin-top: 5px;">Terminar Jogo</button>
+        <div
+          id="debugPanel"
+          style="
+            display: none;
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px dashed #facc15;
+            padding: 10px;
+            z-index: 99999;
+            border-radius: 8px;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+          ">
+          <div style="color: #facc15; font-weight: 900; font-size: 10px; text-transform: uppercase; margin-bottom: 5px; text-align: center">🔧 Dev Tools</div>
+          <button onclick="debugDraw30()" style="font-size: 10px; padding: 6px; background: #3b82f6">+30 Cartas</button>
+          <button onclick="debugMeld('suja')" style="font-size: 10px; padding: 6px; background: #ef4444">Canastra Suja</button>
+          <button onclick="debugMeld('limpa')" style="font-size: 10px; padding: 6px; background: #22c55e">Canastra Limpa</button>
+          <button onclick="debugMeld('real')" style="font-size: 10px; padding: 6px; background: #eab308; color: #000">Canastra Real</button>
+          <button onclick="debugMeld('asas')" style="font-size: 10px; padding: 6px; background: #8b5cf6">Canastra Ás-a-Ás</button>
+          <button onclick="debugSetupDead()" style="font-size: 10px; padding: 6px; background: #0f766e">Prep: Pegar Morto</button>
+          <button onclick="debugSetupWin()" style="font-size: 10px; padding: 6px; background: #1d4ed8">Prep: Bater</button>
+          <button onclick="debugEndGame()" style="font-size: 10px; padding: 6px; background: #000; border: 1px solid #ef4444; margin-top: 5px">Terminar Jogo</button>
         </div>
 
         <div class="board">
@@ -1905,30 +2431,29 @@
               <div class="cards-row"></div>
             </div>
           </div>
-
-      <div id="scoreSection" style="display: none">
-        <div class="score-card">
-          <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
-          <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px"></div>
-          <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
         </div>
-      </div>
-    </div>
-
-    <div id="surrenderSection" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); z-index: 300; align-items: center; justify-content: center; flex-direction: column;">
-        <div class="score-card" style="max-width: 350px;">
-          <h2 style="color: #facc15; font-size: 20px; margin-bottom: 15px;">Votação: Encerrar Jogo</h2>
-          <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 20px;">Todos os jogadores precisam concordar para voltar ao Lobby.</p>
-          
-          <div id="surrenderVotesList" style="display: flex; flex-direction: column; gap: 10px; text-align: left; margin-bottom: 20px;">
-            </div>
-
-          <div style="display: flex; gap: 10px;">
-            <button id="voteYesBtn" style="background: #22c55e;">Votar SIM</button>
-            <button id="voteNoBtn" style="background: #ef4444;">Votar NÃO</button>
+        <div id="scoreSection" style="display: none">
+          <div class="score-card">
+            <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
+            <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px"></div>
+            <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
           </div>
         </div>
       </div>
+    </div>
+    <div id="surrenderSection" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); z-index: 300; align-items: center; justify-content: center; flex-direction: column">
+      <div class="score-card" style="max-width: 350px">
+        <h2 style="color: #facc15; font-size: 20px; margin-bottom: 15px">Votação: Encerrar Jogo</h2>
+        <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 20px">Todos os jogadores precisam concordar para voltar ao Lobby.</p>
+
+        <div id="surrenderVotesList" style="display: flex; flex-direction: column; gap: 10px; text-align: left; margin-bottom: 20px"></div>
+
+        <div style="display: flex; gap: 10px">
+          <button id="voteYesBtn" style="background: #22c55e">Votar SIM</button>
+          <button id="voteNoBtn" style="background: #ef4444">Votar NÃO</button>
+        </div>
+      </div>
+    </div>
 
     <script type="module">
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -1944,15 +2469,15 @@
       window.addEventListener('load', () => {
         // Inicia a rotação dos vídeos
         const videos = [document.getElementById('bgVid1'), document.getElementById('bgVid2'), document.getElementById('bgVid3')];
-        
+
         videos.forEach((vid, idx) => {
           if (!vid) return;
           vid.addEventListener('ended', () => {
             vid.classList.remove('active'); // Esconde o atual com fade out
-            
+
             const nextIdx = (idx + 1) % videos.length;
             const nextVid = videos[nextIdx];
-            
+
             nextVid.currentTime = 0; // Zera o próximo
             nextVid.play().catch(() => {});
             nextVid.classList.add('active'); // Mostra o próximo com fade in
@@ -1960,7 +2485,10 @@
         });
 
         // Força o play do primeiro (fallback para navegadores chatos)
-        if (videos[0]) Object.assign(videos[0], {currentTime: 0}).play().catch(()=>{});
+        if (videos[0])
+          Object.assign(videos[0], { currentTime: 0 })
+            .play()
+            .catch(() => {});
 
         // Lógica de sumir a tela de loading
         loadingScreen.style.display = 'flex';
@@ -2032,6 +2560,8 @@
 
       let state = null;
       let currentLobby = null;
+      window.botPlayTimeoutId = null;
+      window.isClosingGame = false;
       let selectedHandIndexes = new Set();
       let turnTimerId = null;
       let turnTimerRemaining = 0;
@@ -2053,7 +2583,7 @@
       }
       function releaseScreen() {
         if (wakeLock !== null) {
-          wakeLock.release().catch(()=>{});
+          wakeLock.release().catch(() => {});
           wakeLock = null;
         }
       }
@@ -2063,23 +2593,6 @@
           if (state && document.getElementById('gameSection').style.display === 'flex') {
             keepScreenAlive();
           }
-          
-          // 🛡️ CHUTE DE EMERGÊNCIA NO BOT: Se o celular congelou o timer ao minimizar
-          if (state && !state.finished) {
-            const currP = state.players[state.currentPlayer];
-            if (currP && currP.name.toUpperCase().includes('BOT')) {
-              let hostIdx = state.players.findIndex(p => p && !p.name.toUpperCase().includes('BOT'));
-              if (hostIdx === -1) hostIdx = myPlayerIndex; 
-              
-              if (myPlayerIndex === hostIdx) {
-                // Se a aba foi suspensa e o tempo esgotou ou o bot perdeu o próprio turno, força a jogada
-                if (turnTimerRemaining <= 0 || window.lastBotTurnPlayed !== state.turnNumber) {
-                   window.lastBotTurnPlayed = state.turnNumber;
-                   BuracoBot.playTurn(state, state.currentPlayer, botEngine).catch(()=>{});
-                }
-              }
-            }
-          }
         }
       });
 
@@ -2087,7 +2600,7 @@
 
       function toggleMenuVideos(play) {
         const videos = [document.getElementById('bgVid1'), document.getElementById('bgVid2'), document.getElementById('bgVid3')];
-        videos.forEach(vid => {
+        videos.forEach((vid) => {
           if (!vid) return;
           if (play) {
             // Apenas o vídeo que estiver com a classe 'active' volta a rodar
@@ -2194,7 +2707,7 @@
       sfxCardMove.volume = 0.5;
 
       // 🔊 NOVO ÁUDIO DO SEU TURNO
-      const sfxMyTurn = new Audio('assets/sfx/seu-turno.mp3'); 
+      const sfxMyTurn = new Audio('assets/sfx/seu-turno.mp3');
       sfxMyTurn.preload = 'auto';
       sfxMyTurn.volume = 0.8;
 
@@ -2738,13 +3251,17 @@
       let pendingCommit = false;
 
       async function commitState() {
-        if (!state) return;
+        if (!state || window.isClosingGame) return;
         pendingCommit = true;
         if (committing) return;
 
         committing = true;
         try {
           while (pendingCommit) {
+            if (!state || window.isClosingGame) {
+              pendingCommit = false;
+              break;
+            }
             pendingCommit = false;
             await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
           }
@@ -2821,7 +3338,7 @@
               const toRect = getRect(toEl);
               toEl.style.visibility = 'hidden';
               flyRectToRect(top, discardRect, toRect, 'front').then(() => {
-                 if (toEl) toEl.style.visibility = '';
+                if (toEl) toEl.style.visibility = '';
               });
             }
 
@@ -2863,12 +3380,12 @@
           const toRect = getRect(toEl);
           fromEl.style.visibility = 'hidden';
           flyRectToRect(card, fromRect, toRect, 'front').then(() => {
-             if (fromEl) fromEl.style.visibility = '';
+            if (fromEl) fromEl.style.visibility = '';
           });
         }
 
         // Mutação segura no Array blindado
-        const actualIdx = hand.findIndex(c => c.id === card.id);
+        const actualIdx = hand.findIndex((c) => c.id === card.id);
         if (actualIdx !== -1) hand.splice(actualIdx, 1);
         state.discard.push(card);
 
@@ -2965,29 +3482,27 @@
 
         turnTimerId = setInterval(() => {
           if (window.isAutoPlaying) return; // Pausa o relógio se estiver processando
-          
+
           turnTimerRemaining--;
-          
+
           if (turnTimerRemaining <= 0) {
             stopTurnTimer();
             if (state.currentPlayer === myPlayerIndex) {
-              
               // TRAVA DE 2.5s PARA EVITAR RACE CONDITION (DUPLO DESCARTE)
               window.isAutoPlaying = true;
               showMessage('Tempo esgotado. Processando Auto-play...');
               document.querySelector('.player-interface').style.pointerEvents = 'none';
               document.querySelector('.board-middle').style.pointerEvents = 'none';
-              
+
               setTimeout(() => {
                 // Checa se ainda é a vez dele depois do delay (pode ter jogado no milissegundo final)
                 if (!state.finished && state.currentPlayer === myPlayerIndex) {
-                   autoPlayTimeout().catch(console.error);
+                  autoPlayTimeout().catch(console.error);
                 } else {
-                   window.isAutoPlaying = false;
-                   renderAll(); // Restaura a UI
+                  window.isAutoPlaying = false;
+                  renderAll(); // Restaura a UI
                 }
               }, 2500);
-
             }
           } else {
             updateTimerLabel();
@@ -3064,19 +3579,33 @@
       }
 
       function optimizeMeld(meld) {
-        if (!meld || !meld.length) return;
+        if (!Array.isArray(meld) || !meld.length) return;
+
+        // limpa cartas inválidas sem quebrar a partida
+        for (let i = meld.length - 1; i >= 0; i--) {
+          if (!meld[i]) {
+            console.warn('[optimizeMeld] carta inválida removida do meld:', i, meld);
+            meld.splice(i, 1);
+          }
+        }
+
+        if (!meld.length) return;
+
         meld.forEach((c) => {
+          if (!c) return;
           if (!c.joker && (c.rank === '2' || c.rank === 2)) {
             c.forceWild = false;
             c.forceNatural = false;
           }
         });
 
-        const realCards = meld.filter((c) => !c.joker && c.rank !== '2');
+        const realCards = meld.filter((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
         if (!realCards.length) return;
-        const suit = realCards[0].suit;
 
-        const twos = meld.filter((c) => !c.joker && (c.rank === '2' || c.rank === 2) && c.suit === suit);
+        const suit = realCards[0]?.suit;
+        if (!suit) return;
+
+        const twos = meld.filter((c) => c && !c.joker && (c.rank === '2' || c.rank === 2) && c.suit === suit);
         if (twos.length === 1) {
           const two = twos[0];
           two.forceNatural = true;
@@ -3145,7 +3674,7 @@
         for (let t = 0; t < 2; t++) {
           const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
           let tName = t === 0 ? 'Time 1' : 'Time 2';
-          
+
           if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
             tName = t === 0 ? 'Escravo' : '👑 Dominador';
           } else if (mode === '1x2') {
@@ -3153,7 +3682,7 @@
           } else if (mode === '1x3') {
             tName = t === 0 ? 'Solo' : 'Trio';
           }
-          
+
           // O PIX AGORA PERTENCE AO TIME, NÃO AO JOGADOR!
           teams.push({ id: t, name: tName, playerIndexes, melds: [], pix: pixKeys[t] || '' });
         }
@@ -3281,14 +3810,14 @@
                 return;
               } else break;
             } else {
-               const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
-               const toEl = document.querySelector('#drawStockBtn .pile-card');
-               if (fromEl && toEl) {
-                 const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
-                 await flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back');
-                 impactAtRect(getRect(toEl));
-               }
-               showMessage('🔄 O Morto virou Monte!');
+              const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
+              const toEl = document.querySelector('#drawStockBtn .pile-card');
+              if (fromEl && toEl) {
+                const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
+                await flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back');
+                impactAtRect(getRect(toEl));
+              }
+              showMessage('🔄 O Morto virou Monte!');
             }
           }
           const c = state.stock.pop();
@@ -3305,7 +3834,7 @@
         drawnCards.forEach((c) => state.boughtCardIds.push(c.id)); // Salva todas para brilhar
 
         // Atualiza a mesa IMEDIATAMENTE (o número do monte cai na hora do clique)
-        renderAll(); 
+        renderAll();
 
         if (fromRect) {
           const anims = drawnCards.map((c) => {
@@ -3414,8 +3943,8 @@
 
           // 🧠 Simulador Fantasma Injetado na validação da compra do Lixo
           const simulateMeldDiscard = (baseMeld, newCards, topC) => {
-            const combined = [...baseMeld, ...newCards, topC].map(c => c ? { ...c } : null);
-            combined.forEach(c => {
+            const combined = [...baseMeld, ...newCards, topC].map((c) => (c ? { ...c } : null));
+            combined.forEach((c) => {
               if (c && !c.joker && (c.rank === '2' || c.rank === 2)) {
                 c.forceNatural = false;
                 c.forceWild = false;
@@ -3435,7 +3964,7 @@
               return;
             }
             extendedMeldIndex = validExtensions[0];
-          } 
+          }
           // 2. Se não encaixou na mesa, tenta formar um NOVO JOGO
           else if (selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
             isNewMeld = true;
@@ -3449,13 +3978,13 @@
           if ((futureHandSize === 0 || futureHandSize === 1) && !canTeamTakeDeadNow(team.id)) {
             const hasCanasta = teamHasGoodCanastra(team.id);
             let willCreateCanastra = false;
-            
+
             if (isNewMeld) {
-               willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi([...selectedCards, top]).kind);
+              willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi([...selectedCards, top]).kind);
             } else {
-               willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi([...team.melds[extendedMeldIndex], ...selectedCards, top]).kind);
+              willCreateCanastra = ['limpa', 'real', 'asas'].includes(classifyMeldForUi([...team.melds[extendedMeldIndex], ...selectedCards, top]).kind);
             }
-            
+
             if (!hasCanasta && !willCreateCanastra) {
               showMessage(`❌ Matemática inválida: Vai sobrar ${futureHandSize} carta(s) sem ter canastra limpa!`);
               selectedHandIndexes.clear();
@@ -3474,13 +4003,29 @@
           let kindBeforeFechado = '';
           if (!isNewMeld) kindBeforeFechado = classifyMeldForUi(team.melds[extendedMeldIndex]).kind;
 
-          const finalMeldCards = [...selectedCards, topCard];
+          const finalMeldCards = [...selectedCards, topCard].filter(Boolean);
+
+          if (!finalMeldCards.length) {
+            console.warn('[meld] finalMeldCards vazio ou inválido', {
+              selectedCards,
+              topCard,
+              isNewMeld,
+              extendedMeldIndex,
+            });
+            return false;
+          }
+
           if (isNewMeld) {
             optimizeMeld(finalMeldCards);
             normalizeMeldOrder(finalMeldCards);
-            team.melds.push(finalMeldCards);
+            team.melds.push(finalMeldCards.filter(Boolean));
           } else {
-            team.melds[extendedMeldIndex].push(...finalMeldCards);
+            if (!Array.isArray(team.melds[extendedMeldIndex])) {
+              console.warn('[meld] meld alvo inválido', extendedMeldIndex, team.melds);
+              return false;
+            }
+
+            team.melds[extendedMeldIndex].push(...finalMeldCards.filter(Boolean));
             optimizeMeld(team.melds[extendedMeldIndex]);
             normalizeMeldOrder(team.melds[extendedMeldIndex]);
             autoSwapWildWhenFillingGap(team.melds[extendedMeldIndex]);
@@ -3513,14 +4058,14 @@
 
           let specialDeadFechado = null;
           if (state.mode === '1x1_dominacao' && myPlayerIndex === 1) {
-              const meldFechadoCheck = isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex];
-              if (kindBeforeFechado !== 'asas' && classifyMeldForUi(meldFechadoCheck).kind === 'asas') {
-                  specialDeadFechado = triggerDominacaoReward(me);
-              }
+            const meldFechadoCheck = isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex];
+            if (kindBeforeFechado !== 'asas' && classifyMeldForUi(meldFechadoCheck).kind === 'asas') {
+              specialDeadFechado = triggerDominacaoReward(me);
+            }
           }
 
-         // Substitua o final deste bloco:
-          const tookDead = specialDeadFechado || await checkPostMeldStatus(me);
+          // Substitua o final deste bloco:
+          const tookDead = specialDeadFechado || (await checkPostMeldStatus(me));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
@@ -3582,7 +4127,7 @@
         if (!cards) return false;
         cards = cards.filter((c) => c != null); // Remove os fantasmas da matemática
         if (cards.length < 3) return false;
-        
+
         // TRAVA ANTI-ABERRAÇÃO: Nenhuma canastra no Buraco pode passar de 14 cartas (Ás a Ás).
         if (cards.length > 14) return false;
 
@@ -3647,7 +4192,10 @@
         const needHigh = neededWildsForOrder(RANKS_SEQ, 'high');
         const needLow = neededWildsForOrder(RANKS_SEQ_LOW, 'low');
         const baseOk = (needHigh !== null && needHigh <= availableWilds) || (needLow !== null && needLow <= availableWilds);
-        if (baseOk) { if (modifiedTwo) modifiedTwo.forceNatural = false; return true; }
+        if (baseOk) {
+          if (modifiedTwo) modifiedTwo.forceNatural = false;
+          return true;
+        }
 
         const aceCount = nonWild.filter((c) => c.rank === 'A').length;
         const hasKing = nonWild.some((c) => c.rank === 'K');
@@ -3677,7 +4225,10 @@
                 }
                 if (diff > 1) needed += diff - 1;
               }
-              if (ok && needed <= availableWilds) { if (modifiedTwo) modifiedTwo.forceNatural = false; return true; }
+              if (ok && needed <= availableWilds) {
+                if (modifiedTwo) modifiedTwo.forceNatural = false;
+                return true;
+              }
             }
           }
         }
@@ -3702,7 +4253,7 @@
         p.hand.push(...dead.splice(0, chunkSize));
         sortHand(p.hand);
         state.deadChunksTaken[teamId] = taken + 1;
-        
+
         showMessage('👑 DOMINAÇÃO: Ás-a-Ás formou! Pegou um morto extra direto para a mão!');
         return { deadIndex, count: chunkSize };
       }
@@ -3738,8 +4289,8 @@
         // 🧠 Simulador Limpo: Clona as cartas e arranca a armadura do "2" natural
         // Isso permite que o motor matemático enxergue o 2 como coringa novamente!
         const simulateMeld = (baseMeld, newCards) => {
-          const combined = [...baseMeld, ...newCards].map(c => c ? { ...c } : null);
-          combined.forEach(c => {
+          const combined = [...baseMeld, ...newCards].map((c) => (c ? { ...c } : null));
+          combined.forEach((c) => {
             if (c && !c.joker && (c.rank === '2' || c.rank === 2)) {
               c.forceNatural = false;
               c.forceWild = false;
@@ -3751,7 +4302,7 @@
         if (forcedIndex !== null) {
           const targetMeld = team.melds[forcedIndex];
           const combined = simulateMeld(targetMeld, cards);
-          
+
           if (!isValidSequenceMeld(combined)) {
             showMessage('❌ Combinação inválida: As cartas selecionadas não encaixam neste jogo.');
             return false;
@@ -3800,10 +4351,10 @@
 
           let specialDead1 = null;
           if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && kindBefore1 !== 'asas' && classifyMeldForUi(targetMeld).kind === 'asas') {
-              specialDead1 = triggerDominacaoReward(currentPlayer());
+            specialDead1 = triggerDominacaoReward(currentPlayer());
           }
 
-          const tookDead = specialDead1 || await checkPostMeldStatus(currentPlayer());
+          const tookDead = specialDead1 || (await checkPostMeldStatus(currentPlayer()));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
@@ -3868,10 +4419,10 @@
 
         let specialDead2 = null;
         if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && kindBefore2 !== 'asas' && classifyMeldForUi(teamMeld).kind === 'asas') {
-            specialDead2 = triggerDominacaoReward(currentPlayer());
+          specialDead2 = triggerDominacaoReward(currentPlayer());
         }
 
-        const tookDead = specialDead2 || await checkPostMeldStatus(currentPlayer()); 
+        const tookDead = specialDead2 || (await checkPostMeldStatus(currentPlayer()));
         if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
         state.lastAction = {
@@ -3914,7 +4465,7 @@
 
           // TRAVA ANTI-CLONE: Limpa a seleção imediatamente e renderiza
           selectedHandIndexes.clear();
-          renderHand(); 
+          renderHand();
 
           cards.forEach((c) => {
             c.forceNatural = false;
@@ -3975,11 +4526,11 @@
 
           let specialDead = null;
           if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && classifyMeldForUi(meld).kind === 'asas') {
-               specialDead = triggerDominacaoReward(currentPlayer());
+            specialDead = triggerDominacaoReward(currentPlayer());
           }
 
           // Puxa o morto ANTES de avisar o Firebase
-          const tookDead = specialDead || await checkPostMeldStatus(currentPlayer());
+          const tookDead = specialDead || (await checkPostMeldStatus(currentPlayer()));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
@@ -3989,7 +4540,7 @@
             teamId: currentTeam().id,
             meldIndex: meldIdx,
             cards: cards.map(packCard),
-            tookDead: tookDead, 
+            tookDead: tookDead,
             ts: Date.now(),
           };
 
@@ -3998,7 +4549,6 @@
           renderAll();
           await commitState();
           if (!tookDead) showMessage('✅ Jogo baixado com sucesso na mesa.');
-          
         } finally {
           window.isMelding = false; // 🔓 DESTRAVA A FUNÇÃO (Independente de sucesso ou erro)
         }
@@ -4109,13 +4659,13 @@
         }
 
         const card = pInitial.hand[indexes[0]];
-        
+
         if (!card) {
           selectedHandIndexes.clear();
           renderHand();
           return;
         }
-        
+
         ensureCardId(card);
         selectedHandIndexes.clear();
 
@@ -4128,7 +4678,7 @@
           if (!teamHasGoodCanastra(pInitial.teamId)) {
             showMessage('❌ Você não pode bater sem ter uma canastra limpa!');
             renderHand();
-            return; 
+            return;
           }
         }
 
@@ -4147,10 +4697,10 @@
         // Recupera o estado NOVO caso o Firebase tenha atualizado durante o 1 segundo de animação
         const p = state.players[myPlayerIndex];
         const hand = p.hand;
-        
-        const actualIndex = hand.findIndex(c => c.id === card.id);
+
+        const actualIndex = hand.findIndex((c) => c.id === card.id);
         if (actualIndex !== -1) {
-           hand.splice(actualIndex, 1);
+          hand.splice(actualIndex, 1);
         }
         state.discard.push(card);
 
@@ -4334,7 +4884,7 @@
         });
         return results;
       }
-      
+
       // Função que encerra a partida
       async function finishGame(winnerTeamId) {
         if (!state || state.finished) return;
@@ -4351,6 +4901,24 @@
 
         renderAll();
         await commitState();
+      }
+
+      function getBackClass(card) {
+        return card?.back === 'blue' ? 'back-blue' : 'back-red';
+      }
+
+      function setBackClassIfChanged(el, wantedClass, baseClass = null) {
+        if (!el) return false;
+
+        if (baseClass) el.classList.add(baseClass);
+
+        const currentClass = el.classList.contains('back-blue') ? 'back-blue' : el.classList.contains('back-red') ? 'back-red' : '';
+
+        if (currentClass === wantedClass) return false;
+
+        el.classList.remove('back-red', 'back-blue');
+        if (wantedClass) el.classList.add(wantedClass);
+        return true;
       }
 
       function renderAll() {
@@ -4375,6 +4943,7 @@
 
         // Aplica o Estilo de Baralho (Theme) selecionado
         document.body.dataset.deckTheme = state.deckTheme || 'classico';
+        syncMythicPhase();
 
         // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
         if (state.isBetting) {
@@ -4392,7 +4961,7 @@
         }
 
         const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex;
-        
+
         const currP = currentPlayer();
         const pName = currP ? currP.name : 'Aguardando...';
 
@@ -4433,15 +5002,24 @@
           if (m0.length > 0) {
             const color0 = m0[m0.length - 1].back === 'blue' ? 'back-blue' : 'back-red';
             s0.querySelectorAll('.morto-card-back').forEach((el) => {
-              el.classList.remove('back-red', 'back-blue');
-              el.classList.add(color0);
+              const current = el.classList.contains('back-blue') ? 'back-blue' : el.classList.contains('back-red') ? 'back-red' : '';
+
+              if (current !== color0) {
+                el.classList.remove('back-red', 'back-blue');
+                el.classList.add(color0);
+              }
             });
           }
+
           if (m1.length > 0) {
             const color1 = m1[m1.length - 1].back === 'blue' ? 'back-blue' : 'back-red';
             s1.querySelectorAll('.morto-card-back').forEach((el) => {
-              el.classList.remove('back-red', 'back-blue');
-              el.classList.add(color1);
+              const current = el.classList.contains('back-blue') ? 'back-blue' : el.classList.contains('back-red') ? 'back-red' : '';
+
+              if (current !== color1) {
+                el.classList.remove('back-red', 'back-blue');
+                el.classList.add(color1);
+              }
             });
           }
         }
@@ -4463,19 +5041,21 @@
 
         // Toca o som e vibra o celular SOMENTE na virada pro seu turno (Ignora turno 0 para não dar spoiler do Dado)
         const isDicePhase = state.turnNumber === 0 && !state.hasDrawnThisTurn;
-        
+
         if (myTurn && !lastMyTurn) {
           if (!isDicePhase) {
-             if (navigator.vibrate && audioUnlocked) {
-               try { navigator.vibrate([150, 80, 150]); } catch (e) {}
-             }
-             if (audioUnlocked) {
-               try {
-                 sfxMyTurn.pause();
-                 sfxMyTurn.currentTime = 0;
-                 sfxMyTurn.play().catch(() => {});
-               } catch (e) {}
-             }
+            if (navigator.vibrate && audioUnlocked) {
+              try {
+                navigator.vibrate([150, 80, 150]);
+              } catch (e) {}
+            }
+            if (audioUnlocked) {
+              try {
+                sfxMyTurn.pause();
+                sfxMyTurn.currentTime = 0;
+                sfxMyTurn.play().catch(() => {});
+              } catch (e) {}
+            }
           }
         }
         lastMyTurn = myTurn;
@@ -4503,24 +5083,29 @@
         const isFin = !!state.finished;
         const isSpec = myPlayerIndex === -1;
         document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
-        document.getElementById('meldBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
-        document.getElementById('takeDeadBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
-        document.getElementById('moveWildBtn').style.display = (isFin || isSpec) ? 'none' : 'block';
+        document.getElementById('meldBtn').style.display = isFin || isSpec ? 'none' : 'block';
+        document.getElementById('takeDeadBtn').style.display = isFin || isSpec ? 'none' : 'block';
+        document.getElementById('moveWildBtn').style.display = isFin || isSpec ? 'none' : 'block';
 
         let specBadge = document.getElementById('specBadgeInfo');
         if (!specBadge) {
-           specBadge = document.createElement('div');
-           specBadge.id = 'specBadgeInfo';
-           specBadge.style = "color: #94a3b8; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; font-size: 11px; padding: 8px;";
-           specBadge.textContent = "👀 MODO ESPECTADOR";
-           document.querySelector('.player-actions').appendChild(specBadge);
+          specBadge = document.createElement('div');
+          specBadge.id = 'specBadgeInfo';
+          specBadge.style = 'color: #94a3b8; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; font-size: 11px; padding: 8px;';
+          specBadge.textContent = '👀 MODO ESPECTADOR';
+          document.querySelector('.player-actions').appendChild(specBadge);
         }
-        specBadge.style.display = (isSpec && !isFin) ? 'block' : 'none';
+        specBadge.style.display = isSpec && !isFin ? 'block' : 'none';
 
         if (state.finished) renderScores(computeScores(), state.winnerTeamId);
 
         syncCanastraSfxFromState();
-        
+
+        // reativa os carrinhos do tema arcade sem loop bugado
+        refreshArcadeCars(false);
+
+        syncMythicPhase();
+
         // CHAMA A TELA DE VOTAÇÃO AQUI
         renderSurrender();
       }
@@ -4533,7 +5118,7 @@
         if (myPlayerIndex === -1) {
           const p0 = state.players[0];
           if (!p0) return;
-          
+
           p0.hand.forEach((card) => {
             ensureCardId(card);
             const div = document.createElement('div');
@@ -4581,10 +5166,10 @@
       function seatForPlayer(pid) {
         const total = state.players.length;
         // Se for espectador, finge que a cadeira de baixo é do Jogador 0
-        const baseIdx = myPlayerIndex !== -1 ? myPlayerIndex : 0; 
-        
+        const baseIdx = myPlayerIndex !== -1 ? myPlayerIndex : 0;
+
         if (pid === baseIdx) return 'self';
-        
+
         const others = [];
         for (let i = 1; i < total; i++) others.push((baseIdx + i) % total);
 
@@ -4617,10 +5202,10 @@
       function opponentAnchorRect(pid) {
         const seat = seatForPlayer(pid);
         if (seat === 'self') {
-           const hc = document.getElementById('handContainer');
-           if (!hc) return fallbackSeatRect('top');
-           const r = hc.getBoundingClientRect();
-           return { left: r.left + r.width / 2 - 30, top: r.top + 10, width: 60, height: 90 };
+          const hc = document.getElementById('handContainer');
+          if (!hc) return fallbackSeatRect('top');
+          const r = hc.getBoundingClientRect();
+          return { left: r.left + r.width / 2 - 30, top: r.top + 10, width: 60, height: 90 };
         }
         if (seat === 'top') return getOpponentAnchorRectById('opponentTop', 'top');
         if (seat === 'left') return getOpponentAnchorRectById('opponentLeft', 'left');
@@ -4654,7 +5239,7 @@
         const seats = { top: null, left: null, right: null };
         const others = [];
         const baseIdx = myPlayerIndex !== -1 ? myPlayerIndex : 0; // Finge que o P0 é a base
-        
+
         for (let i = 1; i < total; i++) others.push((baseIdx + i) % total);
 
         if (total === 2) seats.top = others[0];
@@ -4679,7 +5264,7 @@
           // 🛡️ TRAVA DE DESTAQUE: Aplica o brilho se for a vez deste bot/jogador
           obj.el.classList.toggle('active-turn-glow', state.currentPlayer === obj.idx);
 
-         const label = document.createElement('div');
+          const label = document.createElement('div');
           label.className = 'opponent-label';
           label.innerHTML = `${p.name} (${p.hand.length})`;
           obj.el.appendChild(label);
@@ -4694,6 +5279,9 @@
           }
           obj.el.appendChild(cardsDiv);
         });
+        if (document.body.dataset.deckTheme === 'mythic') {
+          syncMythicPhase();
+        }
       }
 
       function renderMelds() {
@@ -4713,11 +5301,11 @@
             .filter((p) => p.teamId === t.id)
             .map((p) => p.name)
             .join(' e ');
-            
+
           // Lógica do Badge do Morto
           const mortosPegos = state.deadChunksTaken?.[t.id] ?? 0;
           const maxMortos = state.deadChunksMax?.[t.id] ?? 1;
-          
+
           let mortoHtml = '';
           if (mortosPegos >= maxMortos) {
             mortoHtml = `<span class="morto-badge taken">💀 Morto (OK)</span>`;
@@ -4735,8 +5323,7 @@
 
           const target = i === 0 ? m1 : m2;
           t.melds.forEach((meld, midx) => {
-            
-            // 🛡️ RE-HIDRATAÇÃO DA FÍSICA: Como o Firebase apaga as flags ao salvar, 
+            // 🛡️ RE-HIDRATAÇÃO DA FÍSICA: Como o Firebase apaga as flags ao salvar,
             // precisamos reavaliar a matemática do jogo antes de desenhá-lo.
             // Isso garante que o sistema lembre que o "2" está atuando como carta natural!
             optimizeMeld(meld);
@@ -4758,6 +5345,11 @@
               if (!c) return;
 
               const minic = document.createElement('div');
+              if (!c) {
+                console.warn('[renderMelds] carta inválida ignorada no render');
+                return;
+              }
+
               minic.className = 'carta mini ' + (c.joker ? 'joker-card' : c.suit === '♥' || c.suit === '♦' ? 'hearts' : 'spades');
               minic.dataset.cardIndex = cidx;
               minic.innerHTML = cardFrontHTML(c);
@@ -4942,7 +5534,7 @@
 
         scores.sort((a, b) => b.score - a.score);
 
-        // A MÁGICA AQUI: O vencedor financeiro é SEMPRE o time com mais pontos (índice 0), 
+        // A MÁGICA AQUI: O vencedor financeiro é SEMPRE o time com mais pontos (índice 0),
         // mesmo se a partida acabar por exaustão (sem ninguém bater oficialmente).
         const financialWinnerTeam = scores[0].team || {};
         const winnerPix = financialWinnerTeam.pix || '';
@@ -5074,18 +5666,18 @@
 
         if (a.type === 'drawStock') {
           if (a.recycledDeadIndex !== null && a.recycledDeadIndex !== undefined) {
-             const deadEl = a.recycledDeadIndex === 1 ? dead1El : dead0El;
-             if (deadEl && stockRect) {
-                await flyRectToRect(fallbackCard, getRect(deadEl), stockRect, 'back');
-                impactAtRect(stockRect);
-             }
+            const deadEl = a.recycledDeadIndex === 1 ? dead1El : dead0El;
+            if (deadEl && stockRect) {
+              await flyRectToRect(fallbackCard, getRect(deadEl), stockRect, 'back');
+              impactAtRect(stockRect);
+            }
           }
-          
+
           const drawCount = a.count || 1;
           for (let i = 0; i < drawCount; i++) {
-             if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
-             impactAtRect(handRect);
-             if (i < drawCount - 1) await new Promise(r => setTimeout(r, 180)); // Pequeno delay pra ver as cartas separadas
+            if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
+            impactAtRect(handRect);
+            if (i < drawCount - 1) await new Promise((r) => setTimeout(r, 180)); // Pequeno delay pra ver as cartas separadas
           }
           return;
         }
@@ -5106,28 +5698,28 @@
           const df = document.getElementById('discardFace');
           let prevHtml = null;
           let prevColor = null;
-          
+
           if (df && state.discard.length > 1) {
-             const prevCard = state.discard[state.discard.length - 2];
-             prevHtml = df.innerHTML;
-             prevColor = df.style.color;
-             df.innerHTML = cardFrontHTML(prevCard);
-             df.style.color = prevCard.joker ? '#000' : (prevCard.suit === '♥' || prevCard.suit === '♦' ? '#b91c1c' : '#000');
+            const prevCard = state.discard[state.discard.length - 2];
+            prevHtml = df.innerHTML;
+            prevColor = df.style.color;
+            df.innerHTML = cardFrontHTML(prevCard);
+            df.style.color = prevCard.joker ? '#000' : prevCard.suit === '♥' || prevCard.suit === '♦' ? '#b91c1c' : '#000';
           } else if (df) {
-             df.style.visibility = 'hidden';
+            df.style.visibility = 'hidden';
           }
 
           if (discardRect) await flyRectToRect(fallbackCard, handRect, discardRect, 'front');
           impactAtRect(discardRect);
-          
+
           if (df) {
-             if (prevHtml) {
-               df.innerHTML = prevHtml;
-               df.style.color = prevColor;
-             }
-             df.style.visibility = '';
+            if (prevHtml) {
+              df.innerHTML = prevHtml;
+              df.style.color = prevColor;
+            }
+            df.style.visibility = '';
           }
-          
+
           await animateRemoteDeadIfAny();
           return;
         }
@@ -5141,8 +5733,8 @@
         }
 
         if (a.type === 'drawDiscardFechado') {
-           await animateRemoteDeadIfAny();
-           return;
+          await animateRemoteDeadIfAny();
+          return;
         }
 
         if (a.type === 'meldNew') {
@@ -5167,7 +5759,7 @@
               return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
             }),
           );
-          
+
           await animateRemoteDeadIfAny();
           return;
         }
@@ -5188,7 +5780,7 @@
               return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
             }),
           );
-          
+
           await animateRemoteDeadIfAny();
           return;
         }
@@ -5215,7 +5807,7 @@
         isValidSequenceMeld: (cards) => isValidSequenceMeld(cards),
         canTeamTakeDeadNow: (teamId) => canTeamTakeDeadNow(teamId),
         teamHasGoodCanastra: (teamId) => teamHasGoodCanastra(teamId),
-        
+
         normalizeMeld: (meld) => {
           optimizeMeld(meld);
           normalizeMeldOrder(meld);
@@ -5245,10 +5837,10 @@
           if (!s) return;
           const me = s.players[botIndex];
           const team = s.teams[me.teamId];
-          const cards = handIndexes.map(i => me.hand[i]);
-          
-          handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
-          
+          const cards = handIndexes.map((i) => me.hand[i]);
+
+          handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
+
           botEngine.normalizeMeld(cards);
           team.melds.push(cards);
           const meldIdx = team.melds.length - 1;
@@ -5256,17 +5848,17 @@
           // Recompensa de Dominação para o BOT
           let specialDead = null;
           if (s.mode === '1x1_dominacao' && botIndex === 1 && classifyMeldForUi(cards).kind === 'asas') {
-             specialDead = triggerDominacaoReward(me);
+            specialDead = triggerDominacaoReward(me);
           }
 
-          const tookDead = specialDead || await botEngine._checkBotMortoOrWin(botIndex);
+          const tookDead = specialDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           const freshS = botEngine.getState();
           if (freshS) {
-             freshS.lastAction = { id: newActionId(), type: 'meldNew', playerId: botIndex, teamId: team.id, meldIndex: meldIdx, cards: cards.map(packCard), tookDead, ts: Date.now() };
-             renderAll();
-             await commitState();
+            freshS.lastAction = { id: newActionId(), type: 'meldNew', playerId: botIndex, teamId: team.id, meldIndex: meldIdx, cards: cards.map(packCard), tookDead, ts: Date.now() };
+            renderAll();
+            await commitState();
           }
         },
 
@@ -5275,28 +5867,28 @@
           if (!s) return;
           const me = s.players[botIndex];
           const team = s.teams[me.teamId];
-          const cards = handIndexes.map(i => me.hand[i]);
-          
-          handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
-          
+          const cards = handIndexes.map((i) => me.hand[i]);
+
+          handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
+
+          const kindBefore = classifyMeldForUi(team.melds[meldIndex]).kind;
           team.melds[meldIndex].push(...cards);
           botEngine.normalizeMeld(team.melds[meldIndex]);
-          
+
           // Recompensa de Dominação para o BOT
           let specialDead = null;
-          const kindBefore = classifyMeldForUi(team.melds[meldIndex]).kind;
           if (s.mode === '1x1_dominacao' && botIndex === 1 && kindBefore !== 'asas' && classifyMeldForUi(team.melds[meldIndex]).kind === 'asas') {
-             specialDead = triggerDominacaoReward(me);
+            specialDead = triggerDominacaoReward(me);
           }
 
-          const tookDead = specialDead || await botEngine._checkBotMortoOrWin(botIndex);
+          const tookDead = specialDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           const freshS = botEngine.getState();
           if (freshS) {
-             freshS.lastAction = { id: newActionId(), type: 'meldExtend', playerId: botIndex, teamId: team.id, meldIndex: meldIndex, cards: cards.map(packCard), tookDead, ts: Date.now() };
-             renderAll();
-             await commitState();
+            freshS.lastAction = { id: newActionId(), type: 'meldExtend', playerId: botIndex, teamId: team.id, meldIndex: meldIndex, cards: cards.map(packCard), tookDead, ts: Date.now() };
+            renderAll();
+            await commitState();
           }
         },
 
@@ -5304,9 +5896,9 @@
           const s = botEngine.getState();
           if (!s) return;
           const me = s.players[botIndex];
-          const drawCount = ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw) ? 2 : 1;
+          const drawCount = (s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw ? 2 : 1;
           const drawnCards = [];
-          let recycledIndex = null; 
+          let recycledIndex = null;
 
           for (let i = 0; i < drawCount; i++) {
             if (!s.stock.length) {
@@ -5317,12 +5909,12 @@
                   return;
                 } else break;
               } else {
-                 const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
-                 const toEl = document.querySelector('#drawStockBtn .pile-card');
-                 if (fromEl && toEl) {
-                   const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
-                   flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back').then(() => impactAtRect(getRect(toEl)));
-                 }
+                const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
+                const toEl = document.querySelector('#drawStockBtn .pile-card');
+                if (fromEl && toEl) {
+                  const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
+                  flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back').then(() => impactAtRect(getRect(toEl)));
+                }
               }
             }
             const c = s.stock.pop();
@@ -5337,30 +5929,38 @@
 
           const freshS = botEngine.getState();
           if (freshS && drawnCards.length > 0) {
-            freshS.lastAction = { 
-              id: newActionId(), 
-              type: 'drawStock', 
-              playerId: botIndex, 
-              card: packCard(drawnCards[drawnCards.length - 1]), 
-              count: drawnCards.length, 
-              recycledDeadIndex: recycledIndex, 
-              ts: Date.now() 
+            freshS.lastAction = {
+              id: newActionId(),
+              type: 'drawStock',
+              playerId: botIndex,
+              card: packCard(drawnCards[drawnCards.length - 1]),
+              count: drawnCards.length,
+              recycledDeadIndex: recycledIndex,
+              ts: Date.now(),
             };
-             renderAll(); 
-             await commitState();
+            renderAll();
+            await commitState();
           }
         },
 
         executeDrawDiscard: async (botIndex) => {
           const s = botEngine.getState();
-          if (!s) return;
+          if (!s) return false;
+          if (!Array.isArray(s.discard) || s.discard.length === 0) {
+            console.warn('[BOT] executeDrawDiscard chamado com lixo vazio. Possível jogada duplicada.');
+            return false;
+          }
           const me = s.players[botIndex];
           const pile = s.discard.splice(0, s.discard.length);
           pile.forEach(ensureCardId);
-          const topCard = pile[pile.length - 1]; 
-          
+          const topCard = pile[pile.length - 1];
+          if (!topCard) {
+            console.warn('[BOT] executeDrawDiscard sem carta do topo.');
+            return false;
+          }
+
           me.hand.push(...pile);
-          
+
           // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
             if (s.stock.length > 0) {
@@ -5373,38 +5973,47 @@
           sortHand(me.hand);
           s.hasDrawnThisTurn = true;
           s.partialDraw = false;
-          s.pickedDiscardCardId = topCard.id; 
+          s.pickedDiscardCardId = topCard.id;
 
           const freshS = botEngine.getState();
           if (freshS) {
-             freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
-             renderAll();
-             await commitState();
+            freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
+            renderAll();
+            await commitState();
           }
+          return true;
         },
 
         executeDrawDiscardFechado: async (botIndex, intent) => {
           const s = botEngine.getState();
-          if (!s) return;
+          if (!s) return false;
+          if (!Array.isArray(s.discard) || s.discard.length === 0) {
+            console.warn('[BOT] executeDrawDiscardFechado chamado com lixo vazio. Possível jogada duplicada.');
+            return false;
+          }
           const me = s.players[botIndex];
           const team = s.teams[me.teamId];
           const pile = s.discard.splice(0, s.discard.length);
           pile.forEach(ensureCardId);
-          const topCard = pile.pop(); 
-          
-          if (intent.action === 'extend') {
-             team.melds[intent.meldIndex].push(topCard);
-             botEngine.normalizeMeld(team.melds[intent.meldIndex]);
-          } else if (intent.action === 'new') {
-             const cardsFromHand = intent.handIndexes.map(i => me.hand[i]);
-             intent.handIndexes.sort((a,b) => b-a).forEach(idx => me.hand.splice(idx, 1));
-             const newMeld = [...cardsFromHand, topCard];
-             botEngine.normalizeMeld(newMeld);
-             team.melds.push(newMeld);
+          const topCard = pile.pop();
+          if (!topCard) {
+            console.warn('[BOT] executeDrawDiscardFechado sem carta do topo.');
+            return false;
           }
-          
+
+          if (intent.action === 'extend') {
+            team.melds[intent.meldIndex].push(topCard);
+            botEngine.normalizeMeld(team.melds[intent.meldIndex]);
+          } else if (intent.action === 'new') {
+            const cardsFromHand = intent.handIndexes.map((i) => me.hand[i]);
+            intent.handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
+            const newMeld = [...cardsFromHand, topCard];
+            botEngine.normalizeMeld(newMeld);
+            team.melds.push(newMeld);
+          }
+
           if (pile.length > 0) {
-             me.hand.push(...pile);
+            me.hand.push(...pile);
           }
 
           // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
@@ -5419,16 +6028,17 @@
           sortHand(me.hand);
           s.hasDrawnThisTurn = true;
           s.partialDraw = false;
-          s.pickedDiscardCardId = null; 
+          s.pickedDiscardCardId = null;
 
           await botEngine._checkBotMortoOrWin(botIndex);
 
           const freshS = botEngine.getState();
           if (freshS) {
-             freshS.lastAction = { id: newActionId(), type: 'drawDiscardFechado', playerId: botIndex, ts: Date.now() };
-             renderAll();
-             await commitState();
+            freshS.lastAction = { id: newActionId(), type: 'drawDiscardFechado', playerId: botIndex, ts: Date.now() };
+            renderAll();
+            await commitState();
           }
+          return true;
         },
 
         executeDiscard: async (botIndex, cardIndex) => {
@@ -5436,7 +6046,7 @@
           if (!s) return;
           const me = s.players[botIndex];
           const card = me.hand[cardIndex];
-          
+
           me.hand.splice(cardIndex, 1);
           s.discard.push(card);
 
@@ -5445,22 +6055,22 @@
 
           if (me.hand.length === 0 && !canTeamTakeDeadNow(me.teamId)) {
             if (teamHasGoodCanastra(me.teamId)) await finishGame(me.teamId);
-            else await finishGame(me.teamId === 0 ? 1 : 0); 
+            else await finishGame(me.teamId === 0 ? 1 : 0);
             return;
           }
 
-          passTurn(); 
+          passTurn();
 
           const freshS = botEngine.getState();
           if (freshS) {
-             freshS.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
-             renderAll();
-             await commitState();
+            freshS.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
+            renderAll();
+            await commitState();
           }
-        }
+        },
       };
 
-  function getDiceSpawnPosition(pid) {
+      function getDiceSpawnPosition(pid) {
         const seat = seatForPlayer(pid);
         const vw = window.innerWidth;
         const vh = window.innerHeight;
@@ -5495,14 +6105,33 @@
         bounce.appendChild(cube);
         scene.appendChild(bounce);
 
-        let rx = 0, ry = 0;
+        let rx = 0,
+          ry = 0;
         switch (roll) {
-          case 1: rx = 0; ry = 0; break;
-          case 6: rx = 0; ry = 180; break;
-          case 2: rx = 90; ry = 0; break;
-          case 5: rx = -90; ry = 0; break;
-          case 3: rx = 0; ry = -90; break;
-          case 4: rx = 0; ry = 90; break;
+          case 1:
+            rx = 0;
+            ry = 0;
+            break;
+          case 6:
+            rx = 0;
+            ry = 180;
+            break;
+          case 2:
+            rx = 90;
+            ry = 0;
+            break;
+          case 5:
+            rx = -90;
+            ry = 0;
+            break;
+          case 3:
+            rx = 0;
+            ry = -90;
+            break;
+          case 4:
+            rx = 0;
+            ry = 90;
+            break;
         }
 
         // ALINHAMENTO PERFEITO: Trava chapado na mesa
@@ -5512,19 +6141,22 @@
         const finalRz = orthoZ[Math.floor(Math.random() * orthoZ.length)];
 
         // VETOR DE ARREMESSO: Vem de mais alto e mais longe
-        const throwDirX = (endX > window.innerWidth / 2) ? -450 : 450;
+        const throwDirX = endX > window.innerWidth / 2 ? -450 : 450;
         const throwDirY = 350;
 
         // 1. ANIMAÇÃO DE ROLAMENTO E IMPACTO (2.5s)
-        bounce.animate([
-          { transform: `translate(${throwDirX}px, ${throwDirY}px) scale(2)` }, 
-          { transform: `translate(${throwDirX * 0.6}px, ${throwDirY * 0.6}px) scale(1.2)`, offset: 0.25, easing: 'ease-out' }, 
-          { transform: `translate(${throwDirX * 0.3}px, ${throwDirY * 0.3 - 80}px) scale(1.15)`, offset: 0.40, easing: 'ease-in' }, 
-          { transform: `translate(${throwDirX * 0.15}px, ${throwDirY * 0.15}px) scale(1.08)`, offset: 0.55, easing: 'ease-out' }, 
-          { transform: `translate(${throwDirX * 0.05}px, ${throwDirY * 0.05 - 30}px) scale(1.03)`, offset: 0.70, easing: 'ease-in' }, 
-          { transform: `translate(${throwDirX * 0.01}px, ${throwDirY * 0.01}px) scale(1)`, offset: 0.85, easing: 'ease-out' }, 
-          { transform: `translate(0px, 0px) scale(1)` } 
-        ], { duration: 3500, fill: 'forwards' });
+        bounce.animate(
+          [
+            { transform: `translate(${throwDirX}px, ${throwDirY}px) scale(2)` },
+            { transform: `translate(${throwDirX * 0.6}px, ${throwDirY * 0.6}px) scale(1.2)`, offset: 0.25, easing: 'ease-out' },
+            { transform: `translate(${throwDirX * 0.3}px, ${throwDirY * 0.3 - 80}px) scale(1.15)`, offset: 0.4, easing: 'ease-in' },
+            { transform: `translate(${throwDirX * 0.15}px, ${throwDirY * 0.15}px) scale(1.08)`, offset: 0.55, easing: 'ease-out' },
+            { transform: `translate(${throwDirX * 0.05}px, ${throwDirY * 0.05 - 30}px) scale(1.03)`, offset: 0.7, easing: 'ease-in' },
+            { transform: `translate(${throwDirX * 0.01}px, ${throwDirY * 0.01}px) scale(1)`, offset: 0.85, easing: 'ease-out' },
+            { transform: `translate(0px, 0px) scale(1)` },
+          ],
+          { duration: 3500, fill: 'forwards' },
+        );
 
         // 2. ANIMAÇÃO DE ATRITO E ROTAÇÃO (Giros caóticos até travar reto)
         const startRx = finalRx + 1440 * (Math.random() > 0.5 ? 1 : -1);
@@ -5532,25 +6164,22 @@
         const startRz = finalRz + 720 * (Math.random() > 0.5 ? 1 : -1);
 
         // A MÁGICA AQUI: O rotateZ precisa ser o primeiro da string para girar o dado em relação à câmera e não se auto-tombar.
-        cube.animate([
-          { transform: `rotateZ(${startRz}deg) rotateX(${startRx}deg) rotateY(${startRy}deg)` },
-          { transform: `rotateZ(${finalRz}deg) rotateX(${finalRx}deg) rotateY(${finalRy}deg)` }
-        ], { duration: 3500, easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)', fill: 'forwards' });
+        cube.animate([{ transform: `rotateZ(${startRz}deg) rotateX(${startRx}deg) rotateY(${startRy}deg)` }, { transform: `rotateZ(${finalRz}deg) rotateX(${finalRx}deg) rotateY(${finalRy}deg)` }], {
+          duration: 3500,
+          easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)',
+          fill: 'forwards',
+        });
 
         // 3. FADE OUT
-        scene.animate([
-          { opacity: 1 },
-          { opacity: 1, offset: 0.85 },
-          { opacity: 0 }
-        ], { duration: 6000, fill: 'forwards' });
+        scene.animate([{ opacity: 1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: 6000, fill: 'forwards' });
 
         return scene;
       }
 
       onSnapshot(gameRef, async (snap) => {
         if (!snap.exists()) {
-          releaseScreen(); 
-          toggleMenuVideos(true); 
+          releaseScreen();
+          toggleMenuVideos(true);
 
           if (window.startTimer) {
             clearInterval(window.startTimer);
@@ -5562,15 +6191,22 @@
           if (playerUI) playerUI.classList.remove('active-turn-glow');
           // --------------------------------------
 
-          state = null;
+          window.isClosingGame = true;
+
+          if (window.botPlayTimeoutId) {
+            clearTimeout(window.botPlayTimeoutId);
+            window.botPlayTimeoutId = null;
+          }
+          window.lastBotTurnPlayed = null;
+          window.gameSessionId = (window.gameSessionId || 0) + 1;
           selectedHandIndexes.clear();
           // ... (resto do bloco continua igual)
           movingWild = null;
-          
+
           // 🛡️ PRESERVAÇÃO DE CADEIRA: Mantém você na mesma posição no Lobby caso a sala reinicie
           const localSelect = document.getElementById('localPlayerSelect');
           if (localSelect) {
-             localSelect.value = myPlayerIndex !== -1 ? myPlayerIndex.toString() : "";
+            localSelect.value = myPlayerIndex !== -1 ? myPlayerIndex.toString() : '';
           }
 
           lastSeenActionId = null;
@@ -5605,6 +6241,7 @@
             window.startTimer = null;
           }
 
+          state = null;
           currentLobby = null;
           for (let i = 0; i < 4; i++) {
             const r = document.getElementById('ready' + i);
@@ -5626,10 +6263,10 @@
           // --------------------------------------------
 
           if (introFinished) {
-             document.getElementById('configSection').style.display = 'flex';
-             // ⚡ RESSUSCITADOR DE SALAS: Se o Firebase deletou o jogo, recriamos um lobby vazio imediatamente
-             // Isso previne que os jogadores fiquem numa 'sala fantasma' que não reage a cliques.
-             if (typeof window.pushLobby === 'function') window.pushLobby();
+            document.getElementById('configSection').style.display = 'flex';
+            // ⚡ RESSUSCITADOR DE SALAS: Se o Firebase deletou o jogo, recriamos um lobby vazio imediatamente
+            // Isso previne que os jogadores fiquem numa 'sala fantasma' que não reage a cliques.
+            if (typeof window.pushLobby === 'function') window.pushLobby();
           }
           resetCanastraSfxMemory();
           return;
@@ -5670,20 +6307,20 @@
           document.getElementById('betConfig').style.display = l.betToggle === 'sim' ? 'block' : 'none';
 
           const ready = l.ready || [false, false, false, false];
-          
+
           for (let i = 0; i < 4; i++) {
             const nameInput = document.getElementById(`p${i + 1}Name`);
             const oldCheck = document.getElementById(`ready${i}`);
-            
+
             if (oldCheck) oldCheck.style.display = 'none'; // Esconde o emoji definitivamente
-            
+
             if (nameInput) {
               if (ready[i]) {
                 // Acende o input com a cor verde harmoniosa
-                nameInput.style.backgroundColor = 'rgba(34, 197, 94, 0.15)'; 
-                nameInput.style.borderColor = '#22c55e'; 
-                nameInput.style.color = '#4ade80'; 
-                nameInput.style.boxShadow = 'inset 0 0 15px rgba(34, 197, 94, 0.2)'; 
+                nameInput.style.backgroundColor = 'rgba(34, 197, 94, 0.15)';
+                nameInput.style.borderColor = '#22c55e';
+                nameInput.style.color = '#4ade80';
+                nameInput.style.boxShadow = 'inset 0 0 15px rgba(34, 197, 94, 0.2)';
               } else {
                 // Devolve para a cor padrão do CSS
                 nameInput.style.backgroundColor = '';
@@ -5715,25 +6352,28 @@
           if (readyCount === req) {
             // TRAVA NOVA: Impede de iniciar se faltar a Regra ou o Dinheiro
             if (!currentLobby.variant || !currentLobby.betToggle) {
-               document.getElementById('menuError').textContent = '⚠️ Escolha a Regra e Valendo Dinheiro antes de iniciar!';
-               document.getElementById('menuError').style.display = 'block';
-               return; // Para tudo aqui e não deixa começar
+              document.getElementById('menuError').textContent = '⚠️ Escolha a Regra e Valendo Dinheiro antes de iniciar!';
+              document.getElementById('menuError').style.display = 'block';
+              return; // Para tudo aqui e não deixa começar
             } else {
-               document.getElementById('menuError').style.display = 'none';
+              document.getElementById('menuError').style.display = 'none';
             }
 
             // Verifica se a sala é 100% bot
             let allBots = true;
-            for(let i = 0; i < req; i++) {
-               if (!currentLobby.names[i] || !currentLobby.names[i].toUpperCase().includes('BOT')) {
-                   allBots = false;
-                   break;
-               }
+            for (let i = 0; i < req; i++) {
+              if (!currentLobby.names[i] || !currentLobby.names[i].toUpperCase().includes('BOT')) {
+                allBots = false;
+                break;
+              }
             }
 
             // Trava de segurança: Exige cadeira APENAS se tiver algum humano jogando
             if (!allBots && (myPlayerIndex === -1 || isNaN(myPlayerIndex))) {
-              if (window.startTimer) { clearInterval(window.startTimer); window.startTimer = null; }
+              if (window.startTimer) {
+                clearInterval(window.startTimer);
+                window.startTimer = null;
+              }
               document.getElementById('countdownOverlay').style.display = 'flex';
               document.getElementById('countdownText').textContent = '⚠️';
               document.getElementById('countdownText').nextElementSibling.textContent = 'Selecione quem você é (Sou) para iniciar!';
@@ -5745,23 +6385,23 @@
               document.getElementById('countdownOverlay').style.display = 'flex';
               document.getElementById('countdownText').textContent = timeLeft;
               document.getElementById('countdownText').nextElementSibling.textContent = 'A partida vai começar!';
-              
+
               window.startTimer = setInterval(() => {
                 // 🛡️ TRAVA ANTI-FANTASMA: Se a aba estiver minimizada, pausa a contagem
-                if (document.hidden) return; 
+                if (document.hidden) return;
 
                 timeLeft--;
                 document.getElementById('countdownText').textContent = timeLeft;
                 if (timeLeft <= 0) {
                   clearInterval(window.startTimer);
                   window.startTimer = null;
-                  
-                  let hostIdx = currentLobby.names.findIndex(n => n && !n.toUpperCase().includes('BOT'));
+
+                  let hostIdx = currentLobby.names.findIndex((n) => n && !n.toUpperCase().includes('BOT'));
                   // Se for 100% bot, o observador (-1) vira o Host
-                  if (hostIdx === -1) hostIdx = myPlayerIndex; 
-                  
+                  if (hostIdx === -1) hostIdx = myPlayerIndex;
+
                   if (myPlayerIndex === hostIdx) {
-                     startGame(currentLobby.mode, currentLobby.names, currentLobby.variant, currentLobby.pixKeys);
+                    startGame(currentLobby.mode, currentLobby.names, currentLobby.variant, currentLobby.pixKeys);
                   }
                 }
               }, 1000);
@@ -5783,6 +6423,7 @@
         if (state && !state.finished && newState.finished) playCanastraSfx('fim');
 
         state = newState;
+        window.isClosingGame = false;
         movingWild = null;
         selectedHandIndexes.clear();
 
@@ -5795,52 +6436,56 @@
         renderAll();
         startTurnTimerIfNeeded();
 
-      // 🎲 Anuncia quem venceu no dado assim que a mesa carrega
+        // 🎲 Anuncia quem venceu no dado assim que a mesa carrega
         if (state.turnNumber === 0 && !state.hasDrawnThisTurn && state.diceRolls && !window.diceAnnounced) {
-           window.diceAnnounced = true;
-           const starterName = state.players[state.currentPlayer].name;
-           const maxRoll = Math.max(...state.diceRolls);
-           
-           const pi = document.querySelector('.player-interface');
-           const bm = document.querySelector('.board-middle');
-           if (pi) pi.style.pointerEvents = 'none';
-           if (bm) bm.style.pointerEvents = 'none';
+          window.diceAnnounced = true;
+          const starterName = state.players[state.currentPlayer].name;
+          const maxRoll = Math.max(...state.diceRolls);
+
+          const pi = document.querySelector('.player-interface');
+          const bm = document.querySelector('.board-middle');
+          if (pi) pi.style.pointerEvents = 'none';
+          if (bm) bm.style.pointerEvents = 'none';
 
           // Gera e lança um dado 3D físico para cada jogador na mesa
-           state.players.forEach(p => {
-             const roll = state.diceRolls[p.id];
-             if (!roll) return;
-             
-             // Define a posição de queda na mesa green perto do jogador 
-             const pos = getDiceSpawnPosition(p.id);
-             
-             // Cria o cubo 3D já passando a posição final para a física de arremesso!
-             const diceScene = create3DDiceElement(roll, pos.x, pos.y);
-             
-             document.body.appendChild(diceScene);
-             
-             // Limpa o lixo da memória depois que a animação sumir
-             setTimeout(() => diceScene.remove(), 6000);
-           });
+          state.players.forEach((p) => {
+            const roll = state.diceRolls[p.id];
+            if (!roll) return;
 
-           // Espera a física de impacto e atrito terminar (2.6s) para destravar o jogo
-           setTimeout(() => {
-              showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
-              if (pi) pi.style.pointerEvents = 'auto';
-              if (bm) bm.style.pointerEvents = 'auto';
-              
-              // 🔊 Toca o som e vibra APÓS o dado rolar, mantendo o suspense!
-              if (state.currentPlayer === myPlayerIndex) {
-                 if (navigator.vibrate && audioUnlocked) { try { navigator.vibrate([150, 80, 150]); } catch (e) {} }
-                 if (audioUnlocked) {
-                    try {
-                      sfxMyTurn.pause();
-                      sfxMyTurn.currentTime = 0;
-                      sfxMyTurn.play().catch(() => {});
-                    } catch (e) {}
-                 }
+            // Define a posição de queda na mesa green perto do jogador
+            const pos = getDiceSpawnPosition(p.id);
+
+            // Cria o cubo 3D já passando a posição final para a física de arremesso!
+            const diceScene = create3DDiceElement(roll, pos.x, pos.y);
+
+            document.body.appendChild(diceScene);
+
+            // Limpa o lixo da memória depois que a animação sumir
+            setTimeout(() => diceScene.remove(), 6000);
+          });
+
+          // Espera a física de impacto e atrito terminar (2.6s) para destravar o jogo
+          setTimeout(() => {
+            showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
+            if (pi) pi.style.pointerEvents = 'auto';
+            if (bm) bm.style.pointerEvents = 'auto';
+
+            // 🔊 Toca o som e vibra APÓS o dado rolar, mantendo o suspense!
+            if (state.currentPlayer === myPlayerIndex) {
+              if (navigator.vibrate && audioUnlocked) {
+                try {
+                  navigator.vibrate([150, 80, 150]);
+                } catch (e) {}
               }
-           }, 3700);
+              if (audioUnlocked) {
+                try {
+                  sfxMyTurn.pause();
+                  sfxMyTurn.currentTime = 0;
+                  sfxMyTurn.play().catch(() => {});
+                } catch (e) {}
+              }
+            }
+          }, 3700);
         }
 
         const a = state.lastAction;
@@ -5856,28 +6501,38 @@
         // --- GATILHO DA INTELIGÊNCIA ARTIFICIAL (SINCRONIZADO) ---
         if (!state.finished) {
           const currentPlayerObj = state.players[state.currentPlayer];
-          
+
           if (currentPlayerObj && currentPlayerObj.name.toUpperCase().includes('BOT')) {
-            let hostIdx = state.players.findIndex(p => p && !p.name.toUpperCase().includes('BOT'));
-            if (hostIdx === -1) hostIdx = myPlayerIndex; 
+            let hostIdx = state.players.findIndex((p) => p && !p.name.toUpperCase().includes('BOT'));
+            if (hostIdx === -1) hostIdx = myPlayerIndex;
 
             if (myPlayerIndex === hostIdx) {
               if (window.lastBotTurnPlayed !== state.turnNumber) {
-                
                 // 🛡️ TRAVA DE SINCRONIA: Se for o sorteio inicial (Turno 0), espera o dado parar (4s)
                 // Caso contrário, espera apenas o delay normal de processamento (0.6s)
-                const botDelay = (state.turnNumber === 0) ? 4000 : 600;
+                const botDelay = state.turnNumber === 0 ? 4000 : 600;
+                const scheduledTurn = state.turnNumber;
+                const scheduledPlayerId = currentPlayerObj.id;
 
-                setTimeout(() => {
-                  // Re-checa se ainda é a vez do bot após o tempo de espera
-                  if (!state.finished && state.currentPlayer === currentPlayerObj.id) {
-                    window.lastBotTurnPlayed = state.turnNumber;
-                    BuracoBot.playTurn(state, state.currentPlayer, botEngine)
-                      .catch(err => {
-                        console.error("Erro na Matrix:", err);
-                        window.lastBotTurnPlayed = null; 
-                      });
-                  }
+                if (window.botPlayTimeoutId) {
+                  clearTimeout(window.botPlayTimeoutId);
+                  window.botPlayTimeoutId = null;
+                }
+
+                window.botPlayTimeoutId = setTimeout(() => {
+                  window.botPlayTimeoutId = null;
+
+                  if (window.isClosingGame) return;
+                  if (!state || state.finished) return;
+                  if (document.getElementById('gameSection').style.display !== 'flex') return;
+                  if (state.turnNumber !== scheduledTurn) return;
+                  if (state.currentPlayer !== scheduledPlayerId) return;
+
+                  window.lastBotTurnPlayed = state.turnNumber;
+                  BuracoBot.playTurn(state, state.currentPlayer, botEngine).catch((err) => {
+                    console.error('Erro na Matrix:', err);
+                    window.lastBotTurnPlayed = null;
+                  });
                 }, botDelay);
               }
             }
@@ -5888,7 +6543,7 @@
       window.pushLobby = function () {
         const mode = document.getElementById('modeSelect').value;
         const resetReady = currentLobby && currentLobby.mode !== mode;
-        
+
         const pt1 = document.getElementById('pixTeam1');
         const pt2 = document.getElementById('pixTeam2');
 
@@ -5904,10 +6559,7 @@
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
           names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
-          pixKeys: [
-            pt1.dataset.rawPix || '',
-            pt2.dataset.rawPix || ''
-          ],
+          pixKeys: [pt1.dataset.rawPix || '', pt2.dataset.rawPix || ''],
         };
 
         let readyArray = [false, false, false, false];
@@ -5926,29 +6578,112 @@
             // PONTO 3 RESOLVIDO: Se detectar "BOT", espera 5 segundos para dar tempo de terminar o complemento
             const delay = el.value.toUpperCase().includes('BOT') ? 5000 : 400;
             el.syncTimer = setTimeout(() => {
-                updateMenuDynamic();
-                pushLobby();
+              updateMenuDynamic();
+              pushLobby();
             }, delay);
           });
         }
       });
-      
+
       document.querySelectorAll('#configSection select').forEach((el) => {
         if (el.id !== 'localPlayerSelect') {
           el.addEventListener('change', () => {
-              updateMenuDynamic();
-              pushLobby();
+            updateMenuDynamic();
+            pushLobby();
           });
         }
       });
 
+      const arcadeCarTimers = new WeakMap();
+
+      function getArcadeCarHosts() {
+        return document.querySelectorAll(`
+    body[data-deck-theme="arcade"] .back-red,
+    body[data-deck-theme="arcade"] .back-blue,
+    body[data-deck-theme="arcade"] .fly-card.back:not(.back-blue),
+    body[data-deck-theme="arcade"] .fly-card.back.back-blue,
+    body[data-deck-theme="arcade"] .opponent-card-back:not(.back-blue),
+    body[data-deck-theme="arcade"] .opponent-card-back.back-blue,
+    body[data-deck-theme="arcade"] #mortoSlot0 .morto-card-back,
+    body[data-deck-theme="arcade"] #mortoSlot1 .morto-card-back,
+    body[data-deck-theme="arcade"] .morto-card-back:not(.back-blue),
+    body[data-deck-theme="arcade"] .morto-card-back.back-blue,
+    body[data-deck-theme="arcade"] #drawStockBtn .pile-card:not(.back-blue),
+    body[data-deck-theme="arcade"] #drawStockBtn .pile-card.back-blue,
+    body[data-deck-theme="arcade"] .carta.mini.back:not(.back-blue),
+    body[data-deck-theme="arcade"] .carta.mini.back.back-blue
+  `);
+      }
+
+      function clearArcadeCarTimer(el) {
+        const oldTimer = arcadeCarTimers.get(el);
+        if (oldTimer) {
+          clearTimeout(oldTimer);
+          arcadeCarTimers.delete(el);
+        }
+      }
+
+      function scheduleArcadeCar(el, force = false) {
+        if (!el || !document.contains(el)) return;
+
+        if (!force && arcadeCarTimers.has(el)) return;
+
+        clearArcadeCarTimer(el);
+
+        const run = () => {
+          if (!document.contains(el) || document.body.dataset.deckTheme !== 'arcade') {
+            clearArcadeCarTimer(el);
+            el.classList.remove('arcade-car-run');
+            return;
+          }
+
+          el.classList.remove('arcade-car-run');
+          void el.offsetWidth;
+          el.classList.add('arcade-car-run');
+
+          const waitMs = 8000 + Math.floor(Math.random() * 2001);
+          const totalMs = 1550 + waitMs;
+
+          const timer = setTimeout(run, totalMs);
+          arcadeCarTimers.set(el, timer);
+        };
+
+        const initialWait = 500 + Math.floor(Math.random() * 700);
+        const timer = setTimeout(run, initialWait);
+        arcadeCarTimers.set(el, timer);
+      }
+
+      function refreshArcadeCars(force = false) {
+        if (!document.body || document.body.dataset.deckTheme !== 'arcade') return;
+
+        const hosts = getArcadeCarHosts();
+        if (!hosts || !hosts.length) return;
+
+        hosts.forEach((el) => {
+          if (!el) return;
+          scheduleArcadeCar(el, force);
+        });
+      }
+
+      const MYTHIC_CYCLE_MS = 9500;
+      const mythicPhaseStartedAt = Date.now();
+
+      function syncMythicPhase() {
+        if (!document.body) return;
+
+        const phaseMs = (Date.now() - mythicPhaseStartedAt) % MYTHIC_CYCLE_MS;
+        document.body.style.setProperty('--mythic-delay', `-${phaseMs}ms`);
+      }
+
       // Função que atualiza a quantidade de inputs e os labels do menu
       window.updateMenuDynamic = function () {
         const mode = document.getElementById('modeSelect').value;
-        
+
         // 🎨 ATUALIZA A MINIATURA DO BARALHO NO LOBBY
         const themeSelect = document.getElementById('deckThemeSelect');
         if (themeSelect) document.body.dataset.deckTheme = themeSelect.value || 'classico';
+        refreshArcadeCars(true);
+        syncMythicPhase();
 
         const playersContainer = document.getElementById('playersContainer');
         const humiliationRules = document.getElementById('humiliationRules');
@@ -5979,15 +6714,23 @@
         humiliationRules.style.display = 'none';
 
         // 1. Cores e Estilos dos Times para facilitar a visualização (Identidade visual da mesa)
-        const styleT1 = "position: relative; border-left: 4px solid #22c55e; background: rgba(34, 197, 94, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;";
-        const styleT2 = "position: relative; border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;";
-        const styleNone = "display: none;";
+        const styleT1 = 'position: relative; border-left: 4px solid #22c55e; background: rgba(34, 197, 94, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;';
+        const styleT2 = 'position: relative; border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;';
+        const styleNone = 'display: none;';
 
         // 2. Reseta as opções do "Sou" para o padrão e garante que estão visíveis
-        opt0.hidden = false; opt0.disabled = false; opt0.textContent = 'Jogador 1';
-        opt1.hidden = false; opt1.disabled = false; opt1.textContent = 'Jogador 2';
-        opt2.hidden = false; opt2.disabled = false; opt2.textContent = 'Jogador 3';
-        opt3.hidden = false; opt3.disabled = false; opt3.textContent = 'Jogador 4';
+        opt0.hidden = false;
+        opt0.disabled = false;
+        opt0.textContent = 'Jogador 1';
+        opt1.hidden = false;
+        opt1.disabled = false;
+        opt1.textContent = 'Jogador 2';
+        opt2.hidden = false;
+        opt2.disabled = false;
+        opt2.textContent = 'Jogador 3';
+        opt3.hidden = false;
+        opt3.disabled = false;
+        opt3.textContent = 'Jogador 4';
 
         if (mode === '1x1') {
           p1.style.cssText = styleT1;
@@ -5998,9 +6741,10 @@
           lbl1.innerHTML = 'Jogador 1 <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
           lbl2.innerHTML = 'Jogador 2 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
 
-          opt2.hidden = true; opt2.disabled = true;
-          opt3.hidden = true; opt3.disabled = true;
-          
+          opt2.hidden = true;
+          opt2.disabled = true;
+          opt3.hidden = true;
+          opt3.disabled = true;
         } else if (mode === '2x2') {
           p1.style.cssText = styleT1;
           p2.style.cssText = styleT2;
@@ -6011,7 +6755,6 @@
           lbl2.innerHTML = 'Jogador 2 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
           lbl3.innerHTML = 'Jogador 3 <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
           lbl4.innerHTML = 'Jogador 4 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
-
         } else if (mode === '1x2') {
           p1.style.cssText = styleT1;
           p2.style.cssText = styleT2;
@@ -6021,12 +6764,12 @@
           lbl1.innerHTML = 'Solo <span style="color:#22c55e; font-size:9px;">(Time 1)</span>';
           lbl2.innerHTML = 'Dupla 1 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
           lbl3.innerHTML = 'Dupla 2 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
-          
+
           opt0.textContent = 'Solo';
           opt1.textContent = 'Dupla 1';
           opt2.textContent = 'Dupla 2';
-          opt3.hidden = true; opt3.disabled = true;
-
+          opt3.hidden = true;
+          opt3.disabled = true;
         } else if (mode === '1x3') {
           p1.style.cssText = styleT1;
           p2.style.cssText = styleT2;
@@ -6037,12 +6780,13 @@
           lbl2.innerHTML = 'Trio 1 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
           lbl3.innerHTML = 'Trio 2 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
           lbl4.innerHTML = 'Trio 3 <span style="color:#ef4444; font-size:9px;">(Time 2)</span>';
-          
+
           opt0.textContent = 'Solo';
           opt1.textContent = 'Trio 1';
           opt2.textContent = 'Trio 2';
-          opt3.hidden = false; opt3.disabled = false; opt3.textContent = 'Trio 3';
-
+          opt3.hidden = false;
+          opt3.disabled = false;
+          opt3.textContent = 'Trio 3';
         } else if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
           p1.style.cssText = styleT1;
           p2.style.cssText = styleT2;
@@ -6054,14 +6798,16 @@
 
           opt0.textContent = 'Escravo';
           opt1.textContent = '👑 Dominador';
-          opt2.hidden = true; opt2.disabled = true;
-          opt3.hidden = true; opt3.disabled = true;
-          
+          opt2.hidden = true;
+          opt2.disabled = true;
+          opt3.hidden = true;
+          opt3.disabled = true;
+
           humiliationRules.style.display = 'block';
           const extraRules = document.getElementById('dominacaoExtra');
-          if (extraRules) extraRules.style.display = (mode === '1x1_dominacao') ? 'block' : 'none';
+          if (extraRules) extraRules.style.display = mode === '1x1_dominacao' ? 'block' : 'none';
           const humTitle = document.getElementById('humiliationTitle');
-          if (humTitle) humTitle.textContent = (mode === '1x1_dominacao') ? 'Regras do 1x1 Dominação:' : 'Regras do 1x1 Humilhação:';
+          if (humTitle) humTitle.textContent = mode === '1x1_dominacao' ? 'Regras do 1x1 Dominação:' : 'Regras do 1x1 Humilhação:';
         }
 
         // 3. Se a opção que o usuário já tinha escolhido foi desativada, limpa a seleção
@@ -6073,17 +6819,17 @@
         const pt1 = document.getElementById('pixTeam1');
         const pt2 = document.getElementById('pixTeam2');
         if (mode === '1x1') {
-            pt1.placeholder = 'Chave PIX';
-            pt2.placeholder = 'Chave PIX';
+          pt1.placeholder = 'Chave PIX';
+          pt2.placeholder = 'Chave PIX';
         } else if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') {
-            pt1.placeholder = 'Chave PIX';
-            pt2.placeholder = 'Chave PIX';
+          pt1.placeholder = 'Chave PIX';
+          pt2.placeholder = 'Chave PIX';
         } else if (mode === '1x2') {
-            pt1.placeholder = 'Chave PIX';
-            pt2.placeholder = 'Chave PIX';
+          pt1.placeholder = 'Chave PIX';
+          pt2.placeholder = 'Chave PIX';
         } else {
-            pt1.placeholder = 'Chave PIX';
-            pt2.placeholder = 'Chave PIX';
+          pt1.placeholder = 'Chave PIX';
+          pt2.placeholder = 'Chave PIX';
         }
 
         // -----------------------------------------------------------------
@@ -6095,41 +6841,41 @@
 
         // Sincroniza o Cache Imutável (Dataset) com o Banco de Dados
         if (currentLobby && currentLobby.pixKeys) {
-            pt1.dataset.rawPix = currentLobby.pixKeys[0] || '';
-            pt2.dataset.rawPix = currentLobby.pixKeys[1] || '';
+          pt1.dataset.rawPix = currentLobby.pixKeys[0] || '';
+          pt2.dataset.rawPix = currentLobby.pixKeys[1] || '';
         } else {
-            pt1.dataset.rawPix = pt1.dataset.rawPix || '';
-            pt2.dataset.rawPix = pt2.dataset.rawPix || '';
+          pt1.dataset.rawPix = pt1.dataset.rawPix || '';
+          pt2.dataset.rawPix = pt2.dataset.rawPix || '';
         }
 
         const realPix1 = pt1.dataset.rawPix;
         const realPix2 = pt2.dataset.rawPix;
 
         if (myTeam === 0) {
-            pt1.disabled = false;
-            pt2.disabled = true;
-            if (document.activeElement !== pt1) pt1.value = realPix1;
-            pt2.value = realPix2 ? '•••••••••••••••• (Oculto)' : '';
+          pt1.disabled = false;
+          pt2.disabled = true;
+          if (document.activeElement !== pt1) pt1.value = realPix1;
+          pt2.value = realPix2 ? '•••••••••••••••• (Oculto)' : '';
         } else if (myTeam === 1) {
-            pt1.disabled = true;
-            pt2.disabled = false;
-            pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
-            if (document.activeElement !== pt2) pt2.value = realPix2;
+          pt1.disabled = true;
+          pt2.disabled = false;
+          pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
+          if (document.activeElement !== pt2) pt2.value = realPix2;
         } else {
-            pt1.disabled = true;
-            pt2.disabled = true;
-            pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
-            pt2.value = realPix2 ? '•••••••••••••••• (Oculto)' : '';
+          pt1.disabled = true;
+          pt2.disabled = true;
+          pt1.value = realPix1 ? '•••••••••••••••• (Oculto)' : '';
+          pt2.value = realPix2 ? '•••••••••••••••• (Oculto)' : '';
         }
 
         // Estética Refinada (Identidade de Time sem clashing)
-        const pixBaseStyle = "margin: 0; font-size: 11px; transition: all 0.3s; border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.1);";
-        
+        const pixBaseStyle = 'margin: 0; font-size: 11px; transition: all 0.3s; border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.1);';
+
         // Time 1: Verde sutil apenas na borda de destaque
-        pt1.style.cssText = pixBaseStyle + "border-left: 4px solid #22c55e; background: rgba(34, 197, 94, 0.05); color: #e5e7eb;";
-        
+        pt1.style.cssText = pixBaseStyle + 'border-left: 4px solid #22c55e; background: rgba(34, 197, 94, 0.05); color: #e5e7eb;';
+
         // Time 2: Vermelho sutil apenas na borda de destaque
-        pt2.style.cssText = pixBaseStyle + "border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.05); color: #e5e7eb;";
+        pt2.style.cssText = pixBaseStyle + 'border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.05); color: #e5e7eb;';
 
         // Mantém as travas de opacidade e cursor
         pt1.style.opacity = pt1.disabled ? '0.3' : '1';
@@ -6139,13 +6885,8 @@
         // -----------------------------------------------------------------
 
         // PONTO 4 (Parte A) RESOLVIDO: Verifica se todos os nomes são Bots para sumir com o campo SOU
-        const namesArray = [
-            document.getElementById('p1Name').value,
-            document.getElementById('p2Name').value,
-            document.getElementById('p3Name').value,
-            document.getElementById('p4Name').value
-        ];
-        
+        const namesArray = [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value];
+
         let reqPlayers = 2;
         if (mode === '1x2') reqPlayers = 3;
         if (mode === '2x2' || mode === '1x3') reqPlayers = 4;
@@ -6160,13 +6901,13 @@
 
         const souContainer = document.getElementById('localPlayerSelect').parentElement;
         if (allBots) {
-           souContainer.style.display = 'none'; // Some com a opção
-           document.getElementById('localPlayerSelect').value = ""; // Vira espectador
-           myPlayerIndex = -1;
+          souContainer.style.display = 'none'; // Some com a opção
+          document.getElementById('localPlayerSelect').value = ''; // Vira espectador
+          myPlayerIndex = -1;
         } else {
-           souContainer.style.display = 'flex'; // Volta se tiver humano
+          souContainer.style.display = 'flex'; // Volta se tiver humano
         }
-        };
+      };
 
       // ==========================================
       // MOTOR DE DEBUG / DEVTOOLS
@@ -6216,7 +6957,7 @@
 
         // Dispara a recompensa no debug se for o J2 no modo Dominação
         if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && type === 'asas') {
-            triggerDominacaoReward(currentPlayer());
+          triggerDominacaoReward(currentPlayer());
         }
 
         renderAll();
@@ -6227,7 +6968,7 @@
         if (!ensureMyTurn()) return;
         const me = currentPlayer();
         const teamId = me.teamId;
-        
+
         // Trava para respeitar as regras do jogo fora do debug
         const taken = state.deadChunksTaken?.[teamId] ?? 0;
         const max = state.deadChunksMax?.[teamId] ?? 1;
@@ -6237,7 +6978,7 @@
         }
 
         // Esvazia a mão e deixa 1 carta. Marca que já comprou pra liberar o descarte.
-        me.hand = [ { rank: '4', suit: '♣', joker: false, id: `db_${Date.now()}`, back: 'red' } ];
+        me.hand = [{ rank: '4', suit: '♣', joker: false, id: `db_${Date.now()}`, back: 'red' }];
         state.hasDrawnThisTurn = true;
         renderAll();
         await commitState();
@@ -6319,53 +7060,69 @@
 
         errorDiv.style.display = 'none'; // Passou na validação completa
 
-       // Motor Rigoroso de Validação de PIX (Respostas Diretas)
+        // Motor Rigoroso de Validação de PIX (Respostas Diretas)
         const validatePixDetailed = (chave) => {
           if (!chave) return { valid: false, msg: 'Chave vazia.' };
           chave = chave.trim();
-          
+
           if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chave)) return { valid: true };
           if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chave)) return { valid: true };
-          
+
           const hasPhoneChars = chave.includes('+') || chave.includes('(') || chave.includes(')');
           const hasDocChars = chave.includes('.') || chave.includes('-') || chave.includes('/');
           const num = chave.replace(/\D/g, '');
-          
+
           if (hasPhoneChars) {
-             if (num.length >= 10 && num.length <= 14) return { valid: true };
-             return { valid: false, msg: `Telefone inválido (contém ${num.length} números, exige de 10 a 14).` };
+            if (num.length >= 10 && num.length <= 14) return { valid: true };
+            return { valid: false, msg: `Telefone inválido (contém ${num.length} números, exige de 10 a 14).` };
           }
 
           const isCPF = (cpf) => {
             if (/^(\d)\1+$/.test(cpf)) return false;
-            let sum = 0, rem;
+            let sum = 0,
+              rem;
             for (let i = 1; i <= 9; i++) sum += parseInt(cpf.substring(i - 1, i)) * (11 - i);
-            rem = (sum * 10) % 11; if (rem === 10 || rem === 11) rem = 0;
+            rem = (sum * 10) % 11;
+            if (rem === 10 || rem === 11) rem = 0;
             if (rem !== parseInt(cpf.substring(9, 10))) return false;
             sum = 0;
             for (let i = 1; i <= 10; i++) sum += parseInt(cpf.substring(i - 1, i)) * (12 - i);
-            rem = (sum * 10) % 11; if (rem === 10 || rem === 11) rem = 0;
+            rem = (sum * 10) % 11;
+            if (rem === 10 || rem === 11) rem = 0;
             if (rem !== parseInt(cpf.substring(10, 11))) return false;
             return true;
           };
 
           const isCNPJ = (cnpj) => {
             if (/^(\d)\1+$/.test(cnpj)) return false;
-            let size = cnpj.length - 2, numbers = cnpj.substring(0, size), digits = cnpj.substring(size), sum = 0, pos = size - 7;
-            for (let i = size; i >= 1; i--) { sum += numbers.charAt(size - i) * pos--; if (pos < 2) pos = 9; }
-            let result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+            let size = cnpj.length - 2,
+              numbers = cnpj.substring(0, size),
+              digits = cnpj.substring(size),
+              sum = 0,
+              pos = size - 7;
+            for (let i = size; i >= 1; i--) {
+              sum += numbers.charAt(size - i) * pos--;
+              if (pos < 2) pos = 9;
+            }
+            let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
             if (result !== parseInt(digits.charAt(0))) return false;
-            size = size + 1; numbers = cnpj.substring(0, size); sum = 0; pos = size - 7;
-            for (let i = size; i >= 1; i--) { sum += numbers.charAt(size - i) * pos--; if (pos < 2) pos = 9; }
-            result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+            size = size + 1;
+            numbers = cnpj.substring(0, size);
+            sum = 0;
+            pos = size - 7;
+            for (let i = size; i >= 1; i--) {
+              sum += numbers.charAt(size - i) * pos--;
+              if (pos < 2) pos = 9;
+            }
+            result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
             if (result !== parseInt(digits.charAt(1))) return false;
             return true;
           };
 
           if (hasDocChars) {
-             if (num.length === 11) return isCPF(num) ? { valid: true } : { valid: false, msg: 'CPF inválido.' };
-             if (num.length === 14) return isCNPJ(num) ? { valid: true } : { valid: false, msg: 'CNPJ inválido.' };
-             return { valid: false, msg: `Documento incompleto (CPF=11, CNPJ=14, digitado=${num.length}).` };
+            if (num.length === 11) return isCPF(num) ? { valid: true } : { valid: false, msg: 'CPF inválido.' };
+            if (num.length === 14) return isCNPJ(num) ? { valid: true } : { valid: false, msg: 'CNPJ inválido.' };
+            return { valid: false, msg: `Documento incompleto (CPF=11, CNPJ=14, digitado=${num.length}).` };
           }
 
           if (num.length === 11) return isCPF(num) ? { valid: true } : { valid: false, msg: 'CPF inválido.' };
@@ -6376,38 +7133,38 @@
 
         // 🛡️ TRAVA FRONTEND: Executa a validação e bloqueia a tela se for inválido
         if (betToggle === 'sim') {
-           const p1PixCheck = document.getElementById('pixTeam1').disabled && currentLobby ? currentLobby.pixKeys[0] : document.getElementById('pixTeam1').value.trim();
-           const p2PixCheck = document.getElementById('pixTeam2').disabled && currentLobby ? currentLobby.pixKeys[1] : document.getElementById('pixTeam2').value.trim();
-           
-           const t1IsBot = mode === '2x2' ? (namesArray[0].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT')) : namesArray[0].toUpperCase().includes('BOT');
-           
-           let t2IsBot = false;
-           if (mode.startsWith('1x1')) t2IsBot = namesArray[1].toUpperCase().includes('BOT');
-           else if (mode === '1x2') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT');
-           else if (mode === '2x2') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[3].toUpperCase().includes('BOT');
-           else if (mode === '1x3') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT') && namesArray[3].toUpperCase().includes('BOT');
+          const p1PixCheck = document.getElementById('pixTeam1').disabled && currentLobby ? currentLobby.pixKeys[0] : document.getElementById('pixTeam1').value.trim();
+          const p2PixCheck = document.getElementById('pixTeam2').disabled && currentLobby ? currentLobby.pixKeys[1] : document.getElementById('pixTeam2').value.trim();
 
-           if (!t1IsBot) {
-              const res1 = validatePixDetailed(p1PixCheck);
-              if (!res1.valid) {
-                 errorDiv.innerHTML = `❌ <strong>PIX Time 1:</strong> ${res1.msg}`;
-                 errorDiv.style.display = 'block';
-                 return;
-              }
-           }
-           if (!t2IsBot) {
-              const res2 = validatePixDetailed(p2PixCheck);
-              if (!res2.valid) {
-                 errorDiv.innerHTML = `❌ <strong>PIX Time 2:</strong> ${res2.msg}`;
-                 errorDiv.style.display = 'block';
-                 return;
-              }
-           }
+          const t1IsBot = mode === '2x2' ? namesArray[0].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT') : namesArray[0].toUpperCase().includes('BOT');
+
+          let t2IsBot = false;
+          if (mode.startsWith('1x1')) t2IsBot = namesArray[1].toUpperCase().includes('BOT');
+          else if (mode === '1x2') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT');
+          else if (mode === '2x2') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[3].toUpperCase().includes('BOT');
+          else if (mode === '1x3') t2IsBot = namesArray[1].toUpperCase().includes('BOT') && namesArray[2].toUpperCase().includes('BOT') && namesArray[3].toUpperCase().includes('BOT');
+
+          if (!t1IsBot) {
+            const res1 = validatePixDetailed(p1PixCheck);
+            if (!res1.valid) {
+              errorDiv.innerHTML = `❌ <strong>PIX Time 1:</strong> ${res1.msg}`;
+              errorDiv.style.display = 'block';
+              return;
+            }
+          }
+          if (!t2IsBot) {
+            const res2 = validatePixDetailed(p2PixCheck);
+            if (!res2.valid) {
+              errorDiv.innerHTML = `❌ <strong>PIX Time 2:</strong> ${res2.msg}`;
+              errorDiv.style.display = 'block';
+              return;
+            }
+          }
         }
 
         const l = currentLobby || {};
         const readyArray = l.ready ? [...l.ready] : [false, false, false, false];
-        
+
         // Evita que o Espectador (-1) tente dar ready e quebre o array do Firebase
         if (myPlayerIndex !== -1 && !isNaN(myPlayerIndex)) {
           readyArray[myPlayerIndex] = !readyArray[myPlayerIndex];
@@ -6421,18 +7178,18 @@
         }
 
         const fullLobby = {
-            mode: mode,
-            variant: variant,
-            betToggle: betToggle,
-            betBase: document.getElementById('betBase').value,
-            betPerPoint: document.getElementById('betPerPoint').value,
-            names: [p1, p2, p3, p4],
-            pixKeys: [
-              document.getElementById('pixTeam1').disabled ? (document.getElementById('pixTeam1').dataset.rawPix || '') : document.getElementById('pixTeam1').value.trim(),
-              document.getElementById('pixTeam2').disabled ? (document.getElementById('pixTeam2').dataset.rawPix || '') : document.getElementById('pixTeam2').value.trim()
-            ],
-            ready: readyArray,
-          };
+          mode: mode,
+          variant: variant,
+          betToggle: betToggle,
+          betBase: document.getElementById('betBase').value,
+          betPerPoint: document.getElementById('betPerPoint').value,
+          names: [p1, p2, p3, p4],
+          pixKeys: [
+            document.getElementById('pixTeam1').disabled ? document.getElementById('pixTeam1').dataset.rawPix || '' : document.getElementById('pixTeam1').value.trim(),
+            document.getElementById('pixTeam2').disabled ? document.getElementById('pixTeam2').dataset.rawPix || '' : document.getElementById('pixTeam2').value.trim(),
+          ],
+          ready: readyArray,
+        };
 
         setDoc(gameRef, { lobby: fullLobby, updatedAt: Date.now() }, { merge: true });
       };
@@ -6476,20 +7233,20 @@
 
       document.getElementById('localPlayerSelect').onchange = (e) => {
         myPlayerIndex = parseInt(e.target.value);
-        if (isNaN(myPlayerIndex)) myPlayerIndex = -1; 
-        
-        // 🛡️ TRAVA DE AMNÉSIA ABSOLUTA (URL + LocalStorage)
-              const url = new URL(window.location);
-              if (myPlayerIndex === -1) {
-                url.searchParams.delete('player');
-                localStorage.removeItem(`buraco_seat_${gameId}`);
-              } else {
-                url.searchParams.set('player', myPlayerIndex);
-                localStorage.setItem(`buraco_seat_${gameId}`, myPlayerIndex);
-              }
-              window.history.replaceState({}, '', url);
+        if (isNaN(myPlayerIndex)) myPlayerIndex = -1;
 
-        window.updateMenuDynamic(); 
+        // 🛡️ TRAVA DE AMNÉSIA ABSOLUTA (URL + LocalStorage)
+        const url = new URL(window.location);
+        if (myPlayerIndex === -1) {
+          url.searchParams.delete('player');
+          localStorage.removeItem(`buraco_seat_${gameId}`);
+        } else {
+          url.searchParams.set('player', myPlayerIndex);
+          localStorage.setItem(`buraco_seat_${gameId}`, myPlayerIndex);
+        }
+        window.history.replaceState({}, '', url);
+
+        window.updateMenuDynamic();
         if (state) renderAll();
       };
       document.getElementById('drawStockBtn').onclick = drawFromStock;
@@ -6497,55 +7254,65 @@
       document.getElementById('meldBtn').onclick = makeMeldFromSelection;
       document.getElementById('moveWildBtn').onclick = movePickedWildToSelectedMeld;
       document.getElementById('takeDeadBtn').onclick = takeDead;
-     // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
+      // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
       document.getElementById('endGameBtn').onclick = async () => {
         if (!state) return;
-        
+
+        window.isClosingGame = true;
+        stopTurnTimer();
+        if (window.botPlayTimeoutId) {
+          clearTimeout(window.botPlayTimeoutId);
+          window.botPlayTimeoutId = null;
+        }
+        window.lastBotTurnPlayed = null;
+
         // ZERA a votação completamente para não herdar fantasmas de votações antigas
         state.surrender = { active: true, votes: {} };
         state.surrender.votes[myPlayerIndex] = true;
 
-        state.players.forEach(p => {
+        state.players.forEach((p) => {
           if (p.name.toUpperCase().includes('BOT')) state.surrender.votes[p.id] = true;
         });
 
         // Se for jogo Solo ou só com bots, não precisa de aprovação, destrói direto
-        let yesCount = Object.values(state.surrender.votes).filter(v => v).length;
+        let yesCount = Object.values(state.surrender.votes).filter((v) => v).length;
         if (yesCount >= state.players.length && state.players.length > 0) {
-           await deleteDoc(gameRef);
-           return;
+          await deleteDoc(gameRef);
+          return;
         }
 
-        await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
+        await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
       };
 
       document.getElementById('voteYesBtn').onclick = async () => {
         if (!state || !state.surrender) return;
         state.surrender.votes[myPlayerIndex] = true;
 
-        state.players.forEach(p => {
+        state.players.forEach((p) => {
           if (p.name.toUpperCase().includes('BOT')) state.surrender.votes[p.id] = true;
         });
 
-        let yesCount = Object.values(state.surrender.votes).filter(v => v).length;
+        let yesCount = Object.values(state.surrender.votes).filter((v) => v).length;
         if (yesCount >= state.players.length && state.players.length > 0) {
-           await deleteDoc(gameRef); // Quem deu o último sim destrói a sala instantaneamente
-           return;
+          await deleteDoc(gameRef); // Quem deu o último sim destrói a sala instantaneamente
+          return;
         }
 
-        await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
+        await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
       };
 
       document.getElementById('voteNoBtn').onclick = async () => {
         if (!state || !state.surrender) return;
-        state.surrender.active = false; 
+        window.isClosingGame = false;
+        state.surrender.active = false;
         state.surrender.votes = {};
-        await updateDoc(gameRef, { 'stateJson': JSON.stringify(state), updatedAt: Date.now() });
+        await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
       };
 
       function renderSurrender() {
         const section = document.getElementById('surrenderSection');
         if (!state || !state.surrender || !state.surrender.active) {
+          window.isClosingGame = false;
           section.style.display = 'none';
           return;
         }
@@ -6554,12 +7321,10 @@
         const list = document.getElementById('surrenderVotesList');
         list.innerHTML = '';
 
-        state.players.forEach(p => {
+        state.players.forEach((p) => {
           const votedYes = state.surrender.votes[p.id] === true;
-          const statusHtml = votedYes 
-            ? '<span style="color: #4ade80; font-weight: bold;">✅ Sim</span>' 
-            : '<span style="color: #9ca3af; font-style: italic;">⏳ Aguardando...</span>';
-          
+          const statusHtml = votedYes ? '<span style="color: #4ade80; font-weight: bold;">✅ Sim</span>' : '<span style="color: #9ca3af; font-style: italic;">⏳ Aguardando...</span>';
+
           list.innerHTML += `
             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid #334155;">
               <span style="color: #f8fafc; font-weight: 900; font-size: 14px;">${p.name}</span>
@@ -6579,12 +7344,11 @@
       // Ação do botão de convite
       // Ação do botão de convite
       document.getElementById('inviteBtn').onclick = async () => {
-        
         // 🛡️ TRAVA ANTI-CLONE: Limpa a sua cadeira do link para o convidado não nascer no seu corpo
         const urlObj = new URL(window.location.href);
         urlObj.searchParams.delete('player');
         const inviteUrl = urlObj.toString();
-        
+
         const btn = document.getElementById('inviteBtn');
         const originalText = btn.innerHTML;
 
