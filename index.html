@@ -2282,6 +2282,78 @@
       .face-6 .pip-6 {
         grid-area: 3 / 3;
       }
+
+      /* ================= HUD DE METAS FIXO NA MESA ================= */
+      .goals-hud-container {
+        margin-top: 10px;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px dashed #eab308;
+        border-radius: 10px;
+        padding: 8px;
+        width: 280px; /* Aumentado para caber as explicações */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        display: none;
+      }
+      .goals-hud-title {
+        color: #facc15;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        border-bottom: 1px solid rgba(250, 204, 21, 0.2);
+        padding-bottom: 4px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .goal-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 6px;
+        border-radius: 4px;
+        color: #94a3b8;
+        font-size: 11px;
+        margin-bottom: 2px;
+        transition: all 0.3s;
+      }
+      .goal-item.achieved {
+        background: rgba(16, 185, 129, 0.15);
+        color: #4ade80;
+      }
+      .goal-item strong {
+        color: #f8fafc;
+        font-size: 11px;
+        font-weight: 900;
+      }
+      .goal-item.achieved strong {
+        color: #4ade80;
+      }
+
+      /* Ajuste Mobile: Encolhe o HUD para não tapar o jogo */
+      @media (max-width: 768px), (max-height: 600px) {
+        .goals-hud-container {
+          width: 180px;
+          padding: 5px;
+        }
+        .goal-item {
+          font-size: 9px;
+          padding: 2px 4px;
+        }
+        .goal-item strong {
+          font-size: 9px;
+        }
+      }
+
+      /* ================= FÍSICA 3D: SEPARAÇÃO DE CARTAS ================= */
+      /* Limpa as imagens complexas das camadas inferiores do monte para não virar um tijolo */
+      .visual-layer.sub-layer {
+        background-image: none !important;
+      }
+      .visual-layer.sub-layer::after,
+      .visual-layer.sub-layer::before {
+        display: none !important;
+        animation: none !important;
+      }
     </style>
   </head>
   <body data-deck-theme="classico">
@@ -2423,14 +2495,29 @@
             </label>
 
             <div id="betConfig" style="display: none; background: rgba(0, 0, 0, 0.4); border: 1px dashed rgba(212, 175, 55, 0.3); padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; text-align: center; line-height: 1.5">
-              <strong style="color: #facc15; font-size: 11px; text-transform: uppercase; letter-spacing: 1px">💰 VALORES OFICIAIS DA MESA</strong>
-              <br />
-              <span style="color: #94a3b8; font-size: 10px">
-                Vitória:
-                <strong>R$ 5,00</strong>
-                | Diferença:
-                <strong>R$ 0,01 / pt</strong>
-              </span>
+              <strong style="color: #facc15; font-size: 11px; text-transform: uppercase; letter-spacing: 1px">💰 REGRAS DE PAGAMENTO (PIX)</strong>
+
+              <div style="text-align: left; margin-top: 8px; font-size: 10px; color: #cbd5e1; background: rgba(0, 0, 0, 0.4); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05)">
+                ✅
+                <strong>Vitória:</strong>
+                R$ 5,00
+                <br />
+                📈
+                <strong>Diferença:</strong>
+                R$ 0,01 por ponto
+                <br />
+                ☠️
+                <strong>Adv. Zerado/Negativo:</strong>
+                +R$ 5,00
+                <br />
+                ⭐
+                <strong>Bônus Ás-a-Ás:</strong>
+                1º(+R$3) | 2º(+R$4) | 3º(+R$5) | 4º(+R$15)
+                <br />
+                🔥
+                <strong>Metas Vantagem:</strong>
+                +R$ 2,00 a cada 1000 pts
+              </div>
 
               <input id="betBase" type="hidden" value="5" />
               <input id="betPerPoint" type="hidden" value="0.01" />
@@ -2583,6 +2670,14 @@
               </span>
               <span id="turnTimerLabel" style="margin-left: 5px; font-size: 11px; color: #facc15"></span>
               <div id="gameModeBadge" style="margin-top: 5px; font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; padding-left: 4px"></div>
+
+              <div id="goalsHud" class="goals-hud-container">
+                <div class="goals-hud-title">
+                  <span>🎯 METAS PIX</span>
+                  <span id="goalsTotalHud" style="color: #4ade80">R$ 0,00</span>
+                </div>
+                <div id="goalsListHud"></div>
+              </div>
             </div>
 
             <div class="morto-area">
@@ -2691,6 +2786,19 @@
           <button id="voteYesBtn" style="background: #22c55e">Votar SIM</button>
           <button id="voteNoBtn" style="background: #ef4444">Votar NÃO</button>
         </div>
+      </div>
+    </div>
+
+    <div id="goalsModal">
+      <div class="goals-box">
+        <h2>🎯 Metas PIX (Seu Time)</h2>
+        <div id="goalsList" style="display: flex; flex-direction: column; margin-bottom: 20px"></div>
+        <div style="text-align: center; font-size: 28px; font-weight: 900; color: #4ade80; margin-bottom: 24px" id="goalsTotal">R$ 0,00</div>
+        <button
+          onclick="document.getElementById('goalsModal').style.display = 'none'"
+          style="width: 100%; background: #334155; padding: 16px; border-radius: 8px; color: #fff; font-size: 15px; font-weight: 900; border: none; cursor: pointer; text-transform: uppercase; transition: background 0.3s">
+          FECHAR
+        </button>
       </div>
     </div>
 
@@ -5284,6 +5392,7 @@
         syncMythicPhase();
 
         // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
+        // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
         if (state.isBetting) {
           document.body.classList.add('is-betting');
         } else {
@@ -5336,37 +5445,53 @@
           if (layers < 1) layers = 1;
           if (layers > 16) layers = 16;
 
-          const wantedClass = backColor === 'blue' ? 'back-blue' : backColor === 'red' ? 'back-red' : 'visual-discard-layer';
+          const topClass = backColor === 'blue' ? 'back-blue' : backColor === 'red' ? 'back-red' : 'visual-discard-layer';
 
           for (let i = 0; i < layers; i++) {
             if (isDiscard && i === layers - 1) continue;
 
             const layer = document.createElement('div');
-            layer.className = `${baseCardClass} visual-layer ${wantedClass}`;
-            if (keepArcade && i === layers - 1) layer.classList.add('arcade-car-run');
+            const isTopLayer = i === layers - 1;
+
+            // Intercala as cores herdando perfeitamente as classes do Tema
+            let currentClass = topClass;
+            if (!isDiscard) {
+              const isBlueTop = topClass === 'back-blue';
+              currentClass = (layers - 1 - i) % 2 === 0 ? topClass : isBlueTop ? 'back-red' : 'back-blue';
+            }
+
+            layer.className = `${baseCardClass} visual-layer ${currentClass}`;
+            if (!isTopLayer && !isDiscard) {
+              layer.classList.add('sub-layer'); // Aciona o CSS que apaga os ícones de dentro
+            }
+            if (keepArcade && isTopLayer) layer.classList.add('arcade-car-run');
 
             layer.style.position = 'absolute';
             layer.style.width = '100%';
             layer.style.height = '100%';
+            layer.style.borderRadius = '6px';
 
             layer.style.bottom = `${i * 1.2}px`;
             layer.style.right = `${i * 0.3}px`;
             layer.style.zIndex = i;
             layer.style.margin = '0';
 
-            // 🛑 MATA O BURACO NEGRO: Só a base projeta sombra
-            if (i > 0) {
-              layer.style.setProperty('box-shadow', 'none', 'important');
-            } else {
-              layer.style.setProperty('box-shadow', '0 6px 12px rgba(0,0,0,0.7)', 'important');
+            // CORREÇÃO: Não injeta box-shadow na carta do topo para não esmagar o CSS do Tema Minimalista
+            if (!isTopLayer || isDiscard) {
+              if (i === 0) {
+                layer.style.setProperty('box-shadow', '0 6px 12px rgba(0,0,0,0.8)', 'important');
+              } else {
+                layer.style.setProperty('box-shadow', '-0.5px 1px 1px rgba(0,0,0,0.7), inset 0 0 2px rgba(0,0,0,0.5)', 'important');
+              }
             }
 
             if (isDiscard) {
               layer.style.background = '#f3f4f6';
               layer.style.border = '1px solid #d1d5db';
               layer.style.filter = `brightness(${0.6 + (i / layers) * 0.4})`;
-            } else {
-              if (i < layers - 1) layer.style.filter = `brightness(${0.4 + (i / layers) * 0.4})`;
+            } else if (!isTopLayer) {
+              // Escurece gradativamente para dar noção de profundidade na pilha
+              layer.style.filter = `brightness(${0.4 + (i / layers) * 0.5})`;
             }
 
             container.appendChild(layer);
@@ -6011,37 +6136,102 @@
         triggerScoreAnim(1, window.lastScores[1], s2);
 
         if (state.isBetting) {
-          const base = state.betBase ?? 5;
-          const perPoint = state.betPerPoint ?? 0.01;
-          const diff = Math.abs(s1 - s2);
-          const val = base + diff * perPoint;
-          const moneyStr = '💰 LUCRO: R$ ' + val.toFixed(2).replace('.', ',');
+          // Função universal de cálculo financeiro
+          window.calculatePixFin = (myScore, opScore, myMelds) => {
+            let asasCount = 0;
+            myMelds.forEach((m) => {
+              if (classifyMeldForUi(m).kind === 'asas') asasCount++;
+            });
 
-          const badge1 = document.getElementById('liveMoney1');
-          const badge2 = document.getElementById('liveMoney2');
+            const diff = Math.max(0, myScore - opScore);
+            let total = 0;
+            let b = { base: 0, diff: 0, asas: 0, milestone: 0, negative: 0, countAsas: asasCount, milestonesAchieved: 0 };
 
-          if (s1 > s2) {
-            if (badge1.textContent !== moneyStr) {
-              badge1.textContent = moneyStr;
-              badge1.classList.remove('money-update-anim');
-              void badge1.offsetWidth;
-              badge1.classList.add('money-update-anim');
+            if (myScore > opScore) {
+              total += 5.0;
+              b.base = 5.0;
+              total += diff * 0.01;
+              b.diff = diff * 0.01;
+              if (opScore <= 0) {
+                total += 5.0;
+                b.negative = 5.0;
+              }
+
+              // ATUALIZADO: Vantagem a cada 1000 pontos
+              b.milestonesAchieved = Math.floor(diff / 1000);
+              b.milestone = b.milestonesAchieved * 2.0;
+              total += b.milestone;
             }
-            badge1.style.display = 'block';
-            if (badge2) badge2.style.display = 'none';
-          } else if (s2 > s1) {
-            if (badge2.textContent !== moneyStr) {
-              badge2.textContent = moneyStr;
-              badge2.classList.remove('money-update-anim');
-              void badge2.offsetWidth;
-              badge2.classList.add('money-update-anim');
+
+            // ATUALIZADO: 4ª canastra soma 15, chegando a 27 no total
+            const asasRewards = [0, 3, 7, 12, 27];
+            b.asas = asasRewards[Math.min(asasCount, 4)] || 0;
+            total += b.asas;
+
+            return { total, diff, b };
+          };
+
+          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds);
+          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds);
+
+          const updateBadge = (badge, fin) => {
+            if (!badge) return;
+            if (fin.total > 0) {
+              const moneyStr = '💰 R$ ' + fin.total.toFixed(2).replace('.', ',');
+              if (badge.textContent !== moneyStr) {
+                badge.textContent = moneyStr;
+                badge.classList.remove('money-update-anim');
+                void badge.offsetWidth;
+                badge.classList.add('money-update-anim');
+              }
+              badge.style.display = 'block';
+            } else {
+              badge.style.display = 'none';
             }
-            badge2.style.display = 'block';
-            if (badge1) badge1.style.display = 'none';
-          } else {
-            if (badge1) badge1.style.display = 'none';
-            if (badge2) badge2.style.display = 'none';
+          };
+
+          updateBadge(document.getElementById('liveMoney1'), fin1);
+          updateBadge(document.getElementById('liveMoney2'), fin2);
+
+          // 🎨 PINTANDO A CHECKLIST DE METAS (COM HTML CORRIGIDO)
+          const myTeamId = state.players[myPlayerIndex]?.teamId;
+          const hud = document.getElementById('goalsHud');
+
+          if (myTeamId != null && hud) {
+            const myFin = myTeamId === 0 ? fin1 : fin2;
+            const isWin = (myTeamId === 0 ? s1 : s2) > (myTeamId === 0 ? s2 : s1);
+
+            hud.style.display = !state.finished && myPlayerIndex !== -1 ? 'block' : 'none';
+            document.getElementById('goalsTotalHud').textContent = 'R$ ' + myFin.total.toFixed(2).replace('.', ',');
+
+            const list = document.getElementById('goalsListHud');
+            // ATUALIZADO: Legenda do HUD para 1000 pts
+            list.innerHTML = `
+                    <div class="goal-item ${isWin ? 'achieved' : ''}">
+                        <span>✅ Vitória Base</span> 
+                        <strong>+R$ ${isWin ? '5,00' : '0,00'}</strong>
+                    </div>
+                    <div class="goal-item ${myFin.b.diff > 0 ? 'achieved' : ''}">
+                        <span>📈 Diferença (R$ 0,01/pt)</span> 
+                        <strong>+R$ ${myFin.b.diff.toFixed(2).replace('.', ',')}</strong>
+                    </div>
+                    <div class="goal-item ${myFin.b.negative > 0 ? 'achieved' : ''}">
+                        <span>☠️ Adv. Zerado/Negativo</span> 
+                        <strong>+R$ ${myFin.b.negative > 0 ? '5,00' : '0,00'}</strong>
+                    </div>
+                    <div class="goal-item ${myFin.b.countAsas > 0 ? 'achieved' : ''}">
+                        <span>⭐ Bônus Ás-a-Ás (${myFin.b.countAsas}/4)</span> 
+                        <strong>+R$ ${myFin.b.asas.toFixed(2).replace('.', ',')}</strong>
+                    </div>
+                    <div class="goal-item ${myFin.b.milestonesAchieved > 0 ? 'achieved' : ''}">
+                        <span>🔥 Metas Vantagem (1000 pts)</span> 
+                        <strong>+R$ ${myFin.b.milestone.toFixed(2).replace('.', ',')}</strong>
+                    </div>
+                `;
           }
+        } else {
+          const hud = document.getElementById('goalsHud');
+          if (hud) hud.style.display = 'none';
         }
 
         window.lastScores[0] = s1;
@@ -6079,8 +6269,6 @@
 
         scores.sort((a, b) => b.score - a.score);
 
-        // A MÁGICA AQUI: O vencedor financeiro é SEMPRE o time com mais pontos (índice 0),
-        // mesmo se a partida acabar por exaustão (sem ninguém bater oficialmente).
         const financialWinnerTeam = scores[0].team || {};
         const winnerPix = financialWinnerTeam.pix || '';
 
@@ -6091,13 +6279,14 @@
 
           let financialHtml = '';
           if (state.isBetting) {
-            const highestScore = scores[0].score;
-            const lowestScore = scores[scores.length - 1].score;
-            const diff = Math.max(0, highestScore - lowestScore);
-            const totalMoney = state.betBase + diff * state.betPerPoint;
+            const winnerData = scores[0];
+            const loserData = scores[1];
+            const winnerFin = window.calculatePixFin(winnerData.score, loserData.score, winnerData.team.melds);
+
+            const totalMoney = winnerFin.total;
             const moneyStr = totalMoney.toFixed(2).replace('.', ',');
 
-            if (highestScore === lowestScore) {
+            if (winnerData.score === loserData.score) {
               financialHtml = `
                 <div style="margin-top: 15px; padding: 10px; background: rgba(100, 116, 139, 0.2); border: 1px solid #94a3b8; border-radius: 8px;">
                   <span style="color: #cbd5e1; font-weight: 900; font-size: 16px;">EMPATE: Ninguém paga</span>
@@ -6110,23 +6299,17 @@
                 </div>
               `;
             } else {
-              // Tela de quem perdeu (A Fatura)
               let pixHtml = '';
               if (winnerPix) {
-                // Gera o Payload Oficial e puxa a imagem da API
                 const pixBRCode = generatePixPayload(winnerPix, totalMoney);
                 const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(pixBRCode)}`;
-
                 const zapText = encodeURIComponent(`Fatura do Buraco Findom! 👑 Você perdeu e me deve R$ ${moneyStr}. Faz o PIX aí na chave: ${winnerPix}`);
 
                 pixHtml = `
                   <div style="margin-top: 10px; padding: 15px 10px 10px 10px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid #334155; display: flex; flex-direction: column; align-items: center;">
-                    
                     <img src="${qrCodeUrl}" style="border-radius: 8px; border: 4px solid #fff; margin-bottom: 12px; width: 140px; height: 140px; box-shadow: 0 4px 10px rgba(0,0,0,0.8);" alt="QR Code PIX">
-                    
                     <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Ou copie a Chave PIX:</div>
                     <div style="color: #facc15; font-weight: 900; font-size: 14px; letter-spacing: 1px; user-select: all; cursor: copy; margin-bottom: 15px; padding: 4px 8px; background: rgba(250, 204, 21, 0.1); border: 1px dashed #facc15; border-radius: 4px;" title="Selecionar para copiar">${winnerPix}</div>
-                    
                     <a href="https://wa.me/?text=${zapText}" target="_blank" style="width: 100%; text-align: center; display: block; background: #25D366; color: #fff; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: 900; font-size: 12px; text-transform: uppercase; transition: 0.3s; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
                       📲 Cobrar pelo WhatsApp
                     </a>
@@ -6136,7 +6319,6 @@
                 pixHtml = `<div style="margin-top: 10px; font-size: 10px; color: #9ca3af; font-style: italic;">O vencedor não cadastrou chave PIX. Calote liberado?</div>`;
               }
 
-              // Define o título da fatura dinamicamente com base em quem perdeu
               let titleFatura = 'FATURA';
               if (s.team.name === 'Escravo') titleFatura = 'FATURA DO ESCRAVO';
               else if (s.team.name.includes('Dominador')) titleFatura = 'FATURA DO DOMINADOR';
