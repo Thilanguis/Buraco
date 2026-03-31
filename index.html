@@ -408,7 +408,8 @@
         display: flex;
         flex-direction: column;
         position: relative;
-        overflow: hidden;
+        overflow-y: auto; /* A MESA INTEIRA ROLA AQUI */
+        overflow-x: hidden;
         padding-bottom: 0;
       }
       .board-center {
@@ -416,8 +417,7 @@
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-        overflow-y: auto;
-        overflow-x: hidden;
+        overflow: visible; /* DEIXA ROLAR LIVREMENTE COM O PAI */
         padding-bottom: 20px;
       }
       .board-top {
@@ -455,20 +455,16 @@
         letter-spacing: 1px;
       }
 
-      /* Morto */
       .morto-area {
-        position: relative;
-        width: 80px;
-        height: 80px;
-        margin-right: 15px;
+        width: 45px;
+        height: 60px;
+        margin-right: 5px;
+        transform: none !important;
       }
       .morto-container {
-        position: absolute;
-        width: 55px;
-        height: 80px;
-        top: 0;
-        left: 12.5px;
-        transition: opacity 0.3s;
+        width: 35px;
+        height: 50px;
+        left: 5px;
       }
       #mortoSlot0 {
         z-index: 2;
@@ -752,6 +748,23 @@
         box-shadow: none;
       }
 
+      /* Força máxima para limpar a caixa do monte vazia em qualquer tema */
+      html body[data-deck-theme] #gameSection #drawStockBtn .pile-card.empty-pile {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        border: 2px dashed rgba(255, 255, 255, 0.4) !important;
+        box-shadow: none !important;
+        filter: none !important;
+      }
+
+      /* Garante que sobras de pseudo-elementos (ex: carrinhos do Arcade) não apareçam */
+      html body[data-deck-theme] #gameSection #drawStockBtn .pile-card.empty-pile::after {
+        display: none !important;
+        animation: none !important;
+        background-image: none !important;
+      }
+
       /* Estrutura das Cartas */
       .carta-canto {
         line-height: 1.1;
@@ -811,12 +824,14 @@
 
       /* UI do Jogador */
       .player-interface {
-        background: linear-gradient(to top, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.8) 60%, transparent 100%);
+        position: sticky; /* TRAVA A SUA MÃO E BOTÕES NO FUNDO DA TELA */
+        bottom: 0;
+        background: linear-gradient(to top, rgba(2, 6, 23, 1) 30%, rgba(2, 6, 23, 0.85) 70%, transparent 100%);
         padding: 5px 10px 10px 10px;
         display: flex;
         flex-direction: column;
         gap: 5px;
-        z-index: 50;
+        z-index: 1000;
         width: 100%;
         flex-shrink: 0;
       }
@@ -844,9 +859,6 @@
       }
       #meldBtn {
         background: #059669;
-      }
-      #takeDeadBtn {
-        background: #4f46e5;
       }
       #endGameBtn {
         background: #333;
@@ -943,13 +955,20 @@
 
       /* 1. TRAVAS ESTRUTURAIS (Blinda a mesa contra vazamento de luz) */
       .opponent-card-back,
-      .pile-card,
-      .carta.mini,
-      .morto-card-back {
+      .carta.mini {
         overflow: hidden !important;
         position: relative;
         z-index: 0;
         isolation: isolate;
+      }
+
+      /* Libera o overflow do Monte e Morto para o empilhamento 3D dinâmico não ser decapitado */
+      .pile-card,
+      .morto-card-back,
+      .morto-container {
+        overflow: visible !important;
+        position: relative;
+        z-index: 0;
       }
       /* Trava Inquebrável: Garante que a carta de compra SEMPRE consiga voar na tela */
       .fly-card {
@@ -1731,45 +1750,236 @@
         text-shadow: 0 0 5px rgba(34, 197, 94, 0.6);
       }
 
-      /* ================= MEDIA QUERIES (Mobile / Paisagem) ================= */
-      @media (max-width: 768px), (max-height: 500px) {
+      /* ================= MEDIA QUERIES REFATORADAS (Mobile / Landscape Limpo) ================= */
+
+      @media (max-width: 768px), (max-height: 600px) {
         body {
-          font-size: 12px;
-        }
-        .board {
-          overflow-y: auto;
-          overflow-x: hidden;
-          display: flex;
-          flex-direction: column;
+          font-size: 11px;
         }
         .board-center {
-          flex: 1;
-          justify-content: flex-start;
           padding: 2px 0;
+          overflow-x: hidden;
         }
+
+        /* Topo e Identificação */
         .board-top {
-          padding: 3px 5px;
-          height: 36px;
+          padding: 4px 6px;
+          height: auto;
+          min-height: 35px;
+          z-index: 20;
+          position: relative;
         }
+        .current-player-chip {
+          padding: 2px 6px;
+          font-size: 9px !important;
+        }
+
+        /* CORREÇÃO DO MORTO: Menor, offset ajustado e afastado da borda */
+        .morto-area {
+          width: 44px;
+          height: 44px;
+          margin-right: 15px;
+          margin-top: 4px;
+          transform: none !important;
+        }
+        .morto-container {
+          width: 28px;
+          height: 42px;
+          left: 8px;
+          top: 1px;
+        }
+        #mortoSlot1 {
+          transform: rotate(90deg) !important;
+        }
+        .morto-card-back.offset {
+          transform: translate(2px, -2px) !important;
+        }
+
         .opponent-hand-top {
           top: 2px;
-          transform: translateX(-50%) scale(0.85);
+          transform: translateX(-50%) scale(0.6);
           transform-origin: top center;
         }
         .opponent-hand-left {
           left: 2px;
-          transform: translateY(-50%) scale(0.85);
+          transform: translateY(-50%) scale(0.6);
           transform-origin: left center;
         }
         .opponent-hand-right {
           right: 2px;
-          transform: translateY(-50%) scale(0.85);
+          transform: translateY(-50%) scale(0.6);
           transform-origin: right center;
         }
+
+        /* Mesa Central (Jogos) */
         .board-melds {
-          width: 96%;
+          width: 98%;
+          max-width: 100%;
+          margin-top: 10px;
           margin-left: auto;
           margin-right: auto;
+          gap: 4px;
+          padding: 2px;
+        }
+        .board-melds .grow {
+          padding: 4px;
+          border-radius: 6px;
+        }
+
+        .meld-title {
+          font-size: 8px !important;
+          margin-bottom: 2px;
+          padding-bottom: 2px;
+        }
+        .meld-line {
+          min-width: 55px;
+          padding: 2px;
+          border-radius: 4px;
+        }
+        .meld-line-cards {
+          height: 52px;
+        }
+
+        /* Cartas da Mesa: Tipografia escalada para não vazar a borda */
+        .carta.mini {
+          width: 34px;
+          height: 50px;
+          margin-right: -18px;
+          font-size: 9px;
+          padding: 1px 2px;
+        }
+        .carta.mini .carta-canto {
+          font-size: 8px;
+          line-height: 0.9;
+        }
+        .carta.mini .carta-meio {
+          font-size: 14px;
+        }
+        .carta.mini.canastra-fechada {
+          transform: translate(-50%, -35%) rotate(90deg) !important;
+          margin-right: -8px;
+          margin-bottom: -6px;
+        }
+
+        /* Monte e Lixo: Tipografia escalada */
+        .board-middle {
+          gap: 15px;
+          padding: 2px 0 5px 0;
+          margin-top: auto;
+        }
+        .pile-card {
+          width: 40px;
+          height: 58px;
+        }
+        .discard-face {
+          padding: 2px;
+          font-size: 10px;
+        }
+        .discard-face .carta-canto {
+          font-size: 8px;
+          line-height: 0.9;
+        }
+        .discard-face .carta-meio {
+          font-size: 16px;
+        }
+        .pile-info {
+          font-size: 8px !important;
+          padding: 2px;
+          margin-top: 2px;
+        }
+
+        /* Interface do Jogador */
+        .player-interface {
+          padding: 2px 4px;
+          gap: 2px;
+        }
+        #message {
+          font-size: 9px;
+          height: 12px;
+          margin-bottom: 0;
+        }
+
+        /* Botões: Texto em linha única e altura menor */
+        .player-actions {
+          position: relative;
+          z-index: 10 !important;
+          flex-wrap: wrap;
+          gap: 4px;
+          justify-content: center;
+        }
+        .player-actions button {
+          padding: 4px 6px;
+          font-size: 9px;
+          flex: 1 1 auto;
+          max-width: none;
+          white-space: nowrap;
+          height: 26px;
+          margin: 0;
+        }
+
+        /* Cartas da Mão: Tipografia escalada */
+        .hand-container {
+          position: relative;
+          z-index: 20 !important;
+          min-height: 65px;
+          padding: 2px;
+        }
+        .carta {
+          width: 42px;
+          height: 62px;
+          margin-right: -16px;
+          font-size: 10px;
+          padding: 2px;
+        }
+        .carta .carta-canto {
+          line-height: 0.9;
+        }
+        .carta .carta-meio {
+          font-size: 16px;
+        }
+
+        /* Menu Principal */
+        #configSection {
+          padding: 10px;
+          justify-content: flex-start;
+        }
+        .section {
+          width: 100%;
+          max-width: 400px;
+          padding: 15px;
+          margin: 0 auto;
+        }
+        .section-header h2 {
+          font-size: 18px;
+          margin-bottom: 4px;
+        }
+        .section-header small {
+          margin-bottom: 8px;
+          font-size: 10px;
+        }
+        input,
+        select {
+          padding: 8px;
+          margin-bottom: 6px;
+          font-size: 11px;
+        }
+        #startBtn {
+          padding: 12px;
+          font-size: 12px;
+          margin-top: 4px;
+        }
+        .deck-preview-card {
+          width: 18px;
+          height: 26px;
+        }
+        .deck-preview-select {
+          padding-left: 45px !important;
+        }
+      }
+
+      @media (max-width: 768px) and (orientation: portrait) {
+        .board-melds {
+          flex-direction: column;
         }
         .board-melds .grow {
           width: 100%;
@@ -1777,136 +1987,121 @@
         .board-melds .grow + .grow {
           border-left: none !important;
           border-top: 1px dashed rgba(148, 163, 184, 0.5) !important;
-          padding-left: 6px !important;
-          padding-top: 12px !important;
-        }
-        .meld-title {
-          font-size: 10px;
-        }
-        .meld-line {
-          min-width: 100px;
-          padding: 2px 3px 3px;
-        }
-        .meld-line-cards {
-          height: 68px;
-        }
-        .carta.mini {
-          width: 44px;
-          height: 64px;
-          margin-right: -30px;
-          font-size: 11px;
-        }
-
-        /* Adicione este bloco para corrigir a altura da carta no celular também */
-        .carta.mini.canastra-fechada {
-          transform: translate(-50%, -35%) rotate(90deg) !important;
-        }
-        .carta.mini .carta-meio {
-          font-size: 16px;
-        }
-        .pile-card {
-          width: 44px;
-          height: 64px;
-        }
-        .pile-info {
-          font-size: 9px;
-        }
-        .hand-container {
-          padding: 4px 2px 2px 2px;
-          min-height: 65px;
-          flex-shrink: 0;
-        }
-        .opponent-cards {
-          gap: 1px;
-        }
-        .carta {
-          width: 46px;
-          height: 68px;
-          margin-right: -14px;
-          font-size: 11px;
-        }
-        .carta-meio {
-          font-size: 14px;
-        }
-        .player-interface {
-          padding: 4px;
-          gap: 4px;
-        }
-        #message {
-          font-size: 10px;
-          height: 12px;
-          margin-bottom: 2px;
-        }
-        .player-actions {
-          gap: 4px;
-          flex-wrap: wrap;
-        }
-        .player-actions button {
-          padding: 6px 8px;
-          font-size: 10px;
-          flex: 1 1 auto;
-        }
-        #configSection {
-          padding: 10px;
-          justify-content: flex-start;
-          padding-top: 30px;
-          background-size: 100% auto;
-          background-position: center top;
-        }
-        .section {
-          width: 95%;
-          padding: 20px 15px;
-          margin-top: 0;
-        }
-        .section-header h2 {
-          font-size: 22px;
-        }
-        #configSection div[style*='display: grid'] {
-          grid-template-columns: 1fr !important;
-          gap: 5px !important;
-        }
-        input,
-        select {
-          padding: 10px;
-          margin-bottom: 8px;
-          font-size: 14px;
-        }
-        #startBtn {
-          padding: 18px;
-          font-size: 16px;
+          padding-top: 6px !important;
+          padding-left: 4px !important;
         }
       }
 
       @media (max-height: 600px) and (orientation: landscape) {
-        .app .board .board-melds {
+        .board-melds {
           flex-direction: row;
-          margin-top: 35px;
-          width: calc(100% - 140px);
-          margin-left: 70px;
-          margin-right: 70px;
+          width: calc(100% - 90px);
+          margin-top: 10px;
         }
-        .app .board .board-melds .grow {
+        .board-melds .grow {
           width: 50%;
         }
+        .board-melds .grow + .grow {
+          border-top: none !important;
+          border-left: 1px dashed rgba(148, 163, 184, 0.5) !important;
+          padding-left: 6px !important;
+          padding-top: 2px !important;
+        }
+
+        .opponent-hand-top {
+          transform: translateX(-50%) scale(0.45);
+          top: 0px;
+        }
+        .opponent-hand-left {
+          left: -5px;
+          transform: translateY(-50%) scale(0.45);
+        }
+        .opponent-hand-right {
+          right: -5px;
+          transform: translateY(-50%) scale(0.45);
+        }
+
         .morto-area {
-          transform: scale(0.75);
-          transform-origin: top right;
+          margin-right: 15px;
         }
-        .app .board .board-melds .grow + .grow {
-          border-top: none;
-          border-left: 1px dashed rgba(148, 163, 184, 0.5);
-          padding-top: 6px;
-          padding-left: 10px;
+
+        /* VOLTA AO NORMAL: Interface ocupa a base inteira sem empurrar o centro */
+        .player-interface {
+          display: flex !important;
+          flex-direction: column !important;
+          padding: 0 !important;
+          width: 100% !important;
+          position: relative;
         }
-        .app .board .opponent-hand-left {
-          left: 2px;
-          transform: translateY(-50%) scale(0.65);
-          transform-origin: left center;
+
+        #message {
+          text-align: center !important;
+          margin-bottom: 2px !important;
+          position: relative;
+          z-index: 50;
         }
-        .app .board .opponent-hand-right {
-          right: 2px;
-          transform: translateY(-50%) scale(0.65);
-          transform-origin: right center;
+
+        /* CORREÇÃO DA PAREDE INVISÍVEL E CENTRALIZAÇÃO ABSOLUTA */
+        .hand-container {
+          justify-content: center !important; /* Cartas perfeitamente no meio da tela */
+          padding: 5px 0 15px 0 !important;
+          min-height: 65px;
+          overflow: visible !important; /* Mata a parede invisível! A carta pode voar livre. */
+          position: relative;
+          z-index: 20;
+        }
+
+        .cards-row {
+          padding: 0 !important;
+          margin: 0 auto !important;
+        }
+
+        /* CORREÇÃO DOS BOTÕES: Flutuando de forma independente nos cantos mortos */
+        .player-actions {
+          position: absolute !important;
+          bottom: 15px !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 0 !important;
+          display: block !important; /* Sobrescreve o grid/flex anterior */
+          margin: 0 !important;
+          z-index: 30;
+          pointer-events: none; /* Deixa o clique vazar para as cartas se elas se tocarem */
+        }
+
+        .player-actions button {
+          position: absolute !important;
+          pointer-events: auto; /* Reativa o clique apenas nos botões físicos */
+          height: 36px !important;
+          font-size: 10px !important;
+          white-space: nowrap !important;
+          border-radius: 8px !important;
+          padding: 0 12px !important;
+          margin: 0 !important;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6) !important;
+          bottom: 0 !important; /* Trava todos na mesma linha horizontal */
+        }
+
+        /* 1 Botão na Extrema Esquerda (X) */
+        #endGameBtn {
+          left: 15px !important;
+          width: 45px !important;
+          padding: 0 !important;
+        }
+
+        /* 2 Botões na Extrema Direita (Em linha horizontal) */
+        #meldBtn {
+          right: 140px !important; /* Posicionado ao lado do botão Mover */
+          width: 80px !important;
+        }
+        #moveWildBtn {
+          right: 15px !important;
+          width: 115px !important;
+        }
+
+        /* Caso o placar seja acionado no fim de jogo, fica do lado do X */
+        #showScoreBtn {
+          left: 70px !important;
         }
       }
 
@@ -2089,7 +2284,7 @@
       }
     </style>
   </head>
-  <body>
+  <body data-deck-theme="classico">
     <div id="loadingScreen">
       <div class="loading-content">
         <div class="glitch-title">BURACO FINDOM</div>
@@ -2306,9 +2501,7 @@
           </div>
         </div>
 
-        <div
-          id="countdownOverlay"
-          style="display: none; position: absolute; inset: 0; background: rgba(5, 5, 5, 0.95); z-index: 100; flex-direction: column; align-items: center; justify-content: center; border-radius: 16px; backdrop-filter: blur(5px)">
+        <div id="countdownOverlay" style="display: none; position: fixed; inset: 0; background: rgba(5, 5, 5, 0.95); z-index: 10000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px)">
           <h1 id="countdownText" style="color: #facc15; font-size: 80px; margin: 0; text-shadow: 0 0 20px #facc15">5</h1>
           <p style="color: #fff; font-weight: bold; font-size: 18px">A partida vai começar!</p>
           <button id="cancelReadyBtn" style="background: #ef4444; width: 200px; padding: 15px; border-radius: 99px; font-weight: bold; color: #fff; border: none; cursor: pointer; margin-top: 20px">CANCELAR</button>
@@ -2316,6 +2509,30 @@
       </div>
 
       <div id="gameSection">
+        <button
+          id="debugMiniBtn"
+          onclick="toggleDebugPanel(true)"
+          style="
+            display: none;
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            width: auto;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px dashed #facc15;
+            padding: 8px 12px;
+            z-index: 99999;
+            border-radius: 8px;
+            color: #facc15;
+            font-weight: 900;
+            font-size: 11px;
+            text-transform: uppercase;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+            cursor: pointer;
+          ">
+          🔧 Dev Tools
+        </button>
+
         <div
           id="debugPanel"
           style="
@@ -2323,7 +2540,7 @@
             position: absolute;
             top: 60px;
             left: 10px;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             border: 1px dashed #facc15;
             padding: 10px;
             z-index: 99999;
@@ -2332,15 +2549,29 @@
             gap: 6px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
           ">
-          <div style="color: #facc15; font-weight: 900; font-size: 10px; text-transform: uppercase; margin-bottom: 5px; text-align: center">🔧 Dev Tools</div>
-          <button onclick="debugDraw30()" style="font-size: 10px; padding: 6px; background: #3b82f6">+30 Cartas</button>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px">
+            <span style="color: #facc15; font-weight: 900; font-size: 10px; text-transform: uppercase">🔧 Dev Tools</span>
+            <button onclick="toggleDebugPanel(false)" style="background: transparent; border: none; color: #ef4444; font-weight: 900; cursor: pointer; padding: 0 4px; font-size: 12px; margin: 0; width: auto; box-shadow: none">✖</button>
+          </div>
+
+          <div style="display: flex; gap: 4px">
+            <button onclick="debugDraw5()" style="flex: 1; font-size: 10px; padding: 6px; background: #0ea5e9">+5 Mão</button>
+            <button onclick="debugDraw30()" style="flex: 1; font-size: 10px; padding: 6px; background: #3b82f6">+30 Mão</button>
+            <button onclick="debugDiscard5()" style="flex: 1; font-size: 10px; padding: 6px; background: #64748b">-5 Lixo</button>
+          </div>
+
           <button onclick="debugMeld('suja')" style="font-size: 10px; padding: 6px; background: #ef4444">Canastra Suja</button>
           <button onclick="debugMeld('limpa')" style="font-size: 10px; padding: 6px; background: #22c55e">Canastra Limpa</button>
           <button onclick="debugMeld('real')" style="font-size: 10px; padding: 6px; background: #eab308; color: #000">Canastra Real</button>
           <button onclick="debugMeld('asas')" style="font-size: 10px; padding: 6px; background: #8b5cf6">Canastra Ás-a-Ás</button>
           <button onclick="debugSetupDead()" style="font-size: 10px; padding: 6px; background: #0f766e">Prep: Pegar Morto</button>
           <button onclick="debugSetupWin()" style="font-size: 10px; padding: 6px; background: #1d4ed8">Prep: Bater</button>
-          <button onclick="debugEndGame()" style="font-size: 10px; padding: 6px; background: #000; border: 1px solid #ef4444; margin-top: 5px">Terminar Jogo</button>
+
+          <div style="border-top: 1px dashed rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 6px; display: flex; flex-direction: column; gap: 6px">
+            <button onclick="debugRestartGame()" style="font-size: 10px; padding: 6px; background: #7c3aed; font-weight: bold">🔄 Reiniciar Partida</button>
+            <button onclick="debugEndGame()" style="font-size: 10px; padding: 6px; background: #000; border: 1px solid #ef4444">❌ Terminar Jogo</button>
+            <button onclick="debugTogglePause()" id="debugPauseBtn" style="font-size: 10px; padding: 6px; background: #f97316; font-weight: bold">⏸ Congelar Jogo</button>
+          </div>
         </div>
 
         <div class="board">
@@ -2431,7 +2662,6 @@
             <div class="player-actions">
               <button id="meldBtn">⬇️ Baixar</button>
               <button id="moveWildBtn">↔️ Mover 2/Joker</button>
-              <button id="takeDeadBtn">💀 Morto</button>
               <button id="showScoreBtn" style="display: none; background: #facc15; color: #000; font-weight: 900">🏆 PLACAR</button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
             </div>
@@ -2511,6 +2741,7 @@
 
             if (!state) {
               document.getElementById('configSection').style.display = 'flex';
+              if (typeof window.updateMenuDynamic === 'function') window.updateMenuDynamic();
             }
           }, 1000);
         }, 2500);
@@ -3261,6 +3492,18 @@
 
       async function commitState() {
         if (!state || window.isClosingGame) return;
+
+        // Gatilho Universal de Reciclagem
+        if (state.stock && state.stock.length === 0) {
+          const hasDead = state.deadPiles && state.deadPiles.some((p) => p && p.length > 0);
+          if (hasDead) {
+            const recycledIndex = await recycleDeadToStockIfPossible();
+            if (recycledIndex !== null && state.lastAction) {
+              state.lastAction.autoRecycledIndex = recycledIndex; // Avisa a máquina do oponente
+            }
+          }
+        }
+
         pendingCommit = true;
         if (committing) return;
 
@@ -3490,7 +3733,7 @@
         updateTimerLabel();
 
         turnTimerId = setInterval(() => {
-          if (window.isAutoPlaying) return; // Pausa o relógio se estiver processando
+          if (window.isAutoPlaying || (state && state.debugPaused)) return; // Congela o relógio se o debug exigir
 
           turnTimerRemaining--;
 
@@ -3545,17 +3788,43 @@
         return array;
       }
 
-      function recycleDeadToStockIfPossible() {
-        if (!state || state.stock.length) return null;
+      async function recycleDeadToStockIfPossible() {
+        if (!state || state.stock.length > 0) return null;
         if (!state.deadPiles || !state.deadPiles.length) return null;
 
         const idx = state.deadPiles.findIndex((pile) => pile && pile.length);
         if (idx === -1) return null;
 
+        // Força a tela a mostrar o monte vazio com a borda tracejada
+        renderAll();
+        showMessage('⚠️ O Monte esgotou! Preparando o Morto...');
+
+        // Congela a mesa para o suspense
+        const pi = document.querySelector('.player-interface');
+        const bm = document.querySelector('.board-middle');
+        if (pi) pi.style.pointerEvents = 'none';
+        if (bm) bm.style.pointerEvents = 'none';
+
+        await new Promise((r) => setTimeout(r, 2000));
+
         const collected = state.deadPiles[idx];
         state.deadPiles[idx] = [];
         shuffle(collected);
         state.stock = collected;
+
+        // Animação do Morto subindo
+        const fromEl = document.getElementById(idx === 0 ? 'mortoSlot0' : 'mortoSlot1');
+        const toEl = document.querySelector('#drawStockBtn .pile-card');
+        if (fromEl && toEl) {
+          const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
+          await flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back');
+          impactAtRect(getRect(toEl));
+        }
+
+        showMessage('🔄 O Morto virou o novo Monte!');
+        if (pi) pi.style.pointerEvents = 'auto';
+        if (bm) bm.style.pointerEvents = 'auto';
+        renderAll();
         return idx;
       }
 
@@ -3761,6 +4030,10 @@
           showMessage('Fim de jogo.');
           return false;
         }
+        if (state.debugPaused) {
+          showMessage('⚠️ Jogo congelado pelo DevTools.');
+          return false;
+        }
         if (state.currentPlayer !== myPlayerIndex) {
           showMessage('Aguarde sua vez.');
           return false;
@@ -3811,23 +4084,15 @@
         let recycledIndex = null;
         for (let i = 0; i < drawCount; i++) {
           if (!state.stock.length) {
-            recycledIndex = recycleDeadToStockIfPossible();
+            recycledIndex = await recycleDeadToStockIfPossible();
             if (recycledIndex === null || !state.stock.length) {
               if (i === 0) {
                 showMessage('⚠️ O Monte esgotou e não há mortos. Fim de jogo por exaustão!');
                 await finishGame(null);
                 return;
               } else break;
-            } else {
-              const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
-              const toEl = document.querySelector('#drawStockBtn .pile-card');
-              if (fromEl && toEl) {
-                const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
-                await flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back');
-                impactAtRect(getRect(toEl));
-              }
-              showMessage('🔄 O Morto virou Monte!');
             }
+            showMessage('🔄 O Morto virou Monte!');
           }
           const c = state.stock.pop();
           ensureCardId(c);
@@ -4065,7 +4330,7 @@
 
           renderAll();
 
-          let domReward = processDominationReward(me, kindBeforeFechado, classifyMeldForUi(isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex]).kind);
+          let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex]).kind);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             const fromEl = document.querySelector('#drawStockBtn .pile-card');
@@ -4259,7 +4524,7 @@
         return false;
       }
 
-      function processDominationReward(p, oldKind, newKind) {
+      async function processDominationReward(p, oldKind, newKind) {
         if (!state || state.mode !== '1x1_dominacao') return null;
         if (oldKind === newKind) return null;
 
@@ -4301,7 +4566,7 @@
         if (reward.type === 'draw') {
           for (let i = 0; i < reward.count; i++) {
             if (!state.stock.length) {
-              const recycledIndex = recycleDeadToStockIfPossible();
+              const recycledIndex = await recycleDeadToStockIfPossible();
               if (recycledIndex === null || !state.stock.length) break;
             }
             const c = state.stock.pop();
@@ -4413,7 +4678,7 @@
           selectedHandIndexes.clear();
           selectedMeldTarget = null;
 
-          let domReward = processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind);
+          let domReward = await processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             const fromEl = document.querySelector('#drawStockBtn .pile-card');
@@ -4498,7 +4763,7 @@
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
 
-        let domReward = processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind);
+        let domReward = await processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind);
 
         if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
           const fromEl = document.querySelector('#drawStockBtn .pile-card');
@@ -4623,7 +4888,7 @@
           const meldIdx = currentTeam().melds.length - 1;
 
           // Avaliação Plus Dominação
-          let domReward = processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
+          let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             const fromEl = document.querySelector('#drawStockBtn .pile-card');
@@ -4691,55 +4956,6 @@
         state.deadChunksTaken[teamId] = taken + 1;
 
         return { deadIndex, count: chunkSize };
-      }
-
-      async function takeDead() {
-        if (!ensureMyTurn()) return;
-        const p = currentPlayer();
-        const teamId = p.teamId;
-        const taken = state.deadChunksTaken?.[teamId] ?? 0;
-        const max = state.deadChunksMax?.[teamId] ?? 1;
-
-        if (taken >= max) {
-          showMessage('💀 O morto da sua equipe já foi recolhido.');
-          return;
-        }
-        if (p.hand.length > 0) {
-          showMessage('⚠️ Esvazie sua mão completamente para pegar o morto.');
-          return;
-        }
-
-        // Pega o índice do primeiro morto disponível
-        const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
-        if (deadIndex === -1) {
-          showMessage('💀 Não há mais mortos disponíveis na mesa.');
-          return;
-        }
-
-        const dead = state.deadPiles[deadIndex];
-        const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
-        const fromSlot = document.getElementById(deadIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
-        const handArea = document.getElementById('handContainer');
-
-        await animateDeadToHandLocal(deadIndex);
-
-        p.hand.length = 0;
-        p.hand.push(...dead.splice(0, chunkSize));
-        sortHand(p.hand);
-        state.deadChunksTaken[teamId] = taken + 1;
-
-        state.lastAction = {
-          id: newActionId(),
-          type: 'takeDead',
-          playerId: state.currentPlayer,
-          deadIndex,
-          count: chunkSize,
-          ts: Date.now(),
-        };
-        ignoreOwnActionId = state.lastAction.id;
-
-        await commitState();
-        showMessage('💀 Morto recolhido com sucesso!');
       }
 
       function canTeamTakeDeadNow(teamId) {
@@ -5046,11 +5262,18 @@
         if (pi) pi.style.pointerEvents = 'auto';
         if (bm) bm.style.pointerEvents = 'auto';
 
-        // TRAVA DO DEVTOOLS: Força a exibição sempre que renderizar a mesa
+        // TRAVA DO DEVTOOLS: Força a exibição respeitando o botão de minimizar
         const debugPanel = document.getElementById('debugPanel');
-        if (debugPanel) {
+        const debugMiniBtn = document.getElementById('debugMiniBtn');
+        if (debugPanel && debugMiniBtn) {
           const isDebug = window.location.search.includes('debug=1') || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-          debugPanel.style.display = isDebug ? 'flex' : 'none';
+          if (isDebug) {
+            debugPanel.style.display = window.isDevToolsOpen ? 'flex' : 'none';
+            debugMiniBtn.style.display = window.isDevToolsOpen ? 'none' : 'block';
+          } else {
+            debugPanel.style.display = 'none';
+            debugMiniBtn.style.display = 'none';
+          }
         }
 
         applyViewTeamClass();
@@ -5084,40 +5307,113 @@
         document.querySelector('.current-player-chip').style.background = isMyTurnRightNow ? 'rgba(22, 163, 74, 0.8)' : 'rgba(0, 0, 0, 0.5)';
         document.getElementById('stockCount').textContent = state.stock.length;
 
-        const stockEl = document.querySelector('#drawStockBtn .pile-card');
-        if (state.stock.length > 0) {
-          const topCard = state.stock[state.stock.length - 1];
-          const wantedClass = topCard.back === 'blue' ? 'back-blue' : 'back-red';
-          const keepArcadeRun = stockEl.classList.contains('arcade-car-run');
+        // ==========================================================
+        // MOTOR DE RENDERIZAÇÃO 3D DINÂMICO (Monte, Lixo e Mortos)
+        // ==========================================================
+        function updatePile3D(container, baseCardClass, count, backColor, keepArcade) {
+          if (!container) return 0;
 
-          stockEl.classList.add('pile-card');
-          stockEl.classList.remove('back-red', 'back-blue');
-          stockEl.classList.add(wantedClass);
+          container.querySelectorAll('.visual-layer').forEach((e) => e.remove());
 
-          if (document.body.dataset.deckTheme === 'arcade' && keepArcadeRun) {
-            stockEl.classList.add('arcade-car-run');
+          if (count === 0) {
+            container.style.background = '';
+            container.style.border = '';
+            container.style.boxShadow = '';
+            container.classList.add('empty-pile');
+            if (backColor !== 'discard') container.classList.remove('back-red', 'back-blue');
+            return 0;
           }
 
-          stockEl.style.background = '';
-          stockEl.style.boxShadow = '';
-        } else {
-          stockEl.classList.remove('back-red', 'back-blue', 'arcade-car-run');
-          stockEl.classList.add('pile-card');
-          stockEl.style.background = 'transparent';
-          stockEl.style.boxShadow = 'none';
+          container.classList.remove('empty-pile');
+          container.style.setProperty('background', 'transparent', 'important');
+          container.style.setProperty('border', 'none', 'important');
+          container.style.setProperty('box-shadow', 'none', 'important');
+
+          const isMorto = baseCardClass.includes('morto');
+          const isDiscard = backColor === 'discard';
+          const divisor = isMorto ? 1 : isDiscard ? 2 : 4;
+          let layers = Math.ceil(count / divisor);
+          if (layers < 1) layers = 1;
+          if (layers > 16) layers = 16;
+
+          const wantedClass = backColor === 'blue' ? 'back-blue' : backColor === 'red' ? 'back-red' : 'visual-discard-layer';
+
+          for (let i = 0; i < layers; i++) {
+            if (isDiscard && i === layers - 1) continue;
+
+            const layer = document.createElement('div');
+            layer.className = `${baseCardClass} visual-layer ${wantedClass}`;
+            if (keepArcade && i === layers - 1) layer.classList.add('arcade-car-run');
+
+            layer.style.position = 'absolute';
+            layer.style.width = '100%';
+            layer.style.height = '100%';
+
+            layer.style.bottom = `${i * 1.2}px`;
+            layer.style.right = `${i * 0.3}px`;
+            layer.style.zIndex = i;
+            layer.style.margin = '0';
+
+            // 🛑 MATA O BURACO NEGRO: Só a base projeta sombra
+            if (i > 0) {
+              layer.style.setProperty('box-shadow', 'none', 'important');
+            } else {
+              layer.style.setProperty('box-shadow', '0 6px 12px rgba(0,0,0,0.7)', 'important');
+            }
+
+            if (isDiscard) {
+              layer.style.background = '#f3f4f6';
+              layer.style.border = '1px solid #d1d5db';
+              layer.style.filter = `brightness(${0.6 + (i / layers) * 0.4})`;
+            } else {
+              if (i < layers - 1) layer.style.filter = `brightness(${0.4 + (i / layers) * 0.4})`;
+            }
+
+            container.appendChild(layer);
+          }
+          return layers;
         }
 
-        const discardTop = state.discard[state.discard.length - 1];
-        document.getElementById('discardCount').textContent = state.discard.length;
-        const discardFace = document.getElementById('discardFace');
+        // 1. Aplica o 3D no Monte
+        const stockEl = document.querySelector('#drawStockBtn .pile-card');
+        const count = state.stock.length;
+        let stockClass = 'back-red';
+        let keepArcade = false;
+        if (count > 0) {
+          stockClass = state.stock[count - 1].back === 'blue' ? 'back-blue' : 'back-red';
+          keepArcade = stockEl ? stockEl.querySelector('.arcade-car-run') !== null : false;
+        }
+        updatePile3D(stockEl, 'pile-card', count, stockClass.replace('back-', ''), keepArcade);
 
-        if (!discardTop) discardFace.style.display = 'none';
-        else {
+        // 2. Aplica o 3D no Lixo
+        const discardCount = state.discard.length;
+        document.getElementById('discardCount').textContent = discardCount;
+        const discardFace = document.getElementById('discardFace');
+        const discardEl = document.querySelector('#drawDiscardBtn .pile-card');
+
+        const discardLayers = updatePile3D(discardEl, 'pile-card', discardCount, 'discard', false);
+
+        const discardTop = state.discard[discardCount - 1];
+        if (!discardTop) {
+          discardFace.style.display = 'none';
+        } else {
           discardFace.style.display = 'flex';
+          discardFace.style.position = 'absolute';
+          discardFace.style.width = '100%';
+          discardFace.style.height = '100%';
+          discardFace.style.margin = '0';
+
+          // 🚀 MÁGICA: A carta da face do lixo senta no topo exato do 3D
+          const topIndex = Math.max(0, discardLayers - 1);
+          discardFace.style.bottom = `${topIndex * 1.2}px`;
+          discardFace.style.right = `${topIndex * 0.3}px`;
+          discardFace.style.zIndex = 20;
+
           discardFace.innerHTML = cardFrontHTML(discardTop);
           discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
         }
 
+        // 3. Aplica o 3D nos Mortos
         const s0 = document.getElementById('mortoSlot0');
         const s1 = document.getElementById('mortoSlot1');
         if (state.deadPiles.length >= 2) {
@@ -5126,29 +5422,8 @@
           s0.classList.toggle('used', m0.length === 0);
           s1.classList.toggle('used', m1.length === 0);
 
-          if (m0.length > 0) {
-            const color0 = m0[m0.length - 1].back === 'blue' ? 'back-blue' : 'back-red';
-            s0.querySelectorAll('.morto-card-back').forEach((el) => {
-              const current = el.classList.contains('back-blue') ? 'back-blue' : el.classList.contains('back-red') ? 'back-red' : '';
-
-              if (current !== color0) {
-                el.classList.remove('back-red', 'back-blue');
-                el.classList.add(color0);
-              }
-            });
-          }
-
-          if (m1.length > 0) {
-            const color1 = m1[m1.length - 1].back === 'blue' ? 'back-blue' : 'back-red';
-            s1.querySelectorAll('.morto-card-back').forEach((el) => {
-              const current = el.classList.contains('back-blue') ? 'back-blue' : el.classList.contains('back-red') ? 'back-red' : '';
-
-              if (current !== color1) {
-                el.classList.remove('back-red', 'back-blue');
-                el.classList.add(color1);
-              }
-            });
-          }
+          updatePile3D(s0, 'morto-card-back', m0.length, m0.length ? m0[m0.length - 1].back : 'red', false);
+          updatePile3D(s1, 'morto-card-back', m1.length, m1.length ? m1[m1.length - 1].back : 'blue', false);
         }
 
         renderOpponentHands();
@@ -5201,9 +5476,6 @@
         const me = state.players[myPlayerIndex];
         const myTeamId = me ? me.teamId : null; // Protege o Team ID
 
-        // Só habilita o morto se o jogador existir (me &&)
-        const canTakeDeadBtn = myTurn && me && me.hand.length === 0 && canTeamTakeDeadNow(myTeamId);
-        document.getElementById('takeDeadBtn').disabled = !canTakeDeadBtn;
         document.getElementById('endGameBtn').disabled = false;
 
         // Oculta botões se o jogo acabou OU se for o Espectador (-1)
@@ -5211,7 +5483,6 @@
         const isSpec = myPlayerIndex === -1;
         document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
         document.getElementById('meldBtn').style.display = isFin || isSpec ? 'none' : 'block';
-        document.getElementById('takeDeadBtn').style.display = isFin || isSpec ? 'none' : 'block';
         document.getElementById('moveWildBtn').style.display = isFin || isSpec ? 'none' : 'block';
 
         let specBadge = document.getElementById('specBadgeInfo');
@@ -5235,6 +5506,45 @@
 
         // CHAMA A TELA DE VOTAÇÃO AQUI
         renderSurrender();
+
+        // --- SISTEMA DE CONGELAMENTO VISUAL (DEBUG) ---
+        const boardEl = document.querySelector('.board');
+        let pauseWatermark = document.getElementById('pauseWatermark');
+
+        if (!pauseWatermark) {
+          pauseWatermark = document.createElement('div');
+          pauseWatermark.id = 'pauseWatermark';
+          pauseWatermark.innerHTML = '⏸ JOGO CONGELADO (DEBUG)';
+          pauseWatermark.style.cssText =
+            'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 22px; font-weight: 900; color: #facc15; z-index: 9999; pointer-events: none; text-shadow: 0 5px 15px rgba(0,0,0,0.9); display: none; background: rgba(0,0,0,0.85); padding: 15px 30px; border-radius: 12px; border: 2px dashed #facc15; text-align: center; letter-spacing: 2px;';
+          document.getElementById('gameSection').appendChild(pauseWatermark);
+        }
+
+        if (state.debugPaused) {
+          if (boardEl) {
+            boardEl.style.pointerEvents = 'none'; // Impede qualquer clique na mesa
+            boardEl.style.filter = 'grayscale(0.7) brightness(0.5)'; // Deixa a mesa com aspecto "pausado"
+          }
+          pauseWatermark.style.display = 'block';
+
+          const pauseBtn = document.getElementById('debugPauseBtn');
+          if (pauseBtn) {
+            pauseBtn.innerHTML = '▶️ Descongelar Jogo';
+            pauseBtn.style.background = '#22c55e';
+          }
+        } else {
+          if (boardEl) {
+            boardEl.style.pointerEvents = 'auto';
+            boardEl.style.filter = 'none';
+          }
+          if (pauseWatermark) pauseWatermark.style.display = 'none';
+
+          const pauseBtn = document.getElementById('debugPauseBtn');
+          if (pauseBtn) {
+            pauseBtn.innerHTML = '⏸ Congelar Jogo';
+            pauseBtn.style.background = '#f97316';
+          }
+        }
       }
 
       function renderHand() {
@@ -6096,7 +6406,7 @@
           team.melds.push(cards);
           const meldIdx = team.melds.length - 1;
 
-          let domReward = processDominationReward(me, 'simple', classifyMeldForUi(cards).kind);
+          let domReward = await processDominationReward(me, 'simple', classifyMeldForUi(cards).kind);
           const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
@@ -6131,7 +6441,7 @@
           team.melds[meldIndex].push(...cards);
           botEngine.normalizeMeld(team.melds[meldIndex]);
 
-          let domReward = processDominationReward(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind);
+          let domReward = await processDominationReward(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind);
           const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
@@ -6292,7 +6602,7 @@
             }
           }
 
-          let domReward = processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind);
+          let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind);
 
           sortHand(me.hand);
           s.hasDrawnThisTurn = true;
@@ -6543,6 +6853,7 @@
             document.getElementById('configSection').style.display = 'flex';
             // ⚡ RESSUSCITADOR DE SALAS: Se o Firebase deletou o jogo, recriamos um lobby vazio imediatamente
             // Isso previne que os jogadores fiquem numa 'sala fantasma' que não reage a cliques.
+            if (typeof window.updateMenuDynamic === 'function') window.updateMenuDynamic();
             if (typeof window.pushLobby === 'function') window.pushLobby();
           }
           resetCanastraSfxMemory();
@@ -6802,6 +7113,7 @@
                   if (window.isClosingGame) return;
                   if (!state || state.finished) return;
                   if (document.getElementById('gameSection').style.display !== 'flex') return;
+                  if (state.debugPaused) return; // 🛑 CORTA A IA IMEDIATAMENTE
                   if (state.turnNumber !== scheduledTurn) return;
                   if (state.currentPlayer !== scheduledPlayerId) return;
 
@@ -7190,7 +7502,33 @@
       // MOTOR DE DEBUG / DEVTOOLS
       // ==========================================
       const isDebugMode = urlParams.get('debug') === '1' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-      if (isDebugMode) document.getElementById('debugPanel').style.display = 'flex';
+      window.isDevToolsOpen = true; // Começa aberto por padrão
+
+      window.toggleDebugPanel = (show) => {
+        window.isDevToolsOpen = show;
+        if (isDebugMode) {
+          document.getElementById('debugPanel').style.display = show ? 'flex' : 'none';
+          document.getElementById('debugMiniBtn').style.display = show ? 'none' : 'block';
+        }
+      };
+
+      if (isDebugMode) {
+        window.toggleDebugPanel(true);
+      }
+
+      window.debugDraw5 = async () => {
+        if (!ensureMyTurn()) return;
+        const me = currentPlayer();
+        const limit = Math.min(5, state.stock.length);
+        for (let i = 0; i < limit; i++) {
+          const c = state.stock.pop();
+          ensureCardId(c);
+          me.hand.push(c);
+        }
+        sortHand(me.hand);
+        renderAll();
+        await commitState();
+      };
 
       window.debugDraw30 = async () => {
         if (!ensureMyTurn()) return;
@@ -7207,9 +7545,77 @@
         await commitState();
       };
 
+      window.debugDiscard5 = async () => {
+        if (!ensureMyTurn()) return;
+        const me = currentPlayer();
+        const limit = Math.min(5, me.hand.length);
+        if (limit === 0) return;
+
+        // Arranca as cartas da mão e joga pro lixo (sem animação para ser instantâneo no debug)
+        for (let i = 0; i < limit; i++) {
+          const c = me.hand.pop();
+          state.discard.push(c);
+        }
+
+        let tookDead = null;
+        if (me.hand.length === 0) tookDead = takeDeadIfAvailableForPlayer(me);
+
+        // Se zerar a mão sem morto e sem canastra, aciona o fim de jogo punitivo
+        if (me.hand.length === 0 && !canTeamTakeDeadNow(me.teamId)) {
+          if (teamHasGoodCanastra(me.teamId)) await finishGame(me.teamId);
+          else await finishGame(me.teamId === 0 ? 1 : 0);
+          return;
+        }
+
+        if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
+
+        renderAll();
+        await commitState();
+      };
+
+      window.debugRestartGame = async () => {
+        if (!state) return;
+
+        // Puxa as configurações atuais da partida e da sala para refazer igual
+        const currentNames = [state.players[0]?.name || '', state.players[1]?.name || '', state.players[2]?.name || '', state.players[3]?.name || ''];
+
+        const currentPix = [state.teams[0]?.pix || '', state.teams[1]?.pix || ''];
+
+        // 🧹 FAXINA GLOBAL: Limpa a memória do navegador para não bugar a nova partida
+        if (window.botPlayTimeoutId) {
+          clearTimeout(window.botPlayTimeoutId);
+          window.botPlayTimeoutId = null;
+        }
+        window.lastBotTurnPlayed = null; // Destrava o cérebro da IA
+        window.diceAnnounced = false; // Permite que os dados rolem de novo na tela
+
+        lastSeenActionId = null;
+        ignoreOwnActionId = null;
+        activeTurnNumber = -1;
+        movingWild = null;
+        selectedHandIndexes.clear();
+        stopTurnTimer();
+
+        // Destrava a tela se o DevTools estava com o jogo congelado
+        if (state.debugPaused) state.debugPaused = false;
+
+        // Inicia a nova partida no Firebase
+        await startGame(state.mode, currentNames, state.variant, currentPix);
+
+        // Esconde o painel do DevTools para o jogador ver os dados rolarem
+        window.toggleDebugPanel(false);
+      };
+
       window.debugEndGame = async () => {
         if (!ensureMyTurn()) return;
         await finishGame(currentTeam().id);
+      };
+
+      window.debugTogglePause = async () => {
+        if (!state) return;
+        state.debugPaused = !state.debugPaused; // Inverte o estado atual
+        renderAll();
+        await commitState(); // Salva no Firebase para paralisar a sala inteira
       };
 
       window.debugMeld = async (type) => {
@@ -7233,7 +7639,7 @@
         team.melds.push(meld);
 
         // Dispara a nova recompensa Plus Dominação no debug
-        let domReward = processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
+        let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
 
         if (domReward?.tookDead) {
           await animateDeadToHandLocal(domReward.tookDead.deadIndex);
@@ -7532,7 +7938,6 @@
       document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
       document.getElementById('meldBtn').onclick = makeMeldFromSelection;
       document.getElementById('moveWildBtn').onclick = movePickedWildToSelectedMeld;
-      document.getElementById('takeDeadBtn').onclick = takeDead;
       // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
       document.getElementById('endGameBtn').onclick = async () => {
         if (!state) return;
