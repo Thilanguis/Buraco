@@ -2160,7 +2160,16 @@
               - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
               <br />
               <span id="dominacaoExtra" style="display: none; color: #facc15; font-weight: bold; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px; display: block">
-                🔥 PLUS DOMINAÇÃO: Toda vez que o Dominador fizer uma canastra Ás-a-Ás, ele puxa um morto IMEDIATAMENTE para a mão (se houver morto na mesa)!
+                🔥 PLUS DOMINAÇÃO: Toda vez que formar ou evoluir um jogo:
+                <br />
+                <span style="color: #4ade80">◆ Limpa:</span>
+                Compra +1 carta do monte
+                <br />
+                <span style="color: #22d3ee">◆ Real:</span>
+                Compra +2 cartas do monte
+                <br />
+                <span style="color: #c084fc">◆ Ás-a-Ás:</span>
+                Pega 1 Morto (ou +3 do monte)
               </span>
             </div>
 
@@ -4056,16 +4065,28 @@
 
           renderAll();
 
-          let specialDeadFechado = null;
-          if (state.mode === '1x1_dominacao' && myPlayerIndex === 1) {
-            const meldFechadoCheck = isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex];
-            if (kindBeforeFechado !== 'asas' && classifyMeldForUi(meldFechadoCheck).kind === 'asas') {
-              specialDeadFechado = triggerDominacaoReward(me);
+          let domReward = processDominationReward(me, kindBeforeFechado, classifyMeldForUi(isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex]).kind);
+
+          if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
+            const fromEl = document.querySelector('#drawStockBtn .pile-card');
+            const fromRect = fromEl ? getRect(fromEl) : null;
+            renderHand();
+            if (fromRect) {
+              const anims = domReward.drawnCards.map((c) => {
+                const toEl = cardElById(c.id);
+                if (toEl) {
+                  toEl.style.visibility = 'hidden';
+                  return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
+                    if (toEl) toEl.style.visibility = '';
+                  });
+                }
+                return Promise.resolve();
+              });
+              await Promise.all(anims);
             }
           }
 
-          // Substitua o final deste bloco:
-          const tookDead = specialDeadFechado || (await checkPostMeldStatus(me));
+          const tookDead = domReward?.tookDead || (await checkPostMeldStatus(me));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
@@ -4073,6 +4094,7 @@
             type: 'drawDiscardFechado',
             playerId: state.currentPlayer,
             tookDead: tookDead,
+            drawnCards: domReward?.drawnCards,
             ts: Date.now(),
           };
           ignoreOwnActionId = state.lastAction.id;
@@ -4237,25 +4259,67 @@
         return false;
       }
 
-      function triggerDominacaoReward(p) {
-        if (!state || !p) return null;
+      function processDominationReward(p, oldKind, newKind) {
+        if (!state || state.mode !== '1x1_dominacao') return null;
+        if (oldKind === newKind) return null;
+
+        let reward = { type: 'none' };
+        const hierarchy = { simple: 0, suja: 1, limpa: 2, real: 3, asas: 4 };
+
+        // Premia apenas se houve evolução de nível
+        if (hierarchy[newKind] <= hierarchy[oldKind]) return null;
+
+        if (newKind === 'limpa') reward = { type: 'draw', count: 1 };
+        else if (newKind === 'real') reward = { type: 'draw', count: 2 };
+        else if (newKind === 'asas') reward = { type: 'morto_or_draw', drawFallback: 3 };
+
+        if (reward.type === 'none') return null;
+
+        let tookDead = null;
+        let drawnCards = [];
         const teamId = p.teamId;
-        const taken = state.deadChunksTaken?.[teamId] ?? 0;
-        const max = state.deadChunksMax?.[teamId] ?? 1;
-        if (taken >= max) return null;
 
-        const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
-        if (deadIndex === -1) return null;
+        if (reward.type === 'morto_or_draw') {
+          const taken = state.deadChunksTaken?.[teamId] ?? 0;
+          const max = state.deadChunksMax?.[teamId] ?? 1;
 
-        const dead = state.deadPiles[deadIndex];
-        const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
+          if (taken < max) {
+            const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
+            if (deadIndex !== -1) {
+              const dead = state.deadPiles[deadIndex];
+              const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
+              p.hand.push(...dead.splice(0, chunkSize));
+              sortHand(p.hand);
+              state.deadChunksTaken[teamId] = taken + 1;
+              tookDead = { deadIndex, count: chunkSize };
+              showMessage('👑 DOMINAÇÃO: Ás-a-Ás! Morto direto pra mão!');
+            }
+          }
+          if (!tookDead) reward = { type: 'draw', count: reward.drawFallback };
+        }
 
-        p.hand.push(...dead.splice(0, chunkSize));
-        sortHand(p.hand);
-        state.deadChunksTaken[teamId] = taken + 1;
+        if (reward.type === 'draw') {
+          for (let i = 0; i < reward.count; i++) {
+            if (!state.stock.length) {
+              const recycledIndex = recycleDeadToStockIfPossible();
+              if (recycledIndex === null || !state.stock.length) break;
+            }
+            const c = state.stock.pop();
+            ensureCardId(c);
+            p.hand.push(c);
+            drawnCards.push(c);
 
-        showMessage('👑 DOMINAÇÃO: Ás-a-Ás formou! Pegou um morto extra direto para a mão!');
-        return { deadIndex, count: chunkSize };
+            // Ativa o destaque (glow) nas cartas compradas
+            if (!state.boughtCardIds) state.boughtCardIds = [];
+            state.boughtCardIds.push(c.id);
+          }
+          sortHand(p.hand);
+          if (drawnCards.length > 0) {
+            showMessage(`👑 DOMINAÇÃO: Canastra ${newKind.toUpperCase()}! +${drawnCards.length} carta(s).`);
+          }
+        }
+
+        return { tookDead, drawnCards: drawnCards.length > 0 ? drawnCards.map(packCard) : null };
       }
 
       async function checkPostMeldStatus(player) {
@@ -4349,12 +4413,28 @@
           selectedHandIndexes.clear();
           selectedMeldTarget = null;
 
-          let specialDead1 = null;
-          if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && kindBefore1 !== 'asas' && classifyMeldForUi(targetMeld).kind === 'asas') {
-            specialDead1 = triggerDominacaoReward(currentPlayer());
+          let domReward = processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind);
+
+          if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
+            const fromEl = document.querySelector('#drawStockBtn .pile-card');
+            const fromRect = fromEl ? getRect(fromEl) : null;
+            renderHand();
+            if (fromRect) {
+              const anims = domReward.drawnCards.map((c) => {
+                const toEl = cardElById(c.id);
+                if (toEl) {
+                  toEl.style.visibility = 'hidden';
+                  return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
+                    if (toEl) toEl.style.visibility = '';
+                  });
+                }
+                return Promise.resolve();
+              });
+              await Promise.all(anims);
+            }
           }
 
-          const tookDead = specialDead1 || (await checkPostMeldStatus(currentPlayer()));
+          const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
@@ -4365,6 +4445,7 @@
             meldIndex: forcedIndex,
             cards: cards.map(packCard),
             tookDead: tookDead,
+            drawnCards: domReward?.drawnCards,
             ts: Date.now(),
           };
           ignoreOwnActionId = state.lastAction.id;
@@ -4417,12 +4498,28 @@
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
 
-        let specialDead2 = null;
-        if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && kindBefore2 !== 'asas' && classifyMeldForUi(teamMeld).kind === 'asas') {
-          specialDead2 = triggerDominacaoReward(currentPlayer());
+        let domReward = processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind);
+
+        if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
+          const fromEl = document.querySelector('#drawStockBtn .pile-card');
+          const fromRect = fromEl ? getRect(fromEl) : null;
+          renderHand();
+          if (fromRect) {
+            const anims = domReward.drawnCards.map((c) => {
+              const toEl = cardElById(c.id);
+              if (toEl) {
+                toEl.style.visibility = 'hidden';
+                return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
+                  if (toEl) toEl.style.visibility = '';
+                });
+              }
+              return Promise.resolve();
+            });
+            await Promise.all(anims);
+          }
         }
 
-        const tookDead = specialDead2 || (await checkPostMeldStatus(currentPlayer()));
+        const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
         if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
         state.lastAction = {
@@ -4433,6 +4530,7 @@
           meldIndex: candidateMeldIndexes[0],
           cards: cards.map(packCard),
           tookDead: tookDead,
+          drawnCards: domReward?.drawnCards,
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
@@ -4524,13 +4622,29 @@
           currentTeam().melds.push(meld);
           const meldIdx = currentTeam().melds.length - 1;
 
-          let specialDead = null;
-          if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && classifyMeldForUi(meld).kind === 'asas') {
-            specialDead = triggerDominacaoReward(currentPlayer());
+          // Avaliação Plus Dominação
+          let domReward = processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
+
+          if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
+            const fromEl = document.querySelector('#drawStockBtn .pile-card');
+            const fromRect = fromEl ? getRect(fromEl) : null;
+            renderHand(); // Força as cartas a existirem no DOM para voarem até elas
+            if (fromRect) {
+              const anims = domReward.drawnCards.map((c) => {
+                const toEl = cardElById(c.id);
+                if (toEl) {
+                  toEl.style.visibility = 'hidden';
+                  return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
+                    if (toEl) toEl.style.visibility = '';
+                  });
+                }
+                return Promise.resolve();
+              });
+              await Promise.all(anims);
+            }
           }
 
-          // Puxa o morto ANTES de avisar o Firebase
-          const tookDead = specialDead || (await checkPostMeldStatus(currentPlayer()));
+          const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           state.lastAction = {
@@ -4541,6 +4655,7 @@
             meldIndex: meldIdx,
             cards: cards.map(packCard),
             tookDead: tookDead,
+            drawnCards: domReward?.drawnCards, // <- Envia para o oponente animar
             ts: Date.now(),
           };
 
@@ -5784,6 +5899,18 @@
           }
         };
 
+        const animateRemoteDrawsIfAny = async () => {
+          if (a.drawnCards && a.drawnCards.length > 0) {
+            if (stockRect && handRect) {
+              for (let i = 0; i < a.drawnCards.length; i++) {
+                await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
+                impactAtRect(handRect);
+                if (i < a.drawnCards.length - 1) await new Promise((r) => setTimeout(r, 180));
+              }
+            }
+          }
+        };
+
         if (a.type === 'drawStock') {
           if (a.recycledDeadIndex !== null && a.recycledDeadIndex !== undefined) {
             const deadEl = a.recycledDeadIndex === 1 ? dead1El : dead0El;
@@ -5841,6 +5968,7 @@
           }
 
           await animateRemoteDeadIfAny();
+          await animateRemoteDrawsIfAny();
           return;
         }
 
@@ -5854,6 +5982,7 @@
 
         if (a.type === 'drawDiscardFechado') {
           await animateRemoteDeadIfAny();
+          await animateRemoteDrawsIfAny();
           return;
         }
 
@@ -5881,6 +6010,7 @@
           );
 
           await animateRemoteDeadIfAny();
+          await animateRemoteDrawsIfAny();
           return;
         }
 
@@ -5902,6 +6032,7 @@
           );
 
           await animateRemoteDeadIfAny();
+          await animateRemoteDrawsIfAny();
           return;
         }
 
@@ -5965,18 +6096,23 @@
           team.melds.push(cards);
           const meldIdx = team.melds.length - 1;
 
-          // Recompensa de Dominação para o BOT
-          let specialDead = null;
-          if (s.mode === '1x1_dominacao' && botIndex === 1 && classifyMeldForUi(cards).kind === 'asas') {
-            specialDead = triggerDominacaoReward(me);
-          }
-
-          const tookDead = specialDead || (await botEngine._checkBotMortoOrWin(botIndex));
+          let domReward = processDominationReward(me, 'simple', classifyMeldForUi(cards).kind);
+          const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           const freshS = botEngine.getState();
           if (freshS) {
-            freshS.lastAction = { id: newActionId(), type: 'meldNew', playerId: botIndex, teamId: team.id, meldIndex: meldIdx, cards: cards.map(packCard), tookDead, ts: Date.now() };
+            freshS.lastAction = {
+              id: newActionId(),
+              type: 'meldNew',
+              playerId: botIndex,
+              teamId: team.id,
+              meldIndex: meldIdx,
+              cards: cards.map(packCard),
+              tookDead,
+              drawnCards: domReward?.drawnCards,
+              ts: Date.now(),
+            };
             renderAll();
             await commitState();
           }
@@ -5995,18 +6131,23 @@
           team.melds[meldIndex].push(...cards);
           botEngine.normalizeMeld(team.melds[meldIndex]);
 
-          // Recompensa de Dominação para o BOT
-          let specialDead = null;
-          if (s.mode === '1x1_dominacao' && botIndex === 1 && kindBefore !== 'asas' && classifyMeldForUi(team.melds[meldIndex]).kind === 'asas') {
-            specialDead = triggerDominacaoReward(me);
-          }
-
-          const tookDead = specialDead || (await botEngine._checkBotMortoOrWin(botIndex));
+          let domReward = processDominationReward(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind);
+          const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           const freshS = botEngine.getState();
           if (freshS) {
-            freshS.lastAction = { id: newActionId(), type: 'meldExtend', playerId: botIndex, teamId: team.id, meldIndex: meldIndex, cards: cards.map(packCard), tookDead, ts: Date.now() };
+            freshS.lastAction = {
+              id: newActionId(),
+              type: 'meldExtend',
+              playerId: botIndex,
+              teamId: team.id,
+              meldIndex: meldIndex,
+              cards: cards.map(packCard),
+              tookDead,
+              drawnCards: domReward?.drawnCards,
+              ts: Date.now(),
+            };
             renderAll();
             await commitState();
           }
@@ -6121,22 +6262,28 @@
             return false;
           }
 
+          let kindBeforeFechado = '';
+          let meldToCheck = null;
+
           if (intent.action === 'extend') {
+            kindBeforeFechado = classifyMeldForUi(team.melds[intent.meldIndex]).kind;
             team.melds[intent.meldIndex].push(topCard);
             botEngine.normalizeMeld(team.melds[intent.meldIndex]);
+            meldToCheck = team.melds[intent.meldIndex];
           } else if (intent.action === 'new') {
+            kindBeforeFechado = 'simple';
             const cardsFromHand = intent.handIndexes.map((i) => me.hand[i]);
             intent.handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
             const newMeld = [...cardsFromHand, topCard];
             botEngine.normalizeMeld(newMeld);
             team.melds.push(newMeld);
+            meldToCheck = newMeld;
           }
 
           if (pile.length > 0) {
             me.hand.push(...pile);
           }
 
-          // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
             if (s.stock.length > 0) {
               const extraCard = s.stock.pop();
@@ -6145,16 +6292,26 @@
             }
           }
 
+          let domReward = processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind);
+
           sortHand(me.hand);
           s.hasDrawnThisTurn = true;
           s.partialDraw = false;
           s.pickedDiscardCardId = null;
 
-          await botEngine._checkBotMortoOrWin(botIndex);
+          const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
+          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           const freshS = botEngine.getState();
           if (freshS) {
-            freshS.lastAction = { id: newActionId(), type: 'drawDiscardFechado', playerId: botIndex, ts: Date.now() };
+            freshS.lastAction = {
+              id: newActionId(),
+              type: 'drawDiscardFechado',
+              playerId: botIndex,
+              tookDead,
+              drawnCards: domReward?.drawnCards,
+              ts: Date.now(),
+            };
             renderAll();
             await commitState();
           }
@@ -7075,9 +7232,11 @@
         normalizeMeldOrder(meld);
         team.melds.push(meld);
 
-        // Dispara a recompensa no debug se for o J2 no modo Dominação
-        if (state.mode === '1x1_dominacao' && myPlayerIndex === 1 && type === 'asas') {
-          triggerDominacaoReward(currentPlayer());
+        // Dispara a nova recompensa Plus Dominação no debug
+        let domReward = processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
+
+        if (domReward?.tookDead) {
+          await animateDeadToHandLocal(domReward.tookDead.deadIndex);
         }
 
         renderAll();
