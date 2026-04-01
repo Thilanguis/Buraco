@@ -2293,6 +2293,7 @@
         width: 280px; /* Aumentado para caber as explicações */
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         display: none;
+        transition: all 0.3s ease;
       }
       .goals-hud-title {
         color: #facc15;
@@ -2304,6 +2305,35 @@
         padding-bottom: 4px;
         display: flex;
         justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+      }
+      .goals-toggle-icon {
+        display: inline-block;
+        transition: transform 0.3s ease;
+        margin-right: 4px;
+        font-size: 9px;
+      }
+      .goals-hud-container.collapsed .goals-hud-title {
+        margin-bottom: 0;
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      .goals-hud-container.collapsed .goals-toggle-icon {
+        transform: rotate(-90deg);
+      }
+      #goalsListHud {
+        overflow: hidden;
+        transition:
+          max-height 0.3s ease,
+          opacity 0.3s ease;
+        max-height: 500px;
+        opacity: 1;
+      }
+      .goals-hud-container.collapsed #goalsListHud {
+        max-height: 0;
+        opacity: 0;
       }
       .goal-item {
         display: flex;
@@ -2672,8 +2702,14 @@
               <div id="gameModeBadge" style="margin-top: 5px; font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; padding-left: 4px"></div>
 
               <div id="goalsHud" class="goals-hud-container">
-                <div class="goals-hud-title">
-                  <span>🎯 METAS PIX</span>
+                <div class="goals-hud-title" onclick="toggleGoalsHud()">
+                  <div>
+                    <span class="goals-toggle-icon">▼</span>
+                    <span>
+                      🎯 METAS PIX
+                      <span id="goalsCounterHud" style="color: #94a3b8; font-size: 9px; margin-left: 4px">(0/5)</span>
+                    </span>
+                  </div>
                   <span id="goalsTotalHud" style="color: #4ade80">R$ 0,00</span>
                 </div>
                 <div id="goalsListHud"></div>
@@ -2919,6 +2955,16 @@
       let ignoreOwnActionId = null;
 
       let movingWild = null;
+
+      // --- CONTROLE DO ACORDEÃO DE METAS ---
+      window.isGoalsHudCollapsed = false;
+      window.toggleGoalsHud = function () {
+        window.isGoalsHudCollapsed = !window.isGoalsHudCollapsed;
+        const hud = document.getElementById('goalsHud');
+        if (hud) {
+          hud.classList.toggle('collapsed', window.isGoalsHudCollapsed);
+        }
+      };
 
       // --- CONTROLE DE TELA VIVA (WAKE LOCK) ---
       let wakeLock = null;
@@ -6201,8 +6247,22 @@
             const myFin = myTeamId === 0 ? fin1 : fin2;
             const isWin = (myTeamId === 0 ? s1 : s2) > (myTeamId === 0 ? s2 : s1);
 
+            let achievedCount = 0;
+            if (isWin) achievedCount++;
+            if (myFin.b.diff > 0) achievedCount++;
+            if (myFin.b.negative > 0) achievedCount++;
+            if (myFin.b.countAsas > 0) achievedCount++;
+            if (myFin.b.milestonesAchieved > 0) achievedCount++;
+
             hud.style.display = !state.finished && myPlayerIndex !== -1 ? 'block' : 'none';
+            hud.classList.toggle('collapsed', window.isGoalsHudCollapsed);
             document.getElementById('goalsTotalHud').textContent = 'R$ ' + myFin.total.toFixed(2).replace('.', ',');
+
+            const counterEl = document.getElementById('goalsCounterHud');
+            if (counterEl) {
+              counterEl.textContent = `(${achievedCount}/5)`;
+              counterEl.style.color = achievedCount === 5 ? '#4ade80' : '#94a3b8';
+            }
 
             const list = document.getElementById('goalsListHud');
             // ATUALIZADO: Legenda do HUD para 1000 pts
