@@ -2707,6 +2707,7 @@
                     <span class="goals-toggle-icon">▼</span>
                     <span>
                       🎯 METAS PIX
+                      <span id="winnerNameHud" style="color: #facc15; font-size: 8px; margin-left: 4px; opacity: 0.8"></span>
                       <span id="goalsCounterHud" style="color: #94a3b8; font-size: 9px; margin-left: 4px">(0/5)</span>
                     </span>
                   </div>
@@ -6240,23 +6241,33 @@
           updateBadge(document.getElementById('liveMoney2'), fin2);
 
           // 🎨 PINTANDO A CHECKLIST DE METAS (COM HTML CORRIGIDO)
-          const myTeamId = state.players[myPlayerIndex]?.teamId;
           const hud = document.getElementById('goalsHud');
 
-          if (myTeamId != null && hud) {
-            const myFin = myTeamId === 0 ? fin1 : fin2;
-            const isWin = (myTeamId === 0 ? s1 : s2) > (myTeamId === 0 ? s2 : s1);
+          if (hud) {
+            // --- MOTOR GLOBAL: Sempre mostra os dados de quem está vencendo ---
+            const isT1Leading = s1 >= s2;
+            const winnerFin = isT1Leading ? fin1 : fin2;
+            const winnerName = isT1Leading ? state.teams[0].name : state.teams[1].name;
+            const isWin = s1 !== s2; // Se houver empate real, a meta de vitória não conta
 
             let achievedCount = 0;
             if (isWin) achievedCount++;
-            if (myFin.b.diff > 0) achievedCount++;
-            if (myFin.b.negative > 0) achievedCount++;
-            if (myFin.b.countAsas > 0) achievedCount++;
-            if (myFin.b.milestonesAchieved > 0) achievedCount++;
+            if (winnerFin.b.diff > 0) achievedCount++;
+            if (winnerFin.b.negative > 0) achievedCount++;
+            if (winnerFin.b.countAsas > 0) achievedCount++;
+            if (winnerFin.b.milestonesAchieved > 0) achievedCount++;
 
-            hud.style.display = !state.finished && myPlayerIndex !== -1 ? 'block' : 'none';
+            // PERSISTÊNCIA: Exibe para todos na mesa e não some no fim do jogo
+            hud.style.display = myPlayerIndex !== -1 ? 'block' : 'none';
             hud.classList.toggle('collapsed', window.isGoalsHudCollapsed);
-            document.getElementById('goalsTotalHud').textContent = 'R$ ' + myFin.total.toFixed(2).replace('.', ',');
+
+            // Atualiza o nome do líder ao lado do título
+            const nameEl = document.getElementById('winnerNameHud');
+            if (nameEl) {
+              nameEl.textContent = s1 === s2 ? '(Empate)' : `(${winnerName})`;
+            }
+
+            document.getElementById('goalsTotalHud').textContent = 'R$ ' + winnerFin.total.toFixed(2).replace('.', ',');
 
             const counterEl = document.getElementById('goalsCounterHud');
             if (counterEl) {
@@ -6264,28 +6275,28 @@
               counterEl.style.color = achievedCount === 5 ? '#4ade80' : '#94a3b8';
             }
 
+            // Renderiza a lista de itens sempre baseada no vencedor para todos verem igual
             const list = document.getElementById('goalsListHud');
-            // ATUALIZADO: Legenda do HUD para 1000 pts
             list.innerHTML = `
                     <div class="goal-item ${isWin ? 'achieved' : ''}">
                         <span>✅ Vitória Base</span> 
                         <strong>+R$ ${isWin ? '5,00' : '0,00'}</strong>
                     </div>
-                    <div class="goal-item ${myFin.b.diff > 0 ? 'achieved' : ''}">
+                    <div class="goal-item ${winnerFin.b.diff > 0 ? 'achieved' : ''}">
                         <span>📈 Diferença (R$ 0,01/pt)</span> 
-                        <strong>+R$ ${myFin.b.diff.toFixed(2).replace('.', ',')}</strong>
+                        <strong>+R$ ${winnerFin.b.diff.toFixed(2).replace('.', ',')}</strong>
                     </div>
-                    <div class="goal-item ${myFin.b.negative > 0 ? 'achieved' : ''}">
+                    <div class="goal-item ${winnerFin.b.negative > 0 ? 'achieved' : ''}">
                         <span>☠️ Adv. Zerado/Negativo</span> 
-                        <strong>+R$ ${myFin.b.negative > 0 ? '5,00' : '0,00'}</strong>
+                        <strong>+R$ ${winnerFin.b.negative > 0 ? '5,00' : '0,00'}</strong>
                     </div>
-                    <div class="goal-item ${myFin.b.countAsas > 0 ? 'achieved' : ''}">
-                        <span>⭐ Bônus Ás-a-Ás (${myFin.b.countAsas}/4)</span> 
-                        <strong>+R$ ${myFin.b.asas.toFixed(2).replace('.', ',')}</strong>
+                    <div class="goal-item ${winnerFin.b.countAsas > 0 ? 'achieved' : ''}">
+                        <span>⭐ Bônus Ás-a-Ás (${winnerFin.b.countAsas}/4)</span> 
+                        <strong>+R$ ${winnerFin.b.asas.toFixed(2).replace('.', ',')}</strong>
                     </div>
-                    <div class="goal-item ${myFin.b.milestonesAchieved > 0 ? 'achieved' : ''}">
+                    <div class="goal-item ${winnerFin.b.milestonesAchieved > 0 ? 'achieved' : ''}">
                         <span>🔥 Metas Vantagem (1000 pts)</span> 
-                        <strong>+R$ ${myFin.b.milestone.toFixed(2).replace('.', ',')}</strong>
+                        <strong>+R$ ${winnerFin.b.milestone.toFixed(2).replace('.', ',')}</strong>
                     </div>
                 `;
           }
