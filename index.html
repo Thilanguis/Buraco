@@ -2367,6 +2367,49 @@
         color: #4ade80;
       }
 
+      .goal-item.expandable {
+        flex-direction: column;
+        align-items: stretch;
+        cursor: pointer;
+      }
+      .goal-item.expandable .goal-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+      }
+      .goal-details {
+        max-height: 0;
+        overflow: hidden;
+        transition:
+          max-height 0.3s ease,
+          padding 0.3s ease,
+          margin-top 0.3s ease,
+          opacity 0.3s ease;
+        opacity: 0;
+        /* Fundo e bordas removidos para integração total */
+        padding: 0;
+        margin-top: 0;
+      }
+      .goal-item.expandable.expanded .goal-details {
+        /* Aumentado o max-height para segurança */
+        max-height: 200px;
+        opacity: 1;
+        margin-top: 6px;
+        /* Cria a indentação e o guia visual à esquerda */
+        padding-left: 12px;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .goal-item.expandable .expand-icon {
+        display: inline-block;
+        transition: transform 0.3s ease;
+        margin-right: 4px;
+        font-size: 8px;
+      }
+      .goal-item.expandable.expanded .expand-icon {
+        transform: rotate(90deg);
+      }
+
       /* Ajuste Mobile: Encolhe o HUD para não tapar o jogo */
       @media (max-width: 768px), (max-height: 600px) {
         .goals-hud-container {
@@ -2974,6 +3017,16 @@
         const hud = document.getElementById('goalsHud');
         if (hud) {
           hud.classList.toggle('collapsed', window.isGoalsHudCollapsed);
+        }
+      };
+
+      window.isAsasDetailsExpanded = false;
+      window.toggleAsasDetails = function (event) {
+        if (event) event.stopPropagation(); // Evita conflito caso clique propague
+        window.isAsasDetailsExpanded = !window.isAsasDetailsExpanded;
+        const el = document.getElementById('asasGoalItem');
+        if (el) {
+          el.classList.toggle('expanded', window.isAsasDetailsExpanded);
         }
       };
 
@@ -6289,7 +6342,7 @@
             const list = document.getElementById('goalsListHud');
             list.innerHTML = `
                     <div class="goal-item ${isWin ? 'achieved' : ''}">
-                        <span>✅ Vitória Base</span> 
+                        <span>✅ Vitória (R$ 5)</span> 
                         <strong>+R$ ${isWin ? '5,00' : '0,00'}</strong>
                     </div>
                     <div class="goal-item ${winnerFin.b.diff > 0 ? 'achieved' : ''}">
@@ -6297,15 +6350,31 @@
                         <strong>+R$ ${winnerFin.b.diff.toFixed(2).replace('.', ',')}</strong>
                     </div>
                     <div class="goal-item ${winnerFin.b.negative > 0 ? 'achieved' : ''}">
-                        <span>☠️ Adv. Zerado/Negativo</span> 
+                        <span>☠️ Adv. Negativo (R$ 5)</span> 
                         <strong>+R$ ${winnerFin.b.negative > 0 ? '5,00' : '0,00'}</strong>
                     </div>
-                    <div class="goal-item ${winnerFin.b.countAsas > 0 ? 'achieved' : ''}">
-                        <span>⭐ Bônus Ás-a-Ás (${winnerFin.b.countAsas}/4)</span> 
-                        <strong>+R$ ${winnerFin.b.asas.toFixed(2).replace('.', ',')}</strong>
+                    <div id="asasGoalItem" class="goal-item expandable ${winnerFin.b.countAsas > 0 ? 'achieved' : ''} ${window.isAsasDetailsExpanded ? 'expanded' : ''}" onclick="toggleAsasDetails(event)">
+                        <div class="goal-item-header">
+                            <span><span class="expand-icon">▶</span>⭐ Bônus Ás-a-Ás (${winnerFin.b.countAsas}/4)</span> 
+                            <strong>+R$ ${winnerFin.b.asas.toFixed(2).replace('.', ',')}</strong>
+                        </div>
+                        <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.countAsas >= 1 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>1ª Ás-a-Ás:</span> <span>+R$ 3,00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.countAsas >= 2 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>2ª Ás-a-Ás:</span> <span>+R$ 4,00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.countAsas >= 3 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>3ª Ás-a-Ás:</span> <span>+R$ 5,00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${winnerFin.b.countAsas >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>4ª Ás-a-Ás:</span> <span>+R$ 15,00</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="goal-item ${winnerFin.b.milestonesAchieved > 0 ? 'achieved' : ''}">
-                        <span>🔥 Metas Vantagem (1000 pts)</span> 
+                        <span>🔥 Metas (R$ 2/1000 pts)</span> 
                         <strong>+R$ ${winnerFin.b.milestone.toFixed(2).replace('.', ',')}</strong>
                     </div>
                 `;
@@ -7843,6 +7912,12 @@
         const currentNames = [state.players[0]?.name || '', state.players[1]?.name || '', state.players[2]?.name || '', state.players[3]?.name || ''];
 
         const currentPix = [state.teams[0]?.pix || '', state.teams[1]?.pix || ''];
+
+        // Sincroniza o DOM com o estado atual para o startGame() não perder o PIX e o Tema do Baralho
+        document.getElementById('deckThemeSelect').value = state.deckTheme || 'classico';
+        document.getElementById('betToggle').value = state.isBetting ? 'sim' : 'nao';
+        document.getElementById('betBase').value = state.betBase || 5;
+        document.getElementById('betPerPoint').value = state.betPerPoint || 0.01;
 
         // 🧹 FAXINA GLOBAL: Limpa a memória do navegador para não bugar a nova partida
         if (window.botPlayTimeoutId) {
