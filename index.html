@@ -4454,13 +4454,14 @@
 
           if (selectedMeldTarget) {
             const [tId, mIdx] = selectedMeldTarget.split(':');
-            if (parseInt(tId) === team.id) targetIndexes.push(parseInt(mIdx));
+            // Checagem extra: só tenta empurrar pro jogo se ele de fato existir na memória!
+            if (parseInt(tId) === team.id && team.melds[parseInt(mIdx)]) targetIndexes.push(parseInt(mIdx));
           } else {
             team.melds.forEach((m, i) => targetIndexes.push(i));
           }
 
           // 🧠 Simulador Fantasma Injetado na validação da compra do Lixo
-          const simulateMeldDiscard = (baseMeld, newCards, topC) => {
+          const simulateMeldDiscard = (baseMeld = [], newCards, topC) => {
             const combined = [...baseMeld, ...newCards, topC].map((c) => (c ? { ...c } : null));
             combined.forEach((c) => {
               if (c && !c.joker && (c.rank === '2' || c.rank === 2)) {
@@ -5852,6 +5853,9 @@
             } else {
               selectedHandIndexes.add(idx);
             }
+
+            if (selectedHandIndexes.size === 0) selectedMeldTarget = null; // Auto-clear de segurança
+
             renderHand();
             renderMelds(); // Atualiza a mesa para acender/apagar a zona de drop
           };
@@ -7143,6 +7147,7 @@
           selectedHandIndexes.clear();
           // ... (resto do bloco continua igual)
           movingWild = null;
+          selectedMeldTarget = null; // MATA A SELEÇÃO FANTASMA AQUI
 
           // 🛡️ PRESERVAÇÃO DE CADEIRA: Mantém você na mesma posição no Lobby caso a sala reinicie
           const localSelect = document.getElementById('localPlayerSelect');
@@ -8030,6 +8035,7 @@
         activeTurnNumber = -1;
         movingWild = null;
         selectedHandIndexes.clear();
+        selectedMeldTarget = null; // MATA A SELEÇÃO FANTASMA AQUI TAMBÉM
         stopTurnTimer();
 
         // Destrava a tela se o DevTools estava com o jogo congelado
