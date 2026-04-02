@@ -662,6 +662,12 @@
         height: 100%;
         display: flex;
         flex-direction: column;
+        border-radius: 12px;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+      }
+      .team-panel.can-drop-new {
+        cursor: pointer;
       }
 
       .meld-line {
@@ -674,12 +680,12 @@
         cursor: pointer;
         border: 1px solid transparent;
         flex: 0 0 auto;
-        min-width: 90px; /* Reduzido de 140px para a caixa abraçar os jogos */
+        min-width: 90px;
         max-width: 100%;
+        transition: background 0.2s;
       }
-      .meld-line.selected-meld {
-        border-color: #facc15;
-        background: rgba(250, 204, 21, 0.2);
+      .meld-line:active {
+        background: rgba(255, 255, 255, 0.1);
       }
       .meld-line-cards {
         display: flex;
@@ -2646,24 +2652,46 @@
               </div>
             </div>
 
-            <button
-              id="inviteBtn"
-              style="
-                width: 100%;
-                padding: 12px;
-                border-radius: 12px;
-                border: 1px dashed #3b82f6;
-                font-weight: 900;
-                cursor: pointer;
-                background: rgba(37, 99, 235, 0.15);
-                color: #60a5fa;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                margin-top: 15px;
-                transition: all 0.3s;
-              ">
-              📲 CONVIDAR JOGADOR
-            </button>
+            <div style="display: flex; gap: 10px; margin-top: 15px">
+              <button
+                id="inviteBtn"
+                style="
+                  flex: 1;
+                  padding: 12px;
+                  border-radius: 12px;
+                  border: 1px dashed #3b82f6;
+                  font-weight: 900;
+                  cursor: pointer;
+                  background: rgba(37, 99, 235, 0.15);
+                  color: #60a5fa;
+                  text-transform: uppercase;
+                  letter-spacing: 1px;
+                  margin: 0;
+                  transition: all 0.3s;
+                ">
+                📲 CONVIDAR
+              </button>
+
+              <button
+                id="addBotBtn"
+                onclick="fillEmptyWithBots()"
+                style="
+                  flex: 1;
+                  padding: 12px;
+                  border-radius: 12px;
+                  border: 1px dashed #a855f7;
+                  font-weight: 900;
+                  cursor: pointer;
+                  background: rgba(168, 85, 247, 0.15);
+                  color: #c084fc;
+                  text-transform: uppercase;
+                  letter-spacing: 1px;
+                  margin: 0;
+                  transition: all 0.3s;
+                ">
+                🤖 ADD BOT
+              </button>
+            </div>
 
             <div style="display: flex; gap: 10px; margin-top: 10px">
               <button id="startBtn" style="flex: 1; margin-top: 0">ESTOU PRONTO</button>
@@ -2845,8 +2873,6 @@
             <div id="message"></div>
 
             <div class="player-actions">
-              <button id="meldBtn">⬇️ Baixar</button>
-              <button id="moveWildBtn">↔️ Mover 2/Joker</button>
               <button id="showScoreBtn" style="display: none; background: #facc15; color: #000; font-weight: 900">🏆 PLACAR</button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
             </div>
@@ -4451,10 +4477,7 @@
           }
 
           if (validExtensions.length > 0) {
-            if (validExtensions.length > 1 && !selectedMeldTarget) {
-              showMessage('Encaixa em vários jogos. Selecione o destino na mesa primeiro!');
-              return;
-            }
+            // Em caso puramente raro de 2 jogos idênticos, estende o primeiro e segue a vida
             extendedMeldIndex = validExtensions[0];
           }
           // 2. Se não encaixou na mesa, tenta formar um NOVO JOGO
@@ -5024,7 +5047,7 @@
         return true;
       }
 
-      async function makeMeldFromSelection() {
+      async function makeMeldFromSelection(forceNew = false) {
         if (window.isMelding) return; // 🛡️ TRAVA ANTI-SPAM: Impede duplo-clique
         if (!ensureMyTurn()) return;
         if (!state.hasDrawnThisTurn) {
@@ -5047,21 +5070,34 @@
           // TRAVA ANTI-CLONE: Limpa a seleção imediatamente e renderiza
           selectedHandIndexes.clear();
           renderHand();
+          renderMelds(); // Limpa o efeito de Dropzone do fundo
 
           cards.forEach((c) => {
             c.forceNatural = false;
             c.forceWild = false;
           });
 
-          const extended = await attemptExtendExistingMeld(cards, indexes);
-          if (extended) return;
+          if (!forceNew) {
+            const extended = await attemptExtendExistingMeld(cards, indexes);
+            if (extended) return;
 
+            // Se tentou colocar as cartas num jogo específico mas elas não encaixaram, aborta!
+            // Isso impede que o sistema crie um jogo novo indesejado com as sobras.
+            if (selectedMeldTarget) {
+              renderHand();
+              return;
+            }
+          }
+
+          // --- LÓGICA EXCLUSIVA PARA JOGO NOVO ---
           if (indexes.length < 3) {
             showMessage('⚠️ Um novo jogo exige no mínimo 3 cartas em sequência.');
+            renderHand(); // Devolve as cartas para a tela visualmente
             return;
           }
           if (!isValidSequenceMeld(cards)) {
             showMessage('❌ Sequência inválida: As cartas não formam um jogo estruturado.');
+            renderHand();
             return;
           }
 
@@ -5667,15 +5703,6 @@
 
         const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
 
-        const moveBtn = document.getElementById('moveWildBtn');
-        if (moveBtn) {
-          const me = state.players[myPlayerIndex];
-          const myTeamId = me?.teamId;
-          const dest = parseMeldKey(selectedMeldTarget) || (movingWild ? { teamId: movingWild.fromTeamId, meldIdx: movingWild.fromMeldIndex } : null);
-          const can = myTurn && state.hasDrawnThisTurn && !!movingWild && dest && dest.teamId === myTeamId;
-          moveBtn.disabled = !can;
-        }
-
         // Toca o som e vibra o celular SOMENTE na virada pro seu turno (Ignora turno 0 para não dar spoiler do Dado)
         const isDicePhase = state.turnNumber === 0 && !state.hasDrawnThisTurn;
 
@@ -5706,8 +5733,6 @@
         document.getElementById('drawDiscardBtn').style.pointerEvents = canDrawDiscard || canDiscardToPile ? 'auto' : 'none';
         document.getElementById('drawDiscardBtn').style.opacity = canDrawDiscard || canDiscardToPile ? '1' : '0.5';
 
-        document.getElementById('meldBtn').disabled = !myTurn || !state.hasDrawnThisTurn;
-
         const me = state.players[myPlayerIndex];
         const myTeamId = me ? me.teamId : null; // Protege o Team ID
 
@@ -5717,8 +5742,6 @@
         const isFin = !!state.finished;
         const isSpec = myPlayerIndex === -1;
         document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
-        document.getElementById('meldBtn').style.display = isFin || isSpec ? 'none' : 'block';
-        document.getElementById('moveWildBtn').style.display = isFin || isSpec ? 'none' : 'block';
 
         let specBadge = document.getElementById('specBadgeInfo');
         if (!specBadge) {
@@ -5830,6 +5853,7 @@
               selectedHandIndexes.add(idx);
             }
             renderHand();
+            renderMelds(); // Atualiza a mesa para acender/apagar a zona de drop
           };
           container.appendChild(div);
         });
@@ -6072,10 +6096,31 @@
         let s1 = 0,
           s2 = 0;
 
+        const meLocal = state.players[myPlayerIndex];
+        const myTurnLocal = !state.finished && state.currentPlayer === myPlayerIndex;
+
         state.teams.forEach((t, i) => {
           const info = computeTeamMeldScore(t);
           if (i === 0) s1 = info.total;
           else s2 = info.total;
+
+          const panel = document.getElementById(`teamPanel${i + 1}`);
+          if (panel) {
+            // Efeito visual de Dropzone
+            if (meLocal && t.id === meLocal.teamId && myTurnLocal && selectedHandIndexes.size > 0) {
+              panel.classList.add('can-drop-new');
+            } else {
+              panel.classList.remove('can-drop-new');
+            }
+
+            // Clique no fundo da caixa cria um NOVO JOGO
+            panel.onclick = (ev) => {
+              if (meLocal && t.id === meLocal.teamId && myTurnLocal && selectedHandIndexes.size > 0) {
+                selectedMeldTarget = null; // Zera o alvo para garantir jogo limpo
+                makeMeldFromSelection(true); // Força criação de jogo novo
+              }
+            };
+          }
 
           const pNames = state.players
             .filter((p) => p.teamId === t.id)
@@ -6112,7 +6157,6 @@
             div.className = 'meld-line';
             const key = t.id + ':' + midx;
             div.dataset.meldKey = key;
-            if (selectedMeldTarget === key) div.classList.add('selected-meld');
 
             const row = document.createElement('div');
             row.className = 'meld-line-cards';
@@ -6134,20 +6178,6 @@
               minic.dataset.cardIndex = cidx;
               minic.innerHTML = cardFrontHTML(c);
 
-              const me = state.players[myPlayerIndex];
-              const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
-              const isTrapped = cidx > 0 && cidx < meld.length - 1;
-
-              if (me && t.id === me.teamId && myTurn && state.hasDrawnThisTurn && isMovableTwoOrJoker(c) && !isTrapped) {
-                minic.classList.add('wild-pickable');
-                if (movingWild && movingWild.fromTeamId === t.id && movingWild.fromMeldIndex === midx && movingWild.fromCardIndex === cidx) {
-                  minic.classList.add('wild-picked');
-                }
-                minic.onclick = (ev) => {
-                  ev.stopPropagation();
-                  pickWildFromMeld(t.id, midx, cidx);
-                };
-              }
               row.appendChild(minic);
             });
 
@@ -6162,19 +6192,6 @@
               closed.dataset.cardIndex = meld.length - 1;
               closed.innerHTML = cardFrontHTML(last);
 
-              const me = state.players[myPlayerIndex];
-              const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
-
-              if (me && t.id === me.teamId && myTurn && state.hasDrawnThisTurn && isMovableTwoOrJoker(last)) {
-                closed.classList.add('wild-pickable');
-                if (movingWild && movingWild.fromTeamId === t.id && movingWild.fromMeldIndex === midx && movingWild.fromCardIndex === meld.length - 1) {
-                  closed.classList.add('wild-picked');
-                }
-                closed.onclick = (ev) => {
-                  ev.stopPropagation();
-                  pickWildFromMeld(t.id, midx, meld.length - 1);
-                };
-              }
               row.appendChild(closed);
             }
 
@@ -6184,10 +6201,15 @@
 
             div.appendChild(row);
             div.appendChild(meta);
-            div.onclick = () => {
-              selectedMeldTarget = selectedMeldTarget === key ? null : key;
-              showMessage(selectedMeldTarget ? 'Jogo selecionado.' : 'Seleção limpa.');
-              renderMelds();
+            div.onclick = (ev) => {
+              ev.stopPropagation(); // Impede o clique de vazar pro fundo da caixa
+
+              if (meLocal && t.id === meLocal.teamId && myTurnLocal && selectedHandIndexes.size > 0) {
+                // ESTENDE O JOGO IMEDIATAMENTE
+                selectedMeldTarget = key;
+                makeMeldFromSelection(false);
+              }
+              // O 'else' que acendia a borda amarela foi aniquilado
             };
             target.appendChild(div);
           });
@@ -7492,6 +7514,82 @@
         setDoc(gameRef, { lobby: lobby, updatedAt: Date.now() }, { merge: true });
       };
 
+      window.fillEmptyWithBots = function () {
+        const femaleNames = [
+          'Luana',
+          'Camila',
+          'Juliana',
+          'Amanda',
+          'Letícia',
+          'Fernanda',
+          'Beatriz',
+          'Larissa',
+          'Mariana',
+          'Carolina',
+          'Sofia',
+          'Isabella',
+          'Helena',
+          'Valentina',
+          'Laura', // Originais
+          'Gabriela',
+          'Rafaela',
+          'Manuela',
+          'Lorena',
+          'Nicole',
+          'Rebeca',
+          'Vitória',
+          'Alice',
+          'Clara',
+          'Marina',
+          'Bianca',
+          'Lívia',
+          'Cecília',
+          'Mirella',
+          'Esther',
+          'Sarah',
+          'Antonella',
+          'Giovanna',
+          'Maya',
+          'Isadora',
+          'Clarice',
+          'Pérola',
+          'Aurora',
+          'Olívia',
+          'Bárbara',
+          'Daniela',
+          'Priscila',
+          'Tatiana',
+          'Renata',
+          'Vanessa',
+          'Patrícia',
+          'Milena',
+          'Brenda',
+          'Natália',
+        ];
+
+        const mode = document.getElementById('modeSelect').value;
+        if (!mode) return;
+
+        let reqPlayers = 2;
+        if (mode === '1x2') reqPlayers = 3;
+        if (mode === '2x2' || mode === '1x3') reqPlayers = 4;
+
+        let added = false;
+        for (let i = 1; i <= reqPlayers; i++) {
+          const input = document.getElementById(`p${i}Name`);
+          if (input && input.value.trim() === '') {
+            const randomName = femaleNames[Math.floor(Math.random() * femaleNames.length)];
+            input.value = `BOT ${randomName}`;
+            added = true;
+          }
+        }
+
+        if (added) {
+          if (typeof window.updateMenuDynamic === 'function') window.updateMenuDynamic();
+          if (typeof window.pushLobby === 'function') window.pushLobby();
+        }
+      };
+
       document.querySelectorAll('#configSection input').forEach((el) => {
         if (el.id !== 'localPlayerSelect') {
           el.addEventListener('keyup', (e) => {
@@ -8274,8 +8372,7 @@
       };
       document.getElementById('drawStockBtn').onclick = drawFromStock;
       document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
-      document.getElementById('meldBtn').onclick = makeMeldFromSelection;
-      document.getElementById('moveWildBtn').onclick = movePickedWildToSelectedMeld;
+
       // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
       document.getElementById('endGameBtn').onclick = async () => {
         if (!state) return;
@@ -8288,22 +8385,32 @@
         }
         window.lastBotTurnPlayed = null;
 
-        // ZERA a votação completamente para não herdar fantasmas de votações antigas
         state.surrender = { active: true, votes: {} };
-        state.surrender.votes[myPlayerIndex] = true;
+        if (myPlayerIndex !== -1) state.surrender.votes[myPlayerIndex] = true;
 
         state.players.forEach((p) => {
           if (p.name.toUpperCase().includes('BOT')) state.surrender.votes[p.id] = true;
         });
 
-        // Se for jogo Solo ou só com bots, não precisa de aprovação, destrói direto
         let yesCount = Object.values(state.surrender.votes).filter((v) => v).length;
+
+        // Se a sala estiver pronta para ser fechada (Solo ou Humanos + Bots votaram)
         if (yesCount >= state.players.length && state.players.length > 0) {
-          await deleteDoc(gameRef);
+          try {
+            await deleteDoc(gameRef);
+          } catch (err) {
+            console.error('[ERRO] Falha ao deletar sala no Firebase. Forçando saída local:', err);
+            // Fallback imediato: Se o Firestore barrar o delete, retira o jogador da sala bugada na marra
+            window.location.replace(window.location.pathname);
+          }
           return;
         }
 
-        await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+        try {
+          await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+        } catch (err) {
+          console.error('[ERRO] Falha ao atualizar status de rendição:', err);
+        }
       };
 
       document.getElementById('voteYesBtn').onclick = async () => {
