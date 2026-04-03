@@ -4061,6 +4061,7 @@
         const toEl = document.querySelector('#drawStockBtn .pile-card');
         if (fromEl && toEl) {
           const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
+          fromEl.style.opacity = '0'; // Esconde a pilha original na hora do voo
           await flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back');
           impactAtRect(getRect(toEl));
         }
@@ -4081,6 +4082,7 @@
           const fakeCard = { rank: '★', suit: '★', joker: true, id: `dead_${Date.now()}`, back: 'red' };
           const fromRect = { left: fr.left, top: fr.top, width: fr.width, height: fr.height };
           const toRect = { left: hr.left + hr.width * 0.5 - 30, top: hr.top + 10, width: 60, height: 90 };
+          fromSlot.style.opacity = '0'; // Esconde a pilha original na hora do voo
           await flyRectToRect(fakeCard, fromRect, toRect, 'back');
           impactAtRect(toRect);
         }
@@ -5691,6 +5693,10 @@
         if (state.deadPiles.length >= 2) {
           const m0 = state.deadPiles[0];
           const m1 = state.deadPiles[1];
+
+          s0.style.opacity = ''; // Devolve o controle para o CSS padrão
+          s1.style.opacity = '';
+
           s0.classList.toggle('used', m0.length === 0);
           s1.classList.toggle('used', m1.length === 0);
 
@@ -6561,6 +6567,7 @@
             const fromEl = a.tookDead.deadIndex === 1 ? dead1El : dead0El;
             const fromR = fromEl ? getRect(fromEl) : null;
             if (fromR && handRect) {
+              if (fromEl) fromEl.style.opacity = '0'; // Esconde a pilha original na hora do voo
               await flyRectToRect(fallbackCard, fromR, handRect, 'back');
               impactAtRect(handRect);
             }
@@ -6643,8 +6650,11 @@
         if (a.type === 'takeDead') {
           const fromEl = a.deadIndex === 1 || a.teamId === 1 ? dead1El : dead0El;
           const fromRect = fromEl ? getRect(fromEl) : null;
-          if (fromRect) await flyRectToRect(fallbackCard, fromRect, handRect, 'back');
-          impactAtRect(handRect);
+          if (fromRect) {
+            if (fromEl) fromEl.style.opacity = '0'; // Esconde a pilha original na hora do voo
+            await flyRectToRect(fallbackCard, fromRect, handRect, 'back');
+            impactAtRect(handRect);
+          }
           return;
         }
 
