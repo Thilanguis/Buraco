@@ -4,6 +4,7 @@ export class BuracoBot {
   static _turnLocks = new Set();
 
   static async playTurn(stateIgnored, botIndex, engine) {
+    this.currentEngine = engine; // Salva o motor para o sleep interceptar o pause
     let state = engine.getState();
     if (!state || !state.players || !state.players[botIndex] || !state.teams) {
       if (typeof window !== 'undefined' && window.isClosingGame) return;
@@ -516,7 +517,16 @@ export class BuracoBot {
     await engine.executeDiscard(botIndex, discardIndex);
   }
 
-  static sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  static async sleep(ms) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    const engine = this.currentEngine;
+    if (engine) {
+      let s = engine.getState();
+      // Segura a execução do bot em loop enquanto o jogo estiver congelado no DevTools
+      while (s && s.debugPaused && !s.finished && !(typeof window !== 'undefined' && window.isClosingGame)) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        s = engine.getState();
+      }
+    }
   }
 }
