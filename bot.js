@@ -119,6 +119,11 @@ export class BuracoBot {
     return combined;
   }
 
+  static isMeldDirty(meld) {
+    if (!meld || meld.length === 0) return false;
+    return meld.some((c) => c.joker || c.forceWild || ((c.rank === '2' || c.rank === 2) && !c.forceNatural));
+  }
+
   static evaluateDiscard(state, hand, team, engine, ctx) {
     const pileSize = state.discard.length;
     if (pileSize === 0) return false;
@@ -226,6 +231,10 @@ export class BuracoBot {
 
     const hasWildInPile = state.discard.some((c) => c.joker || c.rank === '2');
     if (hasWildInPile) return { wants: true, action: 'open' };
+
+    // 🛡️ FILTRO DE LIXO: Ignora lixos gigantes se não for pra salvar a vida pegando morto
+    if (pileSize > 5 && !ctx.isRushingMorto) return false;
+
     if (ctx.isRushingMorto && pileSize >= 3) return { wants: true, action: 'open' };
     if (pileSize >= 4 && !ctx.isDuo) return { wants: true, action: 'open' };
     if (pileSize >= 5 && ctx.isDuo) return { wants: true, action: 'open' };
@@ -286,6 +295,11 @@ export class BuracoBot {
 
             if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
 
+            // 🛑 TRAVA ANTI-BURRICE: Não suja jogo limpo a não ser que vá bater
+            const wasDirty = this.isMeldDirty(team.melds[mIdx]);
+            const isNowDirty = this.isMeldDirty(testMeld);
+            if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
+
             if (engine.isValidSequenceMeld(testMeld)) {
               await engine.executeMeldExtend(botIndex, mIdx, [i]);
               madeMove = true;
@@ -310,6 +324,11 @@ export class BuracoBot {
               const testMeld = this.simulateMeld(meld, [c]);
 
               if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
+
+              // 🛑 TRAVA ANTI-BURRICE: Não suja jogo limpo a não ser que vá bater
+              const wasDirty = this.isMeldDirty(meld);
+              const isNowDirty = this.isMeldDirty(testMeld);
+              if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
 
               if (engine.isValidSequenceMeld(testMeld)) {
                 await engine.executeMeldExtend(botIndex, mIdx, [i]);
@@ -399,6 +418,11 @@ export class BuracoBot {
 
               if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
 
+              // 🛑 TRAVA ANTI-BURRICE: Não suja jogo limpo a não ser que vá bater
+              const wasDirty = this.isMeldDirty(meld);
+              const isNowDirty = this.isMeldDirty(testMeld);
+              if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
+
               if (engine.isValidSequenceMeld(testMeld)) {
                 await engine.executeMeldExtend(botIndex, mIdx, [i]);
                 madeMove = true;
@@ -455,29 +479,36 @@ export class BuracoBot {
 
     if (me.hand.length === 0) return;
 
-    let discardIndex = 0;
+    let discardIndex = -1;
+    let minDanger = 9999;
+
     for (let i = 0; i < me.hand.length; i++) {
       const c = me.hand[i];
       if (state.pickedDiscardCardId === c.id) continue;
 
-      if (!c.joker && c.rank !== '2') {
-        let helpsOpponent = false;
+      let danger = 0;
+      // Nunca joga coringa fora a não ser que seja a última opção da vida
+      if (c.joker || c.rank === '2') {
+        danger += 1000;
+      } else {
         if (oppTeam.melds) {
           for (let oppMeld of oppTeam.melds) {
             if (engine.isValidSequenceMeld([...oppMeld, c])) {
-              helpsOpponent = true;
+              danger += 500; // Carta levanta jogo do inimigo!
               break;
             }
           }
         }
-        if (!helpsOpponent) {
-          discardIndex = i;
-          break;
-        }
+      }
+
+      if (danger < minDanger) {
+        minDanger = danger;
+        discardIndex = i;
       }
     }
 
-    if (state.pickedDiscardCardId === me.hand[discardIndex].id) {
+    // Fallback de segurança se tudo der errado
+    if (discardIndex === -1 || (state.pickedDiscardCardId && state.pickedDiscardCardId === me.hand[discardIndex].id)) {
       discardIndex = me.hand.findIndex((c) => c.id !== state.pickedDiscardCardId);
       if (discardIndex === -1) discardIndex = 0;
     }
