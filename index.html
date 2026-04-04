@@ -2603,9 +2603,13 @@
                 <strong>Bônus Ás-a-Ás:</strong>
                 1º(+R$3) | 2º(+R$4) | 3º(+R$5) | 4º(+R$15)
                 <br />
-                🔥
-                <strong>Metas Vantagem:</strong>
-                +R$ 2,00 a cada 1000 pts
+                🩸
+                <strong>Humilhação:</strong>
+                +R$ 10,00 (Vencer sem o adv. fazer canastra)
+                <br />
+                🃏
+                <strong>Chuva de Canastras:</strong>
+                6ª(+R$3) | 7ª em diante(+R$2/cada)
               </div>
 
               <input id="betBase" type="hidden" value="5" />
@@ -2789,7 +2793,7 @@
                     <span>
                       🎯 METAS PIX
                       <span id="winnerNameHud" style="color: #facc15; font-size: 8px; margin-left: 4px; opacity: 0.8"></span>
-                      <span id="goalsCounterHud" style="color: #94a3b8; font-size: 9px; margin-left: 4px">(0/5)</span>
+                      <span id="goalsCounterHud" style="color: #94a3b8; font-size: 9px; margin-left: 4px">(0/6)</span>
                     </span>
                   </div>
                   <span id="goalsTotalHud" style="color: #4ade80">R$ 0,00</span>
@@ -3053,6 +3057,16 @@
         const el = document.getElementById('asasGoalItem');
         if (el) {
           el.classList.toggle('expanded', window.isAsasDetailsExpanded);
+        }
+      };
+
+      window.isChuvaDetailsExpanded = false;
+      window.toggleChuvaDetails = function (event) {
+        if (event) event.stopPropagation();
+        window.isChuvaDetailsExpanded = !window.isChuvaDetailsExpanded;
+        const el = document.getElementById('chuvaGoalItem');
+        if (el) {
+          el.classList.toggle('expanded', window.isChuvaDetailsExpanded);
         }
       };
 
@@ -6279,15 +6293,26 @@
 
         if (state.isBetting) {
           // Função universal de cálculo financeiro
-          window.calculatePixFin = (myScore, opScore, myMelds) => {
+          window.calculatePixFin = (myScore, opScore, myMelds, oppMelds) => {
             let asasCount = 0;
+            let totalCanastras = 0;
             myMelds.forEach((m) => {
-              if (classifyMeldForUi(m).kind === 'asas') asasCount++;
+              const kind = classifyMeldForUi(m).kind;
+              if (kind === 'asas') asasCount++;
+              if (kind !== 'simple') totalCanastras++;
             });
 
             const diff = Math.max(0, myScore - opScore);
             let total = 0;
-            let b = { base: 0, diff: 0, asas: 0, milestone: 0, negative: 0, countAsas: asasCount, milestonesAchieved: 0 };
+
+            // CONTAGEM GLOBAL: Conta as canastras do oponente SEMPRE (evita erro no empate ou na derrota)
+            const oppCanastras = oppMelds.filter((m) => classifyMeldForUi(m).kind !== 'simple').length;
+
+            let b = { base: 0, diff: 0, asas: 0, negative: 0, countAsas: asasCount, totalCanastras: totalCanastras, canastraQuantityBonus: 0, hasHumilhacao: false, humilhacaoSuprema: 0, oppCanastras: oppCanastras };
+
+            if (totalCanastras >= 6) {
+              b.canastraQuantityBonus = 3 + (totalCanastras - 6) * 2;
+            }
 
             if (myScore > opScore) {
               total += 5.0;
@@ -6299,22 +6324,24 @@
                 b.negative = 5.0;
               }
 
-              // ATUALIZADO: Vantagem a cada 1000 pontos
-              b.milestonesAchieved = Math.floor(diff / 1000);
-              b.milestone = b.milestonesAchieved * 2.0;
-              total += b.milestone;
+              if (oppCanastras === 0) {
+                b.hasHumilhacao = true;
+                b.humilhacaoSuprema = 10.0;
+                total += b.humilhacaoSuprema;
+              }
             }
 
-            // ATUALIZADO: 4ª canastra soma 15, chegando a 27 no total
             const asasRewards = [0, 3, 7, 12, 27];
             b.asas = asasRewards[Math.min(asasCount, 4)] || 0;
             total += b.asas;
 
+            total += b.canastraQuantityBonus;
+
             return { total, diff, b };
           };
 
-          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds);
-          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds);
+          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds, state.teams[1].melds);
+          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds, state.teams[0].melds);
 
           const updateBadge = (badge, fin) => {
             if (!badge) return;
@@ -6350,7 +6377,8 @@
             if (winnerFin.b.diff > 0) achievedCount++;
             if (winnerFin.b.negative > 0) achievedCount++;
             if (winnerFin.b.countAsas > 0) achievedCount++;
-            if (winnerFin.b.milestonesAchieved > 0) achievedCount++;
+            if (winnerFin.b.hasHumilhacao) achievedCount++;
+            if (winnerFin.b.canastraQuantityBonus > 0) achievedCount++;
 
             // PERSISTÊNCIA: Exibe para todos na mesa e não some no fim do jogo
             hud.style.display = myPlayerIndex !== -1 ? 'block' : 'none';
@@ -6366,8 +6394,8 @@
 
             const counterEl = document.getElementById('goalsCounterHud');
             if (counterEl) {
-              counterEl.textContent = `(${achievedCount}/5)`;
-              counterEl.style.color = achievedCount === 5 ? '#4ade80' : '#94a3b8';
+              counterEl.textContent = `(${achievedCount}/6)`;
+              counterEl.style.color = achievedCount === 6 ? '#4ade80' : '#94a3b8';
             }
 
             // Renderiza a lista de itens sempre baseada no vencedor para todos verem igual
@@ -6405,9 +6433,29 @@
                             </div>
                         </div>
                     </div>
-                    <div class="goal-item ${winnerFin.b.milestonesAchieved > 0 ? 'achieved' : ''}">
-                        <span>🔥 Metas (R$ 2/1000 pts)</span> 
-                        <strong>+R$ ${winnerFin.b.milestone.toFixed(2).replace('.', ',')}</strong>
+                    <div class="goal-item ${winnerFin.b.hasHumilhacao ? 'achieved' : ''}">
+                        <span>🩸 Adv. ${winnerFin.b.oppCanastras} Canastra(s) (R$ 10)</span> 
+                        <strong>+R$ ${winnerFin.b.humilhacaoSuprema.toFixed(2).replace('.', ',')}</strong>
+                    </div>
+                    <div id="chuvaGoalItem" class="goal-item expandable ${winnerFin.b.totalCanastras >= 6 ? 'achieved' : ''} ${window.isChuvaDetailsExpanded ? 'expanded' : ''}" onclick="toggleChuvaDetails(event)">
+                        <div class="goal-item-header">
+                            <span><span class="expand-icon">▶</span>🃏 Chuva de Canastras (${winnerFin.b.totalCanastras}/6+)</span> 
+                            <strong>+R$ ${winnerFin.b.canastraQuantityBonus.toFixed(2).replace('.', ',')}</strong>
+                        </div>
+                        <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.totalCanastras >= 6 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>6ª Canastra:</span> <span>+R$ 3,00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.totalCanastras >= 7 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>7ª Canastra:</span> <span>+R$ 2,00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.totalCanastras >= 8 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>8ª Canastra:</span> <span>+R$ 2,00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${winnerFin.b.totalCanastras >= 9 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>9ª em diante:</span> <span>+R$ 2,00 /cada</span>
+                            </div>
+                        </div>
                     </div>
                 `;
           }
