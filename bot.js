@@ -513,7 +513,14 @@ export class BuracoBot {
     // Fallback de segurança se tudo der errado
     if (discardIndex === -1 || (state.pickedDiscardCardId && state.pickedDiscardCardId === me.hand[discardIndex]?.id)) {
       discardIndex = me.hand.findIndex((c) => c && c.id !== state.pickedDiscardCardId);
-      if (discardIndex === -1) discardIndex = 0;
+
+      // Se não achou, pega a primeira carta real disponível na mão
+      if (discardIndex === -1) {
+        discardIndex = me.hand.findIndex((c) => c !== null && c !== undefined);
+      }
+
+      // Prevenção extrema: se a mão inteira for fantasma, aborta para não crashar o motor
+      if (discardIndex === -1) return;
     }
 
     await engine.executeDiscard(botIndex, discardIndex);
