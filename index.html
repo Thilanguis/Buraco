@@ -6512,7 +6512,8 @@
           if (state.isBetting) {
             const winnerData = scores[0];
             const loserData = scores[1];
-            const winnerFin = window.calculatePixFin(winnerData.score, loserData.score, winnerData.team.melds);
+            // Correção: Adicionado o loserData.team.melds como 4º parâmetro
+            const winnerFin = window.calculatePixFin(winnerData.score, loserData.score, winnerData.team.melds, loserData.team.melds);
 
             const totalMoney = winnerFin.total;
             const moneyStr = totalMoney.toFixed(2).replace('.', ',');
