@@ -37,9 +37,15 @@ export class BuracoBot {
 
       const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25);
       const isRushingMorto = !tookMorto && me.hand.length <= 5;
-      // O cérebro agora entende que o Trio também exige estratégia de equipe
-      const isDuo = state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes.length > 1);
-      const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto };
+      const isDuo = state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes && team.playerIndexes.length > 1);
+
+      // 🛡️ Identifica se o bot faz parte do time "Apelão" (Vantagem)
+      const isVip = ((state.mode === '1x1_dominacao' || state.mode === '1x1_duploMorto') && botIndex === 1) || ((state.mode === '1x2' || state.mode === '1x3') && me.teamId === 1);
+
+      // VIP Sniper ativado desde o turno 1, só entra em desespero nas últimas 10 cartas
+      const isVipSniper = isVip && !isDesperate && stockCount > 10;
+
+      const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto, isVip, isVipSniper };
 
       engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
       await this.sleep(Math.floor(Math.random() * 4000) + 1500);
@@ -131,8 +137,14 @@ export class BuracoBot {
 
     const topCard = state.discard[pileSize - 1];
     const isJuicyPile = pileSize >= 8;
-    const isEndgame = state.stock.length <= 22 || (ctx.tookMorto && hand.length <= 6);
-    const allowDirty = isJuicyPile || ctx.isRushingMorto || ctx.isDesperate || isEndgame;
+    // O Endgame padrão disparava no 22. O VIP agora tem frieza para segurar a mão.
+    const isEndgame = ctx.isVipSniper ? state.stock.length <= 10 : state.stock.length <= 22 || (ctx.tookMorto && hand.length <= 6);
+    let allowDirty = isJuicyPile || ctx.isRushingMorto || ctx.isDesperate || isEndgame;
+
+    // 🛡️ TRAVA DE COMPRA DO LIXO: O VIP não pega lixo para sujar jogo se a mesa está sob controle
+    if (ctx.isVipSniper && !isJuicyPile) {
+      allowDirty = false;
+    }
 
     const topIsWildOrTwo = topCard.joker || topCard.rank === '2';
 
@@ -282,8 +294,8 @@ export class BuracoBot {
       }
 
       // 🧠 MODO SNIPER (Ganância Segura): VIPs jogam para humilhar, mas só APÓS garantir uma canastra limpa.
-      const isVip = ((s.mode === '1x1_dominacao' || s.mode === '1x1_duploMorto') && botIndex === 1) || ((s.mode === '1x2' || s.mode === '1x3') && me.teamId === 1);
-      const isVipSniper = isVip && engine.teamHasGoodCanastra(team.id) && s.stock.length > 15 && !ctx.isDesperate;
+      // A trava VIP agora vem do contexto global para operar de forma unificada
+      const isVipSniper = ctx.isVipSniper;
 
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
@@ -354,11 +366,11 @@ export class BuracoBot {
 
               if (combo.some((c) => c.joker || c.rank === '2')) continue;
 
-              // 🛑 TRAVA DO SNIPER (Anti-Canibalismo): Se for VIP, não cria jogo novo do mesmo naipe de uma canastra limpa/real que já existe. Segura pra colar nela!
+              // 🛑 TRAVA DO SNIPER (Anti-Canibalismo): Proíbe esvaziar a mão criando jogo novo do mesmo naipe se já houver UM JOGO LIMPO (mesmo incompleto) do time na mesa. Ele segura para colar!
               if (isVipSniper) {
                 const suit = combo[0].suit;
-                const hasLimpaOfSameSuit = team.melds.some((m) => m.length >= 7 && m[0].suit === suit && !m.some((c) => c.joker || (c.rank === '2' && c.suit !== suit) || c.forceWild));
-                if (hasLimpaOfSameSuit) continue;
+                const hasCleanMeldSameSuit = team.melds.some((m) => m && m[0]?.suit === suit && !this.isMeldDirty(m));
+                if (hasCleanMeldSameSuit) continue;
               }
 
               if (engine.isValidSequenceMeld(combo)) {
@@ -375,7 +387,8 @@ export class BuracoBot {
       }
       if (madeMove) continue;
 
-      const isEndgame = s.stock.length <= 22 || (ctx.tookMorto && me.hand.length <= 6);
+      // O Endgame padrão disparava no 22. O VIP agora tem frieza para segurar a mão até as últimas 10 cartas.
+      const isEndgame = ctx.isVipSniper ? s.stock.length <= 10 : s.stock.length <= 22 || (ctx.tookMorto && me.hand.length <= 6);
 
       // 🧠 LÓGICA DE PACIÊNCIA (TEAMPLAY) E MODO SNIPER
       let allowDirty = ctx.isRushingMorto || ctx.isDesperate || isEndgame;
@@ -383,7 +396,7 @@ export class BuracoBot {
         allowDirty = false;
       }
 
-      // 🛑 TRAVA DO SNIPER: Cancela completamente a sujeira para focar na Ás-a-Ás.
+      // 🛑 TRAVA DO SNIPER ABSOLUTA: O VIP é blindado de jogar coringas na mesa antes do verdadeiro endgame
       if (isVipSniper) {
         allowDirty = false;
       }
