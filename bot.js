@@ -485,7 +485,8 @@ export class BuracoBot {
 
     for (let i = 0; i < me.hand.length; i++) {
       const c = me.hand[i];
-      if (state.pickedDiscardCardId === c.id) continue;
+      // Ignora cartas fantasmas (null)
+      if (!c || state.pickedDiscardCardId === c.id) continue;
 
       let danger = 0;
       // Nunca joga coringa fora a não ser que seja a última opção da vida
@@ -494,6 +495,7 @@ export class BuracoBot {
       } else {
         if (oppTeam.melds) {
           for (let oppMeld of oppTeam.melds) {
+            if (!oppMeld) continue; // Trava para melds nulos
             if (engine.isValidSequenceMeld([...oppMeld, c])) {
               danger += 500; // Carta levanta jogo do inimigo!
               break;
@@ -509,8 +511,8 @@ export class BuracoBot {
     }
 
     // Fallback de segurança se tudo der errado
-    if (discardIndex === -1 || (state.pickedDiscardCardId && state.pickedDiscardCardId === me.hand[discardIndex].id)) {
-      discardIndex = me.hand.findIndex((c) => c.id !== state.pickedDiscardCardId);
+    if (discardIndex === -1 || (state.pickedDiscardCardId && state.pickedDiscardCardId === me.hand[discardIndex]?.id)) {
+      discardIndex = me.hand.findIndex((c) => c && c.id !== state.pickedDiscardCardId);
       if (discardIndex === -1) discardIndex = 0;
     }
 

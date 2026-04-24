@@ -3873,7 +3873,7 @@
 
         let validIndexes = [];
         for (let i = 0; i < hand.length; i++) {
-          if (state.pickedDiscardCardId !== hand[i].id) {
+          if (hand[i] && state.pickedDiscardCardId !== hand[i].id) {
             validIndexes.push(i);
           }
         }
@@ -5271,7 +5271,8 @@
         ensureCardId(card);
         selectedHandIndexes.clear();
 
-        if (state.pickedDiscardCardId === card.id) {
+        // Optional chaining para evitar crash se id for nulo na leitura
+        if (state.pickedDiscardCardId && state.pickedDiscardCardId === card.id) {
           showMessage('Você não pode descartar a carta que acabou de pegar do lixo.');
           return;
         }
