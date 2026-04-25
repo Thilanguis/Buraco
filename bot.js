@@ -135,6 +135,26 @@ export class BuracoBot {
     return meld.some((c) => c.joker || c.forceWild || ((c.rank === '2' || c.rank === 2) && !c.forceNatural));
   }
 
+  // 🛡️ MOTOR MATEMÁTICO: Prova que um jogo de 3 cartas na mão é 100% Limpo e permite o início de Ás-a-Ás
+  static isComboPerfectlyClean3(combo, engine) {
+    if (!combo || combo.length !== 3) return false;
+    if (combo.some((c) => c.joker)) return false;
+
+    const testCombo = this.simulateMeld([], combo);
+    if (!engine.isValidSequenceMeld(testCombo)) return false;
+
+    const hasTwo = combo.find((c) => c.rank === '2');
+    if (hasTwo) {
+      const suits = combo.map((c) => c.suit);
+      if (!suits.every((s) => s === suits[0])) return false;
+
+      const order = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      const rankIdxs = combo.map((c) => order.indexOf(c.rank)).sort((a, b) => a - b);
+      if (rankIdxs[2] - rankIdxs[0] !== 2) return false; // Se a diferença entre os index não for exata, tem buraco (logo, o 2 é falso)
+    }
+    return true;
+  }
+
   static evaluateDiscard(state, hand, team, engine, ctx) {
     const pileSize = state.discard.length;
     if (pileSize === 0) return false;
@@ -175,7 +195,7 @@ export class BuracoBot {
     if (team.melds && team.melds.length > 0) {
       for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
         const meld = team.melds[mIdx];
-        if (topIsWildOrTwo && meld.some((c) => c.joker || c.rank === '2')) continue;
+        if (topIsWildOrTwo && this.isMeldDirty(meld)) continue;
 
         const testMeld = this.simulateMeld(meld, [topCard]);
         if (engine.isValidSequenceMeld(testMeld)) {
@@ -195,9 +215,8 @@ export class BuracoBot {
       for (let i = 0; i < hand.length - 1; i++) {
         for (let j = i + 1; j < hand.length; j++) {
           const combo = [hand[i], hand[j], topCard];
-          const hasWild = combo.some((c) => c.joker || c.rank === '2');
 
-          if (!hasWild && engine.isValidSequenceMeld(combo)) {
+          if (this.isComboPerfectlyClean3(combo, engine)) {
             if (!checkSafe(2, combo)) continue;
             return { wants: true, action: 'new', handIndexes: [i, j] };
           }
@@ -210,14 +229,14 @@ export class BuracoBot {
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           const meld = team.melds[mIdx];
-          if (topIsWildOrTwo && meld.some((c) => c.joker || c.rank === '2')) continue;
+          if (topIsWildOrTwo && this.isMeldDirty(meld)) continue;
 
           const testMeld = [...meld, topCard];
           if (engine.isValidSequenceMeld(testMeld)) {
             const isCanastra = meld.length >= 7;
             const hasTwo = meld.some((c) => c.rank === '2');
             const hasThree = meld.some((c) => c.rank === '3');
-            const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit) || (c.rank === '2' && !hasThree));
+            const isLimpa = !this.isMeldDirty(meld);
 
             if (isCanastra && isLimpa) {
               const isPlayingNaturalTwo = topCard.rank === '2' && topCard.suit === meld[0].suit && hasThree && !hasTwo;
@@ -250,6 +269,7 @@ export class BuracoBot {
     // FASE 3: Lixo Aberto (Comprar sem formar jogo imediato na mesa)
     // Devolvemos o interesse deles por lixo solto, mantendo a agressividade natural.
     if (state.variant === 'fechado') return false;
+    if (state.stock.length === 0) return false; // 🛑 BLOQUEIO DO LOOP INFINITO: Impede o bot de ficar pescando lixo inútil e travando o fim do jogo
     if (!checkSafe(0, null)) return false;
 
     const hasWildInPile = state.discard.some((c) => c.joker || c.rank === '2');
@@ -278,6 +298,29 @@ export class BuracoBot {
     if (pendingMeld && pendingMeld.length >= 7) {
       const hasWild = pendingMeld.some((c) => c.joker || (c.rank === '2' && c.suit !== pendingMeld[0].suit) || c.forceWild);
       if (!hasWild) return true; // É limpa/real/ás, pode bater!
+    }
+
+    // 🚨 MODO DESOVA (Inteligência de Risco Iminente)
+    const s = engine.getState();
+    if (s) {
+      // 1. Exaustão Real: O monte tá acabando E não tem mais nenhum morto na mesa para repor.
+      const hasDeadPiles = s.deadPiles && s.deadPiles.some((p) => p && p.length > 0);
+      if (!hasDeadPiles && s.stock && s.stock.length <= 6) return true;
+
+      // 2. Risco de Batida do Adversário (Já tem morto, tem canastra limpa e <= 3 cartas na mão)
+      const oppTeamId = team.id === 0 ? 1 : 0;
+      const oppTookMorto = (s.deadChunksTaken[oppTeamId] || 0) > 0;
+      if (oppTookMorto && engine.teamHasGoodCanastra(oppTeamId)) {
+        const oppAboutToWin = s.players.filter((p) => p.teamId === oppTeamId).some((p) => p.hand.length <= 3);
+        if (oppAboutToWin) return true;
+      }
+
+      // 3. Risco de Batida do Parceiro (Já tem morto, tem canastra e <= 2 cartas na mão)
+      const myTookMorto = (s.deadChunksTaken[team.id] || 0) > 0;
+      if (myTookMorto && engine.teamHasGoodCanastra(team.id)) {
+        const partnerAboutToWin = s.players.filter((p) => p.teamId === team.id && p.id !== me.id).some((p) => p.hand.length <= 2);
+        if (partnerAboutToWin) return true;
+      }
     }
 
     return false;
@@ -339,7 +382,7 @@ export class BuracoBot {
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           const meld = team.melds[mIdx];
-          if (meld.some((c) => c.joker || c.rank === '2')) continue;
+          if (this.isMeldDirty(meld)) continue;
 
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
@@ -347,11 +390,19 @@ export class BuracoBot {
               // CORREÇÃO 2: Usa o simulador para o Coringa Perfeito
               const testMeld = this.simulateMeld(meld, [c]);
 
-              if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
+              if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
+
+              const wasDirty = this.isMeldDirty(meld);
+              let isNowDirty = this.isMeldDirty(testMeld);
+
+              // 🧠 A MÁGICA DO 2 NATURAL: Prova que o 2 encaixou perfeito e não sujou a canastra!
+              const hasThree = meld.some((x) => x.rank === '3');
+              const hasTwo = meld.some((x) => x.rank === '2');
+              if (!wasDirty && hasThree && !hasTwo) {
+                isNowDirty = false;
+              }
 
               // 🛑 TRAVA ANTI-BURRICE: Não suja jogo limpo a não ser que vá bater
-              const wasDirty = this.isMeldDirty(meld);
-              const isNowDirty = this.isMeldDirty(testMeld);
               if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
 
               if (engine.isValidSequenceMeld(testMeld)) {
@@ -375,7 +426,8 @@ export class BuracoBot {
               const combo = [me.hand[i], me.hand[j], me.hand[k]];
               if (!this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
 
-              if (combo.some((c) => c.joker || c.rank === '2')) continue;
+              // Validação blindada: Só permite a criação do jogo se for uma sequência pura e perfeita
+              if (!this.isComboPerfectlyClean3(combo, engine)) continue;
 
               // 🛑 TRAVA DO SNIPER (Anti-Canibalismo Blindado contra Fantasmas)
               if (isVipSniper) {
@@ -423,12 +475,12 @@ export class BuracoBot {
         if (team.melds && team.melds.length > 0) {
           for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
             const meld = team.melds[mIdx];
-            if (meld.some((c) => c.joker || c.rank === '2')) continue;
+            if (this.isMeldDirty(meld)) continue;
 
             const isCanastra = meld.length >= 7;
             const hasTwo = meld.some((c) => c.rank === '2');
             const hasThree = meld.some((c) => c.rank === '3');
-            const isLimpa = !meld.some((c) => c.joker || (c.rank === '2' && c.suit !== meld[0].suit) || (c.rank === '2' && !hasThree));
+            const isLimpa = !this.isMeldDirty(meld);
 
             if (isLimpa) {
               if (isCanastra) continue;
@@ -448,11 +500,19 @@ export class BuracoBot {
               // CORREÇÃO 3: Usa o simulador para sujeira no endgame
               const testMeld = this.simulateMeld(meld, [c]);
 
-              if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
+              if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
+
+              const wasDirty = this.isMeldDirty(meld);
+              let isNowDirty = this.isMeldDirty(testMeld);
+
+              // Proteção idêntica do 2 natural para não travar a extensão suja no endgame
+              const hasThreeDirty = meld.some((x) => x.rank === '3');
+              const hasTwoDirty = meld.some((x) => x.rank === '2');
+              if (!wasDirty && c.rank === '2' && c.suit === meld[0].suit && hasThreeDirty && !hasTwoDirty) {
+                isNowDirty = false;
+              }
 
               // 🛑 TRAVA ANTI-BURRICE: Não suja jogo limpo a não ser que vá bater
-              const wasDirty = this.isMeldDirty(meld);
-              const isNowDirty = this.isMeldDirty(testMeld);
               if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
 
               if (engine.isValidSequenceMeld(testMeld)) {
