@@ -5851,6 +5851,7 @@
         if (!me) return;
 
         me.hand.forEach((card, idx) => {
+          if (!card) return; // 🛡️ BLINDAGEM ANTI-FANTASMA: Impede o crash de UI
           ensureCardId(card);
           const div = document.createElement('div');
           div.dataset.cardId = card.id;

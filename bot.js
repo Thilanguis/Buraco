@@ -45,7 +45,11 @@ export class BuracoBot {
       // VIP Sniper ativado desde o turno 1, só entra em desespero nas últimas 10 cartas
       const isVipSniper = isVip && !isDesperate && stockCount > 10;
 
-      const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto, isVip, isVipSniper };
+      // 🛑 MODO HUMILHAÇÃO (FARMING): Se o VIP já pegou o morto, tem canastra e o oponente tá zerado ou muito atrás, ele recusa bater pra farmar pontos!
+      const oppHasCanastra = engine.teamHasGoodCanastra(oppTeam.id);
+      const isFarming = isVip && tookMorto && engine.teamHasGoodCanastra(team.id) && (!oppHasCanastra || myScore > oppScore + 1000) && stockCount > 6;
+
+      const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto, isVip, isVipSniper, isFarming };
 
       engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
       await this.sleep(Math.floor(Math.random() * 4000) + 1500);
@@ -137,27 +141,29 @@ export class BuracoBot {
 
     const topCard = state.discard[pileSize - 1];
     const isJuicyPile = pileSize >= 8;
-    // O Endgame padrão disparava no 22. O VIP agora tem frieza para segurar a mão.
     const isEndgame = ctx.isVipSniper ? state.stock.length <= 10 : state.stock.length <= 22 || (ctx.tookMorto && hand.length <= 6);
-    let allowDirty = isJuicyPile || ctx.isRushingMorto || ctx.isDesperate || isEndgame;
 
-    // 🛡️ TRAVA DE COMPRA DO LIXO: O VIP não pega lixo para sujar jogo se a mesa está sob controle
-    if (ctx.isVipSniper && !isJuicyPile) {
-      allowDirty = false;
+    // 🛑 TRAVA MAGISTRAL UNIVERSAL: Ninguém suja o jogo à toa mais.
+    let allowDirty = false;
+
+    if (ctx.isDesperate) {
+      allowDirty = true; // Libera a sujeira no pânico total
+    } else if (!ctx.isVipSniper && !ctx.isFarming && ctx.isRushingMorto && isJuicyPile) {
+      // Bot normal só suja se faltar <5 cartas pro morto E o lixo for gigante (8+ cartas)
+      allowDirty = true;
     }
 
     const topIsWildOrTwo = topCard.joker || topCard.rank === '2';
 
-    // 🛡️ MOTOR DE PREVISÃO DE SUICÍDIO (Agora suporta fechamento de canastra simultâneo)
     const checkSafe = (cardsUsedFromHand, pendingMeld) => {
       const cardsAdded = state.variant === 'fechado' ? pileSize - 1 : pileSize;
       const predictedHandSize = hand.length - cardsUsedFromHand + cardsAdded;
 
       if (predictedHandSize > 1) return true;
+      if (ctx.isFarming && predictedHandSize <= 1) return false;
       if (engine.canTeamTakeDeadNow(team.id)) return true;
       if (engine.teamHasGoodCanastra(team.id)) return true;
 
-      // Inteligência Nova: Se a jogada em si FORMAR a canastra limpa, o bot tem permissão para zerar a mão!
       if (pendingMeld && pendingMeld.length >= 7) {
         const hasWild = pendingMeld.some((c) => c.joker || (c.rank === '2' && c.suit !== pendingMeld[0].suit) || c.forceWild);
         if (!hasWild) return true;
@@ -165,6 +171,7 @@ export class BuracoBot {
       return false;
     };
 
+    // FASE 1: Tenta comprar usando jogo LIMPO (Encaixe perfeito)
     if (team.melds && team.melds.length > 0) {
       for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
         const meld = team.melds[mIdx];
@@ -198,6 +205,7 @@ export class BuracoBot {
       }
     }
 
+    // FASE 2: Tenta comprar SUJANDO o jogo (Só vai entrar aqui se estiver no Desespero)
     if (allowDirty) {
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
@@ -239,27 +247,30 @@ export class BuracoBot {
       }
     }
 
+    // FASE 3: Lixo Aberto (Comprar sem formar jogo imediato na mesa)
+    // Devolvemos o interesse deles por lixo solto, mantendo a agressividade natural.
     if (state.variant === 'fechado') return false;
     if (!checkSafe(0, null)) return false;
 
     const hasWildInPile = state.discard.some((c) => c.joker || c.rank === '2');
-    if (hasWildInPile) return { wants: true, action: 'open' };
 
-    // 🛡️ FILTRO DE LIXO: Ignora lixos gigantes se não for pra salvar a vida pegando morto
+    if (hasWildInPile && pileSize <= 8) return { wants: true, action: 'open' };
     if (pileSize > 5 && !ctx.isRushingMorto) return false;
-
     if (ctx.isRushingMorto && pileSize >= 3) return { wants: true, action: 'open' };
-    if (pileSize >= 4 && !ctx.isDuo) return { wants: true, action: 'open' };
-    if (pileSize >= 5 && ctx.isDuo) return { wants: true, action: 'open' };
+    if (pileSize >= 4) return { wants: true, action: 'open' };
 
     return false;
   }
 
   // 🛡️ NOVO CÉREBRO: O bot agora sabe quando a própria jogada vai liberar a batida
-  static canMeldSafely(me, team, cardsToUse, engine, pendingMeld = null) {
+  static canMeldSafely(me, team, cardsToUse, engine, pendingMeld = null, ctx = null) {
     const cardsLeft = me.hand.length - cardsToUse;
 
     if (cardsLeft > 1) return true;
+
+    // 🛑 TRAVA DE FARMING: Se o bot quer humilhar, ele recusa fazer jogadas que deixem ele com 1 carta (força descarte final) ou 0 cartas (batida direta).
+    if (ctx && ctx.isFarming && cardsLeft <= 1) return false;
+
     if (engine.canTeamTakeDeadNow(team.id)) return true;
     if (engine.teamHasGoodCanastra(team.id)) return true;
 
@@ -306,7 +317,7 @@ export class BuracoBot {
             // CORREÇÃO 1: Usa o simulador para ignorar a armadura do 2
             const testMeld = this.simulateMeld(team.melds[mIdx], [c]);
 
-            if (!this.canMeldSafely(me, team, 1, engine, testMeld)) continue;
+            if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
 
             // 🛑 TRAVA ANTI-BURRICE: Não suja jogo limpo a não ser que vá bater
             const wasDirty = this.isMeldDirty(team.melds[mIdx]);
@@ -362,15 +373,22 @@ export class BuracoBot {
           for (let j = i + 1; j < n - 1; j++) {
             for (let k = j + 1; k < n; k++) {
               const combo = [me.hand[i], me.hand[j], me.hand[k]];
-              if (!this.canMeldSafely(me, team, 3, engine, combo)) continue;
+              if (!this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
 
               if (combo.some((c) => c.joker || c.rank === '2')) continue;
 
-              // 🛑 TRAVA DO SNIPER (Anti-Canibalismo): Proíbe esvaziar a mão criando jogo novo do mesmo naipe se já houver UM JOGO LIMPO (mesmo incompleto) do time na mesa. Ele segura para colar!
+              // 🛑 TRAVA DO SNIPER (Anti-Canibalismo Blindado contra Fantasmas)
               if (isVipSniper) {
-                const suit = combo[0].suit;
-                const hasCleanMeldSameSuit = team.melds.some((m) => m && m[0]?.suit === suit && !this.isMeldDirty(m));
-                if (hasCleanMeldSameSuit) continue;
+                const comboRealCard = combo.find((c) => c && !c.joker && c.rank !== '2');
+                if (comboRealCard) {
+                  const suit = comboRealCard.suit;
+                  const hasCleanMeldSameSuit = team.melds.some((m) => {
+                    if (!m) return false;
+                    const meldRealCard = m.find((c) => c && !c.joker && c.rank !== '2');
+                    return meldRealCard && meldRealCard.suit === suit && !this.isMeldDirty(m);
+                  });
+                  if (hasCleanMeldSameSuit) continue;
+                }
               }
 
               if (engine.isValidSequenceMeld(combo)) {
