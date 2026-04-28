@@ -35,21 +35,32 @@ export class BuracoBot {
       const tookMorto = (state.deadChunksTaken[team.id] || 0) > 0;
       const oppTookMorto = (state.deadChunksTaken[oppTeam.id] || 0) > 0;
 
-      const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25);
+      // 🚨 RADAR DE PÂNICO: Bot percebe que a partida está nos últimos suspiros
+      const oppHasCanastra = engine.teamHasGoodCanastra(oppTeam.id);
+      const oppAboutToWin = oppTookMorto && oppHasCanastra && state.players.filter((p) => p.teamId === oppTeam.id).some((p) => p.hand.length <= 3);
+
+      // Verifica se existe QUALQUER morto na mesa (seja para pegar ou para virar monte)
+      const hasDeadPiles = state.deadPiles && state.deadPiles.some((p) => p && p.length > 0);
+
+      // Só entra em desespero por monte secando se NÃO tiver morto e faltarem 5 ou menos cartas
+      const isMonteSecando = !hasDeadPiles && stockCount <= 5;
+      const isPanicDump = oppAboutToWin || isMonteSecando;
+
+      // isDesperate absorve o Pânico, forçando o bot a quebrar as regras de segurar carta
+      const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25) || isPanicDump;
       const isRushingMorto = !tookMorto && me.hand.length <= 5;
       const isDuo = state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes && team.playerIndexes.length > 1);
 
       // 🛡️ Identifica se o bot faz parte do time "Apelão" (Vantagem)
       const isVip = ((state.mode === '1x1_dominacao' || state.mode === '1x1_duploMorto') && botIndex === 1) || ((state.mode === '1x2' || state.mode === '1x3') && me.teamId === 1);
 
-      // VIP Sniper ativado desde o turno 1, só entra em desespero nas últimas 10 cartas
+      // VIP Sniper ativado desde o turno 1, desliga se entrar em pânico
       const isVipSniper = isVip && !isDesperate && stockCount > 10;
 
-      // 🛑 MODO HUMILHAÇÃO (FARMING): Se o VIP já pegou o morto, tem canastra e o oponente tá zerado ou muito atrás, ele recusa bater pra farmar pontos!
-      const oppHasCanastra = engine.teamHasGoodCanastra(oppTeam.id);
-      const isFarming = isVip && tookMorto && engine.teamHasGoodCanastra(team.id) && (!oppHasCanastra || myScore > oppScore + 1000) && stockCount > 6;
+      // 🛑 MODO HUMILHAÇÃO (FARMING): Desativado se o jogo estiver acabando
+      const isFarming = isVip && tookMorto && engine.teamHasGoodCanastra(team.id) && (!oppHasCanastra || myScore > oppScore + 1000) && stockCount > 6 && !isPanicDump;
 
-      const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto, isVip, isVipSniper, isFarming };
+      const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto, isVip, isVipSniper, isFarming, isPanicDump };
 
       engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
       await this.sleep(Math.floor(Math.random() * 4000) + 1500);
@@ -322,6 +333,9 @@ export class BuracoBot {
 
     if (cardsLeft > 1) return true;
 
+    // 🚨 PANIC DUMP: Se a partida vai acabar a qualquer segundo, ignora restrições e desova tudo.
+    if (ctx && ctx.isPanicDump) return true;
+
     // 🛑 TRAVA DE FARMING: Se o bot quer humilhar, ele recusa fazer jogadas que deixem ele com 1 carta (força descarte final) ou 0 cartas (batida direta).
     if (ctx && ctx.isFarming && cardsLeft <= 1) return false;
 
@@ -334,22 +348,9 @@ export class BuracoBot {
       if (!hasWild) return true; // É limpa/real/ás, pode bater!
     }
 
-    // 🚨 MODO DESOVA (Inteligência de Risco Iminente)
+    // Risco de Batida do Parceiro
     const s = engine.getState();
     if (s) {
-      // 1. Exaustão Real: O monte tá acabando E não tem mais nenhum morto na mesa para repor.
-      const hasDeadPiles = s.deadPiles && s.deadPiles.some((p) => p && p.length > 0);
-      if (!hasDeadPiles && s.stock && s.stock.length <= 6) return true;
-
-      // 2. Risco de Batida do Adversário (Já tem morto, tem canastra limpa e <= 3 cartas na mão)
-      const oppTeamId = team.id === 0 ? 1 : 0;
-      const oppTookMorto = (s.deadChunksTaken[oppTeamId] || 0) > 0;
-      if (oppTookMorto && engine.teamHasGoodCanastra(oppTeamId)) {
-        const oppAboutToWin = s.players.filter((p) => p.teamId === oppTeamId).some((p) => p.hand.length <= 3);
-        if (oppAboutToWin) return true;
-      }
-
-      // 3. Risco de Batida do Parceiro (Já tem morto, tem canastra e <= 2 cartas na mão)
       const myTookMorto = (s.deadChunksTaken[team.id] || 0) > 0;
       if (myTookMorto && engine.teamHasGoodCanastra(team.id)) {
         const partnerAboutToWin = s.players.filter((p) => p.teamId === team.id && p.id !== me.id).some((p) => p.hand.length <= 2);
@@ -485,7 +486,8 @@ export class BuracoBot {
                 // VIPs (Dominadores) NUNCA dividem o mesmo naipe.
                 // Bots normais só podem dividir no desespero absoluto (ex: última carta para bater).
                 if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
-                  continue;
+                  // Se entrou em pânico, a honra VIP é suspensa e ele joga as cartas para fugir da multa
+                  if (!ctx.isPanicDump) continue;
                 }
               }
 
