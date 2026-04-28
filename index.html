@@ -1441,6 +1441,64 @@
         filter: none !important;
       }
 
+      /* ================================================================= */
+      /* 7. TEMA: HOLOGRÁFICO (PRISMA ANIMADO)                             */
+      /* ================================================================= */
+
+      @keyframes holoShine {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      body[data-deck-theme='holografico'] .back-red,
+      body[data-deck-theme='holografico'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='holografico'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='holografico'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='holografico'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='holografico'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='holografico'] .carta.mini.back:not(.back-blue) {
+        background-color: #ff003c !important;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='8' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'/%3E%3Cpolygon points='50,40 70,72.5 50,105 30,72.5' fill='rgba(255,255,255,0.15)' stroke='rgba(255,255,255,0.6)' stroke-width='2'/%3E%3Ccircle cx='50' cy='72.5' r='4' fill='rgba(255,255,255,0.9)'/%3E%3C/svg%3E"),
+          linear-gradient(125deg, #ff003c, #ff7300, #ff003c, #900020) !important;
+        background-size:
+          100% 100%,
+          300% 300% !important;
+        animation: holoShine 4s ease infinite !important;
+        border: 2px solid rgba(255, 255, 255, 0.8) !important;
+        box-shadow:
+          inset 0 0 15px rgba(0, 0, 0, 0.4),
+          0 0 8px rgba(255, 0, 60, 0.5) !important;
+      }
+
+      body[data-deck-theme='holografico'] .back-blue,
+      body[data-deck-theme='holografico'] .fly-card.back.back-blue,
+      body[data-deck-theme='holografico'] .opponent-card-back.back-blue,
+      body[data-deck-theme='holografico'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='holografico'] .morto-card-back.back-blue,
+      body[data-deck-theme='holografico'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='holografico'] .carta.mini.back.back-blue {
+        background-color: #00d2ff !important;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='8' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'/%3E%3Cpolygon points='50,40 70,72.5 50,105 30,72.5' fill='rgba(255,255,255,0.15)' stroke='rgba(255,255,255,0.6)' stroke-width='2'/%3E%3Ccircle cx='50' cy='72.5' r='4' fill='rgba(255,255,255,0.9)'/%3E%3C/svg%3E"),
+          linear-gradient(125deg, #00d2ff, #7000ff, #00d2ff, #001830) !important;
+        background-size:
+          100% 100%,
+          300% 300% !important;
+        animation: holoShine 4s ease infinite !important;
+        border: 2px solid rgba(255, 255, 255, 0.8) !important;
+        box-shadow:
+          inset 0 0 15px rgba(0, 0, 0, 0.4),
+          0 0 8px rgba(0, 210, 255, 0.5) !important;
+      }
+
       /* Efeitos Especiais */
       .impact-ring {
         position: fixed;
@@ -2541,6 +2599,7 @@
                 <option value="dominacao">Dominação (Neon Tech / FinDom)</option>
                 <option value="arcade">Arcade (Player 1 / Player 2)</option>
                 <option value="mythic">✨ Mítico (Findom Animado)</option>
+                <option value="holografico">💎 Holográfico (Prisma Animado)</option>
               </select>
             </div>
             <label>

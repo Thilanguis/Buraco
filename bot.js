@@ -119,7 +119,7 @@ export class BuracoBot {
   }
 
   // 🧠 SIMULADOR FANTASMA DA IA: Arranca a armadura do 2 para o bot ver as possibilidades reais
-  static simulateMeld(baseMeld, newCards) {
+  static simulateMeld(baseMeld, newCards, engine) {
     const combined = [...baseMeld, ...newCards].map((c) => (c ? { ...c } : null));
     combined.forEach((c) => {
       if (c && !c.joker && (c.rank === '2' || c.rank === 2)) {
@@ -127,6 +127,11 @@ export class BuracoBot {
         c.forceWild = false;
       }
     });
+
+    // Devolve a armadura se a carta realmente encaixar como natural no novo cenário
+    if (engine && engine.normalizeMeld) {
+      engine.normalizeMeld(combined);
+    }
     return combined;
   }
 
@@ -140,7 +145,7 @@ export class BuracoBot {
     if (!combo || combo.length !== 3) return false;
     if (combo.some((c) => c.joker)) return false;
 
-    const testCombo = this.simulateMeld([], combo);
+    const testCombo = this.simulateMeld([], combo, engine);
     if (!engine.isValidSequenceMeld(testCombo)) return false;
 
     const hasTwo = combo.find((c) => c.rank === '2');
@@ -150,6 +155,11 @@ export class BuracoBot {
 
       const order = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
       const rankIdxs = combo.map((c) => order.indexOf(c.rank)).sort((a, b) => a - b);
+
+      // Trava de blindagem: Garante que não existam cartas repetidas (ex: 2, 2, 4)
+      const uniqueRanks = new Set(rankIdxs);
+      if (uniqueRanks.size !== 3) return false;
+
       if (rankIdxs[2] - rankIdxs[0] !== 2) return false; // Se a diferença entre os index não for exata, tem buraco (logo, o 2 é falso)
     }
     return true;
@@ -197,7 +207,7 @@ export class BuracoBot {
         const meld = team.melds[mIdx];
         if (topIsWildOrTwo && this.isMeldDirty(meld)) continue;
 
-        const testMeld = this.simulateMeld(meld, [topCard]);
+        const testMeld = this.simulateMeld(meld, [topCard], engine);
         if (engine.isValidSequenceMeld(testMeld)) {
           const hasTwo = meld.some((c) => c.rank === '2');
           const needsWild = testMeld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== testMeld[0].suit));
@@ -219,6 +229,30 @@ export class BuracoBot {
           if (this.isComboPerfectlyClean3(combo, engine)) {
             if (!checkSafe(2, combo)) continue;
             return { wants: true, action: 'new', handIndexes: [i, j] };
+          }
+        }
+      }
+    }
+
+    // 🧠 FASE 1.5: GOLPE DO FALSO SUJO
+    // Se o lixo for grande ou o bot for VIP (Dominador), ele usa o 2 do MESMO naipe para roubar a mesa,
+    // pois sabe que pode limpar essa sujeira no futuro.
+    if (hand.length >= 2 && (isJuicyPile || ctx.isVip)) {
+      for (let i = 0; i < hand.length - 1; i++) {
+        for (let j = i + 1; j < hand.length; j++) {
+          const combo = [hand[i], hand[j], topCard];
+
+          if (engine.isValidSequenceMeld(combo)) {
+            const wilds = combo.filter((c) => c.joker || c.rank === '2');
+            const realCards = combo.filter((c) => !c.joker && c.rank !== '2');
+
+            // Só aprova se tiver 1 "coringa", não for o curingão com estrela, e for um 2 do mesmo naipe
+            if (wilds.length === 1 && !wilds[0].joker && wilds[0].rank === '2' && realCards.length > 0) {
+              if (wilds[0].suit === realCards[0].suit) {
+                if (!checkSafe(2, combo)) continue;
+                return { wants: true, action: 'new', handIndexes: [i, j] };
+              }
+            }
           }
         }
       }
@@ -358,7 +392,7 @@ export class BuracoBot {
             if (c.joker || c.rank === '2') continue;
 
             // CORREÇÃO 1: Usa o simulador para ignorar a armadura do 2
-            const testMeld = this.simulateMeld(team.melds[mIdx], [c]);
+            const testMeld = this.simulateMeld(team.melds[mIdx], [c], engine);
 
             if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
 
@@ -388,7 +422,7 @@ export class BuracoBot {
             const c = me.hand[i];
             if (c.rank === '2' && c.suit === meld[0].suit) {
               // CORREÇÃO 2: Usa o simulador para o Coringa Perfeito
-              const testMeld = this.simulateMeld(meld, [c]);
+              const testMeld = this.simulateMeld(meld, [c], engine);
 
               if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
 
@@ -426,20 +460,32 @@ export class BuracoBot {
               const combo = [me.hand[i], me.hand[j], me.hand[k]];
               if (!this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
 
-              // Validação blindada: Só permite a criação do jogo se for uma sequência pura e perfeita
-              if (!this.isComboPerfectlyClean3(combo, engine)) continue;
+              // Validação blindada: Permite sequência pura OU o "Falso Sujo" (2 do mesmo naipe)
+              let isValidCombo = this.isComboPerfectlyClean3(combo, engine);
+              if (!isValidCombo) {
+                const wilds = combo.filter((c) => c.joker || c.rank === '2');
+                const realCards = combo.filter((c) => !c.joker && c.rank !== '2');
+                if (wilds.length === 1 && !wilds[0].joker && wilds[0].rank === '2' && realCards.length > 0) {
+                  if (wilds[0].suit === realCards[0].suit) isValidCombo = true;
+                }
+              }
 
-              // 🛑 TRAVA DO SNIPER (Anti-Canibalismo Blindado contra Fantasmas)
-              if (isVipSniper) {
-                const comboRealCard = combo.find((c) => c && !c.joker && c.rank !== '2');
-                if (comboRealCard) {
-                  const suit = comboRealCard.suit;
-                  const hasCleanMeldSameSuit = team.melds.some((m) => {
-                    if (!m) return false;
-                    const meldRealCard = m.find((c) => c && !c.joker && c.rank !== '2');
-                    return meldRealCard && meldRealCard.suit === suit && !this.isMeldDirty(m);
-                  });
-                  if (hasCleanMeldSameSuit) continue;
+              if (!isValidCombo) continue;
+
+              // 🛑 TRAVA UNIVERSAL ANTI-CANIBALISMO (Impede separar jogos do mesmo naipe)
+              const comboReal = combo.find((c) => c && !c.joker); // Qualquer carta não-coringa tem naipe válido (até o 2 natural)
+              if (comboReal) {
+                const suit = comboReal.suit;
+                const hasMeldSameSuit = team.melds.some((m) => {
+                  if (!m) return false;
+                  const meldReal = m.find((x) => x && !x.joker);
+                  return meldReal && meldReal.suit === suit;
+                });
+
+                // VIPs (Dominadores) NUNCA dividem o mesmo naipe.
+                // Bots normais só podem dividir no desespero absoluto (ex: última carta para bater).
+                if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
+                  continue;
                 }
               }
 
@@ -498,7 +544,7 @@ export class BuracoBot {
               if (!c.joker && c.rank !== '2') continue;
 
               // CORREÇÃO 3: Usa o simulador para sujeira no endgame
-              const testMeld = this.simulateMeld(meld, [c]);
+              const testMeld = this.simulateMeld(meld, [c], engine);
 
               if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
 
@@ -536,7 +582,9 @@ export class BuracoBot {
                 if (!this.canMeldSafely(me, team, 3, engine, combo)) continue;
 
                 const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
-                if (wilds !== 1) continue;
+
+                // Permite 1 coringa normal, ou 2 "wilds" (para o caso de 2, 2, 4 onde um 2 é natural)
+                if (wilds === 0 || wilds > 2) continue;
 
                 if (engine.isValidSequenceMeld(combo)) {
                   await engine.executeMeldNew(botIndex, [i, j, k]);
@@ -590,6 +638,30 @@ export class BuracoBot {
             if (engine.isValidSequenceMeld([...oppMeld, c])) {
               danger += 500; // Carta levanta jogo do inimigo!
               break;
+            }
+          }
+        }
+
+        // Evita jogar fora carta que entra no PRÓPRIO jogo (Blindagem extra)
+        const myTeam = state.teams[me.teamId];
+        if (myTeam && myTeam.melds) {
+          for (let myMeld of myTeam.melds) {
+            if (!myMeld) continue;
+            if (engine.isValidSequenceMeld([...myMeld, c])) {
+              danger += 200;
+              break;
+            }
+          }
+
+          // 🛡️ INSTINTO DE ÁS-A-ÁS: Bot segura o Ás se o time tiver um jogo do mesmo naipe crescendo
+          if (c.rank === 'A') {
+            for (let myMeld of myTeam.melds) {
+              if (!myMeld) continue;
+              const realCards = myMeld.filter((x) => x && !x.joker && x.rank !== '2' && x.rank !== 2);
+              if (realCards.length > 0 && realCards[0].suit === c.suit) {
+                danger += 150; // Dá peso para o Ás ficar na mão esperando a canastra chegar nele
+                break;
+              }
             }
           }
         }
