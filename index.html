@@ -1596,6 +1596,29 @@
         opacity: 1;
       }
 
+      /* Animação do Dinheiro Flutuante (PIX) */
+      .floating-money {
+        position: fixed;
+        font-weight: 900;
+        font-size: 22px;
+        pointer-events: none;
+        z-index: 10001;
+        opacity: 1;
+        transform: translate(-50%, -50%);
+      }
+      .floating-money.positive {
+        color: #4ade80;
+        text-shadow:
+          0 0 10px rgba(74, 222, 128, 0.8),
+          0 3px 6px rgba(0, 0, 0, 1);
+      }
+      .floating-money.negative {
+        color: #ef4444;
+        text-shadow:
+          0 0 10px rgba(239, 68, 68, 0.8),
+          0 3px 6px rgba(0, 0, 0, 1);
+      }
+
       /* Cores Nipes */
       .hearts,
       .diamonds {
@@ -2636,13 +2659,17 @@
                 <strong>Vitória:</strong>
                 R$ 5,00
                 <br />
+                🛑
+                <strong>Adv. Sem Morto:</strong>
+                +R$ 8,00
+                <br />
                 📈
                 <strong>Diferença:</strong>
                 R$ 0,01 por ponto
                 <br />
                 ☠️
-                <strong>Adv. Zerado/Negativo:</strong>
-                +R$ 5,00
+                <strong>Adv. Negativo:</strong>
+                +R$ 0,05 por ponto negativo
                 <br />
                 ⭐
                 <strong>Bônus Ás-a-Ás:</strong>
@@ -2650,7 +2677,7 @@
                 <br />
                 🩸
                 <strong>Humilhação:</strong>
-                +R$ 10,00 (Vencer sem o adv. fazer canastra)
+                +R$ 10,00 (Vencer sem adv. fazer canastra)
                 <br />
                 🃏
                 <strong>Chuva de Canastras:</strong>
@@ -2836,7 +2863,7 @@
                   <div>
                     <span class="goals-toggle-icon">▼</span>
                     <span>
-                      🎯 METAS PIX
+                      🎯 METAS
                       <span id="winnerNameHud" style="color: #facc15; font-size: 8px; margin-left: 4px; opacity: 0.8"></span>
                       <span id="goalsCounterHud" style="color: #94a3b8; font-size: 9px; margin-left: 4px">(0/6)</span>
                     </span>
@@ -2956,7 +2983,7 @@
 
     <div id="goalsModal">
       <div class="goals-box">
-        <h2>🎯 Metas PIX (Seu Time)</h2>
+        <h2>🎯 Metas (Seu Time)</h2>
         <div id="goalsList" style="display: flex; flex-direction: column; margin-bottom: 20px"></div>
         <div style="text-align: center; font-size: 28px; font-weight: 900; color: #4ade80; margin-bottom: 24px" id="goalsTotal">R$ 0,00</div>
         <button
@@ -3800,11 +3827,14 @@
         if (state.stock && state.stock.length === 0) {
           const hasDead = state.deadPiles && state.deadPiles.some((p) => p && p.length > 0);
           if (hasDead) {
-            const recycledIndex = await recycleDeadToStockIfPossible();
-            if (recycledIndex !== null && state.lastAction) {
-              state.lastAction.autoRecycledIndex = recycledIndex; // Avisa a máquina do oponente
-            }
+            await recycleDeadToStockIfPossible();
           }
+        }
+
+        // 🛑 CARIMBADOR DE ANIMAÇÃO: Gruda a animação de reposição na jogada que o usuário/bot acabou de fazer
+        if (state._pendingRecycleSync !== undefined && state.lastAction) {
+          state.lastAction.autoRecycledIndex = state._pendingRecycleSync;
+          delete state._pendingRecycleSync;
         }
 
         pendingCommit = true;
@@ -3848,7 +3878,8 @@
         let actionDraw = null;
 
         if (!state.hasDrawnThisTurn) {
-          if (!state.stock.length) recycleDeadToStockIfPossible();
+          // 🛑 AWAIT INJETADO: Agora o relógio espera o morto virar monte antes de forçar a compra
+          if (!state.stock.length) await recycleDeadToStockIfPossible();
 
           const fromStockEl = document.querySelector('#drawStockBtn .pile-card');
           const fromStockRect = fromStockEl ? getRect(fromStockEl) : null;
@@ -4129,6 +4160,7 @@
         if (pi) pi.style.pointerEvents = 'auto';
         if (bm) bm.style.pointerEvents = 'auto';
         renderAll();
+        state._pendingRecycleSync = idx; // 🛑 RASTREADOR: Avisa o Firebase que o morto voou pro monte
         return idx;
       }
 
@@ -5649,7 +5681,7 @@
 
           const isMorto = baseCardClass.includes('morto');
           const isDiscard = backColor === 'discard';
-          const divisor = isMorto ? 1 : isDiscard ? 2 : 4;
+          const divisor = isMorto ? 1 : 3; // Lixo e Monte vão empilhar na mesma velocidade
           let layers = Math.ceil(count / divisor);
           if (layers < 1) layers = 1;
           if (layers > 16) layers = 16;
@@ -6339,8 +6371,8 @@
         triggerScoreAnim(1, window.lastScores[1], s2);
 
         if (state.isBetting) {
-          // Função universal de cálculo financeiro
-          window.calculatePixFin = (myScore, opScore, myMelds, oppMelds) => {
+          // Função universal de cálculo financeiro com Projeção Real
+          window.calculatePixFin = (myScore, opScore, myMelds, oppMelds, oppTookMorto, myProjected, oppProjected) => {
             let asasCount = 0;
             let totalCanastras = 0;
             myMelds.forEach((m) => {
@@ -6351,11 +6383,23 @@
 
             const diff = Math.max(0, myScore - opScore);
             let total = 0;
-
-            // CONTAGEM GLOBAL: Conta as canastras do oponente SEMPRE (evita erro no empate ou na derrota)
             const oppCanastras = oppMelds.filter((m) => classifyMeldForUi(m).kind !== 'simple').length;
 
-            let b = { base: 0, diff: 0, asas: 0, negative: 0, countAsas: asasCount, totalCanastras: totalCanastras, canastraQuantityBonus: 0, hasHumilhacao: false, humilhacaoSuprema: 0, oppCanastras: oppCanastras };
+            let b = {
+              base: 0,
+              diff: 0,
+              asas: 0,
+              negative: 0,
+              countAsas: asasCount,
+              totalCanastras: totalCanastras,
+              canastraQuantityBonus: 0,
+              hasHumilhacao: false,
+              humilhacaoSuprema: 0,
+              oppCanastras: oppCanastras,
+              virgemDeMorto: false,
+              valorVirgem: 0,
+              oppProjected: oppProjected,
+            };
 
             if (totalCanastras >= 6) {
               b.canastraQuantityBonus = 3 + (totalCanastras - 6) * 2;
@@ -6366,9 +6410,13 @@
               b.base = 5.0;
               total += diff * 0.01;
               b.diff = diff * 0.01;
-              if (opScore <= 0) {
-                total += 5.0;
-                b.negative = 5.0;
+
+              // 🛑 PROJEÇÃO REAL: Oponente negativo paga R$ 0,05 por cada ponto abaixo de zero
+              if (oppProjected < 0) {
+                const negativePoints = Math.abs(oppProjected);
+                const negativePenalty = negativePoints * 0.05;
+                total += negativePenalty;
+                b.negative = negativePenalty;
               }
 
               if (oppCanastras === 0) {
@@ -6376,19 +6424,93 @@
                 b.humilhacaoSuprema = 10.0;
                 total += b.humilhacaoSuprema;
               }
+
+              if (!oppTookMorto) {
+                b.virgemDeMorto = true;
+                b.valorVirgem = 8.0;
+                total += b.valorVirgem;
+              }
             }
 
             const asasRewards = [0, 3, 7, 12, 27];
             b.asas = asasRewards[Math.min(asasCount, 4)] || 0;
             total += b.asas;
-
             total += b.canastraQuantityBonus;
 
             return { total, diff, b };
           };
 
-          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds, state.teams[1].melds);
-          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds, state.teams[0].melds);
+          // Auxiliar para calcular pontos projetados (Mesa - Mão - Morto)
+          const getProjectedScore = (teamId, boardScore, otherBoardScore) => {
+            // 🛡️ TRAVA DE EMPATE INICIAL: Se ninguém pontuou, a projeção é zero para não confundir o HUD
+            if (boardScore === 0 && otherBoardScore === 0) return 0;
+
+            let handPenalty = 0;
+            state.players
+              .filter((p) => p.teamId === teamId)
+              .forEach((p) => {
+                p.hand.forEach((c) => {
+                  if (c) handPenalty += cardBasePoints(c);
+                });
+              });
+            const mortoPenalty = (state.deadChunksTaken?.[teamId] ?? 0) === 0 ? 100 : 0;
+            return boardScore - handPenalty - mortoPenalty;
+          };
+
+          const t1MortosPegos = state.deadChunksTaken?.[0] ?? 0;
+          const t2MortosPegos = state.deadChunksTaken?.[1] ?? 0;
+
+          // Passamos o score de ambos para validar a trava de 0-0
+          const proj1 = getProjectedScore(0, s1, s2);
+          const proj2 = getProjectedScore(1, s2, s1);
+
+          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds, state.teams[1].melds, t2MortosPegos > 0, proj1, proj2);
+          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds, state.teams[0].melds, t1MortosPegos > 0, proj2, proj1);
+
+          // 💸 MOTOR DE ANIMAÇÃO FINANCEIRA: Compara o último render com o atual para soltar a animação de dinheiro
+          if (typeof window.lastFinScores === 'undefined') {
+            window.lastFinScores = [fin1.total, fin2.total]; // Trava o primeiro load para não estourar na tela do nada
+          } else {
+            const triggerMoneyAnim = (teamIndex, oldVal, newVal) => {
+              if (Math.abs(newVal - oldVal) < 0.005) return; // Ignora se não mudou dinheiro
+
+              const diff = newVal - oldVal;
+              const badgeEl = document.getElementById(`liveMoney${teamIndex + 1}`);
+              // Se o badge do PIX estiver escondido (R$ 0,00), tenta achar a caixa do placar
+              const targetEl = badgeEl && badgeEl.offsetWidth > 0 ? badgeEl : document.querySelector(`#teamPanel${teamIndex + 1} .meld-title`);
+
+              if (targetEl) {
+                const r = targetEl.getBoundingClientRect();
+                const flyEl = document.createElement('div');
+                flyEl.className = 'floating-money ' + (diff > 0 ? 'positive' : 'negative');
+                flyEl.textContent = (diff > 0 ? '+' : '-') + 'R$ ' + Math.abs(diff).toFixed(2).replace('.', ',');
+
+                flyEl.style.left = r.left + r.width / 2 + 'px';
+                flyEl.style.top = r.top + r.height / 2 + 'px';
+                document.body.appendChild(flyEl);
+
+                // Lucro: sobe 50px | Prejuízo: afunda 50px
+                const yMove = diff > 0 ? -50 : 50;
+
+                flyEl
+                  .animate(
+                    [
+                      { transform: 'translate(-50%, -50%) scale(0.6)', opacity: 0 },
+                      { transform: 'translate(-50%, -50%) scale(1.1)', opacity: 1, offset: 0.1 }, // Offset menor para ele ficar grande mais rápido e demorar mais sumindo
+                      { transform: `translate(-50%, calc(-50% + ${yMove}px)) scale(1)`, opacity: 0 },
+                    ],
+                    { duration: 3000, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }, // Alterado de 2000 para 3000 (3 segundos)
+                  )
+                  .finished.then(() => flyEl.remove());
+              }
+            };
+
+            triggerMoneyAnim(0, window.lastFinScores[0], fin1.total);
+            triggerMoneyAnim(1, window.lastFinScores[1], fin2.total);
+
+            window.lastFinScores[0] = fin1.total;
+            window.lastFinScores[1] = fin2.total;
+          }
 
           const updateBadge = (badge, fin) => {
             if (!badge) return;
@@ -6413,19 +6535,33 @@
           const hud = document.getElementById('goalsHud');
 
           if (hud) {
-            // --- MOTOR GLOBAL: Sempre mostra os dados de quem está vencendo ---
-            const isT1Leading = s1 >= s2;
-            const winnerFin = isT1Leading ? fin1 : fin2;
-            const winnerName = isT1Leading ? state.teams[0].name : state.teams[1].name;
-            const isWin = s1 !== s2; // Se houver empate real, a meta de vitória não conta
+            // --- MOTOR GLOBAL: Mostra a perspectiva do Vencedor. Se empatar, mostra a perspectiva do próprio jogador! ---
+            let refFin = fin1;
+            let refName = state.teams[0].name;
+            const isWin = s1 !== s2;
+
+            if (s1 > s2) {
+              refFin = fin1;
+              refName = state.teams[0].name;
+            } else if (s2 > s1) {
+              refFin = fin2;
+              refName = state.teams[1].name;
+            } else {
+              // EMPATE (Ex: 0 a 0 no início do jogo)
+              // Mostra a visão local para a palavra "Adversário" não apontar para o próprio jogador
+              const myTeamId = state.players[myPlayerIndex] ? state.players[myPlayerIndex].teamId : 0;
+              refFin = myTeamId === 1 ? fin2 : fin1;
+              refName = myTeamId === 1 ? state.teams[1].name : state.teams[0].name;
+            }
 
             let achievedCount = 0;
             if (isWin) achievedCount++;
-            if (winnerFin.b.diff > 0) achievedCount++;
-            if (winnerFin.b.negative > 0) achievedCount++;
-            if (winnerFin.b.countAsas > 0) achievedCount++;
-            if (winnerFin.b.hasHumilhacao) achievedCount++;
-            if (winnerFin.b.canastraQuantityBonus > 0) achievedCount++;
+            if (refFin.b.diff > 0) achievedCount++;
+            if (refFin.b.negative > 0) achievedCount++;
+            if (refFin.b.countAsas > 0) achievedCount++;
+            if (refFin.b.hasHumilhacao) achievedCount++;
+            if (refFin.b.virgemDeMorto) achievedCount++;
+            if (refFin.b.canastraQuantityBonus > 0) achievedCount++;
 
             // PERSISTÊNCIA: Exibe para todos na mesa e não some no fim do jogo
             hud.style.display = myPlayerIndex !== -1 ? 'block' : 'none';
@@ -6434,72 +6570,78 @@
             // Atualiza o nome do líder ao lado do título
             const nameEl = document.getElementById('winnerNameHud');
             if (nameEl) {
-              nameEl.textContent = s1 === s2 ? '(Empate)' : `(${winnerName})`;
+              nameEl.textContent = s1 === s2 ? '(Empate)' : `(${refName})`;
             }
 
-            document.getElementById('goalsTotalHud').textContent = 'R$ ' + winnerFin.total.toFixed(2).replace('.', ',');
+            // Em caso de empate, o total financeiro deve ser 0 para bater com o "Ninguém Paga" do final
+            const totalDisplay = isWin ? refFin.total : 0;
+            document.getElementById('goalsTotalHud').textContent = 'R$ ' + totalDisplay.toFixed(2).replace('.', ',');
 
             const counterEl = document.getElementById('goalsCounterHud');
             if (counterEl) {
-              counterEl.textContent = `(${achievedCount}/6)`;
-              counterEl.style.color = achievedCount === 6 ? '#4ade80' : '#94a3b8';
+              counterEl.textContent = `(${achievedCount}/7)`;
+              counterEl.style.color = achievedCount === 7 ? '#4ade80' : '#94a3b8';
             }
 
-            // Renderiza a lista de itens sempre baseada no vencedor para todos verem igual
+            // Renderiza a lista de itens baseada na referência calculada
             const list = document.getElementById('goalsListHud');
             list.innerHTML = `
                     <div class="goal-item ${isWin ? 'achieved' : ''}">
                         <span>✅ Vitória (R$ 5)</span> 
                         <strong>+R$ ${isWin ? '5,00' : '0,00'}</strong>
                     </div>
-                    <div class="goal-item ${winnerFin.b.diff > 0 ? 'achieved' : ''}">
+                    <div class="goal-item ${refFin.b.virgemDeMorto ? 'achieved' : ''}">
+                        <span>🛑 Adv. Sem Morto (R$ 8)</span> 
+                        <strong>+R$ ${refFin.b.valorVirgem.toFixed(2).replace('.', ',')}</strong>
+                    </div>
+                    <div class="goal-item ${refFin.b.diff > 0 ? 'achieved' : ''}">
                         <span>📈 Diferença (R$ 0,01/pt)</span> 
-                        <strong>+R$ ${winnerFin.b.diff.toFixed(2).replace('.', ',')}</strong>
+                        <strong>+R$ ${refFin.b.diff.toFixed(2).replace('.', ',')}</strong>
                     </div>
-                    <div class="goal-item ${winnerFin.b.negative > 0 ? 'achieved' : ''}">
-                        <span>☠️ Adv. Negativo (R$ 5)</span> 
-                        <strong>+R$ ${winnerFin.b.negative > 0 ? '5,00' : '0,00'}</strong>
+                    <div class="goal-item ${refFin.b.negative > 0 ? 'achieved' : ''}">
+                        <span>☠️ Adv. Neg. (R$ 0,05/pt) [${refFin.b.oppProjected} pts]</span> 
+                        <strong>+R$ ${refFin.b.negative > 0 ? refFin.b.negative.toFixed(2).replace('.', ',') : '0,00'}</strong>
                     </div>
-                    <div id="asasGoalItem" class="goal-item expandable ${winnerFin.b.countAsas > 0 ? 'achieved' : ''} ${window.isAsasDetailsExpanded ? 'expanded' : ''}" onclick="toggleAsasDetails(event)">
+                    <div id="asasGoalItem" class="goal-item expandable ${refFin.b.countAsas > 0 ? 'achieved' : ''} ${window.isAsasDetailsExpanded ? 'expanded' : ''}" onclick="toggleAsasDetails(event)">
                         <div class="goal-item-header">
-                            <span><span class="expand-icon">▶</span>⭐ Bônus Ás-a-Ás (${winnerFin.b.countAsas}/4)</span> 
-                            <strong>+R$ ${winnerFin.b.asas.toFixed(2).replace('.', ',')}</strong>
+                            <span><span class="expand-icon">▶</span>⭐ Bônus Ás-a-Ás (${refFin.b.countAsas}/4)</span> 
+                            <strong>+R$ ${refFin.b.asas.toFixed(2).replace('.', ',')}</strong>
                         </div>
                         <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.countAsas >= 1 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 1 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>1ª Ás-a-Ás:</span> <span>+R$ 3,00</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.countAsas >= 2 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 2 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>2ª Ás-a-Ás:</span> <span>+R$ 4,00</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.countAsas >= 3 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 3 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>3ª Ás-a-Ás:</span> <span>+R$ 5,00</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${winnerFin.b.countAsas >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.countAsas >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>4ª Ás-a-Ás:</span> <span>+R$ 15,00</span>
                             </div>
                         </div>
                     </div>
-                    <div class="goal-item ${winnerFin.b.hasHumilhacao ? 'achieved' : ''}">
-                        <span>🩸 Adv. ${winnerFin.b.oppCanastras} Canastra(s) (R$ 10)</span> 
-                        <strong>+R$ ${winnerFin.b.humilhacaoSuprema.toFixed(2).replace('.', ',')}</strong>
+                    <div class="goal-item ${refFin.b.hasHumilhacao ? 'achieved' : ''}">
+                        <span>🩸 Adv. ${refFin.b.oppCanastras} Canastra(s) (R$ 10)</span> 
+                        <strong>+R$ ${refFin.b.humilhacaoSuprema.toFixed(2).replace('.', ',')}</strong>
                     </div>
-                    <div id="chuvaGoalItem" class="goal-item expandable ${winnerFin.b.totalCanastras >= 6 ? 'achieved' : ''} ${window.isChuvaDetailsExpanded ? 'expanded' : ''}" onclick="toggleChuvaDetails(event)">
+                    <div id="chuvaGoalItem" class="goal-item expandable ${refFin.b.totalCanastras >= 6 ? 'achieved' : ''} ${window.isChuvaDetailsExpanded ? 'expanded' : ''}" onclick="toggleChuvaDetails(event)">
                         <div class="goal-item-header">
-                            <span><span class="expand-icon">▶</span>🃏 Chuva de Canastras (${winnerFin.b.totalCanastras}/6+)</span> 
-                            <strong>+R$ ${winnerFin.b.canastraQuantityBonus.toFixed(2).replace('.', ',')}</strong>
+                            <span><span class="expand-icon">▶</span>🃏 Chuva de Canastras (${refFin.b.totalCanastras}/6+)</span> 
+                            <strong>+R$ ${refFin.b.canastraQuantityBonus.toFixed(2).replace('.', ',')}</strong>
                         </div>
                         <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.totalCanastras >= 6 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 6 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>6ª Canastra:</span> <span>+R$ 3,00</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.totalCanastras >= 7 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 7 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>7ª Canastra:</span> <span>+R$ 2,00</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${winnerFin.b.totalCanastras >= 8 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 8 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>8ª Canastra:</span> <span>+R$ 2,00</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${winnerFin.b.totalCanastras >= 9 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.totalCanastras >= 9 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
                               <span>9ª em diante:</span> <span>+R$ 2,00 /cada</span>
                             </div>
                         </div>
@@ -6657,8 +6799,21 @@
           return out;
         };
 
+        // 🛑 INJETOR UNIVERSAL DE REPOSIÇÃO (Morto -> Monte)
+        const animateRemoteRecycleIfAny = async () => {
+          if (a.autoRecycledIndex !== undefined && a.autoRecycledIndex !== null) {
+            const deadEl = a.autoRecycledIndex === 1 ? dead1El : dead0El;
+            if (deadEl && stockRect) {
+              if (deadEl) deadEl.style.opacity = '0';
+              await flyRectToRect(fallbackCard, getRect(deadEl), stockRect, 'back');
+              impactAtRect(stockRect);
+            }
+          }
+        };
+
         // Injetor universal para morto automático remoto (incluindo IA)
         const animateRemoteDeadIfAny = async () => {
+          await animateRemoteRecycleIfAny(); // Garante que a reposição aconteça ANTES do morto ou das compras voarem!
           if (a.tookDead) {
             const fromEl = a.tookDead.deadIndex === 1 ? dead1El : dead0El;
             const fromR = fromEl ? getRect(fromEl) : null;
@@ -6937,20 +7092,15 @@
 
           for (let i = 0; i < drawCount; i++) {
             if (!s.stock.length) {
-              recycledIndex = recycleDeadToStockIfPossible();
+              // 🛑 AWAIT ADICIONADO: O bot agora espera a animação de 2 segundos do morto terminar!
+              recycledIndex = await recycleDeadToStockIfPossible();
               if (recycledIndex === null || !s.stock.length) {
                 if (i === 0) {
                   await finishGame(null);
                   return;
                 } else break;
-              } else {
-                const fromEl = document.getElementById(recycledIndex === 0 ? 'mortoSlot0' : 'mortoSlot1');
-                const toEl = document.querySelector('#drawStockBtn .pile-card');
-                if (fromEl && toEl) {
-                  const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
-                  flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back').then(() => impactAtRect(getRect(toEl)));
-                }
               }
+              // Animação redundante apagada (o recycleDeadToStockIfPossible já faz a carta voar)
             }
             const c = s.stock.pop();
             ensureCardId(c);
@@ -6998,6 +7148,11 @@
 
           // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
+            // 🛑 SALVA-VIDAS: Prepara o morto caso o monte tenha acabado bem na carta extra dele!
+            if (s.stock.length === 0) {
+              await recycleDeadToStockIfPossible();
+            }
+
             if (s.stock.length > 0) {
               const extraCard = s.stock.pop();
               ensureCardId(extraCard);
@@ -7059,6 +7214,11 @@
           }
 
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
+            // 🛑 SALVA-VIDAS: Prepara o morto caso o monte tenha acabado bem na carta extra dele!
+            if (s.stock.length === 0) {
+              await recycleDeadToStockIfPossible();
+            }
+
             if (s.stock.length > 0) {
               const extraCard = s.stock.pop();
               ensureCardId(extraCard);

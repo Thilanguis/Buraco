@@ -42,8 +42,9 @@ export class BuracoBot {
       // Verifica se existe QUALQUER morto na mesa (seja para pegar ou para virar monte)
       const hasDeadPiles = state.deadPiles && state.deadPiles.some((p) => p && p.length > 0);
 
-      // Só entra em desespero por monte secando se NÃO tiver morto e faltarem 5 ou menos cartas
-      const isMonteSecando = !hasDeadPiles && stockCount <= 5;
+      // 🚨 REGRA DO BURACO: Se não tem mais morto e faltam 8 cartas ou menos no monte, é PÂNICO!
+      // O bot desliga o modo "fresco" do Ás-a-Ás e passa a desovar jogo separado, sujar cruzado, etc.
+      const isMonteSecando = !hasDeadPiles && stockCount <= 8;
       const isPanicDump = oppAboutToWin || isMonteSecando;
 
       // isDesperate absorve o Pânico, forçando o bot a quebrar as regras de segurar carta
@@ -129,6 +130,13 @@ export class BuracoBot {
     }
   }
 
+  // 🛡️ MOTOR DE VISÃO REAL: Identifica o naipe verdadeiro de um jogo ignorando coringas e o número 2
+  static getRealSuit(meld) {
+    if (!meld || !meld.length) return null;
+    const real = meld.find((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
+    return real ? real.suit : meld[0] ? meld[0].suit : null;
+  }
+
   // 🧠 SIMULADOR FANTASMA DA IA: Arranca a armadura do 2 para o bot ver as possibilidades reais
   static simulateMeld(baseMeld, newCards, engine) {
     const combined = [...baseMeld, ...newCards].map((c) => (c ? { ...c } : null));
@@ -200,13 +208,26 @@ export class BuracoBot {
       const cardsAdded = state.variant === 'fechado' ? pileSize - 1 : pileSize;
       const predictedHandSize = hand.length - cardsUsedFromHand + cardsAdded;
 
+      // 🛑 TRAVA ANTI-OBESIDADE CORRIGIDA (Visão de Monopólio)
+      // Bots normais ficam intimidados com lixos gigantes no final do jogo.
+      // O VIP (Dominador) IGNORA essa regra e engole o lixo para matar o oponente de fome!
+      // Ele só recusa a compra se estiver nas últimas 8 cartas do monte (Panic Dump).
+      if (isEndgame && cardsAdded >= 7 && predictedHandSize > 1) {
+        if (ctx.isVip && !ctx.isPanicDump) {
+          // 👑 LICENÇA PARA GULA: O Dominador pega as cartas para manter o monopólio
+        } else if (!ctx.isPanicDump) {
+          return false; // Bot escravo recusa a compra suicida
+        }
+      }
+
       if (predictedHandSize > 1) return true;
       if (ctx.isFarming && predictedHandSize <= 1) return false;
       if (engine.canTeamTakeDeadNow(team.id)) return true;
       if (engine.teamHasGoodCanastra(team.id)) return true;
 
       if (pendingMeld && pendingMeld.length >= 7) {
-        const hasWild = pendingMeld.some((c) => c.joker || (c.rank === '2' && c.suit !== pendingMeld[0].suit) || c.forceWild);
+        const realSuit = this.getRealSuit(pendingMeld);
+        const hasWild = pendingMeld.some((c) => c.joker || (c.rank === '2' && c.suit !== realSuit) || c.forceWild);
         if (!hasWild) return true;
       }
       return false;
@@ -220,11 +241,17 @@ export class BuracoBot {
 
         const testMeld = this.simulateMeld(meld, [topCard], engine);
         if (engine.isValidSequenceMeld(testMeld)) {
+          const realSuit = this.getRealSuit(meld);
+          const testSuit = this.getRealSuit(testMeld);
           const hasTwo = meld.some((c) => c.rank === '2');
-          const needsWild = testMeld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== testMeld[0].suit));
-          const isPerfectTwo = topCard.rank === '2' && topCard.suit === meld[0].suit && !hasTwo;
+          const needsWild = testMeld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== testSuit));
+          const isPerfectTwo = topCard.rank === '2' && topCard.suit === realSuit && !hasTwo;
 
-          if (!needsWild || isPerfectTwo) {
+          // 🛡️ CORREÇÃO DA CEGUEIRA: Se o jogo já era sujo e a carta do topo é natural, a compra é aprovada!
+          const wasDirty = this.isMeldDirty(meld);
+          const topIsNatural = !topCard.joker && topCard.rank !== '2';
+
+          if (!needsWild || isPerfectTwo || (wasDirty && topIsNatural)) {
             if (!checkSafe(0, testMeld)) continue;
             return { wants: true, action: 'extend', meldIndex: mIdx };
           }
@@ -239,6 +266,19 @@ export class BuracoBot {
 
           if (this.isComboPerfectlyClean3(combo, engine)) {
             if (!checkSafe(2, combo)) continue;
+
+            // 🛑 TRAVA ANTI-CANIBALISMO NO LIXO (Jogo Limpo)
+            const getRealSuit = (cards) => {
+              const real = cards.find((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
+              return real ? real.suit : null;
+            };
+            const suit = getRealSuit(combo);
+            const hasMeldSameSuit = suit && team.melds && team.melds.some((m) => getRealSuit(m) === suit);
+
+            if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
+              if (!ctx.isPanicDump) continue;
+            }
+
             return { wants: true, action: 'new', handIndexes: [i, j] };
           }
         }
@@ -246,8 +286,8 @@ export class BuracoBot {
     }
 
     // 🧠 FASE 1.5: GOLPE DO FALSO SUJO
-    // Se o lixo for grande ou o bot for VIP (Dominador), ele usa o 2 do MESMO naipe para roubar a mesa,
-    // pois sabe que pode limpar essa sujeira no futuro.
+    // O bot (especialmente o VIP) usa EXCLUSIVAMENTE o 2 do MESMO naipe para roubar a mesa,
+    // garantindo que a sujeira poderá ser limpa depois para fazer as canastras de meta.
     if (hand.length >= 2 && (isJuicyPile || ctx.isVip)) {
       for (let i = 0; i < hand.length - 1; i++) {
         for (let j = i + 1; j < hand.length; j++) {
@@ -259,8 +299,22 @@ export class BuracoBot {
 
             // Só aprova se tiver 1 "coringa", não for o curingão com estrela, e for um 2 do mesmo naipe
             if (wilds.length === 1 && !wilds[0].joker && wilds[0].rank === '2' && realCards.length > 0) {
-              if (wilds[0].suit === realCards[0].suit) {
+              const realSuit = this.getRealSuit(combo);
+              if (wilds[0].suit === realSuit) {
                 if (!checkSafe(2, combo)) continue;
+
+                // 🛑 TRAVA ANTI-CANIBALISMO NO LIXO (Falso Sujo)
+                const getRealSuit = (cards) => {
+                  const real = cards.find((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
+                  return real ? real.suit : null;
+                };
+                const suit = getRealSuit(combo);
+                const hasMeldSameSuit = suit && team.melds && team.melds.some((m) => getRealSuit(m) === suit);
+
+                if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
+                  if (!ctx.isPanicDump) continue;
+                }
+
                 return { wants: true, action: 'new', handIndexes: [i, j] };
               }
             }
@@ -278,6 +332,13 @@ export class BuracoBot {
 
           const testMeld = [...meld, topCard];
           if (engine.isValidSequenceMeld(testMeld)) {
+            const realSuit = this.getRealSuit(meld);
+            // 🛑 TRAVA DE PRESERVAÇÃO DO 2 NO LIXO (Anti-Cross-Suit)
+            if (!topCard.joker && topCard.rank === '2' && topCard.suit !== realSuit) {
+              if (ctx.isVip && !ctx.isPanicDump) continue;
+              if (!ctx.isVip && !ctx.isDesperate && !ctx.isRushingMorto) continue;
+            }
+
             const isCanastra = meld.length >= 7;
             const hasTwo = meld.some((c) => c.rank === '2');
             const hasThree = meld.some((c) => c.rank === '3');
@@ -303,7 +364,28 @@ export class BuracoBot {
             const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
 
             if (wilds === 1 && engine.isValidSequenceMeld(combo)) {
+              // 🛑 TRAVA DE PRESERVAÇÃO DO 2 NO LIXO (Nova Sujeira)
+              const wildCard = combo.find((c) => c.joker || c.rank === '2');
+              const realCard = combo.find((c) => !c.joker && c.rank !== '2');
+              if (wildCard && !wildCard.joker && wildCard.rank === '2' && realCard && wildCard.suit !== realCard.suit) {
+                if (ctx.isVip && !ctx.isPanicDump) continue;
+                if (!ctx.isVip && !ctx.isDesperate && !ctx.isRushingMorto) continue;
+              }
+
               if (!checkSafe(2, combo)) continue;
+
+              // 🛑 TRAVA ANTI-CANIBALISMO NO LIXO (Sujeira Desesperada)
+              const getRealSuit = (cards) => {
+                const real = cards.find((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
+                return real ? real.suit : null;
+              };
+              const suit = getRealSuit(combo);
+              const hasMeldSameSuit = suit && team.melds && team.melds.some((m) => getRealSuit(m) === suit);
+
+              if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
+                if (!ctx.isPanicDump) continue;
+              }
+
               return { wants: true, action: 'new', handIndexes: [i, j] };
             }
           }
@@ -344,7 +426,8 @@ export class BuracoBot {
 
     // Se ele for zerar a mão, mas o jogo que ele está montando FORMAR a canastra, a jogada é legalizada!
     if (pendingMeld && pendingMeld.length >= 7) {
-      const hasWild = pendingMeld.some((c) => c.joker || (c.rank === '2' && c.suit !== pendingMeld[0].suit) || c.forceWild);
+      const realSuit = this.getRealSuit(pendingMeld);
+      const hasWild = pendingMeld.some((c) => c.joker || (c.rank === '2' && c.suit !== realSuit) || c.forceWild);
       if (!hasWild) return true; // É limpa/real/ás, pode bater!
     }
 
@@ -419,9 +502,10 @@ export class BuracoBot {
           const meld = team.melds[mIdx];
           if (this.isMeldDirty(meld)) continue;
 
+          const realSuit = this.getRealSuit(meld);
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
-            if (c.rank === '2' && c.suit === meld[0].suit) {
+            if (c.rank === '2' && c.suit === realSuit) {
               // CORREÇÃO 2: Usa o simulador para o Coringa Perfeito
               const testMeld = this.simulateMeld(meld, [c], engine);
 
@@ -474,19 +558,20 @@ export class BuracoBot {
               if (!isValidCombo) continue;
 
               // 🛑 TRAVA UNIVERSAL ANTI-CANIBALISMO (Impede separar jogos do mesmo naipe)
-              const comboReal = combo.find((c) => c && !c.joker); // Qualquer carta não-coringa tem naipe válido (até o 2 natural)
-              if (comboReal) {
-                const suit = comboReal.suit;
-                const hasMeldSameSuit = team.melds.some((m) => {
-                  if (!m) return false;
-                  const meldReal = m.find((x) => x && !x.joker);
-                  return meldReal && meldReal.suit === suit;
-                });
+              // CORREÇÃO: Ignora o '2' na hora de identificar o naipe, pois um 2 coringa mascara a mesa.
+              const getRealSuit = (cards) => {
+                const real = cards.find((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
+                return real ? real.suit : null;
+              };
+
+              const suit = getRealSuit(combo);
+              if (suit) {
+                const hasMeldSameSuit = team.melds.some((m) => getRealSuit(m) === suit);
 
                 // VIPs (Dominadores) NUNCA dividem o mesmo naipe.
                 // Bots normais só podem dividir no desespero absoluto (ex: última carta para bater).
                 if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
-                  // Se entrou em pânico, a honra VIP é suspensa e ele joga as cartas para fugir da multa
+                  // Se entrou em pânico (8 cartas finais sem morto), a honra VIP é suspensa e ele joga as cartas para fugir da multa
                   if (!ctx.isPanicDump) continue;
                 }
               }
@@ -538,12 +623,20 @@ export class BuracoBot {
               if (!ctx.isDuo && meld.length >= 5 && !ctx.isDesperate) continue;
             }
 
-            if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== meld[0].suit) || (c.rank === '2' && !hasThree))) continue;
+            const realSuit = this.getRealSuit(meld);
+            if (meld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== realSuit) || (c.rank === '2' && !hasThree))) continue;
             if (isCanastra && isLimpa) continue;
 
             for (let i = 0; i < me.hand.length; i++) {
               const c = me.hand[i];
               if (!c.joker && c.rank !== '2') continue;
+
+              // 🛑 TRAVA DE PRESERVAÇÃO DO 2 (Anti-Cross-Suit)
+              // Impede que o bot queime um 2 natural em outro naipe, preservando o caminho para o Ás-a-Ás.
+              if (!c.joker && c.rank === '2' && c.suit !== realSuit) {
+                if (ctx.isVip && !ctx.isPanicDump) continue; // Dominador NUNCA suja cruzado antes do pânico fatal
+                if (!ctx.isVip && !ctx.isDesperate && !ctx.isRushingMorto && me.hand.length > 2) continue; // Bot normal segura
+              }
 
               // CORREÇÃO 3: Usa o simulador para sujeira no endgame
               const testMeld = this.simulateMeld(meld, [c], engine);
@@ -556,7 +649,7 @@ export class BuracoBot {
               // Proteção idêntica do 2 natural para não travar a extensão suja no endgame
               const hasThreeDirty = meld.some((x) => x.rank === '3');
               const hasTwoDirty = meld.some((x) => x.rank === '2');
-              if (!wasDirty && c.rank === '2' && c.suit === meld[0].suit && hasThreeDirty && !hasTwoDirty) {
+              if (!wasDirty && c.rank === '2' && c.suit === realSuit && hasThreeDirty && !hasTwoDirty) {
                 isNowDirty = false;
               }
 
@@ -575,7 +668,8 @@ export class BuracoBot {
         }
         if (madeMove) continue;
 
-        if (me.hand.length >= 3 && me.hand.length <= 6) {
+        // 🚨 NOVO: Se o bot estiver no Panic Dump, ele ignora o limite de 6 cartas e tenta sujar tudo que der na mesa para fugir da multa!
+        if (me.hand.length >= 3 && (me.hand.length <= 6 || ctx.isPanicDump)) {
           n = me.hand.length;
           for (let i = 0; i < n - 2; i++) {
             for (let j = i + 1; j < n - 1; j++) {
@@ -587,6 +681,14 @@ export class BuracoBot {
 
                 // Permite 1 coringa normal, ou 2 "wilds" (para o caso de 2, 2, 4 onde um 2 é natural)
                 if (wilds === 0 || wilds > 2) continue;
+
+                // 🛑 TRAVA DE PRESERVAÇÃO DO 2 (Nova Sujeira)
+                const wildCard = combo.find((c) => c.joker || c.rank === '2');
+                const realCard = combo.find((c) => !c.joker && c.rank !== '2');
+                if (wildCard && !wildCard.joker && wildCard.rank === '2' && realCard && wildCard.suit !== realCard.suit) {
+                  if (ctx.isVip && !ctx.isPanicDump) continue;
+                  if (!ctx.isVip && !ctx.isDesperate && !ctx.isRushingMorto && me.hand.length > 2) continue;
+                }
 
                 if (engine.isValidSequenceMeld(combo)) {
                   await engine.executeMeldNew(botIndex, [i, j, k]);
