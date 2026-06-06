@@ -2950,6 +2950,7 @@
 
             <div class="player-actions">
               <button id="showScoreBtn" style="display: none; background: #facc15; color: #000; font-weight: 900">🏆 PLACAR</button>
+              <button id="undoBtn" onclick="executeUndo()" style="display: none; background: #f97316; font-size: 10px; padding: 8px">↩️ VOLTAR</button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
             </div>
 
@@ -3111,6 +3112,93 @@
       let ignoreOwnActionId = null;
 
       let movingWild = null;
+      let localUndoStack = []; // Pilha para o botão voltar
+
+      function saveStateForUndo() {
+        if (!state) return;
+        // Deep copy padrão para isolar a memória antes da mutação
+        const snap = JSON.parse(JSON.stringify(state));
+        localUndoStack.push(snap);
+      }
+
+      window.executeUndo = async () => {
+        if (!ensureMyTurn() || localUndoStack.length === 0) return;
+
+        const previousState = localUndoStack.pop();
+        const actionToUndo = state.lastAction; // Pega a ação que estamos revertendo
+
+        // 1. Descobrir de onde as cartas vão sair (da mesa) ANTES de reverter o DOM
+        let originRect = null;
+        let cardsToAnimate = [];
+
+        if (actionToUndo) {
+          if (actionToUndo.type === 'meldNew' || actionToUndo.type === 'meldExtend') {
+            cardsToAnimate = actionToUndo.cards || [];
+            originRect = meldCardsRect(actionToUndo.teamId, actionToUndo.meldIndex);
+          } else if (actionToUndo.type === 'meldMoveWild') {
+            cardsToAnimate = [actionToUndo.card];
+            originRect = meldCardsRect(actionToUndo.teamId, actionToUndo.toMeldIndex); // De onde o coringa vai sair
+          }
+        }
+
+        // Fallback: se não achar a posição exata da mesa, usa o centro
+        if (!originRect) {
+          const board = document.querySelector('.board-melds');
+          if (board) {
+            const br = board.getBoundingClientRect();
+            originRect = { left: br.left + br.width / 2, top: br.top + br.height / 2, width: 28, height: 40 };
+          }
+        }
+
+        // Trava a interface para evitar duplo clique durante o voo
+        document.querySelector('.player-interface').style.pointerEvents = 'none';
+
+        // 2. Restaura o estado e renderiza a tela (as cartas voltam pra posição original no DOM)
+        previousState.lastAction = {
+          id: newActionId(),
+          type: 'undoMove',
+          playerId: myPlayerIndex,
+          ts: Date.now(),
+        };
+        state = previousState;
+        ignoreOwnActionId = state.lastAction.id;
+
+        renderAll();
+
+        // 3. Executa a animação de voo reversa
+        if (cardsToAnimate.length > 0 && originRect) {
+          const anims = cardsToAnimate.map((c, i) => {
+            let toEl = cardElById(c.id); // Acha a carta na mão
+            let toRect = null;
+
+            if (toEl) {
+              toRect = getRect(toEl);
+            } else if (actionToUndo.type === 'meldMoveWild') {
+              // Se foi o coringa movido, a carta não vai pra mão, volta pro jogo de origem
+              toRect = meldCardsRect(actionToUndo.teamId, actionToUndo.fromMeldIndex);
+            }
+
+            if (!toRect) return Promise.resolve();
+
+            if (toEl) toEl.style.visibility = 'hidden'; // Esconde o elemento original enquanto voa
+
+            // Cria um pequeno espalhamento se forem várias cartas saindo da mesma pilha
+            const fromRect = { ...originRect, left: originRect.left + i * 10, top: originRect.top - i * 2 };
+
+            // Voa usando a física já existente do sistema
+            return flyRectToRect(c, fromRect, toRect, 'front').then(() => {
+              if (toEl) toEl.style.visibility = ''; // Revela a carta no lugar certo
+              impactAtRect(toRect);
+            });
+          });
+          await Promise.all(anims);
+        }
+
+        // Libera a interface e salva no Firebase
+        document.querySelector('.player-interface').style.pointerEvents = 'auto';
+        await commitState();
+        showMessage('🔄 Jogada desfeita!');
+      };
 
       // --- CONTROLE DO ACORDEÃO DE METAS ---
       window.isGoalsHudCollapsed = false;
@@ -3492,6 +3580,8 @@
           }
         }
 
+        saveStateForUndo(); // Salva antes de reposicionar o coringa
+
         const fromEl = miniCardElByMeld(myTeamId, fromMeldIdx, fromIdx);
         const fromRect = fromEl ? getRect(fromEl) : meldCardsRect(myTeamId, fromMeldIdx);
         const keyTo = meldKey(myTeamId, toMeldIdx);
@@ -3858,6 +3948,7 @@
       }
 
       function passTurn() {
+        localUndoStack = []; // Zera o histórico ao passar a vez
         if (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao' || state.mode === '1x1') {
           state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
         } else {
@@ -4999,6 +5090,8 @@
 
           const kindBefore1 = classifyMeldForUi(targetMeld).kind;
 
+          saveStateForUndo(); // Salva antes de estender jogo forçado
+
           for (const idx of indexes) {
             targetMeld.push(hand[idx]);
             hand.splice(idx, 1);
@@ -5083,6 +5176,8 @@
         }
 
         const kindBefore2 = classifyMeldForUi(teamMeld).kind;
+
+        saveStateForUndo(); // Salva antes de estender jogo livre
 
         for (const idx of indexes) {
           teamMeld.push(hand[idx]);
@@ -5207,6 +5302,8 @@
           }
 
           cards.forEach(ensureCardId);
+          saveStateForUndo(); // Salva estado antes de criar novo jogo
+
           const targetContainer = document.getElementById(teamId === 0 ? 'meldsP1' : 'meldsP2');
 
           if (targetContainer) {
@@ -5836,6 +5933,12 @@
         const myTeamId = me ? me.teamId : null; // Protege o Team ID
 
         document.getElementById('endGameBtn').disabled = false;
+
+        // Controle de exibição do botão Voltar
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn) {
+          undoBtn.style.display = myTurn && localUndoStack.length > 0 ? 'block' : 'none';
+        }
 
         // Oculta botões se o jogo acabou OU se for o Espectador (-1)
         const isFin = !!state.finished;
