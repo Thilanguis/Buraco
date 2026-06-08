@@ -3196,6 +3196,7 @@
 
         // Libera a interface e salva no Firebase
         document.querySelector('.player-interface').style.pointerEvents = 'auto';
+        resetTurnTimer();
         await commitState();
         showMessage('🔄 Jogada desfeita!');
       };
@@ -3645,6 +3646,7 @@
 
         movingWild = null;
         renderAll();
+        resetTurnTimer();
         await commitState();
         showMessage('✅ Coringa reposicionado com sucesso.');
       }
@@ -3904,6 +3906,13 @@
         if (turnTimerId !== null) {
           clearInterval(turnTimerId);
           turnTimerId = null;
+        }
+      }
+
+      function resetTurnTimer() {
+        if (turnTimerId !== null) {
+          turnTimerRemaining = 60;
+          updateTimerLabel();
         }
       }
 
@@ -4557,6 +4566,7 @@
         state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), count: drawnCards.length, recycledDeadIndex: recycledIndex, ts: Date.now() };
         ignoreOwnActionId = state.lastAction.id;
 
+        resetTurnTimer();
         await commitState();
         if (!state.partialDraw) showMessage('✅ Compra realizada.');
       }
@@ -4791,6 +4801,7 @@
           ignoreOwnActionId = state.lastAction.id;
 
           renderAll();
+          resetTurnTimer();
           await commitState();
           return;
         }
@@ -4832,6 +4843,7 @@
         };
         ignoreOwnActionId = state.lastAction.id;
 
+        resetTurnTimer();
         await commitState();
         if (!state.partialDraw) showMessage('✅ Lixo recolhido.');
       }
@@ -5144,6 +5156,7 @@
           ignoreOwnActionId = state.lastAction.id;
 
           renderAll();
+          resetTurnTimer();
           await commitState();
           showMessage('Cartas adicionadas!');
           return true;
@@ -5231,6 +5244,7 @@
         ignoreOwnActionId = state.lastAction.id;
 
         renderAll();
+        resetTurnTimer();
         await commitState();
         showMessage('Cartas adicionadas!');
         return true;
@@ -5372,6 +5386,7 @@
           ignoreOwnActionId = state.lastAction.id;
           selectedHandIndexes.clear();
           renderAll();
+          resetTurnTimer();
           await commitState();
           if (!tookDead) showMessage('✅ Jogo baixado com sucesso na mesa.');
         } finally {
