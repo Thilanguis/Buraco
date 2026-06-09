@@ -2510,6 +2510,43 @@
         animation: none !important;
         background-image: none !important;
       }
+
+      /* ================= VISÃO DO DOMINADOR (IDÊNTICA À MÃO) ================= */
+      .opponent-hand.reveal-mode {
+        pointer-events: auto !important;
+        z-index: 10000;
+      }
+      .reveal-mode .opponent-cards {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        justify-content: center !important;
+        max-width: none !important;
+        gap: 0 !important; /* Remove o gap para as cartas se sobreporem igual na sua mão */
+      }
+
+      /* Força a carta da visão a ter exatamente a mesma classe da sua mão */
+      .reveal-mode .carta.mini {
+        /* Removemos bordas coloridas, sombras especiais e filtros */
+        border: 1px solid #000 !important;
+        box-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3) !important;
+        background: #fff !important;
+        filter: none !important;
+        transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+
+        /* Mantém o tamanho mini, mas alinha a tipografia com a carta maior */
+        width: 55px !important;
+        height: 80px !important;
+        margin-right: -20px !important;
+      }
+      .reveal-mode .carta.mini:hover {
+        transform: translateY(-15px) scale(1.1) !important;
+        z-index: 100 !important;
+        border: 1px solid #000 !important;
+      }
+      .reveal-mode .carta.mini:last-child {
+        margin-right: 0 !important;
+      }
     </style>
   </head>
   <body data-deck-theme="classico">
@@ -2593,6 +2630,10 @@
                 <br />
                 <span style="color: #c084fc">◆ Ás-a-Ás:</span>
                 Pega 1 Morto (ou +3 do monte)
+                <br />
+                <br />
+                <span style="color: #a855f7; font-weight: 900">👁️ VISÃO DO DOMINADOR:</span>
+                1x por partida, no seu turno, veja a mão do Escravo e roube até 2 cartas no lugar de comprar da mesa!
               </span>
             </div>
 
@@ -2951,6 +2992,12 @@
             <div class="player-actions">
               <button id="showScoreBtn" style="display: none; background: #facc15; color: #000; font-weight: 900">🏆 PLACAR</button>
               <button id="undoBtn" onclick="executeUndo()" style="display: none; background: #f97316; font-size: 10px; padding: 8px">↩️ VOLTAR</button>
+              <button
+                id="powerBtn"
+                onclick="toggleStealMode()"
+                style="display: none; background: #a855f7; font-size: 10px; padding: 8px; font-weight: 900; box-shadow: 0 0 10px rgba(168, 85, 247, 0.6); border: 1px solid #d8b4fe; transition: all 0.3s">
+                👁️ ROUBAR MÃO
+              </button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
             </div>
 
@@ -3113,6 +3160,7 @@
 
       let movingWild = null;
       let localUndoStack = []; // Pilha para o botão voltar
+      window.isStealModeActive = false; // Controle da visão da mesa
 
       function saveStateForUndo() {
         if (!state) return;
@@ -3138,6 +3186,10 @@
           } else if (actionToUndo.type === 'meldMoveWild') {
             cardsToAnimate = [actionToUndo.card];
             originRect = meldCardsRect(actionToUndo.teamId, actionToUndo.toMeldIndex); // De onde o coringa vai sair
+          } else if (actionToUndo.type === 'stealCard') {
+            cardsToAnimate = [actionToUndo.card];
+            const fromCardEl = cardElById(actionToUndo.card.id);
+            if (fromCardEl) originRect = getRect(fromCardEl); // Sai da sua mão
           }
         }
 
@@ -3171,7 +3223,10 @@
             let toEl = cardElById(c.id); // Acha a carta na mão
             let toRect = null;
 
-            if (toEl) {
+            if (actionToUndo.type === 'stealCard') {
+              // Se desfez um roubo, a carta volta pro escravo no topo
+              toRect = opponentAnchorRect(0);
+            } else if (toEl) {
               toRect = getRect(toEl);
             } else if (actionToUndo.type === 'meldMoveWild') {
               // Se foi o coringa movido, a carta não vai pra mão, volta pro jogo de origem
@@ -3958,6 +4013,8 @@
 
       function passTurn() {
         localUndoStack = []; // Zera o histórico ao passar a vez
+        state.powerActiveThisTurn = false; // Desativa o poder do Dominador ao fim do turno
+        window.isStealModeActive = false; // Força fechar a visão
         if (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao' || state.mode === '1x1') {
           state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
         } else {
@@ -4451,6 +4508,8 @@
           isBetting,
           betBase,
           betPerPoint,
+          dominatorUsedPower: false,
+          powerActiveThisTurn: false,
         };
         await setDoc(gameRef, { stateJson: JSON.stringify(newState), createdAt: Date.now() });
         showMessage('Partida iniciada!');
@@ -4538,8 +4597,10 @@
         }
 
         sortHand(currentPlayer().hand);
+        localUndoStack = []; // 🔒 TRAVA DE SEGURANÇA: Limpa o botão voltar para impedir trapaça
         state.hasDrawnThisTurn = true;
         state.partialDraw = false; // Finalizou as compras
+        window.isStealModeActive = false; // 👁️ Desativa a visão se tiver comprado do monte
 
         if (!state.boughtCardIds) state.boughtCardIds = [];
         drawnCards.forEach((c) => state.boughtCardIds.push(c.id)); // Salva todas para brilhar
@@ -4600,6 +4661,7 @@
 
       async function drawFromDiscard() {
         if (!ensureMyTurn()) return;
+        localUndoStack = []; // 🔒 TRAVA DE SEGURANÇA: Interagiu com o lixo, apaga histórico do voltar
 
         // NOVO: Se já comprou, o clique no lixo funciona como botão de Descartar
         if (state.hasDrawnThisTurn) {
@@ -5955,6 +6017,24 @@
           undoBtn.style.display = myTurn && localUndoStack.length > 0 ? 'block' : 'none';
         }
 
+        const powerBtn = document.getElementById('powerBtn');
+        if (powerBtn) {
+          const canUsePower = state.mode === '1x1_dominacao' && state.currentPlayer === 1 && myPlayerIndex === 1 && !state.hasDrawnThisTurn && (!state.dominatorUsedPower || state.powerActiveThisTurn);
+          powerBtn.style.display = canUsePower ? 'block' : 'none';
+
+          if (window.isStealModeActive) {
+            powerBtn.innerHTML = '❌ FECHAR VISÃO';
+            powerBtn.style.background = '#ef4444';
+            powerBtn.style.borderColor = '#fca5a5';
+            powerBtn.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
+          } else {
+            powerBtn.innerHTML = '👁️ ROUBAR MÃO';
+            powerBtn.style.background = '#a855f7';
+            powerBtn.style.borderColor = '#d8b4fe';
+            powerBtn.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.6)';
+          }
+        }
+
         // Oculta botões se o jogo acabou OU se for o Espectador (-1)
         const isFin = !!state.finished;
         const isSpec = myPlayerIndex === -1;
@@ -6247,10 +6327,8 @@
             return;
           }
 
-          // mantém o brilho do turno exatamente como antes
           rootEl.classList.toggle('active-turn-glow', state.currentPlayer === playerIdx);
 
-          // mantém o label do jogador
           let label = rootEl.querySelector('.opponent-label');
           if (!label) {
             label = document.createElement('div');
@@ -6259,7 +6337,6 @@
           }
           label.innerHTML = `${p.name} (${p.hand.length})`;
 
-          // mantém o container das cartas
           let cardsDiv = rootEl.querySelector('.opponent-cards');
           if (!cardsDiv) {
             cardsDiv = document.createElement('div');
@@ -6267,35 +6344,64 @@
             rootEl.appendChild(cardsDiv);
           }
 
-          const desiredCount = Math.min(p.hand.length, 12);
+          // 👁️ VISÃO DO DOMINADOR: Liga o CSS grid e exibe a face das cartas com clique liberado
+          const isStealTarget = window.isStealModeActive && playerIdx === 0 && myPlayerIndex === 1 && state.powerActiveThisTurn && !state.hasDrawnThisTurn;
 
-          // cria só o que faltar
-          while (cardsDiv.children.length < desiredCount) {
-            const c = document.createElement('div');
-            c.className = 'opponent-card-back';
-            cardsDiv.appendChild(c);
-          }
+          if (isStealTarget) {
+            rootEl.classList.add('reveal-mode');
+            cardsDiv.innerHTML = '';
 
-          // remove só o excedente
-          while (cardsDiv.children.length > desiredCount) {
-            cardsDiv.removeChild(cardsDiv.lastChild);
-          }
+            p.hand.forEach((cdata) => {
+              ensureCardId(cdata);
+              const c = document.createElement('div');
+              // Mantém a classe .mini para o tamanho, mas o HTML agora é o padrão da sua mão
+              c.className = 'carta mini ' + (cdata.joker ? 'joker-card' : cdata.suit === '♥' || cdata.suit === '♦' ? 'hearts' : 'spades');
+              c.dataset.cardId = cdata.id;
 
-          // atualiza as cartas existentes sem destruir tudo
-          for (let i = 0; i < desiredCount; i++) {
-            const cdata = p.hand[i];
-            const cardEl = cardsDiv.children[i];
-            const wantedClass = cdata?.back === 'blue' ? 'back-blue' : 'back-red';
-            const keepArcadeRun = cardEl.classList.contains('arcade-car-run');
+              // Usa exatamente o mesmo HTML que renderiza a sua mão
+              c.innerHTML = cardFrontHTML(cdata);
 
-            cardEl.classList.add('opponent-card-back');
-            cardEl.classList.remove('back-red', 'back-blue');
-            cardEl.classList.add(wantedClass);
+              c.onclick = (e) => {
+                e.stopPropagation();
+                stealCard(cdata.id);
+              };
+              cardsDiv.appendChild(c);
+            });
+          } else {
+            rootEl.classList.remove('reveal-mode');
+            const desiredCount = Math.min(p.hand.length, 12);
 
-            if (document.body.dataset.deckTheme === 'arcade' && keepArcadeRun) {
-              cardEl.classList.add('arcade-car-run');
-            } else if (document.body.dataset.deckTheme !== 'arcade') {
-              cardEl.classList.remove('arcade-car-run');
+            while (cardsDiv.children.length < desiredCount) {
+              const c = document.createElement('div');
+              c.className = 'opponent-card-back';
+              cardsDiv.appendChild(c);
+            }
+
+            while (cardsDiv.children.length > desiredCount) {
+              cardsDiv.removeChild(cardsDiv.lastChild);
+            }
+
+            for (let i = 0; i < desiredCount; i++) {
+              const cdata = p.hand[i];
+              const cardEl = cardsDiv.children[i];
+              if (!cardEl) continue;
+
+              // 🧹 CORREÇÃO DO BURACO FANTASMA: Destrói a invisibilidade injetada pela animação!
+              cardEl.removeAttribute('style');
+              cardEl.innerHTML = '';
+              cardEl.onclick = null;
+              cardEl.className = 'opponent-card-back';
+
+              const wantedClass = cdata?.back === 'blue' ? 'back-blue' : 'back-red';
+              const keepArcadeRun = cardEl.classList.contains('arcade-car-run');
+
+              cardEl.classList.add(wantedClass);
+
+              if (document.body.dataset.deckTheme === 'arcade' && keepArcadeRun) {
+                cardEl.classList.add('arcade-car-run');
+              } else if (document.body.dataset.deckTheme !== 'arcade') {
+                cardEl.classList.remove('arcade-car-run');
+              }
             }
           }
         }
@@ -6954,6 +7060,18 @@
             }
           }
         };
+
+        if (a.type === 'stealCard') {
+          const fromRect = opponentAnchorRect(a.playerId === 1 ? 0 : 1);
+          const toRect = opponentAnchorRect(a.playerId);
+
+          if (fromRect && toRect) {
+            await flyRectToRect(fallbackCard, fromRect, toRect, 'front');
+            impactAtRect(toRect);
+          }
+          await animateRemoteDeadIfAny();
+          return;
+        }
 
         if (a.type === 'drawStock') {
           if (a.recycledDeadIndex !== null && a.recycledDeadIndex !== undefined) {
@@ -8861,7 +8979,6 @@
       document.getElementById('showScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'flex');
 
       // Ação do botão de convite
-      // Ação do botão de convite
       document.getElementById('inviteBtn').onclick = async () => {
         // 🛡️ TRAVA ANTI-CLONE: Limpa a sua cadeira do link para o convidado não nascer no seu corpo
         const urlObj = new URL(window.location.href);
@@ -8898,6 +9015,90 @@
             console.error('Erro ao copiar link:', err);
           }
         }
+      };
+
+      // ==========================================
+      // SISTEMA DE ROUBO DE MÃO (DOMINAÇÃO COMPLETA)
+      // ==========================================
+      window.toggleStealMode = async () => {
+        if (!ensureMyTurn() || state.hasDrawnThisTurn) return;
+
+        if (!state.dominatorUsedPower) {
+          state.dominatorUsedPower = true;
+          state.powerActiveThisTurn = true;
+          await commitState();
+        }
+
+        window.isStealModeActive = !window.isStealModeActive; // Inverte o estado da visão
+        renderAll();
+      };
+
+      window.stealCard = async (cardId) => {
+        if (!ensureMyTurn()) return;
+
+        const p1 = state.players[0]; // Escravo
+        const p2 = state.players[1]; // Dominador
+
+        const cardIndex = p1.hand.findIndex((c) => c && c.id === cardId);
+        if (cardIndex === -1) {
+          showMessage('Erro: Carta não encontrada.');
+          return;
+        }
+
+        saveStateForUndo();
+
+        const card = p1.hand.splice(cardIndex, 1)[0];
+        p2.hand.push(card);
+        sortHand(p2.hand);
+
+        if (!state.boughtCardIds) state.boughtCardIds = [];
+        state.boughtCardIds.push(card.id);
+
+        // Animação de voo saindo da mesa
+        const fromCardEl = document.querySelector(`.reveal-mode .carta.mini[data-card-id="${cardId}"]`);
+
+        renderHand(); // Força a carta nova a existir no DOM do J2
+        const toEl = cardElById(card.id);
+
+        if (fromCardEl && toEl) {
+          fromCardEl.style.visibility = 'hidden';
+          if (toEl) toEl.style.visibility = 'hidden';
+          await flyRectToRect(card, getRect(fromCardEl), getRect(toEl), 'front');
+          if (toEl) toEl.style.visibility = '';
+        }
+
+        let tookDead = null;
+        if (p1.hand.length === 0) {
+          tookDead = takeDeadIfAvailableForPlayer(p1);
+          if (!tookDead && !canTeamTakeDeadNow(p1.teamId)) {
+            if (teamHasGoodCanastra(p1.teamId)) await finishGame(p1.teamId);
+            else await finishGame(1);
+          }
+        }
+
+        state.lastAction = {
+          id: newActionId(),
+          type: 'stealCard',
+          playerId: 1,
+          card: packCard(card),
+          tookDead: tookDead,
+          ts: Date.now(),
+        };
+        ignoreOwnActionId = state.lastAction.id;
+
+        if (state.partialDraw) {
+          state.hasDrawnThisTurn = true;
+          state.partialDraw = false;
+          window.isStealModeActive = false; // Desliga a visão após roubar a 2ª
+          showMessage('👁️ 2 cartas roubadas. Sua fase de compra acabou!');
+        } else {
+          state.partialDraw = true;
+          showMessage('👁️ 1 carta roubada. Roube a 2ª ou compre na mesa!');
+        }
+
+        renderAll();
+        resetTurnTimer();
+        await commitState();
       };
     </script>
   </body>
