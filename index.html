@@ -7943,6 +7943,7 @@
           if (a.id === ignoreOwnActionId) {
             ignoreOwnActionId = null;
           } else {
+            resetTurnTimer(); // ⏱️ Reseta o cronômetro na tela do oponente instantaneamente na chegada da ação
             await playRemoteAction(a);
           }
         }
