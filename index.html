@@ -4831,22 +4831,29 @@
           let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex]).kind);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
-            const fromEl = document.querySelector('#drawStockBtn .pile-card');
-            const fromRect = fromEl ? getRect(fromEl) : null;
             renderHand();
-            if (fromRect) {
-              const anims = domReward.drawnCards.map((c) => {
-                const toEl = cardElById(c.id);
-                if (toEl) {
-                  toEl.style.visibility = 'hidden';
-                  return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
-                    if (toEl) toEl.style.visibility = '';
-                  });
-                }
-                return Promise.resolve();
+            const anims = domReward.drawnCards.map((c) => {
+              const toEl = cardElById(c.id);
+              if (!toEl) return Promise.resolve();
+
+              const isSteal = c && c._isEndgameSteal === true;
+              let fromRect = null;
+
+              if (isSteal) {
+                fromRect = opponentAnchorRect(0); // Sai do Escravo (Index 0)
+              } else {
+                const fromEl = document.querySelector('#drawStockBtn .pile-card');
+                fromRect = fromEl ? getRect(fromEl) : null;
+              }
+
+              if (!fromRect) return Promise.resolve();
+
+              toEl.style.visibility = 'hidden';
+              return flyRectToRect(c, fromRect, getRect(toEl), isSteal ? 'front' : 'back').then(() => {
+                if (toEl) toEl.style.visibility = '';
               });
-              await Promise.all(anims);
-            }
+            });
+            await Promise.all(anims);
           }
 
           const tookDead = domReward?.tookDead || (await checkPostMeldStatus(me));
@@ -5066,25 +5073,52 @@
         if (reward.type === 'draw') {
           for (let i = 0; i < reward.count; i++) {
             if (!state.stock.length) {
-              const recycledIndex = await recycleDeadToStockIfPossible();
-              if (recycledIndex === null || !state.stock.length) break;
+              await recycleDeadToStockIfPossible();
             }
-            const c = state.stock.pop();
-            ensureCardId(c);
-            p.hand.push(c);
-            drawnCards.push(c);
 
-            // Ativa o destaque (glow) nas cartas compradas
-            if (!state.boughtCardIds) state.boughtCardIds = [];
-            state.boughtCardIds.push(c.id);
+            if (state.stock.length > 0) {
+              const c = state.stock.pop();
+              ensureCardId(c);
+
+              const packed = packCard(c);
+              packed._isEndgameSteal = false;
+
+              p.hand.push(c);
+              drawnCards.push(packed);
+
+              if (!state.boughtCardIds) state.boughtCardIds = [];
+              state.boughtCardIds.push(c.id);
+            } else {
+              const escravo = state.players[0];
+              if (escravo && escravo.hand.length > 0) {
+                const randIdx = Math.floor(Math.random() * escravo.hand.length);
+                const c = escravo.hand.splice(randIdx, 1)[0];
+                ensureCardId(c);
+
+                // Injeta a flag direto na estrutura principal da carta
+                c._isEndgameSteal = true;
+                const packed = packCard(c);
+                packed._isEndgameSteal = true;
+
+                p.hand.push(c);
+                drawnCards.push(packed);
+
+                if (!state.boughtCardIds) state.boughtCardIds = [];
+                state.boughtCardIds.push(c.id);
+              }
+            }
           }
           sortHand(p.hand);
+
           if (drawnCards.length > 0) {
-            showMessage(`👑 DOMINAÇÃO: Canastra ${newKind.toUpperCase()}! +${drawnCards.length} carta(s).`);
+            const temRoubo = drawnCards.some((c) => c && c._isEndgameSteal === true);
+            showMessage(`👑 DOMINAÇÃO: Canastra ${newKind.toUpperCase()}! +${drawnCards.length} carta(s) ${temRoubo ? 'ROUBADA DA MÃO' : 'DO MONTE'}.`);
           }
         }
 
-        return { tookDead, drawnCards: drawnCards.length > 0 ? drawnCards.map(packCard) : null };
+        // 🚀 CORREÇÃO DE LOGICA: Como as cartas já foram tratadas e empacotadas no loop acima,
+        // não podemos passar o map(packCard) de novo aqui, senão ele apaga a nossa flag de roubo!
+        return { tookDead, drawnCards: drawnCards.length > 0 ? drawnCards : null };
       }
 
       async function checkPostMeldStatus(player) {
@@ -5183,22 +5217,29 @@
           let domReward = await processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
-            const fromEl = document.querySelector('#drawStockBtn .pile-card');
-            const fromRect = fromEl ? getRect(fromEl) : null;
             renderHand();
-            if (fromRect) {
-              const anims = domReward.drawnCards.map((c) => {
-                const toEl = cardElById(c.id);
-                if (toEl) {
-                  toEl.style.visibility = 'hidden';
-                  return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
-                    if (toEl) toEl.style.visibility = '';
-                  });
-                }
-                return Promise.resolve();
+            const anims = domReward.drawnCards.map((c) => {
+              const toEl = cardElById(c.id);
+              if (!toEl) return Promise.resolve();
+
+              const isSteal = c && c._isEndgameSteal === true;
+              let fromRect = null;
+
+              if (isSteal) {
+                fromRect = opponentAnchorRect(0);
+              } else {
+                const fromEl = document.querySelector('#drawStockBtn .pile-card');
+                fromRect = fromEl ? getRect(fromEl) : null;
+              }
+
+              if (!fromRect) return Promise.resolve();
+
+              toEl.style.visibility = 'hidden';
+              return flyRectToRect(c, fromRect, getRect(toEl), isSteal ? 'front' : 'back').then(() => {
+                if (toEl) toEl.style.visibility = '';
               });
-              await Promise.all(anims);
-            }
+            });
+            await Promise.all(anims);
           }
 
           const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
@@ -5271,22 +5312,29 @@
         let domReward = await processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind);
 
         if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
-          const fromEl = document.querySelector('#drawStockBtn .pile-card');
-          const fromRect = fromEl ? getRect(fromEl) : null;
           renderHand();
-          if (fromRect) {
-            const anims = domReward.drawnCards.map((c) => {
-              const toEl = cardElById(c.id);
-              if (toEl) {
-                toEl.style.visibility = 'hidden';
-                return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
-                  if (toEl) toEl.style.visibility = '';
-                });
-              }
-              return Promise.resolve();
+          const anims = domReward.drawnCards.map((c) => {
+            const toEl = cardElById(c.id);
+            if (!toEl) return Promise.resolve();
+
+            const isSteal = c && c._isEndgameSteal === true;
+            let fromRect = null;
+
+            if (isSteal) {
+              fromRect = opponentAnchorRect(0);
+            } else {
+              const fromEl = document.querySelector('#drawStockBtn .pile-card');
+              fromRect = fromEl ? getRect(fromEl) : null;
+            }
+
+            if (!fromRect) return Promise.resolve();
+
+            toEl.style.visibility = 'hidden';
+            return flyRectToRect(c, fromRect, getRect(toEl), isSteal ? 'front' : 'back').then(() => {
+              if (toEl) toEl.style.visibility = '';
             });
-            await Promise.all(anims);
-          }
+          });
+          await Promise.all(anims);
         }
 
         const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
@@ -5412,22 +5460,29 @@
           let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
-            const fromEl = document.querySelector('#drawStockBtn .pile-card');
-            const fromRect = fromEl ? getRect(fromEl) : null;
             renderHand(); // Força as cartas a existirem no DOM para voarem até elas
-            if (fromRect) {
-              const anims = domReward.drawnCards.map((c) => {
-                const toEl = cardElById(c.id);
-                if (toEl) {
-                  toEl.style.visibility = 'hidden';
-                  return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
-                    if (toEl) toEl.style.visibility = '';
-                  });
-                }
-                return Promise.resolve();
+            const anims = domReward.drawnCards.map((c) => {
+              const toEl = cardElById(c.id);
+              if (!toEl) return Promise.resolve();
+
+              const isSteal = c && c._isEndgameSteal === true;
+              let fromRect = null;
+
+              if (isSteal) {
+                fromRect = opponentAnchorRect(0);
+              } else {
+                const fromEl = document.querySelector('#drawStockBtn .pile-card');
+                fromRect = fromEl ? getRect(fromEl) : null;
+              }
+
+              if (!fromRect) return Promise.resolve();
+
+              toEl.style.visibility = 'hidden';
+              return flyRectToRect(c, fromRect, getRect(toEl), isSteal ? 'front' : 'back').then(() => {
+                if (toEl) toEl.style.visibility = '';
               });
-              await Promise.all(anims);
-            }
+            });
+            await Promise.all(anims);
           }
 
           const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
@@ -7051,10 +7106,38 @@
 
         const animateRemoteDrawsIfAny = async () => {
           if (a.drawnCards && a.drawnCards.length > 0) {
-            if (stockRect && handRect) {
-              for (let i = 0; i < a.drawnCards.length; i++) {
-                await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
+            for (let i = 0; i < a.drawnCards.length; i++) {
+              const cardData = a.drawnCards[i];
+
+              const isSteal = cardData && (cardData._isEndgameSteal === true || cardData.id?._isEndgameSteal === true);
+
+              let fromRect = stockRect;
+              let fromEl = null;
+
+              if (isSteal) {
+                const targetVictimId = a.playerId === 1 ? 0 : 1;
+                if (targetVictimId === myPlayerIndex) {
+                  fromEl = cardElById(cardData.id);
+                }
+
+                if (fromEl) {
+                  fromRect = getRect(fromEl);
+                } else {
+                  fromRect = opponentAnchorRect(targetVictimId);
+                }
+              }
+
+              if (fromRect && handRect) {
+                const cardVisual = cardData ? { rank: cardData.rank, suit: cardData.suit, joker: !!cardData.joker, back: cardData.back } : fallbackCard;
+
+                // 🔥 CORREÇÃO: Oculta cada carta individualmente assim que ela inicia o voo
+                if (fromEl) {
+                  fromEl.style.visibility = 'hidden';
+                }
+
+                await flyRectToRect(cardVisual, fromRect, handRect, isSteal ? 'front' : 'back');
                 impactAtRect(handRect);
+
                 if (i < a.drawnCards.length - 1) await new Promise((r) => setTimeout(r, 180));
               }
             }
@@ -7871,6 +7954,22 @@
         const newState = JSON.parse(data.stateJson);
         if (state && !state.finished && newState.finished) playCanastraSfx('fim');
 
+        // 🚀 INTERCEPTOR GRAFICO: Captura a nova ação remota ANTES de aplicar as mutações de dados no state
+        const a = newState.lastAction;
+        const isNewRemoteAction = a && a.id !== lastSeenActionId && a.id !== ignoreOwnActionId;
+
+        if (isNewRemoteAction) {
+          lastSeenActionId = a.id;
+          resetTurnTimer();
+
+          // 1. Executa a animação de voo com os elementos gráficos e cartas atuais ainda fixados na mão
+          await playRemoteAction(a);
+        } else if (a && a.id !== lastSeenActionId && a.id === ignoreOwnActionId) {
+          lastSeenActionId = a.id;
+          ignoreOwnActionId = null;
+        }
+
+        // 2. Após o término do voo, atualiza a memória com o novo estado e renderiza limpando o DOM de forma síncrona
         state = newState;
         window.isClosingGame = false;
         movingWild = null;
@@ -7878,73 +7977,54 @@
 
         document.getElementById('configSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'flex';
-        keepScreenAlive(); // 🛡️ Trava a tela acesa durante a partida inteira
+        keepScreenAlive();
 
-        toggleMenuVideos(false); // 🔋 Mata o processamento de vídeo durante a partida
+        toggleMenuVideos(false);
 
         renderAll();
         startTurnTimerIfNeeded();
 
-        // 🎲 Anuncia quem venceu no dado assim que a mesa carrega
-        if (state.turnNumber === 0 && !state.hasDrawnThisTurn && state.diceRolls && !window.diceAnnounced) {
-          window.diceAnnounced = true;
-          const starterName = state.players[state.currentPlayer].name;
-          const maxRoll = Math.max(...state.diceRolls);
+        // 🎲 Anuncia quem venceu no dado assim que a mesa carrega (Isolado no fluxo estável)
+        if (!isNewRemoteAction) {
+          if (state.turnNumber === 0 && !state.hasDrawnThisTurn && state.diceRolls && !window.diceAnnounced) {
+            window.diceAnnounced = true;
+            const starterName = state.players[state.currentPlayer].name;
+            const maxRoll = Math.max(...state.diceRolls);
 
-          const pi = document.querySelector('.player-interface');
-          const bm = document.querySelector('.board-middle');
-          if (pi) pi.style.pointerEvents = 'none';
-          if (bm) bm.style.pointerEvents = 'none';
+            const pi = document.querySelector('.player-interface');
+            const bm = document.querySelector('.board-middle');
+            if (pi) pi.style.pointerEvents = 'none';
+            if (bm) bm.style.pointerEvents = 'none';
 
-          // Gera e lança um dado 3D físico para cada jogador na mesa
-          state.players.forEach((p) => {
-            const roll = state.diceRolls[p.id];
-            if (!roll) return;
+            state.players.forEach((p) => {
+              const roll = state.diceRolls[p.id];
+              if (!roll) return;
+              const pos = getDiceSpawnPosition(p.id);
+              const diceScene = create3DDiceElement(roll, pos.x, pos.y);
+              document.body.appendChild(diceScene);
+              setTimeout(() => diceScene.remove(), 6000);
+            });
 
-            // Define a posição de queda na mesa green perto do jogador
-            const pos = getDiceSpawnPosition(p.id);
+            setTimeout(() => {
+              showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
+              if (pi) pi.style.pointerEvents = 'auto';
+              if (bm) bm.style.pointerEvents = 'auto';
 
-            // Cria o cubo 3D já passando a posição final para a física de arremesso!
-            const diceScene = create3DDiceElement(roll, pos.x, pos.y);
-
-            document.body.appendChild(diceScene);
-
-            // Limpa o lixo da memória depois que a animação sumir
-            setTimeout(() => diceScene.remove(), 6000);
-          });
-
-          // Espera a física de impacto e atrito terminar (2.6s) para destravar o jogo
-          setTimeout(() => {
-            showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
-            if (pi) pi.style.pointerEvents = 'auto';
-            if (bm) bm.style.pointerEvents = 'auto';
-
-            // 🔊 Toca o som e vibra APÓS o dado rolar, mantendo o suspense!
-            if (state.currentPlayer === myPlayerIndex) {
-              if (navigator.vibrate && audioUnlocked) {
-                try {
-                  navigator.vibrate([150, 80, 150]);
-                } catch (e) {}
+              if (state.currentPlayer === myPlayerIndex) {
+                if (navigator.vibrate && audioUnlocked) {
+                  try {
+                    navigator.vibrate([150, 80, 150]);
+                  } catch (e) {}
+                }
+                if (audioUnlocked) {
+                  try {
+                    sfxMyTurn.pause();
+                    sfxMyTurn.currentTime = 0;
+                    sfxMyTurn.play().catch(() => {});
+                  } catch (e) {}
+                }
               }
-              if (audioUnlocked) {
-                try {
-                  sfxMyTurn.pause();
-                  sfxMyTurn.currentTime = 0;
-                  sfxMyTurn.play().catch(() => {});
-                } catch (e) {}
-              }
-            }
-          }, 3700);
-        }
-
-        const a = state.lastAction;
-        if (a && a.id !== lastSeenActionId) {
-          lastSeenActionId = a.id;
-          if (a.id === ignoreOwnActionId) {
-            ignoreOwnActionId = null;
-          } else {
-            resetTurnTimer(); // ⏱️ Reseta o cronômetro na tela do oponente instantaneamente na chegada da ação
-            await playRemoteAction(a);
+            }, 3700);
           }
         }
 
