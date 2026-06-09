@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v79'; // Força atualização
+const CACHE_NAME = 'buraco-v80'; // Força atualização
 
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
