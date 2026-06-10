@@ -402,6 +402,86 @@
         overflow: hidden;
         background: radial-gradient(circle at center, #15803d 0%, #14532d 100%);
         animation: smoothTableReveal 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        transition: background 0.4s ease-in-out; /* Transição suave ao trocar de tema */
+      }
+      /* ================================================================= */
+      /* SISTEMA DE IDENTIDADE VISUAL E MARCAS D'ÁGUA DA MESA              */
+      /* ================================================================= */
+
+      body[data-table-theme='feltro'] #gameSection {
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Ccircle cx='15' cy='15' r='1' fill='%2322c55e' fill-opacity='0.04'/%3E%3C/svg%3E") repeat center center / 30px 30px,
+          radial-gradient(circle at center, #15803d 0%, #14532d 100%);
+      }
+
+      body[data-table-theme='cassino'] #gameSection {
+        background: 
+          /* Marca d'água: Arabesco calibrado com mais contraste e brilho estilo linha de costura */
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23ef4444' stroke-width='0.5' stroke-opacity='0.08'%3E%3Cpath d='M50 5 C55 25 75 25 80 45 C75 65 55 65 50 85 C45 65 25 65 20 45 C25 25 45 25 50 5 Z M50 25 C53 35 65 35 68 45 C65 55 53 55 50 65 C47 55 35 55 32 45 C35 35 47 35 50 25 Z'/%3E%3Cpath d='M0 45 C5 65 25 65 30 85 M100 45 C95 65 75 65 70 85 M30 5 C35 15 45 15 50 25 M70 5 C65 15 55 15 50 25'/%3E%3Ccircle cx='50' cy='45' r='2' fill='%23ef4444' fill-opacity='0.08'/%3E%3C/g%3E%3C/svg%3E")
+            repeat center center / 100px 100px,
+          /* Mantém a transição rica e o fundo bordô escuro para destacar as cartas */ radial-gradient(circle at center, #2d0408 0%, #170103 65%, #050001 100%);
+      }
+
+      body[data-table-theme='masmorra'] #gameSection {
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath d='M30 10c-5.523 0-10 4.477-10 10s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z' fill='%23a855f7' fill-opacity='0.035'/%3E%3Cpath d='M0 40c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10-10-4.477-10-10zm18 0c0-4.411-3.589-8-8-8s-8 3.589-8 8 3.589 8 8 8 8-3.589 8-8z' fill='%23a855f7' fill-opacity='0.035'/%3E%3Cpath d='M60 40c0-5.523-4.477-10-10-10s-10 4.477-10 10 4.477 10 10 10 10-4.477 10-10zm-2 0c0 4.411-3.589 8-8 8s-8-3.589-8-8 3.589-8 8-8 8 3.589 8 8z' fill='%23a855f7' fill-opacity='0.035'/%3E%3C/svg%3E")
+            repeat center center / 60px 60px,
+          radial-gradient(circle at center, #3b0764 0%, #0f051d 70%, #020005 100%);
+      }
+
+      body[data-table-theme='ostentacao'] #gameSection {
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath d='M40 15l6 8h10l-4 10v4H28v-4l-4-10h10z M35 30h10v2h-10z' fill='%23d4af37' fill-opacity='0.025'/%3E%3Ctext x='40' y='52' font-size='10' fill='%23d4af37' fill-opacity='0.02' font-family='sans-serif' font-weight='bold' text-anchor='middle'%3E%24%3C/text%3E%3C/svg%3E")
+            repeat center center / 80px 80px,
+          radial-gradient(circle at center, #78350f 0%, #1c1917 55%, #000000 100%);
+      }
+
+      body[data-table-theme='submissao'] #gameSection {
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23ec4899' stroke-width='1' stroke-opacity='0.035'%3E%3Cpath d='M0 0l40 40M40 0L0 40'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='1.5' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='0' cy='0' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='40' cy='0' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='0' cy='40' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='40' cy='40' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3C/svg%3E")
+            repeat center center / 40px 40px,
+          radial-gradient(circle at center, #9d174d 0%, #4c0519 45%, #0f0105 100%);
+      }
+
+      /* Estrutura da prévia do fundo da mesa no menu */
+      .table-preview-wrap {
+        position: relative;
+        width: 100%;
+        margin-bottom: 12px;
+      }
+      .table-preview-select {
+        width: 100% !important;
+        margin: 0 !important;
+        padding-left: 45px !important;
+      }
+      .table-preview-icon {
+        position: absolute;
+        top: 50%;
+        left: 12px;
+        transform: translateY(-50%);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 1.5px solid #d4af37;
+        pointer-events: none;
+        z-index: 2;
+        transition: background 0.3s ease-in-out;
+      }
+      /* Dinâmica de cores da amostra baseada no tema selecionado */
+      body[data-table-theme='feltro'] .table-preview-icon {
+        background: radial-gradient(circle at center, #15803d 0%, #14532d 100%);
+      }
+      body[data-table-theme='cassino'] .table-preview-icon {
+        background: radial-gradient(circle at center, #2d0408 0%, #050001 100%);
+      }
+      body[data-table-theme='masmorra'] .table-preview-icon {
+        background: radial-gradient(circle at center, #3b0764 0%, #0f051d 70%, #020005 100%);
+      }
+      body[data-table-theme='ostentacao'] .table-preview-icon {
+        background: radial-gradient(circle at center, #78350f 0%, #1c1917 55%, #000000 100%);
+      }
+      body[data-table-theme='submissao'] .table-preview-icon {
+        background: radial-gradient(circle at center, #9d174d 0%, #4c0519 45%, #0f0105 100%);
       }
       .board {
         flex: 1;
@@ -2056,6 +2136,14 @@
         .deck-preview-select {
           padding-left: 45px !important;
         }
+        .table-preview-icon {
+          width: 18px;
+          height: 18px;
+          left: 10px;
+        }
+        .table-preview-select {
+          padding-left: 36px !important;
+        }
       }
 
       @media (max-width: 768px) and (orientation: portrait) {
@@ -2662,6 +2750,24 @@
                 <option value="arcade">Arcade (Player 1 / Player 2)</option>
                 <option value="mythic">✨ Mítico (Findom Animado)</option>
                 <option value="holografico">💎 Holográfico (Prisma Animado)</option>
+              </select>
+            </div>
+
+            <label style="margin-bottom: 2px">Fundo da Mesa</label>
+            <div class="table-preview-wrap">
+              <div class="table-preview-icon"></div>
+              <select
+                id="tableThemeSelect"
+                class="table-preview-select"
+                onchange="
+                  updateMenuDynamic();
+                  pushLobby();
+                ">
+                <option value="feltro" selected>Feltro Verde Clássico</option>
+                <option value="cassino">Veludo Vermelho Cassino</option>
+                <option value="masmorra">Masmorra de Luxo (Neon Purple)</option>
+                <option value="ostentacao">Ostentação (Ouro & Veludo Negro)</option>
+                <option value="submissao">Submissão Total (Latex & Pink Glow)</option>
               </select>
             </div>
             <label>
@@ -4467,6 +4573,7 @@
         let deadChunksMax = [1, 1];
         if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') deadChunksMax = [1, 2];
         const deckTheme = document.getElementById('deckThemeSelect').value || 'classico';
+        const tableTheme = document.getElementById('tableThemeSelect').value || 'feltro'; // Captura novo tema
         const isBetting = document.getElementById('betToggle').value === 'sim';
         const betBase = parseFloat(document.getElementById('betBase').value) || 0;
         const betPerPoint = parseFloat(document.getElementById('betPerPoint').value) || 0;
@@ -4482,6 +4589,7 @@
           mode,
           variant,
           deckTheme,
+          tableTheme,
           players,
           teams,
           currentPlayer: starterIdx,
@@ -5853,6 +5961,7 @@
 
         // Aplica o Estilo de Baralho (Theme) selecionado
         document.body.dataset.deckTheme = state.deckTheme || 'classico';
+        document.body.dataset.tableTheme = state.tableTheme || 'feltro'; // Aplica o fundo dinâmico na mesa ativa
         syncMythicPhase();
 
         // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
@@ -7810,6 +7919,7 @@
           setIfUnfocused('modeSelect', l.mode || '');
           setIfUnfocused('variantSelect', l.variant || '');
           setIfUnfocused('deckThemeSelect', l.deckTheme || 'classico');
+          setIfUnfocused('tableThemeSelect', l.tableTheme || 'feltro'); // Sincroniza inputs entre abas
           setIfUnfocused('betToggle', l.betToggle || '');
           setIfUnfocused('betBase', l.betBase || 5);
           setIfUnfocused('betPerPoint', l.betPerPoint || 0.01);
@@ -8073,6 +8183,7 @@
           mode: mode,
           variant: document.getElementById('variantSelect').value,
           deckTheme: document.getElementById('deckThemeSelect').value,
+          tableTheme: document.getElementById('tableThemeSelect').value, // Sincroniza escolha no lobby do Firebase
           betToggle: document.getElementById('betToggle').value,
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
@@ -8276,6 +8387,8 @@
         // 🎨 ATUALIZA A MINIATURA DO BARALHO NO LOBBY
         const themeSelect = document.getElementById('deckThemeSelect');
         if (themeSelect) document.body.dataset.deckTheme = themeSelect.value || 'classico';
+        const tableSelect = document.getElementById('tableThemeSelect');
+        if (tableSelect) document.body.dataset.tableTheme = tableSelect.value || 'feltro'; // Atualiza miniatura local do menu
         refreshArcadeCars(true);
         syncMythicPhase();
 
@@ -8706,10 +8819,11 @@
         const variant = document.getElementById('variantSelect').value;
         const localPlayer = document.getElementById('localPlayerSelect').value;
         const betToggle = document.getElementById('betToggle').value;
+        const tableTheme = document.getElementById('tableThemeSelect').value; // 🔥 CORREÇÃO: Declaração adicionada aqui
 
         // 1. Verifica Seleções Básicas do Menu
-        if (!mode || !variant || !betToggle) {
-          errorDiv.textContent = 'Selecione todas as opções (Modo, Regra e Dinheiro).';
+        if (!mode || !variant || !tableTheme || !betToggle) {
+          errorDiv.textContent = 'Selecione todas as opções (Modo, Regra, Fundo e Dinheiro).';
           errorDiv.style.display = 'block';
           return;
         }
@@ -8924,6 +9038,7 @@
           names: namesArray,
           pixKeys: currentLobby.pixKeys || ['', ''],
           ready: readyArray,
+          tableTheme: document.getElementById('tableThemeSelect').value, // 🔥 CORREÇÃO: Captura o valor direto do elemento
         };
         setDoc(gameRef, { lobby: fullLobby, updatedAt: Date.now() }, { merge: true });
       };
