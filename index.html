@@ -3975,8 +3975,8 @@
       async function commitState() {
         if (!state || window.isClosingGame) return;
 
-        // Gatilho Universal de Reciclagem
-        if (state.stock && state.stock.length === 0) {
+        // Gatilho Universal de Reciclagem (Travado se o jogo já acabou)
+        if (state.stock && state.stock.length === 0 && !state.finished && !window.isClosingGame) {
           const hasDead = state.deadPiles && state.deadPiles.some((p) => p && p.length > 0);
           if (hasDead) {
             await recycleDeadToStockIfPossible();
@@ -4055,10 +4055,8 @@
             if (fromStockRect && toEl) {
               const toRect = getRect(toEl);
               toEl.style.visibility = 'hidden';
-              // Roda livre: Não espera a animação acabar para prosseguir com a lógica
-              flyRectToRect(c, fromStockRect, toRect, 'back').then(() => {
-                if (toEl) toEl.style.visibility = '';
-              });
+              await flyRectToRect(c, fromStockRect, toRect, 'back');
+              if (toEl) toEl.style.visibility = '';
             }
 
             actionDraw = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(c), ts: Date.now() };
@@ -4078,9 +4076,8 @@
             if (discardRect && toEl) {
               const toRect = getRect(toEl);
               toEl.style.visibility = 'hidden';
-              flyRectToRect(top, discardRect, toRect, 'front').then(() => {
-                if (toEl) toEl.style.visibility = '';
-              });
+              await flyRectToRect(top, discardRect, toRect, 'front');
+              if (toEl) toEl.style.visibility = '';
             }
 
             actionDraw = { id: newActionId(), type: 'drawDiscard', playerId: state.currentPlayer, card: packCard(top), ts: Date.now() };
@@ -4120,9 +4117,8 @@
           const fromRect = getRect(fromEl);
           const toRect = getRect(toEl);
           fromEl.style.visibility = 'hidden';
-          flyRectToRect(card, fromRect, toRect, 'front').then(() => {
-            if (fromEl) fromEl.style.visibility = '';
-          });
+          await flyRectToRect(card, fromRect, toRect, 'front');
+          if (fromEl) fromEl.style.visibility = '';
         }
 
         // Mutação segura no Array blindado
@@ -7359,7 +7355,6 @@
               drawnCards: domReward?.drawnCards,
               ts: Date.now(),
             };
-            renderAll();
             await commitState();
           }
         },
@@ -7394,7 +7389,6 @@
               drawnCards: domReward?.drawnCards,
               ts: Date.now(),
             };
-            renderAll();
             await commitState();
           }
         },
@@ -7440,7 +7434,6 @@
               recycledDeadIndex: recycledIndex,
               ts: Date.now(),
             };
-            renderAll();
             await commitState();
           }
         },
@@ -7485,7 +7478,6 @@
           const freshS = botEngine.getState();
           if (freshS) {
             freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
-            renderAll();
             await commitState();
           }
           return true;
@@ -7551,7 +7543,6 @@
           s.pickedDiscardCardId = null;
 
           const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
-          if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
           const freshS = botEngine.getState();
           if (freshS) {
@@ -7563,7 +7554,6 @@
               drawnCards: domReward?.drawnCards,
               ts: Date.now(),
             };
-            renderAll();
             await commitState();
           }
           return true;
@@ -7592,7 +7582,6 @@
           const freshS = botEngine.getState();
           if (freshS) {
             freshS.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
-            renderAll();
             await commitState();
           }
         },
@@ -9134,7 +9123,7 @@
         state.boughtCardIds.push(card.id);
 
         // Animação de voo saindo da mesa
-        const fromCardEl = document.querySelector(`.reveal-mode .carta.mini[data-card-id="${cardId}"]`);
+        const fromCardEl = document.querySelector(`.reveal-mode .carta[data-card-id="${cardId}"]`);
 
         renderHand(); // Força a carta nova a existir no DOM do J2
         const toEl = cardElById(card.id);
