@@ -2889,9 +2889,8 @@
                 <br />
                 🃏
                 <strong>Chuva de Canastras:</strong>
-                6ª(+R$3) | 7ª em diante(+R$2/cada)
+                4ª(+R$2) | 5ª(+R$3) | 6ª em diante(+R$2/cada)
               </div>
-
               <input id="betBase" type="hidden" value="5" />
               <input id="betPerPoint" type="hidden" value="0.01" />
 
@@ -3260,21 +3259,31 @@
             .catch(() => {});
 
         // Lógica de sumir a tela de loading
-        loadingScreen.style.display = 'flex';
-        loadingScreen.style.opacity = '1';
+        const isDebug = window.location.search.includes('debug=1') || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+        if (isDebug) {
+          loadingScreen.style.display = 'none';
+          introFinished = true;
+          if (!state) {
+            document.getElementById('configSection').style.display = 'flex';
+            if (typeof window.updateMenuDynamic === 'function') window.updateMenuDynamic();
+          }
+        } else {
+          loadingScreen.style.display = 'flex';
+          loadingScreen.style.opacity = '1';
 
-        setTimeout(() => {
-          loadingScreen.style.opacity = '0';
           setTimeout(() => {
-            loadingScreen.style.display = 'none';
-            introFinished = true;
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+              loadingScreen.style.display = 'none';
+              introFinished = true;
 
-            if (!state) {
-              document.getElementById('configSection').style.display = 'flex';
-              if (typeof window.updateMenuDynamic === 'function') window.updateMenuDynamic();
-            }
-          }, 1000);
-        }, 2500);
+              if (!state) {
+                document.getElementById('configSection').style.display = 'flex';
+                if (typeof window.updateMenuDynamic === 'function') window.updateMenuDynamic();
+              }
+            }, 1000);
+          }, 2500);
+        }
       });
 
       document.addEventListener(
@@ -6905,8 +6914,12 @@
               oppProjected: oppProjected,
             };
 
-            if (totalCanastras >= 6) {
-              b.canastraQuantityBonus = 3 + (totalCanastras - 6) * 2;
+            if (totalCanastras === 4) {
+              b.canastraQuantityBonus = 2;
+            } else if (totalCanastras === 5) {
+              b.canastraQuantityBonus = 5;
+            } else if (totalCanastras >= 6) {
+              b.canastraQuantityBonus = 5 + (totalCanastras - 5) * 2;
             }
 
             if (myScore > opScore) {
@@ -6958,7 +6971,11 @@
                 });
               });
             const mortoPenalty = (state.deadChunksTaken?.[teamId] ?? 0) === 0 ? 100 : 0;
-            return boardScore - handPenalty - mortoPenalty;
+
+            // 🏅 Sincroniza o bônus de batida (+100 pts) no HUD ao vivo assim que o jogo finalizar
+            const bonusBatida = state.finished && state.winnerTeamId === teamId ? 100 : 0;
+
+            return boardScore - handPenalty - mortoPenalty + bonusBatida;
           };
 
           const t1MortosPegos = state.deadChunksTaken?.[0] ?? 0;
@@ -6968,8 +6985,8 @@
           const proj1 = getProjectedScore(0, s1, s2);
           const proj2 = getProjectedScore(1, s2, s1);
 
-          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds, state.teams[1].melds, t2MortosPegos > 0, proj1, proj2);
-          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds, state.teams[0].melds, t1MortosPegos > 0, proj2, proj1);
+          const fin1 = window.calculatePixFin(proj1, proj2, state.teams[0].melds, state.teams[1].melds, t2MortosPegos > 0, proj1, proj2);
+          const fin2 = window.calculatePixFin(proj2, proj1, state.teams[1].melds, state.teams[0].melds, t1MortosPegos > 0, proj2, proj1);
 
           // 💸 MOTOR DE ANIMAÇÃO FINANCEIRA: Compara o último render com o atual para soltar a animação de dinheiro
           if (typeof window.lastFinScores === 'undefined') {
@@ -7130,23 +7147,23 @@
                         <span>🩸 Adv. ${refFin.b.oppCanastras} Canastra(s) (R$ 10)</span> 
                         <strong>+R$ ${refFin.b.humilhacaoSuprema.toFixed(2).replace('.', ',')}</strong>
                     </div>
-                    <div id="chuvaGoalItem" class="goal-item expandable ${refFin.b.totalCanastras >= 6 ? 'achieved' : ''} ${window.isChuvaDetailsExpanded ? 'expanded' : ''}" onclick="toggleChuvaDetails(event)">
+                    <div id="chuvaGoalItem" class="goal-item expandable ${refFin.b.totalCanastras >= 4 ? 'achieved' : ''} ${window.isChuvaDetailsExpanded ? 'expanded' : ''}" onclick="toggleChuvaDetails(event)">
                         <div class="goal-item-header">
-                            <span><span class="expand-icon">▶</span>🃏 Chuva de Canastras (${refFin.b.totalCanastras}/6+)</span> 
+                            <span><span class="expand-icon">▶</span>🃏 Chuva de Canastras (${refFin.b.totalCanastras}/4+)</span> 
                             <strong>+R$ ${refFin.b.canastraQuantityBonus.toFixed(2).replace('.', ',')}</strong>
                         </div>
                         <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>4ª Canastra:</span> <span>+R$ 2,00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 5 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>5ª Canastra:</span> <span>+R$ 3,00</span>
+                            </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 6 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>6ª Canastra:</span> <span>+R$ 3,00</span>
+                              <span>6ª Canastra:</span> <span>+R$ 2,00</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 7 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>7ª Canastra:</span> <span>+R$ 2,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 8 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>8ª Canastra:</span> <span>+R$ 2,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.totalCanastras >= 9 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>9ª em diante:</span> <span>+R$ 2,00 /cada</span>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.totalCanastras >= 7 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                              <span>7ª em diante:</span> <span>+R$ 2,00 /cada</span>
                             </div>
                         </div>
                     </div>
@@ -7204,8 +7221,9 @@
           if (state.isBetting) {
             const winnerData = scores[0];
             const loserData = scores[1];
-            // Correção: Adicionado o loserData.team.melds como 4º parâmetro
-            const winnerFin = window.calculatePixFin(winnerData.score, loserData.score, winnerData.team.melds, loserData.team.melds);
+            const loserTookMorto = (state.deadChunksTaken?.[loserData.team.id] ?? 0) > 0;
+
+            const winnerFin = window.calculatePixFin(winnerData.score, loserData.score, winnerData.team.melds, loserData.team.melds, loserTookMorto, winnerData.score, loserData.score);
 
             const totalMoney = winnerFin.total;
             const moneyStr = totalMoney.toFixed(2).replace('.', ',');
@@ -8222,38 +8240,45 @@
 
             const pi = document.querySelector('.player-interface');
             const bm = document.querySelector('.board-middle');
-            if (pi) pi.style.pointerEvents = 'none';
-            if (bm) bm.style.pointerEvents = 'none';
 
-            state.players.forEach((p) => {
-              const roll = state.diceRolls[p.id];
-              if (!roll) return;
-              const pos = getDiceSpawnPosition(p.id);
-              const diceScene = create3DDiceElement(roll, pos.x, pos.y);
-              document.body.appendChild(diceScene);
-              setTimeout(() => diceScene.remove(), 6000);
-            });
-
-            setTimeout(() => {
+            if (isDebugMode) {
               showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
               if (pi) pi.style.pointerEvents = 'auto';
               if (bm) bm.style.pointerEvents = 'auto';
+            } else {
+              if (pi) pi.style.pointerEvents = 'none';
+              if (bm) bm.style.pointerEvents = 'none';
 
-              if (state.currentPlayer === myPlayerIndex) {
-                if (navigator.vibrate && audioUnlocked) {
-                  try {
-                    navigator.vibrate([150, 80, 150]);
-                  } catch (e) {}
+              state.players.forEach((p) => {
+                const roll = state.diceRolls[p.id];
+                if (!roll) return;
+                const pos = getDiceSpawnPosition(p.id);
+                const diceScene = create3DDiceElement(roll, pos.x, pos.y);
+                document.body.appendChild(diceScene);
+                setTimeout(() => diceScene.remove(), 6000);
+              });
+
+              setTimeout(() => {
+                showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
+                if (pi) pi.style.pointerEvents = 'auto';
+                if (bm) bm.style.pointerEvents = 'auto';
+
+                if (state.currentPlayer === myPlayerIndex) {
+                  if (navigator.vibrate && audioUnlocked) {
+                    try {
+                      navigator.vibrate([150, 80, 150]);
+                    } catch (e) {}
+                  }
+                  if (audioUnlocked) {
+                    try {
+                      sfxMyTurn.pause();
+                      sfxMyTurn.currentTime = 0;
+                      sfxMyTurn.play().catch(() => {});
+                    } catch (e) {}
+                  }
                 }
-                if (audioUnlocked) {
-                  try {
-                    sfxMyTurn.pause();
-                    sfxMyTurn.currentTime = 0;
-                    sfxMyTurn.play().catch(() => {});
-                  } catch (e) {}
-                }
-              }
-            }, 3700);
+              }, 3700);
+            }
           }
         }
 
