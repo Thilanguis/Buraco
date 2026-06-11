@@ -2270,7 +2270,22 @@
 
         /* Caso o placar seja acionado no fim de jogo, fica do lado do X */
         #showScoreBtn {
-          left: 70px !important;
+          left: 68px !important;
+        }
+
+        /* Botão Jogar Novamente posicionado perfeitamente à direita do Placar */
+        #rematchBtn {
+          position: absolute !important;
+          pointer-events: auto;
+          height: 36px !important;
+          font-size: 10px !important;
+          white-space: nowrap !important;
+          border-radius: 8px !important;
+          padding: 0 12px !important;
+          margin: 0 !important;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6) !important;
+          bottom: 0 !important;
+          left: 156px !important;
         }
       }
 
@@ -3103,7 +3118,12 @@
                 👁️ ROUBAR MÃO
               </button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
+              <!-- 🔥 NOVO: Botão de revanche ao lado do botão de fechar sala -->
+              <button id="rematchBtn" onclick="voteRematch()" style="display: none; background: #22c55e; font-size: 10px; padding: 8px; font-weight: 900">🔄 JOGAR NOVAMENTE</button>
             </div>
+
+            <!-- 🔥 Badge local com a cor corrigida explicitamente para ficar idêntico ao dos bots -->
+            <div id="localPlayerLabel" class="opponent-label" style="position: relative; margin: 12px auto 4px auto; display: none; pointer-events: none; text-shadow: none !important; width: fit-content; color: #e5e7eb !important"></div>
 
             <div id="handContainer" class="hand-container">
               <div class="cards-row"></div>
@@ -5961,10 +5981,8 @@
 
         // Aplica o Estilo de Baralho (Theme) selecionado
         document.body.dataset.deckTheme = state.deckTheme || 'classico';
-        document.body.dataset.tableTheme = state.tableTheme || 'feltro'; // Aplica o fundo dinâmico na mesa ativa
         syncMythicPhase();
 
-        // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
         // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
         if (state.isBetting) {
           document.body.classList.add('is-betting');
@@ -5984,8 +6002,12 @@
 
         const currP = currentPlayer();
         const pName = currP ? currP.name : 'Aguardando...';
+        const cardCount = currP && currP.hand ? currP.hand.length : 0; // 🔥 CORREÇÃO: Variável declarada corretamente no escopo de renderAll
 
-        document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? 'Sua Vez!' : `Vez de ${pName}`;
+        document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? `Sua Vez! (${cardCount})` : `Vez de ${pName} (${cardCount})`;
+
+        // Exibe o contador de cartas no chip de status do topo esquerdo
+        document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? `Sua Vez! (${cardCount})` : `Vez de ${pName} (${cardCount})`;
         document.querySelector('.current-player-chip').style.background = isMyTurnRightNow ? 'rgba(22, 163, 74, 0.8)' : 'rgba(0, 0, 0, 0.5)';
         document.getElementById('stockCount').textContent = state.stock.length;
 
@@ -6198,6 +6220,27 @@
         const isSpec = myPlayerIndex === -1;
         document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
 
+        // 🔥 NOVO: Controle de render do botão de revanche com contagem de votos síncrona
+        const rematchBtn = document.getElementById('rematchBtn');
+        if (rematchBtn) {
+          if (isFin && !isSpec) {
+            rematchBtn.style.display = 'block';
+            const votes = state.rematch?.votes || {};
+            const totalRequired = state.players.length;
+            const yesCount = Object.values(votes).filter((v) => v === true).length;
+
+            if (votes[myPlayerIndex]) {
+              rematchBtn.textContent = `⏳ ACEITO (${yesCount}/${totalRequired})`;
+              rematchBtn.style.background = '#1e3a8a'; // Tom azul escuro de espera
+            } else {
+              rematchBtn.textContent = '🔄 JOGAR NOVAMENTE';
+              rematchBtn.style.background = '#22c55e'; // Tom verde pronto
+            }
+          } else {
+            rematchBtn.style.display = 'none';
+          }
+        }
+
         let specBadge = document.getElementById('specBadgeInfo');
         if (!specBadge) {
           specBadge = document.createElement('div');
@@ -6263,9 +6306,11 @@
       function renderHand() {
         const container = document.querySelector('#handContainer .cards-row');
         container.innerHTML = '';
+        const localLabelEl = document.getElementById('localPlayerLabel'); // Captura o novo elemento
 
         // --- MODO ESPECTADOR ---
         if (myPlayerIndex === -1) {
+          if (localLabelEl) localLabelEl.style.display = 'none';
           const p0 = state.players[0];
           if (!p0) return;
 
@@ -6281,7 +6326,26 @@
 
         // --- JOGADOR NORMAL ---
         const me = state.players[myPlayerIndex];
-        if (!me) return;
+        if (!me) {
+          if (localLabelEl) localLabelEl.style.display = 'none';
+          return;
+        }
+
+        // 🔥 Atualiza o seu próprio indicador dinamicamente na tela com nome e contagem real
+        if (localLabelEl) {
+          localLabelEl.textContent = `${me.name} (${me.hand.length})`;
+          localLabelEl.style.display = 'block';
+
+          // Verifica se é a sua vez para aplicar o mesmo verde dinâmico dos oponentes ativos
+          const isMyTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+          if (isMyTurn) {
+            localLabelEl.style.setProperty('background', '#16a34a', 'important');
+            localLabelEl.style.setProperty('border-color', 'rgba(255, 255, 255, 0.3)', 'important');
+          } else {
+            localLabelEl.style.setProperty('background', 'rgba(15, 23, 42, 0.9)', 'important');
+            localLabelEl.style.setProperty('border-color', 'rgba(255, 255, 255, 0.15)', 'important');
+          }
+        }
 
         me.hand.forEach((card, idx) => {
           if (!card) return; // 🛡️ BLINDAGEM ANTI-FANTASMA: Impede o crash de UI
@@ -9281,6 +9345,37 @@
 
         renderAll();
         resetTurnTimer();
+        await commitState();
+      };
+
+      // 🔥 NOVO: Motor de verificação e gatilho de nova partida síncrona
+      window.voteRematch = async () => {
+        if (!state || !state.finished || myPlayerIndex === -1) return;
+
+        if (!state.rematch) {
+          state.rematch = { votes: {} };
+        }
+
+        // Registra o voto do jogador local
+        state.rematch.votes[myPlayerIndex] = true;
+
+        // Computa automaticamente o voto de confirmação dos bots da sala
+        state.players.forEach((p) => {
+          if (p && p.name && p.name.toUpperCase().includes('BOT')) {
+            state.rematch.votes[p.id] = true;
+          }
+        });
+
+        const yesCount = Object.values(state.rematch.votes).filter((v) => v === true).length;
+
+        // Se todos aceitaram, dispara o motor de faxina e reinicia direto no Firebase
+        if (yesCount >= state.players.length) {
+          await window.debugRestartGame();
+          return;
+        }
+
+        // Senão, joga o estado pro Firebase pro outro jogador ver a contagem subir
+        renderAll();
         await commitState();
       };
     </script>
