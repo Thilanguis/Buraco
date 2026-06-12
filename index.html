@@ -7088,8 +7088,9 @@
           const proj1 = getProjectedScore(0, s1, s2);
           const proj2 = getProjectedScore(1, s2, s1);
 
-          const fin1 = window.calculatePixFin(proj1, proj2, state.teams[0].melds, state.teams[1].melds, t2MortosPegos > 0, proj1, proj2);
-          const fin2 = window.calculatePixFin(proj2, proj1, state.teams[1].melds, state.teams[0].melds, t1MortosPegos > 0, proj2, proj1);
+          // Corrigido: s1 e s2 voltam para o início, mantendo os projetados apenas no final
+          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds, state.teams[1].melds, t2MortosPegos > 0, proj1, proj2);
+          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds, state.teams[0].melds, t1MortosPegos > 0, proj2, proj1);
 
           // 💸 MOTOR DE ANIMAÇÃO FINANCEIRA: Compara o último render com o atual para soltar a animação de dinheiro
           if (typeof window.lastFinScores === 'undefined') {
