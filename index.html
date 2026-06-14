@@ -5116,7 +5116,7 @@
 
           renderAll();
 
-          let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex]).kind);
+          let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex]).kind, isNewMeld ? team.melds.length - 1 : extendedMeldIndex);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             renderHand();
@@ -5319,93 +5319,92 @@
         return false;
       }
 
-      async function processDominationReward(p, oldKind, newKind) {
+      async function processDominationReward(p, oldKind, newKind, meldIndex) {
         if (!state || state.mode !== '1x1_dominacao') return null;
         if (oldKind === newKind) return null;
+        if (meldIndex === undefined || meldIndex === null || meldIndex < 0) return null;
 
-        let reward = { type: 'none' };
-        const hierarchy = { simple: 0, suja: 1, limpa: 2, real: 3, asas: 4 };
+        // Tabela de valores exatos das compras
+        const rewards = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 };
 
-        // Premia apenas se houve evolução de nível
-        if (hierarchy[newKind] <= hierarchy[oldKind]) return null;
+        state.dominationTurnTracking = state.dominationTurnTracking || {};
+        const trackingKey = `${p.teamId}:${meldIndex}`;
+        const currentTurnNumber = state.turnNumber || 0;
+        const lastTracked = state.dominationTurnTracking[trackingKey];
 
-        if (newKind === 'limpa') reward = { type: 'draw', count: 1 };
-        else if (newKind === 'real') reward = { type: 'draw', count: 2 };
-        else if (newKind === 'asas') reward = { type: 'morto_or_draw', drawFallback: 3 };
+        let cardsToDraw = 0;
+        const newRewardValue = rewards[newKind] || 0;
 
-        if (reward.type === 'none') return null;
+        if (newRewardValue === 0) return null;
+
+        if (!lastTracked || lastTracked.turnNumber !== currentTurnNumber) {
+          // NOVO TURNO: Dá o bônus cheio da canastra atual
+          cardsToDraw = newRewardValue;
+        } else {
+          // MESMO TURNO: Calcula apenas a diferença (Anti-Exploit)
+          const previousRewardValue = lastTracked.highestWeight || 0;
+          if (newRewardValue > previousRewardValue) {
+            cardsToDraw = newRewardValue - previousRewardValue;
+          }
+        }
+
+        // Atualiza a memória da jogada atual
+        state.dominationTurnTracking[trackingKey] = {
+          turnNumber: currentTurnNumber,
+          highestWeight: newRewardValue,
+        };
+
+        if (cardsToDraw <= 0) return null;
 
         let tookDead = null;
         let drawnCards = [];
-        const teamId = p.teamId;
 
-        if (reward.type === 'morto_or_draw') {
-          const taken = state.deadChunksTaken?.[teamId] ?? 0;
-          const max = state.deadChunksMax?.[teamId] ?? 1;
-
-          if (taken < max) {
-            const deadIndex = state.deadPiles.findIndex((pile) => pile && pile.length > 0);
-            if (deadIndex !== -1) {
-              const dead = state.deadPiles[deadIndex];
-              const chunkSize = Math.min(DEAD_CHUNK_SIZE, dead.length);
-              p.hand.push(...dead.splice(0, chunkSize));
-              sortHand(p.hand);
-              state.deadChunksTaken[teamId] = taken + 1;
-              tookDead = { deadIndex, count: chunkSize };
-              showMessage('👑 DOMINAÇÃO: Ás-a-Ás! Morto direto pra mão!');
-            }
+        // Compra as cartas rigorosamente baseada na matemática (sem puxar o morto inteiro)
+        for (let i = 0; i < cardsToDraw; i++) {
+          if (!state.stock.length) {
+            await recycleDeadToStockIfPossible();
           }
-          if (!tookDead) reward = { type: 'draw', count: reward.drawFallback };
-        }
 
-        if (reward.type === 'draw') {
-          for (let i = 0; i < reward.count; i++) {
-            if (!state.stock.length) {
-              await recycleDeadToStockIfPossible();
-            }
+          if (state.stock.length > 0) {
+            const c = state.stock.pop();
+            ensureCardId(c);
 
-            if (state.stock.length > 0) {
-              const c = state.stock.pop();
+            const packed = packCard(c);
+            packed._isEndgameSteal = false;
+
+            p.hand.push(c);
+            drawnCards.push(packed);
+
+            if (!state.boughtCardIds) state.boughtCardIds = [];
+            state.boughtCardIds.push(c.id);
+          } else {
+            // Se não tem monte nem morto, rouba do escravo
+            const escravo = state.players[0];
+            if (escravo && escravo.hand.length > 0) {
+              const randIdx = Math.floor(Math.random() * escravo.hand.length);
+              const c = escravo.hand.splice(randIdx, 1)[0];
               ensureCardId(c);
 
+              c._isEndgameSteal = true;
               const packed = packCard(c);
-              packed._isEndgameSteal = false;
+              packed._isEndgameSteal = true;
 
               p.hand.push(c);
               drawnCards.push(packed);
 
               if (!state.boughtCardIds) state.boughtCardIds = [];
               state.boughtCardIds.push(c.id);
-            } else {
-              const escravo = state.players[0];
-              if (escravo && escravo.hand.length > 0) {
-                const randIdx = Math.floor(Math.random() * escravo.hand.length);
-                const c = escravo.hand.splice(randIdx, 1)[0];
-                ensureCardId(c);
-
-                // Injeta a flag direto na estrutura principal da carta
-                c._isEndgameSteal = true;
-                const packed = packCard(c);
-                packed._isEndgameSteal = true;
-
-                p.hand.push(c);
-                drawnCards.push(packed);
-
-                if (!state.boughtCardIds) state.boughtCardIds = [];
-                state.boughtCardIds.push(c.id);
-              }
             }
-          }
-          sortHand(p.hand);
-
-          if (drawnCards.length > 0) {
-            const temRoubo = drawnCards.some((c) => c && c._isEndgameSteal === true);
-            showMessage(`👑 DOMINAÇÃO: Canastra ${newKind.toUpperCase()}! +${drawnCards.length} carta(s) ${temRoubo ? 'ROUBADA DA MÃO' : 'DO MONTE'}.`);
           }
         }
 
-        // 🚀 CORREÇÃO DE LOGICA: Como as cartas já foram tratadas e empacotadas no loop acima,
-        // não podemos passar o map(packCard) de novo aqui, senão ele apaga a nossa flag de roubo!
+        sortHand(p.hand);
+
+        if (drawnCards.length > 0) {
+          const temRoubo = drawnCards.some((c) => c && c._isEndgameSteal === true);
+          showMessage(`👑 DOMINAÇÃO: Canastra ${newKind.toUpperCase()}! +${drawnCards.length} carta(s) ${temRoubo ? 'ROUBADA DA MÃO' : 'DO MONTE'}.`);
+        }
+
         return { tookDead, drawnCards: drawnCards.length > 0 ? drawnCards : null };
       }
 
@@ -5502,7 +5501,7 @@
           selectedHandIndexes.clear();
           selectedMeldTarget = null;
 
-          let domReward = await processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind);
+          let domReward = await processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind, forcedIndex);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             renderHand();
@@ -5597,7 +5596,7 @@
         selectedHandIndexes.clear();
         selectedMeldTarget = null;
 
-        let domReward = await processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind);
+        let domReward = await processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind, candidateMeldIndexes[0]);
 
         if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
           renderHand();
@@ -5744,8 +5743,8 @@
           currentTeam().melds.push(meld);
           const meldIdx = currentTeam().melds.length - 1;
 
-          // Avaliação Plus Dominação
-          let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
+          // Avaliação Plus Dominação (CORRIGIDO: meldIdx numérico)
+          let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx);
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             renderHand(); // Força as cartas a existirem no DOM para voarem até elas
@@ -7694,7 +7693,8 @@
           team.melds.push(cards);
           const meldIdx = team.melds.length - 1;
 
-          let domReward = await processDominationReward(me, 'simple', classifyMeldForUi(cards).kind);
+          // CORRIGIDO: meldIdx no lugar do array
+          let domReward = await processDominationReward(me, 'simple', classifyMeldForUi(cards).kind, meldIdx);
           const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
@@ -7728,7 +7728,7 @@
           team.melds[meldIndex].push(...cards);
           botEngine.normalizeMeld(team.melds[meldIndex]);
 
-          let domReward = await processDominationReward(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind);
+          let domReward = await processDominationReward(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind, meldIndex);
           const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
@@ -7891,7 +7891,8 @@
             }
           }
 
-          let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind);
+          const targetIdx = intent.action === 'extend' ? intent.meldIndex : team.melds.length - 1;
+          let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind, targetIdx);
 
           sortHand(me.hand);
           s.hasDrawnThisTurn = true;
@@ -9056,9 +9057,36 @@
         optimizeMeld(meld);
         normalizeMeldOrder(meld);
         team.melds.push(meld);
+        const meldIdx = team.melds.length - 1;
 
-        // Dispara a nova recompensa Plus Dominação no debug
-        let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind);
+        // Passando o meldIdx corretamente no lugar do array "meld"
+        let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx);
+
+        if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
+          renderHand(); // Força as cartas a existirem no DOM para voarem até a mão
+          const anims = domReward.drawnCards.map((c) => {
+            const toEl = cardElById(c.id);
+            if (!toEl) return Promise.resolve();
+
+            const isSteal = c && c._isEndgameSteal === true;
+            let fromRect = null;
+
+            if (isSteal) {
+              fromRect = opponentAnchorRect(0);
+            } else {
+              const fromEl = document.querySelector('#drawStockBtn .pile-card');
+              fromRect = fromEl ? getRect(fromEl) : null;
+            }
+
+            if (!fromRect) return Promise.resolve();
+
+            toEl.style.visibility = 'hidden';
+            return flyRectToRect(c, fromRect, getRect(toEl), isSteal ? 'front' : 'back').then(() => {
+              if (toEl) toEl.style.visibility = '';
+            });
+          });
+          await Promise.all(anims);
+        }
 
         if (domReward?.tookDead) {
           await animateDeadToHandLocal(domReward.tookDead.deadIndex);
