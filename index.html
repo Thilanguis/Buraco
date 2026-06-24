@@ -3395,8 +3395,88 @@
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('service-worker.js').catch((err) => console.log('SW erro:', err));
+          navigator.serviceWorker
+            .register('service-worker.js')
+            .then((reg) => {
+              // Monitora se o Service Worker encontrou arquivos novos no servidor
+              reg.onupdatefound = () => {
+                const installingWorker = reg.installing;
+                installingWorker.onstatechange = () => {
+                  // Se os arquivos novos foram baixados e o app já estava rodando, avisa o jogador
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    showUpdatePrompt();
+                  }
+                };
+              };
+            })
+            .catch((err) => console.log('SW erro:', err));
         });
+      }
+
+      function showUpdatePrompt() {
+        const overlay = document.createElement('div');
+        // Usando o mesmo padrão de z-index e desfoque das telas do jogo
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(5, 5, 5, 0.95); z-index: 100000; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+
+        overlay.innerHTML = `
+          <div class="score-card" style="max-width: 380px; text-align: center; padding: 30px 20px; border-color: #facc15;">
+            <div style="font-size: 2.5rem; margin-bottom: 12px; text-shadow: 0 0 15px rgba(250, 204, 21, 0.4);">✨</div>
+            <h2 style="margin: 0 0 10px 0; color: #facc15; font-size: 22px; text-transform: uppercase; letter-spacing: 1px;">Atualização Pronta</h2>
+            <p style="color: #94a3b8; font-size: 12px; margin-bottom: 24px; line-height: 1.5;">Uma nova versão do Buraco Findom foi detectada. Deseja aplicar as novas regras e melhorias agora?</p>
+            <div style="display: flex; gap: 10px; width: 100%;">
+              <button class="custom-modal-btn" id="btn-update-later" style="flex: 1; background: #334155; color: #fff; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none;">DEPOIS</button>
+              <button class="custom-modal-btn" id="btn-update-now" style="flex: 1; background: linear-gradient(135deg, #b45309 0%, #78350f 100%); color: #facc15; border: 1px solid #facc15; padding: 12px; border-radius: 8px; font-weight: 900; cursor: pointer; letter-spacing: 1px;">ATUALIZAR</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('btn-update-later').onclick = () => overlay.remove();
+
+        document.getElementById('btn-update-now').onclick = () => {
+          // Transforma o card na tela de download com a barra de progresso dourada/verde
+          overlay.innerHTML = `
+            <div class="score-card" style="max-width: 320px; text-align: center; padding: 30px 20px; border-color: #facc15;">
+              <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Sincronizando Módulos...</h2>
+              
+              <div style="width: 100%; background: #1e293b; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(250, 204, 21, 0.2);">
+                <div id="update-progress-bar" style="width: 0%; height: 100%; background: #22c55e; box-shadow: 0 0 10px #22c55e; transition: width 0.15s linear;"></div>
+              </div>
+              
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8;">
+                <span id="update-status-text">Embaralhando...</span>
+                <span id="update-percent" style="color: #4ade80; font-weight: bold;">0%</span>
+              </div>
+            </div>
+          `;
+
+          let progress = 0;
+          const bar = document.getElementById('update-progress-bar');
+          const percentText = document.getElementById('update-percent');
+          const statusText = document.getElementById('update-status-text');
+
+          const interval = setInterval(() => {
+            progress += Math.floor(Math.random() * 12) + 4;
+
+            if (progress >= 100) {
+              progress = 100;
+              clearInterval(interval);
+              statusText.textContent = 'Mesa pronta!';
+              statusText.style.color = '#4ade80';
+              bar.style.background = '#facc15';
+              bar.style.boxShadow = '0 0 15px #facc15';
+              percentText.textContent = '100%';
+
+              // Força o reload limpando a sessão para subir o jogo atualizado
+              setTimeout(() => window.location.reload(), 600);
+            } else {
+              bar.style.width = progress + '%';
+              percentText.textContent = progress + '%';
+              if (progress > 30) statusText.textContent = 'Puxando baralho novo...';
+              if (progress > 70) statusText.textContent = 'Preparando o morto...';
+            }
+          }, 180);
+        };
       }
 
       const firebaseConfig = {
@@ -6094,6 +6174,9 @@
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
+
+        // Força o áudio a rodar na máquina de quem executou a batida/botão de teste
+        playCanastraSfx('fim');
 
         renderAll();
         await commitState();
