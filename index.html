@@ -3398,24 +3398,35 @@
           navigator.serviceWorker
             .register('service-worker.js')
             .then((reg) => {
-              // Monitora se o Service Worker encontrou arquivos novos no servidor
+              // Se o usuário abriu o app e já tinha um update baixado esperando
+              if (reg.waiting) {
+                showUpdatePrompt(reg.waiting);
+              }
+
               reg.onupdatefound = () => {
                 const installingWorker = reg.installing;
                 installingWorker.onstatechange = () => {
-                  // Se os arquivos novos foram baixados e o app já estava rodando, avisa o jogador
                   if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    showUpdatePrompt();
+                    showUpdatePrompt(installingWorker);
                   }
                 };
               };
             })
             .catch((err) => console.log('SW erro:', err));
+
+          // Monitor de transição limpa: recarrega a mesa assim que o novo SW assumir o controle
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
         });
       }
 
-      function showUpdatePrompt() {
+      function showUpdatePrompt(worker) {
         const overlay = document.createElement('div');
-        // Usando o mesmo padrão de z-index e desfoque das telas do jogo
         overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(5, 5, 5, 0.95); z-index: 100000; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
 
         overlay.innerHTML = `
@@ -3434,7 +3445,6 @@
         document.getElementById('btn-update-later').onclick = () => overlay.remove();
 
         document.getElementById('btn-update-now').onclick = () => {
-          // Transforma o card na tela de download com a barra de progresso dourada/verde
           overlay.innerHTML = `
             <div class="score-card" style="max-width: 320px; text-align: center; padding: 30px 20px; border-color: #facc15;">
               <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Sincronizando Módulos...</h2>
@@ -3467,8 +3477,11 @@
               bar.style.boxShadow = '0 0 15px #facc15';
               percentText.textContent = '100%';
 
-              // Força o reload limpando a sessão para subir o jogo atualizado
-              setTimeout(() => window.location.reload(), 600);
+              // Libera o novo Service Worker e ativa o controllerchange para dar reload limpo
+              setTimeout(() => {
+                if (worker) worker.postMessage('skipWaiting');
+                else window.location.reload();
+              }, 600);
             } else {
               bar.style.width = progress + '%';
               percentText.textContent = progress + '%';
@@ -3795,6 +3808,11 @@
       sfxMyTurn.preload = 'auto';
       sfxMyTurn.volume = 0.8;
 
+      // 🔊 SFX DE ROUBO DE MÃO (Sincronizado e com volume forte)
+      window.sfxSteal = window.sfxSteal || new Audio('assets/sfx/roubo-mao.mp3');
+      window.sfxSteal.preload = 'auto';
+      window.sfxSteal.volume = 0.95;
+
       function playCardMove() {
         if (!audioUnlocked) return;
         try {
@@ -3817,8 +3835,8 @@
           if (AudioContext) audioCtx = new AudioContext();
         } catch (e) {}
 
-        // Injeta o sfxMyTurn aqui para navegadores mobile não bloquearem ele
-        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn];
+        // Injeta os áudios de turno e roubo na lista de permissões do mobile
+        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn, window.sfxSteal];
         for (const a of allAudios) {
           try {
             a.pause();
@@ -7577,6 +7595,18 @@
         };
 
         if (a.type === 'stealCard') {
+          // Anti-Spam: Só toca a risada se ela não estiver ativa no momento
+          if (window.sfxSteal && window.sfxSteal.paused) {
+            window.sfxSteal.currentTime = 0;
+            window.sfxSteal.play().catch(() => {});
+          }
+
+          if (myPlayerIndex === 0) {
+            showMessage('💥 SABOTAGEM! O Dominador invadiu sua mão e roubou uma carta!');
+          } else if (myPlayerIndex === 1) {
+            showMessage('👑 Mão invadida! Você extraiu uma carta direto da mão do Escravo.');
+          }
+
           const fromRect = opponentAnchorRect(a.playerId === 1 ? 0 : 1);
           const toRect = opponentAnchorRect(a.playerId);
 
@@ -9623,6 +9653,12 @@
 
       window.stealCard = async (cardId) => {
         if (!ensureMyTurn()) return;
+
+        // Anti-Spam: Só toca se a execução anterior já tiver finalizado os 5s
+        if (window.sfxSteal && window.sfxSteal.paused) {
+          window.sfxSteal.currentTime = 0;
+          window.sfxSteal.play().catch(() => {});
+        }
 
         const p1 = state.players[0]; // Escravo
         const p2 = state.players[1]; // Dominador

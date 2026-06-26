@@ -1,4 +1,9 @@
-const CACHE_NAME = 'buraco-v91'; // Força atualização
+const CACHE_NAME = 'buraco-v92'; // Força atualização
+
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+
+// Incrementado para v92 para forçar a detecção de arquivos novos no servidor
+const CACHE_NAME = 'buraco-v92';
 
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
@@ -8,12 +13,19 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS);
     }),
   );
-  self.skipWaiting();
+  // Removemos o skipWaiting daqui para ele segurar o card de atualização na tela
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))));
   self.clients.claim();
+});
+
+// Escuta o comando disparado pela barra de progresso do index.html para assumir o controle
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
