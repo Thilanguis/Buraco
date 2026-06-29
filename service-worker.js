@@ -1,9 +1,5 @@
-const CACHE_NAME = 'buraco-v92'; // Força atualização
-
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
-
-// Incrementado para v92 para forçar a detecção de arquivos novos no servidor
-const CACHE_NAME = 'buraco-v92';
+// Cache limpo e unificado sem declarações duplicadas
+const CACHE_NAME = 'buraco-v93';
 
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

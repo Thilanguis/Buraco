@@ -7595,14 +7595,27 @@
         };
 
         if (a.type === 'stealCard') {
-          // Anti-Spam: Só toca a risada se ela não estiver ativa no momento
-          if (window.sfxSteal && window.sfxSteal.paused) {
+          // Executa o áudio de forma direta na máquina de destino sem travas de estado
+          if (window.sfxSteal) {
             window.sfxSteal.currentTime = 0;
-            window.sfxSteal.play().catch(() => {});
+            window.sfxSteal.play().catch((e) => console.log('Bloqueio reativo de áudio:', e));
           }
 
           if (myPlayerIndex === 0) {
             showMessage('💥 SABOTAGEM! O Dominador invadiu sua mão e roubou uma carta!');
+
+            // --- ALERTA VISUAL DE IMPACTO (Flash cinematográfico na tela da vítima) ---
+            const flashOverlay = document.createElement('div');
+            flashOverlay.style.cssText = 'position: fixed; inset: 0; background: rgba(220, 38, 38, 0.45); z-index: 999999; pointer-events: none; backdrop-filter: blur(1px);';
+            document.body.appendChild(flashOverlay);
+
+            // Faz o fundo sumir suavemente em 1.5 segundos
+            flashOverlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1500, easing: 'ease-out' }).finished.then(() => flashOverlay.remove());
+
+            // Dispara um pulso duplo de vibração no celular do escravo
+            if (navigator.vibrate) {
+              navigator.vibrate([300, 110, 300]);
+            }
           } else if (myPlayerIndex === 1) {
             showMessage('👑 Mão invadida! Você extraiu uma carta direto da mão do Escravo.');
           }
