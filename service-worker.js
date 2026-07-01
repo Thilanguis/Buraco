@@ -1,15 +1,35 @@
 // Cache limpo e unificado sem declarações duplicadas
-const CACHE_NAME = 'buraco-v93';
+const CACHE_NAME = 'buraco-v94'; // Incrementado para forçar a atualização
 
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      let totalFiles = ASSETS.length;
+      let loadedFiles = 0;
+
+      for (const url of ASSETS) {
+        try {
+          await cache.add(url);
+          loadedFiles++;
+
+          // Dispara para o index.html qual arquivo acabou de ser baixado e o progresso real
+          const allClients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+          for (const client of allClients) {
+            client.postMessage({
+              type: 'DOWNLOAD_PROGRESS',
+              current: loadedFiles,
+              total: totalFiles,
+              url: url,
+            });
+          }
+        } catch (err) {
+          console.error('[SW] Falha ao cachear recurso:', url, err);
+        }
+      }
     }),
   );
-  // Removemos o skipWaiting daqui para ele segurar o card de atualização na tela
 });
 
 self.addEventListener('activate', (event) => {

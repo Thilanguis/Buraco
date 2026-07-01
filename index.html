@@ -2794,6 +2794,19 @@
       .reveal-mode .carta:last-child {
         margin-right: 0 !important;
       }
+
+      /* Vinheta Vermelha Sensual e Dominadora (Suave no centro, intensa nas bordas) */
+      .sensual-steal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        pointer-events: none;
+        background: radial-gradient(circle, transparent 25%, rgba(110, 4, 14, 0.75) 100%);
+        box-shadow: inset 0 0 120px rgba(220, 38, 38, 0.6);
+        opacity: 0;
+        display: none;
+        transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
     </style>
   </head>
   <body data-deck-theme="classico">
@@ -3397,24 +3410,42 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker
             .register('service-worker.js')
-            .then((reg) => {
-              // Se o usuário abriu o app e já tinha um update baixado esperando
+            .then(async (reg) => {
+              let totalAtts = 1;
+              let newVersionNum = 93;
+
+              // Lê o service-worker.js em tempo de execução para extrair o número do CACHE_NAME
+              try {
+                const response = await fetch('service-worker.js');
+                const text = await response.text();
+                const match = text.match(/CACHE_NAME\s*=\s*['"`]buraco-v(\d+)['"`]/);
+                if (match) {
+                  newVersionNum = parseInt(match[1], 10);
+                  const oldVersionNum = parseInt(localStorage.getItem('buraco_current_version') || '93', 10);
+
+                  if (newVersionNum > oldVersionNum) {
+                    totalAtts = newVersionNum - oldVersionNum;
+                  }
+                }
+              } catch (err) {
+                console.error('[SW] Erro ao calcular salto de versões:', err);
+              }
+
               if (reg.waiting) {
-                showUpdatePrompt(reg.waiting);
+                showUpdatePrompt(reg.waiting, totalAtts, newVersionNum);
               }
 
               reg.onupdatefound = () => {
                 const installingWorker = reg.installing;
                 installingWorker.onstatechange = () => {
                   if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    showUpdatePrompt(installingWorker);
+                    showUpdatePrompt(installingWorker, totalAtts, newVersionNum);
                   }
                 };
               };
             })
             .catch((err) => console.log('SW erro:', err));
 
-          // Monitor de transição limpa: recarrega a mesa assim que o novo SW assumir o controle
           let refreshing = false;
           navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (!refreshing) {
@@ -3425,71 +3456,92 @@
         });
       }
 
-      function showUpdatePrompt(worker) {
+      function showUpdatePrompt(worker, totalAtts = 1, newVersion = 93) {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(5, 5, 5, 0.95); z-index: 100000; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
-
-        overlay.innerHTML = `
-          <div class="score-card" style="max-width: 380px; text-align: center; padding: 30px 20px; border-color: #facc15;">
-            <div style="font-size: 2.5rem; margin-bottom: 12px; text-shadow: 0 0 15px rgba(250, 204, 21, 0.4);">✨</div>
-            <h2 style="margin: 0 0 10px 0; color: #facc15; font-size: 22px; text-transform: uppercase; letter-spacing: 1px;">Atualização Pronta</h2>
-            <p style="color: #94a3b8; font-size: 12px; margin-bottom: 24px; line-height: 1.5;">Uma nova versão do Buraco Findom foi detectada. Deseja aplicar as novas regras e melhorias agora?</p>
-            <div style="display: flex; gap: 10px; width: 100%;">
-              <button class="custom-modal-btn" id="btn-update-later" style="flex: 1; background: #334155; color: #fff; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none;">DEPOIS</button>
-              <button class="custom-modal-btn" id="btn-update-now" style="flex: 1; background: linear-gradient(135deg, #b45309 0%, #78350f 100%); color: #facc15; border: 1px solid #facc15; padding: 12px; border-radius: 8px; font-weight: 900; cursor: pointer; letter-spacing: 1px;">ATUALIZAR</button>
-            </div>
-          </div>
-        `;
         document.body.appendChild(overlay);
 
-        document.getElementById('btn-update-later').onclick = () => overlay.remove();
-
-        document.getElementById('btn-update-now').onclick = () => {
+        const startProgressSequence = () => {
           overlay.innerHTML = `
-            <div class="score-card" style="max-width: 320px; text-align: center; padding: 30px 20px; border-color: #facc15;">
-              <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Sincronizando Módulos...</h2>
-              
-              <div style="width: 100%; background: #1e293b; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(250, 204, 21, 0.2);">
-                <div id="update-progress-bar" style="width: 0%; height: 100%; background: #22c55e; box-shadow: 0 0 10px #22c55e; transition: width 0.15s linear;"></div>
-              </div>
-              
-              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8;">
-                <span id="update-status-text">Embaralhando...</span>
-                <span id="update-percent" style="color: #4ade80; font-weight: bold;">0%</span>
-              </div>
-            </div>
-          `;
+                    <div class="score-card" style="max-width: 320px; text-align: center; padding: 30px 20px; border-color: #facc15;">
+                      <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Sincronizando Módulos...</h2>
+
+                      <div style="width: 100%; background: #1e293b; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(250, 204, 21, 0.2);">
+                        <div id="update-progress-bar" style="width: 0%; height: 100%; background: #22c55e; box-shadow: 0 0 10px #22c55e; transition: width 0.1s linear;"></div>
+                      </div>
+
+                      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8;">
+                        <span id="update-status-text">Compilando pacotes (1/${totalAtts})...</span>
+                        <span id="update-percent" style="color: #4ade80; font-weight: bold;">0%</span>
+                      </div>
+                    </div>
+                  `;
 
           let progress = 0;
+          let currentStep = 1;
           const bar = document.getElementById('update-progress-bar');
           const percentText = document.getElementById('update-percent');
           const statusText = document.getElementById('update-status-text');
 
           const interval = setInterval(() => {
-            progress += Math.floor(Math.random() * 12) + 4;
+            // Calcula o teto de progresso visual para a etapa atual (Ex: se total for 3, etapa 1 para em 33%)
+            let stepTarget = (currentStep / totalAtts) * 100;
+            progress += Math.floor(Math.random() * 8) + 4;
+
+            if (progress >= stepTarget) {
+              progress = stepTarget;
+              if (currentStep < totalAtts) {
+                currentStep++;
+              }
+            }
 
             if (progress >= 100) {
               progress = 100;
               clearInterval(interval);
               statusText.textContent = 'Mesa pronta!';
               statusText.style.color = '#4ade80';
+              bar.style.width = '100%';
               bar.style.background = '#facc15';
               bar.style.boxShadow = '0 0 15px #facc15';
               percentText.textContent = '100%';
 
-              // Libera o novo Service Worker e ativa o controllerchange para dar reload limpo
+              // Salva a versão atualizada com sucesso para a próxima checagem bater certo
+              localStorage.setItem('buraco_current_version', newVersion);
+
               setTimeout(() => {
-                if (worker) worker.postMessage('skipWaiting');
-                else window.location.reload();
+                if (worker) {
+                  try {
+                    worker.postMessage('skipWaiting');
+                  } catch (err) {
+                    console.error('[SW] Erro ao enviar skipWaiting:', err);
+                  }
+                }
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
               }, 600);
             } else {
               bar.style.width = progress + '%';
-              percentText.textContent = progress + '%';
-              if (progress > 30) statusText.textContent = 'Puxando baralho novo...';
-              if (progress > 70) statusText.textContent = 'Preparando o morto...';
+              percentText.textContent = Math.round(progress) + '%';
+              statusText.textContent = `Compilando pacotes (${currentStep}/${totalAtts})...`;
             }
-          }, 180);
+          }, 80);
         };
+
+        overlay.innerHTML = `
+              <div class="score-card" style="max-width: 380px; text-align: center; padding: 30px 20px; border-color: #facc15;">
+                <div style="font-size: 2.5rem; margin-bottom: 12px; text-shadow: 0 0 15px rgba(250, 204, 21, 0.4);">✨</div>
+                <h2 style="margin: 0 0 10px 0; color: #facc15; font-size: 22px; text-transform: uppercase; letter-spacing: 1px;">Atualização Pronta</h2>
+                <p style="color: #94a3b8; font-size: 12px; margin-bottom: 24px; line-height: 1.5;">Uma nova versão do Buraco Findom foi detectada (${totalAtts} modificação(ões) pendente(s)). Deseja aplicar as melhorias agora?</p>
+                <div style="display: flex; gap: 10px; width: 100%;">
+                  <button class="custom-modal-btn" id="btn-update-later" style="flex: 1; background: #334155; color: #fff; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none;">DEPOIS</button>
+                  <button class="custom-modal-btn" id="btn-update-now" style="flex: 1; background: linear-gradient(135deg, #b45309 0%, #78350f 100%); color: #facc15; border: 1px solid #facc15; padding: 12px; border-radius: 8px; font-weight: 900; cursor: pointer; letter-spacing: 1px;">ATUALIZAR</button>
+                </div>
+              </div>
+            `;
+
+        document.getElementById('btn-update-later').onclick = () => overlay.remove();
+        document.getElementById('btn-update-now').onclick = () => startProgressSequence();
       }
 
       const firebaseConfig = {
@@ -6223,6 +6275,27 @@
 
         // Garante que a UI sempre destrave ao receber novo estado
         window.isAutoPlaying = false;
+
+        // Gerenciador Síncrono da Vinheta Sensual para ambas as telas
+        let stealOverlay = document.getElementById('sensualStealOverlay');
+        if (!stealOverlay) {
+          stealOverlay = document.createElement('div');
+          stealOverlay.id = 'sensualStealOverlay';
+          stealOverlay.className = 'sensual-steal-overlay';
+          document.body.appendChild(stealOverlay);
+        }
+
+        if (state.powerActiveThisTurn && !state.finished) {
+          stealOverlay.style.display = 'block';
+          setTimeout(() => {
+            stealOverlay.style.opacity = '1';
+          }, 20);
+        } else {
+          stealOverlay.style.opacity = '0';
+          setTimeout(() => {
+            if (stealOverlay.style.opacity === '0') stealOverlay.style.display = 'none';
+          }, 500);
+        }
         const pi = document.querySelector('.player-interface');
         const bm = document.querySelector('.board-middle');
         if (pi) pi.style.pointerEvents = 'auto';
@@ -7311,70 +7384,70 @@
             // Renderiza a lista de itens baseada na referência calculada
             const list = document.getElementById('goalsListHud');
             list.innerHTML = `
-                    <div class="goal-item ${isWin ? 'achieved' : ''}">
-                        <span>✅ Vitória (R$ 5)</span> 
-                        <strong>+R$ ${isWin ? '5,00' : '0,00'}</strong>
-                    </div>
-                    <div class="goal-item ${refFin.b.virgemDeMorto ? 'achieved' : ''}">
-                        <span>🛑 Adv. Sem Morto (R$ 8)</span> 
-                        <strong>+R$ ${refFin.b.valorVirgem.toFixed(2).replace('.', ',')}</strong>
-                    </div>
-                    <div class="goal-item ${refFin.b.diff > 0 ? 'achieved' : ''}">
-                        <span>📈 Diferença (R$ 0,01/pt)</span> 
-                        <strong>+R$ ${refFin.b.diff.toFixed(2).replace('.', ',')}</strong>
-                    </div>
-                    <div class="goal-item ${refFin.b.negative > 0 ? 'achieved' : ''}">
-                        <span>☠️ Adv. Neg. (R$ 0,05/pt) [${refFin.b.oppProjected} pts]</span> 
-                        <strong>+R$ ${refFin.b.negative > 0 ? refFin.b.negative.toFixed(2).replace('.', ',') : '0,00'}</strong>
-                    </div>
-                    <div id="asasGoalItem" class="goal-item expandable ${refFin.b.countAsas > 0 ? 'achieved' : ''} ${window.isAsasDetailsExpanded ? 'expanded' : ''}" onclick="toggleAsasDetails(event)">
-                        <div class="goal-item-header">
-                            <span><span class="expand-icon">▶</span>⭐ Bônus Ás-a-Ás (${refFin.b.countAsas}/4)</span> 
-                            <strong>+R$ ${refFin.b.asas.toFixed(2).replace('.', ',')}</strong>
+                        <div class="goal-item ${isWin ? 'achieved' : ''}">
+                            <span>✅ Vitória (R$ 5)</span>
+                            <strong>+R$ ${isWin ? '5,00' : '0,00'}</strong>
                         </div>
-                        <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 1 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>1ª Ás-a-Ás:</span> <span>+R$ 3,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 2 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>2ª Ás-a-Ás:</span> <span>+R$ 4,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 3 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>3ª Ás-a-Ás:</span> <span>+R$ 5,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.countAsas >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>4ª Ás-a-Ás:</span> <span>+R$ 15,00</span>
-                            </div>
+                        <div class="goal-item ${refFin.b.virgemDeMorto ? 'achieved' : ''}">
+                            <span>🛑 Adv. Sem Morto (R$ 8)</span>
+                            <strong>+R$ ${refFin.b.valorVirgem.toFixed(2).replace('.', ',')}</strong>
                         </div>
-                    </div>
-                    <div class="goal-item ${refFin.b.hasHumilhacao ? 'achieved' : ''}">
-                        <span>🩸 Adv. ${refFin.b.oppCanastras} Canastra(s) (R$ 10)</span> 
-                        <strong>+R$ ${refFin.b.humilhacaoSuprema.toFixed(2).replace('.', ',')}</strong>
-                    </div>
-                    <div id="chuvaGoalItem" class="goal-item expandable ${refFin.b.totalCanastras >= 4 ? 'achieved' : ''} ${window.isChuvaDetailsExpanded ? 'expanded' : ''}" onclick="toggleChuvaDetails(event)">
-                        <div class="goal-item-header">
-                            <span><span class="expand-icon">▶</span>🃏 Chuva de Canastras (${refFin.b.totalCanastras}/4+)</span> 
-                            <strong>+R$ ${refFin.b.canastraQuantityBonus.toFixed(2).replace('.', ',')}</strong>
+                        <div class="goal-item ${refFin.b.diff > 0 ? 'achieved' : ''}">
+                            <span>📈 Diferença (R$ 0,01/pt)</span>
+                            <strong>+R$ ${refFin.b.diff.toFixed(2).replace('.', ',')}</strong>
                         </div>
-                        <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>4ª Canastra:</span> <span>+R$ 2,00</span>
+                        <div class="goal-item ${refFin.b.negative > 0 ? 'achieved' : ''}">
+                            <span>☠️ Adv. Neg. (R$ 0,05/pt) [${refFin.b.oppProjected} pts]</span>
+                            <strong>+R$ ${refFin.b.negative > 0 ? refFin.b.negative.toFixed(2).replace('.', ',') : '0,00'}</strong>
+                        </div>
+                        <div id="asasGoalItem" class="goal-item expandable ${refFin.b.countAsas > 0 ? 'achieved' : ''} ${window.isAsasDetailsExpanded ? 'expanded' : ''}" onclick="toggleAsasDetails(event)">
+                            <div class="goal-item-header">
+                                <span><span class="expand-icon">▶</span>⭐ Bônus Ás-a-Ás (${refFin.b.countAsas}/4)</span>
+                                <strong>+R$ ${refFin.b.asas.toFixed(2).replace('.', ',')}</strong>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 5 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>5ª Canastra:</span> <span>+R$ 3,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 6 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>6ª Canastra:</span> <span>+R$ 4,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 7 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>7ª Canastra:</span> <span>+R$ 5,00</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.totalCanastras >= 8 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
-                              <span>8ª em diante:</span> <span>+R$ 5,00 /cada</span>
+                            <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 1 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>1ª Ás-a-Ás:</span> <span>+R$ 3,00</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 2 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>2ª Ás-a-Ás:</span> <span>+R$ 4,00</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.countAsas >= 3 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>3ª Ás-a-Ás:</span> <span>+R$ 5,00</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.countAsas >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>4ª Ás-a-Ás:</span> <span>+R$ 15,00</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
+                        <div class="goal-item ${refFin.b.hasHumilhacao ? 'achieved' : ''}">
+                            <span>🩸 Adv. ${refFin.b.oppCanastras} Canastra(s) (R$ 10)</span>
+                            <strong>+R$ ${refFin.b.humilhacaoSuprema.toFixed(2).replace('.', ',')}</strong>
+                        </div>
+                        <div id="chuvaGoalItem" class="goal-item expandable ${refFin.b.totalCanastras >= 4 ? 'achieved' : ''} ${window.isChuvaDetailsExpanded ? 'expanded' : ''}" onclick="toggleChuvaDetails(event)">
+                            <div class="goal-item-header">
+                                <span><span class="expand-icon">▶</span>🃏 Chuva de Canastras (${refFin.b.totalCanastras}/4+)</span>
+                                <strong>+R$ ${refFin.b.canastraQuantityBonus.toFixed(2).replace('.', ',')}</strong>
+                            </div>
+                            <div class="goal-details" style="font-size: 11px; margin-top: 4px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 4 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>4ª Canastra:</span> <span>+R$ 2,00</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 5 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>5ª Canastra:</span> <span>+R$ 3,00</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 6 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>6ª Canastra:</span> <span>+R$ 4,00</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: ${refFin.b.totalCanastras >= 7 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>7ª Canastra:</span> <span>+R$ 5,00</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: ${refFin.b.totalCanastras >= 8 ? '#4ade80' : 'rgba(255,255,255,0.5)'};">
+                                  <span>8ª em diante:</span> <span>+R$ 5,00 /cada</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
           }
         } else {
           const hud = document.getElementById('goalsHud');
@@ -7403,13 +7476,13 @@
 
         const scoreCard = document.querySelector('.score-card');
         scoreCard.innerHTML = `
-          <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
-          <div style="font-size: 11px; color: #facc15; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">
-            MODO: ${state.mode === '1x1_duploMorto' ? '1x1 Humilhação' : state.mode === '1x1_dominacao' ? '1x1 Dominação' : state.mode} | REGRA: ${state.variant}
-          </div>
-          <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
-          <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
-        `;
+              <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
+              <div style="font-size: 11px; color: #facc15; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">
+                MODO: ${state.mode === '1x1_duploMorto' ? '1x1 Humilhação' : state.mode === '1x1_dominacao' ? '1x1 Dominação' : state.mode} | REGRA: ${state.variant}
+              </div>
+              <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
+              <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
+            `;
 
         const board = document.getElementById('scoreBoard');
         document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
@@ -7437,16 +7510,16 @@
 
             if (winnerData.score === loserData.score) {
               financialHtml = `
-                <div style="margin-top: 15px; padding: 10px; background: rgba(100, 116, 139, 0.2); border: 1px solid #94a3b8; border-radius: 8px;">
-                  <span style="color: #cbd5e1; font-weight: 900; font-size: 16px;">EMPATE: Ninguém paga</span>
-                </div>
-              `;
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(100, 116, 139, 0.2); border: 1px solid #94a3b8; border-radius: 8px;">
+                      <span style="color: #cbd5e1; font-weight: 900; font-size: 16px;">EMPATE: Ninguém paga</span>
+                    </div>
+                  `;
             } else if (index === 0) {
               financialHtml = `
-                <div style="margin-top: 15px; padding: 10px; background: rgba(34, 197, 94, 0.2); border: 1px solid #4ade80; border-radius: 8px;">
-                  <span style="color: #4ade80; font-weight: 900; font-size: 16px;">LUCRO A RECEBER: R$ ${moneyStr}</span>
-                </div>
-              `;
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(34, 197, 94, 0.2); border: 1px solid #4ade80; border-radius: 8px;">
+                      <span style="color: #4ade80; font-weight: 900; font-size: 16px;">LUCRO A RECEBER: R$ ${moneyStr}</span>
+                    </div>
+                  `;
             } else {
               let pixHtml = '';
               if (winnerPix) {
@@ -7455,15 +7528,15 @@
                 const zapText = encodeURIComponent(`Fatura do Buraco Findom! 👑 Você perdeu e me deve R$ ${moneyStr}. Faz o PIX aí na chave: ${winnerPix}`);
 
                 pixHtml = `
-                  <div style="margin-top: 10px; padding: 15px 10px 10px 10px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid #334155; display: flex; flex-direction: column; align-items: center;">
-                    <img src="${qrCodeUrl}" style="border-radius: 8px; border: 4px solid #fff; margin-bottom: 12px; width: 140px; height: 140px; box-shadow: 0 4px 10px rgba(0,0,0,0.8);" alt="QR Code PIX">
-                    <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Ou copie a Chave PIX:</div>
-                    <div style="color: #facc15; font-weight: 900; font-size: 14px; letter-spacing: 1px; user-select: all; cursor: copy; margin-bottom: 15px; padding: 4px 8px; background: rgba(250, 204, 21, 0.1); border: 1px dashed #facc15; border-radius: 4px;" title="Selecionar para copiar">${winnerPix}</div>
-                    <a href="https://wa.me/?text=${zapText}" target="_blank" style="width: 100%; text-align: center; display: block; background: #25D366; color: #fff; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: 900; font-size: 12px; text-transform: uppercase; transition: 0.3s; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
-                      📲 Cobrar pelo WhatsApp
-                    </a>
-                  </div>
-                `;
+                      <div style="margin-top: 10px; padding: 15px 10px 10px 10px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid #334155; display: flex; flex-direction: column; align-items: center;">
+                        <img src="${qrCodeUrl}" style="border-radius: 8px; border: 4px solid #fff; margin-bottom: 12px; width: 140px; height: 140px; box-shadow: 0 4px 10px rgba(0,0,0,0.8);" alt="QR Code PIX">
+                        <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Ou copie a Chave PIX:</div>
+                        <div style="color: #facc15; font-weight: 900; font-size: 14px; letter-spacing: 1px; user-select: all; cursor: copy; margin-bottom: 15px; padding: 4px 8px; background: rgba(250, 204, 21, 0.1); border: 1px dashed #facc15; border-radius: 4px;" title="Selecionar para copiar">${winnerPix}</div>
+                        <a href="https://wa.me/?text=${zapText}" target="_blank" style="width: 100%; text-align: center; display: block; background: #25D366; color: #fff; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: 900; font-size: 12px; text-transform: uppercase; transition: 0.3s; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
+                          📲 Cobrar pelo WhatsApp
+                        </a>
+                      </div>
+                    `;
               } else {
                 pixHtml = `<div style="margin-top: 10px; font-size: 10px; color: #9ca3af; font-style: italic;">O vencedor não cadastrou chave PIX. Calote liberado?</div>`;
               }
@@ -7474,32 +7547,32 @@
               else titleFatura = `FATURA DO ${s.team.name.toUpperCase()}`;
 
               financialHtml = `
-                <div style="margin-top: 15px; padding: 12px; background: rgba(239, 68, 68, 0.15); border: 1px dashed #ef4444; border-radius: 8px;">
-                  <div style="color: #ef4444; font-size: 10px; letter-spacing: 2px; margin-bottom: 5px; font-weight: bold;">${titleFatura}</div>
-                  <span style="color: #fca5a5; font-weight: 900; font-size: 20px;">PAGUE: R$ ${moneyStr}</span>
-                  ${pixHtml}
-                </div>
-              `;
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(239, 68, 68, 0.15); border: 1px dashed #ef4444; border-radius: 8px;">
+                      <div style="color: #ef4444; font-size: 10px; letter-spacing: 2px; margin-bottom: 5px; font-weight: bold;">${titleFatura}</div>
+                      <span style="color: #fca5a5; font-weight: 900; font-size: 20px;">PAGUE: R$ ${moneyStr}</span>
+                      ${pixHtml}
+                    </div>
+                  `;
             }
           }
 
           board.innerHTML += `
-            <div class="score-team ${isWinner ? 'winner' : ''}">
-              <div class="score-team-name">
-                ${isWinner ? '👑 ' : ''}${s.team.name}
-                <span style="font-size: 12px; color: #9ca3af; font-weight: normal; margin-left: 6px;">(${pNames})</span>
-              </div>
-              <div class="score-details">
-                <div class="score-row"><span>Cartas Baixadas:</span> <span class="text-green">+${s.meldPoints} pts</span></div>
-                <div class="score-row"><span>Bônus Canastras:</span> <span class="text-green">+${totalBonus} pts</span></div>
-                <div class="score-row" style="border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px;"><span>Batida Final:</span> <span>${s.bonusBatida > 0 ? '<strong class="text-green">Sim (+100 pts)</strong>' : '<strong class="text-red">Não (0 pts)</strong>'}</span></div>
-                <div class="score-row" style="margin-top: 6px;"><span>Cartas Restantes:</span> <span class="text-red">-${s.handPenalty} pts</span></div>
-                <div class="score-row"><span>Pegou Morto?</span> <span>${s.penaltyMorto > 0 ? '<strong class="text-red">Não (-100 pts)</strong>' : '<strong class="text-green">Sim (0 pts)</strong>'}</span></div>
-              </div>
-              <div class="score-row total"><span>PONTUAÇÃO FINAL:</span> <span>${s.score} pts</span></div>
-              ${financialHtml}
-            </div>
-          `;
+                <div class="score-team ${isWinner ? 'winner' : ''}">
+                  <div class="score-team-name">
+                    ${isWinner ? '👑 ' : ''}${s.team.name}
+                    <span style="font-size: 12px; color: #9ca3af; font-weight: normal; margin-left: 6px;">(${pNames})</span>
+                  </div>
+                  <div class="score-details">
+                    <div class="score-row"><span>Cartas Baixadas:</span> <span class="text-green">+${s.meldPoints} pts</span></div>
+                    <div class="score-row"><span>Bônus Canastras:</span> <span class="text-green">+${totalBonus} pts</span></div>
+                    <div class="score-row" style="border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px;"><span>Batida Final:</span> <span>${s.bonusBatida > 0 ? '<strong class="text-green">Sim (+100 pts)</strong>' : '<strong class="text-red">Não (0 pts)</strong>'}</span></div>
+                    <div class="score-row" style="margin-top: 6px;"><span>Cartas Restantes:</span> <span class="text-red">-${s.handPenalty} pts</span></div>
+                    <div class="score-row"><span>Pegou Morto?</span> <span>${s.penaltyMorto > 0 ? '<strong class="text-red">Não (-100 pts)</strong>' : '<strong class="text-green">Sim (0 pts)</strong>'}</span></div>
+                  </div>
+                  <div class="score-row total"><span>PONTUAÇÃO FINAL:</span> <span>${s.score} pts</span></div>
+                  ${financialHtml}
+                </div>
+              `;
         });
       }
 
@@ -7595,31 +7668,20 @@
         };
 
         if (a.type === 'stealCard') {
-          // Executa o áudio de forma direta na máquina de destino sem travas de estado
           if (window.sfxSteal) {
             window.sfxSteal.currentTime = 0;
-            window.sfxSteal.play().catch((e) => console.log('Bloqueio reativo de áudio:', e));
+            window.sfxSteal.play().catch((e) => console.log(e));
           }
 
           if (myPlayerIndex === 0) {
             showMessage('💥 SABOTAGEM! O Dominador invadiu sua mão e roubou uma carta!');
-
-            // --- ALERTA VISUAL DE IMPACTO (Flash cinematográfico na tela da vítima) ---
-            const flashOverlay = document.createElement('div');
-            flashOverlay.style.cssText = 'position: fixed; inset: 0; background: rgba(220, 38, 38, 0.45); z-index: 999999; pointer-events: none; backdrop-filter: blur(1px);';
-            document.body.appendChild(flashOverlay);
-
-            // Faz o fundo sumir suavemente em 1.5 segundos
-            flashOverlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1500, easing: 'ease-out' }).finished.then(() => flashOverlay.remove());
-
-            // Dispara um pulso duplo de vibração no celular do escravo
-            if (navigator.vibrate) {
-              navigator.vibrate([300, 110, 300]);
-            }
+            if (navigator.vibrate) navigator.vibrate([300, 110, 300]);
           } else if (myPlayerIndex === 1) {
             showMessage('👑 Mão invadida! Você extraiu uma carta direto da mão do Escravo.');
+            if (navigator.vibrate) navigator.vibrate([70]);
           }
 
+          // Ambas as telas calculam a mesma trajetória física com base em quem disparou a ação (a.playerId)
           const fromRect = opponentAnchorRect(a.playerId === 1 ? 0 : 1);
           const toRect = opponentAnchorRect(a.playerId);
 
@@ -8176,6 +8238,9 @@
         return scene;
       }
 
+      // Flag de controle para bloquear re-escrita do lobby durante carregamento de cache
+      window.isFirstLobbyLoad = true;
+
       onSnapshot(gameRef, async (snap) => {
         if (!snap.exists()) {
           releaseScreen();
@@ -8186,10 +8251,8 @@
             window.startTimer = null;
           }
 
-          // --- ADICIONE ESTAS DUAS LINHAS AQUI ---
           const playerUI = document.querySelector('.player-interface');
           if (playerUI) playerUI.classList.remove('active-turn-glow');
-          // --------------------------------------
 
           window.isClosingGame = true;
 
@@ -8200,11 +8263,9 @@
           window.lastBotTurnPlayed = null;
           window.gameSessionId = (window.gameSessionId || 0) + 1;
           selectedHandIndexes.clear();
-          // ... (resto do bloco continua igual)
           movingWild = null;
-          selectedMeldTarget = null; // MATA A SELEÇÃO FANTASMA AQUI
+          selectedMeldTarget = null;
 
-          // 🛡️ PRESERVAÇÃO DE CADEIRA: Mantém você na mesma posição no Lobby caso a sala reinicie
           const localSelect = document.getElementById('localPlayerSelect');
           if (localSelect) {
             localSelect.value = myPlayerIndex !== -1 ? myPlayerIndex.toString() : '';
@@ -8213,7 +8274,7 @@
           lastSeenActionId = null;
           ignoreOwnActionId = null;
           window.lastScores = [0, 0];
-          window.diceAnnounced = false; // Reseta o anúncio do dado
+          window.diceAnnounced = false;
           activeTurnNumber = -1;
           stopTurnTimer();
 
@@ -8232,9 +8293,8 @@
 
           document.getElementById('gameSection').style.display = 'none';
           document.getElementById('scoreSection').style.display = 'none';
-          document.getElementById('surrenderSection').style.display = 'none'; // <- MATA O MODAL DE VOTAÇÃO AQUI
+          document.getElementById('surrenderSection').style.display = 'none';
 
-          // --- CORREÇÃO DO OVERLAY E RESET DO LOBBY ---
           const overlay = document.getElementById('countdownOverlay');
           if (overlay) overlay.style.display = 'none';
           if (window.startTimer) {
@@ -8261,14 +8321,16 @@
             startBtn.style.background = '';
             startBtn.style.boxShadow = '';
           }
-          // --------------------------------------------
 
           if (introFinished) {
             document.getElementById('configSection').style.display = 'flex';
-            // ⚡ RESSUSCITADOR DE SALAS: Se o Firebase deletou o jogo, recriamos um lobby vazio imediatamente
-            // Isso previne que os jogadores fiquem numa 'sala fantasma' que não reage a cliques.
             if (typeof window.updateMenuDynamic === 'function') window.updateMenuDynamic();
-            if (typeof window.pushLobby === 'function') window.pushLobby();
+
+            // 🔥 CORREÇÃO: Bloqueia o pushLobby imediato no reset de testes para não corromper o cache do navegador
+            if (!window.isFirstLobbyLoad) {
+              if (typeof window.pushLobby === 'function') window.pushLobby();
+            }
+            window.isFirstLobbyLoad = false;
           }
           resetCanastraSfxMemory();
           return;
@@ -8445,7 +8507,8 @@
 
           // 1. Executa a animação de voo com os elementos gráficos e cartas atuais ainda fixados na mão
           await playRemoteAction(a);
-        } else if (a && a.id !== lastSeenActionId && a.id === ignoreOwnActionId) {
+        } else if (a && a.id === ignoreOwnActionId) {
+          // Trava de segurança: Limpa a flag do autor e impede qualquer re-execução visual
           lastSeenActionId = a.id;
           ignoreOwnActionId = null;
         }
@@ -8694,21 +8757,21 @@
 
       function getArcadeCarHosts() {
         return document.querySelectorAll(`
-    body[data-deck-theme="arcade"] .back-red:not(.sub-layer),
-    body[data-deck-theme="arcade"] .back-blue:not(.sub-layer),
-    body[data-deck-theme="arcade"] .fly-card.back:not(.back-blue):not(.sub-layer),
-    body[data-deck-theme="arcade"] .fly-card.back.back-blue:not(.sub-layer),
-    body[data-deck-theme="arcade"] .opponent-card-back:not(.back-blue):not(.sub-layer),
-    body[data-deck-theme="arcade"] .opponent-card-back.back-blue:not(.sub-layer),
-    body[data-deck-theme="arcade"] #mortoSlot0 .morto-card-back:not(.sub-layer),
-    body[data-deck-theme="arcade"] #mortoSlot1 .morto-card-back:not(.sub-layer),
-    body[data-deck-theme="arcade"] .morto-card-back:not(.back-blue):not(.sub-layer),
-    body[data-deck-theme="arcade"] .morto-card-back.back-blue:not(.sub-layer),
-    body[data-deck-theme="arcade"] #drawStockBtn .pile-card.back-red:not(.sub-layer),
-    body[data-deck-theme="arcade"] #drawStockBtn .pile-card.back-blue:not(.sub-layer),
-    body[data-deck-theme="arcade"] .carta.mini.back:not(.back-blue):not(.sub-layer),
-    body[data-deck-theme="arcade"] .carta.mini.back.back-blue:not(.sub-layer)
-  `);
+        body[data-deck-theme="arcade"] .back-red:not(.sub-layer),
+        body[data-deck-theme="arcade"] .back-blue:not(.sub-layer),
+        body[data-deck-theme="arcade"] .fly-card.back:not(.back-blue):not(.sub-layer),
+        body[data-deck-theme="arcade"] .fly-card.back.back-blue:not(.sub-layer),
+        body[data-deck-theme="arcade"] .opponent-card-back:not(.back-blue):not(.sub-layer),
+        body[data-deck-theme="arcade"] .opponent-card-back.back-blue:not(.sub-layer),
+        body[data-deck-theme="arcade"] #mortoSlot0 .morto-card-back:not(.sub-layer),
+        body[data-deck-theme="arcade"] #mortoSlot1 .morto-card-back:not(.sub-layer),
+        body[data-deck-theme="arcade"] .morto-card-back:not(.back-blue):not(.sub-layer),
+        body[data-deck-theme="arcade"] .morto-card-back.back-blue:not(.sub-layer),
+        body[data-deck-theme="arcade"] #drawStockBtn .pile-card.back-red:not(.sub-layer),
+        body[data-deck-theme="arcade"] #drawStockBtn .pile-card.back-blue:not(.sub-layer),
+        body[data-deck-theme="arcade"] .carta.mini.back:not(.back-blue):not(.sub-layer),
+        body[data-deck-theme="arcade"] .carta.mini.back.back-blue:not(.sub-layer)
+      `);
       }
 
       function clearArcadeCarTimer(el) {
@@ -9594,11 +9657,11 @@
           const statusHtml = votedYes ? '<span style="color: #4ade80; font-weight: bold;">✅ Sim</span>' : '<span style="color: #9ca3af; font-style: italic;">⏳ Aguardando...</span>';
 
           list.innerHTML += `
-            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid #334155;">
-              <span style="color: #f8fafc; font-weight: 900; font-size: 14px;">${p.name}</span>
-              ${statusHtml}
-            </div>
-          `;
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid #334155;">
+                  <span style="color: #f8fafc; font-weight: 900; font-size: 14px;">${p.name}</span>
+                  ${statusHtml}
+                </div>
+              `;
         });
 
         const alreadyVoted = state.surrender.votes[myPlayerIndex] === true;
@@ -9654,14 +9717,15 @@
       window.toggleStealMode = async () => {
         if (!ensureMyTurn() || state.hasDrawnThisTurn) return;
 
-        if (!state.dominatorUsedPower) {
+        window.isStealModeActive = !window.isStealModeActive;
+        if (window.isStealModeActive) {
           state.dominatorUsedPower = true;
-          state.powerActiveThisTurn = true;
-          await commitState();
         }
+        // Sincroniza a vinheta no Firebase com base na visão ativa
+        state.powerActiveThisTurn = window.isStealModeActive;
 
-        window.isStealModeActive = !window.isStealModeActive; // Inverte o estado da visão
         renderAll();
+        await commitState();
       };
 
       window.stealCard = async (cardId) => {
@@ -9726,7 +9790,8 @@
         if (state.partialDraw) {
           state.hasDrawnThisTurn = true;
           state.partialDraw = false;
-          window.isStealModeActive = false; // Desliga a visão após roubar a 2ª
+          window.isStealModeActive = false;
+          state.powerActiveThisTurn = false; // Desliga a vinheta síncrona para ambos
           showMessage('👁️ 2 cartas roubadas. Sua fase de compra acabou!');
         } else {
           state.partialDraw = true;
