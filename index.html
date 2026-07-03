@@ -7317,8 +7317,8 @@
         triggerScoreAnim(1, window.lastScores[1], s2);
 
         if (state.isBetting) {
-          // Função universal de cálculo financeiro com Projeção Real
-          window.calculatePixFin = (myScore, opScore, myMelds, oppMelds, oppTookMorto, myProjected, oppProjected) => {
+          // Função universal de cálculo financeiro com Projeção Real e suporte a contagem de mortos do próprio time
+          window.calculatePixFin = (myScore, opScore, myMelds, oppMelds, myTookMorto, oppTookMorto, myProjected, oppProjected) => {
             let asasCount = 0;
             let totalCanastras = 0;
             myMelds.forEach((m) => {
@@ -7345,6 +7345,8 @@
               virgemDeMorto: false,
               valorVirgem: 0,
               oppProjected: oppProjected,
+              myTookMorto: myTookMorto,
+              soberaniaMortosBonus: myTookMorto === 2 ? 12.0 : 0,
             };
 
             if (totalCanastras === 4) {
@@ -7390,6 +7392,7 @@
             b.asas = asasRewards[Math.min(asasCount, 4)] || 0;
             total += b.asas;
             total += b.canastraQuantityBonus;
+            total += b.soberaniaMortosBonus; // Injeta os 12 reais caso complete a Soberania dos Mortos
 
             return { total, diff, b };
           };
@@ -7422,9 +7425,9 @@
           const proj1 = getProjectedScore(0, s1, s2);
           const proj2 = getProjectedScore(1, s2, s1);
 
-          // Corrigido: s1 e s2 voltam para o início, mantendo os projetados apenas no final
-          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds, state.teams[1].melds, t2MortosPegos > 0, proj1, proj2);
-          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds, state.teams[0].melds, t1MortosPegos > 0, proj2, proj1);
+          // Sincroniza a quantidade de mortos coletados de cada equipe respectiva na assinatura da função
+          const fin1 = window.calculatePixFin(s1, s2, state.teams[0].melds, state.teams[1].melds, t1MortosPegos, t2MortosPegos > 0, proj1, proj2);
+          const fin2 = window.calculatePixFin(s2, s1, state.teams[1].melds, state.teams[0].melds, t2MortosPegos, t1MortosPegos > 0, proj2, proj1);
 
           // 💸 MOTOR DE ANIMAÇÃO FINANCEIRA: Compara o último render com o atual para soltar a animação de dinheiro
           if (typeof window.lastFinScores === 'undefined') {
@@ -7494,60 +7497,51 @@
           const hud = document.getElementById('goalsHud');
 
           if (hud) {
-            // --- MOTOR GLOBAL: Mostra a perspectiva do Vencedor. Se empatar, mostra a perspectiva do próprio jogador! ---
-            let refFin = fin1;
-            let refName = state.teams[0].name;
-            const isWin = s1 !== s2;
+            // --- MOTOR CORRIGIDO: Vincula o painel fixo ao time do cliente local para o rastreio individual funcionar ---
+            const myTeamId = state.players[myPlayerIndex] ? state.players[myPlayerIndex].teamId : 0;
+            let refFin = myTeamId === 1 ? fin2 : fin1;
+            let refName = state.teams[myTeamId].name;
 
-            if (s1 > s2) {
-              refFin = fin1;
-              refName = state.teams[0].name;
-            } else if (s2 > s1) {
-              refFin = fin2;
-              refName = state.teams[1].name;
-            } else {
-              // EMPATE (Ex: 0 a 0 no início do jogo)
-              // Mostra a visão local para a palavra "Adversário" não apontar para o próprio jogador
-              const myTeamId = state.players[myPlayerIndex] ? state.players[myPlayerIndex].teamId : 0;
-              refFin = myTeamId === 1 ? fin2 : fin1;
-              refName = myTeamId === 1 ? state.teams[1].name : state.teams[0].name;
-            }
+            // Determina se o seu time está na liderança de pontos para acender o bônus de vitória
+            const isMyTeamLeading = myTeamId === 1 ? s2 > s1 : s1 > s2;
+            const isMyTeamWinner = state.finished && state.winnerTeamId === myTeamId;
+            const myTeamWinsGoal = state.finished ? isMyTeamWinner : isMyTeamLeading;
 
             let achievedCount = 0;
-            if (isWin) achievedCount++;
+            if (myTeamWinsGoal) achievedCount++;
             if (refFin.b.diff > 0) achievedCount++;
             if (refFin.b.negative > 0) achievedCount++;
             if (refFin.b.countAsas > 0) achievedCount++;
             if (refFin.b.hasHumilhacao) achievedCount++;
             if (refFin.b.virgemDeMorto) achievedCount++;
             if (refFin.b.canastraQuantityBonus > 0) achievedCount++;
+            if (refFin.b.myTookMorto === 2) achievedCount++;
 
             // PERSISTÊNCIA: Exibe para todos na mesa e não some no fim do jogo
             hud.style.display = myPlayerIndex !== -1 ? 'block' : 'none';
             hud.classList.toggle('collapsed', window.isGoalsHudCollapsed);
 
-            // Atualiza o nome do líder ao lado do título
+            // Indica o nome do seu time no topo do menu de metas
             const nameEl = document.getElementById('winnerNameHud');
             if (nameEl) {
-              nameEl.textContent = s1 === s2 ? '(Empate)' : `(${refName})`;
+              nameEl.textContent = `(${refName})`;
             }
 
-            // Em caso de empate, o total financeiro deve ser 0 para bater com o "Ninguém Paga" do final
-            const totalDisplay = isWin ? refFin.total : 0;
-            document.getElementById('goalsTotalHud').textContent = 'R$ ' + totalDisplay.toFixed(2).replace('.', ',');
+            // Exibe o balanço financeiro em tempo real do seu time
+            document.getElementById('goalsTotalHud').textContent = 'R$ ' + refFin.total.toFixed(2).replace('.', ',');
 
             const counterEl = document.getElementById('goalsCounterHud');
             if (counterEl) {
-              counterEl.textContent = `(${achievedCount}/7)`;
-              counterEl.style.color = achievedCount === 7 ? '#4ade80' : '#94a3b8';
+              counterEl.textContent = `(${achievedCount}/8)`;
+              counterEl.style.color = achievedCount === 8 ? '#4ade80' : '#94a3b8';
             }
 
-            // Renderiza a lista de itens baseada na referência calculada
+            // Renderiza a lista de itens baseada na referência calculada incluindo a Soberania dos Mortos
             const list = document.getElementById('goalsListHud');
             list.innerHTML = `
-                        <div class="goal-item ${isWin ? 'achieved' : ''}">
+                        <div class="goal-item ${myTeamWinsGoal ? 'achieved' : ''}">
                             <span>✅ Vitória (R$ 5)</span>
-                            <strong>+R$ ${isWin ? '5,00' : '0,00'}</strong>
+                            <strong>+R$ ${myTeamWinsGoal ? '5,00' : '0,00'}</strong>
                         </div>
                         <div class="goal-item ${refFin.b.virgemDeMorto ? 'achieved' : ''}">
                             <span>🛑 Adv. Sem Morto (R$ 8)</span>
@@ -7560,6 +7554,10 @@
                         <div class="goal-item ${refFin.b.negative > 0 ? 'achieved' : ''}">
                             <span>☠️ Adv. Neg. (R$ 0,05/pt) [${refFin.b.oppProjected} pts]</span>
                             <strong>+R$ ${refFin.b.negative > 0 ? refFin.b.negative.toFixed(2).replace('.', ',') : '0,00'}</strong>
+                        </div>
+                        <div class="goal-item ${refFin.b.myTookMorto === 2 ? 'achieved' : ''}">
+                            <span>💀 Soberania dos Mortos (${refFin.b.myTookMorto}/2)</span>
+                            <strong>+R$ ${refFin.b.myTookMorto === 2 ? '12,00' : '0,00'}</strong>
                         </div>
                         <div id="asasGoalItem" class="goal-item expandable ${refFin.b.countAsas > 0 ? 'achieved' : ''} ${window.isAsasDetailsExpanded ? 'expanded' : ''}" onclick="toggleAsasDetails(event)">
                             <div class="goal-item-header">
@@ -7663,8 +7661,9 @@
             const winnerData = scores[0];
             const loserData = scores[1];
             const loserTookMorto = (state.deadChunksTaken?.[loserData.team.id] ?? 0) > 0;
+            const winnerTookMortoCount = state.deadChunksTaken?.[winnerData.team.id] ?? 0;
 
-            const winnerFin = window.calculatePixFin(winnerData.score, loserData.score, winnerData.team.melds, loserData.team.melds, loserTookMorto, winnerData.score, loserData.score);
+            const winnerFin = window.calculatePixFin(winnerData.score, loserData.score, winnerData.team.melds, loserData.team.melds, winnerTookMortoCount, loserTookMorto, winnerData.score, loserData.score);
 
             const totalMoney = winnerFin.total;
             const moneyStr = totalMoney.toFixed(2).replace('.', ',');
@@ -9251,19 +9250,23 @@
         const menuPanel = document.getElementById('menuDebugPanel');
         if (menuPanel) menuPanel.style.display = 'flex';
 
-        // 🔥 Preenche todas as configurações ideais e inicia instantaneamente sem delay
+        // 🔥 Preenche todas as configurações ideais e inicia instantaneamente sem delay com o motor de metas ativado
         window.debugInstantStart = async (selectedMode) => {
           document.getElementById('modeSelect').value = selectedMode;
           document.getElementById('variantSelect').value = 'aberto';
           document.getElementById('deckThemeSelect').value = 'dominacao';
           document.getElementById('tableThemeSelect').value = 'cassino';
           document.getElementById('localPlayerSelect').value = '0';
-          document.getElementById('betToggle').value = 'nao';
+          document.getElementById('betToggle').value = 'sim'; // 🔥 Ativa o sistema de apostas e metas no clique rápido
 
           document.getElementById('p1Name').value = 'Gabriel';
           document.getElementById('p2Name').value = 'BOT Rebeca';
           document.getElementById('p3Name').value = 'BOT Luana';
           document.getElementById('p4Name').value = 'BOT Camila';
+
+          // Insere emails fictícios válidos nos inputs para passar direto pela checagem estrita de PIX
+          document.getElementById('pixTeam1').value = 'biel@financeiro.com';
+          document.getElementById('pixTeam2').value = 'bot@rebeca.com';
 
           // Seta a sua cadeira local imediatamente na memória
           myPlayerIndex = 0;
@@ -9275,7 +9278,8 @@
           window.updateMenuDynamic();
 
           const names = ['Gabriel', 'BOT Rebeca', 'BOT Luana', 'BOT Camila'];
-          await startGame(selectedMode, names, 'aberto', ['', '']);
+          // Força a inicialização com as chaves vinculadas ao banco do Firebase
+          await startGame(selectedMode, names, 'aberto', ['biel@financeiro.com', 'bot@rebeca.com']);
         };
       }
 
