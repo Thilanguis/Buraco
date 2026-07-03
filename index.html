@@ -7849,7 +7849,15 @@
             await flyRectToRect(fallbackCard, fromRect, toRect, 'front');
             impactAtRect(toRect);
           }
-          await animateRemoteDeadIfAny();
+
+          // 🔥 NOVO: Renderiza o voo do Monte para o Escravo na tela do J2 (Dominador)
+          if (a.escravoAutoDraw && stockRect) {
+            const escravoRect = opponentAnchorRect(0);
+            if (escravoRect) {
+              await flyRectToRect(a.escravoAutoDraw, stockRect, escravoRect, 'back');
+              impactAtRect(escravoRect);
+            }
+          }
           return;
         }
 
@@ -9933,10 +9941,32 @@
           if (toEl) toEl.style.visibility = '';
         }
 
-        let tookDead = null;
+        // 🔥 NOVA REGRA: Bloqueia o morto defensivo e força compra do monte para manter o Escravo sob controle
+        let escravoAutoDraw = null;
         if (p1.hand.length === 0) {
-          tookDead = takeDeadIfAvailableForPlayer(p1);
-          if (!tookDead && !canTeamTakeDeadNow(p1.teamId)) {
+          if (!state.stock.length) {
+            await recycleDeadToStockIfPossible();
+          }
+
+          if (state.stock.length > 0) {
+            const extraC = state.stock.pop();
+            ensureCardId(extraC);
+            p1.hand.push(extraC);
+            sortHand(p1.hand);
+            escravoAutoDraw = packCard(extraC); // Registra para sincronizar com a outra tela
+
+            // Animação local: A carta do monte voa para a mão do Escravo
+            const stockEl = document.querySelector('#drawStockBtn .pile-card');
+            if (stockEl) {
+              const stockRect = getRect(stockEl);
+              const targetHandRect = opponentAnchorRect(0);
+              if (stockRect && targetHandRect) {
+                await flyRectToRect(extraC, stockRect, targetHandRect, 'back');
+                impactAtRect(targetHandRect);
+              }
+            }
+            showMessage('🛡️ DOMINAÇÃO: Mão do Escravo esvaziada! +1 carta forçada do Monte.');
+          } else {
             if (teamHasGoodCanastra(p1.teamId)) await finishGame(p1.teamId);
             else await finishGame(1);
           }
@@ -9947,7 +9977,7 @@
           type: 'stealCard',
           playerId: 1,
           card: packCard(card),
-          tookDead: tookDead,
+          escravoAutoDraw: escravoAutoDraw, // Envia o draw para o oponente renderizar remoto
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
