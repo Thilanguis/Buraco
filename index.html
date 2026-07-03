@@ -3431,21 +3431,21 @@
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
+          // Substitua o bloco do navigator.serviceWorker.register (linhas 3435 a 3470) por este:
+
           navigator.serviceWorker
             .register('service-worker.js')
             .then(async (reg) => {
               let totalAtts = 1;
               let newVersionNum = 93;
+              let oldVersionNum = parseInt(localStorage.getItem('buraco_current_version') || '93', 10);
 
-              // Lê o service-worker.js em tempo de execução para extrair o número do CACHE_NAME
               try {
                 const response = await fetch('service-worker.js');
                 const text = await response.text();
                 const match = text.match(/CACHE_NAME\s*=\s*['"`]buraco-v(\d+)['"`]/);
                 if (match) {
                   newVersionNum = parseInt(match[1], 10);
-                  const oldVersionNum = parseInt(localStorage.getItem('buraco_current_version') || '93', 10);
-
                   if (newVersionNum > oldVersionNum) {
                     totalAtts = newVersionNum - oldVersionNum;
                   }
@@ -3454,18 +3454,24 @@
                 console.error('[SW] Erro ao calcular salto de versões:', err);
               }
 
-              if (reg.waiting) {
-                showUpdatePrompt(reg.waiting, totalAtts, newVersionNum);
-              }
+              // 🛡️ TRAVA: Só abre a modal se a versão do servidor for maior que a do localStorage
+              if (newVersionNum > oldVersionNum) {
+                if (reg.waiting) {
+                  showUpdatePrompt(reg.waiting, totalAtts, newVersionNum);
+                }
 
-              reg.onupdatefound = () => {
-                const installingWorker = reg.installing;
-                installingWorker.onstatechange = () => {
-                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    showUpdatePrompt(installingWorker, totalAtts, newVersionNum);
-                  }
+                reg.onupdatefound = () => {
+                  const installingWorker = reg.installing;
+                  installingWorker.onstatechange = () => {
+                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      showUpdatePrompt(installingWorker, totalAtts, newVersionNum);
+                    }
+                  };
                 };
-              };
+              } else if (reg.waiting) {
+                // Se a versão for a mesma, descarta o update silenciosamente
+                reg.waiting.postMessage('skipWaiting');
+              }
             })
             .catch((err) => console.log('SW erro:', err));
 
