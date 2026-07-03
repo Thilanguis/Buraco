@@ -3203,9 +3203,10 @@
               id="menuDebugPanel"
               style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px dashed #ef4444; padding: 12px; border-radius: 8px; margin-top: 12px; flex-direction: column; gap: 8px; box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5)">
               <strong style="color: #ef4444; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px">🔧 Menu Dev Tools</strong>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
-                <button onclick="window.debugInstantStart('1x1_dominacao')" style="background: #a855f7; font-size: 10px; padding: 8px; font-weight: 900; margin: 0; border-radius: 6px">⚡ DOMINAÇÃO INSTANTÂNEO</button>
-                <button onclick="window.debugInstantStart('1x1')" style="background: #3b82f6; font-size: 10px; padding: 8px; font-weight: 900; margin: 0; border-radius: 6px">⚡ 1X1 INSTANTÂNEO</button>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px">
+                <button onclick="window.debugInstantStart('1x1_dominacao', 1)" style="background: #a855f7; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">👑 DOMINADOR</button>
+                <button onclick="window.debugInstantStart('1x1_dominacao', 0)" style="background: #16a34a; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">⛓️ ESCRAVO</button>
+                <button onclick="window.debugInstantStart('1x1', 0)" style="background: #3b82f6; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">🃏 CLÁSSICO</button>
               </div>
             </div>
           </div>
@@ -9258,35 +9259,45 @@
         const menuPanel = document.getElementById('menuDebugPanel');
         if (menuPanel) menuPanel.style.display = 'flex';
 
-        // 🔥 Preenche todas as configurações ideais e inicia instantaneamente sem delay com o motor de metas ativado
-        window.debugInstantStart = async (selectedMode) => {
+        // 🔥 Preenche as configurações e inverte dinamicamente os BOTs de lugar baseado na sua cadeira de teste
+        window.debugInstantStart = async (selectedMode, preferredSeat = 0) => {
           document.getElementById('modeSelect').value = selectedMode;
           document.getElementById('variantSelect').value = 'aberto';
           document.getElementById('deckThemeSelect').value = 'dominacao';
           document.getElementById('tableThemeSelect').value = 'cassino';
-          document.getElementById('localPlayerSelect').value = '0';
-          document.getElementById('betToggle').value = 'sim'; // 🔥 Ativa o sistema de apostas e metas no clique rápido
+          document.getElementById('betToggle').value = 'sim';
 
-          document.getElementById('p1Name').value = 'Gabriel';
-          document.getElementById('p2Name').value = 'BOT Rebeca';
-          document.getElementById('p3Name').value = 'BOT Luana';
-          document.getElementById('p4Name').value = 'BOT Camila';
+          const targetSeat = String(preferredSeat);
+          document.getElementById('localPlayerSelect').value = targetSeat;
 
-          // Insere emails fictícios válidos nos inputs para passar direto pela checagem estrita de PIX
+          // Monta o array jogando os BOTs estritamente nas cadeiras que você não está ocupando
+          const names = [];
+          const poolNomes = ['Rebeca', 'Luana', 'Camila', 'Juliana'];
+          for (let i = 0; i < 4; i++) {
+            if (i === preferredSeat) {
+              names.push('Biel');
+            } else {
+              names.push(`BOT ${poolNomes[i]}`);
+            }
+          }
+
+          // Atualiza os elementos do DOM para o painel do lobby não ficar dessincronizado
+          document.getElementById('p1Name').value = names[0];
+          document.getElementById('p2Name').value = names[1];
+          document.getElementById('p3Name').value = names[2];
+          document.getElementById('p4Name').value = names[3];
+
           document.getElementById('pixTeam1').value = 'biel@financeiro.com';
           document.getElementById('pixTeam2').value = 'bot@rebeca.com';
 
-          // Seta a sua cadeira local imediatamente na memória
-          myPlayerIndex = 0;
+          myPlayerIndex = preferredSeat;
           const url = new URL(window.location);
-          url.searchParams.set('player', '0');
+          url.searchParams.set('player', targetSeat);
           window.history.replaceState({}, '', url);
-          localStorage.setItem(`buraco_seat_${gameId}`, '0');
+          localStorage.setItem(`buraco_seat_${gameId}`, targetSeat);
 
           window.updateMenuDynamic();
 
-          const names = ['Gabriel', 'BOT Rebeca', 'BOT Luana', 'BOT Camila'];
-          // Força a inicialização com as chaves vinculadas ao banco do Firebase
           await startGame(selectedMode, names, 'aberto', ['biel@financeiro.com', 'bot@rebeca.com']);
         };
       }
@@ -9904,8 +9915,8 @@
       window.stealCard = async (cardId) => {
         if (!ensureMyTurn()) return;
 
-        // Anti-Spam: Só toca se a execução anterior já tiver finalizado os 5s
-        if (window.sfxSteal && window.sfxSteal.paused) {
+        // Trava de anti-spam deletada: reseta o ponteiro e força a risada a tocar em todo clique
+        if (window.sfxSteal) {
           window.sfxSteal.currentTime = 0;
           window.sfxSteal.play().catch(() => {});
         }
