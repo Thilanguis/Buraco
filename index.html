@@ -2067,9 +2067,9 @@
         font-weight: 900;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        padding: 2px 6px;
-        border-radius: 6px;
-        margin-left: 10px;
+        padding: 2px 5px; /* Reduzido para economizar espaço horizontal */
+        border-radius: 5px;
+        margin-left: 4px; /* Aproxima os badges um do outro */
         vertical-align: middle;
         transition: all 0.3s ease;
       }
@@ -2086,6 +2086,59 @@
           inset 0 0 8px rgba(34, 197, 94, 0.2),
           0 0 8px rgba(34, 197, 94, 0.4);
         text-shadow: 0 0 5px rgba(34, 197, 94, 0.6);
+      }
+
+      /* Badge informativo de compras extras acumuladas por canastras no modo Dominação */
+      .extra-cards-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 8px !important;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 2px 5px;
+        border-radius: 5px;
+        margin-left: 4px;
+        vertical-align: middle;
+        background: rgba(14, 165, 233, 0.15);
+        border: 1px solid #0ea5e9;
+        color: #38bdf8;
+        box-shadow:
+          inset 0 0 8px rgba(14, 165, 233, 0.2),
+          0 0 8px rgba(14, 165, 233, 0.4);
+        text-shadow: 0 0 5px rgba(14, 165, 233, 0.6);
+      }
+
+      /* Badge de status do superpoder único do Dominador */
+      .power-steal-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 8px !important;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 2px 5px;
+        border-radius: 5px;
+        margin-left: 4px;
+        vertical-align: middle;
+        transition: all 0.3s ease;
+      }
+      .power-steal-badge.available {
+        background: rgba(168, 85, 247, 0.18);
+        border: 1px solid #a855f7;
+        color: #c084fc;
+        box-shadow:
+          inset 0 0 8px rgba(168, 85, 247, 0.25),
+          0 0 8px rgba(168, 85, 247, 0.4);
+        text-shadow: 0 0 5px rgba(168, 85, 247, 0.6);
+      }
+      /* Removido o tom preto estranho: agora fica em um tom vinho/fundo escuro esmaecido limpo */
+      .power-steal-badge.used {
+        background: rgba(220, 38, 38, 0.1);
+        border: 1px dashed #b91c1c;
+        color: #f87171;
+        text-shadow: none;
+        box-shadow: none;
       }
 
       /* ================= MEDIA QUERIES REFATORADAS (Mobile / Landscape Limpo) ================= */
@@ -7094,23 +7147,47 @@
             .map((p) => p.name)
             .join(' e ');
 
-          // Lógica do Badge do Morto
+          // Lógica do Badge do Morto (Corrigido o parêntese quebrado do Firebase)
           const mortosPegos = state.deadChunksTaken?.[t.id] ?? 0;
           const maxMortos = state.deadChunksMax?.[t.id] ?? 1;
 
           let mortoHtml = '';
           if (mortosPegos >= maxMortos) {
-            mortoHtml = `<span class="morto-badge taken">💀 Morto (OK)</span>`;
+            mortoHtml = `<span class="morto-badge taken">💀 Morto (${mortosPegos}/${maxMortos})</span>`;
           } else if (mortosPegos > 0) {
             mortoHtml = `<span class="morto-badge taken">💀 Morto (${mortosPegos}/${maxMortos})</span>`;
           } else {
             mortoHtml = `<span class="morto-badge pending">💀 Sem Morto</span>`;
           }
 
+          // Texto encurtado para "+X" economizando espaço precioso na barra
+          let extraCardsHtml = '';
+          if (state.mode === '1x1_dominacao') {
+            let extraCardsDrawn = 0;
+            const rewardsMap = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 };
+            t.melds.forEach((m) => {
+              const kind = classifyMeldForUi(m).kind;
+              extraCardsDrawn += rewardsMap[kind] || 0;
+            });
+            if (extraCardsDrawn > 0) {
+              extraCardsHtml = `<span class="extra-cards-badge">🃏 +${extraCardsDrawn}</span>`;
+            }
+          }
+
+          // Mantido o texto sutil e enxuto sem ocupar espaço duplicado
+          let powerStealHtml = '';
+          if (state.mode === '1x1_dominacao' && t.id === 1) {
+            if (state.dominatorUsedPower) {
+              powerStealHtml = `<span class="power-steal-badge used">👁️ Roubo</span>`;
+            } else {
+              powerStealHtml = `<span class="power-steal-badge available">👁️ Roubo</span>`;
+            }
+          }
+
           const titleSpan = document.querySelector(`#teamPanel${i + 1} .meld-title span`);
           if (titleSpan) {
-            // Usa innerHTML para processar o badge e deixa os nomes cinza sutil para destacar o status
-            titleSpan.innerHTML = `${t.name} <span style="font-size: 9px; color: #9ca3af; font-weight: normal; text-transform: none;">(${pNames})</span> ${mortoHtml}`;
+            // Alinha todos os badges em sequência na barra de título do painel correspondente
+            titleSpan.innerHTML = `${t.name} <span style="font-size: 9px; color: #9ca3af; font-weight: normal; text-transform: none;">(${pNames})</span> ${mortoHtml}${extraCardsHtml}${powerStealHtml}`;
           }
 
           const target = i === 0 ? m1 : m2;
