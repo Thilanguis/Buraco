@@ -1920,9 +1920,40 @@
         border-color: rgba(250, 204, 21, 0.35);
       }
       .meld-tag.asas {
-        background: rgba(99, 102, 241, 0.18);
-        color: #c7d2fe;
-        border-color: rgba(99, 102, 241, 0.35);
+        background: rgba(236, 72, 153, 0.25);
+        color: #fbcfe8;
+        border-color: #ec4899;
+        box-shadow: 0 0 8px #ec4899;
+      }
+
+      /* Animação que faz um feixe de luz neon correr linearmente pelas bordas */
+      @keyframes bdsmLaserSweep {
+        0% {
+          background-position:
+            0% 0%,
+            200% 0%;
+        }
+        100% {
+          background-position:
+            0% 0%,
+            0% 0%;
+        }
+      }
+
+      /* Contorna exatamente o bloco de cartas, sem fundo e com feixe dinâmico */
+      .meld-line.canastra-asas-bdsm .meld-line-cards {
+        border: 1px solid transparent !important;
+        /* Laranja Neon / Lava Incandescente: Corta o verde, o roxo, o vermelho e o preto com contraste violento */
+        background-image: linear-gradient(transparent, transparent), linear-gradient(90deg, transparent 35%, #ff5500 43%, #ffea00 50%, #ff5500 57%, transparent 65%) !important;
+        background-origin: border-box !important;
+        background-clip: content-box, border-box !important;
+        background-size: 200% 100% !important;
+        animation: bdsmLaserSweep 2.8s infinite linear !important;
+        border-radius: 6px !important;
+        padding: 1px !important;
+        z-index: 5;
+        /* Drop shadow em vermelho/laranja de alta voltagem para dar profundidade e destacar a canastra */
+        filter: drop-shadow(0 0 6px rgba(255, 69, 0, 0.85));
       }
 
       /* Placar Final */
@@ -7097,6 +7128,11 @@
             const row = document.createElement('div');
             row.className = 'meld-line-cards';
             const mInfo = classifyMeldForUi(meld);
+
+            // Se for uma canastra Ás-a-Ás, injeta o visual BDSM de destaque
+            if (mInfo && mInfo.kind === 'asas') {
+              div.classList.add('canastra-asas-bdsm');
+            }
 
             meld.forEach((c, cidx) => {
               if (mInfo.kind !== 'simple' && cidx === meld.length - 1) return;
