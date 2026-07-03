@@ -2807,6 +2807,29 @@
         display: none;
         transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
       }
+
+      /* Animação que simula a pulsação de um coração alterando a intensidade da vinheta */
+      @keyframes heartbeatPulse {
+        0% {
+          box-shadow: inset 0 0 120px rgba(220, 38, 38, 0.6);
+        }
+        20% {
+          box-shadow: inset 0 0 200px rgba(220, 38, 38, 0.95);
+        }
+        40% {
+          box-shadow: inset 0 0 150px rgba(220, 38, 38, 0.7);
+        }
+        60% {
+          box-shadow: inset 0 0 240px rgba(220, 38, 38, 1);
+        }
+        100% {
+          box-shadow: inset 0 0 120px rgba(220, 38, 38, 0.6);
+        }
+      }
+
+      .sensual-steal-overlay.pulsing {
+        animation: heartbeatPulse 1.2s infinite ease-in-out;
+      }
     </style>
   </head>
   <body data-deck-theme="classico">
@@ -3865,6 +3888,12 @@
       window.sfxSteal.preload = 'auto';
       window.sfxSteal.volume = 0.95;
 
+      // 🔊 SFX DO CORAÇÃO BATENDO (Configurado em loop para a duração do roubo)
+      const sfxHeartbeat = new Audio('assets/sfx/coracao-batendo.mp3');
+      sfxHeartbeat.preload = 'auto';
+      sfxHeartbeat.volume = 0.85;
+      sfxHeartbeat.loop = true;
+
       function playCardMove() {
         if (!audioUnlocked) return;
         try {
@@ -3887,8 +3916,8 @@
           if (AudioContext) audioCtx = new AudioContext();
         } catch (e) {}
 
-        // Injeta os áudios de turno e roubo na lista de permissões do mobile
-        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn, window.sfxSteal];
+        // Injeta o novo som de coração na lista global para garantir que o navegador libere o autoplay
+        const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn, window.sfxSteal, sfxHeartbeat];
         for (const a of allAudios) {
           try {
             a.pause();
@@ -6287,11 +6316,24 @@
 
         if (state.powerActiveThisTurn && !state.finished) {
           stealOverlay.style.display = 'block';
+          stealOverlay.classList.add('pulsing'); // Liga a animação de pulsação do CSS
+
+          // Dispara o loop do coração batendo junto com o efeito visual
+          if (audioUnlocked) {
+            sfxHeartbeat.play().catch((e) => console.log('Erro ao tocar som do coração:', e));
+          }
+
           setTimeout(() => {
             stealOverlay.style.opacity = '1';
           }, 20);
         } else {
           stealOverlay.style.opacity = '0';
+          stealOverlay.classList.remove('pulsing'); // Desliga a pulsação do CSS
+
+          // Pausa e reinicia o ponteiro do áudio para o início imediatamente
+          sfxHeartbeat.pause();
+          sfxHeartbeat.currentTime = 0;
+
           setTimeout(() => {
             if (stealOverlay.style.opacity === '0') stealOverlay.style.display = 'none';
           }, 500);

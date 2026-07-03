@@ -1,5 +1,4 @@
-// Cache limpo e unificado sem declarações duplicadas
-const CACHE_NAME = 'buraco-v94'; // Incrementado para forçar a atualização
+const CACHE_NAME = 'buraco-v95';
 
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
