@@ -394,6 +394,28 @@
         }
       }
       #gameSection {
+        --table-light-opacity: 0;
+        --table-light-layer: none;
+        --table-light-size: auto;
+        --table-light-position: center;
+        --table-light-blend: screen;
+        --table-light-filter: saturate(1.05);
+        --table-light-animation: tableLightStill 8s ease-in-out infinite;
+        --table-light-mask: linear-gradient(#000, #000);
+        --table-light-mask-size: auto;
+        --table-light-mask-position: center;
+        --dom-border-underlay: rgba(2, 6, 23, 0.74);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.5);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(2, 6, 23, 0.13), rgba(2, 6, 23, 0.04) 46%, transparent 72%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(2, 6, 23, 0.17), rgba(2, 6, 23, 0.05) 50%, transparent 74%);
+        --dom-border-glow-boost: 1;
+        --dom-runner-core: rgba(255, 247, 237, 0.96);
+        --dom-runner-soft: rgba(250, 204, 21, 0.58);
+        --dom-spark-core: rgba(255, 247, 237, 0.58);
+        --dom-spark-warm: rgba(250, 204, 21, 0.34);
+        --brasao-contrast-ring: rgba(2, 6, 23, 0.82);
+        position: relative;
+        isolation: isolate;
         flex: 1;
         display: none;
         flex-direction: column;
@@ -404,11 +426,168 @@
         animation: smoothTableReveal 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
         transition: background 0.4s ease-in-out; /* Transição suave ao trocar de tema */
       }
+      #gameSection::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: var(--table-light-opacity);
+        background: var(--table-light-layer);
+        background-size: var(--table-light-size);
+        background-position: var(--table-light-position);
+        mix-blend-mode: var(--table-light-blend);
+        filter: var(--table-light-filter);
+        animation: var(--table-light-animation);
+        -webkit-mask-image: var(--table-light-mask);
+        -webkit-mask-size: var(--table-light-mask-size);
+        -webkit-mask-position: var(--table-light-mask-position);
+        mask-image: var(--table-light-mask);
+        mask-size: var(--table-light-mask-size);
+        mask-position: var(--table-light-mask-position);
+      }
+      #gameSection > * {
+        position: relative;
+        z-index: 1;
+      }
+      #gameSection:has(.board-melds.has-domination-status)::before {
+        opacity: calc(var(--table-light-opacity) + 0.055);
+      }
+      @keyframes tableLightStill {
+        0%,
+        100% {
+          filter: var(--table-light-filter);
+        }
+      }
+      @keyframes tableFeltCirclePulse {
+        0% {
+          filter: saturate(1) brightness(0.9);
+          background-size:
+            120px 120px,
+            120px 120px;
+        }
+        50% {
+          filter: saturate(1.18) brightness(1.2);
+          background-size:
+            124px 124px,
+            120px 120px;
+        }
+        100% {
+          filter: saturate(1) brightness(0.9);
+          background-size:
+            120px 120px,
+            120px 120px;
+        }
+      }
+      @keyframes tableTraceSweep {
+        0% {
+          -webkit-mask-position: -140% 0;
+          mask-position: -140% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        42% {
+          filter: saturate(1.25) brightness(1.28);
+        }
+        100% {
+          -webkit-mask-position: 220% 0;
+          mask-position: 220% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableTraceDiagonalUp {
+        0% {
+          -webkit-mask-position: -120% 130%;
+          mask-position: -120% 130%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        44% {
+          filter: saturate(1.24) brightness(1.24);
+        }
+        100% {
+          -webkit-mask-position: 210% -110%;
+          mask-position: 210% -110%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableTraceDiagonalDown {
+        0% {
+          -webkit-mask-position: -120% -110%;
+          mask-position: -120% -110%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        44% {
+          filter: saturate(1.24) brightness(1.24);
+        }
+        100% {
+          -webkit-mask-position: 210% 130%;
+          mask-position: 210% 130%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableTraceVertical {
+        0% {
+          -webkit-mask-position: 0 -140%;
+          mask-position: 0 -140%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        42% {
+          filter: saturate(1.28) brightness(1.3);
+        }
+        100% {
+          -webkit-mask-position: 0 220%;
+          mask-position: 0 220%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableTraceReverse {
+        0% {
+          -webkit-mask-position: 220% 0;
+          mask-position: 220% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        42% {
+          filter: saturate(1.25) brightness(1.28);
+        }
+        100% {
+          -webkit-mask-position: -140% 0;
+          mask-position: -140% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tablePointTwinkle {
+        0%,
+        100% {
+          filter: saturate(1) brightness(0.85);
+        }
+        50% {
+          filter: saturate(1.22) brightness(1.25);
+        }
+      }
       /* ================================================================= */
       /* SISTEMA DE IDENTIDADE VISUAL E MARCAS D'ÁGUA DA MESA              */
       /* ================================================================= */
 
       body[data-table-theme='feltro'] #gameSection {
+        --table-light-opacity: 0.26;
+        --table-light-layer:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23bbf7d0' stroke-width='0.85' stroke-linecap='round' stroke-opacity='0.52'%3E%3Ccircle cx='60' cy='60' r='54'/%3E%3Ccircle cx='60' cy='60' r='46' stroke-dasharray='2 3' stroke-opacity='0.34'/%3E%3Cpath d='M60 6 C24 24 24 96 60 114 C96 96 96 24 60 6 Z'/%3E%3Cpath d='M6 60 C24 24 96 24 114 60 C96 96 24 96 6 60 Z'/%3E%3Cpath d='M60 36 L67 53 L84 60 L67 67 L60 84 L53 67 L36 60 L53 53 Z' stroke='%23dcfce7' stroke-opacity='0.62'/%3E%3Ccircle cx='60' cy='60' r='1.6' fill='%23dcfce7' fill-opacity='0.6' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+        --table-light-size:
+          120px 120px;
+        --table-light-filter: saturate(1.12) brightness(1.04);
+        --table-light-animation: tableTraceDiagonalUp 8.4s linear infinite;
+        --table-light-mask: linear-gradient(130deg, transparent 0 41%, rgba(0, 0, 0, 0.16) 46%, #000 50%, rgba(0, 0, 0, 0.16) 54%, transparent 60% 100%);
+        --table-light-mask-size: 240% 240%;
+        --table-light-mask-position: -120% 130%;
+        --dom-border-underlay: rgba(2, 6, 23, 0.78);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.46);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(2, 6, 23, 0.15), rgba(2, 6, 23, 0.04) 46%, transparent 72%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(2, 6, 23, 0.2), rgba(2, 6, 23, 0.06) 50%, transparent 74%);
+        --dom-border-glow-boost: 0.92;
+        --dom-runner-core: rgba(255, 247, 237, 0.96);
+        --dom-runner-soft: rgba(250, 204, 21, 0.62);
+        --dom-spark-core: rgba(255, 247, 237, 0.58);
+        --dom-spark-warm: rgba(250, 204, 21, 0.36);
+        --brasao-contrast-ring: rgba(2, 6, 23, 0.82);
         background:
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='0.7'%3E%3Ccircle cx='60' cy='60' r='54' stroke-opacity='0.05'/%3E%3Ccircle cx='60' cy='60' r='46' stroke-opacity='0.03' stroke-dasharray='2 3'/%3E%3Crect x='22' y='22' width='76' height='76' stroke-opacity='0.02' transform='rotate(0 60 60)'/%3E%3Crect x='22' y='22' width='76' height='76' stroke-opacity='0.02' transform='rotate(45 60 60)'/%3E%3Cpath d='M60 6 C24 24 24 96 60 114 C96 96 96 24 60 6 Z' stroke-opacity='0.06'/%3E%3Cpath d='M6 60 C24 24 96 24 114 60 C96 96 24 96 6 60 Z' stroke-opacity='0.06'/%3E%3Cpath d='M60 36 L67 53 L84 60 L67 67 L60 84 L53 67 L36 60 L53 53 Z' fill='%23ffffff' fill-opacity='0.015' stroke-opacity='0.09' stroke-width='0.9'/%3E%3C/g%3E%3C/svg%3E")
             repeat center center / 120px 120px,
@@ -416,6 +595,26 @@
       }
 
       body[data-table-theme='cassino'] #gameSection {
+        --table-light-opacity: 0.34;
+        --table-light-layer:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23facc15' stroke-width='0.9' stroke-linecap='round' stroke-opacity='0.68'%3E%3Cpath d='M50 5 C55 25 75 25 80 45 C75 65 55 65 50 85 C45 65 25 65 20 45 C25 25 45 25 50 5 Z M50 25 C53 35 65 35 68 45 C65 55 53 55 50 65 C47 55 35 55 32 45 C35 35 47 35 50 25 Z'/%3E%3Cpath d='M0 45 C5 65 25 65 30 85 M100 45 C95 65 75 65 70 85 M30 5 C35 15 45 15 50 25 M70 5 C65 15 55 15 50 25'/%3E%3Ccircle cx='50' cy='45' r='1.5' fill='%23fff7ad' fill-opacity='0.72' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+        --table-light-size:
+          100px 100px;
+        --table-light-filter: saturate(1.08) brightness(1.02);
+        --table-light-animation: tableTraceSweep 6.2s linear infinite;
+        --table-light-mask: linear-gradient(105deg, transparent 0 39%, rgba(0, 0, 0, 0.18) 45%, #000 50%, rgba(0, 0, 0, 0.18) 55%, transparent 61% 100%);
+        --table-light-mask-size: 230% 100%;
+        --table-light-mask-position: -140% 0;
+        --dom-border-underlay: rgba(255, 247, 237, 0.34);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.62);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(255, 247, 237, 0.08), rgba(2, 6, 23, 0.06) 50%, transparent 74%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(255, 247, 237, 0.11), rgba(2, 6, 23, 0.08) 52%, transparent 76%);
+        --dom-border-glow-boost: 1.08;
+        --dom-runner-core: rgba(255, 247, 237, 0.96);
+        --dom-runner-soft: rgba(248, 113, 113, 0.42);
+        --dom-spark-core: rgba(255, 247, 237, 0.54);
+        --dom-spark-warm: rgba(250, 204, 21, 0.38);
+        --brasao-contrast-ring: rgba(255, 247, 237, 0.22);
         background: 
           /* Marca d'água: Arabesco calibrado com mais contraste e brilho estilo linha de costura */
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23ef4444' stroke-width='0.5' stroke-opacity='0.08'%3E%3Cpath d='M50 5 C55 25 75 25 80 45 C75 65 55 65 50 85 C45 65 25 65 20 45 C25 25 45 25 50 5 Z M50 25 C53 35 65 35 68 45 C65 55 53 55 50 65 C47 55 35 55 32 45 C35 35 47 35 50 25 Z'/%3E%3Cpath d='M0 45 C5 65 25 65 30 85 M100 45 C95 65 75 65 70 85 M30 5 C35 15 45 15 50 25 M70 5 C65 15 55 15 50 25'/%3E%3Ccircle cx='50' cy='45' r='2' fill='%23ef4444' fill-opacity='0.08'/%3E%3C/g%3E%3C/svg%3E")
@@ -424,6 +623,26 @@
       }
 
       body[data-table-theme='masmorra'] #gameSection {
+        --table-light-opacity: 0.28;
+        --table-light-layer:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23e9d5ff' stroke-width='0.95' stroke-opacity='0.5'%3E%3Ccircle cx='30' cy='20' r='9'/%3E%3Ccircle cx='10' cy='40' r='9'/%3E%3Ccircle cx='50' cy='40' r='9'/%3E%3Cpath d='M30 11v18M21 20h18M10 31v18M1 40h18M50 31v18M41 40h18' stroke-opacity='0.28'/%3E%3C/g%3E%3C/svg%3E");
+        --table-light-size:
+          60px 60px;
+        --table-light-filter: saturate(1.1) brightness(1.02);
+        --table-light-animation: tableTraceVertical 7.2s linear infinite;
+        --table-light-mask: linear-gradient(180deg, transparent 0 38%, rgba(0, 0, 0, 0.18) 44%, #000 50%, rgba(0, 0, 0, 0.18) 56%, transparent 62% 100%);
+        --table-light-mask-size: 100% 240%;
+        --table-light-mask-position: 0 -140%;
+        --dom-border-underlay: rgba(255, 247, 237, 0.3);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.62);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(255, 247, 237, 0.07), rgba(2, 6, 23, 0.08) 50%, transparent 76%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(255, 247, 237, 0.1), rgba(2, 6, 23, 0.1) 52%, transparent 78%);
+        --dom-border-glow-boost: 1.08;
+        --dom-runner-core: rgba(255, 247, 237, 0.94);
+        --dom-runner-soft: rgba(216, 180, 254, 0.5);
+        --dom-spark-core: rgba(233, 213, 255, 0.54);
+        --dom-spark-warm: rgba(250, 204, 21, 0.3);
+        --brasao-contrast-ring: rgba(255, 247, 237, 0.18);
         background:
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath d='M30 10c-5.523 0-10 4.477-10 10s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z' fill='%23a855f7' fill-opacity='0.035'/%3E%3Cpath d='M0 40c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10-10-4.477-10-10zm18 0c0-4.411-3.589-8-8-8s-8 3.589-8 8 3.589 8 8 8 8-3.589 8-8z' fill='%23a855f7' fill-opacity='0.035'/%3E%3Cpath d='M60 40c0-5.523-4.477-10-10-10s-10 4.477-10 10 4.477 10 10 10 10-4.477 10-10zm-2 0c0 4.411-3.589 8-8 8s-8-3.589-8-8 3.589-8 8-8 8 3.589 8 8z' fill='%23a855f7' fill-opacity='0.035'/%3E%3C/svg%3E")
             repeat center center / 60px 60px,
@@ -431,6 +650,26 @@
       }
 
       body[data-table-theme='ostentacao'] #gameSection {
+        --table-light-opacity: 0.34;
+        --table-light-layer:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23fef08a' stroke-linejoin='round' stroke-linecap='round' stroke-opacity='0.58'%3E%3Cpath d='M40 15l6 8h10l-4 10v4H28v-4l-4-10h10z' stroke-width='1.1'/%3E%3Cpath d='M32 37h16M35 30h10' stroke-width='0.9'/%3E%3C/g%3E%3Ctext x='40' y='53' font-size='12' fill='%23fde68a' fill-opacity='0.5' font-family='sans-serif' font-weight='900' text-anchor='middle'%3E%24%3C/text%3E%3C/svg%3E");
+        --table-light-size:
+          80px 80px;
+        --table-light-filter: saturate(1.1) brightness(1.06);
+        --table-light-animation: tableTraceVertical 5.8s linear infinite;
+        --table-light-mask: linear-gradient(180deg, transparent 0 36%, rgba(0, 0, 0, 0.2) 43%, #000 50%, rgba(0, 0, 0, 0.2) 57%, transparent 64% 100%);
+        --table-light-mask-size: 100% 230%;
+        --table-light-mask-position: 0 -140%;
+        --dom-border-underlay: rgba(2, 6, 23, 0.78);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.66);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(2, 6, 23, 0.18), rgba(2, 6, 23, 0.06) 52%, transparent 78%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(2, 6, 23, 0.24), rgba(2, 6, 23, 0.08) 54%, transparent 80%);
+        --dom-border-glow-boost: 0.82;
+        --dom-runner-core: rgba(255, 247, 237, 0.96);
+        --dom-runner-soft: rgba(244, 63, 94, 0.36);
+        --dom-spark-core: rgba(255, 247, 237, 0.46);
+        --dom-spark-warm: rgba(250, 204, 21, 0.28);
+        --brasao-contrast-ring: rgba(2, 6, 23, 0.86);
         background:
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath d='M40 15l6 8h10l-4 10v4H28v-4l-4-10h10z M35 30h10v2h-10z' fill='%23d4af37' fill-opacity='0.025'/%3E%3Ctext x='40' y='52' font-size='10' fill='%23d4af37' fill-opacity='0.02' font-family='sans-serif' font-weight='bold' text-anchor='middle'%3E%24%3C/text%3E%3C/svg%3E")
             repeat center center / 80px 80px,
@@ -438,6 +677,26 @@
       }
 
       body[data-table-theme='submissao'] #gameSection {
+        --table-light-opacity: 0.3;
+        --table-light-layer:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='%23fbcfe8' fill-opacity='0.58'%3E%3Ccircle cx='20' cy='20' r='1.55'/%3E%3Ccircle cx='0' cy='0' r='1.05'/%3E%3Ccircle cx='40' cy='0' r='1.05'/%3E%3Ccircle cx='0' cy='40' r='1.05'/%3E%3Ccircle cx='40' cy='40' r='1.05'/%3E%3C/g%3E%3Cg fill='none' stroke='%23f9a8d4' stroke-width='0.75' stroke-opacity='0.34'%3E%3Cpath d='M0 0l40 40M40 0L0 40'/%3E%3C/g%3E%3C/svg%3E");
+        --table-light-size:
+          40px 40px;
+        --table-light-filter: saturate(1.12) brightness(1.03);
+        --table-light-animation: tableTraceDiagonalDown 5.9s linear infinite;
+        --table-light-mask: linear-gradient(55deg, transparent 0 39%, rgba(0, 0, 0, 0.18) 45%, #000 50%, rgba(0, 0, 0, 0.18) 55%, transparent 61% 100%);
+        --table-light-mask-size: 230% 230%;
+        --table-light-mask-position: -120% -110%;
+        --dom-border-underlay: rgba(255, 247, 237, 0.28);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.64);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(255, 247, 237, 0.07), rgba(2, 6, 23, 0.08) 50%, transparent 76%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(255, 247, 237, 0.1), rgba(2, 6, 23, 0.1) 52%, transparent 78%);
+        --dom-border-glow-boost: 1.04;
+        --dom-runner-core: rgba(255, 247, 237, 0.96);
+        --dom-runner-soft: rgba(244, 114, 182, 0.5);
+        --dom-spark-core: rgba(255, 247, 237, 0.48);
+        --dom-spark-warm: rgba(244, 114, 182, 0.34);
+        --brasao-contrast-ring: rgba(255, 247, 237, 0.18);
         background:
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23ec4899' stroke-width='1' stroke-opacity='0.035'%3E%3Cpath d='M0 0l40 40M40 0L0 40'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='1.5' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='0' cy='0' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='40' cy='0' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='0' cy='40' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3Ccircle cx='40' cy='40' r='1' fill='%23ec4899' fill-opacity='0.07'/%3E%3C/svg%3E")
             repeat center center / 40px 40px,
@@ -445,6 +704,24 @@
       }
 
       body[data-table-theme='findom'] #gameSection {
+        --table-light-opacity: 0.18;
+        --table-light-layer:
+          radial-gradient(circle at 50% 50%, rgba(250, 204, 21, 0.24) 0 1px, transparent 10px),
+          radial-gradient(circle at 50% 50%, transparent 18px, rgba(16, 185, 129, 0.13) 19px, transparent 23px);
+        --table-light-size:
+          90px 90px,
+          90px 90px;
+        --table-light-animation: tablePointTwinkle 4s ease-in-out infinite;
+        --dom-border-underlay: rgba(2, 6, 23, 0.82);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.68);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(2, 6, 23, 0.2), rgba(2, 6, 23, 0.07) 50%, transparent 76%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(2, 6, 23, 0.27), rgba(2, 6, 23, 0.09) 54%, transparent 80%);
+        --dom-border-glow-boost: 0.88;
+        --dom-runner-core: rgba(236, 253, 245, 0.96);
+        --dom-runner-soft: rgba(16, 185, 129, 0.54);
+        --dom-spark-core: rgba(236, 253, 245, 0.52);
+        --dom-spark-warm: rgba(250, 204, 21, 0.34);
+        --brasao-contrast-ring: rgba(2, 6, 23, 0.9);
         background:
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 100 100'%3E%3Ctext x='50%25' y='50%25' font-size='36' fill='%23facc15' fill-opacity='0.1' font-family='Montserrat, sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='central'%3E%24%3C/text%3E%3C/svg%3E")
             repeat center center / 90px 90px,
@@ -467,14 +744,6 @@
             100px 100px,
             100% 100%;
         }
-      }
-
-      body[data-table-theme='supremacia'] #gameSection {
-        background:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg stroke='%23ff0055' stroke-opacity='0.035' stroke-width='0.7' fill='none'%3E%3Cpath d='M0 0 L100 100 M100 0 L0 100 M0 50 H100 M50 0 V100'/%3E%3Ccircle cx='50' cy='50' r='38' stroke-dasharray='4 3'/%3E%3Ccircle cx='50' cy='50' r='20'/%3E%3C/g%3E%3C/svg%3E")
-            repeat center center,
-          radial-gradient(circle at center, #2a000b 0%, #090003 60%, #000000 100%);
-        animation: vortexNexusPulse 9s ease-in-out infinite;
       }
 
       /* Estrutura da prévia do fundo da mesa no menu */
@@ -520,10 +789,6 @@
       body[data-table-theme='findom'] .table-preview-icon {
         background: radial-gradient(circle at center, #011c12 0%, #000000 100%);
         border-color: #00ff66 !important;
-      }
-      body[data-table-theme='supremacia'] .table-preview-icon {
-        background: radial-gradient(circle at center, #2a000b 0%, #000000 100%);
-        border-color: #ff0055 !important;
       }
       .board {
         flex: 1;
@@ -628,6 +893,7 @@
         top: 26px;
         left: 50%;
         transform: translateX(-50%);
+        z-index: 25;
       }
       .opponent-hand-left {
         top: 45%;
@@ -770,14 +1036,6 @@
         -webkit-backdrop-filter: none !important;
         box-shadow: none !important; /* Remove a sombra que causa a mancha */
       }
-      body[data-table-theme='supremacia'] .board-melds .grow {
-        background: transparent !important;
-        border-color: rgba(255, 0, 85, 0.07) !important;
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2) !important;
-      }
-
       /* Destaque pontilhado para os times ativos, suave e sem berrar */
       .view-team0 .board-melds .grow:nth-child(1),
       .view-team1 .board-melds .grow:nth-child(2) {
@@ -834,14 +1092,6 @@
         -webkit-backdrop-filter: blur(4px);
         box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2) !important;
       }
-      body[data-table-theme='supremacia'] .board-melds .grow {
-        background: transparent !important;
-        border-color: rgba(255, 0, 85, 0.12) !important;
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2) !important;
-      }
-
       /* Destaques Pontilhados de Turno Ativo: Elegantes e sem poluição visual */
       .view-team0 .board-melds .grow:nth-child(1),
       .view-team1 .board-melds .grow:nth-child(2) {
@@ -857,6 +1107,7 @@
       .meld-title {
         display: flex;
         justify-content: space-between;
+        gap: 8px;
         font-size: 9px !important;
         font-weight: 600;
         letter-spacing: 0.5px;
@@ -871,6 +1122,101 @@
         font-size: 11px !important;
         color: #facc15;
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      }
+      .player-title-main {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .player-identity-chip {
+        --identity-accent: #94a3b8;
+        --identity-bg: rgba(15, 23, 42, 0.64);
+        display: inline-flex;
+        align-items: center;
+        gap: 0;
+        min-width: 0;
+        max-width: 100%;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--identity-accent), transparent 42%);
+        background:
+          linear-gradient(90deg, color-mix(in srgb, var(--identity-accent), transparent 88%), transparent 62%),
+          var(--identity-bg);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          0 0 10px color-mix(in srgb, var(--identity-accent), transparent 78%);
+      }
+      .player-identity-chip.role-dominador {
+        --identity-bg: rgba(15, 23, 42, 0.72);
+      }
+      .player-identity-chip.role-escravo {
+        --identity-bg: rgba(30, 6, 13, 0.44);
+      }
+      .view-team0 #teamPanel1 .player-identity-chip,
+      .view-team1 #teamPanel2 .player-identity-chip {
+        --identity-accent: #22c55e;
+      }
+      .view-team0 #teamPanel2 .player-identity-chip,
+      .view-team1 #teamPanel1 .player-identity-chip {
+        --identity-accent: #ef4444;
+      }
+      .identity-copy {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        min-width: 0;
+      }
+      .identity-role {
+        color: #f8fafc;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
+        white-space: nowrap;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.78);
+      }
+      .identity-player-name {
+        min-width: 0;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #cbd5e1;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: none;
+        opacity: 0.92;
+      }
+      .player-title-badges {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+        flex-wrap: wrap;
+      }
+      .player-title-badges .morto-badge,
+      .player-title-badges .extra-cards-badge,
+      .player-title-badges .power-steal-badge {
+        margin-left: 0;
+      }
+      .title-score-cluster {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex: 0 0 auto;
+        margin-left: auto;
+      }
+      .dom-dominador .player-identity-chip {
+        border-color: color-mix(in srgb, var(--identity-accent), #fff 16%);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.12),
+          0 0 14px color-mix(in srgb, var(--identity-accent), transparent 66%);
+      }
+      .dom-escravo .player-identity-chip {
+        filter: saturate(0.82);
+        opacity: 0.86;
       }
 
       .meld-container {
@@ -895,6 +1241,535 @@
       .team-panel.can-drop-new {
         cursor: pointer;
       }
+
+      /* ================= SISTEMA DE DOMINAÇÃO ================= */
+      @keyframes domBorderGlide {
+        0% {
+          background-position: 0% 50%;
+        }
+        100% {
+          background-position: 200% 50%;
+        }
+      }
+
+      @property --dom-orbit-angle {
+        syntax: '<angle>';
+        inherits: false;
+        initial-value: 0deg;
+      }
+
+      @keyframes domBorderOrbit {
+        to {
+          --dom-orbit-angle: 360deg;
+        }
+      }
+
+      @keyframes domSparkDrift {
+        0% {
+          background-position:
+            0 0,
+            48px 18px,
+            0 0;
+        }
+        100% {
+          background-position:
+            180px -90px,
+            -120px 92px,
+            0 0;
+        }
+      }
+
+      /* Reseta a borda padrão e a sombra para dar lugar ao efeito neon contínuo */
+      #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0) {
+        --dom-level-border: #d4af37;
+        --dom-level-filter: drop-shadow(0 0 3px rgba(212, 175, 55, 0.34));
+        --dom-panel-spark-layer: linear-gradient(transparent, transparent);
+        --dom-panel-spark-size: auto;
+        border-color: transparent !important;
+        box-shadow:
+          inset 0 0 0 1px var(--dom-border-underlay),
+          0 0 0 1px var(--dom-border-underlay),
+          0 10px 22px var(--dom-contrast-shadow),
+          var(--dom-panel-shadow, 0 0 0 transparent) !important;
+        isolation: isolate;
+      }
+
+      #gameSection .board-melds.has-domination-status {
+        margin-top: clamp(92px, 10vh, 108px);
+      }
+
+      #gameSection .board-melds .grow.dom-escravo {
+        box-shadow: inset 0 0 20px rgba(127, 29, 29, 0.1) !important;
+      }
+
+      #gameSection .board-melds .grow.dom-nivel-4 {
+        --dom-panel-shadow: 0 0 14px rgba(250, 204, 21, 0.16);
+        --dom-panel-spark-layer:
+          radial-gradient(circle at 18px 16px, var(--dom-spark-core) 0 1px, transparent 2px),
+          radial-gradient(circle at 74px 38px, var(--dom-spark-warm) 0 1px, transparent 2px);
+        --dom-panel-spark-size:
+          180px 110px,
+          230px 135px;
+      }
+      #gameSection .board-melds .grow.dom-nivel-5 {
+        --dom-panel-shadow: 0 0 18px rgba(245, 158, 11, 0.22);
+        --dom-panel-spark-layer:
+          radial-gradient(circle at 20px 18px, var(--dom-spark-core) 0 1.2px, transparent 2.4px),
+          radial-gradient(circle at 84px 42px, var(--dom-spark-warm) 0 1.1px, transparent 2.3px);
+        --dom-panel-spark-size:
+          150px 96px,
+          210px 126px;
+      }
+      #gameSection .board-melds .grow.dom-nivel-6 {
+        --dom-panel-shadow: 0 0 20px rgba(244, 63, 94, 0.24);
+        --dom-panel-spark-layer:
+          radial-gradient(circle at 20px 18px, var(--dom-spark-core) 0 1.35px, transparent 2.7px),
+          radial-gradient(circle at 88px 46px, var(--dom-spark-warm) 0 1.25px, transparent 2.6px);
+        --dom-panel-spark-size:
+          128px 86px,
+          186px 112px;
+      }
+
+      #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0)::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.14;
+        background:
+          var(--dom-panel-spark-layer),
+          var(--dom-panel-scrim);
+        background-size:
+          var(--dom-panel-spark-size),
+          auto;
+      }
+      #gameSection .board-melds .grow.dom-nivel-5::before,
+      #gameSection .board-melds .grow.dom-nivel-6::before {
+        opacity: 0.18;
+        background:
+          var(--dom-panel-spark-layer),
+          var(--dom-panel-scrim-strong);
+        background-size:
+          var(--dom-panel-spark-size),
+          auto;
+      }
+      #gameSection .board-melds .grow.dom-nivel-4::before {
+        opacity: 0.18;
+        animation: domSparkDrift 8s linear infinite;
+      }
+      #gameSection .board-melds .grow.dom-nivel-5::before {
+        opacity: 0.23;
+        animation: domSparkDrift 6.8s linear infinite;
+      }
+      #gameSection .board-melds .grow.dom-nivel-6::before {
+        opacity: 0.28;
+        animation: domSparkDrift 5.8s linear infinite;
+      }
+
+      /* MÁSCARA: Cria uma trilha exata na borda para o gradiente correr por dentro */
+      #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0)::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: inherit;
+        padding: 2px;
+        -webkit-mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
+        z-index: 3;
+        background: var(--dom-level-border);
+        filter: var(--dom-level-filter);
+      }
+
+      /* NÍVEL 1: Pressão */
+      #gameSection .board-melds .grow.dom-nivel-1::after {
+        --dom-level-border:
+          conic-gradient(from var(--dom-orbit-angle), #78350f 0deg 38deg, var(--dom-runner-soft) 48deg, var(--dom-runner-core) 58deg, var(--dom-runner-soft) 68deg, #d4af37 82deg 178deg, #fff7ad 186deg, #d4af37 194deg 318deg, #78350f 340deg 360deg);
+        --dom-level-filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.3));
+        animation: domBorderOrbit 7s linear infinite;
+      }
+
+      /* NÍVEL 2: Controle (Laser Suave) */
+      #gameSection .board-melds .grow.dom-nivel-2::after {
+        --dom-level-border:
+          conic-gradient(from var(--dom-orbit-angle), #92400e 0deg 34deg, var(--dom-runner-soft) 46deg, var(--dom-runner-core) 58deg, var(--dom-runner-soft) 70deg, #facc15 86deg 176deg, #fff7ad 186deg, #facc15 198deg 314deg, #92400e 338deg 360deg);
+        --dom-level-filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.36));
+        animation: domBorderOrbit 5.8s linear infinite;
+      }
+
+      /* NÍVEL 3: Dominação (Laser com brilho externo) */
+      #gameSection .board-melds .grow.dom-nivel-3::after {
+        --dom-level-border:
+          conic-gradient(from var(--dom-orbit-angle), #78350f 0deg 32deg, var(--dom-runner-soft) 44deg, var(--dom-runner-core) 58deg, var(--dom-runner-soft) 72deg, #eab308 90deg 174deg, #fff7ad 186deg, #eab308 200deg 312deg, #78350f 338deg 360deg);
+        --dom-level-filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.42));
+        animation: domBorderOrbit 4.8s linear infinite;
+      }
+
+      /* NÍVEL 4: Controle Absoluto (Feixe Rápido Dourado/Branco) */
+      #gameSection .board-melds .grow.dom-nivel-4::after {
+        padding: 2px;
+        --dom-level-border:
+          conic-gradient(from var(--dom-orbit-angle), #451a03 0deg 28deg, var(--dom-runner-soft) 42deg, var(--dom-runner-core) 58deg, var(--dom-runner-soft) 74deg, #ca8a04 92deg, #facc15 126deg 172deg, #fff7ad 186deg, #facc15 204deg 286deg, #b45309 318deg, #451a03 346deg 360deg);
+        --dom-level-filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.5)) drop-shadow(0 0 1px var(--dom-border-underlay));
+        animation: domBorderOrbit 3.8s linear infinite;
+      }
+
+      /* NÍVEL 5: Humilhação Total (Ouro Incandescente) */
+      #gameSection .board-melds .grow.dom-nivel-5::after {
+        padding: 2px;
+        --dom-level-border:
+          conic-gradient(from var(--dom-orbit-angle), #431407 0deg 24deg, var(--dom-runner-soft) 40deg, var(--dom-runner-core) 58deg, var(--dom-runner-soft) 76deg, #ea580c 96deg, #facc15 130deg 170deg, #fff7ad 186deg, #f59e0b 206deg 284deg, #fef3c7 312deg, #7c2d12 344deg 360deg);
+        --dom-level-filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.54)) drop-shadow(0 0 1px var(--dom-border-underlay));
+        animation: domBorderOrbit 3.1s linear infinite;
+      }
+
+      /* NÍVEL 6: Falência (Carmesim/Neon Elegante) */
+      #gameSection .board-melds .grow.dom-nivel-6::after {
+        padding: 2px;
+        --dom-level-border:
+          conic-gradient(from var(--dom-orbit-angle), #2a020d 0deg 20deg, var(--dom-runner-soft) 38deg, var(--dom-runner-core) 58deg, var(--dom-runner-soft) 78deg, #be123c 98deg, #fb7185 132deg 168deg, #facc15 182deg, #fff7ed 192deg, #fb7185 210deg 280deg, #be123c 314deg, #f59e0b 342deg, #2a020d 360deg);
+        --dom-level-filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.58)) drop-shadow(0 0 1px var(--dom-border-underlay));
+        animation: domBorderOrbit 2.55s linear infinite;
+      }
+      /* ======================================================== */
+      #gameSection .board-melds .grow {
+        position: relative;
+        overflow: visible !important;
+      }
+      #gameSection .board-melds .grow.has-brasao {
+        padding-top: 8px;
+      }
+      #gameSection .board-melds .grow .team-panel {
+        position: relative;
+        z-index: 2;
+      }
+
+      /* ================= BRASÃO DE DOMINAÇÃO (EVOLUTIVO) ================= */
+      .brasao-dominacao {
+        --brasao-accent: #d4af37;
+        --brasao-accent-2: #facc15;
+        --brasao-total-width: 156px;
+        --brasao-core-width: 156px;
+        --brasao-height: 28px;
+        --brasao-wing-width: 0px;
+        --brasao-wing-height: 10px;
+        --brasao-title-size: 8px;
+        --brasao-point-size: 12px;
+        --brasao-crown-size: 8px;
+        --brasao-glow: rgba(212, 175, 55, 0.18);
+        position: absolute;
+        top: -52px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        z-index: 12;
+        width: var(--brasao-total-width);
+        height: var(--brasao-height);
+        max-width: calc(100vw - 42px);
+        pointer-events: none;
+        display: grid;
+        place-items: center;
+        filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.46));
+        transition:
+          width 0.35s ease,
+          height 0.35s ease,
+          filter 0.35s ease;
+        overflow: visible;
+      }
+
+      .brasao-frame {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 2;
+        width: var(--brasao-core-width);
+        height: var(--brasao-height);
+        transform: translate(-50%, -50%);
+        border: 1.5px solid var(--brasao-accent);
+        border-radius: 999px;
+        background:
+          linear-gradient(180deg, rgba(15, 23, 42, 0.97), rgba(2, 6, 23, 0.99)),
+          radial-gradient(circle at 50% 0%, var(--brasao-glow), transparent 72%);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+          0 0 0 2px var(--brasao-contrast-ring),
+          0 0 8px var(--brasao-glow);
+        overflow: hidden;
+      }
+
+      .brasao-frame::before {
+        content: '';
+        position: absolute;
+        inset: 1px;
+        border-radius: inherit;
+        background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.14) 42%, transparent 58%);
+        background-size: 220% 100%;
+        opacity: 0.16;
+        animation: brasaoSweep 5.8s infinite ease-in-out;
+      }
+
+      .brasao-frame::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -4px;
+        width: 52%;
+        height: 8px;
+        transform: translateX(-50%);
+        border-bottom: 1px solid var(--brasao-accent);
+        border-radius: 50%;
+        opacity: 0.38;
+      }
+
+      @keyframes brasaoSweep {
+        0% {
+          background-position: 160% 50%;
+        }
+        52%,
+        100% {
+          background-position: -160% 50%;
+        }
+      }
+
+      @keyframes brasaoPulse {
+        from {
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+            0 0 9px var(--brasao-glow);
+        }
+        to {
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+            0 0 13px var(--brasao-glow);
+        }
+      }
+
+      /* Estilos específicos por Nível */
+      .brasao-lvl-1 {
+        --brasao-accent: #d4af37;
+        --brasao-accent-2: #facc15;
+        --brasao-total-width: 156px;
+        --brasao-core-width: 156px;
+        --brasao-height: 28px;
+        --brasao-title-size: 8px;
+        --brasao-point-size: 12px;
+        --brasao-crown-size: 8px;
+        --brasao-glow: rgba(212, 175, 55, 0.18);
+      }
+      .brasao-lvl-2 {
+        --brasao-accent: #eab308;
+        --brasao-accent-2: #facc15;
+        --brasao-total-width: 164px;
+        --brasao-core-width: 164px;
+        --brasao-height: 29px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 13px;
+        --brasao-crown-size: 8px;
+        --brasao-glow: rgba(234, 179, 8, 0.2);
+      }
+      .brasao-lvl-3 {
+        --brasao-accent: #f59e0b;
+        --brasao-accent-2: #fde68a;
+        --brasao-total-width: 176px;
+        --brasao-core-width: 176px;
+        --brasao-height: 30px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 14px;
+        --brasao-crown-size: 9px;
+        --brasao-glow: rgba(245, 158, 11, 0.24);
+      }
+      .brasao-lvl-4 {
+        --brasao-accent: #facc15;
+        --brasao-accent-2: #fef08a;
+        --brasao-side-gem: #fef08a;
+        --brasao-total-width: 208px;
+        --brasao-core-width: 208px;
+        --brasao-height: 31px;
+        --brasao-wing-width: 30px;
+        --brasao-wing-height: 9px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 15px;
+        --brasao-crown-size: 9px;
+        --brasao-glow: rgba(250, 204, 21, 0.26);
+      }
+      .brasao-lvl-5 {
+        --brasao-accent: #f59e0b;
+        --brasao-accent-2: #fef3c7;
+        --brasao-side-gem: #facc15;
+        --brasao-total-width: 214px;
+        --brasao-core-width: 214px;
+        --brasao-height: 32px;
+        --brasao-wing-width: 34px;
+        --brasao-wing-height: 10px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 16px;
+        --brasao-crown-size: 10px;
+        --brasao-glow: rgba(245, 158, 11, 0.3);
+      }
+      .brasao-lvl-6 {
+        --brasao-accent: #f59e0b;
+        --brasao-accent-2: #fb2d5c;
+        --brasao-side-gem: #fb2d5c;
+        --brasao-total-width: 204px;
+        --brasao-core-width: 204px;
+        --brasao-height: 32px;
+        --brasao-wing-width: 34px;
+        --brasao-wing-height: 10px;
+        --brasao-title-size: 10px;
+        --brasao-point-size: 17px;
+        --brasao-crown-size: 10px;
+        --brasao-glow: rgba(244, 63, 94, 0.3);
+      }
+
+      .brasao-lvl-4 .brasao-frame,
+      .brasao-lvl-5 .brasao-frame,
+      .brasao-lvl-6 .brasao-frame {
+        animation: brasaoPulse 2.6s ease-in-out infinite alternate;
+      }
+
+      .brasao-lvl-4 .brasao-frame {
+        background:
+          linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(3, 7, 18, 0.99)),
+          radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.22), transparent 68%);
+      }
+
+      .brasao-lvl-5 .brasao-frame {
+        background:
+          linear-gradient(180deg, rgba(33, 17, 4, 0.98), rgba(3, 7, 18, 0.99)),
+          radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.24), transparent 68%);
+      }
+
+      .brasao-lvl-6 .brasao-frame {
+        border-color: #f59e0b;
+        background:
+          linear-gradient(180deg, rgba(45, 7, 18, 0.98), rgba(3, 7, 18, 0.99)),
+          radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.28), transparent 70%);
+      }
+
+      .brasao-wing {
+        display: none;
+        position: absolute;
+        top: 50%;
+        z-index: 1;
+        width: var(--brasao-wing-width);
+        height: 20px;
+        transform: translateY(-50%);
+        opacity: 0.9;
+        filter: drop-shadow(0 0 4px var(--brasao-glow));
+      }
+
+      .brasao-wing::before {
+        content: '';
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        width: 62%;
+        height: 2px;
+        transform: translateY(-50%);
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.45), var(--brasao-accent));
+        box-shadow: 0 0 6px var(--brasao-glow);
+      }
+
+      .brasao-wing::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 11px;
+        height: 11px;
+        transform: translateY(-50%) rotate(45deg);
+        border: 1px solid var(--brasao-accent);
+        border-radius: 2px;
+        background:
+          radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.78), transparent 28%),
+          linear-gradient(135deg, var(--brasao-side-gem), rgba(15, 23, 42, 0.88));
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+          0 0 8px var(--brasao-glow);
+      }
+
+      .brasao-lvl-4 .brasao-wing,
+      .brasao-lvl-5 .brasao-wing,
+      .brasao-lvl-6 .brasao-wing {
+        display: block;
+      }
+
+      .brasao-wing.wing-left {
+        left: calc(var(--brasao-wing-width) * -0.62);
+      }
+
+      .brasao-wing.wing-right {
+        right: calc(var(--brasao-wing-width) * -0.62);
+        transform: translateY(-50%) scaleX(-1);
+      }
+
+      .brasao-coroas {
+        position: absolute;
+        top: -13px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 1px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: rgba(2, 6, 23, 0.9);
+        z-index: 5;
+      }
+      .coroa-slot {
+        font-size: var(--brasao-crown-size);
+        line-height: 1;
+        opacity: 0.2;
+        filter: grayscale(1);
+        transition: all 0.3s;
+      }
+      .coroa-slot.active {
+        opacity: 1;
+        filter: grayscale(0) drop-shadow(0 0 4px var(--brasao-glow));
+      }
+      .brasao-core {
+        position: relative;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        width: var(--brasao-core-width);
+        height: var(--brasao-height);
+        padding: 0 11px;
+        box-sizing: border-box;
+        white-space: nowrap;
+      }
+      .brasao-titulo {
+        flex: 0 1 auto;
+        min-width: 0;
+        font-size: var(--brasao-title-size);
+        font-weight: 900;
+        letter-spacing: 0;
+        line-height: 1.1;
+        text-transform: uppercase;
+        color: #f8fafc;
+        text-align: center;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.26);
+      }
+      .brasao-pontos {
+        flex: 0 0 auto;
+        font-size: var(--brasao-point-size);
+        font-weight: 900;
+        letter-spacing: 0;
+        color: var(--brasao-runtime-accent, var(--brasao-accent-2));
+        line-height: 1;
+        text-shadow:
+          0 0 7px var(--brasao-glow),
+          0 2px 0 rgba(0, 0, 0, 0.9);
+      }
+      /* ======================================================== */
 
       .meld-line {
         background: transparent;
@@ -1055,8 +1930,9 @@
       }
 
       /* UI do Jogador */
+      /* UI do Jogador */
       .player-interface {
-        position: sticky; /* TRAVA A SUA MÃO E BOTÕES NO FUNDO DA TELA */
+        position: sticky;
         bottom: 0;
         background: linear-gradient(to top, rgba(2, 6, 23, 1) 30%, rgba(2, 6, 23, 0.85) 70%, transparent 100%);
         padding: 5px 10px 10px 10px;
@@ -1067,6 +1943,7 @@
         width: 100%;
         flex-shrink: 0;
       }
+
       #message {
         text-align: center;
         font-size: 11px;
@@ -2212,15 +3089,65 @@
           gap: 4px;
           padding: 2px;
         }
+        #gameSection .board-melds.has-domination-status {
+          margin-top: 58px;
+        }
         .board-melds .grow {
           padding: 4px;
           border-radius: 6px;
+        }
+        #gameSection .board-melds .grow.has-brasao {
+          padding-top: 4px;
+        }
+        .brasao-dominacao {
+          top: -44px;
+          width: var(--brasao-total-width);
+          height: var(--brasao-height);
+          transform: translateX(-50%) scale(0.9);
+          transform-origin: center;
+        }
+        .brasao-coroas {
+          gap: 0;
+          top: -10px;
+          padding: 0 5px;
+        }
+        .brasao-core {
+          gap: 5px;
+        }
+        .brasao-titulo {
+          white-space: normal;
         }
 
         .meld-title {
           font-size: 8px !important;
           margin-bottom: 2px;
           padding-bottom: 2px;
+          gap: 4px;
+          align-items: flex-start;
+        }
+        .player-title-main {
+          gap: 4px;
+          flex-wrap: wrap;
+        }
+        .player-identity-chip {
+          padding: 2px 6px;
+          gap: 0;
+        }
+        .identity-copy {
+          gap: 3px;
+        }
+        .identity-role {
+          font-size: 8px;
+        }
+        .identity-player-name {
+          max-width: 74px;
+          font-size: 8px;
+        }
+        .player-title-badges {
+          gap: 2px;
+        }
+        .title-score-cluster {
+          gap: 4px;
         }
         .meld-line {
           min-width: 55px;
@@ -3277,6 +4204,18 @@
           <button onclick="debugMeld('asas')" style="font-size: 10px; padding: 6px; background: #8b5cf6">Canastra Ás-a-Ás</button>
           <button onclick="debugSetupDead()" style="font-size: 10px; padding: 6px; background: #0f766e">Prep: Pegar Morto</button>
           <button onclick="debugSetupWin()" style="font-size: 10px; padding: 6px; background: #1d4ed8">Prep: Bater</button>
+
+          <label style="display: flex; flex-direction: column; gap: 4px; color: #facc15; font-size: 9px; font-weight: 900; text-transform: uppercase">
+            Fundo da Mesa
+            <select id="debugTableThemeSelect" onchange="debugSetTableTheme(this.value)" style="width: 100%; margin: 0; padding: 6px; border-radius: 6px; border: 1px solid rgba(250, 204, 21, 0.45); background: rgba(15, 23, 42, 0.96); color: #fff; font-size: 10px; font-weight: 800">
+              <option value="feltro">Feltro Verde</option>
+              <option value="cassino">Cassino</option>
+              <option value="masmorra">Masmorra</option>
+              <option value="ostentacao">Ostentação</option>
+              <option value="submissao">Submissão</option>
+              <option value="findom">Findom</option>
+            </select>
+          </label>
 
           <div style="border-top: 1px dashed rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 6px; display: flex; flex-direction: column; gap: 6px">
             <button onclick="debugRestartGame()" style="font-size: 10px; padding: 6px; background: #7c3aed; font-weight: bold">🔄 Reiniciar Partida</button>
@@ -6453,6 +7392,12 @@
 
         // Aplica o Estilo de Baralho (Theme) selecionado
         document.body.dataset.deckTheme = state.deckTheme || 'classico';
+        if (!['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom'].includes(state.tableTheme)) state.tableTheme = 'cassino';
+        document.body.dataset.tableTheme = state.tableTheme || document.body.dataset.tableTheme || 'feltro';
+        const debugTableThemeSelect = document.getElementById('debugTableThemeSelect');
+        if (debugTableThemeSelect && debugTableThemeSelect.value !== document.body.dataset.tableTheme) {
+          debugTableThemeSelect.value = document.body.dataset.tableTheme;
+        }
         syncMythicPhase();
 
         // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
@@ -7185,10 +8130,28 @@
             }
           }
 
-          const titleSpan = document.querySelector(`#teamPanel${i + 1} .meld-title span`);
-          if (titleSpan) {
-            // Alinha todos os badges em sequência na barra de título do painel correspondente
-            titleSpan.innerHTML = `${t.name} <span style="font-size: 9px; color: #9ca3af; font-weight: normal; text-transform: none;">(${pNames})</span> ${mortoHtml}${extraCardsHtml}${powerStealHtml}`;
+          const titleEl = document.querySelector(`#teamPanel${i + 1} .meld-title`);
+          if (titleEl) {
+            const normalizedRole = (t.name || '').toLowerCase();
+            const isDominadorRole = normalizedRole.includes('dominador');
+            const isEscravoRole = normalizedRole.includes('escravo');
+            const roleClass = isDominadorRole ? 'role-dominador' : isEscravoRole ? 'role-escravo' : 'role-neutral';
+
+            titleEl.innerHTML = `
+              <div class="player-title-main">
+                <div class="player-identity-chip ${roleClass}">
+                  <span class="identity-copy">
+                    <span class="identity-role">${t.name}</span>
+                    <span class="identity-player-name">${pNames}</span>
+                  </span>
+                </div>
+                <div class="player-title-badges">${mortoHtml}${extraCardsHtml}${powerStealHtml}</div>
+              </div>
+              <div class="title-score-cluster">
+                <div id="liveMoney${i + 1}" class="live-money-badge"></div>
+                <strong id="scoreTeam${i + 1}">${i === 0 ? s1 : s2}</strong>
+              </div>
+            `;
           }
 
           const target = i === 0 ? m1 : m2;
@@ -7316,6 +8279,101 @@
 
         triggerScoreAnim(0, window.lastScores[0], s1);
         triggerScoreAnim(1, window.lastScores[1], s2);
+
+        // --- SISTEMA DE DOMINAÇÃO ---
+        const diff = Math.abs(s1 - s2);
+        let level = 0;
+        let statusText = 'Equilibrado';
+        let glowColor = '#4ade80';
+
+        if (diff >= 300 && diff <= 799) {
+          level = 1;
+          statusText = 'Pressão';
+          glowColor = '#d4af37';
+        } else if (diff >= 800 && diff <= 1499) {
+          level = 2;
+          statusText = 'Controle';
+          glowColor = '#facc15';
+        } else if (diff >= 1500 && diff <= 2499) {
+          level = 3;
+          statusText = 'Dominação';
+          glowColor = '#eab308';
+        } else if (diff >= 2500 && diff <= 3499) {
+          level = 4;
+          statusText = 'Controle Absoluto';
+          glowColor = '#facc15';
+        } else if (diff >= 3500 && diff <= 4499) {
+          level = 5;
+          statusText = 'Humilhação Total';
+          glowColor = '#f97316';
+        } else if (diff >= 4500) {
+          level = 6;
+          statusText = 'Falência';
+          glowColor = '#fb2d5c';
+        } // Carmesim Elegante
+
+        const panel1 = document.getElementById('teamPanel1');
+        const panel2 = document.getElementById('teamPanel2');
+
+        if (panel1 && panel2) {
+          const grow1 = panel1.closest('.grow');
+          const grow2 = panel2.closest('.grow');
+          const boardMelds = panel1.closest('.board-melds');
+
+          for (let i = 0; i <= 6; i++) {
+            grow1.classList.remove('dom-nivel-' + i);
+            grow2.classList.remove('dom-nivel-' + i);
+          }
+          grow1.classList.remove('has-brasao', 'dom-dominador', 'dom-escravo');
+          grow2.classList.remove('has-brasao', 'dom-dominador', 'dom-escravo');
+          if (boardMelds) boardMelds.classList.remove('has-domination-status');
+
+          const oldStatus1 = document.getElementById('statusDom1');
+          if (oldStatus1) oldStatus1.remove();
+          const oldStatus2 = document.getElementById('statusDom2');
+          if (oldStatus2) oldStatus2.remove();
+
+          if (level === 0) {
+            grow1.classList.add('dom-nivel-0');
+            grow2.classList.add('dom-nivel-0');
+          }
+
+          // Calcula quantas coroas acender (nível 1 a 6)
+          const coroaSlots = Array.from({ length: 6 }, (_, i) => `<span class="coroa-slot ${i < level ? 'active' : ''}">👑</span>`).join('');
+
+          // Adiciona a classe dinâmica baseada no nível (ex: brasao-lvl-5)
+          const levelClass = level > 0 ? `brasao-lvl-${level}` : '';
+
+          const brasaoHtml = `
+                <div id="statusDom_ID_AQUI" class="brasao-dominacao ${levelClass}" data-level="${level}" style="--brasao-runtime-accent:${glowColor};">
+                    <div class="brasao-coroas">${coroaSlots}</div>
+                    <div class="brasao-frame"></div>
+                    <span class="brasao-wing wing-left" aria-hidden="true"></span>
+                    <span class="brasao-wing wing-right" aria-hidden="true"></span>
+                    <div class="brasao-core">
+                        <span class="brasao-titulo">${statusText}</span>
+                        <span class="brasao-pontos">+${diff}</span>
+                    </div>
+                </div>
+            `;
+
+          const applyDominationVisual = (winnerGrow, loserGrow, statusId) => {
+            winnerGrow.classList.add('dom-nivel-' + level, 'dom-dominador');
+            loserGrow.classList.add('dom-escravo');
+            if (level > 0) {
+              winnerGrow.classList.add('has-brasao');
+              if (boardMelds) boardMelds.classList.add('has-domination-status');
+              winnerGrow.insertAdjacentHTML('afterbegin', brasaoHtml.replace('statusDom_ID_AQUI', statusId));
+            }
+          };
+
+          if (level > 0 && s1 > s2) {
+            applyDominationVisual(grow1, grow2, 'statusDom1');
+          } else if (level > 0 && s2 > s1) {
+            applyDominationVisual(grow2, grow1, 'statusDom2');
+          }
+        }
+        // -----------------------------
 
         if (state.isBetting) {
           // Função universal de cálculo financeiro com Projeção Real e suporte a contagem de mortos do próprio time
@@ -9253,6 +10311,24 @@
         }
       };
 
+      window.debugSetTableTheme = async (theme) => {
+        const allowedTableThemes = ['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom'];
+        const nextTheme = allowedTableThemes.includes(theme) ? theme : 'feltro';
+        document.body.dataset.tableTheme = nextTheme;
+
+        const lobbySelect = document.getElementById('tableThemeSelect');
+        if (lobbySelect) lobbySelect.value = nextTheme;
+
+        const debugSelect = document.getElementById('debugTableThemeSelect');
+        if (debugSelect && debugSelect.value !== nextTheme) debugSelect.value = nextTheme;
+
+        if (state) {
+          state.tableTheme = nextTheme;
+          renderAll();
+          await commitState();
+        }
+      };
+
       if (isDebugMode) {
         window.toggleDebugPanel(true);
         // 🔥 Exibe o painel de atalhos rápidos do menu principal
@@ -9361,6 +10437,7 @@
 
       window.debugRestartGame = async () => {
         if (!state) return;
+        const keepDevToolsOpen = window.isDevToolsOpen;
 
         // Puxa as configurações atuais da partida e da sala para refazer igual
         const currentNames = [state.players[0]?.name || '', state.players[1]?.name || '', state.players[2]?.name || '', state.players[3]?.name || ''];
@@ -9369,6 +10446,7 @@
 
         // Sincroniza o DOM com o estado atual para o startGame() não perder o PIX e o Tema do Baralho
         document.getElementById('deckThemeSelect').value = state.deckTheme || 'classico';
+        document.getElementById('tableThemeSelect').value = state.tableTheme || document.body.dataset.tableTheme || 'feltro';
         document.getElementById('betToggle').value = state.isBetting ? 'sim' : 'nao';
         document.getElementById('betBase').value = state.betBase || 5;
         document.getElementById('betPerPoint').value = state.betPerPoint || 0.01;
@@ -9396,7 +10474,7 @@
         await startGame(state.mode, currentNames, state.variant, currentPix);
 
         // Esconde o painel do DevTools para o jogador ver os dados rolarem
-        window.toggleDebugPanel(false);
+        window.toggleDebugPanel(keepDevToolsOpen);
       };
 
       window.debugEndGame = async () => {
