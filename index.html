@@ -5937,6 +5937,135 @@
       sfxHeartbeat.volume = 0.85;
       sfxHeartbeat.loop = true;
 
+      // 🎵 MÚSICA AMBIENTE POR TEMA DE MESA
+      // Deixe estes arquivos na pasta assets/music/ com exatamente estes nomes.
+      // O volume fica propositalmente baixo para não competir com os SFX da mesa
+      // (cartas 0.5, turno 0.8, roubo 0.95, coração 0.85 e canastras 0.9).
+      function clampMediaVolume(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+const TABLE_AMBIENT_MUSIC = {
+        feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.11 },
+        cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.12 },
+        masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.1 },
+        ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.1 },
+        submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.09 },
+        findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.1 },
+      };
+
+      const TABLE_AMBIENT_MAX_VOLUME = 0.14;
+      let tableAmbientAudio = null;
+      let tableAmbientTheme = null;
+      let tableAmbientFadeId = 0;
+      let tableAmbientEnabled = true;
+
+      function normalizeTableTheme(theme) {
+        return Object.prototype.hasOwnProperty.call(TABLE_AMBIENT_MUSIC, theme) ? theme : 'feltro';
+      }
+
+      function getSafeAmbientVolume(theme) {
+        const cfg = TABLE_AMBIENT_MUSIC[normalizeTableTheme(theme)] || TABLE_AMBIENT_MUSIC.feltro;
+        const requested = Number(cfg.volume) || 0.1;
+        // Mantém a música sempre bem abaixo dos efeitos mais baixos da mesa.
+        return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.32);
+      }
+
+      function fadeTableAmbientTo(targetVolume, duration = 850, onDone = null) {
+        if (!tableAmbientAudio) return;
+        const audio = tableAmbientAudio;
+        const fadeId = ++tableAmbientFadeId;
+        const startVolume = Number(audio.volume) || 0;
+        const safeTarget = Math.max(0, Math.min(targetVolume, TABLE_AMBIENT_MAX_VOLUME));
+        const startedAt = performance.now();
+
+        function step(now) {
+          if (fadeId !== tableAmbientFadeId || audio !== tableAmbientAudio) return;
+          const progress = duration <= 0 ? 1 : Math.min(1, (now - startedAt) / duration);
+          audio.volume = startVolume + (safeTarget - startVolume) * progress;
+
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          } else if (typeof onDone === 'function') {
+            onDone(audio);
+          }
+        }
+
+        requestAnimationFrame(step);
+      }
+
+      function stopTableAmbientMusic(immediate = false) {
+        if (!tableAmbientAudio) return;
+        const audio = tableAmbientAudio;
+
+        const finish = (a) => {
+          try {
+            a.pause();
+            a.currentTime = 0;
+          } catch (e) {}
+        };
+
+        if (immediate) {
+          tableAmbientFadeId++;
+          finish(audio);
+          tableAmbientAudio = null;
+          tableAmbientTheme = null;
+          return;
+        }
+
+        fadeTableAmbientTo(0, 650, (a) => {
+          finish(a);
+          if (tableAmbientAudio === a) {
+            tableAmbientAudio = null;
+            tableAmbientTheme = null;
+          }
+        });
+      }
+
+      function syncTableAmbientMusic() {
+        const gameSection = document.getElementById('gameSection');
+        const gameVisible = !!gameSection && gameSection.style.display === 'flex';
+        const shouldPlay = tableAmbientEnabled && audioUnlocked && state && !window.isClosingGame && gameVisible && document.visibilityState !== 'hidden';
+
+        if (!shouldPlay) {
+          stopTableAmbientMusic(false);
+          return;
+        }
+
+        const theme = normalizeTableTheme(state.tableTheme || document.body.dataset.tableTheme || 'feltro');
+        const cfg = TABLE_AMBIENT_MUSIC[theme];
+        const targetVolume = getSafeAmbientVolume(theme);
+
+        if (!tableAmbientAudio || tableAmbientTheme !== theme) {
+          stopTableAmbientMusic(true);
+          tableAmbientTheme = theme;
+          tableAmbientAudio = new Audio(cfg.src);
+        tableAmbientAudio.addEventListener('error', () => {
+          console.warn('[ambient] Música ambiente não encontrada ou não carregou:', cfg.src);
+        });
+          tableAmbientAudio.preload = 'auto';
+          tableAmbientAudio.loop = true;
+          tableAmbientAudio.volume = clampMediaVolume( 0);
+          tableAmbientAudio.play().then(() => {
+            fadeTableAmbientTo(targetVolume, 1000);
+          }).catch(() => {});
+          return;
+        }
+
+        tableAmbientAudio.loop = true;
+        if (tableAmbientAudio.paused) tableAmbientAudio.play().catch(() => {});
+        if (Math.abs(tableAmbientAudio.volume - targetVolume) > 0.01) {
+          fadeTableAmbientTo(targetVolume, 500);
+        }
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') stopTableAmbientMusic(false);
+        else syncTableAmbientMusic();
+      });
+
       function playCardMove() {
         if (!audioUnlocked) return;
         try {
@@ -5973,6 +6102,8 @@
               .catch(() => {});
           } catch (e) {}
         }
+
+        syncTableAmbientMusic();
       }
 
       function isMovableTwoOrJoker(card) {
@@ -8411,6 +8542,7 @@
         document.body.dataset.deckTheme = state.deckTheme || 'classico';
         if (!['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom'].includes(state.tableTheme)) state.tableTheme = 'cassino';
         document.body.dataset.tableTheme = state.tableTheme || document.body.dataset.tableTheme || 'feltro';
+        syncTableAmbientMusic();
         const debugTableThemeSelect = document.getElementById('debugTableThemeSelect');
         if (debugTableThemeSelect && debugTableThemeSelect.value !== document.body.dataset.tableTheme) {
           debugTableThemeSelect.value = document.body.dataset.tableTheme;
@@ -10498,6 +10630,7 @@
         if (!snap.exists()) {
           releaseScreen();
           toggleMenuVideos(true);
+          stopTableAmbientMusic(true);
 
           if (window.startTimer) {
             clearInterval(window.startTimer);
@@ -10592,6 +10725,7 @@
         const data = snap.data();
 
         if (!data.stateJson && data.lobby) {
+          stopTableAmbientMusic(false);
           if (introFinished) {
             document.getElementById('configSection').style.display = 'flex';
             document.getElementById('gameSection').style.display = 'none';
@@ -10777,6 +10911,7 @@
         keepScreenAlive();
 
         toggleMenuVideos(false);
+        syncTableAmbientMusic();
 
         renderAll();
         startTurnTimerIfNeeded();
@@ -11341,6 +11476,7 @@
         const allowedTableThemes = ['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom'];
         const nextTheme = allowedTableThemes.includes(theme) ? theme : 'feltro';
         document.body.dataset.tableTheme = nextTheme;
+        syncTableAmbientMusic();
 
         const lobbySelect = document.getElementById('tableThemeSelect');
         if (lobbySelect) lobbySelect.value = nextTheme;
@@ -11353,6 +11489,12 @@
           renderAll();
           await commitState();
         }
+      };
+
+      window.setTableAmbientEnabled = (enabled) => {
+        tableAmbientEnabled = enabled !== false;
+        if (tableAmbientEnabled) syncTableAmbientMusic();
+        else stopTableAmbientMusic(false);
       };
 
       window.debugSetDeckTheme = async (theme) => {
