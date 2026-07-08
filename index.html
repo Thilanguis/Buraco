@@ -13,7 +13,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
 
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Montserrat:wght@400;600;800;900&display=swap');
 
       :root {
         --bg-main: #020617;
@@ -2526,6 +2526,17 @@
         padding-right: 20px;
         margin: 0 auto; /* Isso garante que fique centralizado quando tiver pouca carta */
       }
+      .carta,
+      .discard-face {
+        --card-face-surface: var(--deck-card-face-surface, linear-gradient(180deg, #ffffff 0%, #f8fafc 100%));
+        --card-face-border: var(--deck-card-face-border, rgba(15, 23, 42, 0.82));
+        --card-face-inner: var(--deck-card-face-inner, rgba(15, 23, 42, 0.12));
+        --card-face-accent: var(--deck-card-face-accent, rgba(15, 23, 42, 0.26));
+        --card-face-mark: var(--deck-card-face-mark, none);
+        --card-face-mark-opacity: var(--deck-card-face-mark-opacity, 0);
+        --card-face-shadow: var(--deck-card-face-shadow, -1px 1px 4px rgba(0, 0, 0, 0.3));
+      }
+
       .carta {
         width: 60px;
         height: 90px;
@@ -2549,6 +2560,172 @@
         font-size: 14px;
         font-weight: bold;
         overflow: hidden;
+      }
+      .carta:not(.back),
+      .discard-face {
+        background-color: #fff;
+        background-image: var(--card-face-surface);
+        border: 1px solid var(--card-face-border);
+        border-color: var(--card-face-border);
+        box-sizing: border-box;
+        box-shadow: var(--card-face-shadow);
+        position: relative;
+      }
+      /* removida a linha interna da face da carta */
+      .carta:not(.back)::before,
+      .discard-face::before {
+        content: none;
+        display: none;
+      }
+      .carta:not(.back)::after,
+      .discard-face::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--card-face-mark);
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 78% 78%;
+        opacity: var(--card-face-mark-opacity);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .carta:not(.back) .carta-canto,
+      .carta:not(.back) .carta-meio,
+      .discard-face .carta-canto,
+      .discard-face .carta-meio {
+        position: relative;
+        z-index: 1;
+      }
+      .carta:not(.back) .carta-canto,
+      .discard-face .carta-canto {
+        text-shadow: 0 0 1px rgba(255, 255, 255, 0.55);
+      }
+      .carta:not(.back).deck-red,
+      .discard-face.deck-red {
+        --card-face-accent: var(--deck-face-red-accent, rgba(220, 38, 38, 0.26));
+        --card-face-border: var(--deck-face-red-border, var(--deck-card-face-border, rgba(127, 29, 29, 0.74)));
+        --card-face-inner: var(--deck-face-red-inner, var(--deck-card-face-inner, rgba(220, 38, 38, 0.16)));
+        --card-face-mark: var(--deck-face-red-mark, none);
+        --card-face-mark-opacity: var(--deck-face-red-mark-opacity, 0);
+      }
+      .carta:not(.back).deck-blue,
+      .discard-face.deck-blue {
+        --card-face-accent: var(--deck-face-blue-accent, rgba(37, 99, 235, 0.24));
+        --card-face-border: var(--deck-face-blue-border, var(--deck-card-face-border, rgba(30, 64, 175, 0.72)));
+        --card-face-inner: var(--deck-face-blue-inner, var(--deck-card-face-inner, rgba(37, 99, 235, 0.14)));
+        --card-face-mark: var(--deck-face-blue-mark, none);
+        --card-face-mark-opacity: var(--deck-face-blue-mark-opacity, 0);
+      }
+
+      /* ================================================================= */
+      /* FACE DAS CARTAS — VISUAL LIMPO POR TEMA                           */
+      /* Mantém a carta legível e muda identidade por fonte, símbolo e selo. */
+      /* ================================================================= */
+      .carta:not(.back).deck-red,
+      .discard-face.deck-red {
+        --card-face-surface: var(--deck-face-red-surface, var(--deck-card-face-surface));
+        --deck-current-accent: var(--deck-face-red-border, var(--deck-card-face-border));
+        --deck-center-badge-bg: var(--deck-face-red-center-bg, var(--deck-center-badge-bg-default, transparent));
+        --deck-center-badge-border: var(--deck-face-red-center-border, var(--deck-center-badge-border-default, transparent));
+      }
+
+      .carta:not(.back).deck-blue,
+      .discard-face.deck-blue {
+        --card-face-surface: var(--deck-face-blue-surface, var(--deck-card-face-surface));
+        --deck-current-accent: var(--deck-face-blue-border, var(--deck-card-face-border));
+        --deck-center-badge-bg: var(--deck-face-blue-center-bg, var(--deck-center-badge-bg-default, transparent));
+        --deck-center-badge-border: var(--deck-face-blue-center-border, var(--deck-center-badge-border-default, transparent));
+      }
+
+      .carta:not(.back),
+      .discard-face {
+        background: var(--card-face-surface) !important;
+        font-family: var(--deck-face-font, 'Montserrat', system-ui, -apple-system, sans-serif);
+      }
+
+      .carta:not(.back) .carta-canto,
+      .discard-face .carta-canto {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        min-width: 13px;
+        padding: 1px 2px;
+        border-radius: 4px;
+        font-family: var(--deck-rank-font, 'Montserrat', system-ui, -apple-system, sans-serif);
+        font-weight: var(--deck-rank-weight, 900);
+        letter-spacing: var(--deck-rank-spacing, -0.03em);
+        line-height: 0.88;
+        text-shadow: var(--deck-rank-shadow, none);
+      }
+
+      .carta:not(.back) .card-rank,
+      .discard-face .card-rank {
+        display: block;
+        transform: var(--deck-rank-transform, none);
+      }
+
+      .carta:not(.back) .card-suit,
+      .discard-face .card-suit {
+        display: block;
+        font-size: 0.82em;
+        line-height: 0.9;
+        margin-top: 1px;
+        opacity: var(--deck-corner-suit-opacity, 0.94);
+      }
+
+      .carta:not(.back) .carta-meio,
+      .discard-face .carta-meio {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--deck-center-size, 1.62em);
+        height: var(--deck-center-size, 1.62em);
+        align-self: center;
+        border-radius: var(--deck-center-radius, 999px);
+        border: none !important;
+        background: transparent !important;
+        font-family: var(--deck-center-font, var(--deck-rank-font, 'Montserrat', system-ui, -apple-system, sans-serif));
+        font-weight: var(--deck-center-weight, 900);
+        transform: scale(var(--deck-center-scale, 1));
+        text-shadow: var(--deck-center-shadow, none);
+      }
+
+      .carta:not(.back) .carta-meio::after,
+      .discard-face .carta-meio::after {
+        content: var(--deck-center-mini-mark, '');
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(var(--deck-center-mini-rotate, 0deg));
+        font-size: 0.82em;
+        line-height: 1;
+        color: var(--deck-current-accent, currentColor);
+        opacity: var(--deck-center-mini-opacity, 0);
+        pointer-events: none;
+      }
+
+      .carta:not(.back) .joker-symbol::after,
+      .discard-face .joker-symbol::after {
+        content: '';
+      }
+
+      .carta.mini .carta-canto {
+        min-width: 10px;
+        padding: 0 1px;
+      }
+
+      .carta.mini .carta-meio {
+        width: var(--deck-center-size-mini, 1.48em);
+        height: var(--deck-center-size-mini, 1.48em);
+      }
+
+      .discard-face .carta-meio {
+        width: var(--deck-center-size-discard, 1.5em);
+        height: var(--deck-center-size-discard, 1.5em);
       }
       .carta:last-child {
         margin-right: 0;
@@ -2667,6 +2844,292 @@
       }
 
       /* 3. ESTRUTURA BASE DOS BARALHOS */
+      body[data-deck-theme] {
+        --deck-card-face-surface:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.7), transparent 34%),
+          linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --deck-card-face-border: rgba(15, 23, 42, 0.82);
+        --deck-card-face-inner: rgba(15, 23, 42, 0.12);
+        --deck-card-face-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3);
+        --deck-face-red-accent: rgba(220, 38, 38, 0.24);
+        --deck-face-blue-accent: rgba(37, 99, 235, 0.22);
+        --deck-face-red-border: rgba(127, 29, 29, 0.74);
+        --deck-face-blue-border: rgba(30, 64, 175, 0.7);
+        --deck-face-red-inner: rgba(220, 38, 38, 0.15);
+        --deck-face-blue-inner: rgba(37, 99, 235, 0.13);
+        --deck-face-red-mark: none;
+        --deck-face-blue-mark: none;
+        --deck-face-red-mark-opacity: 0;
+        --deck-face-blue-mark-opacity: 0;
+      }
+
+      body[data-deck-theme='classico'] {
+        --deck-face-red-mark:
+          radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.9) 0 2px, transparent 3px),
+          linear-gradient(45deg, transparent 46%, rgba(220, 38, 38, 0.38) 47% 53%, transparent 54%);
+        --deck-face-blue-mark:
+          radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.86) 0 2px, transparent 3px),
+          linear-gradient(45deg, transparent 46%, rgba(37, 99, 235, 0.34) 47% 53%, transparent 54%);
+        --deck-face-red-mark-opacity: 0.045;
+        --deck-face-blue-mark-opacity: 0.04;
+      }
+
+      body[data-deck-theme='cassino'] {
+        --deck-card-face-surface:
+          linear-gradient(135deg, rgba(212, 175, 55, 0.12), transparent 34%),
+          linear-gradient(180deg, #fffdf5 0%, #f8f0dc 100%);
+        --deck-card-face-shadow: -1px 1px 5px rgba(0, 0, 0, 0.34);
+        --deck-face-red-accent: rgba(212, 175, 55, 0.34);
+        --deck-face-blue-accent: rgba(16, 185, 129, 0.3);
+        --deck-face-red-border: rgba(146, 64, 14, 0.72);
+        --deck-face-blue-border: rgba(6, 95, 70, 0.72);
+        --deck-face-red-inner: rgba(212, 175, 55, 0.24);
+        --deck-face-blue-inner: rgba(16, 185, 129, 0.2);
+        --deck-face-red-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72' r='28' fill='none' stroke='%23b45309' stroke-width='3' stroke-opacity='0.9'/%3E%3Ctext x='50' y='82' font-size='48' fill='%23b45309' font-family='Arial,sans-serif' font-weight='900' text-anchor='middle'%3E%24%3C/text%3E%3C/svg%3E");
+        --deck-face-blue-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M50 35 L82 72 L50 109 L18 72 Z' fill='none' stroke='%23059669' stroke-width='3' stroke-opacity='0.9'/%3E%3Ctext x='50' y='78' font-size='22' fill='%23059669' font-family='Arial,sans-serif' font-weight='900' text-anchor='middle'%3EPIX%3C/text%3E%3C/svg%3E");
+        --deck-face-red-mark-opacity: 0.055;
+        --deck-face-blue-mark-opacity: 0.05;
+      }
+
+      body[data-deck-theme='minimal'] {
+        --deck-card-face-surface: linear-gradient(180deg, #ffffff 0%, #f6f7fb 100%);
+        --deck-face-red-border: rgba(185, 28, 28, 0.62);
+        --deck-face-blue-border: rgba(29, 78, 216, 0.62);
+        --deck-face-red-inner: rgba(239, 68, 68, 0.13);
+        --deck-face-blue-inner: rgba(59, 130, 246, 0.13);
+      }
+
+      body[data-deck-theme='dominacao'] {
+        --deck-card-face-surface:
+          linear-gradient(135deg, rgba(2, 6, 23, 0.04), transparent 42%),
+          linear-gradient(180deg, #ffffff 0%, #eef7ff 100%);
+        --deck-face-red-accent: rgba(255, 20, 147, 0.3);
+        --deck-face-blue-accent: rgba(0, 188, 212, 0.3);
+        --deck-face-red-border: rgba(190, 24, 93, 0.7);
+        --deck-face-blue-border: rgba(8, 145, 178, 0.7);
+        --deck-face-red-inner: rgba(255, 20, 147, 0.22);
+        --deck-face-blue-inner: rgba(0, 188, 212, 0.2);
+        --deck-face-red-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='24' y='46' width='52' height='52' rx='8' fill='none' stroke='%23db2777' stroke-width='3' stroke-opacity='0.9' transform='rotate(45 50 72)'/%3E%3Ccircle cx='50' cy='72' r='9' fill='none' stroke='%23db2777' stroke-width='2'/%3E%3C/svg%3E");
+        --deck-face-blue-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='24' y='46' width='52' height='52' rx='8' fill='none' stroke='%2306b6d4' stroke-width='3' stroke-opacity='0.9' transform='rotate(45 50 72)'/%3E%3Ccircle cx='50' cy='72' r='9' fill='none' stroke='%2306b6d4' stroke-width='2'/%3E%3C/svg%3E");
+        --deck-face-red-mark-opacity: 0.055;
+        --deck-face-blue-mark-opacity: 0.055;
+      }
+
+      body[data-deck-theme='arcade'] {
+        --deck-card-face-surface:
+          repeating-linear-gradient(180deg, rgba(15, 23, 42, 0) 0 5px, rgba(15, 23, 42, 0.025) 6px),
+          linear-gradient(180deg, #fffdf7 0%, #f4f7ff 100%);
+        --deck-face-red-border: rgba(255, 53, 94, 0.72);
+        --deck-face-blue-border: rgba(0, 217, 255, 0.72);
+        --deck-face-red-inner: rgba(255, 214, 10, 0.2);
+        --deck-face-blue-inner: rgba(163, 255, 18, 0.17);
+        --deck-face-red-mark: linear-gradient(90deg, transparent 38%, rgba(255, 53, 94, 0.8) 39% 41%, transparent 42% 58%, rgba(255, 214, 10, 0.78) 59% 61%, transparent 62%);
+        --deck-face-blue-mark: linear-gradient(90deg, transparent 38%, rgba(0, 217, 255, 0.8) 39% 41%, transparent 42% 58%, rgba(163, 255, 18, 0.72) 59% 61%, transparent 62%);
+        --deck-face-red-mark-opacity: 0.035;
+        --deck-face-blue-mark-opacity: 0.035;
+      }
+
+      body[data-deck-theme='mythic'] {
+        --deck-card-face-surface:
+          radial-gradient(circle at 50% 8%, rgba(250, 204, 21, 0.12), transparent 34%),
+          linear-gradient(180deg, #fffaf5 0%, #f9f0f5 100%);
+        --deck-face-red-accent: rgba(244, 114, 182, 0.32);
+        --deck-face-blue-accent: rgba(34, 211, 238, 0.3);
+        --deck-face-red-border: rgba(180, 83, 9, 0.7);
+        --deck-face-blue-border: rgba(8, 145, 178, 0.68);
+        --deck-face-red-inner: rgba(244, 114, 182, 0.2);
+        --deck-face-blue-inner: rgba(34, 211, 238, 0.18);
+        --deck-face-red-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72' r='30' fill='none' stroke='%23be185d' stroke-width='2.5'/%3E%3Cpath d='M50 38 L56 52 H72 L60 62 L65 80 L50 70 L35 80 L40 62 L28 52 H44 Z' fill='none' stroke='%23b45309' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --deck-face-blue-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72' r='30' fill='none' stroke='%230e7490' stroke-width='2.5'/%3E%3Cpath d='M50 38 L56 52 H72 L60 62 L65 80 L50 70 L35 80 L40 62 L28 52 H44 Z' fill='none' stroke='%2306b6d4' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --deck-face-red-mark-opacity: 0.052;
+        --deck-face-blue-mark-opacity: 0.052;
+      }
+
+      body[data-deck-theme='holografico'] {
+        --deck-card-face-surface:
+          linear-gradient(125deg, rgba(255, 0, 60, 0.08), rgba(0, 210, 255, 0.08), rgba(255, 255, 255, 0.7)),
+          linear-gradient(180deg, #ffffff 0%, #f5fbff 100%);
+        --deck-face-red-border: rgba(244, 63, 94, 0.56);
+        --deck-face-blue-border: rgba(14, 165, 233, 0.56);
+        --deck-face-red-inner: rgba(244, 63, 94, 0.16);
+        --deck-face-blue-inner: rgba(14, 165, 233, 0.16);
+        --deck-face-red-mark: linear-gradient(125deg, rgba(255, 0, 60, 0.78), rgba(255, 115, 0, 0.72), rgba(255, 0, 60, 0.78));
+        --deck-face-blue-mark: linear-gradient(125deg, rgba(0, 210, 255, 0.78), rgba(112, 0, 255, 0.72), rgba(0, 210, 255, 0.78));
+        --deck-face-red-mark-opacity: 0.035;
+        --deck-face-blue-mark-opacity: 0.035;
+      }
+
+
+      /* ================================================================= */
+      /* IDENTIDADE LIMPA DAS FACES POR TEMA                               */
+      /* ================================================================= */
+      body[data-deck-theme] {
+        --deck-rank-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-center-font: var(--deck-rank-font);
+        --deck-rank-weight: 900;
+        --deck-center-weight: 900;
+        --deck-rank-spacing: -0.03em;
+        --deck-rank-shadow: none;
+        --deck-center-shadow: none;
+        --deck-center-scale: 1;
+        --deck-center-badge-bg-default: transparent;
+        --deck-center-badge-border-default: transparent;
+        --deck-center-mini-mark: '';
+        --deck-center-mini-opacity: 0;
+        --deck-face-red-surface: var(--deck-card-face-surface);
+        --deck-face-blue-surface: var(--deck-card-face-surface);
+      }
+
+      body[data-deck-theme='classico'] {
+        --deck-rank-font: Georgia, 'Times New Roman', serif;
+        --deck-center-font: Georgia, 'Times New Roman', serif;
+        --deck-rank-weight: 700;
+        --deck-center-weight: 700;
+        --deck-rank-spacing: -0.06em;
+        --deck-rank-shadow: none;
+        --deck-center-shadow: none;
+        --deck-card-face-surface:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.95), transparent 36%),
+          linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --deck-face-red-surface:
+          linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+        --deck-face-blue-surface:
+          linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+        --deck-face-red-mark-opacity: 0.028;
+        --deck-face-blue-mark-opacity: 0.026;
+        --deck-center-badge-bg-default: rgba(15, 23, 42, 0.025);
+        --deck-center-badge-border-default: rgba(15, 23, 42, 0.08);
+      }
+
+      body[data-deck-theme='cassino'] {
+        --deck-rank-font: 'Cinzel', 'Trajan Pro', Georgia, serif;
+        --deck-center-font: 'Cinzel', 'Trajan Pro', Georgia, serif;
+        --deck-rank-weight: 900;
+        --deck-center-weight: 900;
+        --deck-rank-spacing: -0.02em;
+        --deck-rank-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 5px rgba(180, 83, 9, 0.18);
+        --deck-center-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 7px rgba(180, 83, 9, 0.2);
+        --deck-card-face-surface:
+          linear-gradient(135deg, rgba(212, 175, 55, 0.08), transparent 42%),
+          linear-gradient(180deg, #fffef8 0%, #faf4e5 100%);
+        --deck-face-red-surface:
+          linear-gradient(180deg, #fffef8 0%, #fbf0df 100%);
+        --deck-face-blue-surface:
+          linear-gradient(180deg, #fffef8 0%, #eef8f1 100%);
+        --deck-face-red-mark-opacity: 0.038;
+        --deck-face-blue-mark-opacity: 0.035;
+        --deck-center-badge-bg-default:
+          radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.75), transparent 34%),
+          rgba(212, 175, 55, 0.13);
+        --deck-center-badge-border-default: rgba(180, 83, 9, 0.24);
+        --deck-center-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+      }
+
+      body[data-deck-theme='minimal'] {
+        --deck-rank-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --deck-center-font: var(--deck-rank-font);
+        --deck-rank-weight: 800;
+        --deck-rank-spacing: -0.04em;
+        --deck-card-face-surface: linear-gradient(180deg, #ffffff 0%, #f7f8fb 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #ffffff 0%, #fffafa 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        --deck-card-face-inner: rgba(15, 23, 42, 0.07);
+        --deck-center-scale: 0.96;
+        --deck-center-badge-bg-default: transparent;
+        --deck-center-badge-border-default: transparent;
+        --deck-face-red-mark-opacity: 0;
+        --deck-face-blue-mark-opacity: 0;
+      }
+
+      body[data-deck-theme='dominacao'] {
+        --deck-rank-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-center-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-rank-weight: 900;
+        --deck-rank-spacing: -0.08em;
+        --deck-rank-transform: skew(-3deg);
+        --deck-card-face-surface:
+          linear-gradient(135deg, rgba(2, 6, 23, 0.035), transparent 42%),
+          linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #ffffff 0%, #fff4fb 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #ffffff 0%, #effcff 100%);
+        --deck-face-red-center-bg: rgba(219, 39, 119, 0.075);
+        --deck-face-blue-center-bg: rgba(6, 182, 212, 0.075);
+        --deck-face-red-center-border: rgba(219, 39, 119, 0.22);
+        --deck-face-blue-center-border: rgba(6, 182, 212, 0.22);
+        --deck-face-red-mark-opacity: 0.04;
+        --deck-face-blue-mark-opacity: 0.04;
+        --deck-center-mini-mark: '◇';
+        --deck-center-mini-opacity: 0.13;
+        --deck-center-mini-rotate: 45deg;
+      }
+
+      body[data-deck-theme='arcade'] {
+        --deck-rank-font: 'Courier New', ui-monospace, monospace;
+        --deck-center-font: 'Courier New', ui-monospace, monospace;
+        --deck-rank-weight: 900;
+        --deck-rank-spacing: -0.12em;
+        --deck-rank-shadow: 1px 0 rgba(0, 0, 0, 0.12);
+        --deck-card-face-surface:
+          repeating-linear-gradient(180deg, rgba(15, 23, 42, 0.03) 0 1px, transparent 1px 7px),
+          linear-gradient(180deg, #fffefd 0%, #f4f7ff 100%);
+        --deck-face-red-surface:
+          repeating-linear-gradient(180deg, rgba(255, 53, 94, 0.035) 0 1px, transparent 1px 7px),
+          linear-gradient(180deg, #fffefd 0%, #fff6f8 100%);
+        --deck-face-blue-surface:
+          repeating-linear-gradient(180deg, rgba(0, 217, 255, 0.04) 0 1px, transparent 1px 7px),
+          linear-gradient(180deg, #fffefd 0%, #f2fcff 100%);
+        --deck-face-red-mark-opacity: 0.03;
+        --deck-face-blue-mark-opacity: 0.03;
+        --deck-center-badge-bg-default: rgba(15, 23, 42, 0.035);
+        --deck-center-badge-border-default: rgba(15, 23, 42, 0.12);
+        --deck-center-mini-mark: '▣';
+        --deck-center-mini-opacity: 0.11;
+      }
+
+      body[data-deck-theme='mythic'] {
+        --deck-rank-font: Georgia, 'Times New Roman', serif;
+        --deck-center-font: Georgia, 'Times New Roman', serif;
+        --deck-rank-weight: 800;
+        --deck-rank-spacing: -0.05em;
+        --deck-card-face-surface:
+          radial-gradient(circle at 50% 12%, rgba(250, 204, 21, 0.09), transparent 34%),
+          linear-gradient(180deg, #fffdf8 0%, #fbf3f7 100%);
+        --deck-face-red-surface:
+          radial-gradient(circle at 50% 12%, rgba(244, 114, 182, 0.08), transparent 34%),
+          linear-gradient(180deg, #fffdf8 0%, #fff5fb 100%);
+        --deck-face-blue-surface:
+          radial-gradient(circle at 50% 12%, rgba(34, 211, 238, 0.08), transparent 34%),
+          linear-gradient(180deg, #fffdf8 0%, #f0fdff 100%);
+        --deck-face-red-mark-opacity: 0.04;
+        --deck-face-blue-mark-opacity: 0.04;
+        --deck-center-badge-bg-default: rgba(250, 204, 21, 0.07);
+        --deck-center-badge-border-default: rgba(180, 83, 9, 0.18);
+        --deck-center-mini-mark: '✦';
+        --deck-center-mini-opacity: 0.14;
+      }
+
+      body[data-deck-theme='holografico'] {
+        --deck-rank-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-center-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-rank-weight: 900;
+        --deck-rank-spacing: -0.07em;
+        --deck-card-face-surface:
+          linear-gradient(125deg, rgba(255, 0, 60, 0.045), rgba(0, 210, 255, 0.055), rgba(255, 255, 255, 0.55)),
+          linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        --deck-face-red-surface:
+          linear-gradient(125deg, rgba(244, 63, 94, 0.055), rgba(255, 255, 255, 0.6)),
+          linear-gradient(180deg, #ffffff 0%, #fff8fb 100%);
+        --deck-face-blue-surface:
+          linear-gradient(125deg, rgba(14, 165, 233, 0.06), rgba(255, 255, 255, 0.6)),
+          linear-gradient(180deg, #ffffff 0%, #f5fcff 100%);
+        --deck-face-red-mark-opacity: 0.03;
+        --deck-face-blue-mark-opacity: 0.03;
+        --deck-center-badge-bg-default:
+          linear-gradient(135deg, rgba(255, 0, 90, 0.08), rgba(0, 210, 255, 0.09));
+        --deck-center-badge-border-default: rgba(14, 165, 233, 0.16);
+        --deck-center-shadow: 0 0 5px rgba(14, 165, 233, 0.16);
+      }
+
       .back-red,
       .fly-card.back:not(.back-blue),
       .opponent-card-back:not(.back-blue),
@@ -4751,6 +5214,22 @@
             </select>
           </label>
 
+          <label style="display: flex; flex-direction: column; gap: 4px; color: #facc15; font-size: 9px; font-weight: 900; text-transform: uppercase">
+            Baralho
+            <select
+              id="debugDeckThemeSelect"
+              onchange="debugSetDeckTheme(this.value)"
+              style="width: 100%; margin: 0; padding: 6px; border-radius: 6px; border: 1px solid rgba(250, 204, 21, 0.45); background: rgba(15, 23, 42, 0.96); color: #fff; font-size: 10px; font-weight: 800">
+              <option value="classico">Clássico</option>
+              <option value="cassino">Cassino</option>
+              <option value="minimal">Minimalista</option>
+              <option value="dominacao">Dominação</option>
+              <option value="arcade">Arcade</option>
+              <option value="mythic">Mítico</option>
+              <option value="holografico">Holográfico</option>
+            </select>
+          </label>
+
           <div style="border-top: 1px dashed rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 6px; display: flex; flex-direction: column; gap: 6px">
             <button onclick="debugRestartGame()" style="font-size: 10px; padding: 6px; background: #7c3aed; font-weight: bold">🔄 Reiniciar Partida</button>
             <button onclick="debugEndGame()" style="font-size: 10px; padding: 6px; background: #000; border: 1px solid #ef4444">❌ Terminar Jogo</button>
@@ -5834,12 +6313,16 @@
         return card.joker ? 'joker-card' : card.suit === '♥' || card.suit === '♦' ? 'hearts' : 'spades';
       }
 
+      function deckFaceClass(card) {
+        return card?.back === 'blue' ? 'deck-blue' : 'deck-red';
+      }
+
       function cardFrontHTML(card) {
         if (!card) return ''; // Retorna vazio se for fantasma
         if (card.joker) {
-          return `<div class="carta-canto top">JOKER</div><div class="carta-meio">★</div><div class="carta-canto bottom">JOKER</div>`;
+          return `<div class="carta-canto top joker-label"><span class="card-rank">JOKER</span></div><div class="carta-meio joker-symbol">★</div><div class="carta-canto bottom joker-label"><span class="card-rank">JOKER</span></div>`;
         }
-        return `<div class="carta-canto top">${card.rank}<br>${card.suit}</div><div class="carta-meio">${card.suit}</div><div class="carta-canto bottom">${card.rank}<br>${card.suit}</div>`;
+        return `<div class="carta-canto top"><span class="card-rank">${card.rank}</span><span class="card-suit">${card.suit}</span></div><div class="carta-meio">${card.suit}</div><div class="carta-canto bottom"><span class="card-rank">${card.rank}</span><span class="card-suit">${card.suit}</span></div>`;
       }
 
       function getRect(el) {
@@ -5849,7 +6332,7 @@
 
       function makeFlyEl(card, face = 'front') {
         const el = document.createElement('div');
-        el.className = `carta fly-card ${suitClass(card)}`;
+        el.className = `carta fly-card ${suitClass(card)} ${deckFaceClass(card)}`;
         if (face === 'back') {
           el.classList.add('back');
           el.classList.add(card.back === 'blue' ? 'back-blue' : 'back-red');
@@ -7932,6 +8415,10 @@
         if (debugTableThemeSelect && debugTableThemeSelect.value !== document.body.dataset.tableTheme) {
           debugTableThemeSelect.value = document.body.dataset.tableTheme;
         }
+        const debugDeckThemeSelect = document.getElementById('debugDeckThemeSelect');
+        if (debugDeckThemeSelect && debugDeckThemeSelect.value !== document.body.dataset.deckTheme) {
+          debugDeckThemeSelect.value = document.body.dataset.deckTheme;
+        }
         syncMythicPhase();
 
         // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
@@ -8081,6 +8568,7 @@
           discardFace.style.zIndex = 20;
 
           discardFace.innerHTML = cardFrontHTML(discardTop);
+          discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}`;
           discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
         }
 
@@ -8303,7 +8791,7 @@
           ensureCardId(card);
           const div = document.createElement('div');
           div.dataset.cardId = card.id;
-          div.className = 'carta ' + (card.joker ? 'joker-card' : card.suit === '♥' || card.suit === '♦' ? 'hearts' : 'spades');
+          div.className = `carta ${suitClass(card)} ${deckFaceClass(card)}`;
 
           // O Brilho visual, isolado da lógica de clique
           if (state.boughtCardIds && state.boughtCardIds.includes(card.id)) {
@@ -8528,7 +9016,7 @@
               ensureCardId(cdata);
               const c = document.createElement('div');
               // Mantém a classe .mini para o tamanho, mas o HTML agora é o padrão da sua mão
-              c.className = 'carta mini ' + (cdata.joker ? 'joker-card' : cdata.suit === '♥' || cdata.suit === '♦' ? 'hearts' : 'spades');
+              c.className = `carta mini ${suitClass(cdata)} ${deckFaceClass(cdata)}`;
               c.dataset.cardId = cdata.id;
 
               // Usa exatamente o mesmo HTML que renderiza a sua mão
@@ -8721,7 +9209,7 @@
                 return;
               }
 
-              minic.className = 'carta mini ' + (c.joker ? 'joker-card' : c.suit === '♥' || c.suit === '♦' ? 'hearts' : 'spades');
+              minic.className = `carta mini ${suitClass(c)} ${deckFaceClass(c)}`;
               minic.dataset.cardIndex = cidx;
               minic.innerHTML = cardFrontHTML(c);
 
@@ -8735,7 +9223,7 @@
               if (!last) return;
 
               const closed = document.createElement('div');
-              closed.className = 'carta mini canastra-fechada ' + (last.joker ? 'joker-card' : last.suit === '♥' || last.suit === '♦' ? 'hearts' : 'spades');
+              closed.className = `carta mini canastra-fechada ${suitClass(last)} ${deckFaceClass(last)}`;
               closed.dataset.cardIndex = meld.length - 1;
               closed.innerHTML = cardFrontHTML(last);
 
@@ -9488,12 +9976,15 @@
           const df = document.getElementById('discardFace');
           let prevHtml = null;
           let prevColor = null;
+          let prevClass = null;
 
           if (df && state.discard.length > 1) {
             const prevCard = state.discard[state.discard.length - 2];
             prevHtml = df.innerHTML;
             prevColor = df.style.color;
+            prevClass = df.className;
             df.innerHTML = cardFrontHTML(prevCard);
+            df.className = `discard-face ${suitClass(prevCard)} ${deckFaceClass(prevCard)}`;
             df.style.color = prevCard.joker ? '#000' : prevCard.suit === '♥' || prevCard.suit === '♦' ? '#b91c1c' : '#000';
           } else if (df) {
             df.style.visibility = 'hidden';
@@ -9505,6 +9996,7 @@
           if (df) {
             if (prevHtml) {
               df.innerHTML = prevHtml;
+              if (prevClass) df.className = prevClass;
               df.style.color = prevColor;
             }
             df.style.visibility = '';
@@ -10858,6 +11350,24 @@
 
         if (state) {
           state.tableTheme = nextTheme;
+          renderAll();
+          await commitState();
+        }
+      };
+
+      window.debugSetDeckTheme = async (theme) => {
+        const allowedDeckThemes = ['classico', 'cassino', 'minimal', 'dominacao', 'arcade', 'mythic', 'holografico'];
+        const nextTheme = allowedDeckThemes.includes(theme) ? theme : 'classico';
+        document.body.dataset.deckTheme = nextTheme;
+
+        const lobbySelect = document.getElementById('deckThemeSelect');
+        if (lobbySelect) lobbySelect.value = nextTheme;
+
+        const debugSelect = document.getElementById('debugDeckThemeSelect');
+        if (debugSelect && debugSelect.value !== nextTheme) debugSelect.value = nextTheme;
+
+        if (state) {
+          state.deckTheme = nextTheme;
           renderAll();
           await commitState();
         }
