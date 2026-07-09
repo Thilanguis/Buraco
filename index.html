@@ -581,10 +581,18 @@
           --table-flash-filter: none !important;
         }
         #gameSection::before {
+          /* iPadOS pode piscar ao animar mask-position em uma camada fullscreen.
+             Mantemos a vida do tema com deslocamento suave do desenho de fundo. */
+          -webkit-mask-image: none !important;
+          -webkit-mask-size: auto !important;
+          -webkit-mask-position: center !important;
+          mask-image: none !important;
+          mask-size: auto !important;
+          mask-position: center !important;
+          mix-blend-mode: normal !important;
           filter: none !important;
-          transform: translateZ(0);
-          backface-visibility: hidden;
-          will-change: opacity, background-position, mask-position;
+          animation: tableTabletBackgroundDrift 18s ease-in-out infinite !important;
+          will-change: auto;
         }
         #gameSection::after {
           content: none !important;
@@ -592,6 +600,17 @@
           animation: none !important;
           filter: none !important;
           opacity: 0 !important;
+        }
+      }
+      @keyframes tableTabletBackgroundDrift {
+        0%,
+        100% {
+          background-position: center;
+          opacity: var(--table-light-opacity);
+        }
+        50% {
+          background-position: 28px -20px;
+          opacity: calc(var(--table-light-opacity) + 0.045);
         }
       }
       @keyframes tableLightStill {
