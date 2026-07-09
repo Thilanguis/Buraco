@@ -263,6 +263,73 @@
         margin-bottom: 20px;
         font-size: 11px;
       }
+
+      .menu-form {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .menu-block {
+        border: 1px solid rgba(212, 175, 55, 0.22);
+        border-radius: 14px;
+        padding: 12px;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.74), rgba(2, 6, 23, 0.52));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.04),
+          0 12px 24px rgba(0, 0, 0, 0.22);
+      }
+
+      .menu-block-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        color: #facc15;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+      }
+
+      .menu-block-title::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(250, 204, 21, 0.44), transparent);
+      }
+
+      .menu-block-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .menu-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .menu-field label {
+        margin: 0 !important;
+      }
+
+      .menu-field input,
+      .menu-field select {
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+
+      .menu-block-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .menu-block-start {
+        padding-top: 4px;
+      }
       label {
         font-size: 11px;
         color: #cbd5e1;
@@ -283,16 +350,19 @@
       input,
       select {
         width: 100%;
-        padding: 12px;
+        min-height: 46px;
+        padding: 13px 14px;
         margin-top: 4px;
         margin-bottom: 12px;
-        border-radius: 8px;
+        border-radius: 10px;
         /* Troca a borda branca por um ouro fosco */
         border: 1px solid rgba(212, 175, 55, 0.3);
         /* Escurece o fundo e dá efeito de baixo-relevo (afundado no painel) */
         background: rgba(0, 0, 0, 0.8);
         box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.9);
         color: white;
+        font-size: 12px;
+        font-weight: 700;
         transition: all 0.3s;
         color-scheme: dark;
       }
@@ -349,35 +419,37 @@
       .deck-preview-wrap {
         position: relative;
         width: 100%;
-        margin-bottom: 12px;
+        margin-bottom: 0;
       }
 
       .deck-preview-select {
         width: 100% !important;
+        min-height: 52px;
         margin: 0 !important;
-        padding-left: 62px !important;
+        padding-left: 82px !important;
       }
 
       .deck-preview-card {
         position: absolute;
         top: 50%;
-        width: 24px;
-        height: 34px;
-        border-radius: 3px;
+        width: 32px;
+        height: 46px;
+        border-radius: 5px;
         pointer-events: none;
         overflow: hidden;
         isolation: isolate;
         z-index: 0;
+        filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.5));
       }
 
       .deck-preview-card-red {
-        left: 12px;
+        left: 14px;
         transform: translateY(-50%);
         z-index: 2;
       }
 
       .deck-preview-card-blue {
-        left: 24px;
+        left: 32px;
         transform: translateY(-50%) rotate(8deg);
         z-index: 1;
       }
@@ -1293,24 +1365,28 @@
       .table-preview-wrap {
         position: relative;
         width: 100%;
-        margin-bottom: 12px;
+        margin-bottom: 0;
       }
       .table-preview-select {
         width: 100% !important;
+        min-height: 52px;
         margin: 0 !important;
-        padding-left: 45px !important;
+        padding-left: 62px !important;
       }
       .table-preview-icon {
         position: absolute;
         top: 50%;
-        left: 12px;
+        left: 14px;
         transform: translateY(-50%);
-        width: 22px;
-        height: 22px;
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
-        border: 1.5px solid #d4af37;
+        border: 2px solid #d4af37;
         pointer-events: none;
         z-index: 2;
+        box-shadow:
+          inset 0 0 10px rgba(255, 255, 255, 0.1),
+          0 6px 12px rgba(0, 0, 0, 0.45);
         transition: background 0.3s ease-in-out;
       }
       /* Dinâmica de cores da amostra baseada no tema selecionado */
@@ -4597,9 +4673,24 @@
         }
         input,
         select {
-          padding: 8px;
+          min-height: 42px;
+          padding: 10px 11px;
           margin-bottom: 6px;
           font-size: 11px;
+        }
+        .menu-form {
+          gap: 9px;
+        }
+        .menu-block {
+          padding: 10px;
+          border-radius: 12px;
+        }
+        .menu-block-title {
+          margin-bottom: 8px;
+          font-size: 10px;
+        }
+        .menu-block-grid {
+          gap: 8px;
         }
         #startBtn {
           padding: 12px;
@@ -4607,19 +4698,27 @@
           margin-top: 4px;
         }
         .deck-preview-card {
-          width: 18px;
-          height: 26px;
+          width: 28px;
+          height: 40px;
+        }
+        .deck-preview-card-red {
+          left: 12px;
+        }
+        .deck-preview-card-blue {
+          left: 28px;
         }
         .deck-preview-select {
-          padding-left: 45px !important;
+          min-height: 46px;
+          padding-left: 72px !important;
         }
         .table-preview-icon {
-          width: 18px;
-          height: 18px;
-          left: 10px;
+          width: 30px;
+          height: 30px;
+          left: 12px;
         }
         .table-preview-select {
-          padding-left: 36px !important;
+          min-height: 46px;
+          padding-left: 56px !important;
         }
       }
 
@@ -5194,256 +5293,282 @@
             </h2>
             <small>Configuração da sala</small>
           </div>
-          <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px">
+          <div class="menu-form">
             <div id="menuError" style="color: #ef4444; font-size: 12px; font-weight: bold; text-align: center; display: none"></div>
 
-            <label>
-              Modo
-              <select
-                id="modeSelect"
-                required
-                onchange="
-                  updateMenuDynamic();
-                  pushLobby();
-                ">
-                <option value="" disabled selected>Selecione...</option>
-                <option value="1x1">1x1 Clássico</option>
-                <option value="2x2">2x2 Clássico</option>
-                <option value="1x2">1x2 (Solo vs Dupla)</option>
-                <option value="1x3">1x3 (Solo vs Trio)</option>
-                <option value="1x1_duploMorto">1x1 Humilhação</option>
-                <option value="1x1_dominacao">1x1 Dominação Completa</option>
-              </select>
-            </label>
+            <div class="menu-block">
+              <div class="menu-block-title">🃏 Partida</div>
+              <div class="menu-block-grid">
+                <div class="menu-field">
+                  <label for="modeSelect">Modo</label>
+                  <select
+                    id="modeSelect"
+                    required
+                    onchange="
+                      updateMenuDynamic();
+                      pushLobby();
+                    ">
+                    <option value="" disabled selected>Selecione...</option>
+                    <option value="1x1">1x1 Clássico</option>
+                    <option value="2x2">2x2 Clássico</option>
+                    <option value="1x2">1x2 (Solo vs Dupla)</option>
+                    <option value="1x3">1x3 (Solo vs Trio)</option>
+                    <option value="1x1_duploMorto">1x1 Humilhação</option>
+                    <option value="1x1_dominacao">1x1 Dominação Completa</option>
+                  </select>
+                </div>
 
-            <div id="humiliationRules" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; font-size: 11px; color: #fca5a5; line-height: 1.4">
-              <strong id="humiliationTitle">Regras Especiais:</strong>
-              <br />
-              - O
-              <strong style="color: #cbd5e1">Escravo (J1)</strong>
-              joga o buraco normal com 1 morto.
-              <br />
-              - O
-              <strong style="color: #facc15">Dominador (J2)</strong>
-              tem privilégios: possui
-              <strong>2 mortos</strong>
-              e puxa
-              <strong>2 cartas</strong>
-              de cada vez do monte!
-              <br />
-              - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
-              <br />
-              <span id="dominacaoExtra" style="display: none; color: #facc15; font-weight: bold; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px; display: block">
-                🔥 PLUS DOMINAÇÃO: Toda vez que formar ou evoluir um jogo:
-                <br />
-                <span style="color: #4ade80">◆ Limpa:</span>
-                Compra +1 carta do monte
-                <br />
-                <span style="color: #22d3ee">◆ Real:</span>
-                Compra +2 cartas do monte
-                <br />
-                <span style="color: #c084fc">◆ Ás-a-Ás:</span>
-                Compra +3 cartas do monte
-                <br />
-                <br />
-                <span style="color: #a855f7; font-weight: 900">👁️ VISÃO DO DOMINADOR:</span>
-                1x por partida, no seu turno, veja a mão do Escravo e roube até 2 cartas no lugar de comprar da mesa!
-              </span>
-            </div>
+                <div
+                  id="humiliationRules"
+                  style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px dashed #ef4444; padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; font-size: 11px; color: #fca5a5; line-height: 1.4">
+                  <strong id="humiliationTitle">Regras Especiais:</strong>
+                  <br />
+                  - O
+                  <strong style="color: #cbd5e1">Escravo (J1)</strong>
+                  joga o buraco normal com 1 morto.
+                  <br />
+                  - O
+                  <strong style="color: #facc15">Dominador (J2)</strong>
+                  tem privilégios: possui
+                  <strong>2 mortos</strong>
+                  e puxa
+                  <strong>2 cartas</strong>
+                  de cada vez do monte!
+                  <br />
+                  - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
+                  <br />
+                  <span id="dominacaoExtra" style="display: none; color: #facc15; font-weight: bold; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px; display: block">
+                    🔥 PLUS DOMINAÇÃO: Toda vez que formar ou evoluir um jogo:
+                    <br />
+                    <span style="color: #4ade80">◆ Limpa:</span>
+                    Compra +1 carta do monte
+                    <br />
+                    <span style="color: #22d3ee">◆ Real:</span>
+                    Compra +2 cartas do monte
+                    <br />
+                    <span style="color: #c084fc">◆ Ás-a-Ás:</span>
+                    Compra +3 cartas do monte
+                    <br />
+                    <br />
+                    <span style="color: #a855f7; font-weight: 900">👁️ VISÃO DO DOMINADOR:</span>
+                    1x por partida, no seu turno, veja a mão do Escravo e roube até 2 cartas no lugar de comprar da mesa!
+                  </span>
+                </div>
 
-            <label>
-              Regra
-              <select id="variantSelect" required onchange="pushLobby()">
-                <option value="" disabled selected>Selecione...</option>
-                <option value="aberto">Aberto</option>
-                <option value="fechado">Fechado</option>
-              </select>
-            </label>
-            <label style="margin-bottom: 2px">Baralho</label>
-            <div class="deck-preview-wrap">
-              <div class="back-red deck-preview-card deck-preview-card-red"></div>
-              <div class="back-blue deck-preview-card deck-preview-card-blue"></div>
+                <div class="menu-field">
+                  <label for="variantSelect">Regra</label>
+                  <select id="variantSelect" required onchange="pushLobby()">
+                    <option value="" disabled selected>Selecione...</option>
+                    <option value="aberto">Aberto</option>
+                    <option value="fechado">Fechado</option>
+                  </select>
+                </div>
 
-              <select
-                id="deckThemeSelect"
-                class="deck-preview-select"
-                onchange="
-                  updateMenuDynamic();
-                  pushLobby();
-                ">
-                <option value="classico" selected>Clássico (Vermelho / Azul)</option>
-                <option value="cassino">Cassino (Ouro Negro / Verde PIX)</option>
-                <option value="minimal">Minimalista (Sólido Liso)</option>
-                <option value="dominacao">Dominação (Neon Tech / FinDom)</option>
-                <option value="arcade">Arcade (Player 1 / Player 2)</option>
-                <option value="mythic">✨ Mítico (Findom Animado)</option>
-                <option value="holografico">💎 Holográfico (Prisma Animado)</option>
-              </select>
-            </div>
-
-            <label style="margin-bottom: 2px">Fundo da Mesa</label>
-            <div class="table-preview-wrap">
-              <div class="table-preview-icon"></div>
-              <select
-                id="tableThemeSelect"
-                class="table-preview-select"
-                onchange="
-                  updateMenuDynamic();
-                  pushLobby();
-                ">
-                <option value="feltro" selected>Feltro Verde Clássico</option>
-                <option value="cassino">Veludo Vermelho Cassino</option>
-                <option value="masmorra">Masmorra de Luxo (Neon Purple)</option>
-                <option value="ostentacao">Ostentação (Ouro & Veludo Negro)</option>
-                <option value="submissao">Submissão Total (Latex & Pink Glow)</option>
-                <option value="findom">Dominação Financeira (Grafite & Ouro Verde)</option>
-              </select>
-            </div>
-            <label>
-              Sou
-              <select id="localPlayerSelect">
-                <option value="" selected>Espectador (Apenas Bots)</option>
-                <option value="0">Jogador 1</option>
-                <option value="1">Jogador 2</option>
-                <option value="2">Jogador 3</option>
-                <option value="3">Jogador 4</option>
-              </select>
-            </label>
-
-            <label style="margin-top: 10px; color: #facc15; font-weight: bold">
-              Valendo dinheiro?
-              <select
-                id="betToggle"
-                required
-                onchange="
-                  document.getElementById('betConfig').style.display = this.value === 'sim' ? 'block' : 'none';
-                  pushLobby();
-                ">
-                <option value="" disabled selected>Selecione...</option>
-                <option value="nao">Não</option>
-                <option value="sim">Sim</option>
-              </select>
-            </label>
-
-            <div id="betConfig" style="display: none; background: rgba(0, 0, 0, 0.4); border: 1px dashed rgba(212, 175, 55, 0.3); padding: 10px; border-radius: 8px; margin-top: 5px; margin-bottom: 5px; text-align: center; line-height: 1.5">
-              <strong style="color: #facc15; font-size: 11px; text-transform: uppercase; letter-spacing: 1px">💰 REGRAS DE PAGAMENTO (PIX)</strong>
-
-              <div style="text-align: left; margin-top: 8px; font-size: 10px; color: #cbd5e1; background: rgba(0, 0, 0, 0.4); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05)">
-                ✅
-                <strong>Vitória:</strong>
-                R$ 5,00
-                <br />
-                🛑
-                <strong>Adv. Sem Morto:</strong>
-                +R$ 8,00
-                <br />
-                📈
-                <strong>Diferença:</strong>
-                R$ 0,01 por ponto
-                <br />
-                ☠️
-                <strong>Adv. Negativo:</strong>
-                +R$ 0,05 por ponto negativo
-                <br />
-                ⭐
-                <strong>Bônus Ás-a-Ás:</strong>
-                1º(+R$3) | 2º(+R$4) | 3º(+R$5) | 4º(+R$15)
-                <br />
-                🩸
-                <strong>Humilhação:</strong>
-                +R$ 10,00 (Vencer sem adv. fazer canastra)
-                <br />
-                🃏
-                <strong>Chuva de Canastras:</strong>
-                4ª(+R$2) | 5ª(+R$3) | 6ª(+R$4) | 7ª(+R$5) | 8ª em diante(+R$5/cada)
-              </div>
-              <input id="betBase" type="hidden" value="5" />
-              <input id="betPerPoint" type="hidden" value="0.01" />
-
-              <div id="pixContainer" style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-                <input id="pixTeam1" value="" placeholder="PIX Time 1" style="margin: 0; font-size: 11px" />
-                <input id="pixTeam2" value="" placeholder="PIX Time 2" style="margin: 0; font-size: 11px" />
-              </div>
-
-              <div style="margin-top: 8px; font-size: 9px; color: #9ca3af; text-align: left; line-height: 1.4; background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05)">
-                <strong style="color: #cbd5e1">Formatos aceitos:</strong>
-                CPF/CNPJ, E-mail ou Chave Aleatória.
-                <br />
-                <span style="color: #facc15">⚠️ Para Celular:</span>
-                Use o código do país (ex:
-                <strong>+55</strong>
-                ) ou parênteses
-                <strong>( )</strong>
-                no DDD para o sistema não confundir com CPF.
+                <div class="menu-field">
+                  <label for="localPlayerSelect">Sou</label>
+                  <select id="localPlayerSelect">
+                    <option value="" selected>Espectador (Apenas Bots)</option>
+                    <option value="0">Jogador 1</option>
+                    <option value="1">Jogador 2</option>
+                    <option value="2">Jogador 3</option>
+                    <option value="3">Jogador 4</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
-              <div id="boxP1" style="position: relative; margin-top: 4px; margin-bottom: 5px">
-                <label id="lblP1" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 1</label>
-                <input id="p1Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <span id="ready0" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
-              </div>
-              <div id="boxP2" style="position: relative; margin-top: 4px; margin-bottom: 5px">
-                <label id="lblP2" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 2</label>
-                <input id="p2Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <span id="ready1" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
-              </div>
-              <div id="boxP3" style="position: relative; margin-top: 4px; margin-bottom: 5px">
-                <label id="lblP3" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 3</label>
-                <input id="p3Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <span id="ready2" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
-              </div>
-              <div id="boxP4" style="position: relative; margin-top: 4px; margin-bottom: 5px">
-                <label id="lblP4" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 4</label>
-                <input id="p4Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
-                <span id="ready3" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
+            <div class="menu-block">
+              <div class="menu-block-title">🎨 Visual</div>
+              <div class="menu-block-grid">
+                <div class="menu-field">
+                  <label for="deckThemeSelect">Baralho</label>
+                  <div class="deck-preview-wrap">
+                    <div class="back-red deck-preview-card deck-preview-card-red"></div>
+                    <div class="back-blue deck-preview-card deck-preview-card-blue"></div>
+
+                    <select
+                      id="deckThemeSelect"
+                      class="deck-preview-select"
+                      onchange="
+                        updateMenuDynamic();
+                        pushLobby();
+                      ">
+                      <option value="classico" selected>Clássico (Vermelho / Azul)</option>
+                      <option value="cassino">Cassino (Ouro Negro / Verde PIX)</option>
+                      <option value="minimal">Minimalista (Sólido Liso)</option>
+                      <option value="dominacao">Dominação (Neon Tech / FinDom)</option>
+                      <option value="arcade">Arcade (Player 1 / Player 2)</option>
+                      <option value="mythic">✨ Mítico (Findom Animado)</option>
+                      <option value="holografico">💎 Holográfico (Prisma Animado)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="menu-field">
+                  <label for="tableThemeSelect">Fundo da Mesa</label>
+                  <div class="table-preview-wrap">
+                    <div class="table-preview-icon"></div>
+                    <select
+                      id="tableThemeSelect"
+                      class="table-preview-select"
+                      onchange="
+                        updateMenuDynamic();
+                        pushLobby();
+                      ">
+                      <option value="feltro" selected>Feltro Verde Clássico</option>
+                      <option value="cassino">Veludo Vermelho Cassino</option>
+                      <option value="masmorra">Masmorra de Luxo (Neon Purple)</option>
+                      <option value="ostentacao">Ostentação (Ouro & Veludo Negro)</option>
+                      <option value="submissao">Submissão Total (Latex & Pink Glow)</option>
+                      <option value="findom">Dominação Financeira (Grafite & Ouro Verde)</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 15px">
-              <button
-                id="inviteBtn"
-                style="
-                  flex: 1;
-                  padding: 12px;
-                  border-radius: 12px;
-                  border: 1px dashed #3b82f6;
-                  font-weight: 900;
-                  cursor: pointer;
-                  background: rgba(37, 99, 235, 0.15);
-                  color: #60a5fa;
-                  text-transform: uppercase;
-                  letter-spacing: 1px;
-                  margin: 0;
-                  transition: all 0.3s;
-                ">
-                📲 CONVIDAR
-              </button>
+            <div class="menu-block">
+              <div class="menu-block-title">💰 Dinheiro / PIX</div>
+              <div class="menu-field">
+                <label for="betToggle" style="color: #facc15; font-weight: bold">Valendo dinheiro?</label>
+                <select
+                  id="betToggle"
+                  required
+                  onchange="
+                    document.getElementById('betConfig').style.display = this.value === 'sim' ? 'block' : 'none';
+                    pushLobby();
+                  ">
+                  <option value="" disabled selected>Selecione...</option>
+                  <option value="nao">Não</option>
+                  <option value="sim">Sim</option>
+                </select>
+              </div>
 
-              <button
-                id="addBotBtn"
-                onclick="fillEmptyWithBots()"
-                style="
-                  flex: 1;
-                  padding: 12px;
-                  border-radius: 12px;
-                  border: 1px dashed #a855f7;
-                  font-weight: 900;
-                  cursor: pointer;
-                  background: rgba(168, 85, 247, 0.15);
-                  color: #c084fc;
-                  text-transform: uppercase;
-                  letter-spacing: 1px;
-                  margin: 0;
-                  transition: all 0.3s;
-                ">
-                🤖 ADD BOT
-              </button>
+              <div id="betConfig" style="display: none; background: rgba(0, 0, 0, 0.4); border: 1px dashed rgba(212, 175, 55, 0.3); padding: 10px; border-radius: 8px; margin-top: 10px; margin-bottom: 0; text-align: center; line-height: 1.5">
+                <strong style="color: #facc15; font-size: 11px; text-transform: uppercase; letter-spacing: 1px">💰 REGRAS DE PAGAMENTO (PIX)</strong>
+
+                <div style="text-align: left; margin-top: 8px; font-size: 10px; color: #cbd5e1; background: rgba(0, 0, 0, 0.4); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05)">
+                  ✅
+                  <strong>Vitória:</strong>
+                  R$ 5,00
+                  <br />
+                  🛑
+                  <strong>Adv. Sem Morto:</strong>
+                  +R$ 8,00
+                  <br />
+                  📈
+                  <strong>Diferença:</strong>
+                  R$ 0,01 por ponto
+                  <br />
+                  ☠️
+                  <strong>Adv. Negativo:</strong>
+                  +R$ 0,05 por ponto negativo
+                  <br />
+                  ⭐
+                  <strong>Bônus Ás-a-Ás:</strong>
+                  1º(+R$3) | 2º(+R$4) | 3º(+R$5) | 4º(+R$15)
+                  <br />
+                  🩸
+                  <strong>Humilhação:</strong>
+                  +R$ 10,00 (Vencer sem adv. fazer canastra)
+                  <br />
+                  🃏
+                  <strong>Chuva de Canastras:</strong>
+                  4ª(+R$2) | 5ª(+R$3) | 6ª(+R$4) | 7ª(+R$5) | 8ª em diante(+R$5/cada)
+                </div>
+                <input id="betBase" type="hidden" value="5" />
+                <input id="betPerPoint" type="hidden" value="0.01" />
+
+                <div id="pixContainer" style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+                  <input id="pixTeam1" value="" placeholder="PIX Time 1" style="margin: 0; font-size: 11px" />
+                  <input id="pixTeam2" value="" placeholder="PIX Time 2" style="margin: 0; font-size: 11px" />
+                </div>
+
+                <div style="margin-top: 8px; font-size: 9px; color: #9ca3af; text-align: left; line-height: 1.4; background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05)">
+                  <strong style="color: #cbd5e1">Formatos aceitos:</strong>
+                  CPF/CNPJ, E-mail ou Chave Aleatória.
+                  <br />
+                  <span style="color: #facc15">⚠️ Para Celular:</span>
+                  Use o código do país (ex:
+                  <strong>+55</strong>
+                  ) ou parênteses
+                  <strong>( )</strong>
+                  no DDD para o sistema não confundir com CPF.
+                </div>
+              </div>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 10px">
-              <button id="startBtn" style="flex: 1; margin-top: 0">ESTOU PRONTO</button>
+            <div id="playersMenuBlock" class="menu-block" style="display: none">
+              <div class="menu-block-title">👥 Jogadores</div>
+              <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
+                <div id="boxP1" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                  <label id="lblP1" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 1</label>
+                  <input id="p1Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                  <span id="ready0" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
+                </div>
+                <div id="boxP2" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                  <label id="lblP2" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 2</label>
+                  <input id="p2Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                  <span id="ready1" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
+                </div>
+                <div id="boxP3" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                  <label id="lblP3" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 3</label>
+                  <input id="p3Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                  <span id="ready2" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
+                </div>
+                <div id="boxP4" style="position: relative; margin-top: 4px; margin-bottom: 5px">
+                  <label id="lblP4" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 4</label>
+                  <input id="p4Name" value="" placeholder="Nome" style="margin: 0; padding-right: 35px" />
+                  <span id="ready3" style="position: absolute; right: 12px; top: 32px; display: none; font-size: 16px">✅</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="menu-block menu-block-start">
+              <div class="menu-block-actions">
+                <button
+                  id="inviteBtn"
+                  style="
+                    flex: 1;
+                    padding: 12px;
+                    border-radius: 12px;
+                    border: 1px dashed #3b82f6;
+                    font-weight: 900;
+                    cursor: pointer;
+                    background: rgba(37, 99, 235, 0.15);
+                    color: #60a5fa;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    margin: 0;
+                    transition: all 0.3s;
+                  ">
+                  📲 CONVIDAR
+                </button>
+
+                <button
+                  id="addBotBtn"
+                  onclick="fillEmptyWithBots()"
+                  style="
+                    flex: 1;
+                    padding: 12px;
+                    border-radius: 12px;
+                    border: 1px dashed #a855f7;
+                    font-weight: 900;
+                    cursor: pointer;
+                    background: rgba(168, 85, 247, 0.15);
+                    color: #c084fc;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    margin: 0;
+                    transition: all 0.3s;
+                  ">
+                  🤖 ADD BOT
+                </button>
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 10px">
+                <button id="startBtn" style="flex: 1; margin-top: 0">ESTOU PRONTO</button>
+              </div>
             </div>
 
             <div
@@ -11614,6 +11739,7 @@
         syncMythicPhase();
 
         const playersContainer = document.getElementById('playersContainer');
+        const playersMenuBlock = document.getElementById('playersMenuBlock');
         const humiliationRules = document.getElementById('humiliationRules');
 
         const p1 = document.getElementById('boxP1');
@@ -11633,11 +11759,13 @@
         const opt3 = localSelect.querySelector('option[value="3"]');
 
         if (!mode) {
+          if (playersMenuBlock) playersMenuBlock.style.display = 'none';
           playersContainer.style.display = 'none';
           humiliationRules.style.display = 'none';
           return;
         }
 
+        if (playersMenuBlock) playersMenuBlock.style.display = 'block';
         playersContainer.style.display = 'grid';
         humiliationRules.style.display = 'none';
 
