@@ -6404,15 +6404,15 @@
       }
 
       const TABLE_AMBIENT_MUSIC = {
-        feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.12 },
-        cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.11 },
-        masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.105 },
-        ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.07 },
-        submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.108 },
-        findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.12 },
+        feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.22 },
+        cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.2 },
+        masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.19 },
+        ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.13 },
+        submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.19 },
+        findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.21 },
       };
 
-      const TABLE_AMBIENT_MAX_VOLUME = 0.12;
+      const TABLE_AMBIENT_MAX_VOLUME = 0.23;
       const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
       let tableAmbientAudio = null;
       let tableAmbientTheme = null;
@@ -6463,7 +6463,7 @@
         const cfg = TABLE_AMBIENT_MUSIC[normalizeTableTheme(theme)] || TABLE_AMBIENT_MUSIC.feltro;
         const requested = Number(cfg.volume) || 0.1;
         // Mantém a música sempre bem abaixo dos efeitos mais baixos da mesa.
-        return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.32);
+        return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.46);
       }
 
       function fadeTableAmbientTo(targetVolume, duration = 850, onDone = null) {
