@@ -421,6 +421,31 @@
         --dom-spark-core: rgba(255, 247, 237, 0.58);
         --dom-spark-warm: rgba(250, 204, 21, 0.34);
         --brasao-contrast-ring: rgba(2, 6, 23, 0.82);
+        --hud-accent: #facc15;
+        --hud-accent-soft: rgba(250, 204, 21, 0.2);
+        --hud-accent-glow: rgba(250, 204, 21, 0.36);
+        --hud-danger: #fb7185;
+        --hud-chip-bg: rgba(15, 23, 42, 0.78);
+        --hud-chip-border: rgba(250, 204, 21, 0.38);
+        --hud-muted: #94a3b8;
+        --table-panel-bg: rgba(2, 6, 23, 0.08);
+        --table-panel-border: rgba(148, 163, 184, 0.12);
+        --table-panel-self-border: #35f08a;
+        --table-panel-rival-border: #ff4b5f;
+        --table-panel-self-glow: rgba(34, 197, 94, 0.18);
+        --table-panel-rival-glow: rgba(239, 68, 68, 0.18);
+        --table-panel-active-glow: rgba(250, 204, 21, 0.18);
+        --table-panel-title-line: rgba(255, 255, 255, 0.1);
+        --table-panel-self-wash: rgba(34, 197, 94, 0.055);
+        --table-panel-rival-wash: rgba(239, 68, 68, 0.055);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.34);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.46));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.12), rgba(15, 23, 42, 0.18) 42%, transparent 70%);
+        --table-pile-border: rgba(250, 204, 21, 0.2);
+        --table-pile-glow: rgba(250, 204, 21, 0.18);
+        --table-dom-panel-sheen: linear-gradient(transparent, transparent);
+        --table-brasao-sheen: rgba(250, 204, 21, 0.08);
         position: relative;
         isolation: isolate;
         flex: 1;
@@ -1086,12 +1111,12 @@
 
       body[data-table-theme='feltro'] #gameSection {
         --table-light-opacity: 0.12;
-        --table-light-layer: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22960%22%20viewBox%3D%220%200%20960%20960%22%3E%3Cpath%20d%3D%22M720%20336%20L727%20353%20L744%20360%20L727%20367%20L720%20384%20L713%20367%20L696%20360%20L713%20353%20Z%22%20fill%3D%22%23f0fdf4%22%20fill-opacity%3D%220.24%22%20stroke%3D%22%23f0fdf4%22%20stroke-width%3D%221.1%22%20stroke-opacity%3D%220.84%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+        --table-light-layer: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22960%22%20viewBox%3D%220%200%20960%20960%22%3E%3Cpath%20d%3D%22M720%20336%20L727%20353%20L744%20360%20L727%20367%20L720%20384%20L713%20367%20L696%20360%20L713%20353%20Z%22%20fill%3D%22%23f0fdf4%22%20fill-opacity%3D%220.24%22%20stroke%3D%22%23f0fdf4%22%20stroke-width%3D%221.1%22%20stroke-opacity%3D%220.84%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E');
         --table-light-size: 960px 960px;
         --table-light-filter: saturate(1.2) brightness(1.14) drop-shadow(0 0 7px rgba(240, 253, 244, 0.44));
         --table-light-animation: tableSparseFeltFlash 12.6s linear -4.1s infinite;
         --table-flash-opacity: 0.16;
-        --table-flash-layer: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22960%22%20viewBox%3D%220%200%20960%20960%22%3E%3Cpath%20d%3D%22M480%20456%20L487%20473%20L504%20480%20L487%20487%20L480%20504%20L473%20487%20L456%20480%20L473%20473%20Z%22%20fill%3D%22%23f0fdf4%22%20fill-opacity%3D%220.28%22%20stroke%3D%22%23f0fdf4%22%20stroke-width%3D%221.2%22%20stroke-opacity%3D%220.9%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+        --table-flash-layer: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22960%22%20viewBox%3D%220%200%20960%20960%22%3E%3Cpath%20d%3D%22M480%20456%20L487%20473%20L504%20480%20L487%20487%20L480%20504%20L473%20487%20L456%20480%20L473%20473%20Z%22%20fill%3D%22%23f0fdf4%22%20fill-opacity%3D%220.28%22%20stroke%3D%22%23f0fdf4%22%20stroke-width%3D%221.2%22%20stroke-opacity%3D%220.9%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E');
         --table-flash-size: 960px 960px;
         --table-flash-filter: saturate(1.25) brightness(1.2) drop-shadow(0 0 8px rgba(240, 253, 244, 0.52));
         --table-flash-animation: tableSparseFeltFlash 9.8s linear infinite;
@@ -1139,12 +1164,12 @@
 
       body[data-table-theme='masmorra'] #gameSection {
         --table-light-opacity: 0.11;
-        --table-light-layer: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22600%22%20height%3D%22600%22%20viewBox%3D%220%200%20600%20600%22%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22310%22%20r%3D%229%22%20fill%3D%22none%22%20stroke%3D%22%23faf5ff%22%20stroke-width%3D%221.05%22%20stroke-opacity%3D%220.78%22%2F%3E%3C%2Fsvg%3E");
+        --table-light-layer: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22600%22%20height%3D%22600%22%20viewBox%3D%220%200%20600%20600%22%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22310%22%20r%3D%229%22%20fill%3D%22none%22%20stroke%3D%22%23faf5ff%22%20stroke-width%3D%221.05%22%20stroke-opacity%3D%220.78%22%2F%3E%3C%2Fsvg%3E');
         --table-light-size: 600px 600px;
         --table-light-filter: saturate(1.18) brightness(1.1) drop-shadow(0 0 7px rgba(250, 245, 255, 0.38));
         --table-light-animation: tableSparseBubbleFlash 10.9s linear -2.8s infinite;
         --table-flash-opacity: 0.15;
-        --table-flash-layer: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22600%22%20height%3D%22600%22%20viewBox%3D%220%200%20600%20600%22%3E%3Ccircle%20cx%3D%22300%22%20cy%3D%22290%22%20r%3D%229%22%20fill%3D%22none%22%20stroke%3D%22%23faf5ff%22%20stroke-width%3D%221.15%22%20stroke-opacity%3D%220.86%22%2F%3E%3C%2Fsvg%3E");
+        --table-flash-layer: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22600%22%20height%3D%22600%22%20viewBox%3D%220%200%20600%20600%22%3E%3Ccircle%20cx%3D%22300%22%20cy%3D%22290%22%20r%3D%229%22%20fill%3D%22none%22%20stroke%3D%22%23faf5ff%22%20stroke-width%3D%221.15%22%20stroke-opacity%3D%220.86%22%2F%3E%3C%2Fsvg%3E');
         --table-flash-size: 600px 600px;
         --table-flash-filter: saturate(1.24) brightness(1.16) drop-shadow(0 0 8px rgba(250, 245, 255, 0.46));
         --table-flash-animation: tableSparseBubbleFlash 8.6s linear infinite;
@@ -1191,12 +1216,12 @@
 
       body[data-table-theme='submissao'] #gameSection {
         --table-light-opacity: 0.12;
-        --table-light-layer: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22640%22%20viewBox%3D%220%200%20640%20640%22%3E%3Ccircle%20cx%3D%22480%22%20cy%3D%22200%22%20r%3D%221.05%22%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.88%22%2F%3E%3C%2Fsvg%3E");
+        --table-light-layer: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22640%22%20viewBox%3D%220%200%20640%20640%22%3E%3Ccircle%20cx%3D%22480%22%20cy%3D%22200%22%20r%3D%221.05%22%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.88%22%2F%3E%3C%2Fsvg%3E');
         --table-light-size: 640px 640px;
         --table-light-filter: saturate(1.18) brightness(1.14) drop-shadow(0 0 7px rgba(251, 207, 232, 0.42));
         --table-light-animation: tableSparsePointFlash 9.2s linear -3.1s infinite;
         --table-flash-opacity: 0.16;
-        --table-flash-layer: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22640%22%20viewBox%3D%220%200%20640%20640%22%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22320%22%20r%3D%221.1%22%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.92%22%2F%3E%3C%2Fsvg%3E");
+        --table-flash-layer: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22640%22%20viewBox%3D%220%200%20640%20640%22%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22320%22%20r%3D%221.1%22%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.92%22%2F%3E%3C%2Fsvg%3E');
         --table-flash-size: 640px 640px;
         --table-flash-filter: saturate(1.25) brightness(1.22) drop-shadow(0 0 8px rgba(251, 207, 232, 0.52));
         --table-flash-animation: tableSparsePointFlash 7.4s linear infinite;
@@ -1308,6 +1333,156 @@
         background: radial-gradient(circle at center, #011c12 0%, #000000 100%);
         border-color: #00ff66 !important;
       }
+      body[data-table-theme='feltro'] #gameSection {
+        --hud-accent: #4ade80;
+        --hud-accent-soft: rgba(34, 197, 94, 0.18);
+        --hud-accent-glow: rgba(34, 197, 94, 0.32);
+        --hud-chip-border: rgba(74, 222, 128, 0.36);
+        --hud-danger: #f87171;
+        --table-panel-bg: rgba(6, 78, 59, 0.06);
+        --table-panel-border: rgba(74, 222, 128, 0.13);
+        --table-panel-self-border: #35f08a;
+        --table-panel-rival-border: #ff4b5f;
+        --table-panel-self-glow: rgba(74, 222, 128, 0.18);
+        --table-panel-rival-glow: rgba(248, 113, 113, 0.16);
+        --table-panel-active-glow: rgba(187, 247, 208, 0.18);
+        --table-panel-title-line: rgba(187, 247, 208, 0.14);
+        --table-panel-self-wash: rgba(34, 197, 94, 0.055);
+        --table-panel-rival-wash: rgba(239, 68, 68, 0.055);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(74, 222, 128, 0.05);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.62), 0 0 14px rgba(74, 222, 128, 0.12);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.46)) drop-shadow(0 0 5px rgba(74, 222, 128, 0.08));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(74, 222, 128, 0.11), rgba(6, 78, 59, 0.14) 42%, transparent 70%);
+        --table-pile-border: rgba(74, 222, 128, 0.18);
+        --table-pile-glow: rgba(74, 222, 128, 0.14);
+        --table-dom-panel-sheen: radial-gradient(circle at 50% 0%, rgba(74, 222, 128, 0.08), transparent 56%);
+        --table-brasao-sheen: rgba(74, 222, 128, 0.08);
+      }
+      body[data-table-theme='cassino'] #gameSection {
+        --hud-accent: #fbbf24;
+        --hud-accent-soft: rgba(239, 68, 68, 0.18);
+        --hud-accent-glow: rgba(250, 204, 21, 0.36);
+        --hud-chip-border: rgba(251, 191, 36, 0.42);
+        --hud-danger: #fb7185;
+        --table-panel-bg: rgba(127, 29, 29, 0.07);
+        --table-panel-border: rgba(251, 191, 36, 0.15);
+        --table-panel-self-border: #34d399;
+        --table-panel-rival-border: #fb4b5f;
+        --table-panel-self-glow: rgba(52, 211, 153, 0.2);
+        --table-panel-rival-glow: rgba(239, 68, 68, 0.18);
+        --table-panel-active-glow: rgba(250, 204, 21, 0.24);
+        --table-panel-title-line: rgba(254, 240, 138, 0.16);
+        --table-panel-self-wash: rgba(16, 185, 129, 0.052);
+        --table-panel-rival-wash: rgba(239, 68, 68, 0.056);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(251, 191, 36, 0.06);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.68), 0 0 16px rgba(251, 191, 36, 0.16);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 6px rgba(251, 191, 36, 0.1));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.1), rgba(127, 29, 29, 0.13) 42%, transparent 70%);
+        --table-pile-border: rgba(251, 191, 36, 0.24);
+        --table-pile-glow: rgba(251, 191, 36, 0.18);
+        --table-dom-panel-sheen: linear-gradient(90deg, rgba(239, 68, 68, 0.08), transparent 36%, rgba(251, 191, 36, 0.1) 64%, transparent);
+        --table-brasao-sheen: rgba(251, 191, 36, 0.1);
+      }
+      body[data-table-theme='masmorra'] #gameSection {
+        --hud-accent: #c084fc;
+        --hud-accent-soft: rgba(168, 85, 247, 0.2);
+        --hud-accent-glow: rgba(192, 132, 252, 0.34);
+        --hud-chip-border: rgba(192, 132, 252, 0.4);
+        --hud-danger: #f472b6;
+        --table-panel-bg: rgba(88, 28, 135, 0.07);
+        --table-panel-border: rgba(192, 132, 252, 0.15);
+        --table-panel-self-border: #5eead4;
+        --table-panel-rival-border: #fb7185;
+        --table-panel-self-glow: rgba(94, 234, 212, 0.18);
+        --table-panel-rival-glow: rgba(251, 113, 133, 0.17);
+        --table-panel-active-glow: rgba(216, 180, 254, 0.22);
+        --table-panel-title-line: rgba(216, 180, 254, 0.15);
+        --table-panel-self-wash: rgba(45, 212, 191, 0.05);
+        --table-panel-rival-wash: rgba(244, 63, 94, 0.055);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(192, 132, 252, 0.05);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7), 0 0 16px rgba(192, 132, 252, 0.13);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.52)) drop-shadow(0 0 6px rgba(192, 132, 252, 0.09));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(192, 132, 252, 0.1), rgba(30, 6, 54, 0.15) 42%, transparent 70%);
+        --table-pile-border: rgba(192, 132, 252, 0.22);
+        --table-pile-glow: rgba(192, 132, 252, 0.17);
+        --table-dom-panel-sheen: radial-gradient(circle at 50% 0%, rgba(192, 132, 252, 0.1), transparent 58%);
+        --table-brasao-sheen: rgba(192, 132, 252, 0.09);
+      }
+      body[data-table-theme='ostentacao'] #gameSection {
+        --hud-accent: #d4af37;
+        --hud-accent-soft: rgba(212, 175, 55, 0.18);
+        --hud-accent-glow: rgba(212, 175, 55, 0.38);
+        --hud-chip-border: rgba(212, 175, 55, 0.44);
+        --hud-danger: #fb923c;
+        --table-panel-bg: rgba(120, 53, 15, 0.07);
+        --table-panel-border: rgba(212, 175, 55, 0.16);
+        --table-panel-self-border: #34d399;
+        --table-panel-rival-border: #fb4b5f;
+        --table-panel-self-glow: rgba(52, 211, 153, 0.18);
+        --table-panel-rival-glow: rgba(251, 75, 95, 0.17);
+        --table-panel-active-glow: rgba(254, 240, 138, 0.22);
+        --table-panel-title-line: rgba(254, 240, 138, 0.16);
+        --table-panel-self-wash: rgba(16, 185, 129, 0.048);
+        --table-panel-rival-wash: rgba(239, 68, 68, 0.052);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(212, 175, 55, 0.06);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.72), 0 0 16px rgba(212, 175, 55, 0.16);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.54)) drop-shadow(0 0 6px rgba(212, 175, 55, 0.1));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(212, 175, 55, 0.1), rgba(120, 53, 15, 0.13) 42%, transparent 70%);
+        --table-pile-border: rgba(212, 175, 55, 0.24);
+        --table-pile-glow: rgba(212, 175, 55, 0.18);
+        --table-dom-panel-sheen: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.12), transparent 58%);
+        --table-brasao-sheen: rgba(212, 175, 55, 0.11);
+      }
+      body[data-table-theme='submissao'] #gameSection {
+        --hud-accent: #f472b6;
+        --hud-accent-soft: rgba(236, 72, 153, 0.2);
+        --hud-accent-glow: rgba(244, 114, 182, 0.36);
+        --hud-chip-border: rgba(244, 114, 182, 0.42);
+        --hud-danger: #fb7185;
+        --table-panel-bg: rgba(157, 23, 77, 0.07);
+        --table-panel-border: rgba(244, 114, 182, 0.15);
+        --table-panel-self-border: #5eead4;
+        --table-panel-rival-border: #fb4b7a;
+        --table-panel-self-glow: rgba(94, 234, 212, 0.17);
+        --table-panel-rival-glow: rgba(251, 113, 133, 0.17);
+        --table-panel-active-glow: rgba(251, 207, 232, 0.22);
+        --table-panel-title-line: rgba(251, 207, 232, 0.15);
+        --table-panel-self-wash: rgba(45, 212, 191, 0.048);
+        --table-panel-rival-wash: rgba(236, 72, 153, 0.055);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(244, 114, 182, 0.05);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.68), 0 0 16px rgba(244, 114, 182, 0.13);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 6px rgba(244, 114, 182, 0.09));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(244, 114, 182, 0.09), rgba(157, 23, 77, 0.13) 42%, transparent 70%);
+        --table-pile-border: rgba(244, 114, 182, 0.22);
+        --table-pile-glow: rgba(244, 114, 182, 0.16);
+        --table-dom-panel-sheen: radial-gradient(circle at 50% 0%, rgba(244, 114, 182, 0.1), transparent 58%);
+        --table-brasao-sheen: rgba(244, 114, 182, 0.09);
+      }
+      body[data-table-theme='findom'] #gameSection {
+        --hud-accent: #22c55e;
+        --hud-accent-soft: rgba(34, 197, 94, 0.16);
+        --hud-accent-glow: rgba(250, 204, 21, 0.32);
+        --hud-chip-border: rgba(34, 197, 94, 0.4);
+        --hud-danger: #facc15;
+        --table-panel-bg: rgba(6, 78, 59, 0.06);
+        --table-panel-border: rgba(212, 175, 55, 0.15);
+        --table-panel-self-border: #22e070;
+        --table-panel-rival-border: #ff4b5f;
+        --table-panel-self-glow: rgba(34, 197, 94, 0.2);
+        --table-panel-rival-glow: rgba(255, 75, 95, 0.17);
+        --table-panel-active-glow: rgba(250, 204, 21, 0.22);
+        --table-panel-title-line: rgba(250, 204, 21, 0.14);
+        --table-panel-self-wash: rgba(34, 197, 94, 0.052);
+        --table-panel-rival-wash: rgba(244, 63, 94, 0.05);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(34, 197, 94, 0.05);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.72), 0 0 16px rgba(250, 204, 21, 0.14);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.54)) drop-shadow(0 0 6px rgba(250, 204, 21, 0.09));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.09), rgba(34, 197, 94, 0.1) 42%, transparent 70%);
+        --table-pile-border: rgba(250, 204, 21, 0.23);
+        --table-pile-glow: rgba(250, 204, 21, 0.17);
+        --table-dom-panel-sheen: linear-gradient(90deg, rgba(34, 197, 94, 0.08), transparent 40%, rgba(250, 204, 21, 0.1) 66%, transparent);
+        --table-brasao-sheen: rgba(250, 204, 21, 0.1);
+      }
       .board {
         flex: 1;
         display: flex;
@@ -1346,8 +1521,11 @@
         font-weight: 800;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-        background: rgba(0, 0, 0, 0.5);
+        box-shadow:
+          0 0 12px var(--hud-accent-glow),
+          0 2px 4px rgba(0, 0, 0, 0.5);
+        background: linear-gradient(90deg, var(--hud-accent-soft), rgba(15, 23, 42, 0.62));
+        border: 1px solid var(--hud-chip-border);
         padding: 4px 10px;
         border-radius: 20px;
         color: #fff;
@@ -1355,15 +1533,25 @@
         align-items: center;
         gap: 6px;
       }
+      .current-player-chip.is-my-turn {
+        background: linear-gradient(90deg, color-mix(in srgb, var(--hud-accent), transparent 72%), rgba(15, 23, 42, 0.76));
+        border-color: var(--hud-accent);
+        box-shadow:
+          0 0 16px var(--hud-accent-glow),
+          0 2px 6px rgba(0, 0, 0, 0.55);
+      }
       .current-dot {
         width: 8px;
         height: 8px;
-        background: #4ade80;
+        background: var(--hud-accent);
+        box-shadow: 0 0 8px var(--hud-accent-glow);
         border-radius: 50%;
       }
       #gameModeBadge {
         font-size: 8px !important;
         letter-spacing: 1px;
+        color: var(--hud-accent) !important;
+        text-shadow: 0 0 8px var(--hud-accent-glow);
       }
 
       .morto-area {
@@ -1379,17 +1567,17 @@
         margin: 13px 0 0 0;
         padding: 0;
         border-radius: 50%;
-        border: 1px solid rgba(250, 204, 21, 0.36);
-        background:
-          radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.2), transparent 32%),
-          rgba(15, 23, 42, 0.78);
-        color: #facc15;
+        border: 1px solid var(--hud-chip-border);
+        background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.2), transparent 32%), rgba(15, 23, 42, 0.78);
+        color: var(--hud-accent);
         font-size: 13px;
         line-height: 1;
         display: grid;
         place-items: center;
         cursor: pointer;
-        box-shadow: 0 0 10px rgba(250, 204, 21, 0.16), 0 3px 8px rgba(0, 0, 0, 0.35);
+        box-shadow:
+          0 0 10px var(--hud-accent-glow),
+          0 3px 8px rgba(0, 0, 0, 0.35);
         opacity: 0.78;
         transition:
           transform 0.16s ease,
@@ -1401,8 +1589,10 @@
       .ambient-toggle:hover {
         opacity: 1;
         transform: translateY(-1px);
-        border-color: rgba(250, 204, 21, 0.72);
-        box-shadow: 0 0 14px rgba(250, 204, 21, 0.28), 0 4px 10px rgba(0, 0, 0, 0.42);
+        border-color: var(--hud-accent);
+        box-shadow:
+          0 0 14px var(--hud-accent-glow),
+          0 4px 10px rgba(0, 0, 0, 0.42);
       }
       .ambient-toggle.muted {
         color: #94a3b8;
@@ -1665,6 +1855,116 @@
         box-shadow: 0 0 10px rgba(239, 68, 68, 0.2) !important;
       }
 
+      /* Assinatura de mesa: integra cartas, painéis e centro ao tema sem adicionar texto novo */
+      #gameSection .board-melds .grow {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 42%), var(--table-panel-bg) !important;
+        border-color: var(--table-panel-border) !important;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.025),
+          0 12px 28px rgba(0, 0, 0, 0.22) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      body.view-team0 #gameSection .board-melds .grow:nth-child(1),
+      body.view-team1 #gameSection .board-melds .grow:nth-child(2) {
+        background: linear-gradient(90deg, var(--table-panel-self-wash), transparent 46%), var(--table-panel-bg) !important;
+        border-color: var(--table-panel-self-border) !important;
+        border-style: dashed !important;
+        box-shadow:
+          inset 0 0 0 1px color-mix(in srgb, var(--table-panel-self-border), transparent 64%),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04),
+          0 0 12px var(--table-panel-self-glow) !important;
+      }
+
+      body.view-team0 #gameSection .board-melds .grow:nth-child(2),
+      body.view-team1 #gameSection .board-melds .grow:nth-child(1) {
+        background: linear-gradient(90deg, var(--table-panel-rival-wash), transparent 46%), var(--table-panel-bg) !important;
+        border-color: var(--table-panel-rival-border) !important;
+        border-style: dashed !important;
+        box-shadow:
+          inset 0 0 0 1px color-mix(in srgb, var(--table-panel-rival-border), transparent 66%),
+          inset 0 1px 0 rgba(255, 255, 255, 0.025),
+          0 0 11px var(--table-panel-rival-glow) !important;
+      }
+
+      #gameSection .board-melds .grow.is-current-team {
+        box-shadow:
+          inset 0 0 0 1px color-mix(in srgb, var(--hud-accent), transparent 60%),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06),
+          0 0 16px var(--table-panel-active-glow),
+          0 14px 30px rgba(0, 0, 0, 0.24) !important;
+      }
+
+      #gameSection .board-melds .grow.is-current-team .player-identity-chip {
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.12),
+          0 0 14px var(--hud-accent-glow);
+      }
+
+      #gameSection .team-panel .meld-title {
+        border-bottom-color: var(--table-panel-title-line);
+      }
+
+      #gameSection .carta:not(.back),
+      #gameSection .discard-face {
+        box-shadow: var(--table-card-shadow, var(--card-face-shadow));
+      }
+
+      #gameSection #handContainer .carta:hover {
+        box-shadow: var(--table-card-hover-shadow, -8px 20px 30px rgba(0, 0, 0, 0.7));
+      }
+
+      #gameSection .opponent-card-back,
+      #gameSection .morto-card-back,
+      #gameSection .carta.back {
+        filter: var(--table-card-back-filter);
+      }
+
+      #gameSection .board-middle {
+        position: relative;
+        isolation: isolate;
+      }
+
+      #gameSection .board-middle::before {
+        content: none;
+      }
+
+      #gameSection .pile-area::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 54%;
+        width: 86px;
+        height: 78px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--table-pile-border), transparent 35%);
+        background: var(--table-pile-spot);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 0 10px var(--table-pile-glow);
+        opacity: 0.42;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      #gameSection .board-middle .pile-area {
+        z-index: 1;
+      }
+
+      #gameSection .pile-area > .pile-card {
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.34));
+      }
+
+      #gameSection .pile-info {
+        border-color: var(--table-pile-border);
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(2, 6, 23, 0.78));
+        box-shadow:
+          0 2px 5px rgba(0, 0, 0, 0.62),
+          0 0 9px var(--table-pile-glow);
+      }
+
       .meld-title {
         display: flex;
         justify-content: space-between;
@@ -1681,8 +1981,10 @@
       }
       .meld-title strong {
         font-size: 11px !important;
-        color: #facc15;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        color: var(--hud-accent);
+        text-shadow:
+          0 0 8px var(--hud-accent-glow),
+          0 1px 3px rgba(0, 0, 0, 0.8);
       }
       .player-title-main {
         display: flex;
@@ -1708,6 +2010,7 @@
           0 0 10px color-mix(in srgb, var(--identity-accent), transparent 78%);
       }
       .player-identity-chip.role-dominador {
+        --identity-accent: var(--hud-accent);
         --identity-bg: rgba(15, 23, 42, 0.72);
       }
       .player-identity-chip.role-escravo {
@@ -1885,14 +2188,14 @@
         pointer-events: none;
         z-index: 0;
         opacity: 0.14;
-        background: var(--dom-panel-spark-layer), var(--dom-panel-scrim);
-        background-size: var(--dom-panel-spark-size), auto;
+        background: var(--dom-panel-spark-layer), var(--table-dom-panel-sheen), var(--dom-panel-scrim);
+        background-size: var(--dom-panel-spark-size), auto, auto;
       }
       #gameSection .board-melds .grow.dom-nivel-5::before,
       #gameSection .board-melds .grow.dom-nivel-6::before {
         opacity: 0.18;
-        background: var(--dom-panel-spark-layer), var(--dom-panel-scrim-strong);
-        background-size: var(--dom-panel-spark-size), auto;
+        background: var(--dom-panel-spark-layer), var(--table-dom-panel-sheen), var(--dom-panel-scrim-strong);
+        background-size: var(--dom-panel-spark-size), auto, auto;
       }
       #gameSection .board-melds .grow.dom-nivel-4::before {
         opacity: 0.18;
@@ -2096,7 +2399,9 @@
         transform: translate(-50%, -50%);
         border: 1.5px solid var(--brasao-accent);
         border-radius: 999px;
-        background: linear-gradient(180deg, rgba(15, 23, 42, 0.97), rgba(2, 6, 23, 0.99)), radial-gradient(circle at 50% 0%, var(--brasao-glow), transparent 72%);
+        background:
+          radial-gradient(circle at 16% 30%, var(--table-brasao-sheen), transparent 46%), radial-gradient(circle at 84% 30%, var(--table-brasao-sheen), transparent 46%), linear-gradient(180deg, rgba(15, 23, 42, 0.97), rgba(2, 6, 23, 0.99)),
+          radial-gradient(circle at 50% 0%, var(--brasao-glow), transparent 72%);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.1),
           inset 0 -1px 0 rgba(0, 0, 0, 0.42),
@@ -2541,12 +2846,13 @@
       #message {
         text-align: center;
         font-size: 11px;
-        color: #facc15;
+        color: var(--hud-accent);
         font-weight: bold;
         height: 15px;
-        text-shadow: 0 1px 2px black;
+        text-shadow:
+          0 0 8px var(--hud-accent-glow),
+          0 1px 2px black;
       }
-
       .player-actions {
         display: flex;
         justify-content: center;
@@ -2908,9 +3214,7 @@
 
       /* 3. ESTRUTURA BASE DOS BARALHOS */
       body[data-deck-theme] {
-        --deck-card-face-surface:
-          linear-gradient(135deg, rgba(255, 255, 255, 0.7), transparent 34%),
-          linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.7), transparent 34%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         --deck-card-face-border: rgba(15, 23, 42, 0.82);
         --deck-card-face-inner: rgba(15, 23, 42, 0.12);
         --deck-card-face-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3);
@@ -2927,20 +3231,14 @@
       }
 
       body[data-deck-theme='classico'] {
-        --deck-face-red-mark:
-          radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.9) 0 2px, transparent 3px),
-          linear-gradient(45deg, transparent 46%, rgba(220, 38, 38, 0.38) 47% 53%, transparent 54%);
-        --deck-face-blue-mark:
-          radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.86) 0 2px, transparent 3px),
-          linear-gradient(45deg, transparent 46%, rgba(37, 99, 235, 0.34) 47% 53%, transparent 54%);
+        --deck-face-red-mark: radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.9) 0 2px, transparent 3px), linear-gradient(45deg, transparent 46%, rgba(220, 38, 38, 0.38) 47% 53%, transparent 54%);
+        --deck-face-blue-mark: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.86) 0 2px, transparent 3px), linear-gradient(45deg, transparent 46%, rgba(37, 99, 235, 0.34) 47% 53%, transparent 54%);
         --deck-face-red-mark-opacity: 0.045;
         --deck-face-blue-mark-opacity: 0.04;
       }
 
       body[data-deck-theme='cassino'] {
-        --deck-card-face-surface:
-          linear-gradient(135deg, rgba(212, 175, 55, 0.12), transparent 34%),
-          linear-gradient(180deg, #fffdf5 0%, #f8f0dc 100%);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(212, 175, 55, 0.12), transparent 34%), linear-gradient(180deg, #fffdf5 0%, #f8f0dc 100%);
         --deck-card-face-shadow: -1px 1px 5px rgba(0, 0, 0, 0.34);
         --deck-face-red-accent: rgba(212, 175, 55, 0.34);
         --deck-face-blue-accent: rgba(16, 185, 129, 0.3);
@@ -2963,9 +3261,7 @@
       }
 
       body[data-deck-theme='dominacao'] {
-        --deck-card-face-surface:
-          linear-gradient(135deg, rgba(2, 6, 23, 0.04), transparent 42%),
-          linear-gradient(180deg, #ffffff 0%, #eef7ff 100%);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(2, 6, 23, 0.04), transparent 42%), linear-gradient(180deg, #ffffff 0%, #eef7ff 100%);
         --deck-face-red-accent: rgba(255, 20, 147, 0.3);
         --deck-face-blue-accent: rgba(0, 188, 212, 0.3);
         --deck-face-red-border: rgba(190, 24, 93, 0.7);
@@ -2979,9 +3275,7 @@
       }
 
       body[data-deck-theme='arcade'] {
-        --deck-card-face-surface:
-          repeating-linear-gradient(180deg, rgba(15, 23, 42, 0) 0 5px, rgba(15, 23, 42, 0.025) 6px),
-          linear-gradient(180deg, #fffdf7 0%, #f4f7ff 100%);
+        --deck-card-face-surface: repeating-linear-gradient(180deg, rgba(15, 23, 42, 0) 0 5px, rgba(15, 23, 42, 0.025) 6px), linear-gradient(180deg, #fffdf7 0%, #f4f7ff 100%);
         --deck-face-red-border: rgba(255, 53, 94, 0.72);
         --deck-face-blue-border: rgba(0, 217, 255, 0.72);
         --deck-face-red-inner: rgba(255, 214, 10, 0.2);
@@ -2993,9 +3287,7 @@
       }
 
       body[data-deck-theme='mythic'] {
-        --deck-card-face-surface:
-          radial-gradient(circle at 50% 8%, rgba(250, 204, 21, 0.12), transparent 34%),
-          linear-gradient(180deg, #fffaf5 0%, #f9f0f5 100%);
+        --deck-card-face-surface: radial-gradient(circle at 50% 8%, rgba(250, 204, 21, 0.12), transparent 34%), linear-gradient(180deg, #fffaf5 0%, #f9f0f5 100%);
         --deck-face-red-accent: rgba(244, 114, 182, 0.32);
         --deck-face-blue-accent: rgba(34, 211, 238, 0.3);
         --deck-face-red-border: rgba(180, 83, 9, 0.7);
@@ -3009,9 +3301,7 @@
       }
 
       body[data-deck-theme='holografico'] {
-        --deck-card-face-surface:
-          linear-gradient(125deg, rgba(255, 0, 60, 0.08), rgba(0, 210, 255, 0.08), rgba(255, 255, 255, 0.7)),
-          linear-gradient(180deg, #ffffff 0%, #f5fbff 100%);
+        --deck-card-face-surface: linear-gradient(125deg, rgba(255, 0, 60, 0.08), rgba(0, 210, 255, 0.08), rgba(255, 255, 255, 0.7)), linear-gradient(180deg, #ffffff 0%, #f5fbff 100%);
         --deck-face-red-border: rgba(244, 63, 94, 0.56);
         --deck-face-blue-border: rgba(14, 165, 233, 0.56);
         --deck-face-red-inner: rgba(244, 63, 94, 0.16);
@@ -3021,7 +3311,6 @@
         --deck-face-red-mark-opacity: 0.035;
         --deck-face-blue-mark-opacity: 0.035;
       }
-
 
       /* ================================================================= */
       /* IDENTIDADE LIMPA DAS FACES POR TEMA                               */
@@ -3051,13 +3340,9 @@
         --deck-rank-spacing: -0.06em;
         --deck-rank-shadow: none;
         --deck-center-shadow: none;
-        --deck-card-face-surface:
-          linear-gradient(135deg, rgba(255, 255, 255, 0.95), transparent 36%),
-          linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-        --deck-face-red-surface:
-          linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
-        --deck-face-blue-surface:
-          linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.95), transparent 36%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
         --deck-face-red-mark-opacity: 0.028;
         --deck-face-blue-mark-opacity: 0.026;
         --deck-center-badge-bg-default: rgba(15, 23, 42, 0.025);
@@ -3072,18 +3357,12 @@
         --deck-rank-spacing: -0.02em;
         --deck-rank-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 5px rgba(180, 83, 9, 0.18);
         --deck-center-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 7px rgba(180, 83, 9, 0.2);
-        --deck-card-face-surface:
-          linear-gradient(135deg, rgba(212, 175, 55, 0.08), transparent 42%),
-          linear-gradient(180deg, #fffef8 0%, #faf4e5 100%);
-        --deck-face-red-surface:
-          linear-gradient(180deg, #fffef8 0%, #fbf0df 100%);
-        --deck-face-blue-surface:
-          linear-gradient(180deg, #fffef8 0%, #eef8f1 100%);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(212, 175, 55, 0.08), transparent 42%), linear-gradient(180deg, #fffef8 0%, #faf4e5 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #fffef8 0%, #fbf0df 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #fffef8 0%, #eef8f1 100%);
         --deck-face-red-mark-opacity: 0.038;
         --deck-face-blue-mark-opacity: 0.035;
-        --deck-center-badge-bg-default:
-          radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.75), transparent 34%),
-          rgba(212, 175, 55, 0.13);
+        --deck-center-badge-bg-default: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.75), transparent 34%), rgba(212, 175, 55, 0.13);
         --deck-center-badge-border-default: rgba(180, 83, 9, 0.24);
         --deck-center-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
       }
@@ -3110,9 +3389,7 @@
         --deck-rank-weight: 900;
         --deck-rank-spacing: -0.08em;
         --deck-rank-transform: skew(-3deg);
-        --deck-card-face-surface:
-          linear-gradient(135deg, rgba(2, 6, 23, 0.035), transparent 42%),
-          linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(2, 6, 23, 0.035), transparent 42%), linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
         --deck-face-red-surface: linear-gradient(180deg, #ffffff 0%, #fff4fb 100%);
         --deck-face-blue-surface: linear-gradient(180deg, #ffffff 0%, #effcff 100%);
         --deck-face-red-center-bg: rgba(219, 39, 119, 0.075);
@@ -3132,15 +3409,9 @@
         --deck-rank-weight: 900;
         --deck-rank-spacing: -0.12em;
         --deck-rank-shadow: 1px 0 rgba(0, 0, 0, 0.12);
-        --deck-card-face-surface:
-          repeating-linear-gradient(180deg, rgba(15, 23, 42, 0.03) 0 1px, transparent 1px 7px),
-          linear-gradient(180deg, #fffefd 0%, #f4f7ff 100%);
-        --deck-face-red-surface:
-          repeating-linear-gradient(180deg, rgba(255, 53, 94, 0.035) 0 1px, transparent 1px 7px),
-          linear-gradient(180deg, #fffefd 0%, #fff6f8 100%);
-        --deck-face-blue-surface:
-          repeating-linear-gradient(180deg, rgba(0, 217, 255, 0.04) 0 1px, transparent 1px 7px),
-          linear-gradient(180deg, #fffefd 0%, #f2fcff 100%);
+        --deck-card-face-surface: repeating-linear-gradient(180deg, rgba(15, 23, 42, 0.03) 0 1px, transparent 1px 7px), linear-gradient(180deg, #fffefd 0%, #f4f7ff 100%);
+        --deck-face-red-surface: repeating-linear-gradient(180deg, rgba(255, 53, 94, 0.035) 0 1px, transparent 1px 7px), linear-gradient(180deg, #fffefd 0%, #fff6f8 100%);
+        --deck-face-blue-surface: repeating-linear-gradient(180deg, rgba(0, 217, 255, 0.04) 0 1px, transparent 1px 7px), linear-gradient(180deg, #fffefd 0%, #f2fcff 100%);
         --deck-face-red-mark-opacity: 0.03;
         --deck-face-blue-mark-opacity: 0.03;
         --deck-center-badge-bg-default: rgba(15, 23, 42, 0.035);
@@ -3154,15 +3425,9 @@
         --deck-center-font: Georgia, 'Times New Roman', serif;
         --deck-rank-weight: 800;
         --deck-rank-spacing: -0.05em;
-        --deck-card-face-surface:
-          radial-gradient(circle at 50% 12%, rgba(250, 204, 21, 0.09), transparent 34%),
-          linear-gradient(180deg, #fffdf8 0%, #fbf3f7 100%);
-        --deck-face-red-surface:
-          radial-gradient(circle at 50% 12%, rgba(244, 114, 182, 0.08), transparent 34%),
-          linear-gradient(180deg, #fffdf8 0%, #fff5fb 100%);
-        --deck-face-blue-surface:
-          radial-gradient(circle at 50% 12%, rgba(34, 211, 238, 0.08), transparent 34%),
-          linear-gradient(180deg, #fffdf8 0%, #f0fdff 100%);
+        --deck-card-face-surface: radial-gradient(circle at 50% 12%, rgba(250, 204, 21, 0.09), transparent 34%), linear-gradient(180deg, #fffdf8 0%, #fbf3f7 100%);
+        --deck-face-red-surface: radial-gradient(circle at 50% 12%, rgba(244, 114, 182, 0.08), transparent 34%), linear-gradient(180deg, #fffdf8 0%, #fff5fb 100%);
+        --deck-face-blue-surface: radial-gradient(circle at 50% 12%, rgba(34, 211, 238, 0.08), transparent 34%), linear-gradient(180deg, #fffdf8 0%, #f0fdff 100%);
         --deck-face-red-mark-opacity: 0.04;
         --deck-face-blue-mark-opacity: 0.04;
         --deck-center-badge-bg-default: rgba(250, 204, 21, 0.07);
@@ -3176,19 +3441,12 @@
         --deck-center-font: 'Montserrat', system-ui, -apple-system, sans-serif;
         --deck-rank-weight: 900;
         --deck-rank-spacing: -0.07em;
-        --deck-card-face-surface:
-          linear-gradient(125deg, rgba(255, 0, 60, 0.045), rgba(0, 210, 255, 0.055), rgba(255, 255, 255, 0.55)),
-          linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
-        --deck-face-red-surface:
-          linear-gradient(125deg, rgba(244, 63, 94, 0.055), rgba(255, 255, 255, 0.6)),
-          linear-gradient(180deg, #ffffff 0%, #fff8fb 100%);
-        --deck-face-blue-surface:
-          linear-gradient(125deg, rgba(14, 165, 233, 0.06), rgba(255, 255, 255, 0.6)),
-          linear-gradient(180deg, #ffffff 0%, #f5fcff 100%);
+        --deck-card-face-surface: linear-gradient(125deg, rgba(255, 0, 60, 0.045), rgba(0, 210, 255, 0.055), rgba(255, 255, 255, 0.55)), linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        --deck-face-red-surface: linear-gradient(125deg, rgba(244, 63, 94, 0.055), rgba(255, 255, 255, 0.6)), linear-gradient(180deg, #ffffff 0%, #fff8fb 100%);
+        --deck-face-blue-surface: linear-gradient(125deg, rgba(14, 165, 233, 0.06), rgba(255, 255, 255, 0.6)), linear-gradient(180deg, #ffffff 0%, #f5fcff 100%);
         --deck-face-red-mark-opacity: 0.03;
         --deck-face-blue-mark-opacity: 0.03;
-        --deck-center-badge-bg-default:
-          linear-gradient(135deg, rgba(255, 0, 90, 0.08), rgba(0, 210, 255, 0.09));
+        --deck-center-badge-bg-default: linear-gradient(135deg, rgba(255, 0, 90, 0.08), rgba(0, 210, 255, 0.09));
         --deck-center-badge-border-default: rgba(14, 165, 233, 0.16);
         --deck-center-shadow: 0 0 5px rgba(14, 165, 233, 0.16);
       }
@@ -3714,14 +3972,14 @@
       .live-money-badge {
         font-size: 10px !important;
         font-weight: 900;
-        color: #4ade80;
+        color: color-mix(in srgb, #4ade80, var(--hud-accent) 20%);
         background: transparent !important;
         border: none !important;
         padding: 0 !important;
         margin: 0 !important;
         line-height: 1 !important;
         text-align: center;
-        text-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+        text-shadow: 0 0 8px color-mix(in srgb, #4ade80, var(--hud-accent) 28%);
         display: none;
         letter-spacing: 0.5px;
       }
@@ -4008,18 +4266,18 @@
         transition: all 0.3s ease;
       }
       .morto-badge.pending {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px dashed #475569;
-        color: #64748b;
+        background: rgba(15, 23, 42, 0.56);
+        border: 1px dashed color-mix(in srgb, var(--hud-accent), #475569 74%);
+        color: color-mix(in srgb, var(--hud-muted), var(--hud-accent) 18%);
       }
       .morto-badge.taken {
-        background: rgba(22, 163, 74, 0.15);
-        border: 1px solid #22c55e;
-        color: #4ade80;
+        background: var(--hud-accent-soft);
+        border: 1px solid color-mix(in srgb, var(--hud-accent), #22c55e 45%);
+        color: color-mix(in srgb, var(--hud-accent), #ffffff 22%);
         box-shadow:
-          inset 0 0 8px rgba(34, 197, 94, 0.2),
-          0 0 8px rgba(34, 197, 94, 0.4);
-        text-shadow: 0 0 5px rgba(34, 197, 94, 0.6);
+          inset 0 0 8px var(--hud-accent-soft),
+          0 0 8px var(--hud-accent-glow);
+        text-shadow: 0 0 5px var(--hud-accent-glow);
       }
 
       /* Badge informativo de compras extras acumuladas por canastras no modo Dominação */
@@ -4034,13 +4292,13 @@
         border-radius: 5px;
         margin-left: 4px;
         vertical-align: middle;
-        background: rgba(14, 165, 233, 0.15);
-        border: 1px solid #0ea5e9;
-        color: #38bdf8;
+        background: var(--hud-accent-soft);
+        border: 1px solid color-mix(in srgb, var(--hud-accent), #38bdf8 40%);
+        color: color-mix(in srgb, var(--hud-accent), #e0f2fe 30%);
         box-shadow:
-          inset 0 0 8px rgba(14, 165, 233, 0.2),
-          0 0 8px rgba(14, 165, 233, 0.4);
-        text-shadow: 0 0 5px rgba(14, 165, 233, 0.6);
+          inset 0 0 8px var(--hud-accent-soft),
+          0 0 8px var(--hud-accent-glow);
+        text-shadow: 0 0 5px var(--hud-accent-glow);
       }
 
       /* Badge de status do superpoder único do Dominador */
@@ -4058,13 +4316,13 @@
         transition: all 0.3s ease;
       }
       .power-steal-badge.available {
-        background: rgba(168, 85, 247, 0.18);
-        border: 1px solid #a855f7;
-        color: #c084fc;
+        background: var(--hud-accent-soft);
+        border: 1px solid color-mix(in srgb, var(--hud-accent), #a855f7 42%);
+        color: color-mix(in srgb, var(--hud-accent), #f5d0fe 28%);
         box-shadow:
-          inset 0 0 8px rgba(168, 85, 247, 0.25),
-          0 0 8px rgba(168, 85, 247, 0.4);
-        text-shadow: 0 0 5px rgba(168, 85, 247, 0.6);
+          inset 0 0 8px var(--hud-accent-soft),
+          0 0 8px var(--hud-accent-glow);
+        text-shadow: 0 0 5px var(--hud-accent-glow);
       }
       /* Removido o tom preto estranho: agora fica em um tom vinho/fundo escuro esmaecido limpo */
       .power-steal-badge.used {
@@ -4931,7 +5189,7 @@
               BURACO
               <span class="naipes">
                 <span class="n-preto">♣</span>
-                <span class="n-vermelho">♦</span>
+                <span class="n-vermelho">♥</span>
               </span>
             </h2>
             <small>Configuração da sala</small>
@@ -6158,9 +6416,12 @@
           tableAmbientAudio.preload = 'auto';
           tableAmbientAudio.loop = true;
           tableAmbientAudio.volume = clampMediaVolume(0);
-          tableAmbientAudio.play().then(() => {
-            fadeTableAmbientTo(targetVolume, 1000);
-          }).catch(() => {});
+          tableAmbientAudio
+            .play()
+            .then(() => {
+              fadeTableAmbientTo(targetVolume, 1000);
+            })
+            .catch(() => {});
           return;
         }
 
@@ -8689,7 +8950,8 @@
 
         // Exibe o contador de cartas no chip de status do topo esquerdo
         document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? `Sua Vez! (${cardCount})` : `Vez de ${pName} (${cardCount})`;
-        document.querySelector('.current-player-chip').style.background = isMyTurnRightNow ? 'rgba(22, 163, 74, 0.8)' : 'rgba(0, 0, 0, 0.5)';
+        const currentChip = document.querySelector('.current-player-chip');
+        if (currentChip) currentChip.classList.toggle('is-my-turn', isMyTurnRightNow);
         document.getElementById('stockCount').textContent = state.stock.length;
 
         // ==========================================================
@@ -8891,9 +9153,9 @@
             powerBtn.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
           } else {
             powerBtn.innerHTML = '👁️ ROUBAR MÃO';
-            powerBtn.style.background = '#a855f7';
-            powerBtn.style.borderColor = '#d8b4fe';
-            powerBtn.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.6)';
+            powerBtn.style.background = 'linear-gradient(90deg, var(--hud-accent-soft), rgba(15, 23, 42, 0.82))';
+            powerBtn.style.borderColor = 'var(--hud-accent)';
+            powerBtn.style.boxShadow = '0 0 10px var(--hud-accent-glow)';
           }
         }
 
@@ -9329,6 +9591,7 @@
 
         const meLocal = state.players[myPlayerIndex];
         const myTurnLocal = !state.finished && state.currentPlayer === myPlayerIndex;
+        const activeTeamId = state.players?.[state.currentPlayer]?.teamId;
 
         state.teams.forEach((t, i) => {
           const info = computeTeamMeldScore(t);
@@ -9337,6 +9600,11 @@
 
           const panel = document.getElementById(`teamPanel${i + 1}`);
           if (panel) {
+            const growPanel = panel.closest('.grow');
+            const isCurrentTeamPanel = !state.finished && t.id === activeTeamId;
+            panel.classList.toggle('is-current-team', isCurrentTeamPanel);
+            if (growPanel) growPanel.classList.toggle('is-current-team', isCurrentTeamPanel);
+
             // Efeito visual de Dropzone
             if (meLocal && t.id === meLocal.teamId && myTurnLocal && selectedHandIndexes.size > 0) {
               panel.classList.add('can-drop-new');
