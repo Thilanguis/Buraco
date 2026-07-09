@@ -477,6 +477,26 @@
       #gameSection:has(.board-melds.has-domination-status)::after {
         opacity: calc(var(--table-flash-opacity) + 0.04);
       }
+      @media (hover: none) and (pointer: coarse) {
+        #gameSection {
+          --table-flash-opacity: 0 !important;
+          --table-flash-animation: none !important;
+          --table-flash-filter: none !important;
+        }
+        #gameSection::before {
+          filter: none !important;
+          transform: translateZ(0);
+          backface-visibility: hidden;
+          will-change: opacity, background-position, mask-position;
+        }
+        #gameSection::after {
+          content: none !important;
+          display: none !important;
+          animation: none !important;
+          filter: none !important;
+          opacity: 0 !important;
+        }
+      }
       @keyframes tableLightStill {
         0%,
         100% {
