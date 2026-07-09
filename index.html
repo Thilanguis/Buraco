@@ -1313,6 +1313,12 @@
         height: 50px;
         z-index: 20;
       }
+      .board-top-actions {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-right: 5px;
+      }
 
       /* Chips e Topo */
       .current-player-chip {
@@ -1343,8 +1349,45 @@
       .morto-area {
         width: 45px;
         height: 60px;
-        margin-right: 5px;
+        position: relative;
         transform: none !important;
+      }
+      .ambient-toggle {
+        flex: 0 0 auto;
+        width: 24px;
+        height: 24px;
+        margin: 13px 0 0 0;
+        padding: 0;
+        border-radius: 50%;
+        border: 1px solid rgba(250, 204, 21, 0.36);
+        background:
+          radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.2), transparent 32%),
+          rgba(15, 23, 42, 0.78);
+        color: #facc15;
+        font-size: 13px;
+        line-height: 1;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        box-shadow: 0 0 10px rgba(250, 204, 21, 0.16), 0 3px 8px rgba(0, 0, 0, 0.35);
+        opacity: 0.78;
+        transition:
+          transform 0.16s ease,
+          opacity 0.16s ease,
+          border-color 0.16s ease,
+          box-shadow 0.16s ease;
+        z-index: 6;
+      }
+      .ambient-toggle:hover {
+        opacity: 1;
+        transform: translateY(-1px);
+        border-color: rgba(250, 204, 21, 0.72);
+        box-shadow: 0 0 14px rgba(250, 204, 21, 0.28), 0 4px 10px rgba(0, 0, 0, 0.42);
+      }
+      .ambient-toggle.muted {
+        color: #94a3b8;
+        border-color: rgba(148, 163, 184, 0.32);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.34);
       }
       .morto-container {
         width: 35px;
@@ -4040,9 +4083,14 @@
         .morto-area {
           width: 44px;
           height: 44px;
-          margin-right: 15px;
           margin-top: 4px;
           transform: none !important;
+        }
+        .ambient-toggle {
+          width: 22px;
+          height: 22px;
+          margin-top: 12px;
+          font-size: 12px;
         }
         .morto-container {
           width: 28px;
@@ -5263,16 +5311,21 @@
               </div>
             </div>
 
-            <div class="morto-area">
-              <div id="mortoSlot0" class="morto-container" title="Morto Time 1">
-                <div class="morto-card-back"></div>
-                <div class="morto-card-back offset"></div>
-                <span class="morto-label">Morto 1</span>
-              </div>
-              <div id="mortoSlot1" class="morto-container" title="Morto Time 2">
-                <div class="morto-card-back"></div>
-                <div class="morto-card-back offset"></div>
-                <span class="morto-label">Morto 2</span>
+            <div class="board-top-actions">
+              <button id="ambientMusicToggle" class="ambient-toggle" type="button" onclick="toggleTableAmbientMusic()" title="Desligar música da mesa" aria-label="Desligar música da mesa">
+                <span id="ambientMusicIcon">&#128266;</span>
+              </button>
+              <div class="morto-area">
+                <div id="mortoSlot0" class="morto-container" title="Morto Time 1">
+                  <div class="morto-card-back"></div>
+                  <div class="morto-card-back offset"></div>
+                  <span class="morto-label">Morto 1</span>
+                </div>
+                <div id="mortoSlot1" class="morto-container" title="Morto Time 2">
+                  <div class="morto-card-back"></div>
+                  <div class="morto-card-back offset"></div>
+                  <span class="morto-label">Morto 2</span>
+                </div>
               </div>
             </div>
           </div>
@@ -5942,28 +5995,65 @@
       // O volume fica propositalmente baixo para não competir com os SFX da mesa
       // (cartas 0.5, turno 0.8, roubo 0.95, coração 0.85 e canastras 0.9).
       function clampMediaVolume(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(1, n));
-}
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 0;
+        return Math.max(0, Math.min(1, n));
+      }
 
-const TABLE_AMBIENT_MUSIC = {
-        feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.11 },
-        cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.12 },
-        masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.1 },
-        ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.1 },
-        submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.09 },
-        findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.1 },
+      const TABLE_AMBIENT_MUSIC = {
+        feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.12 },
+        cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.11 },
+        masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.105 },
+        ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.07 },
+        submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.108 },
+        findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.12 },
       };
 
-      const TABLE_AMBIENT_MAX_VOLUME = 0.14;
+      const TABLE_AMBIENT_MAX_VOLUME = 0.12;
+      const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
       let tableAmbientAudio = null;
       let tableAmbientTheme = null;
       let tableAmbientFadeId = 0;
-      let tableAmbientEnabled = true;
+      let tableAmbientEnabled = (() => {
+        try {
+          return localStorage.getItem(TABLE_AMBIENT_STORAGE_KEY) !== 'false';
+        } catch (e) {
+          return true;
+        }
+      })();
 
       function normalizeTableTheme(theme) {
         return Object.prototype.hasOwnProperty.call(TABLE_AMBIENT_MUSIC, theme) ? theme : 'feltro';
+      }
+
+      function updateAmbientMusicToggle() {
+        const btn = document.getElementById('ambientMusicToggle');
+        const icon = document.getElementById('ambientMusicIcon');
+        if (!btn || !icon) return;
+
+        btn.classList.toggle('muted', !tableAmbientEnabled);
+        icon.innerHTML = tableAmbientEnabled ? '&#128266;' : '&#128263;';
+        const label = tableAmbientEnabled ? 'Desligar música da mesa' : 'Ligar música da mesa';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('aria-pressed', String(tableAmbientEnabled));
+      }
+
+      function setTableAmbientEnabled(enabled, persist = true) {
+        tableAmbientEnabled = enabled !== false;
+        if (persist) {
+          try {
+            localStorage.setItem(TABLE_AMBIENT_STORAGE_KEY, String(tableAmbientEnabled));
+          } catch (e) {}
+        }
+        updateAmbientMusicToggle();
+        if (tableAmbientEnabled) syncTableAmbientMusic();
+        else stopTableAmbientMusic(false);
+      }
+
+      function toggleTableAmbientMusic() {
+        if (!audioUnlocked) unlockAudio();
+        setTableAmbientEnabled(!tableAmbientEnabled);
       }
 
       function getSafeAmbientVolume(theme) {
@@ -6042,12 +6132,12 @@ const TABLE_AMBIENT_MUSIC = {
           stopTableAmbientMusic(true);
           tableAmbientTheme = theme;
           tableAmbientAudio = new Audio(cfg.src);
-        tableAmbientAudio.addEventListener('error', () => {
-          console.warn('[ambient] Música ambiente não encontrada ou não carregou:', cfg.src);
-        });
+          tableAmbientAudio.addEventListener('error', () => {
+            console.warn('[ambient] Música ambiente não encontrada ou não carregou:', cfg.src);
+          });
           tableAmbientAudio.preload = 'auto';
           tableAmbientAudio.loop = true;
-          tableAmbientAudio.volume = clampMediaVolume( 0);
+          tableAmbientAudio.volume = clampMediaVolume(0);
           tableAmbientAudio.play().then(() => {
             fadeTableAmbientTo(targetVolume, 1000);
           }).catch(() => {});
@@ -8547,6 +8637,7 @@ const TABLE_AMBIENT_MUSIC = {
         if (debugTableThemeSelect && debugTableThemeSelect.value !== document.body.dataset.tableTheme) {
           debugTableThemeSelect.value = document.body.dataset.tableTheme;
         }
+        updateAmbientMusicToggle();
         const debugDeckThemeSelect = document.getElementById('debugDeckThemeSelect');
         if (debugDeckThemeSelect && debugDeckThemeSelect.value !== document.body.dataset.deckTheme) {
           debugDeckThemeSelect.value = document.body.dataset.deckTheme;
@@ -11492,10 +11583,10 @@ const TABLE_AMBIENT_MUSIC = {
       };
 
       window.setTableAmbientEnabled = (enabled) => {
-        tableAmbientEnabled = enabled !== false;
-        if (tableAmbientEnabled) syncTableAmbientMusic();
-        else stopTableAmbientMusic(false);
+        setTableAmbientEnabled(enabled);
       };
+
+      window.toggleTableAmbientMusic = toggleTableAmbientMusic;
 
       window.debugSetDeckTheme = async (theme) => {
         const allowedDeckThemes = ['classico', 'cassino', 'minimal', 'dominacao', 'arcade', 'mythic', 'holografico'];
