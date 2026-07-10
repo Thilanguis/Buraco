@@ -581,18 +581,10 @@
           --table-flash-filter: none !important;
         }
         #gameSection::before {
-          /* iPadOS pode piscar ao animar mask-position em uma camada fullscreen.
-             Mantemos a vida do tema com deslocamento suave do desenho de fundo. */
-          -webkit-mask-image: none !important;
-          -webkit-mask-size: auto !important;
-          -webkit-mask-position: center !important;
-          mask-image: none !important;
-          mask-size: auto !important;
-          mask-position: center !important;
-          mix-blend-mode: normal !important;
           filter: none !important;
-          animation: tableTabletBackgroundDrift 18s ease-in-out infinite !important;
-          will-change: auto;
+          transform: translateZ(0);
+          backface-visibility: hidden;
+          will-change: opacity, background-position, mask-position;
         }
         #gameSection::after {
           content: none !important;
@@ -600,17 +592,6 @@
           animation: none !important;
           filter: none !important;
           opacity: 0 !important;
-        }
-      }
-      @keyframes tableTabletBackgroundDrift {
-        0%,
-        100% {
-          background-position: center;
-          opacity: var(--table-light-opacity);
-        }
-        50% {
-          background-position: 28px -20px;
-          opacity: calc(var(--table-light-opacity) + 0.045);
         }
       }
       @keyframes tableLightStill {
@@ -6423,15 +6404,15 @@
       }
 
       const TABLE_AMBIENT_MUSIC = {
-        feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.22 },
-        cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.2 },
-        masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.19 },
-        ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.13 },
-        submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.19 },
-        findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.21 },
+        feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.35 },
+        cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.32 },
+        masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.31 },
+        ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.23 },
+        submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.32 },
+        findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.34 },
       };
 
-      const TABLE_AMBIENT_MAX_VOLUME = 0.23;
+      const TABLE_AMBIENT_MAX_VOLUME = 0.35;
       const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
       let tableAmbientAudio = null;
       let tableAmbientTheme = null;
@@ -6482,21 +6463,21 @@
         const cfg = TABLE_AMBIENT_MUSIC[normalizeTableTheme(theme)] || TABLE_AMBIENT_MUSIC.feltro;
         const requested = Number(cfg.volume) || 0.1;
         // Mantém a música sempre bem abaixo dos efeitos mais baixos da mesa.
-        return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.46);
+        return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.7);
       }
 
       function fadeTableAmbientTo(targetVolume, duration = 850, onDone = null) {
         if (!tableAmbientAudio) return;
         const audio = tableAmbientAudio;
         const fadeId = ++tableAmbientFadeId;
-        const startVolume = Number(audio.volume) || 0;
-        const safeTarget = Math.max(0, Math.min(targetVolume, TABLE_AMBIENT_MAX_VOLUME));
+        const startVolume = clampMediaVolume(audio.volume);
+        const safeTarget = clampMediaVolume(Math.min(targetVolume, TABLE_AMBIENT_MAX_VOLUME));
         const startedAt = performance.now();
 
         function step(now) {
           if (fadeId !== tableAmbientFadeId || audio !== tableAmbientAudio) return;
           const progress = duration <= 0 ? 1 : Math.min(1, (now - startedAt) / duration);
-          audio.volume = startVolume + (safeTarget - startVolume) * progress;
+          audio.volume = clampMediaVolume(startVolume + (safeTarget - startVolume) * progress);
 
           if (progress < 1) {
             requestAnimationFrame(step);
