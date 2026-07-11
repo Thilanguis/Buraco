@@ -1,0 +1,564 @@
+      /* ================= SISTEMA DE DOMINAÇÃO ================= */
+      @keyframes domBorderGlide {
+        0% {
+          background-position: 0% 50%;
+        }
+        100% {
+          background-position: 200% 50%;
+        }
+      }
+
+      @property --dom-orbit-angle {
+        syntax: '<angle>';
+        inherits: false;
+        initial-value: 0deg;
+      }
+
+      @keyframes domBorderOrbit {
+        to {
+          --dom-orbit-angle: 360deg;
+        }
+      }
+
+      @keyframes domSparkDrift {
+        0% {
+          background-position:
+            0 0,
+            48px 18px,
+            0 0;
+        }
+        100% {
+          background-position:
+            180px -90px,
+            -120px 92px,
+            0 0;
+        }
+      }
+
+      /* Reseta a borda padrão e a sombra para dar lugar ao efeito neon contínuo */
+      #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0) {
+        --dom-level-border: #d4af37;
+        --dom-level-filter: drop-shadow(0 0 3px rgba(212, 175, 55, 0.34));
+        --dom-panel-spark-layer: linear-gradient(transparent, transparent);
+        --dom-panel-spark-size: auto;
+        border-color: transparent !important;
+        box-shadow:
+          inset 0 0 0 1px var(--dom-border-underlay),
+          0 0 0 1px var(--dom-border-underlay),
+          0 10px 22px var(--dom-contrast-shadow),
+          var(--dom-panel-shadow, 0 0 0 transparent) !important;
+        isolation: isolate;
+      }
+
+      #gameSection .board-melds.has-domination-status {
+        margin-top: clamp(92px, 10vh, 108px);
+      }
+
+      #gameSection .board-melds .grow.dom-escravo {
+        box-shadow: inset 0 0 20px rgba(127, 29, 29, 0.1) !important;
+      }
+
+      #gameSection .board-melds .grow.dom-nivel-4 {
+        --dom-panel-shadow: 0 0 14px rgba(250, 204, 21, 0.16);
+        --dom-panel-spark-layer: radial-gradient(circle at 18px 16px, var(--dom-spark-core) 0 1px, transparent 2px), radial-gradient(circle at 74px 38px, var(--dom-spark-warm) 0 1px, transparent 2px);
+        --dom-panel-spark-size: 180px 110px, 230px 135px;
+      }
+      #gameSection .board-melds .grow.dom-nivel-5 {
+        --dom-panel-shadow: 0 0 18px rgba(245, 158, 11, 0.22);
+        --dom-panel-spark-layer: radial-gradient(circle at 20px 18px, var(--dom-spark-core) 0 1.2px, transparent 2.4px), radial-gradient(circle at 84px 42px, var(--dom-spark-warm) 0 1.1px, transparent 2.3px);
+        --dom-panel-spark-size: 150px 96px, 210px 126px;
+      }
+      #gameSection .board-melds .grow.dom-nivel-6 {
+        --dom-panel-shadow: 0 0 20px rgba(244, 63, 94, 0.24);
+        --dom-panel-spark-layer: radial-gradient(circle at 20px 18px, var(--dom-spark-core) 0 1.35px, transparent 2.7px), radial-gradient(circle at 88px 46px, var(--dom-spark-warm) 0 1.25px, transparent 2.6px);
+        --dom-panel-spark-size: 128px 86px, 186px 112px;
+      }
+
+      #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0)::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.14;
+        background: var(--dom-panel-spark-layer), var(--table-dom-panel-sheen), var(--dom-panel-scrim);
+        background-size: var(--dom-panel-spark-size), auto, auto;
+      }
+      #gameSection .board-melds .grow.dom-nivel-5::before,
+      #gameSection .board-melds .grow.dom-nivel-6::before {
+        opacity: 0.18;
+        background: var(--dom-panel-spark-layer), var(--table-dom-panel-sheen), var(--dom-panel-scrim-strong);
+        background-size: var(--dom-panel-spark-size), auto, auto;
+      }
+      #gameSection .board-melds .grow.dom-nivel-4::before {
+        opacity: 0.18;
+        animation: domSparkDrift 8s linear infinite;
+      }
+      #gameSection .board-melds .grow.dom-nivel-5::before {
+        opacity: 0.23;
+        animation: domSparkDrift 6.8s linear infinite;
+      }
+      #gameSection .board-melds .grow.dom-nivel-6::before {
+        opacity: 0.28;
+        animation: domSparkDrift 5.8s linear infinite;
+      }
+
+      /* MÁSCARA: Cria uma trilha exata na borda para o gradiente correr por dentro */
+      #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0)::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: inherit;
+        padding: 2px;
+        -webkit-mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
+        z-index: 3;
+        background: var(--dom-level-border);
+        filter: var(--dom-level-filter);
+      }
+
+      /* NÍVEL 1: Pressão */
+      #gameSection .board-melds .grow.dom-nivel-1::after {
+        --dom-level-border: conic-gradient(
+          from var(--dom-orbit-angle),
+          #78350f 0deg 38deg,
+          var(--dom-runner-soft) 48deg,
+          var(--dom-runner-core) 58deg,
+          var(--dom-runner-soft) 68deg,
+          #d4af37 82deg 178deg,
+          #fff7ad 186deg,
+          #d4af37 194deg 318deg,
+          #78350f 340deg 360deg
+        );
+        --dom-level-filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.3));
+        animation: domBorderOrbit 7s linear infinite;
+      }
+
+      /* NÍVEL 2: Controle (Laser Suave) */
+      #gameSection .board-melds .grow.dom-nivel-2::after {
+        --dom-level-border: conic-gradient(
+          from var(--dom-orbit-angle),
+          #92400e 0deg 34deg,
+          var(--dom-runner-soft) 46deg,
+          var(--dom-runner-core) 58deg,
+          var(--dom-runner-soft) 70deg,
+          #facc15 86deg 176deg,
+          #fff7ad 186deg,
+          #facc15 198deg 314deg,
+          #92400e 338deg 360deg
+        );
+        --dom-level-filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.36));
+        animation: domBorderOrbit 5.8s linear infinite;
+      }
+
+      /* NÍVEL 3: Dominação (Laser com brilho externo) */
+      #gameSection .board-melds .grow.dom-nivel-3::after {
+        --dom-level-border: conic-gradient(
+          from var(--dom-orbit-angle),
+          #78350f 0deg 32deg,
+          var(--dom-runner-soft) 44deg,
+          var(--dom-runner-core) 58deg,
+          var(--dom-runner-soft) 72deg,
+          #eab308 90deg 174deg,
+          #fff7ad 186deg,
+          #eab308 200deg 312deg,
+          #78350f 338deg 360deg
+        );
+        --dom-level-filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.42));
+        animation: domBorderOrbit 4.8s linear infinite;
+      }
+
+      /* NÍVEL 4: Controle Absoluto (Feixe Rápido Dourado/Branco) */
+      #gameSection .board-melds .grow.dom-nivel-4::after {
+        padding: 2px;
+        --dom-level-border: conic-gradient(
+          from var(--dom-orbit-angle),
+          #451a03 0deg 28deg,
+          var(--dom-runner-soft) 42deg,
+          var(--dom-runner-core) 58deg,
+          var(--dom-runner-soft) 74deg,
+          #ca8a04 92deg,
+          #facc15 126deg 172deg,
+          #fff7ad 186deg,
+          #facc15 204deg 286deg,
+          #b45309 318deg,
+          #451a03 346deg 360deg
+        );
+        --dom-level-filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.5)) drop-shadow(0 0 1px var(--dom-border-underlay));
+        animation: domBorderOrbit 3.8s linear infinite;
+      }
+
+      /* NÍVEL 5: Humilhação Total (Ouro Incandescente) */
+      #gameSection .board-melds .grow.dom-nivel-5::after {
+        padding: 2px;
+        --dom-level-border: conic-gradient(
+          from var(--dom-orbit-angle),
+          #431407 0deg 24deg,
+          var(--dom-runner-soft) 40deg,
+          var(--dom-runner-core) 58deg,
+          var(--dom-runner-soft) 76deg,
+          #ea580c 96deg,
+          #facc15 130deg 170deg,
+          #fff7ad 186deg,
+          #f59e0b 206deg 284deg,
+          #fef3c7 312deg,
+          #7c2d12 344deg 360deg
+        );
+        --dom-level-filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.54)) drop-shadow(0 0 1px var(--dom-border-underlay));
+        animation: domBorderOrbit 3.1s linear infinite;
+      }
+
+      /* NÍVEL 6: Falência (Carmesim/Neon Elegante) */
+      #gameSection .board-melds .grow.dom-nivel-6::after {
+        padding: 2px;
+        --dom-level-border: conic-gradient(
+          from var(--dom-orbit-angle),
+          #2a020d 0deg 20deg,
+          var(--dom-runner-soft) 38deg,
+          var(--dom-runner-core) 58deg,
+          var(--dom-runner-soft) 78deg,
+          #be123c 98deg,
+          #fb7185 132deg 168deg,
+          #facc15 182deg,
+          #fff7ed 192deg,
+          #fb7185 210deg 280deg,
+          #be123c 314deg,
+          #f59e0b 342deg,
+          #2a020d 360deg
+        );
+        --dom-level-filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.58)) drop-shadow(0 0 1px var(--dom-border-underlay));
+        animation: domBorderOrbit 2.55s linear infinite;
+      }
+      /* ======================================================== */
+      #gameSection .board-melds .grow {
+        position: relative;
+        overflow: visible !important;
+      }
+      #gameSection .board-melds .grow.has-brasao {
+        padding-top: 8px;
+      }
+      #gameSection .board-melds .grow .team-panel {
+        position: relative;
+        z-index: 2;
+      }
+
+      /* ================= BRASÃO DE DOMINAÇÃO (EVOLUTIVO) ================= */
+      .brasao-dominacao {
+        --brasao-accent: #d4af37;
+        --brasao-accent-2: #facc15;
+        --brasao-total-width: 156px;
+        --brasao-core-width: 156px;
+        --brasao-height: 28px;
+        --brasao-wing-width: 0px;
+        --brasao-wing-height: 10px;
+        --brasao-title-size: 8px;
+        --brasao-point-size: 12px;
+        --brasao-crown-size: 8px;
+        --brasao-glow: rgba(212, 175, 55, 0.18);
+        position: absolute;
+        top: -52px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        z-index: 12;
+        width: var(--brasao-total-width);
+        height: var(--brasao-height);
+        max-width: calc(100vw - 42px);
+        pointer-events: none;
+        display: grid;
+        place-items: center;
+        filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.46));
+        transition:
+          width 0.35s ease,
+          height 0.35s ease,
+          filter 0.35s ease;
+        overflow: visible;
+      }
+
+      .brasao-frame {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 2;
+        width: var(--brasao-core-width);
+        height: var(--brasao-height);
+        transform: translate(-50%, -50%);
+        border: 1.5px solid var(--brasao-accent);
+        border-radius: 999px;
+        background:
+          radial-gradient(circle at 16% 30%, var(--table-brasao-sheen), transparent 46%), radial-gradient(circle at 84% 30%, var(--table-brasao-sheen), transparent 46%), linear-gradient(180deg, rgba(15, 23, 42, 0.97), rgba(2, 6, 23, 0.99)),
+          radial-gradient(circle at 50% 0%, var(--brasao-glow), transparent 72%);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+          0 0 0 2px var(--brasao-contrast-ring),
+          0 0 8px var(--brasao-glow);
+        overflow: hidden;
+      }
+
+      .brasao-frame::before {
+        content: '';
+        position: absolute;
+        inset: 1px;
+        border-radius: inherit;
+        background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.14) 42%, transparent 58%);
+        background-size: 220% 100%;
+        opacity: 0.16;
+        animation: brasaoSweep 5.8s infinite ease-in-out;
+      }
+
+      .brasao-frame::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -4px;
+        width: 52%;
+        height: 8px;
+        transform: translateX(-50%);
+        border-bottom: 1px solid var(--brasao-accent);
+        border-radius: 50%;
+        opacity: 0.38;
+      }
+
+      @keyframes brasaoSweep {
+        0% {
+          background-position: 160% 50%;
+        }
+        52%,
+        100% {
+          background-position: -160% 50%;
+        }
+      }
+
+      @keyframes brasaoPulse {
+        from {
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+            0 0 9px var(--brasao-glow);
+        }
+        to {
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+            0 0 13px var(--brasao-glow);
+        }
+      }
+
+      /* Estilos específicos por Nível */
+      .brasao-lvl-1 {
+        --brasao-accent: #d4af37;
+        --brasao-accent-2: #facc15;
+        --brasao-total-width: 156px;
+        --brasao-core-width: 156px;
+        --brasao-height: 28px;
+        --brasao-title-size: 8px;
+        --brasao-point-size: 12px;
+        --brasao-crown-size: 8px;
+        --brasao-glow: rgba(212, 175, 55, 0.18);
+      }
+      .brasao-lvl-2 {
+        --brasao-accent: #eab308;
+        --brasao-accent-2: #facc15;
+        --brasao-total-width: 164px;
+        --brasao-core-width: 164px;
+        --brasao-height: 29px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 13px;
+        --brasao-crown-size: 8px;
+        --brasao-glow: rgba(234, 179, 8, 0.2);
+      }
+      .brasao-lvl-3 {
+        --brasao-accent: #f59e0b;
+        --brasao-accent-2: #fde68a;
+        --brasao-total-width: 176px;
+        --brasao-core-width: 176px;
+        --brasao-height: 30px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 14px;
+        --brasao-crown-size: 9px;
+        --brasao-glow: rgba(245, 158, 11, 0.24);
+      }
+      .brasao-lvl-4 {
+        --brasao-accent: #facc15;
+        --brasao-accent-2: #fef08a;
+        --brasao-side-gem: #fef08a;
+        --brasao-total-width: 208px;
+        --brasao-core-width: 208px;
+        --brasao-height: 31px;
+        --brasao-wing-width: 30px;
+        --brasao-wing-height: 9px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 15px;
+        --brasao-crown-size: 9px;
+        --brasao-glow: rgba(250, 204, 21, 0.26);
+      }
+      .brasao-lvl-5 {
+        --brasao-accent: #f59e0b;
+        --brasao-accent-2: #fef3c7;
+        --brasao-side-gem: #facc15;
+        --brasao-total-width: 214px;
+        --brasao-core-width: 214px;
+        --brasao-height: 32px;
+        --brasao-wing-width: 34px;
+        --brasao-wing-height: 10px;
+        --brasao-title-size: 9px;
+        --brasao-point-size: 16px;
+        --brasao-crown-size: 10px;
+        --brasao-glow: rgba(245, 158, 11, 0.3);
+      }
+      .brasao-lvl-6 {
+        --brasao-accent: #f59e0b;
+        --brasao-accent-2: #fb2d5c;
+        --brasao-side-gem: #fb2d5c;
+        --brasao-total-width: 204px;
+        --brasao-core-width: 204px;
+        --brasao-height: 32px;
+        --brasao-wing-width: 34px;
+        --brasao-wing-height: 10px;
+        --brasao-title-size: 10px;
+        --brasao-point-size: 17px;
+        --brasao-crown-size: 10px;
+        --brasao-glow: rgba(244, 63, 94, 0.3);
+      }
+
+      .brasao-lvl-4 .brasao-frame,
+      .brasao-lvl-5 .brasao-frame,
+      .brasao-lvl-6 .brasao-frame {
+        animation: brasaoPulse 2.6s ease-in-out infinite alternate;
+      }
+
+      .brasao-lvl-4 .brasao-frame {
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(3, 7, 18, 0.99)), radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.22), transparent 68%);
+      }
+
+      .brasao-lvl-5 .brasao-frame {
+        background: linear-gradient(180deg, rgba(33, 17, 4, 0.98), rgba(3, 7, 18, 0.99)), radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.24), transparent 68%);
+      }
+
+      .brasao-lvl-6 .brasao-frame {
+        border-color: #f59e0b;
+        background: linear-gradient(180deg, rgba(45, 7, 18, 0.98), rgba(3, 7, 18, 0.99)), radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.28), transparent 70%);
+      }
+
+      .brasao-wing {
+        display: none;
+        position: absolute;
+        top: 50%;
+        z-index: 1;
+        width: var(--brasao-wing-width);
+        height: 20px;
+        transform: translateY(-50%);
+        opacity: 0.9;
+        filter: drop-shadow(0 0 4px var(--brasao-glow));
+      }
+
+      .brasao-wing::before {
+        content: '';
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        width: 62%;
+        height: 2px;
+        transform: translateY(-50%);
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.45), var(--brasao-accent));
+        box-shadow: 0 0 6px var(--brasao-glow);
+      }
+
+      .brasao-wing::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 11px;
+        height: 11px;
+        transform: translateY(-50%) rotate(45deg);
+        border: 1px solid var(--brasao-accent);
+        border-radius: 2px;
+        background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.78), transparent 28%), linear-gradient(135deg, var(--brasao-side-gem), rgba(15, 23, 42, 0.88));
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+          0 0 8px var(--brasao-glow);
+      }
+
+      .brasao-lvl-4 .brasao-wing,
+      .brasao-lvl-5 .brasao-wing,
+      .brasao-lvl-6 .brasao-wing {
+        display: block;
+      }
+
+      .brasao-wing.wing-left {
+        left: calc(var(--brasao-wing-width) * -0.62);
+      }
+
+      .brasao-wing.wing-right {
+        right: calc(var(--brasao-wing-width) * -0.62);
+        transform: translateY(-50%) scaleX(-1);
+      }
+
+      .brasao-coroas {
+        position: absolute;
+        top: -13px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 1px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: rgba(2, 6, 23, 0.9);
+        z-index: 5;
+      }
+      .coroa-slot {
+        font-size: var(--brasao-crown-size);
+        line-height: 1;
+        opacity: 0.2;
+        filter: grayscale(1);
+        transition: all 0.3s;
+      }
+      .coroa-slot.active {
+        opacity: 1;
+        filter: grayscale(0) drop-shadow(0 0 4px var(--brasao-glow));
+      }
+      .brasao-core {
+        position: relative;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        width: var(--brasao-core-width);
+        height: var(--brasao-height);
+        padding: 0 11px;
+        box-sizing: border-box;
+        white-space: nowrap;
+      }
+      .brasao-titulo {
+        flex: 0 1 auto;
+        min-width: 0;
+        font-size: var(--brasao-title-size);
+        font-weight: 900;
+        letter-spacing: 0;
+        line-height: 1.1;
+        text-transform: uppercase;
+        color: #f8fafc;
+        text-align: center;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.26);
+      }
+      .brasao-pontos {
+        flex: 0 0 auto;
+        font-size: var(--brasao-point-size);
+        font-weight: 900;
+        letter-spacing: 0;
+        color: var(--brasao-runtime-accent, var(--brasao-accent-2));
+        line-height: 1;
+        text-shadow:
+          0 0 7px var(--brasao-glow),
+          0 2px 0 rgba(0, 0, 0, 0.9);
+      }

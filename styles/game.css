@@ -1,0 +1,723 @@
+      /* ================= JOGO MESA ================= */
+      @keyframes smoothTableReveal {
+        0% {
+          opacity: 0;
+          filter: brightness(0.2);
+        }
+        100% {
+          opacity: 1;
+          filter: brightness(1);
+        }
+      }
+      #gameSection {
+        --table-light-opacity: 0;
+        --table-light-layer: none;
+        --table-light-size: auto;
+        --table-light-position: center;
+        --table-light-blend: screen;
+        --table-light-filter: saturate(1.05);
+        --table-light-animation: tableLightStill 8s ease-in-out infinite;
+        --table-light-mask: linear-gradient(#000, #000);
+        --table-light-mask-size: auto;
+        --table-light-mask-position: center;
+        --table-flash-opacity: 0;
+        --table-flash-layer: none;
+        --table-flash-size: auto;
+        --table-flash-position: center;
+        --table-flash-filter: saturate(1);
+        --table-flash-blend: screen;
+        --table-flash-animation: tableLightStill 8s ease-in-out infinite;
+        --dom-border-underlay: rgba(2, 6, 23, 0.74);
+        --dom-contrast-shadow: rgba(0, 0, 0, 0.5);
+        --dom-panel-scrim: linear-gradient(180deg, rgba(2, 6, 23, 0.13), rgba(2, 6, 23, 0.04) 46%, transparent 72%);
+        --dom-panel-scrim-strong: linear-gradient(180deg, rgba(2, 6, 23, 0.17), rgba(2, 6, 23, 0.05) 50%, transparent 74%);
+        --dom-border-glow-boost: 1;
+        --dom-runner-core: rgba(255, 247, 237, 0.96);
+        --dom-runner-soft: rgba(250, 204, 21, 0.58);
+        --dom-spark-core: rgba(255, 247, 237, 0.58);
+        --dom-spark-warm: rgba(250, 204, 21, 0.34);
+        --brasao-contrast-ring: rgba(2, 6, 23, 0.82);
+        --hud-accent: #facc15;
+        --hud-accent-soft: rgba(250, 204, 21, 0.2);
+        --hud-accent-glow: rgba(250, 204, 21, 0.36);
+        --hud-danger: #fb7185;
+        --hud-chip-bg: rgba(15, 23, 42, 0.78);
+        --hud-chip-border: rgba(250, 204, 21, 0.38);
+        --hud-muted: #94a3b8;
+        --table-panel-bg: rgba(2, 6, 23, 0.08);
+        --table-panel-border: rgba(148, 163, 184, 0.12);
+        --table-panel-self-border: #35f08a;
+        --table-panel-rival-border: #ff4b5f;
+        --table-panel-self-glow: rgba(34, 197, 94, 0.18);
+        --table-panel-rival-glow: rgba(239, 68, 68, 0.18);
+        --table-panel-active-glow: rgba(250, 204, 21, 0.18);
+        --table-panel-title-line: rgba(255, 255, 255, 0.1);
+        --table-panel-self-wash: rgba(34, 197, 94, 0.055);
+        --table-panel-rival-wash: rgba(239, 68, 68, 0.055);
+        --table-card-shadow: -1px 2px 5px rgba(0, 0, 0, 0.34);
+        --table-card-hover-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7);
+        --table-card-back-filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.46));
+        --table-pile-spot: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.12), rgba(15, 23, 42, 0.18) 42%, transparent 70%);
+        --table-pile-border: rgba(250, 204, 21, 0.2);
+        --table-pile-glow: rgba(250, 204, 21, 0.18);
+        --table-dom-panel-sheen: linear-gradient(transparent, transparent);
+        --table-brasao-sheen: rgba(250, 204, 21, 0.08);
+        position: relative;
+        isolation: isolate;
+        flex: 1;
+        display: none;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        background: radial-gradient(circle at center, #15803d 0%, #14532d 100%);
+        animation: smoothTableReveal 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        transition: background 0.4s ease-in-out; /* Transição suave ao trocar de tema */
+      }
+      #gameSection::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: var(--table-light-opacity);
+        background: var(--table-light-layer);
+        background-size: var(--table-light-size);
+        background-position: var(--table-light-position);
+        mix-blend-mode: var(--table-light-blend);
+        filter: var(--table-light-filter);
+        animation: var(--table-light-animation);
+        -webkit-mask-image: var(--table-light-mask);
+        -webkit-mask-size: var(--table-light-mask-size);
+        -webkit-mask-position: var(--table-light-mask-position);
+        mask-image: var(--table-light-mask);
+        mask-size: var(--table-light-mask-size);
+        mask-position: var(--table-light-mask-position);
+      }
+      #gameSection::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: var(--table-flash-opacity);
+        background: var(--table-flash-layer);
+        background-size: var(--table-flash-size);
+        background-position: var(--table-flash-position);
+        mix-blend-mode: var(--table-flash-blend);
+        filter: var(--table-flash-filter);
+        animation: var(--table-flash-animation);
+      }
+      #gameSection > * {
+        position: relative;
+        z-index: 1;
+      }
+      #gameSection:has(.board-melds.has-domination-status)::before {
+        opacity: calc(var(--table-light-opacity) + 0.055);
+      }
+      #gameSection:has(.board-melds.has-domination-status)::after {
+        opacity: calc(var(--table-flash-opacity) + 0.04);
+      }
+      @media (hover: none) and (pointer: coarse) {
+        #gameSection {
+          --table-flash-opacity: 0 !important;
+          --table-flash-animation: none !important;
+          --table-flash-filter: none !important;
+        }
+        #gameSection::before {
+          filter: none !important;
+          transform: translateZ(0);
+          backface-visibility: hidden;
+          will-change: opacity, background-position, mask-position;
+        }
+        #gameSection::after {
+          content: none !important;
+          display: none !important;
+          animation: none !important;
+          filter: none !important;
+          opacity: 0 !important;
+        }
+      }
+      @keyframes tableLightStill {
+        0%,
+        100% {
+          filter: var(--table-light-filter);
+        }
+      }
+      @keyframes tableFeltCirclePulse {
+        0% {
+          filter: saturate(1) brightness(0.9);
+          background-size:
+            120px 120px,
+            120px 120px;
+        }
+        50% {
+          filter: saturate(1.18) brightness(1.2);
+          background-size:
+            124px 124px,
+            120px 120px;
+        }
+        100% {
+          filter: saturate(1) brightness(0.9);
+          background-size:
+            120px 120px,
+            120px 120px;
+        }
+      }
+      @keyframes tableTraceSweep {
+        0% {
+          -webkit-mask-position: -140% 0;
+          mask-position: -140% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        42% {
+          filter: saturate(1.25) brightness(1.28);
+        }
+        100% {
+          -webkit-mask-position: 220% 0;
+          mask-position: 220% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableCasinoShuffledSweep {
+        0%,
+        14% {
+          -webkit-mask-position: -145% 0;
+          mask-position: -145% 0;
+          filter: saturate(0.92) brightness(0.76);
+        }
+        40% {
+          -webkit-mask-position: 220% 0;
+          mask-position: 220% 0;
+          filter: saturate(1.02) brightness(1.02);
+        }
+        60% {
+          -webkit-mask-position: 220% 0;
+          mask-position: 220% 0;
+          filter: saturate(0.9) brightness(0.72);
+        }
+        88% {
+          -webkit-mask-position: -145% 0;
+          mask-position: -145% 0;
+          filter: saturate(1.02) brightness(1.02);
+        }
+        100% {
+          -webkit-mask-position: -145% 0;
+          mask-position: -145% 0;
+          filter: saturate(0.92) brightness(0.76);
+        }
+      }
+      @keyframes tableTraceDiagonalUp {
+        0% {
+          -webkit-mask-position: -120% 130%;
+          mask-position: -120% 130%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        44% {
+          filter: saturate(1.24) brightness(1.24);
+        }
+        100% {
+          -webkit-mask-position: 210% -110%;
+          mask-position: 210% -110%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableTraceDiagonalDown {
+        0% {
+          -webkit-mask-position: -120% -110%;
+          mask-position: -120% -110%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        44% {
+          filter: saturate(1.24) brightness(1.24);
+        }
+        100% {
+          -webkit-mask-position: 210% 130%;
+          mask-position: 210% 130%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableTraceVertical {
+        0% {
+          -webkit-mask-position: 0 -140%;
+          mask-position: 0 -140%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        42% {
+          filter: saturate(1.28) brightness(1.3);
+        }
+        100% {
+          -webkit-mask-position: 0 220%;
+          mask-position: 0 220%;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tableTraceReverse {
+        0% {
+          -webkit-mask-position: 220% 0;
+          mask-position: 220% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+        42% {
+          filter: saturate(1.25) brightness(1.28);
+        }
+        100% {
+          -webkit-mask-position: -140% 0;
+          mask-position: -140% 0;
+          filter: saturate(1.02) brightness(0.88);
+        }
+      }
+      @keyframes tablePointTwinkle {
+        0%,
+        100% {
+          filter: saturate(1) brightness(0.85);
+        }
+        50% {
+          filter: saturate(1.22) brightness(1.25);
+        }
+      }
+      @keyframes tableStarBlink {
+        0%,
+        13%,
+        100% {
+          opacity: 0.02;
+          background-position: 0 0;
+          filter: saturate(0.95) brightness(0.75);
+        }
+        16%,
+        23% {
+          opacity: 0.2;
+          background-position: 28px 18px;
+          filter: saturate(1.22) brightness(1.35);
+        }
+        38%,
+        44% {
+          opacity: 0.14;
+          background-position: -36px 52px;
+          filter: saturate(1.15) brightness(1.2);
+        }
+        61%,
+        67% {
+          opacity: 0.22;
+          background-position: 54px -24px;
+          filter: saturate(1.25) brightness(1.38);
+        }
+        82%,
+        88% {
+          opacity: 0.16;
+          background-position: -18px -42px;
+          filter: saturate(1.16) brightness(1.22);
+        }
+      }
+      @keyframes tableExistingMarkFlash {
+        0%,
+        100% {
+          opacity: 0.03;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        12%,
+        16% {
+          opacity: 0.34;
+          filter: saturate(1.55) brightness(1.9) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+        }
+        34%,
+        38% {
+          opacity: 0.18;
+          filter: saturate(1.25) brightness(1.35) drop-shadow(0 0 5px rgba(255, 255, 255, 0.28));
+        }
+        57%,
+        62% {
+          opacity: 0.38;
+          filter: saturate(1.65) brightness(2) drop-shadow(0 0 10px rgba(255, 255, 255, 0.54));
+        }
+        78%,
+        82% {
+          opacity: 0.2;
+          filter: saturate(1.3) brightness(1.42) drop-shadow(0 0 6px rgba(255, 255, 255, 0.32));
+        }
+      }
+      @keyframes tableSparseFeltFlash {
+        0%,
+        8% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.95) brightness(0.82) drop-shadow(0 0 0 transparent);
+        }
+        10% {
+          opacity: 0.08;
+          background-position: center center;
+          filter: saturate(1.25) brightness(1.35) drop-shadow(0 0 5px rgba(240, 253, 244, 0.28));
+        }
+        12% {
+          opacity: 0.34;
+          background-position: center center;
+          filter: saturate(1.72) brightness(2.18) drop-shadow(0 0 13px rgba(240, 253, 244, 0.72));
+        }
+        18% {
+          opacity: 0.05;
+          background-position: center center;
+          filter: saturate(1.1) brightness(1.12) drop-shadow(0 0 4px rgba(220, 252, 231, 0.24));
+        }
+        21%,
+        29% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.95) brightness(0.82) drop-shadow(0 0 0 transparent);
+        }
+        31% {
+          opacity: 0.06;
+          background-position: center center;
+          filter: saturate(1.18) brightness(1.24) drop-shadow(0 0 4px rgba(220, 252, 231, 0.24));
+        }
+        33% {
+          opacity: 0.22;
+          background-position: center center;
+          filter: saturate(1.45) brightness(1.72) drop-shadow(0 0 9px rgba(240, 253, 244, 0.48));
+        }
+        39% {
+          opacity: 0.04;
+          background-position: center center;
+          filter: saturate(1.05) brightness(1.05) drop-shadow(0 0 3px rgba(220, 252, 231, 0.18));
+        }
+        42%,
+        53% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.95) brightness(0.82) drop-shadow(0 0 0 transparent);
+        }
+        55% {
+          opacity: 0.08;
+          background-position: center center;
+          filter: saturate(1.28) brightness(1.38) drop-shadow(0 0 5px rgba(240, 253, 244, 0.3));
+        }
+        57% {
+          opacity: 0.36;
+          background-position: center center;
+          filter: saturate(1.8) brightness(2.28) drop-shadow(0 0 14px rgba(240, 253, 244, 0.76));
+        }
+        63% {
+          opacity: 0.05;
+          background-position: center center;
+          filter: saturate(1.12) brightness(1.1) drop-shadow(0 0 4px rgba(220, 252, 231, 0.22));
+        }
+        66%,
+        78% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.95) brightness(0.82) drop-shadow(0 0 0 transparent);
+        }
+        80% {
+          opacity: 0.06;
+          background-position: center center;
+          filter: saturate(1.18) brightness(1.22) drop-shadow(0 0 4px rgba(220, 252, 231, 0.22));
+        }
+        82% {
+          opacity: 0.18;
+          background-position: center center;
+          filter: saturate(1.34) brightness(1.52) drop-shadow(0 0 8px rgba(240, 253, 244, 0.42));
+        }
+        88% {
+          opacity: 0.04;
+          background-position: center center;
+          filter: saturate(1.04) brightness(1.04) drop-shadow(0 0 3px rgba(220, 252, 231, 0.16));
+        }
+        92%,
+        100% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.95) brightness(0.82) drop-shadow(0 0 0 transparent);
+        }
+      }
+      @keyframes tableSparseBubbleFlash {
+        0%,
+        9% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        11% {
+          opacity: 0.07;
+          background-position: center center;
+          filter: saturate(1.18) brightness(1.24) drop-shadow(0 0 4px rgba(250, 245, 255, 0.24));
+        }
+        13% {
+          opacity: 0.3;
+          background-position: center center;
+          filter: saturate(1.58) brightness(1.98) drop-shadow(0 0 12px rgba(250, 245, 255, 0.66));
+        }
+        19% {
+          opacity: 0.05;
+          background-position: center center;
+          filter: saturate(1.06) brightness(1.08) drop-shadow(0 0 3px rgba(233, 213, 255, 0.18));
+        }
+        22%,
+        34% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        36% {
+          opacity: 0.06;
+          background-position: center center;
+          filter: saturate(1.12) brightness(1.16) drop-shadow(0 0 4px rgba(233, 213, 255, 0.22));
+        }
+        38% {
+          opacity: 0.2;
+          background-position: center center;
+          filter: saturate(1.34) brightness(1.52) drop-shadow(0 0 8px rgba(250, 245, 255, 0.42));
+        }
+        44% {
+          opacity: 0.04;
+          background-position: center center;
+          filter: saturate(1.02) brightness(1.02) drop-shadow(0 0 2px rgba(233, 213, 255, 0.16));
+        }
+        47%,
+        61% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        63% {
+          opacity: 0.08;
+          background-position: center center;
+          filter: saturate(1.2) brightness(1.28) drop-shadow(0 0 5px rgba(250, 245, 255, 0.28));
+        }
+        65% {
+          opacity: 0.33;
+          background-position: center center;
+          filter: saturate(1.64) brightness(2.06) drop-shadow(0 0 12px rgba(250, 245, 255, 0.7));
+        }
+        71% {
+          opacity: 0.05;
+          background-position: center center;
+          filter: saturate(1.08) brightness(1.08) drop-shadow(0 0 3px rgba(233, 213, 255, 0.18));
+        }
+        74%,
+        84% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        86% {
+          opacity: 0.05;
+          background-position: center center;
+          filter: saturate(1.08) brightness(1.12) drop-shadow(0 0 3px rgba(233, 213, 255, 0.18));
+        }
+        88% {
+          opacity: 0.16;
+          background-position: center center;
+          filter: saturate(1.24) brightness(1.34) drop-shadow(0 0 6px rgba(250, 245, 255, 0.34));
+        }
+        93%,
+        100% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+      }
+      @keyframes tableSparsePointFlash {
+        0%,
+        6% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        8% {
+          opacity: 0.08;
+          background-position: center center;
+          filter: saturate(1.18) brightness(1.28) drop-shadow(0 0 4px rgba(251, 207, 232, 0.26));
+        }
+        10% {
+          opacity: 0.34;
+          background-position: center center;
+          filter: saturate(1.58) brightness(2.15) drop-shadow(0 0 12px rgba(251, 207, 232, 0.7));
+        }
+        16% {
+          opacity: 0.14;
+          background-position: center center;
+          filter: saturate(1.26) brightness(1.42) drop-shadow(0 0 7px rgba(251, 207, 232, 0.42));
+        }
+        22% {
+          opacity: 0.04;
+          background-position: center center;
+          filter: saturate(1.04) brightness(1.04) drop-shadow(0 0 2px rgba(251, 207, 232, 0.12));
+        }
+        24%,
+        27% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        29% {
+          opacity: 0.06;
+          background-position: center center;
+          filter: saturate(1.12) brightness(1.16) drop-shadow(0 0 4px rgba(251, 207, 232, 0.22));
+        }
+        31% {
+          opacity: 0.2;
+          background-position: center center;
+          filter: saturate(1.32) brightness(1.52) drop-shadow(0 0 7px rgba(251, 207, 232, 0.42));
+        }
+        37% {
+          opacity: 0.1;
+          background-position: center center;
+          filter: saturate(1.18) brightness(1.28) drop-shadow(0 0 5px rgba(251, 207, 232, 0.3));
+        }
+        42% {
+          opacity: 0.03;
+          background-position: center center;
+          filter: saturate(1.02) brightness(1.02) drop-shadow(0 0 2px rgba(251, 207, 232, 0.12));
+        }
+        44%,
+        49% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        51% {
+          opacity: 0.08;
+          background-position: center center;
+          filter: saturate(1.2) brightness(1.3) drop-shadow(0 0 5px rgba(251, 207, 232, 0.28));
+        }
+        53% {
+          opacity: 0.38;
+          background-position: center center;
+          filter: saturate(1.66) brightness(2.22) drop-shadow(0 0 13px rgba(251, 207, 232, 0.74));
+        }
+        59% {
+          opacity: 0.16;
+          background-position: center center;
+          filter: saturate(1.3) brightness(1.5) drop-shadow(0 0 8px rgba(251, 207, 232, 0.46));
+        }
+        65% {
+          opacity: 0.04;
+          background-position: center center;
+          filter: saturate(1.04) brightness(1.04) drop-shadow(0 0 2px rgba(251, 207, 232, 0.14));
+        }
+        67%,
+        74% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+        76% {
+          opacity: 0.05;
+          background-position: center center;
+          filter: saturate(1.08) brightness(1.12) drop-shadow(0 0 3px rgba(251, 207, 232, 0.18));
+        }
+        78% {
+          opacity: 0.17;
+          background-position: center center;
+          filter: saturate(1.22) brightness(1.36) drop-shadow(0 0 6px rgba(251, 207, 232, 0.34));
+        }
+        84%,
+        91% {
+          opacity: 0.05;
+          background-position: center center;
+          filter: saturate(1.08) brightness(1.12) drop-shadow(0 0 3px rgba(251, 207, 232, 0.18));
+        }
+        94%,
+        100% {
+          opacity: 0;
+          background-position: center center;
+          filter: saturate(0.9) brightness(0.78) drop-shadow(0 0 0 transparent);
+        }
+      }
+      @keyframes tableBubbleBlink {
+        0%,
+        100% {
+          opacity: 0.07;
+          background-position: 0 0;
+          filter: saturate(0.92) brightness(0.72);
+        }
+        12%,
+        19% {
+          opacity: 0.24;
+          background-position: 16px 34px;
+          filter: saturate(1.3) brightness(1.4);
+        }
+        32%,
+        38% {
+          opacity: 0.16;
+          background-position: -28px 12px;
+          filter: saturate(1.18) brightness(1.18);
+        }
+        56%,
+        64% {
+          opacity: 0.27;
+          background-position: 44px -18px;
+          filter: saturate(1.34) brightness(1.46);
+        }
+        80%,
+        86% {
+          opacity: 0.14;
+          background-position: -10px -34px;
+          filter: saturate(1.12) brightness(1.12);
+        }
+      }
+      @keyframes tablePointFlash {
+        0%,
+        100% {
+          opacity: 0.06;
+          background-position: 0 0;
+          filter: saturate(0.92) brightness(0.7);
+        }
+        9%,
+        13% {
+          opacity: 0.32;
+          background-position: 9px 17px;
+          filter: saturate(1.35) brightness(1.5);
+        }
+        27%,
+        31% {
+          opacity: 0.22;
+          background-position: -15px 6px;
+          filter: saturate(1.2) brightness(1.22);
+        }
+        48%,
+        53% {
+          opacity: 0.36;
+          background-position: 21px -11px;
+          filter: saturate(1.42) brightness(1.62);
+        }
+        71%,
+        75% {
+          opacity: 0.24;
+          background-position: -7px -19px;
+          filter: saturate(1.24) brightness(1.28);
+        }
+      }
+      @keyframes tableFindomGlint {
+        0%,
+        100% {
+          opacity: 0.1;
+          background-position:
+            0 0,
+            30px 18px;
+          filter: saturate(0.95) brightness(0.82);
+        }
+        18%,
+        26% {
+          opacity: 0.28;
+          background-position:
+            26px -14px,
+            58px 46px;
+          filter: saturate(1.22) brightness(1.34);
+        }
+        51%,
+        58% {
+          opacity: 0.22;
+          background-position:
+            -38px 36px,
+            12px -22px;
+          filter: saturate(1.15) brightness(1.18);
+        }
+        76%,
+        83% {
+          opacity: 0.32;
+          background-position:
+            48px 18px,
+            -20px 52px;
+          filter: saturate(1.28) brightness(1.42);
+        }
+      }

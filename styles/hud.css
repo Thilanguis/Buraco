@@ -1,0 +1,82 @@
+      /* ================= STATUS DO MORTO (BADGE) ================= */
+      .morto-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 8px !important;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 2px 5px; /* Reduzido para economizar espaço horizontal */
+        border-radius: 5px;
+        margin-left: 4px; /* Aproxima os badges um do outro */
+        vertical-align: middle;
+        transition: all 0.3s ease;
+      }
+      .morto-badge.pending {
+        background: rgba(15, 23, 42, 0.56);
+        border: 1px dashed color-mix(in srgb, var(--hud-accent), #475569 74%);
+        color: color-mix(in srgb, var(--hud-muted), var(--hud-accent) 18%);
+      }
+      .morto-badge.taken {
+        background: var(--hud-accent-soft);
+        border: 1px solid color-mix(in srgb, var(--hud-accent), #22c55e 45%);
+        color: color-mix(in srgb, var(--hud-accent), #ffffff 22%);
+        box-shadow:
+          inset 0 0 8px var(--hud-accent-soft),
+          0 0 8px var(--hud-accent-glow);
+        text-shadow: 0 0 5px var(--hud-accent-glow);
+      }
+
+      /* Badge informativo de compras extras acumuladas por canastras no modo Dominação */
+      .extra-cards-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 8px !important;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 2px 5px;
+        border-radius: 5px;
+        margin-left: 4px;
+        vertical-align: middle;
+        background: var(--hud-accent-soft);
+        border: 1px solid color-mix(in srgb, var(--hud-accent), #38bdf8 40%);
+        color: color-mix(in srgb, var(--hud-accent), #e0f2fe 30%);
+        box-shadow:
+          inset 0 0 8px var(--hud-accent-soft),
+          0 0 8px var(--hud-accent-glow);
+        text-shadow: 0 0 5px var(--hud-accent-glow);
+      }
+
+      /* Badge de status do superpoder único do Dominador */
+      .power-steal-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 8px !important;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 2px 5px;
+        border-radius: 5px;
+        margin-left: 4px;
+        vertical-align: middle;
+        transition: all 0.3s ease;
+      }
+      .power-steal-badge.available {
+        background: var(--hud-accent-soft);
+        border: 1px solid color-mix(in srgb, var(--hud-accent), #a855f7 42%);
+        color: color-mix(in srgb, var(--hud-accent), #f5d0fe 28%);
+        box-shadow:
+          inset 0 0 8px var(--hud-accent-soft),
+          0 0 8px var(--hud-accent-glow);
+        text-shadow: 0 0 5px var(--hud-accent-glow);
+      }
+      /* Removido o tom preto estranho: agora fica em um tom vinho/fundo escuro esmaecido limpo */
+      .power-steal-badge.used {
+        background: rgba(220, 38, 38, 0.1);
+        border: 1px dashed #b91c1c;
+        color: #f87171;
+        text-shadow: none;
+        box-shadow: none;
+      }
+

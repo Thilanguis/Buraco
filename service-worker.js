@@ -1,11 +1,31 @@
 const CACHE_NAME = 'buraco-v117';
 
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const ASSETS = [
+  './',
+  './index.html',
+  './app.js',
+  './bot.js',
+  './js/audio.js',
+  './js/firebase.js',
+  './js/themes.js',
+  './styles/base-menu.css',
+  './styles/game.css',
+  './styles/table-themes.css',
+  './styles/domination.css',
+  './styles/cards.css',
+  './styles/hud.css',
+  './styles/responsive.css',
+  './styles/effects.css',
+  './manifest.json',
+  './manifest.webmanifest',
+  './icon-192.png',
+  './icon-512.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      let totalFiles = ASSETS.length;
+      const totalFiles = ASSETS.length;
       let loadedFiles = 0;
 
       for (const url of ASSETS) {
@@ -13,18 +33,17 @@ self.addEventListener('install', (event) => {
           await cache.add(url);
           loadedFiles++;
 
-          // Dispara para o index.html qual arquivo acabou de ser baixado e o progresso real
           const allClients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
           for (const client of allClients) {
             client.postMessage({
               type: 'DOWNLOAD_PROGRESS',
               current: loadedFiles,
               total: totalFiles,
-              url: url,
+              url,
             });
           }
-        } catch (err) {
-          console.error('[SW] Falha ao cachear recurso:', url, err);
+        } catch (error) {
+          console.error('[SW] Falha ao cachear recurso:', url, error);
         }
       }
     }),
@@ -36,29 +55,60 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Escuta o comando disparado pela barra de progresso do index.html para assumir o controle
 self.addEventListener('message', (event) => {
-  if (event.data === 'skipWaiting') {
-    self.skipWaiting();
-  }
+  if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
+function unavailableResponse() {
+  return new Response('Recurso offline indisponível.', {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: new Headers({ 'Content-Type': 'text/plain; charset=utf-8' }),
+  });
+}
 
-  if (req.method !== 'GET') return;
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  const isNavigation = request.mode === 'navigate';
+  const isAppCode = /\.(?:css|html|js|json|webmanifest)$/i.test(url.pathname);
+
+  if (isNavigation || isAppCode) {
+    event.respondWith(
+      fetch(request)
+        .then(async (response) => {
+          if (response.ok) {
+            const cacheKey = isNavigation ? './index.html' : request;
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(cacheKey, response.clone());
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = isNavigation ? await caches.match('./index.html') : await caches.match(request);
+          return cached || unavailableResponse();
+        }),
+    );
+    return;
+  }
 
   event.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((cached) => {
+    caches.match(request).then((cached) => {
       if (cached) return cached;
 
-      return fetch(req).catch(() => {
-        return new Response('Recurso offline indisponível.', {
-          status: 503,
-          statusText: 'Service Unavailable',
-          headers: new Headers({ 'Content-Type': 'text/plain' }),
-        });
-      });
+      return fetch(request)
+        .then(async (response) => {
+          if (response.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => unavailableResponse());
     }),
   );
 });

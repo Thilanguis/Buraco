@@ -1,0 +1,1583 @@
+      /* ======================================================== */
+
+      .meld-line {
+        background: transparent;
+        border-radius: 6px;
+        padding: 4px 6px 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+        border: 1px solid transparent;
+        flex: 0 0 auto;
+        min-width: 90px;
+        max-width: 100%;
+        transition: background 0.2s;
+      }
+      .meld-line:active {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .meld-line-cards {
+        display: flex;
+        align-items: center;
+        height: 85px;
+        flex-wrap: nowrap;
+        transition: transform 0.15s ease;
+        position: relative; /* <- ADICIONE ESTA LINHA */
+      }
+
+      .carta.mini.canastra-fechada {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        /* O -35% assenta a carta exatamente na linha de base das outras */
+        transform: translate(-50%, -35%) rotate(90deg) !important;
+        margin: 0 !important;
+        z-index: 10;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6) !important;
+      }
+      .meld-meta {
+        font-size: 10px;
+        color: #e5e7eb;
+        margin-top: 4px;
+        text-align: center;
+      }
+
+      /* Monte e Lixo */
+      .board-middle {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        align-items: center;
+        padding: 10px 0 20px 0;
+        flex-shrink: 0;
+        z-index: 5;
+        margin-top: auto;
+      }
+      .pile-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        cursor: pointer;
+      }
+      .pile-card {
+        width: 55px;
+        height: 80px;
+        border-radius: 6px;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: visible;
+      }
+      #drawStockBtn .pile-card::before {
+        display: none !important;
+      }
+
+      .pile-card.discard-pile {
+        background: transparent;
+        border: 2px dashed rgba(255, 255, 255, 0.4);
+        box-shadow: none;
+      }
+
+      /* Força máxima para limpar a caixa do monte vazia em qualquer tema */
+      html body[data-deck-theme] #gameSection #drawStockBtn .pile-card.empty-pile {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        border: 2px dashed rgba(255, 255, 255, 0.4) !important;
+        box-shadow: none !important;
+        filter: none !important;
+      }
+
+      /* Garante que sobras de pseudo-elementos (ex: carrinhos do Arcade) não apareçam */
+      html body[data-deck-theme] #gameSection #drawStockBtn .pile-card.empty-pile::after {
+        display: none !important;
+        animation: none !important;
+        background-image: none !important;
+      }
+
+      /* Estrutura das Cartas */
+      .carta-canto {
+        line-height: 1.1;
+        font-weight: bold;
+      }
+      .carta-canto.top {
+        align-self: flex-start;
+        text-align: center;
+      }
+      .carta-canto.bottom {
+        align-self: flex-end;
+        text-align: center;
+        transform: rotate(180deg);
+      }
+      .carta-meio {
+        font-size: 24px;
+        align-self: center;
+        line-height: 1;
+      }
+
+      .discard-face {
+        width: 100%;
+        height: 100%;
+        background: #f3f4f6;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 2px 4px 6px 4px;
+        font-size: 14px;
+        color: #000;
+        overflow: hidden;
+      }
+      .discard-face .carta-canto {
+        font-size: 11px;
+        padding: 0 2px;
+        line-height: 0.95;
+      }
+      .discard-face .carta-meio {
+        font-size: 24px;
+      }
+
+      .pile-info {
+        font-size: 8px !important;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        color: #fff;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-top: 6px;
+        z-index: 10;
+      }
+
+      /* UI do Jogador */
+      /* UI do Jogador */
+      .player-interface {
+        position: sticky;
+        bottom: 0;
+        background: linear-gradient(to top, rgba(2, 6, 23, 1) 30%, rgba(2, 6, 23, 0.85) 70%, transparent 100%);
+        padding: 5px 10px 10px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        z-index: 1000;
+        width: 100%;
+        flex-shrink: 0;
+      }
+
+      #message {
+        text-align: center;
+        font-size: 11px;
+        color: var(--hud-accent);
+        font-weight: bold;
+        height: 15px;
+        text-shadow:
+          0 0 8px var(--hud-accent-glow),
+          0 1px 2px black;
+      }
+      .player-actions {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+      .player-actions button {
+        width: auto;
+        padding: 8px 12px;
+        font-size: 11px;
+        margin: 0;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      #meldBtn {
+        background: #059669;
+      }
+      #endGameBtn {
+        background: #333;
+        padding: 8px;
+      }
+      #moveWildBtn {
+        background: #0ea5e9;
+      }
+      #moveWildBtn:disabled {
+        opacity: 0.5;
+      }
+
+      /* Mão */
+      .hand-container {
+        display: flex;
+        justify-content: flex-start; /* Mudou de center para flex-start */
+        overflow-x: auto;
+        padding: 15px 10px 5px 10px;
+        min-height: 90px;
+        flex-shrink: 0;
+      }
+      .cards-row {
+        display: flex;
+        align-items: flex-end;
+        padding-right: 20px;
+        margin: 0 auto; /* Isso garante que fique centralizado quando tiver pouca carta */
+      }
+      .carta,
+      .discard-face {
+        --card-face-surface: var(--deck-card-face-surface, linear-gradient(180deg, #ffffff 0%, #f8fafc 100%));
+        --card-face-border: var(--deck-card-face-border, rgba(15, 23, 42, 0.82));
+        --card-face-inner: var(--deck-card-face-inner, rgba(15, 23, 42, 0.12));
+        --card-face-accent: var(--deck-card-face-accent, rgba(15, 23, 42, 0.26));
+        --card-face-mark: var(--deck-card-face-mark, none);
+        --card-face-mark-opacity: var(--deck-card-face-mark-opacity, 0);
+        --card-face-shadow: var(--deck-card-face-shadow, -1px 1px 4px rgba(0, 0, 0, 0.3));
+      }
+
+      .carta {
+        width: 60px;
+        height: 90px;
+        background: #fff;
+        border-radius: 5px;
+        border: 1px solid #000;
+        position: relative;
+        z-index: 0;
+        isolation: isolate;
+        flex-shrink: 0;
+        cursor: pointer;
+        box-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3);
+        margin-right: -20px;
+        transition:
+          transform 0.1s,
+          margin-right 0.1s;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 2px 4px;
+        font-size: 14px;
+        font-weight: bold;
+        overflow: hidden;
+      }
+      .carta:not(.back),
+      .discard-face {
+        background-color: #fff;
+        background-image: var(--card-face-surface);
+        border: 1px solid var(--card-face-border);
+        border-color: var(--card-face-border);
+        box-sizing: border-box;
+        box-shadow: var(--card-face-shadow);
+        position: relative;
+      }
+      /* removida a linha interna da face da carta */
+      .carta:not(.back)::before,
+      .discard-face::before {
+        content: none;
+        display: none;
+      }
+      .carta:not(.back)::after,
+      .discard-face::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--card-face-mark);
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 78% 78%;
+        opacity: var(--card-face-mark-opacity);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .carta:not(.back) .carta-canto,
+      .carta:not(.back) .carta-meio,
+      .discard-face .carta-canto,
+      .discard-face .carta-meio {
+        position: relative;
+        z-index: 1;
+      }
+      .carta:not(.back) .carta-canto,
+      .discard-face .carta-canto {
+        text-shadow: 0 0 1px rgba(255, 255, 255, 0.55);
+      }
+      .carta:not(.back).deck-red,
+      .discard-face.deck-red {
+        --card-face-accent: var(--deck-face-red-accent, rgba(220, 38, 38, 0.26));
+        --card-face-border: var(--deck-face-red-border, var(--deck-card-face-border, rgba(127, 29, 29, 0.74)));
+        --card-face-inner: var(--deck-face-red-inner, var(--deck-card-face-inner, rgba(220, 38, 38, 0.16)));
+        --card-face-mark: var(--deck-face-red-mark, none);
+        --card-face-mark-opacity: var(--deck-face-red-mark-opacity, 0);
+      }
+      .carta:not(.back).deck-blue,
+      .discard-face.deck-blue {
+        --card-face-accent: var(--deck-face-blue-accent, rgba(37, 99, 235, 0.24));
+        --card-face-border: var(--deck-face-blue-border, var(--deck-card-face-border, rgba(30, 64, 175, 0.72)));
+        --card-face-inner: var(--deck-face-blue-inner, var(--deck-card-face-inner, rgba(37, 99, 235, 0.14)));
+        --card-face-mark: var(--deck-face-blue-mark, none);
+        --card-face-mark-opacity: var(--deck-face-blue-mark-opacity, 0);
+      }
+
+      /* ================================================================= */
+      /* FACE DAS CARTAS — VISUAL LIMPO POR TEMA                           */
+      /* Mantém a carta legível e muda identidade por fonte, símbolo e selo. */
+      /* ================================================================= */
+      .carta:not(.back).deck-red,
+      .discard-face.deck-red {
+        --card-face-surface: var(--deck-face-red-surface, var(--deck-card-face-surface));
+        --deck-current-accent: var(--deck-face-red-border, var(--deck-card-face-border));
+        --deck-center-badge-bg: var(--deck-face-red-center-bg, var(--deck-center-badge-bg-default, transparent));
+        --deck-center-badge-border: var(--deck-face-red-center-border, var(--deck-center-badge-border-default, transparent));
+      }
+
+      .carta:not(.back).deck-blue,
+      .discard-face.deck-blue {
+        --card-face-surface: var(--deck-face-blue-surface, var(--deck-card-face-surface));
+        --deck-current-accent: var(--deck-face-blue-border, var(--deck-card-face-border));
+        --deck-center-badge-bg: var(--deck-face-blue-center-bg, var(--deck-center-badge-bg-default, transparent));
+        --deck-center-badge-border: var(--deck-face-blue-center-border, var(--deck-center-badge-border-default, transparent));
+      }
+
+      .carta:not(.back),
+      .discard-face {
+        background: var(--card-face-surface) !important;
+        font-family: var(--deck-face-font, 'Montserrat', system-ui, -apple-system, sans-serif);
+      }
+
+      .carta:not(.back) .carta-canto,
+      .discard-face .carta-canto {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        min-width: 13px;
+        padding: 1px 2px;
+        border-radius: 4px;
+        font-family: var(--deck-rank-font, 'Montserrat', system-ui, -apple-system, sans-serif);
+        font-weight: var(--deck-rank-weight, 900);
+        letter-spacing: var(--deck-rank-spacing, -0.03em);
+        line-height: 0.88;
+        text-shadow: var(--deck-rank-shadow, none);
+      }
+
+      .carta:not(.back) .card-rank,
+      .discard-face .card-rank {
+        display: block;
+        transform: var(--deck-rank-transform, none);
+      }
+
+      .carta:not(.back) .card-suit,
+      .discard-face .card-suit {
+        display: block;
+        font-size: 0.82em;
+        line-height: 0.9;
+        margin-top: 1px;
+        opacity: var(--deck-corner-suit-opacity, 0.94);
+      }
+
+      .carta:not(.back) .carta-meio,
+      .discard-face .carta-meio {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--deck-center-size, 1.62em);
+        height: var(--deck-center-size, 1.62em);
+        align-self: center;
+        border-radius: var(--deck-center-radius, 999px);
+        border: none !important;
+        background: transparent !important;
+        font-family: var(--deck-center-font, var(--deck-rank-font, 'Montserrat', system-ui, -apple-system, sans-serif));
+        font-weight: var(--deck-center-weight, 900);
+        transform: scale(var(--deck-center-scale, 1));
+        text-shadow: var(--deck-center-shadow, none);
+      }
+
+      .carta:not(.back) .carta-meio::after,
+      .discard-face .carta-meio::after {
+        content: var(--deck-center-mini-mark, '');
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(var(--deck-center-mini-rotate, 0deg));
+        font-size: 0.82em;
+        line-height: 1;
+        color: var(--deck-current-accent, currentColor);
+        opacity: var(--deck-center-mini-opacity, 0);
+        pointer-events: none;
+      }
+
+      .carta:not(.back) .joker-symbol::after,
+      .discard-face .joker-symbol::after {
+        content: '';
+      }
+
+      .carta.mini .carta-canto {
+        min-width: 10px;
+        padding: 0 1px;
+      }
+
+      .carta.mini .carta-meio {
+        width: var(--deck-center-size-mini, 1.48em);
+        height: var(--deck-center-size-mini, 1.48em);
+      }
+
+      .discard-face .carta-meio {
+        width: var(--deck-center-size-discard, 1.5em);
+        height: var(--deck-center-size-discard, 1.5em);
+      }
+      .carta:last-child {
+        margin-right: 0;
+      }
+      /* FÍSICA 3D (PARALLAX) NO HOVER */
+      #handContainer .carta {
+        transition:
+          transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+          margin-right 0.2s,
+          box-shadow 0.25s;
+        transform-style: preserve-3d;
+      }
+      #handContainer .carta:hover {
+        margin-right: 0;
+        z-index: 100;
+        /* Efeito 3D puxando a carta pra câmera e rotacionando levemente */
+        transform: translateY(-15px) scale(1.08) rotateX(12deg) rotateY(-4deg) !important;
+        box-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7);
+      }
+
+      /* CARTA SELECIONADA (Fica travada no alto, sem pular e com altura reduzida) */
+      #handContainer .carta.selected {
+        margin-right: 0;
+        z-index: 100;
+        /* A Mágica: Reduzi o deslocamento de -20px para -12px. A carta sobe bem menos! */
+        transform: translateY(-12px) scale(1.05) !important;
+        border: 2px solid #facc15 !important;
+        box-shadow: 0 15px 30px rgba(250, 204, 21, 0.8) !important;
+      }
+      .fly-card {
+        position: fixed;
+        left: 0;
+        top: 0;
+        margin: 0 !important;
+        z-index: 9999;
+        pointer-events: none;
+        transform-origin: top left;
+        will-change: transform, opacity;
+      }
+
+      /* ================================================================= */
+      /* SISTEMA MESTRE DE BARALHOS (CORREÇÃO DEFINITIVA)                  */
+      /* ================================================================= */
+
+      /* 1. TRAVAS ESTRUTURAIS (Blinda a mesa contra vazamento de luz) */
+      .opponent-card-back,
+      .carta.mini,
+      .morto-card-back {
+        overflow: hidden !important;
+        position: relative;
+        z-index: 0;
+        isolation: isolate;
+      }
+
+      /* Libera o overflow APENAS dos contêineres pais (Mesa) para o empilhamento 3D não ser decapitado */
+      .pile-area > .pile-card,
+      .morto-container {
+        overflow: visible !important;
+        position: relative;
+        z-index: 0;
+      }
+
+      /* Trava DEFINITIVA para as cartas geradas pelo JS (visual-layer) 
+         Isso anula o 'visible' caso a carta herde a classe do pai, cortando o carrinho vazado na borda! */
+      div.visual-layer {
+        overflow: hidden !important;
+        isolation: isolate;
+        border-radius: 6px;
+      }
+      /* Trava Inquebrável: Garante que a carta de compra SEMPRE consiga voar na tela */
+      .fly-card {
+        position: fixed !important;
+      }
+      .fly-card.back * {
+        visibility: hidden !important;
+      }
+
+      /* 2. GEOMETRIA DO MORTO (Trava em Cruz Perfeita, nunca mais fica torto) */
+      .morto-area {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        margin-right: 15px;
+      }
+      .morto-container {
+        position: absolute;
+        width: 55px;
+        height: 80px;
+        top: 0;
+        left: 12.5px;
+        transition: opacity 0.3s;
+        transform-origin: center center !important;
+      }
+      #mortoSlot0 {
+        z-index: 2;
+        transform: none !important;
+      }
+      #mortoSlot1 {
+        z-index: 1;
+        transform: rotate(90deg) !important;
+      }
+      .morto-card-back {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+      }
+      .morto-card-back:nth-child(1) {
+        z-index: 2;
+      }
+      .morto-card-back.offset {
+        transform: translate(3px, -3px) !important;
+        z-index: 1;
+      }
+
+      /* 3. ESTRUTURA BASE DOS BARALHOS */
+      body[data-deck-theme] {
+        --deck-card-face-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.7), transparent 34%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --deck-card-face-border: rgba(15, 23, 42, 0.82);
+        --deck-card-face-inner: rgba(15, 23, 42, 0.12);
+        --deck-card-face-shadow: -1px 1px 4px rgba(0, 0, 0, 0.3);
+        --deck-face-red-accent: rgba(220, 38, 38, 0.24);
+        --deck-face-blue-accent: rgba(37, 99, 235, 0.22);
+        --deck-face-red-border: rgba(127, 29, 29, 0.74);
+        --deck-face-blue-border: rgba(30, 64, 175, 0.7);
+        --deck-face-red-inner: rgba(220, 38, 38, 0.15);
+        --deck-face-blue-inner: rgba(37, 99, 235, 0.13);
+        --deck-face-red-mark: none;
+        --deck-face-blue-mark: none;
+        --deck-face-red-mark-opacity: 0;
+        --deck-face-blue-mark-opacity: 0;
+      }
+
+      body[data-deck-theme='classico'] {
+        --deck-face-red-mark: radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.9) 0 2px, transparent 3px), linear-gradient(45deg, transparent 46%, rgba(220, 38, 38, 0.38) 47% 53%, transparent 54%);
+        --deck-face-blue-mark: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.86) 0 2px, transparent 3px), linear-gradient(45deg, transparent 46%, rgba(37, 99, 235, 0.34) 47% 53%, transparent 54%);
+        --deck-face-red-mark-opacity: 0.045;
+        --deck-face-blue-mark-opacity: 0.04;
+      }
+
+      body[data-deck-theme='cassino'] {
+        --deck-card-face-surface: linear-gradient(135deg, rgba(212, 175, 55, 0.12), transparent 34%), linear-gradient(180deg, #fffdf5 0%, #f8f0dc 100%);
+        --deck-card-face-shadow: -1px 1px 5px rgba(0, 0, 0, 0.34);
+        --deck-face-red-accent: rgba(212, 175, 55, 0.34);
+        --deck-face-blue-accent: rgba(16, 185, 129, 0.3);
+        --deck-face-red-border: rgba(146, 64, 14, 0.72);
+        --deck-face-blue-border: rgba(6, 95, 70, 0.72);
+        --deck-face-red-inner: rgba(212, 175, 55, 0.24);
+        --deck-face-blue-inner: rgba(16, 185, 129, 0.2);
+        --deck-face-red-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72' r='28' fill='none' stroke='%23b45309' stroke-width='3' stroke-opacity='0.9'/%3E%3Ctext x='50' y='82' font-size='48' fill='%23b45309' font-family='Arial,sans-serif' font-weight='900' text-anchor='middle'%3E%24%3C/text%3E%3C/svg%3E");
+        --deck-face-blue-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpath d='M50 35 L82 72 L50 109 L18 72 Z' fill='none' stroke='%23059669' stroke-width='3' stroke-opacity='0.9'/%3E%3Ctext x='50' y='78' font-size='22' fill='%23059669' font-family='Arial,sans-serif' font-weight='900' text-anchor='middle'%3EPIX%3C/text%3E%3C/svg%3E");
+        --deck-face-red-mark-opacity: 0.055;
+        --deck-face-blue-mark-opacity: 0.05;
+      }
+
+      body[data-deck-theme='minimal'] {
+        --deck-card-face-surface: linear-gradient(180deg, #ffffff 0%, #f6f7fb 100%);
+        --deck-face-red-border: rgba(185, 28, 28, 0.62);
+        --deck-face-blue-border: rgba(29, 78, 216, 0.62);
+        --deck-face-red-inner: rgba(239, 68, 68, 0.13);
+        --deck-face-blue-inner: rgba(59, 130, 246, 0.13);
+      }
+
+      body[data-deck-theme='dominacao'] {
+        --deck-card-face-surface: linear-gradient(135deg, rgba(2, 6, 23, 0.04), transparent 42%), linear-gradient(180deg, #ffffff 0%, #eef7ff 100%);
+        --deck-face-red-accent: rgba(255, 20, 147, 0.3);
+        --deck-face-blue-accent: rgba(0, 188, 212, 0.3);
+        --deck-face-red-border: rgba(190, 24, 93, 0.7);
+        --deck-face-blue-border: rgba(8, 145, 178, 0.7);
+        --deck-face-red-inner: rgba(255, 20, 147, 0.22);
+        --deck-face-blue-inner: rgba(0, 188, 212, 0.2);
+        --deck-face-red-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='24' y='46' width='52' height='52' rx='8' fill='none' stroke='%23db2777' stroke-width='3' stroke-opacity='0.9' transform='rotate(45 50 72)'/%3E%3Ccircle cx='50' cy='72' r='9' fill='none' stroke='%23db2777' stroke-width='2'/%3E%3C/svg%3E");
+        --deck-face-blue-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='24' y='46' width='52' height='52' rx='8' fill='none' stroke='%2306b6d4' stroke-width='3' stroke-opacity='0.9' transform='rotate(45 50 72)'/%3E%3Ccircle cx='50' cy='72' r='9' fill='none' stroke='%2306b6d4' stroke-width='2'/%3E%3C/svg%3E");
+        --deck-face-red-mark-opacity: 0.055;
+        --deck-face-blue-mark-opacity: 0.055;
+      }
+
+      body[data-deck-theme='arcade'] {
+        --deck-card-face-surface: repeating-linear-gradient(180deg, rgba(15, 23, 42, 0) 0 5px, rgba(15, 23, 42, 0.025) 6px), linear-gradient(180deg, #fffdf7 0%, #f4f7ff 100%);
+        --deck-face-red-border: rgba(255, 53, 94, 0.72);
+        --deck-face-blue-border: rgba(0, 217, 255, 0.72);
+        --deck-face-red-inner: rgba(255, 214, 10, 0.2);
+        --deck-face-blue-inner: rgba(163, 255, 18, 0.17);
+        --deck-face-red-mark: linear-gradient(90deg, transparent 38%, rgba(255, 53, 94, 0.8) 39% 41%, transparent 42% 58%, rgba(255, 214, 10, 0.78) 59% 61%, transparent 62%);
+        --deck-face-blue-mark: linear-gradient(90deg, transparent 38%, rgba(0, 217, 255, 0.8) 39% 41%, transparent 42% 58%, rgba(163, 255, 18, 0.72) 59% 61%, transparent 62%);
+        --deck-face-red-mark-opacity: 0.035;
+        --deck-face-blue-mark-opacity: 0.035;
+      }
+
+      body[data-deck-theme='mythic'] {
+        --deck-card-face-surface: radial-gradient(circle at 50% 8%, rgba(250, 204, 21, 0.12), transparent 34%), linear-gradient(180deg, #fffaf5 0%, #f9f0f5 100%);
+        --deck-face-red-accent: rgba(244, 114, 182, 0.32);
+        --deck-face-blue-accent: rgba(34, 211, 238, 0.3);
+        --deck-face-red-border: rgba(180, 83, 9, 0.7);
+        --deck-face-blue-border: rgba(8, 145, 178, 0.68);
+        --deck-face-red-inner: rgba(244, 114, 182, 0.2);
+        --deck-face-blue-inner: rgba(34, 211, 238, 0.18);
+        --deck-face-red-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72' r='30' fill='none' stroke='%23be185d' stroke-width='2.5'/%3E%3Cpath d='M50 38 L56 52 H72 L60 62 L65 80 L50 70 L35 80 L40 62 L28 52 H44 Z' fill='none' stroke='%23b45309' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --deck-face-blue-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72' r='30' fill='none' stroke='%230e7490' stroke-width='2.5'/%3E%3Cpath d='M50 38 L56 52 H72 L60 62 L65 80 L50 70 L35 80 L40 62 L28 52 H44 Z' fill='none' stroke='%2306b6d4' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --deck-face-red-mark-opacity: 0.052;
+        --deck-face-blue-mark-opacity: 0.052;
+      }
+
+      body[data-deck-theme='holografico'] {
+        --deck-card-face-surface: linear-gradient(125deg, rgba(255, 0, 60, 0.08), rgba(0, 210, 255, 0.08), rgba(255, 255, 255, 0.7)), linear-gradient(180deg, #ffffff 0%, #f5fbff 100%);
+        --deck-face-red-border: rgba(244, 63, 94, 0.56);
+        --deck-face-blue-border: rgba(14, 165, 233, 0.56);
+        --deck-face-red-inner: rgba(244, 63, 94, 0.16);
+        --deck-face-blue-inner: rgba(14, 165, 233, 0.16);
+        --deck-face-red-mark: linear-gradient(125deg, rgba(255, 0, 60, 0.78), rgba(255, 115, 0, 0.72), rgba(255, 0, 60, 0.78));
+        --deck-face-blue-mark: linear-gradient(125deg, rgba(0, 210, 255, 0.78), rgba(112, 0, 255, 0.72), rgba(0, 210, 255, 0.78));
+        --deck-face-red-mark-opacity: 0.035;
+        --deck-face-blue-mark-opacity: 0.035;
+      }
+
+      /* ================================================================= */
+      /* IDENTIDADE LIMPA DAS FACES POR TEMA                               */
+      /* ================================================================= */
+      body[data-deck-theme] {
+        --deck-rank-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-center-font: var(--deck-rank-font);
+        --deck-rank-weight: 900;
+        --deck-center-weight: 900;
+        --deck-rank-spacing: -0.03em;
+        --deck-rank-shadow: none;
+        --deck-center-shadow: none;
+        --deck-center-scale: 1;
+        --deck-center-badge-bg-default: transparent;
+        --deck-center-badge-border-default: transparent;
+        --deck-center-mini-mark: '';
+        --deck-center-mini-opacity: 0;
+        --deck-face-red-surface: var(--deck-card-face-surface);
+        --deck-face-blue-surface: var(--deck-card-face-surface);
+      }
+
+      body[data-deck-theme='classico'] {
+        --deck-rank-font: Georgia, 'Times New Roman', serif;
+        --deck-center-font: Georgia, 'Times New Roman', serif;
+        --deck-rank-weight: 700;
+        --deck-center-weight: 700;
+        --deck-rank-spacing: -0.06em;
+        --deck-rank-shadow: none;
+        --deck-center-shadow: none;
+        --deck-card-face-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.95), transparent 36%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+        --deck-face-red-mark-opacity: 0.028;
+        --deck-face-blue-mark-opacity: 0.026;
+        --deck-center-badge-bg-default: rgba(15, 23, 42, 0.025);
+        --deck-center-badge-border-default: rgba(15, 23, 42, 0.08);
+      }
+
+      body[data-deck-theme='cassino'] {
+        --deck-rank-font: 'Cinzel', 'Trajan Pro', Georgia, serif;
+        --deck-center-font: 'Cinzel', 'Trajan Pro', Georgia, serif;
+        --deck-rank-weight: 900;
+        --deck-center-weight: 900;
+        --deck-rank-spacing: -0.02em;
+        --deck-rank-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 5px rgba(180, 83, 9, 0.18);
+        --deck-center-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 7px rgba(180, 83, 9, 0.2);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(212, 175, 55, 0.08), transparent 42%), linear-gradient(180deg, #fffef8 0%, #faf4e5 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #fffef8 0%, #fbf0df 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #fffef8 0%, #eef8f1 100%);
+        --deck-face-red-mark-opacity: 0.038;
+        --deck-face-blue-mark-opacity: 0.035;
+        --deck-center-badge-bg-default: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.75), transparent 34%), rgba(212, 175, 55, 0.13);
+        --deck-center-badge-border-default: rgba(180, 83, 9, 0.24);
+        --deck-center-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+      }
+
+      body[data-deck-theme='minimal'] {
+        --deck-rank-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --deck-center-font: var(--deck-rank-font);
+        --deck-rank-weight: 800;
+        --deck-rank-spacing: -0.04em;
+        --deck-card-face-surface: linear-gradient(180deg, #ffffff 0%, #f7f8fb 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #ffffff 0%, #fffafa 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        --deck-card-face-inner: rgba(15, 23, 42, 0.07);
+        --deck-center-scale: 0.96;
+        --deck-center-badge-bg-default: transparent;
+        --deck-center-badge-border-default: transparent;
+        --deck-face-red-mark-opacity: 0;
+        --deck-face-blue-mark-opacity: 0;
+      }
+
+      body[data-deck-theme='dominacao'] {
+        --deck-rank-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-center-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-rank-weight: 900;
+        --deck-rank-spacing: -0.08em;
+        --deck-rank-transform: skew(-3deg);
+        --deck-card-face-surface: linear-gradient(135deg, rgba(2, 6, 23, 0.035), transparent 42%), linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        --deck-face-red-surface: linear-gradient(180deg, #ffffff 0%, #fff4fb 100%);
+        --deck-face-blue-surface: linear-gradient(180deg, #ffffff 0%, #effcff 100%);
+        --deck-face-red-center-bg: rgba(219, 39, 119, 0.075);
+        --deck-face-blue-center-bg: rgba(6, 182, 212, 0.075);
+        --deck-face-red-center-border: rgba(219, 39, 119, 0.22);
+        --deck-face-blue-center-border: rgba(6, 182, 212, 0.22);
+        --deck-face-red-mark-opacity: 0.04;
+        --deck-face-blue-mark-opacity: 0.04;
+        --deck-center-mini-mark: '◇';
+        --deck-center-mini-opacity: 0.13;
+        --deck-center-mini-rotate: 45deg;
+      }
+
+      body[data-deck-theme='arcade'] {
+        --deck-rank-font: 'Courier New', ui-monospace, monospace;
+        --deck-center-font: 'Courier New', ui-monospace, monospace;
+        --deck-rank-weight: 900;
+        --deck-rank-spacing: -0.12em;
+        --deck-rank-shadow: 1px 0 rgba(0, 0, 0, 0.12);
+        --deck-card-face-surface: repeating-linear-gradient(180deg, rgba(15, 23, 42, 0.03) 0 1px, transparent 1px 7px), linear-gradient(180deg, #fffefd 0%, #f4f7ff 100%);
+        --deck-face-red-surface: repeating-linear-gradient(180deg, rgba(255, 53, 94, 0.035) 0 1px, transparent 1px 7px), linear-gradient(180deg, #fffefd 0%, #fff6f8 100%);
+        --deck-face-blue-surface: repeating-linear-gradient(180deg, rgba(0, 217, 255, 0.04) 0 1px, transparent 1px 7px), linear-gradient(180deg, #fffefd 0%, #f2fcff 100%);
+        --deck-face-red-mark-opacity: 0.03;
+        --deck-face-blue-mark-opacity: 0.03;
+        --deck-center-badge-bg-default: rgba(15, 23, 42, 0.035);
+        --deck-center-badge-border-default: rgba(15, 23, 42, 0.12);
+        --deck-center-mini-mark: '▣';
+        --deck-center-mini-opacity: 0.11;
+      }
+
+      body[data-deck-theme='mythic'] {
+        --deck-rank-font: Georgia, 'Times New Roman', serif;
+        --deck-center-font: Georgia, 'Times New Roman', serif;
+        --deck-rank-weight: 800;
+        --deck-rank-spacing: -0.05em;
+        --deck-card-face-surface: radial-gradient(circle at 50% 12%, rgba(250, 204, 21, 0.09), transparent 34%), linear-gradient(180deg, #fffdf8 0%, #fbf3f7 100%);
+        --deck-face-red-surface: radial-gradient(circle at 50% 12%, rgba(244, 114, 182, 0.08), transparent 34%), linear-gradient(180deg, #fffdf8 0%, #fff5fb 100%);
+        --deck-face-blue-surface: radial-gradient(circle at 50% 12%, rgba(34, 211, 238, 0.08), transparent 34%), linear-gradient(180deg, #fffdf8 0%, #f0fdff 100%);
+        --deck-face-red-mark-opacity: 0.04;
+        --deck-face-blue-mark-opacity: 0.04;
+        --deck-center-badge-bg-default: rgba(250, 204, 21, 0.07);
+        --deck-center-badge-border-default: rgba(180, 83, 9, 0.18);
+        --deck-center-mini-mark: '✦';
+        --deck-center-mini-opacity: 0.14;
+      }
+
+      body[data-deck-theme='holografico'] {
+        --deck-rank-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-center-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+        --deck-rank-weight: 900;
+        --deck-rank-spacing: -0.07em;
+        --deck-card-face-surface: linear-gradient(125deg, rgba(255, 0, 60, 0.045), rgba(0, 210, 255, 0.055), rgba(255, 255, 255, 0.55)), linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        --deck-face-red-surface: linear-gradient(125deg, rgba(244, 63, 94, 0.055), rgba(255, 255, 255, 0.6)), linear-gradient(180deg, #ffffff 0%, #fff8fb 100%);
+        --deck-face-blue-surface: linear-gradient(125deg, rgba(14, 165, 233, 0.06), rgba(255, 255, 255, 0.6)), linear-gradient(180deg, #ffffff 0%, #f5fcff 100%);
+        --deck-face-red-mark-opacity: 0.03;
+        --deck-face-blue-mark-opacity: 0.03;
+        --deck-center-badge-bg-default: linear-gradient(135deg, rgba(255, 0, 90, 0.08), rgba(0, 210, 255, 0.09));
+        --deck-center-badge-border-default: rgba(14, 165, 233, 0.16);
+        --deck-center-shadow: 0 0 5px rgba(14, 165, 233, 0.16);
+      }
+
+      .back-red,
+      .fly-card.back:not(.back-blue),
+      .opponent-card-back:not(.back-blue),
+      #mortoSlot0 .morto-card-back,
+      .morto-card-back:not(.back-blue),
+      #drawStockBtn .pile-card:not(.back-blue),
+      .carta.mini.back:not(.back-blue),
+      .back-blue,
+      .fly-card.back.back-blue,
+      .opponent-card-back.back-blue,
+      #mortoSlot1 .morto-card-back,
+      .morto-card-back.back-blue,
+      #drawStockBtn .pile-card.back-blue,
+      .carta.mini.back.back-blue {
+        box-sizing: border-box !important;
+        color: transparent !important;
+        background-repeat: no-repeat !important;
+      }
+
+      /* 4. TEMA: CLÁSSICO */
+      body[data-deck-theme='classico'] .back-red,
+      body[data-deck-theme='classico'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='classico'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='classico'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='classico'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='classico'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='classico'] .carta.mini.back:not(.back-blue) {
+        border: 2px solid #fff !important;
+        background: var(--bg-card-red) !important;
+        background-size: 10px 10px !important;
+        background-position: center center !important;
+        box-shadow:
+          -2px 2px 0 rgba(255, 255, 255, 0.1),
+          -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
+      }
+      body[data-deck-theme='classico'] .back-blue,
+      body[data-deck-theme='classico'] .fly-card.back.back-blue,
+      body[data-deck-theme='classico'] .opponent-card-back.back-blue,
+      body[data-deck-theme='classico'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='classico'] .morto-card-back.back-blue,
+      body[data-deck-theme='classico'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='classico'] .carta.mini.back.back-blue {
+        border: 2px solid #fff !important;
+        background: var(--bg-card-blue) !important;
+        background-size: 10px 10px !important;
+        background-position: center center !important;
+        box-shadow:
+          -2px 2px 0 rgba(255, 255, 255, 0.1),
+          -4px 4px 5px rgba(0, 0, 0, 0.8) !important;
+      }
+
+      /* 5. TEMAS PREMIUM */
+      body[data-deck-theme='cassino'] .back-red,
+      body[data-deck-theme='cassino'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='cassino'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='cassino'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='cassino'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='cassino'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='cassino'] .carta.mini.back:not(.back-blue) {
+        background-color: #0a0a0a !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Ccircle cx='50' cy='72.5' r='35' fill='%230a0a0a' stroke='%23d4af37' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='45' fill='%23d4af37' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3E%24%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important;
+        border: 2px solid #d4af37 !important;
+        box-shadow: inset 0 0 10px #000 !important;
+      }
+      body[data-deck-theme='cassino'] .back-blue,
+      body[data-deck-theme='cassino'] .fly-card.back.back-blue,
+      body[data-deck-theme='cassino'] .opponent-card-back.back-blue,
+      body[data-deck-theme='cassino'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='cassino'] .morto-card-back.back-blue,
+      body[data-deck-theme='cassino'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='cassino'] .carta.mini.back.back-blue {
+        background-color: #022c22 !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Cpolygon points='50,37.5 85,72.5 50,107.5 15,72.5' fill='%23022c22' stroke='%2310b981' stroke-width='4'/%3E%3Ctext x='50' y='77.5' font-size='24' fill='%2310b981' font-family='sans-serif' font-weight='900' text-anchor='middle' dominant-baseline='middle'%3EPIX%3C/text%3E%3C/svg%3E") !important;
+        background-size: 100% 100% !important;
+        border: 2px solid #10b981 !important;
+        box-shadow: inset 0 0 10px #000 !important;
+      }
+      body[data-deck-theme='minimal'] .back-red,
+      body[data-deck-theme='minimal'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='minimal'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='minimal'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='minimal'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='minimal'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='minimal'] .carta.mini.back:not(.back-blue) {
+        background-color: #b91c1c !important;
+        background-image: none !important;
+        border: 2px solid #ef4444 !important;
+        box-shadow:
+          inset 0 0 0 2px #fff,
+          inset 0 0 0 4px #7f1d1d !important;
+      }
+      body[data-deck-theme='minimal'] .back-blue,
+      body[data-deck-theme='minimal'] .fly-card.back.back-blue,
+      body[data-deck-theme='minimal'] .opponent-card-back.back-blue,
+      body[data-deck-theme='minimal'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='minimal'] .morto-card-back.back-blue,
+      body[data-deck-theme='minimal'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='minimal'] .carta.mini.back.back-blue {
+        background-color: #1d4ed8 !important;
+        background-image: none !important;
+        border: 2px solid #3b82f6 !important;
+        box-shadow:
+          inset 0 0 0 2px #fff,
+          inset 0 0 0 4px #1e3a8a !important;
+      }
+      /* ================================================================= */
+      /* TEMA: DOMINAÇÃO (LUXO TECH / CLEAN NEON)                          */
+      /* ================================================================= */
+
+      /* Deck 1 — Magenta */
+      body[data-deck-theme='dominacao'] .back-red,
+      body[data-deck-theme='dominacao'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='dominacao'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='dominacao'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='dominacao'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='dominacao'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='dominacao'] .carta.mini.back:not(.back-blue) {
+        background-color: #050505 !important;
+        background-image:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 45%, rgba(255, 20, 147, 0.04) 100%),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' ry='10' fill='none' stroke='%23ff1493' stroke-opacity='0.18' stroke-width='1.2'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' ry='8' fill='none' stroke='%23ff1493' stroke-opacity='0.55' stroke-width='1.8'/%3E%3Cpath d='M50 40 L66 56 L50 72 L34 56 Z' fill='none' stroke='%23ff1493' stroke-width='2.2' stroke-opacity='0.9'/%3E%3Ccircle cx='50' cy='56' r='10' fill='none' stroke='%23ff1493' stroke-width='1.2' stroke-opacity='0.45'/%3E%3Cpath d='M28 28 L36 36 M64 36 L72 28 M28 117 L36 109 M64 109 L72 117' stroke='%23ff1493' stroke-width='1.2' stroke-opacity='0.35' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='56' r='2.8' fill='%23ff1493' fill-opacity='0.95'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid rgba(255, 20, 147, 0.75) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+          inset 0 0 18px rgba(255, 20, 147, 0.1),
+          0 0 8px rgba(255, 20, 147, 0.16) !important;
+        filter: none !important;
+      }
+
+      /* Deck 2 — Cyan */
+      body[data-deck-theme='dominacao'] .back-blue,
+      body[data-deck-theme='dominacao'] .fly-card.back.back-blue,
+      body[data-deck-theme='dominacao'] .opponent-card-back.back-blue,
+      body[data-deck-theme='dominacao'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='dominacao'] .morto-card-back.back-blue,
+      body[data-deck-theme='dominacao'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='dominacao'] .carta.mini.back.back-blue {
+        background-color: #050505 !important;
+        background-image:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 45%, rgba(0, 255, 255, 0.04) 100%),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' ry='10' fill='none' stroke='%2300ffff' stroke-opacity='0.16' stroke-width='1.2'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' ry='8' fill='none' stroke='%2300ffff' stroke-opacity='0.50' stroke-width='1.8'/%3E%3Cpath d='M50 40 L66 56 L50 72 L34 56 Z' fill='none' stroke='%2300ffff' stroke-width='2.2' stroke-opacity='0.85'/%3E%3Ccircle cx='50' cy='56' r='10' fill='none' stroke='%2300ffff' stroke-width='1.2' stroke-opacity='0.40'/%3E%3Cpath d='M28 28 L36 36 M64 36 L72 28 M28 117 L36 109 M64 109 L72 117' stroke='%2300ffff' stroke-width='1.2' stroke-opacity='0.30' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='56' r='2.8' fill='%2300ffff' fill-opacity='0.92'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid rgba(0, 255, 255, 0.68) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          inset 0 0 18px rgba(0, 255, 255, 0.08),
+          0 0 8px rgba(0, 255, 255, 0.14) !important;
+        filter: none !important;
+      }
+
+      /* ================================================================= */
+      /* TEMA: ARCADE (FLIPERAMA NEON / RETRÔ TECH)                        */
+      /* ================================================================= */
+
+      body[data-deck-theme='arcade'] .back-red,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-red,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue) {
+        background-color: #050505 !important;
+        background-image:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 8%, transparent 8%, transparent 100%),
+          repeating-linear-gradient(180deg, rgba(255, 255, 255, 0) 0px, rgba(255, 255, 255, 0) 3px, rgba(255, 255, 255, 0.035) 4px, rgba(255, 255, 255, 0) 5px),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%23ff355e' stroke-width='2.2' stroke-opacity='0.9'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' fill='none' stroke='%23ffd60a' stroke-width='1.4' stroke-opacity='0.7'/%3E%3Cpath d='M24 30 H76 M24 115 H76' stroke='%23ff355e' stroke-width='1.2' stroke-opacity='0.35'/%3E%3Cpath d='M20 40 L30 40 M70 40 L80 40 M20 105 L30 105 M70 105 L80 105' stroke='%23ffd60a' stroke-width='2' stroke-linecap='round' stroke-opacity='0.7'/%3E%3Ctext x='50' y='60' font-size='14' fill='%23ffd60a' font-family='monospace' font-weight='900' text-anchor='middle'%3EPLAYER%3C/text%3E%3Ctext x='50' y='88' font-size='30' fill='%23ff355e' font-family='monospace' font-weight='900' text-anchor='middle'%3E1%3C/text%3E%3Ccircle cx='30' cy='72' r='3' fill='%23ff355e'/%3E%3Ccircle cx='70' cy='72' r='3' fill='%23ff355e'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid #ff355e !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 214, 10, 0.25),
+          inset 0 0 16px rgba(255, 53, 94, 0.18),
+          0 0 8px rgba(255, 53, 94, 0.22) !important;
+        filter: none !important;
+      }
+
+      body[data-deck-theme='arcade'] .back-blue,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue {
+        background-color: #050505 !important;
+        background-image:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 8%, transparent 8%, transparent 100%),
+          repeating-linear-gradient(180deg, rgba(255, 255, 255, 0) 0px, rgba(255, 255, 255, 0) 3px, rgba(255, 255, 255, 0.035) 4px, rgba(255, 255, 255, 0) 5px),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%2300d9ff' stroke-width='2.2' stroke-opacity='0.9'/%3E%3Crect x='12' y='12' width='76' height='121' rx='8' fill='none' stroke='%23a3ff12' stroke-width='1.4' stroke-opacity='0.7'/%3E%3Cpath d='M24 30 H76 M24 115 H76' stroke='%2300d9ff' stroke-width='1.2' stroke-opacity='0.35'/%3E%3Cpath d='M20 40 L30 40 M70 40 L80 40 M20 105 L30 105 M70 105 L80 105' stroke='%23a3ff12' stroke-width='2' stroke-linecap='round' stroke-opacity='0.7'/%3E%3Ctext x='50' y='60' font-size='14' fill='%23a3ff12' font-family='monospace' font-weight='900' text-anchor='middle'%3EPLAYER%3C/text%3E%3Ctext x='50' y='88' font-size='30' fill='%2300d9ff' font-family='monospace' font-weight='900' text-anchor='middle'%3E2%3C/text%3E%3Ccircle cx='30' cy='72' r='3' fill='%2300d9ff'/%3E%3Ccircle cx='70' cy='72' r='3' fill='%2300d9ff'/%3E%3C/svg%3E");
+        background-size:
+          100% 100%,
+          100% 100%,
+          100% 100% !important;
+        background-position: center center !important;
+        border: 2px solid #00d9ff !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(163, 255, 18, 0.22),
+          inset 0 0 16px rgba(0, 217, 255, 0.16),
+          0 0 8px rgba(0, 217, 255, 0.18) !important;
+        filter: none !important;
+      }
+
+      /* ================================================================= */
+      /* TEMA: ARCADE - CARRINHO ANIMADO                                   */
+      /* ================================================================= */
+
+      @keyframes arcadeCarPassRight {
+        0% {
+          left: -22px;
+          opacity: 0;
+        }
+        8% {
+          opacity: 1;
+        }
+        92% {
+          opacity: 1;
+        }
+        100% {
+          left: calc(100% + 4px);
+          opacity: 0;
+        }
+      }
+
+      @keyframes arcadeCarPassLeft {
+        0% {
+          right: -22px;
+          opacity: 0;
+        }
+        8% {
+          opacity: 1;
+        }
+        92% {
+          opacity: 1;
+        }
+        100% {
+          right: calc(100% + 4px);
+          opacity: 0;
+        }
+      }
+
+      body[data-deck-theme='arcade'] .back-red::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-red::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .back-blue::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue::after {
+        content: '';
+        position: absolute;
+        top: 77%;
+        width: 18px;
+        height: 9px;
+        pointer-events: none;
+        z-index: 1;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+        opacity: 0;
+      }
+
+      body[data-deck-theme='arcade'] .back-red::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-red::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue)::after {
+        left: -22px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 12'%3E%3Cpath d='M3 8 L6 5 H13 L17 6.5 H20 L21 9 H18.5 L17 11 H8 L7 9 H3 Z' fill='none' stroke='%23ff355e' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='10' r='1.4' fill='%23ffd60a'/%3E%3Ccircle cx='16' cy='10' r='1.4' fill='%23ffd60a'/%3E%3C/svg%3E");
+      }
+
+      body[data-deck-theme='arcade'] .back-red.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue).arcade-car-run::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue).arcade-car-run::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue).arcade-car-run::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-red.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue).arcade-car-run::after {
+        animation: arcadeCarPassRight 1.55s linear 1;
+      }
+
+      body[data-deck-theme='arcade'] .back-blue::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue::after {
+        right: -22px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 12'%3E%3Cpath d='M21 8 L18 5 H11 L7 6.5 H4 L3 9 H5.5 L7 11 H16 L17 9 H21 Z' fill='none' stroke='%2300d9ff' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='10' r='1.4' fill='%23a3ff12'/%3E%3Ccircle cx='15' cy='10' r='1.4' fill='%23a3ff12'/%3E%3C/svg%3E");
+      }
+
+      body[data-deck-theme='arcade'] .back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue.arcade-car-run::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue.arcade-car-run::after {
+        animation: arcadeCarPassLeft 1.55s linear 1;
+      }
+
+      /* ajuste fino da faixa onde o carro passa */
+      body[data-deck-theme='arcade'] .back-red::after,
+      body[data-deck-theme='arcade'] .fly-card.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .opponent-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #mortoSlot0 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-red::after,
+      body[data-deck-theme='arcade'] .carta.mini.back:not(.back-blue)::after,
+      body[data-deck-theme='arcade'] .back-blue::after,
+      body[data-deck-theme='arcade'] .fly-card.back.back-blue::after,
+      body[data-deck-theme='arcade'] .opponent-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #mortoSlot1 .morto-card-back::after,
+      body[data-deck-theme='arcade'] .morto-card-back.back-blue::after,
+      body[data-deck-theme='arcade'] #drawStockBtn .pile-card.back-blue::after,
+      body[data-deck-theme='arcade'] .carta.mini.back.back-blue::after {
+        top: 76%;
+      }
+
+      /* ================================================================= */
+      /* 6. TEMA: MÍTICO (RITUAL FINDOM / BDSM LUXO ANIMADO)               */
+      /* ================================================================= */
+
+      @keyframes mythicShineBg {
+        0% {
+          background-position:
+            240% 50%,
+            center center,
+            center center,
+            center center;
+        }
+        100% {
+          background-position:
+            -160% 50%,
+            center center,
+            center center,
+            center center;
+        }
+      }
+
+      /* MÍTICO - VERMELHO (Dominação / Ouro Rosa / Ritual) */
+      body[data-deck-theme='mythic'] .back-red,
+      body[data-deck-theme='mythic'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='mythic'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='mythic'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='mythic'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='mythic'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='mythic'] .carta.mini.back:not(.back-blue) {
+        background-color: #12070a !important;
+        background-image:
+          /* linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0) 36%, rgba(255, 240, 245, 0.16) 45%, rgba(255, 255, 255, 0.45) 50%, rgba(255, 240, 245, 0.16) 55%, rgba(255, 255, 255, 0) 64%, transparent 100%), */
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%23f9a8d4' stroke-width='1.1' stroke-opacity='0.18'/%3E%3Crect x='11' y='11' width='78' height='123' rx='8' fill='none' stroke='%23f472b6' stroke-width='1.4' stroke-opacity='0.34'/%3E%3Crect x='15' y='15' width='70' height='115' rx='7' fill='none' stroke='%23facc15' stroke-width='1.6' stroke-opacity='0.55'/%3E%3Ccircle cx='50' cy='56' r='16' fill='none' stroke='%23f9a8d4' stroke-width='1.5' stroke-opacity='0.55'/%3E%3Cpath d='M59 43 C56 41 53 40 49 40 C43 40 39 44 39 49 C39 54 43 57 50 59 C57 61 61 64 61 69 C61 75 56 79 50 79 C46 79 43 78 40 76' fill='none' stroke='%23f472b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' stroke-opacity='0.92'/%3E%3Cpath d='M50 37 L50 82' stroke='%23facc15' stroke-width='1.7' stroke-linecap='round' stroke-opacity='0.95'/%3E%3Ccircle cx='50' cy='84.5' r='2.2' fill='%23facc15' fill-opacity='0.95'/%3E%3Cpath d='M24 24 L31 31 M69 31 L76 24 M24 121 L31 114 M69 114 L76 121' stroke='%23f9a8d4' stroke-width='1' stroke-opacity='0.28' stroke-linecap='round'/%3E%3C/svg%3E"),
+          radial-gradient(circle at 30% 25%, #4a1026 0%, #24060f 42%, #12070a 88%) !important;
+
+        background-size:
+          100% 100%,
+          100% 100%,
+          100% 100% !important;
+        border: 2px solid rgba(250, 204, 21, 0.82) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          inset 0 0 10px rgba(0, 0, 0, 0.8) !important;
+        filter: none !important;
+      }
+
+      /* MÍTICO - AZUL (Submissão / Gelo / Luxo Ritual) */
+      body[data-deck-theme='mythic'] .back-blue,
+      body[data-deck-theme='mythic'] .fly-card.back.back-blue,
+      body[data-deck-theme='mythic'] .opponent-card-back.back-blue,
+      body[data-deck-theme='mythic'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='mythic'] .morto-card-back.back-blue,
+      body[data-deck-theme='mythic'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='mythic'] .carta.mini.back.back-blue {
+        background-color: #071017 !important;
+        background-image:
+          /* linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0) 36%, rgba(220, 245, 255, 0.14) 45%, rgba(255, 255, 255, 0.45) 50%, rgba(220, 245, 255, 0.14) 55%, rgba(255, 255, 255, 0) 64%, transparent 100%), */
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='10' fill='none' stroke='%2399f6e4' stroke-width='1.1' stroke-opacity='0.16'/%3E%3Crect x='11' y='11' width='78' height='123' rx='8' fill='none' stroke='%2322d3ee' stroke-width='1.4' stroke-opacity='0.30'/%3E%3Crect x='15' y='15' width='70' height='115' rx='7' fill='none' stroke='%2367e8f9' stroke-width='1.6' stroke-opacity='0.50'/%3E%3Ccircle cx='50' cy='56' r='16' fill='none' stroke='%2399f6e4' stroke-width='1.5' stroke-opacity='0.50'/%3E%3Cpath d='M59 43 C56 41 53 40 49 40 C43 40 39 44 39 49 C39 54 43 57 50 59 C57 61 61 64 61 69 C61 75 56 79 50 79 C46 79 43 78 40 76' fill='none' stroke='%2322d3ee' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' stroke-opacity='0.92'/%3E%3Cpath d='M50 37 L50 82' stroke='%2399f6e4' stroke-width='1.7' stroke-linecap='round' stroke-opacity='0.95'/%3E%3Ccircle cx='50' cy='84.5' r='2.2' fill='%2367e8f9' fill-opacity='0.92'/%3E%3Cpath d='M24 24 L31 31 M69 31 L76 24 M24 121 L31 114 M69 114 L76 121' stroke='%2399f6e4' stroke-width='1' stroke-opacity='0.24' stroke-linecap='round'/%3E%3C/svg%3E"),
+          radial-gradient(circle at 30% 25%, #0f3b4a 0%, #081d27 42%, #071017 88%) !important;
+
+        background-size:
+          100% 100%,
+          100% 100%,
+          100% 100% !important;
+        border: 2px solid rgba(103, 232, 249, 0.76) !important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          inset 0 0 10px rgba(0, 0, 0, 0.8) !important;
+        filter: none !important;
+      }
+
+      /* ================================================================= */
+      /* 7. TEMA: HOLOGRÁFICO (PRISMA ANIMADO)                             */
+      /* ================================================================= */
+
+      @keyframes holoShine {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      body[data-deck-theme='holografico'] .back-red,
+      body[data-deck-theme='holografico'] .fly-card.back:not(.back-blue),
+      body[data-deck-theme='holografico'] .opponent-card-back:not(.back-blue),
+      body[data-deck-theme='holografico'] #mortoSlot0 .morto-card-back,
+      body[data-deck-theme='holografico'] .morto-card-back:not(.back-blue),
+      body[data-deck-theme='holografico'] #drawStockBtn .pile-card:not(.back-blue),
+      body[data-deck-theme='holografico'] .carta.mini.back:not(.back-blue) {
+        background-color: #ff003c !important;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='8' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'/%3E%3Cpolygon points='50,40 70,72.5 50,105 30,72.5' fill='rgba(255,255,255,0.15)' stroke='rgba(255,255,255,0.6)' stroke-width='2'/%3E%3Ccircle cx='50' cy='72.5' r='4' fill='rgba(255,255,255,0.9)'/%3E%3C/svg%3E"),
+          linear-gradient(125deg, #ff003c, #ff7300, #ff003c, #900020) !important;
+        background-size:
+          100% 100%,
+          300% 300% !important;
+        animation: holoShine 4s ease infinite !important;
+        border: 2px solid rgba(255, 255, 255, 0.8) !important;
+        box-shadow:
+          inset 0 0 15px rgba(0, 0, 0, 0.4),
+          0 0 8px rgba(255, 0, 60, 0.5) !important;
+      }
+
+      body[data-deck-theme='holografico'] .back-blue,
+      body[data-deck-theme='holografico'] .fly-card.back.back-blue,
+      body[data-deck-theme='holografico'] .opponent-card-back.back-blue,
+      body[data-deck-theme='holografico'] #mortoSlot1 .morto-card-back,
+      body[data-deck-theme='holografico'] .morto-card-back.back-blue,
+      body[data-deck-theme='holografico'] #drawStockBtn .pile-card.back-blue,
+      body[data-deck-theme='holografico'] .carta.mini.back.back-blue {
+        background-color: #00d2ff !important;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 145'%3E%3Crect x='6' y='6' width='88' height='133' rx='8' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'/%3E%3Cpolygon points='50,40 70,72.5 50,105 30,72.5' fill='rgba(255,255,255,0.15)' stroke='rgba(255,255,255,0.6)' stroke-width='2'/%3E%3Ccircle cx='50' cy='72.5' r='4' fill='rgba(255,255,255,0.9)'/%3E%3C/svg%3E"),
+          linear-gradient(125deg, #00d2ff, #7000ff, #00d2ff, #001830) !important;
+        background-size:
+          100% 100%,
+          300% 300% !important;
+        animation: holoShine 4s ease infinite !important;
+        border: 2px solid rgba(255, 255, 255, 0.8) !important;
+        box-shadow:
+          inset 0 0 15px rgba(0, 0, 0, 0.4),
+          0 0 8px rgba(0, 210, 255, 0.5) !important;
+      }
+
+      /* Efeitos Especiais */
+      .impact-ring {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        border: 2px solid rgba(250, 204, 21, 0.95);
+        box-shadow: 0 0 18px rgba(250, 204, 21, 0.6);
+        pointer-events: none;
+        z-index: 10000;
+        transform: translate(-50%, -50%) scale(0.2);
+        opacity: 0.95;
+      }
+      .spark {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 6px;
+        height: 2px;
+        border-radius: 999px;
+        background: rgba(250, 204, 21, 1);
+        box-shadow: 0 0 10px rgba(250, 204, 21, 0.85);
+        pointer-events: none;
+        z-index: 10000;
+        transform: translate(-50%, -50%);
+        opacity: 1;
+      }
+
+      .carta.just-bought {
+        background-color: #fef9c3 !important; /* Fundo amarelo claro apenas */
+        border: 1px solid #000 !important; /* Borda preta original */
+        box-shadow: inset 0 0 10px rgba(250, 204, 21, 0.3) !important;
+      }
+
+      @keyframes justBoughtGlow {
+        0% {
+          transform: translateY(-18px);
+          box-shadow:
+            0 0 0 8px rgba(250, 204, 21, 0.65),
+            0 14px 28px rgba(0, 0, 0, 0.75);
+        }
+        100% {
+          transform: translateY(0px);
+          box-shadow:
+            0 0 0 0px rgba(250, 204, 21, 0),
+            0 10px 22px rgba(0, 0, 0, 0.35);
+        }
+      }
+
+      /* Indicador PIX e Placar Voador */
+      .live-money-badge {
+        font-size: 10px !important;
+        font-weight: 900;
+        color: color-mix(in srgb, #4ade80, var(--hud-accent) 20%);
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        line-height: 1 !important;
+        text-align: center;
+        text-shadow: 0 0 8px color-mix(in srgb, #4ade80, var(--hud-accent) 28%);
+        display: none;
+        letter-spacing: 0.5px;
+      }
+      .money-update-anim {
+        animation: moneyPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      @keyframes moneyPop {
+        0% {
+          transform: scale(1);
+          filter: brightness(1);
+        }
+        40% {
+          transform: scale(1.2);
+          filter: brightness(1.5);
+          text-shadow: 0 0 15px rgba(74, 222, 128, 1);
+        }
+        100% {
+          transform: scale(1);
+          filter: brightness(1);
+        }
+      }
+      .floating-score {
+        position: fixed;
+        font-weight: 900;
+        color: #4ade80;
+        font-size: 28px;
+        text-shadow:
+          0 0 10px rgba(74, 222, 128, 0.6),
+          0 3px 6px rgba(0, 0, 0, 1);
+        pointer-events: none;
+        z-index: 10000;
+        opacity: 1;
+      }
+
+      /* Animação do Dinheiro Flutuante (PIX) */
+      .floating-money {
+        position: fixed;
+        font-weight: 900;
+        font-size: 22px;
+        pointer-events: none;
+        z-index: 10001;
+        opacity: 1;
+        transform: translate(-50%, -50%);
+      }
+      .floating-money.positive {
+        color: #4ade80;
+        text-shadow:
+          0 0 10px rgba(74, 222, 128, 0.8),
+          0 3px 6px rgba(0, 0, 0, 1);
+      }
+      .floating-money.negative {
+        color: #ef4444;
+        text-shadow:
+          0 0 10px rgba(239, 68, 68, 0.8),
+          0 3px 6px rgba(0, 0, 0, 1);
+      }
+
+      /* Cores Nipes */
+      .hearts,
+      .diamonds {
+        color: #dc2626;
+      }
+      .spades,
+      .clubs,
+      .joker-card {
+        color: #000;
+      }
+
+      /* Cartas Miniatura */
+      .carta.mini {
+        width: 55px;
+        height: 80px;
+        margin-right: -38px; /* <- AQUI: Cartas mais juntas */
+        margin-bottom: 0;
+        font-size: 13px;
+        padding: 2px 4px;
+      }
+      .carta.mini .carta-canto {
+        font-size: 10px;
+        line-height: 0.95;
+      }
+      .carta.mini .carta-meio {
+        font-size: 22px;
+      }
+      /* Esta regra com :has resolve o vazamento puxando o freio da última carta em pé */
+      .carta.mini:last-child,
+      .meld-line-cards > div:last-child,
+      .carta.mini:has(+ .canastra-fechada) {
+        margin-right: 0 !important;
+      }
+      .carta.mini.canastra-fechada {
+        transform: rotate(90deg);
+        margin-right: -12px;
+        margin-bottom: -12px;
+      }
+      .carta.mini.wild-pickable {
+        cursor: pointer;
+        outline: 2px dashed rgba(250, 204, 21, 0.8);
+        outline-offset: 1px;
+      }
+      .carta.mini.wild-picked {
+        border: 2px solid #facc15 !important;
+        box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.5) !important;
+        transform: translateY(-2px);
+      }
+
+      /* Tags */
+      .meld-tag {
+        display: inline-block;
+        font-size: 9px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        margin-left: 4px;
+        line-height: 1.3;
+      }
+      .meld-tag.suja {
+        background: rgba(239, 68, 68, 0.18);
+        color: #fecaca;
+        border-color: rgba(239, 68, 68, 0.35);
+      }
+      .meld-tag.limpa {
+        background: rgba(34, 197, 94, 0.18);
+        color: #bbf7d0;
+        border-color: rgba(34, 197, 94, 0.35);
+      }
+      .meld-tag.real {
+        background: rgba(250, 204, 21, 0.18);
+        color: #fde68a;
+        border-color: rgba(250, 204, 21, 0.35);
+      }
+      .meld-tag.asas {
+        background: rgba(236, 72, 153, 0.25);
+        color: #fbcfe8;
+        border-color: #ec4899;
+        box-shadow: 0 0 8px #ec4899;
+      }
+
+      /* Animação que faz um feixe de luz neon correr linearmente pelas bordas */
+      @keyframes bdsmLaserSweep {
+        0% {
+          background-position:
+            0% 0%,
+            200% 0%;
+        }
+        100% {
+          background-position:
+            0% 0%,
+            0% 0%;
+        }
+      }
+
+      /* Contorna exatamente o bloco de cartas, sem fundo e com feixe dinâmico */
+      .meld-line.canastra-asas-bdsm .meld-line-cards {
+        border: 1px solid transparent !important;
+        /* Laranja Neon / Lava Incandescente: Corta o verde, o roxo, o vermelho e o preto com contraste violento */
+        background-image: linear-gradient(transparent, transparent), linear-gradient(90deg, transparent 35%, #ff5500 43%, #ffea00 50%, #ff5500 57%, transparent 65%) !important;
+        background-origin: border-box !important;
+        background-clip: content-box, border-box !important;
+        background-size: 200% 100% !important;
+        animation: bdsmLaserSweep 2.8s infinite linear !important;
+        border-radius: 6px !important;
+        padding: 1px !important;
+        z-index: 5;
+        /* Drop shadow em vermelho/laranja de alta voltagem para dar profundidade e destacar a canastra */
+        filter: drop-shadow(0 0 6px rgba(255, 69, 0, 0.85));
+      }
+
+      /* Placar Final */
+      #scoreSection {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 100000; /* TRAVA CORRIGIDA: Cobre os botões da mesa */
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        overflow-y: auto;
+        padding: 40px 0;
+      }
+      .score-card {
+        background: rgba(15, 23, 42, 0.98);
+        border: 2px solid #334155;
+        border-radius: 16px;
+        padding: 24px;
+        width: 92%;
+        max-width: 450px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.9);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: auto; /* Centraliza a caixa automaticamente se a tela for grande */
+      }
+      .score-team {
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid #1e293b;
+      }
+      .score-team.winner {
+        border-color: #facc15;
+        background: linear-gradient(180deg, rgba(250, 204, 21, 0.15) 0%, rgba(0, 0, 0, 0.4) 100%);
+        box-shadow: 0 0 15px rgba(250, 204, 21, 0.1);
+      }
+      .score-team-name {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 12px;
+        color: #e5e7eb;
+      }
+      .score-team.winner .score-team-name {
+        color: #facc15;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+      }
+      .score-details {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: #cbd5e1;
+      }
+      .score-row {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        padding-bottom: 4px;
+      }
+      .score-row.total {
+        font-size: 16px;
+        font-weight: bold;
+        color: #fff;
+        border-top: 1px solid #475569;
+        border-bottom: none;
+        padding-top: 10px;
+        margin-top: 6px;
+      }
+      .text-green {
+        color: #4ade80;
+        font-weight: bold;
+      }
+      .text-red {
+        color: #f87171;
+        font-weight: bold;
+      }
+
+      @keyframes panicPulse {
+        0% {
+          transform: scale(1);
+          color: #facc15;
+          text-shadow: 0 0 5px rgba(250, 204, 21, 0.5);
+        }
+        50% {
+          transform: scale(1.6);
+          color: #ef4444;
+          text-shadow: 0 0 15px rgba(239, 68, 68, 1);
+        }
+        100% {
+          transform: scale(1);
+          color: #facc15;
+          text-shadow: 0 0 5px rgba(250, 204, 21, 0.5);
+        }
+      }
+      .timer-critical {
+        animation: panicPulse 1s infinite;
+        font-size: 16px !important;
+        font-weight: 900;
+        display: inline-block;
+        margin-left: 15px !important;
+      }
+

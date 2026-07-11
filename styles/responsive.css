@@ -1,0 +1,456 @@
+      /* ================= MEDIA QUERIES REFATORADAS (Mobile / Landscape Limpo) ================= */
+
+      @media (max-width: 768px), (max-height: 600px) {
+        body {
+          font-size: 11px;
+        }
+        .board-center {
+          padding: 2px 0;
+          overflow-x: hidden;
+        }
+
+        /* Topo e Identificação */
+        .board-top {
+          padding: 4px 6px;
+          height: auto;
+          min-height: 35px;
+          z-index: 20;
+          position: relative;
+        }
+        .current-player-chip {
+          padding: 2px 6px;
+          font-size: 9px !important;
+        }
+
+        /* CORREÇÃO DO MORTO: Menor, offset ajustado e afastado da borda */
+        .morto-area {
+          width: 44px;
+          height: 44px;
+          margin-top: 4px;
+          transform: none !important;
+        }
+        .ambient-toggle {
+          width: 22px;
+          height: 22px;
+          margin-top: 12px;
+          font-size: 12px;
+        }
+        .morto-container {
+          width: 28px;
+          height: 42px;
+          left: 8px;
+          top: 1px;
+        }
+        #mortoSlot1 {
+          transform: rotate(90deg) !important;
+        }
+        .morto-card-back.offset {
+          transform: translate(2px, -2px) !important;
+        }
+
+        .opponent-hand-top {
+          top: 2px;
+          transform: translateX(-50%) scale(0.6);
+          transform-origin: top center;
+        }
+        .opponent-hand-left {
+          left: 2px;
+          transform: translateY(-50%) scale(0.6);
+          transform-origin: left center;
+        }
+        .opponent-hand-right {
+          right: 2px;
+          transform: translateY(-50%) scale(0.6);
+          transform-origin: right center;
+        }
+
+        /* Mesa Central (Jogos) */
+        .board-melds {
+          width: 98%;
+          max-width: 100%;
+          margin-top: 10px;
+          margin-left: auto;
+          margin-right: auto;
+          gap: 4px;
+          padding: 2px;
+        }
+        #gameSection .board-melds.has-domination-status {
+          margin-top: 58px;
+        }
+        .board-melds .grow {
+          padding: 4px;
+          border-radius: 6px;
+        }
+        #gameSection .board-melds .grow.has-brasao {
+          padding-top: 4px;
+        }
+        .brasao-dominacao {
+          top: -44px;
+          width: var(--brasao-total-width);
+          height: var(--brasao-height);
+          transform: translateX(-50%) scale(0.9);
+          transform-origin: center;
+        }
+        .brasao-coroas {
+          gap: 0;
+          top: -10px;
+          padding: 0 5px;
+        }
+        .brasao-core {
+          gap: 5px;
+        }
+        .brasao-titulo {
+          white-space: normal;
+        }
+
+        .meld-title {
+          font-size: 8px !important;
+          margin-bottom: 2px;
+          padding-bottom: 2px;
+          gap: 4px;
+          align-items: flex-start;
+        }
+        .player-title-main {
+          gap: 4px;
+          flex-wrap: wrap;
+        }
+        .player-identity-chip {
+          padding: 2px 6px;
+          gap: 0;
+        }
+        .identity-copy {
+          gap: 3px;
+        }
+        .identity-role {
+          font-size: 8px;
+        }
+        .identity-player-name {
+          max-width: 74px;
+          font-size: 8px;
+        }
+        .player-title-badges {
+          gap: 2px;
+        }
+        .title-score-cluster {
+          gap: 4px;
+        }
+        .meld-line {
+          min-width: 55px;
+          padding: 2px;
+          border-radius: 4px;
+        }
+        .meld-line-cards {
+          height: 52px;
+        }
+
+        /* Cartas da Mesa: Tipografia escalada para não vazar a borda */
+        .carta.mini {
+          width: 34px;
+          height: 50px;
+          margin-right: -18px;
+          font-size: 9px;
+          padding: 1px 2px;
+        }
+        .carta.mini .carta-canto {
+          font-size: 8px;
+          line-height: 0.9;
+        }
+        .carta.mini .carta-meio {
+          font-size: 14px;
+        }
+        .carta.mini.canastra-fechada {
+          transform: translate(-50%, -35%) rotate(90deg) !important;
+          margin-right: -8px;
+          margin-bottom: -6px;
+        }
+
+        /* Monte e Lixo: Tipografia escalada */
+        .board-middle {
+          gap: 15px;
+          padding: 2px 0 5px 0;
+          margin-top: auto;
+        }
+        .pile-card {
+          width: 40px;
+          height: 58px;
+        }
+        .discard-face {
+          padding: 2px;
+          font-size: 10px;
+        }
+        .discard-face .carta-canto {
+          font-size: 8px;
+          line-height: 0.9;
+        }
+        .discard-face .carta-meio {
+          font-size: 16px;
+        }
+        .pile-info {
+          font-size: 8px !important;
+          padding: 2px;
+          margin-top: 2px;
+        }
+
+        /* Interface do Jogador */
+        .player-interface {
+          padding: 2px 4px;
+          gap: 2px;
+        }
+        #message {
+          font-size: 9px;
+          height: 12px;
+          margin-bottom: 0;
+        }
+
+        /* Botões: Texto em linha única e altura menor */
+        .player-actions {
+          position: relative;
+          z-index: 10 !important;
+          flex-wrap: wrap;
+          gap: 4px;
+          justify-content: center;
+        }
+        .player-actions button {
+          padding: 4px 6px;
+          font-size: 9px;
+          flex: 1 1 auto;
+          max-width: none;
+          white-space: nowrap;
+          height: 26px;
+          margin: 0;
+        }
+
+        /* Cartas da Mão: Tipografia escalada */
+        .hand-container {
+          position: relative;
+          z-index: 20 !important;
+          min-height: 65px;
+          padding: 2px;
+        }
+        .carta {
+          width: 42px;
+          height: 62px;
+          margin-right: -16px;
+          font-size: 10px;
+          padding: 2px;
+        }
+        .carta .carta-canto {
+          line-height: 0.9;
+        }
+        .carta .carta-meio {
+          font-size: 16px;
+        }
+
+        /* Menu Principal */
+        #configSection {
+          padding: 10px;
+          justify-content: flex-start;
+        }
+        .section {
+          width: 100%;
+          max-width: 400px;
+          padding: 15px;
+          margin: 0 auto;
+        }
+        .section-header h2 {
+          font-size: 18px;
+          margin-bottom: 4px;
+        }
+        .section-header small {
+          margin-bottom: 8px;
+          font-size: 10px;
+        }
+        input,
+        select {
+          min-height: 42px;
+          padding: 10px 11px;
+          margin-bottom: 6px;
+          font-size: 11px;
+        }
+        .menu-form {
+          gap: 9px;
+        }
+        .menu-block {
+          padding: 10px;
+          border-radius: 12px;
+        }
+        .menu-block-title {
+          margin-bottom: 8px;
+          font-size: 10px;
+        }
+        .menu-block-grid {
+          gap: 8px;
+        }
+        #startBtn {
+          padding: 12px;
+          font-size: 12px;
+          margin-top: 4px;
+        }
+        .deck-preview-card {
+          width: 28px;
+          height: 40px;
+        }
+        .deck-preview-card-red {
+          left: 12px;
+        }
+        .deck-preview-card-blue {
+          left: 28px;
+        }
+        .deck-preview-select {
+          min-height: 46px;
+          padding-left: 72px !important;
+        }
+        .table-preview-icon {
+          width: 30px;
+          height: 30px;
+          left: 12px;
+        }
+        .table-preview-select {
+          min-height: 46px;
+          padding-left: 56px !important;
+        }
+      }
+
+      @media (max-width: 768px) and (orientation: portrait) {
+        .board-melds {
+          flex-direction: column;
+        }
+        .board-melds .grow {
+          width: 100%;
+        }
+        .board-melds .grow + .grow {
+          border-left: none !important;
+          border-top: 1px dashed rgba(148, 163, 184, 0.5) !important;
+          padding-top: 6px !important;
+          padding-left: 4px !important;
+        }
+      }
+
+      @media (max-height: 600px) and (orientation: landscape) {
+        .board-melds {
+          flex-direction: row;
+          width: calc(100% - 90px);
+          margin-top: 10px;
+        }
+        .board-melds .grow {
+          width: 50%;
+        }
+        .board-melds .grow + .grow {
+          border-top: none !important;
+          border-left: 1px dashed rgba(148, 163, 184, 0.5) !important;
+          padding-left: 6px !important;
+          padding-top: 2px !important;
+        }
+
+        .opponent-hand-top {
+          transform: translateX(-50%) scale(0.45);
+          top: 0px;
+        }
+        .opponent-hand-left {
+          left: -5px;
+          transform: translateY(-50%) scale(0.45);
+        }
+        .opponent-hand-right {
+          right: -5px;
+          transform: translateY(-50%) scale(0.45);
+        }
+
+        .morto-area {
+          margin-right: 15px;
+        }
+
+        /* VOLTA AO NORMAL: Interface ocupa a base inteira sem empurrar o centro */
+        .player-interface {
+          display: flex !important;
+          flex-direction: column !important;
+          padding: 0 !important;
+          width: 100% !important;
+          position: relative;
+        }
+
+        #message {
+          text-align: center !important;
+          margin-bottom: 2px !important;
+          position: relative;
+          z-index: 50;
+        }
+
+        /* CORREÇÃO DA PAREDE INVISÍVEL E CENTRALIZAÇÃO ABSOLUTA */
+        .hand-container {
+          justify-content: center !important; /* Cartas perfeitamente no meio da tela */
+          padding: 5px 0 15px 0 !important;
+          min-height: 65px;
+          overflow: visible !important; /* Mata a parede invisível! A carta pode voar livre. */
+          position: relative;
+          z-index: 20;
+        }
+
+        .cards-row {
+          padding: 0 !important;
+          margin: 0 auto !important;
+        }
+
+        /* CORREÇÃO DOS BOTÕES: Flutuando de forma independente nos cantos mortos */
+        .player-actions {
+          position: absolute !important;
+          bottom: 15px !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 0 !important;
+          display: block !important; /* Sobrescreve o grid/flex anterior */
+          margin: 0 !important;
+          z-index: 30;
+          pointer-events: none; /* Deixa o clique vazar para as cartas se elas se tocarem */
+        }
+
+        .player-actions button {
+          position: absolute !important;
+          pointer-events: auto; /* Reativa o clique apenas nos botões físicos */
+          height: 36px !important;
+          font-size: 10px !important;
+          white-space: nowrap !important;
+          border-radius: 8px !important;
+          padding: 0 12px !important;
+          margin: 0 !important;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6) !important;
+          bottom: 0 !important; /* Trava todos na mesma linha horizontal */
+        }
+
+        /* 1 Botão na Extrema Esquerda (X) */
+        #endGameBtn {
+          left: 15px !important;
+          width: 45px !important;
+          padding: 0 !important;
+        }
+
+        /* 2 Botões na Extrema Direita (Em linha horizontal) */
+        #meldBtn {
+          right: 140px !important; /* Posicionado ao lado do botão Mover */
+          width: 80px !important;
+        }
+        #moveWildBtn {
+          right: 15px !important;
+          width: 115px !important;
+        }
+
+        /* Caso o placar seja acionado no fim de jogo, fica do lado do X */
+        #showScoreBtn {
+          left: 68px !important;
+        }
+
+        /* Botão Jogar Novamente posicionado perfeitamente à direita do Placar */
+        #rematchBtn {
+          position: absolute !important;
+          pointer-events: auto;
+          height: 36px !important;
+          font-size: 10px !important;
+          white-space: nowrap !important;
+          border-radius: 8px !important;
+          padding: 0 12px !important;
+          margin: 0 !important;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6) !important;
+          bottom: 0 !important;
+          left: 156px !important;
+        }
+      }
+
