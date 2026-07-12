@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v117';
+const CACHE_NAME = 'buraco-v118';
 
 const ASSETS = [
   './',
@@ -73,6 +73,11 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Audio e video usam requisicoes Range (respostas 206). O Cache API nao
+  // aceita armazenar essas respostas parciais e a rejeicao acabava virando 503.
+  // Deixa o navegador cuidar do streaming e do buffer nativo desses arquivos.
+  if (request.headers.has('range') || request.destination === 'audio' || request.destination === 'video') return;
 
   const isNavigation = request.mode === 'navigate';
   const isAppCode = /\.(?:css|html|js|json|webmanifest)$/i.test(url.pathname);

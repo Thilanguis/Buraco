@@ -1,4 +1,4 @@
-      import { CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSteal } from './js/audio.js';
+      import { CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSteal, stopAllGameSfx } from './js/audio.js';
       import { db, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from './js/firebase.js';
       import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
 
@@ -95,23 +95,21 @@
               }
 
               // 🛡️ TRAVA: Só abre a modal se a versão do servidor for maior que a do localStorage
-              if (newVersionNum > oldVersionNum) {
-                if (reg.waiting) {
-                  showUpdatePrompt(reg.waiting, totalAtts, newVersionNum);
-                }
+              const applyWorker = (worker) => {
+                if (!worker) return;
+                if (newVersionNum > oldVersionNum) showUpdatePrompt(worker, totalAtts, newVersionNum);
+                else worker.postMessage('skipWaiting');
+              };
 
-                reg.onupdatefound = () => {
-                  const installingWorker = reg.installing;
-                  installingWorker.onstatechange = () => {
-                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                      showUpdatePrompt(installingWorker, totalAtts, newVersionNum);
-                    }
-                  };
+              if (reg.waiting) applyWorker(reg.waiting);
+
+              reg.onupdatefound = () => {
+                const installingWorker = reg.installing;
+                if (!installingWorker) return;
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) applyWorker(installingWorker);
                 };
-              } else if (reg.waiting) {
-                // Se a versão for a mesma, descarta o update silenciosamente
-                reg.waiting.postMessage('skipWaiting');
-              }
+              };
             })
             .catch((err) => console.log('SW erro:', err));
 
@@ -241,6 +239,9 @@
       let currentLobby = null;
       window.botPlayTimeoutId = null;
       window.isClosingGame = false;
+      window.gameSessionId = window.gameSessionId || 0;
+      let localExitPending = false;
+      let botTurnController = new AbortController();
       let selectedHandIndexes = new Set();
       let turnTimerId = null;
       let turnTimerRemaining = 0;
@@ -252,6 +253,50 @@
       let movingWild = null;
       let localUndoStack = []; // Pilha para o botão voltar
       window.isStealModeActive = false; // Controle da visão da mesa
+
+      function cancelGameAnimations() {
+        const gameSection = document.getElementById('gameSection');
+        (document.getAnimations?.() || []).forEach((animation) => {
+          const target = animation.effect?.target;
+          if (target && (gameSection?.contains(target) || target.classList?.contains('dice-scene'))) animation.cancel();
+        });
+        document.querySelectorAll('.fly-card, .impact-ring, .spark, .dice-scene').forEach((element) => element.remove());
+      }
+
+      function invalidateGameSession({ stopMedia = true } = {}) {
+        window.isClosingGame = true;
+        window.gameSessionId += 1;
+        botTurnController.abort();
+        botTurnController = new AbortController();
+        BuracoBot.cancelPendingTurns();
+
+        if (window.botPlayTimeoutId) {
+          clearTimeout(window.botPlayTimeoutId);
+          window.botPlayTimeoutId = null;
+        }
+        window.lastBotTurnPlayed = null;
+        stopTurnTimer();
+        cancelGameAnimations();
+
+        if (stopMedia) {
+          stopTableAmbientMusic(true);
+          stopAllGameSfx();
+        }
+      }
+
+      function activateGameSession() {
+        botTurnController.abort();
+        botTurnController = new AbortController();
+        window.gameSessionId += 1;
+        window.isClosingGame = false;
+        localExitPending = false;
+        BuracoBot.cancelPendingTurns();
+        return window.gameSessionId;
+      }
+
+      function isGameSessionActive(sessionId, signal) {
+        return !signal?.aborted && !window.isClosingGame && !localExitPending && !!state && window.gameSessionId === sessionId && document.getElementById('gameSection')?.style.display === 'flex';
+      }
 
       function saveStateForUndo() {
         if (!state) return;
@@ -645,10 +690,24 @@
       function playCardMove() {
         if (!audioUnlocked) return;
         try {
-          const clone = sfxCardMove.cloneNode();
-          clone.volume = sfxCardMove.volume;
-          clone.play().catch(() => {});
+          playSfxClone(sfxCardMove);
         } catch (e) {}
+      }
+
+      function syncHeartbeatAudio(active) {
+        if (active && audioUnlocked) {
+          if (sfxHeartbeat.paused) sfxHeartbeat.play().catch((error) => console.log('Erro ao tocar som do coracao:', error));
+
+          if (tableAmbientAudio && state) {
+            const theme = normalizeTableTheme(state.tableTheme || document.body.dataset.tableTheme || 'feltro');
+            fadeTableAmbientTo(getSafeAmbientVolume(theme) * 0.45, 280);
+          }
+          return;
+        }
+
+        sfxHeartbeat.pause();
+        sfxHeartbeat.currentTime = 0;
+        if (state && !window.isClosingGame) syncTableAmbientMusic();
       }
 
       Object.values(CANASTRA_SFX).forEach((a) => {
@@ -1114,7 +1173,7 @@
             ],
             { duration: dur, easing: 'cubic-bezier(.2,.9,.2,1)', fill: 'forwards' },
           )
-          .finished.finally(() => ring.remove());
+          .finished.catch(() => {}).finally(() => ring.remove());
 
         for (let i = 0; i < particles; i++) {
           const sp = document.createElement('div');
@@ -1135,7 +1194,7 @@
               { transform: `translate(-50%, -50%) rotate(${rot}deg) translate(${dx}px,${dy}px)`, opacity: 0 },
             ],
             { duration: dur, easing: 'cubic-bezier(.2,.9,.2,1)', fill: 'forwards' },
-          ).finished.finally(() => sp.remove());
+          ).finished.catch(() => {}).finally(() => sp.remove());
         }
       }
 
@@ -1630,6 +1689,7 @@
       }
 
       async function startGame(mode, names, variant, pixKeys = []) {
+        activateGameSession();
         const players = [];
         const teams = [];
         let playerConfigs = [];
@@ -3073,9 +3133,7 @@
           stealOverlay.classList.add('pulsing'); // Liga a animação de pulsação do CSS
 
           // Dispara o loop do coração batendo junto com o efeito visual
-          if (audioUnlocked) {
-            sfxHeartbeat.play().catch((e) => console.log('Erro ao tocar som do coração:', e));
-          }
+          syncHeartbeatAudio(true);
 
           setTimeout(() => {
             stealOverlay.style.opacity = '1';
@@ -3085,8 +3143,7 @@
           stealOverlay.classList.remove('pulsing'); // Desliga a pulsação do CSS
 
           // Pausa e reinicia o ponteiro do áudio para o início imediatamente
-          sfxHeartbeat.pause();
-          sfxHeartbeat.currentTime = 0;
+          syncHeartbeatAudio(false);
 
           setTimeout(() => {
             if (stealOverlay.style.opacity === '0') stealOverlay.style.display = 'none';
@@ -3996,7 +4053,7 @@
                 ],
                 { duration: 900, easing: 'ease-in' },
               )
-              .finished.then(() => flyEl.remove());
+              .finished.catch(() => {}).then(() => flyEl.remove());
           }
 
           let startTime = null;
@@ -4260,7 +4317,7 @@
                     ],
                     { duration: 3000, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }, // Alterado de 2000 para 3000 (3 segundos)
                   )
-                  .finished.then(() => flyEl.remove());
+                  .finished.catch(() => {}).then(() => flyEl.remove());
               }
             };
 
@@ -4807,13 +4864,15 @@
       // ==========================================
       const botEngine = {
         getState: () => state,
+        isActive: () => !window.isClosingGame && !localExitPending && !!state,
+        commitState: async () => commitState(),
         showMessage: (msg) => showMessage(msg),
         computeTeamMeldScore: (team) => computeTeamMeldScore(team),
         isValidSequenceMeld: (cards) => isValidSequenceMeld(cards),
         canTeamTakeDeadNow: (teamId) => canTeamTakeDeadNow(teamId),
         teamHasGoodCanastra: (teamId) => teamHasGoodCanastra(teamId),
 
-        normalizeMeld: (meld) => {
+        normalizeMeld(meld) {
           optimizeMeld(meld);
           normalizeMeldOrder(meld);
           autoSwapWildWhenFillingGap(meld);
@@ -4821,8 +4880,8 @@
           normalizeMeldOrder(meld);
         },
 
-        _checkBotMortoOrWin: async (botIndex) => {
-          const s = botEngine.getState();
+        async _checkBotMortoOrWin(botIndex) {
+          const s = this.getState();
           if (!s) return null;
           const me = s.players[botIndex];
           if (me.hand.length === 0) {
@@ -4837,8 +4896,8 @@
           return null;
         },
 
-        executeMeldNew: async (botIndex, handIndexes) => {
-          const s = botEngine.getState();
+        async executeMeldNew(botIndex, handIndexes) {
+          const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
           const team = s.teams[me.teamId];
@@ -4846,16 +4905,16 @@
 
           handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
 
-          botEngine.normalizeMeld(cards);
+          this.normalizeMeld(cards);
           team.melds.push(cards);
           const meldIdx = team.melds.length - 1;
 
           // CORRIGIDO: meldIdx no lugar do array
           let domReward = await processDominationReward(me, 'simple', classifyMeldForUi(cards).kind, meldIdx);
-          const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
+          const tookDead = domReward?.tookDead || (await this._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
-          const freshS = botEngine.getState();
+          const freshS = this.getState();
           if (freshS) {
             freshS.lastAction = {
               id: newActionId(),
@@ -4868,12 +4927,12 @@
               drawnCards: domReward?.drawnCards,
               ts: Date.now(),
             };
-            await commitState();
+            await this.commitState();
           }
         },
 
-        executeMeldExtend: async (botIndex, meldIndex, handIndexes) => {
-          const s = botEngine.getState();
+        async executeMeldExtend(botIndex, meldIndex, handIndexes) {
+          const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
           const team = s.teams[me.teamId];
@@ -4883,13 +4942,13 @@
 
           const kindBefore = classifyMeldForUi(team.melds[meldIndex]).kind;
           team.melds[meldIndex].push(...cards);
-          botEngine.normalizeMeld(team.melds[meldIndex]);
+          this.normalizeMeld(team.melds[meldIndex]);
 
           let domReward = await processDominationReward(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind, meldIndex);
-          const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
+          const tookDead = domReward?.tookDead || (await this._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
-          const freshS = botEngine.getState();
+          const freshS = this.getState();
           if (freshS) {
             freshS.lastAction = {
               id: newActionId(),
@@ -4902,12 +4961,12 @@
               drawnCards: domReward?.drawnCards,
               ts: Date.now(),
             };
-            await commitState();
+            await this.commitState();
           }
         },
 
-        executeDrawStock: async (botIndex) => {
-          const s = botEngine.getState();
+        async executeDrawStock(botIndex) {
+          const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
           const drawCount = (s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw ? 2 : 1;
@@ -4936,7 +4995,7 @@
           s.hasDrawnThisTurn = true;
           s.partialDraw = false;
 
-          const freshS = botEngine.getState();
+          const freshS = this.getState();
           if (freshS && drawnCards.length > 0) {
             freshS.lastAction = {
               id: newActionId(),
@@ -4947,12 +5006,12 @@
               recycledDeadIndex: recycledIndex,
               ts: Date.now(),
             };
-            await commitState();
+            await this.commitState();
           }
         },
 
-        executeDrawDiscard: async (botIndex) => {
-          const s = botEngine.getState();
+        async executeDrawDiscard(botIndex) {
+          const s = this.getState();
           if (!s) return false;
           if (!Array.isArray(s.discard) || s.discard.length === 0) {
             console.warn('[BOT] executeDrawDiscard chamado com lixo vazio. Possível jogada duplicada.');
@@ -4988,16 +5047,16 @@
           s.partialDraw = false;
           s.pickedDiscardCardId = topCard.id;
 
-          const freshS = botEngine.getState();
+          const freshS = this.getState();
           if (freshS) {
             freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
-            await commitState();
+            await this.commitState();
           }
           return true;
         },
 
-        executeDrawDiscardFechado: async (botIndex, intent) => {
-          const s = botEngine.getState();
+        async executeDrawDiscardFechado(botIndex, intent) {
+          const s = this.getState();
           if (!s) return false;
           if (!Array.isArray(s.discard) || s.discard.length === 0) {
             console.warn('[BOT] executeDrawDiscardFechado chamado com lixo vazio. Possível jogada duplicada.');
@@ -5019,14 +5078,14 @@
           if (intent.action === 'extend') {
             kindBeforeFechado = classifyMeldForUi(team.melds[intent.meldIndex]).kind;
             team.melds[intent.meldIndex].push(topCard);
-            botEngine.normalizeMeld(team.melds[intent.meldIndex]);
+            this.normalizeMeld(team.melds[intent.meldIndex]);
             meldToCheck = team.melds[intent.meldIndex];
           } else if (intent.action === 'new') {
             kindBeforeFechado = 'simple';
             const cardsFromHand = intent.handIndexes.map((i) => me.hand[i]);
             intent.handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
             const newMeld = [...cardsFromHand, topCard];
-            botEngine.normalizeMeld(newMeld);
+            this.normalizeMeld(newMeld);
             team.melds.push(newMeld);
             meldToCheck = newMeld;
           }
@@ -5056,9 +5115,9 @@
           s.partialDraw = false;
           s.pickedDiscardCardId = null;
 
-          const tookDead = domReward?.tookDead || (await botEngine._checkBotMortoOrWin(botIndex));
+          const tookDead = domReward?.tookDead || (await this._checkBotMortoOrWin(botIndex));
 
-          const freshS = botEngine.getState();
+          const freshS = this.getState();
           if (freshS) {
             freshS.lastAction = {
               id: newActionId(),
@@ -5068,13 +5127,13 @@
               drawnCards: domReward?.drawnCards,
               ts: Date.now(),
             };
-            await commitState();
+            await this.commitState();
           }
           return true;
         },
 
-        executeDiscard: async (botIndex, cardIndex) => {
-          const s = botEngine.getState();
+        async executeDiscard(botIndex, cardIndex) {
+          const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
           const card = me.hand[cardIndex];
@@ -5093,13 +5152,28 @@
 
           passTurn();
 
-          const freshS = botEngine.getState();
+          const freshS = this.getState();
           if (freshS) {
             freshS.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
-            await commitState();
+            await this.commitState();
           }
         },
       };
+
+      function createBotEngineForSession(sessionId, signal) {
+        const engine = Object.create(botEngine);
+        engine.isActive = () => isGameSessionActive(sessionId, signal);
+        engine.getState = () => (engine.isActive() ? state : null);
+        engine.commitState = async () => {
+          if (!engine.isActive()) {
+            const error = new Error('Commit do bot cancelado para uma sessao antiga.');
+            error.name = 'AbortError';
+            throw error;
+          }
+          await commitState();
+        };
+        return engine;
+      }
 
       function getDiceSpawnPosition(pid) {
         const seat = seatForPlayer(pid);
@@ -5212,9 +5286,10 @@
 
       onSnapshot(gameRef, async (snap) => {
         if (!snap.exists()) {
+          invalidateGameSession();
+          localExitPending = false;
           releaseScreen();
           toggleMenuVideos(true);
-          stopTableAmbientMusic(true);
 
           if (window.startTimer) {
             clearInterval(window.startTimer);
@@ -5224,14 +5299,6 @@
           const playerUI = document.querySelector('.player-interface');
           if (playerUI) playerUI.classList.remove('active-turn-glow');
 
-          window.isClosingGame = true;
-
-          if (window.botPlayTimeoutId) {
-            clearTimeout(window.botPlayTimeoutId);
-            window.botPlayTimeoutId = null;
-          }
-          window.lastBotTurnPlayed = null;
-          window.gameSessionId = (window.gameSessionId || 0) + 1;
           selectedHandIndexes.clear();
           movingWild = null;
           selectedMeldTarget = null;
@@ -5309,6 +5376,12 @@
         const data = snap.data();
 
         if (!data.stateJson && data.lobby) {
+          if (state || document.getElementById('gameSection').style.display === 'flex') {
+            invalidateGameSession();
+            localExitPending = false;
+            state = null;
+            toggleMenuVideos(true);
+          }
           stopTableAmbientMusic(false);
           if (introFinished) {
             document.getElementById('configSection').style.display = 'flex';
@@ -5466,6 +5539,15 @@
         if (!data.stateJson) return;
 
         const newState = JSON.parse(data.stateJson);
+        if (newState.surrender?.active) {
+          state = newState;
+          if (!window.isClosingGame) invalidateGameSession({ stopMedia: false });
+          renderSurrender();
+          return;
+        }
+
+        if (!state || window.isClosingGame) activateGameSession();
+        const snapshotSessionId = window.gameSessionId;
         if (state && !state.finished && newState.finished) playCanastraSfx('fim');
 
         // 🚀 INTERCEPTOR GRAFICO: Captura a nova ação remota ANTES de aplicar as mutações de dados no state
@@ -5477,7 +5559,13 @@
           resetTurnTimer();
 
           // 1. Executa a animação de voo com os elementos gráficos e cartas atuais ainda fixados na mão
-          await playRemoteAction(a);
+          try {
+            await playRemoteAction(a);
+          } catch (error) {
+            if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
+            throw error;
+          }
+          if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
         } else if (a && a.id === ignoreOwnActionId) {
           // Trava de segurança: Limpa a flag do autor e impede qualquer re-execução visual
           lastSeenActionId = a.id;
@@ -5485,8 +5573,8 @@
         }
 
         // 2. Após o término do voo, atualiza a memória com o novo estado e renderiza limpando o DOM de forma síncrona
+        if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
         state = newState;
-        window.isClosingGame = false;
         movingWild = null;
         selectedHandIndexes.clear();
 
@@ -5566,6 +5654,8 @@
                 const botDelay = state.turnNumber === 0 ? 4000 : 600;
                 const scheduledTurn = state.turnNumber;
                 const scheduledPlayerId = currentPlayerObj.id;
+                const scheduledSessionId = window.gameSessionId;
+                const scheduledSignal = botTurnController.signal;
 
                 if (window.botPlayTimeoutId) {
                   clearTimeout(window.botPlayTimeoutId);
@@ -5575,7 +5665,7 @@
                 window.botPlayTimeoutId = setTimeout(() => {
                   window.botPlayTimeoutId = null;
 
-                  if (window.isClosingGame) return;
+                  if (!isGameSessionActive(scheduledSessionId, scheduledSignal)) return;
                   if (!state || state.finished) return;
                   if (document.getElementById('gameSection').style.display !== 'flex') return;
                   if (state.debugPaused) return; // 🛑 CORTA A IA IMEDIATAMENTE
@@ -5583,7 +5673,9 @@
                   if (state.currentPlayer !== scheduledPlayerId) return;
 
                   window.lastBotTurnPlayed = state.turnNumber;
-                  BuracoBot.playTurn(state, state.currentPlayer, botEngine).catch((err) => {
+                  const sessionEngine = createBotEngineForSession(scheduledSessionId, scheduledSignal);
+                  BuracoBot.playTurn(state, state.currentPlayer, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId }).catch((err) => {
+                    if (BuracoBot.isCancellationError(err)) return;
                     console.error('Erro na Matrix:', err);
                     window.lastBotTurnPlayed = null;
                   });
@@ -6612,13 +6704,8 @@
       document.getElementById('endGameBtn').onclick = async () => {
         if (!state) return;
 
-        window.isClosingGame = true;
-        stopTurnTimer();
-        if (window.botPlayTimeoutId) {
-          clearTimeout(window.botPlayTimeoutId);
-          window.botPlayTimeoutId = null;
-        }
-        window.lastBotTurnPlayed = null;
+        localExitPending = true;
+        invalidateGameSession();
 
         state.surrender = { active: true, votes: {} };
         if (myPlayerIndex !== -1) state.surrender.votes[myPlayerIndex] = true;
@@ -6628,6 +6715,7 @@
         });
 
         let yesCount = Object.values(state.surrender.votes).filter((v) => v).length;
+        renderSurrender();
 
         // Se a sala estiver pronta para ser fechada (Solo ou Humanos + Bots votaram)
         if (yesCount >= state.players.length && state.players.length > 0) {
@@ -6650,6 +6738,8 @@
 
       document.getElementById('voteYesBtn').onclick = async () => {
         if (!state || !state.surrender) return;
+        localExitPending = true;
+        invalidateGameSession();
         state.surrender.votes[myPlayerIndex] = true;
 
         state.players.forEach((p) => {
@@ -6667,7 +6757,7 @@
 
       document.getElementById('voteNoBtn').onclick = async () => {
         if (!state || !state.surrender) return;
-        window.isClosingGame = false;
+        activateGameSession();
         state.surrender.active = false;
         state.surrender.votes = {};
         await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
@@ -6676,7 +6766,6 @@
       function renderSurrender() {
         const section = document.getElementById('surrenderSection');
         if (!state || !state.surrender || !state.surrender.active) {
-          window.isClosingGame = false;
           section.style.display = 'none';
           return;
         }

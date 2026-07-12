@@ -21,7 +21,7 @@ window.sfxSteal = sfxSteal;
 
 export const sfxHeartbeat = new Audio('assets/sfx/coracao-batendo.mp3');
 sfxHeartbeat.preload = 'auto';
-sfxHeartbeat.volume = 0.85;
+sfxHeartbeat.volume = 1;
 sfxHeartbeat.loop = true;
 
 export const TABLE_AMBIENT_MUSIC = Object.freeze({
@@ -35,6 +35,33 @@ export const TABLE_AMBIENT_MUSIC = Object.freeze({
 
 export const TABLE_AMBIENT_MAX_VOLUME = 0.35;
 export const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
+
+const GAME_SFX = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
+const transientSfx = new Set();
+
+export function playSfxClone(source) {
+  if (!source) return null;
+
+  const clone = source.cloneNode();
+  clone.volume = source.volume;
+  transientSfx.add(clone);
+
+  const release = () => transientSfx.delete(clone);
+  clone.addEventListener('ended', release, { once: true });
+  clone.addEventListener('error', release, { once: true });
+  clone.play().catch(release);
+  return clone;
+}
+
+export function stopAllGameSfx() {
+  for (const audio of [...GAME_SFX, ...transientSfx]) {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (error) {}
+  }
+  transientSfx.clear();
+}
 
 export function clampMediaVolume(value) {
   const number = Number(value);

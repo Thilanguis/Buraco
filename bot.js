@@ -3,8 +3,26 @@
 export class BuracoBot {
   static _turnLocks = new Set();
 
-  static async playTurn(stateIgnored, botIndex, engine) {
-    this.currentEngine = engine; // Salva o motor para o sleep interceptar o pause
+  static isCancellationError(error) {
+    return error?.name === 'AbortError' || error?.code === 'BOT_TURN_CANCELLED';
+  }
+
+  static assertActive(engine, signal) {
+    if (signal?.aborted || (typeof engine?.isActive === 'function' && !engine.isActive())) {
+      const error = new Error('Turno do bot cancelado porque a partida nao esta mais ativa.');
+      error.name = 'AbortError';
+      error.code = 'BOT_TURN_CANCELLED';
+      throw error;
+    }
+  }
+
+  static cancelPendingTurns() {
+    this._turnLocks.clear();
+  }
+
+  static async playTurn(stateIgnored, botIndex, engine, options = {}) {
+    const signal = options.signal;
+    this.assertActive(engine, signal);
     let state = engine.getState();
     if (!state || !state.players || !state.players[botIndex] || !state.teams) {
       if (typeof window !== 'undefined' && window.isClosingGame) return;
@@ -64,15 +82,17 @@ export class BuracoBot {
       const ctx = { isDesperate, isRushingMorto, isDuo, tookMorto, isVip, isVipSniper, isFarming, isPanicDump };
 
       engine.showMessage(`🤖 ${me.name} analisando a mesa...`);
-      await this.sleep(Math.floor(Math.random() * 4000) + 1500);
+      await this.sleep(Math.floor(Math.random() * 4000) + 1500, engine, signal);
 
       try {
+        this.assertActive(engine, signal);
         let boughtFromDiscard = false;
         if (state.discard.length > 0) {
           const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
           if (intent && intent.wants) {
             engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
 
+            this.assertActive(engine, signal);
             const drawOk = state.variant === 'fechado' ? await engine.executeDrawDiscardFechado(botIndex, intent) : await engine.executeDrawDiscard(botIndex);
             boughtFromDiscard = drawOk !== false;
           }
@@ -86,10 +106,11 @@ export class BuracoBot {
         }
 
         if (!boughtFromDiscard || state.partialDraw) {
+          this.assertActive(engine, signal);
           await engine.executeDrawStock(botIndex);
         }
 
-        await this.sleep(1000);
+        await this.sleep(1000, engine, signal);
 
         state = engine.getState();
         if (!state || !state.players || !state.players[botIndex]) {
@@ -101,9 +122,10 @@ export class BuracoBot {
         me = state.players[botIndex];
         engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
 
-        await this.processMelds(botIndex, ctx, engine);
-        await this.sleep(1000);
+        await this.processMelds(botIndex, ctx, engine, signal);
+        await this.sleep(1000, engine, signal);
       } catch (error) {
+        if (this.isCancellationError(error)) throw error;
         console.error('Erro interno:', error);
         let s = engine.getState();
         const botName = s && s.players && s.players[botIndex] ? s.players[botIndex].name : 'BOT';
@@ -115,13 +137,15 @@ export class BuracoBot {
         const botName = s && s.players && s.players[botIndex] ? s.players[botIndex].name : 'BOT';
 
         engine.showMessage(`🤖 ${botName} descartando...`);
-        await this.sleep(1200);
-        await this.processDiscard(botIndex, me.teamId === 0 ? 1 : 0, engine);
+        await this.sleep(1200, engine, signal);
+        await this.processDiscard(botIndex, me.teamId === 0 ? 1 : 0, engine, signal);
       } catch (error) {
+        if (this.isCancellationError(error)) throw error;
         console.error('Erro fatal:', error);
 
         const s = engine.getState();
         if (s && s.players && s.players[botIndex]) {
+          this.assertActive(engine, signal);
           await engine.executeDiscard(botIndex, 0);
         }
       }
@@ -444,11 +468,12 @@ export class BuracoBot {
     return false;
   }
 
-  static async processMelds(botIndex, ctx, engine) {
+  static async processMelds(botIndex, ctx, engine, signal) {
     let madeMove = true;
     let loops = 0;
 
     while (madeMove && loops < 25) {
+      this.assertActive(engine, signal);
       madeMove = false;
       loops++;
 
@@ -486,9 +511,10 @@ export class BuracoBot {
             if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
 
             if (engine.isValidSequenceMeld(testMeld)) {
+              this.assertActive(engine, signal);
               await engine.executeMeldExtend(botIndex, mIdx, [i]);
               madeMove = true;
-              await this.sleep(300);
+              await this.sleep(300, engine, signal);
               break;
             }
           }
@@ -525,9 +551,10 @@ export class BuracoBot {
               if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
 
               if (engine.isValidSequenceMeld(testMeld)) {
+                this.assertActive(engine, signal);
                 await engine.executeMeldExtend(botIndex, mIdx, [i]);
                 madeMove = true;
-                await this.sleep(300);
+                await this.sleep(300, engine, signal);
                 break;
               }
             }
@@ -577,9 +604,10 @@ export class BuracoBot {
               }
 
               if (engine.isValidSequenceMeld(combo)) {
+                this.assertActive(engine, signal);
                 await engine.executeMeldNew(botIndex, [i, j, k]);
                 madeMove = true;
-                await this.sleep(400);
+                await this.sleep(400, engine, signal);
                 break;
               }
             }
@@ -657,9 +685,10 @@ export class BuracoBot {
               if (!wasDirty && isNowDirty && me.hand.length > 1) continue;
 
               if (engine.isValidSequenceMeld(testMeld)) {
+                this.assertActive(engine, signal);
                 await engine.executeMeldExtend(botIndex, mIdx, [i]);
                 madeMove = true;
-                await this.sleep(400);
+                await this.sleep(400, engine, signal);
                 break;
               }
             }
@@ -691,9 +720,10 @@ export class BuracoBot {
                 }
 
                 if (engine.isValidSequenceMeld(combo)) {
+                  this.assertActive(engine, signal);
                   await engine.executeMeldNew(botIndex, [i, j, k]);
                   madeMove = true;
-                  await this.sleep(400);
+                  await this.sleep(400, engine, signal);
                   break;
                 }
               }
@@ -706,7 +736,8 @@ export class BuracoBot {
     }
   }
 
-  static async processDiscard(botIndex, oppTeamId, engine) {
+  static async processDiscard(botIndex, oppTeamId, engine, signal) {
+    this.assertActive(engine, signal);
     const state = engine.getState();
     if (!state || !state.players || !state.players[botIndex] || !state.teams) {
       if (typeof window !== 'undefined' && window.isClosingGame) return;
@@ -790,19 +821,35 @@ export class BuracoBot {
       if (discardIndex === -1) return;
     }
 
+    this.assertActive(engine, signal);
     await engine.executeDiscard(botIndex, discardIndex);
   }
 
-  static async sleep(ms) {
-    await new Promise((resolve) => setTimeout(resolve, ms));
-    const engine = this.currentEngine;
-    if (engine) {
-      let s = engine.getState();
+  static async sleep(ms, engine, signal) {
+    this.assertActive(engine, signal);
+
+    await new Promise((resolve, reject) => {
+      let timer = null;
+      const abort = () => {
+        clearTimeout(timer);
+        const error = new Error('Turno do bot cancelado durante a espera.');
+        error.name = 'AbortError';
+        error.code = 'BOT_TURN_CANCELLED';
+        reject(error);
+      };
+      timer = setTimeout(() => {
+        signal?.removeEventListener('abort', abort);
+        resolve();
+      }, ms);
+      signal?.addEventListener('abort', abort, { once: true });
+    });
+
+    this.assertActive(engine, signal);
+    let s = engine.getState();
       // Segura a execução do bot em loop enquanto o jogo estiver congelado no DevTools
-      while (s && s.debugPaused && !s.finished && !(typeof window !== 'undefined' && window.isClosingGame)) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        s = engine.getState();
-      }
+    while (s && s.debugPaused && !s.finished) {
+      await this.sleep(500, engine, signal);
+      s = engine.getState();
     }
   }
 }
