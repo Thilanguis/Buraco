@@ -172,6 +172,17 @@ function eligibleMeldIndexes(gameState, { excludePossessed = false } = {}) {
     .map(({ index }) => index);
 }
 
+function possessionDamageForMeld(gameState, meldIndex) {
+  const boss = gameState.boss;
+  const meld = gameState.teams?.[0]?.melds?.[meldIndex] || [];
+  const damagedCardIds = new Set(boss.damagedCardIds || []);
+  const individualDamage = meld.reduce((total, card) => (
+    card?.id && damagedCardIds.has(card.id) ? total + bossCardDamage(card) : total
+  ), 0);
+  const canastraDamage = Math.max(0, Number(boss.meldProgress?.[`0:${meldIndex}`]?.damageValue) || 0);
+  return individualDamage + canastraDamage;
+}
+
 function cardCanBePlayedNow(gameState, player, card) {
   if (!player || !card?.id) return false;
   const melds = gameState.teams?.[player.teamId]?.melds || [];
@@ -232,7 +243,10 @@ function createPayload(gameState, abilityId) {
     amount: boss.phase === 3 ? 8 : 6,
     collateralAmount: boss.phase === 3 ? 5 : 3,
   };
-  if (abilityId === 'maintenance_fee') return { extraDraw: boss.phase === 3 ? 2 : 1 };
+  if (abilityId === 'maintenance_fee') return {
+    extraDraw: boss.phase === 3 ? 2 : 1,
+    financedDebt: boss.phase === 3 ? 4 : 3,
+  };
   if (abilityId === 'suit_audit') {
     const suit = SUITS[Math.floor(seededUnit(bossSeed(gameState, 17)) * SUITS.length) % SUITS.length];
     return { suit: suit.value, suitLabel: suit.label, required: boss.phase === 3 ? 4 : 3, progress: 0, successDelta: -5, failureDelta: boss.phase === 3 ? 12 : 10 };
@@ -274,7 +288,7 @@ function createPayload(gameState, abilityId) {
     }
     if (abilityId === 'possession') {
       const meldIndex = chooseSeeded(eligibleMeldIndexes(gameState, { excludePossessed: true }), gameState, 71);
-      return { meldIndex, progress: 0, required: 2 };
+      return { meldIndex, progress: 0, required: 1 };
     }
     if (abilityId === 'favorite') {
       const protectedPlayer = choosePlayer(gameState, 73);
@@ -376,6 +390,7 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     chainsByPlayer: {},
     chainReliefRoundByPlayer: {},
     choiceDrawnCardIdsByPlayer: {},
+    pendingFinancedDrawsByPlayer: {},
     damagedCardIds: [],
     suppressedDamageCardIds: [],
     vaultsByPlayer: {},
@@ -423,6 +438,7 @@ export function normalizeBossState(gameState) {
   boss.chainsByPlayer ||= {};
   boss.chainReliefRoundByPlayer ||= {};
   boss.choiceDrawnCardIdsByPlayer ||= {};
+  boss.pendingFinancedDrawsByPlayer ||= {};
   boss.damagedCardIds ||= [];
   boss.suppressedDamageCardIds ||= [];
   boss.vaultsByPlayer ||= {};
@@ -1078,7 +1094,7 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
   let possessionReleased = false;
   let possessionProgress = null;
   let possessionSuppressesDamage = false;
-  let cardsEnteredUnderPossession = false;
+  let possessionReappliedDamage = 0;
 
   if (boss.id === 'dominadora') {
     const intent = boss.currentIntent;
@@ -1088,11 +1104,11 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
       const newProgressCards = cardsAdded.filter((card) => card?.id && !possession.progressCardIds.includes(card.id));
       newProgressCards.forEach((card) => possession.progressCardIds.push(card.id));
       possessionProgressed = newProgressCards.length > 0;
-      cardsEnteredUnderPossession = newProgressCards.length > 0;
-      possession.progress = clamp((possession.progress || 0) + newProgressCards.length, 0, possession.required || 2);
+      possession.progress = clamp((possession.progress || 0) + newProgressCards.length, 0, possession.required || 1);
       possessionProgress = possession.progress;
-      if (possession.progress >= (possession.required || 2)) {
+      if (possession.progress >= (possession.required || 1)) {
         possessionReleased = true;
+        possessionReappliedDamage = Math.max(0, Number(possession.suppressedDamage) || 0);
         boss.possessions = boss.possessions.filter((entry) => entry.id !== possession.id);
       } else possessionSuppressesDamage = true;
       if (possessionSuppressesDamage) canastraDamage = 0;
@@ -1111,16 +1127,11 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
   const suppressedCardIds = new Set(boss.suppressedDamageCardIds);
   for (const card of cardsAdded) {
     if (!card?.id || accountedCardIds.has(card.id) || suppressedCardIds.has(card.id)) continue;
-    if (cardsEnteredUnderPossession) {
-      suppressedCardIds.add(card.id);
-      boss.suppressedDamageCardIds.push(card.id);
-      continue;
-    }
     accountedCardIds.add(card.id);
     boss.damagedCardIds.push(card.id);
     cardDamage += bossCardDamage(card);
   }
-  const damage = canastraDamage + cardDamage;
+  const damage = canastraDamage + cardDamage + possessionReappliedDamage;
 
   boss.meldProgress[key] = {
     damageValue: possessionSuppressesDamage ? previous.damageValue : nextDamageValue,
@@ -1159,6 +1170,7 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     damage,
     cardDamage,
     canastraDamage,
+    possessionReappliedDamage,
     debtReduction,
     chainsRemoved,
     possessionProgress: possessionProgressed ? possessionProgress : null,
@@ -1191,7 +1203,8 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
       type: 'possessionReleased',
       actionId: `possession_released_${meldIndex}_${boss.actionSequence}`,
       meldIndex,
-      outcome: `A equipe rompeu a Posse do jogo ${meldIndex + 1}.`,
+      reappliedDamage: possessionReappliedDamage,
+      outcome: `A equipe rompeu a Posse do jogo ${meldIndex + 1}; ${possessionReappliedDamage} de dano foram reaplicados.`,
     });
   }
   return damageEvent;
@@ -1273,9 +1286,45 @@ export function consumeBossExtraDraw(gameState, playerId) {
   if (!boss) return 0;
   const effect = boss.effects.find((entry) => entry.id === 'maintenance_fee' && entry.pendingPlayerIds?.includes(playerId));
   if (!effect) return 0;
+  boss.pendingFinancedDrawsByPlayer[playerId] = {
+    count: effect.extraDraw || 1,
+    debtPerCard: effect.financedDebt || 3,
+    sourceActionId: effect.sourceActionId || null,
+  };
   effect.pendingPlayerIds = effect.pendingPlayerIds.filter((id) => id !== playerId);
   boss.effects = boss.effects.filter((entry) => entry.id !== 'maintenance_fee' || entry.pendingPlayerIds.length > 0);
   return effect.extraDraw || 1;
+}
+
+export function registerBossFinancedCards(gameState, playerId, cards = []) {
+  const boss = normalizeBossState(gameState);
+  const pending = boss?.pendingFinancedDrawsByPlayer?.[playerId];
+  if (!boss || boss.id !== 'banker' || !pending) return null;
+  const financedCards = cards.filter((card) => card?.id).slice(0, pending.count || cards.length);
+  delete boss.pendingFinancedDrawsByPlayer[playerId];
+  if (!financedCards.length) return null;
+  financedCards.forEach((card) => {
+    if (boss.effects.some((effect) => effect.id === 'financed_card' && effect.playerId === playerId && effect.cardId === card.id)) return;
+    boss.effects.push({
+      id: 'financed_card',
+      playerId,
+      cardId: card.id,
+      debtPerCard: pending.debtPerCard,
+      appliedRound: boss.roundNumber,
+      sourceActionId: pending.sourceActionId,
+    });
+  });
+  boss.actionSequence += 1;
+  return recordEvent(boss, {
+    type: 'financedCards',
+    actionId: `financed_${playerId}_${boss.actionSequence}`,
+    playerId,
+    cardIds: financedCards.map((card) => card.id),
+    cardLabels: financedCards.map(compactCardLabel),
+    count: financedCards.length,
+    debtPerCard: pending.debtPerCard,
+    outcome: `Tarifa de Manutenção: +${financedCards.length} carta${financedCards.length === 1 ? '' : 's'} financiada${financedCards.length === 1 ? '' : 's'}.`,
+  });
 }
 
 function enqueueChoice(boss, playerId, type, options, data = {}) {
@@ -1302,6 +1351,10 @@ function swapCooperatorCards(gameState) {
     secondCardId: secondCard.id,
     firstCardLabel: compactCardLabel(firstCard),
     secondCardLabel: compactCardLabel(secondCard),
+    receivedCards: [
+      { playerId: players[0].id, fromPlayerId: players[1].id, cardId: secondCard.id, cardLabel: compactCardLabel(secondCard) },
+      { playerId: players[1].id, fromPlayerId: players[0].id, cardId: firstCard.id, cardLabel: compactCardLabel(firstCard) },
+    ],
   };
 }
 
@@ -1357,16 +1410,23 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else if (intent.abilityId === 'possession') {
       const alreadyPossessed = boss.possessions.some((entry) => entry.meldIndex === intent.payload.meldIndex);
       if (!alreadyPossessed && boss.possessions.length < 2 && eligibleMeldIndexes(gameState, { excludePossessed: true }).includes(intent.payload.meldIndex)) {
+        const calculatedDamage = possessionDamageForMeld(gameState, intent.payload.meldIndex);
+        const suppressedDamage = Math.min(calculatedDamage, Math.max(0, boss.maxHp - boss.hp));
+        boss.hp = clamp(boss.hp + suppressedDamage, 0, boss.maxHp);
+        boss.stats.totalDamage = Math.max(0, boss.stats.totalDamage - suppressedDamage);
         boss.possessions.push({
           id: `possession_${intent.id}`,
           teamId: 0,
           meldIndex: intent.payload.meldIndex,
           progress: 0,
           progressCardIds: [],
-          required: 2,
+          required: 1,
+          suppressedDamage,
+          calculatedDamage,
           appliedRound: boss.roundNumber,
         });
-        outcome = `O jogo ${intent.payload.meldIndex + 1} foi possuído e não causará dano até receber 2 cartas.`;
+        outcome = `O jogo ${intent.payload.meldIndex + 1} foi possuído; ${suppressedDamage} de dano ficaram suspensos até receber 1 carta legal.`;
+        resultData = { meldIndex: intent.payload.meldIndex, suppressedDamage, calculatedDamage };
       } else {
         outcome = 'A Posse não encontrou um jogo elegível.';
       }
@@ -1390,10 +1450,11 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     }
   } else if (intent.abilityId === 'maintenance_fee') {
     const extraDraw = intent.payload.extraDraw ?? (intent.announcedPhase === 3 ? 2 : 1);
+    const financedDebt = intent.payload.financedDebt ?? (intent.announcedPhase === 3 ? 4 : 3);
     boss.effects = boss.effects.filter((entry) => entry.id !== 'maintenance_fee');
-    boss.effects.push({ id: 'maintenance_fee', extraDraw, pendingPlayerIds: gameState.players.map((player) => player.id) });
+    boss.effects.push({ id: 'maintenance_fee', extraDraw, financedDebt, sourceActionId: intent.id, pendingPlayerIds: gameState.players.map((player) => player.id) });
     boss.lastMaintenanceRound = boss.roundNumber;
-    outcome = `Tarifa ativa: +${extraDraw} compra(s) para cada jogador.`;
+    outcome = `Tarifa ativa: +${extraDraw} carta${extraDraw === 1 ? '' : 's'} financiada${extraDraw === 1 ? '' : 's'} para cada jogador.`;
   } else if (intent.abilityId === 'credit_block') {
     outcome = 'Bloqueio de Crédito encerrado.';
   } else if (intent.abilityId === 'suit_audit') {
@@ -1462,6 +1523,31 @@ export function completeBossPlayerTurn(gameState, playerId) {
     playerName: player?.name || `Jogador ${playerId + 1}`,
     cardsInHand: player?.hand?.length || 0,
   });
+
+  if (boss.id === 'banker') {
+    const financedCards = boss.effects.filter((effect) => effect.id === 'financed_card' && effect.playerId === playerId);
+    if (financedCards.length) {
+      const heldCardIds = new Set((player?.hand || []).map((card) => card?.id).filter(Boolean));
+      const chargedCards = financedCards.filter((effect) => heldCardIds.has(effect.cardId));
+      const dangerDelta = chargedCards.reduce((total, effect) => total + (Number(effect.debtPerCard) || 0), 0);
+      boss.effects = boss.effects.filter((effect) => !(effect.id === 'financed_card' && effect.playerId === playerId));
+      boss.danger = clamp(boss.danger + dangerDelta, 0, boss.maxDanger);
+      boss.actionSequence += 1;
+      recordEvent(boss, {
+        type: 'financedCharge',
+        actionId: `financed_charge_${playerId}_${boss.actionSequence}`,
+        playerId,
+        financedCardIds: financedCards.map((effect) => effect.cardId),
+        chargedCardIds: chargedCards.map((effect) => effect.cardId),
+        dangerDelta,
+        danger: boss.danger,
+        dangerChangeLabel: dangerDelta ? `Tarifa de Manutenção: Dívida +${dangerDelta}` : '',
+        outcome: dangerDelta
+          ? `${chargedCards.length} Carta${chargedCards.length === 1 ? '' : 's'} Financiada${chargedCards.length === 1 ? '' : 's'} permaneceram na mão.`
+          : 'Todas as Cartas Financiadas foram usadas ou descartadas; nenhuma Dívida foi aplicada.',
+      });
+    }
+  }
 
   if (boss.id === 'dominadora') {
     const expiringExposures = boss.effects.filter((effect) => effect.id === 'choice_exposure' && effect.playerId === playerId && effect.expiresAfterTurn);

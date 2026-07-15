@@ -12,6 +12,7 @@
         beginBossTurn,
         completeBossPlayerTurn,
         consumeBossExtraDraw,
+        registerBossFinancedCards,
         createBossStateForMode,
         canBossCreateMeld,
         canBossUseMeld,
@@ -312,6 +313,7 @@
       let lastSeenActionId = null;
       let ignoreOwnActionId = null;
       let lastRenderedBossEventId = null;
+      let lastAnimatedBossSwapId = null;
       let renderedBossFeedbackCount = null;
       let bossPresentationTimer = null;
       let bossPresentationKey = '';
@@ -2030,6 +2032,8 @@
           return [];
         }
         const extraCount = consumeBossExtraDraw(state, player.id);
+        const stockEl = document.querySelector('#drawStockBtn .pile-card');
+        const stockRect = stockEl ? getRect(stockEl) : null;
         const cards = [];
         for (let i = 0; i < extraCount; i++) {
           if (!state.stock.length) await recycleDeadToStockIfPossible();
@@ -2042,7 +2046,24 @@
           player.hand.push(card);
           cards.push(card);
         }
-        if (cards.length) sortHand(player.hand);
+        const financedEvent = registerBossFinancedCards(state, player.id, cards);
+        if (cards.length) {
+          sortHand(player.hand);
+          state.boughtCardIds = [...new Set([...(state.boughtCardIds || []), ...cards.map((card) => card.id)])];
+          if (player.id === myPlayerIndex) {
+            renderHand();
+            for (const card of cards) {
+              const toEl = cardElById(card.id);
+              if (!stockRect || !toEl) continue;
+              toEl.style.visibility = 'hidden';
+              await flyRectToRect(card, stockRect, getRect(toEl), 'back');
+              toEl.style.visibility = '';
+            }
+          }
+        }
+        if (financedEvent && player.id === myPlayerIndex) {
+          showMessage(`${financedEvent.outcome} Use ou descarte neste turno. Cada carta restante gera Dívida.`);
+        }
         return cards;
       }
 
@@ -2085,6 +2106,9 @@
           drawnCards.push(c);
         }
 
+        const bossExtraCards = bossExtraDraw > 0 ? drawnCards.slice(-bossExtraDraw) : [];
+        const financedEvent = registerBossFinancedCards(state, state.currentPlayer, bossExtraCards);
+
         sortHand(currentPlayer().hand);
         localUndoStack = []; // 🔒 TRAVA DE SEGURANÇA: Limpa o botão voltar para impedir trapaça
         state.hasDrawnThisTurn = true;
@@ -2098,27 +2122,24 @@
         renderAll();
 
         if (fromRect) {
-          const anims = drawnCards.map((c) => {
+          for (const c of drawnCards) {
             const toEl = cardElById(c.id);
             if (toEl) {
               toEl.style.visibility = 'hidden';
-              return flyRectToRect(c, fromRect, getRect(toEl), 'back').then(() => {
-                if (toEl) toEl.style.visibility = '';
-              });
+              await flyRectToRect(c, fromRect, getRect(toEl), 'back');
+              toEl.style.visibility = '';
             }
-            return Promise.resolve();
-          });
-          await Promise.all(anims);
+          }
         }
 
-        showMessage(''); // Limpa a mensagem da puxada parcial
+        showMessage(financedEvent ? `${financedEvent.outcome} Use ou descarte neste turno. Cada carta restante gera Dívida.` : '');
 
-        state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), count: drawnCards.length, recycledDeadIndex: recycledIndex, ts: Date.now() };
+        state.lastAction = { id: newActionId(), type: 'drawStock', playerId: state.currentPlayer, card: packCard(drawnCards[drawnCards.length - 1]), count: drawnCards.length, bossExtraCards: bossExtraCards.map(packCard), bossEvent: financedEvent, recycledDeadIndex: recycledIndex, ts: Date.now() };
         ignoreOwnActionId = state.lastAction.id;
 
         resetTurnTimer();
         await commitState();
-        if (!state.partialDraw) showMessage('✅ Compra realizada.');
+        if (!state.partialDraw && !financedEvent) showMessage('✅ Compra realizada.');
       }
 
       function canUseDiscardInClosed(discardTop, hand, team) {
@@ -3543,6 +3564,25 @@
         root.onclick = isLocal ? reclaimLocalBossVault : null;
       }
 
+      async function animateBossForcedSwap(feedback) {
+        renderHand();
+        const flights = feedback.receivedCards.map(async (received) => {
+          const owner = state.players.find((player) => player.id === received.playerId);
+          const card = owner?.hand?.find((entry) => entry.id === received.cardId);
+          const fromRect = opponentAnchorRect(received.fromPlayerId);
+          const localCardEl = received.playerId === myPlayerIndex ? cardElById(received.cardId) : null;
+          const toRect = localCardEl ? getRect(localCardEl) : opponentAnchorRect(received.playerId);
+          if (localCardEl) localCardEl.classList.add('boss-swap-received');
+          if (card && fromRect && toRect) await flyRectToRect(card, fromRect, toRect, 'front');
+        });
+        await Promise.all(flights);
+        const mine = feedback.receivedCards.find((received) => received.playerId === myPlayerIndex);
+        if (mine) {
+          const sender = state.players.find((player) => player.id === mine.fromPlayerId);
+          showMessage(`Você recebeu ${mine.cardLabel} de ${sender?.name || 'outro jogador'}.`);
+        }
+      }
+
       function renderBossHud() {
         const hud = document.getElementById('bossHud');
         const resultSection = document.getElementById('bossResultSection');
@@ -3633,18 +3673,24 @@
           id: 'possession',
           meldIndex: possession.meldIndex,
           progress: possession.progress || 0,
-          required: possession.required || 2,
+          required: possession.required || 1,
+          suppressedDamage: possession.suppressedDamage || 0,
         }));
         document.getElementById('bossEffects').innerHTML = [...(boss.effects || []), ...persistentPossessions]
           .map((effect) => {
-            if (effect.id === 'maintenance_fee') return `<span class="boss-effect-chip">Tarifa: +${effect.extraDraw} compra</span>`;
+            if (effect.id === 'maintenance_fee') return `<span class="boss-effect-chip">Tarifa: +${effect.extraDraw} carta${effect.extraDraw === 1 ? '' : 's'} financiada${effect.extraDraw === 1 ? '' : 's'} · Dívida +${effect.financedDebt} cada</span>`;
+            if (effect.id === 'financed_card') {
+              const owner = state.players.find((player) => player.id === effect.playerId);
+              const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
+              return `<span class="boss-effect-chip boss-financed-chip">$ ${owner?.name || 'Jogador'}: ${card ? `${card.rank}${card.suit}` : 'carta'} financiada · +${effect.debtPerCard}</span>`;
+            }
             if (effect.id === 'choice_lock') {
               const owner = state.players.find((player) => player.id === effect.playerId);
               const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
               const label = card ? `${card.rank}${card.suit}` : 'carta';
               return `<span class="boss-effect-chip">⛓ ${owner?.name || 'Jogador'}: ${label} presa</span>`;
             }
-            if (effect.id === 'possession') return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required}</span>`;
+            if (effect.id === 'possession') return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required} · ${effect.suppressedDamage} dano suspenso</span>`;
             return `<span class="boss-effect-chip">${effect.id}</span>`;
           })
           .join('');
@@ -3826,6 +3872,10 @@
           const newFeedback = feedbackEvents.slice(renderedBossFeedbackCount);
           renderedBossFeedbackCount = feedbackEvents.length;
           newFeedback.forEach((feedback, index) => {
+            if (feedback.type === 'bossAbility' && feedback.abilityId === 'forced_swap' && feedback.actionId !== lastAnimatedBossSwapId && feedback.receivedCards?.length === 2) {
+              lastAnimatedBossSwapId = feedback.actionId;
+              void animateBossForcedSwap(feedback);
+            }
             const isChain = feedback.type === 'chainChange' && feedback.amount;
             const isDebt = feedback.dangerChangeLabel && (feedback.type === 'bossAbility' || feedback.type === 'bossDamage' || feedback.type === 'debtReduction');
             if (!isChain && !isDebt) return;
@@ -4350,6 +4400,11 @@
           if (bossCardEffect === 'exposed') {
             div.classList.add('boss-card-exposed');
             div.title = 'Carta exposta: não pode ser descartada';
+          }
+          const financedCard = state.boss?.effects?.find((effect) => effect.id === 'financed_card' && effect.playerId === me.id && effect.cardId === card.id);
+          if (financedCard) {
+            div.classList.add('boss-card-financed');
+            div.title = `Carta Financiada: Dívida +${financedCard.debtPerCard} se permanecer na mão ao fim do turno`;
           }
 
           div.innerHTML = cardFrontHTML(card);
@@ -5509,6 +5564,18 @@
           }
         };
 
+        const animateRemoteFinancedCards = async () => {
+          const financedCards = a.bossExtraCards || [];
+          if (!financedCards.length || !stockRect) return;
+          for (let i = 0; i < financedCards.length; i++) {
+            await flyRectToRect(financedCards[i], stockRect, handRect, 'back');
+            impactAtRect(handRect);
+            if (i < financedCards.length - 1) await new Promise((resolve) => setTimeout(resolve, 220));
+          }
+          const playerName = state.players?.find((player) => player.id === a.playerId)?.name || 'Jogador';
+          showMessage(`Tarifa de Manutenção: ${playerName} recebeu +${financedCards.length} carta${financedCards.length === 1 ? '' : 's'} financiada${financedCards.length === 1 ? '' : 's'}. Cada carta restante gera Dívida.`);
+        };
+
         if (a.type === 'stealCard') {
           if (sfxSteal) {
             sfxSteal.currentTime = 0;
@@ -5552,12 +5619,13 @@
             }
           }
 
-          const drawCount = a.count || 1;
+          const drawCount = Math.max(0, (a.count || 1) - (a.bossExtraCards?.length || 0));
           for (let i = 0; i < drawCount; i++) {
             if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
             impactAtRect(handRect);
             if (i < drawCount - 1) await new Promise((r) => setTimeout(r, 180)); // Pequeno delay pra ver as cartas separadas
           }
+          await animateRemoteFinancedCards();
           return;
         }
 
@@ -5570,6 +5638,7 @@
               if (opPlayer) renderOpponentHands();
             }
           }
+          await animateRemoteFinancedCards();
           return;
         }
 
@@ -5622,6 +5691,7 @@
         if (a.type === 'drawDiscardFechado') {
           await animateRemoteDeadIfAny();
           await animateRemoteDrawsIfAny();
+          await animateRemoteFinancedCards();
           return;
         }
 
@@ -5848,7 +5918,8 @@
             await this.commitState();
             return;
           }
-          const drawCount = ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw ? 2 : 1) + consumeBossExtraDraw(s, botIndex);
+          const bossExtraCount = consumeBossExtraDraw(s, botIndex);
+          const drawCount = ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw ? 2 : 1) + bossExtraCount;
           const drawnCards = [];
           let recycledIndex = null;
 
@@ -5870,6 +5941,9 @@
             drawnCards.push(c);
           }
 
+          const bossExtraCards = bossExtraCount > 0 ? drawnCards.slice(-bossExtraCount) : [];
+          const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
+
           sortHand(me.hand);
           s.hasDrawnThisTurn = true;
           s.partialDraw = false;
@@ -5882,6 +5956,8 @@
               playerId: botIndex,
               card: packCard(drawnCards[drawnCards.length - 1]),
               count: drawnCards.length,
+              bossExtraCards: bossExtraCards.map(packCard),
+              bossEvent: financedEvent,
               recycledDeadIndex: recycledIndex,
               ts: Date.now(),
             };
@@ -5909,13 +5985,16 @@
           me.hand.push(...pile);
 
           const bossExtraCount = consumeBossExtraDraw(s, botIndex);
+          const bossExtraCards = [];
           for (let i = 0; i < bossExtraCount; i++) {
             if (!s.stock.length) await recycleDeadToStockIfPossible();
             if (!s.stock.length) break;
             const extraCard = s.stock.pop();
             ensureCardId(extraCard);
             me.hand.push(extraCard);
+            bossExtraCards.push(extraCard);
           }
+          const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
 
           // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
@@ -5938,7 +6017,7 @@
 
           const freshS = this.getState();
           if (freshS) {
-            freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, ts: Date.now() };
+            freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, bossExtraCards: bossExtraCards.map(packCard), bossEvent: financedEvent, ts: Date.now() };
             await this.commitState();
           }
           return true;
@@ -5998,13 +6077,16 @@
           }
 
           const bossExtraCount = consumeBossExtraDraw(s, botIndex);
+          const bossExtraCards = [];
           for (let i = 0; i < bossExtraCount; i++) {
             if (!s.stock.length) await recycleDeadToStockIfPossible();
             if (!s.stock.length) break;
             const extraCard = s.stock.pop();
             ensureCardId(extraCard);
             me.hand.push(extraCard);
+            bossExtraCards.push(extraCard);
           }
+          const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
 
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
             // 🛑 SALVA-VIDAS: Prepara o morto caso o monte tenha acabado bem na carta extra dele!
@@ -6039,6 +6121,8 @@
               playerId: botIndex,
               tookDead,
               drawnCards: domReward?.drawnCards,
+              bossExtraCards: bossExtraCards.map(packCard),
+              bossFinanceEvent: financedEvent,
               bossEvent,
               ts: Date.now(),
             };
@@ -6256,6 +6340,7 @@
           document.body.classList.remove('boss-mode');
           document.body.removeAttribute('data-boss-id');
           lastRenderedBossEventId = null;
+          lastAnimatedBossSwapId = null;
           renderedBossFeedbackCount = null;
 
           const overlay = document.getElementById('countdownOverlay');

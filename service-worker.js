@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v120';
+const CACHE_NAME = 'buraco-v121';
 
 const ASSETS = [
   './',

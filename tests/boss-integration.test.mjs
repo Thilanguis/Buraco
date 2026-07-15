@@ -201,10 +201,29 @@ test('HUD mostra quatro Correntes, estado Sob Controle e Posses independentes', 
 
 test('HUD do chefe acompanha a largura responsiva da mesa', () => {
   const hudRule = bossCss.match(/\.boss-hud \{[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(hudRule, /width:\s*calc\(100% - 180px\)/);
-  assert.match(hudRule, /max-width:\s*1120px/);
-  assert.match(hudRule, /min-height:\s*116px/);
-  assert.match(bossCss, /\.boss-portrait \{[^}]*width:\s*138px;[^}]*height:\s*82px/);
+  assert.match(hudRule, /width:\s*calc\(100% - 130px\)/);
+  assert.match(hudRule, /max-width:\s*1200px/);
+  assert.match(hudRule, /min-height:\s*138px/);
+  assert.match(bossCss, /\.boss-portrait \{[^}]*width:\s*160px;[^}]*height:\s*98px/);
+});
+
+test('Tarifa identifica e anima separadamente as Cartas Financiadas em todos os fluxos', () => {
+  assert.match(app, /registerBossFinancedCards\(state, state\.currentPlayer, bossExtraCards\)/);
+  assert.match(app, /registerBossFinancedCards\(state, player\.id, cards\)/);
+  assert.match(app, /registerBossFinancedCards\(s, botIndex, bossExtraCards\)/);
+  assert.match(app, /bossExtraCards:\s*bossExtraCards\.map\(packCard\)/);
+  assert.match(app, /animateRemoteFinancedCards/);
+  assert.match(app, /Use ou descarte neste turno\. Cada carta restante gera Dívida/);
+  assert.match(app, /boss-card-financed/);
+  assert.match(bossCss, /\.boss-mode \.carta\.boss-card-financed/);
+});
+
+test('Troca Forçada apresenta os dois voos e identifica a carta recebida', () => {
+  assert.match(app, /function animateBossForcedSwap\(feedback\)/);
+  assert.match(app, /feedback\.receivedCards\.map/);
+  assert.match(app, /flyRectToRect\(card, fromRect, toRect, 'front'\)/);
+  assert.match(app, /Você recebeu \$\{mine\.cardLabel\} de/);
+  assert.match(bossCss, /\.boss-mode \.carta\.boss-swap-received/);
 });
 
 test('tela final mostra resultado explicito, chefe, fala e duas acoes', () => {

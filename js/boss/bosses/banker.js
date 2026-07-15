@@ -24,7 +24,7 @@ export const bankerDefinition = Object.freeze({
   tableTheme: 'findom',
   deckTheme: 'cassino',
   accent: '#22c55e',
-  maxHp: 2200,
+  maxHp: 2500,
   dangerType: 'debt',
   maxDanger: 100,
   phaseNames: Object.freeze({ 1: 'Crédito Fácil', 2: 'Auditoria', 3: 'Cobrança Final' }),

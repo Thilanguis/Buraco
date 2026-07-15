@@ -14,19 +14,19 @@
 .boss-menu-rules span { display: block; }
 
 .boss-hud {
-  width: calc(100% - 180px);
-  max-width: 1120px;
-  min-height: 116px;
-  margin: 4px auto 14px;
+  width: calc(100% - 130px);
+  max-width: 1200px;
+  min-height: 138px;
+  margin: 6px auto 18px;
   display: grid;
-  grid-template-columns: minmax(250px, .95fr) minmax(250px, 1.2fr) minmax(240px, 1fr);
-  gap: 9px 14px;
+  grid-template-columns: minmax(285px, 1.02fr) minmax(270px, 1.18fr) minmax(250px, 1fr);
+  gap: 11px 17px;
   align-items: center;
-  padding: 15px 17px 13px;
+  padding: 17px 19px 15px;
   border: 1px solid rgba(245, 158, 11, 0.72);
   border-radius: 7px;
   background: linear-gradient(180deg, rgba(20, 7, 11, 0.97), rgba(5, 9, 17, 0.96));
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.52), inset 0 1px rgba(255, 255, 255, 0.08), 0 0 22px rgba(245, 158, 11, 0.11);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.58), inset 0 1px rgba(255, 255, 255, 0.1), 0 0 28px rgba(245, 158, 11, 0.15);
   color: #f8fafc;
   position: relative;
   z-index: 32;
@@ -44,9 +44,9 @@
 .boss-hud::before { left: -2px; top: -2px; width: 13px; height: 13px; border-width: 2px 0 0 2px; }
 .boss-hud::after { right: -2px; bottom: -2px; width: 13px; height: 13px; border-width: 0 2px 2px 0; }
 
-.boss-hud-heading { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.boss-hud-heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .boss-hud-heading > div { display: grid; gap: 2px; min-width: 0; }
-.boss-portrait { width: 138px; height: 82px; flex: 0 0 138px; display: block; overflow: hidden; border: 1px solid rgba(248,113,113,.65); border-radius: 5px; background: #050505; box-shadow: 0 0 18px rgba(239,68,68,.22), inset 0 0 0 1px rgba(255,255,255,.06); }
+.boss-portrait { width: 160px; height: 98px; flex: 0 0 160px; display: block; overflow: hidden; border: 1px solid rgba(248,113,113,.72); border-radius: 5px; background: #050505; box-shadow: 0 0 23px rgba(239,68,68,.27), inset 0 0 0 1px rgba(255,255,255,.08); }
 .boss-portrait img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 38%; transform: scale(1.14); transform-origin: 50% 38%; }
 body[data-boss-id='dominadora'] .boss-portrait { border-color: rgba(244,114,182,.7); box-shadow: 0 0 16px rgba(219,39,119,.25); }
 body[data-boss-id='dominadora'] .boss-portrait img { object-position: 50% 22%; transform: scale(1.32); transform-origin: 50% 22%; }
@@ -59,10 +59,10 @@ body[data-boss-id='banker'] .boss-hud::before,
 body[data-boss-id='banker'] .boss-hud::after { border-color: #22c55e; }
 body[data-boss-id='banker'] .boss-phase { border-color: rgba(34,197,94,.72); color: #86efac; }
 body[data-boss-id='banker'] .boss-hud-kicker { color: #4ade80; }
-.boss-hud-kicker { color: #fb7185; font-size: 7px; font-weight: 1000; letter-spacing: 1px; }
-.boss-hud-heading strong { font-size: 15px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.boss-phase { width: fit-content; padding: 2px 5px; border: 1px solid rgba(245,158,11,.72); border-radius: 3px; color: #fbbf24; font-size: 7px; font-weight: 1000; }
-.boss-phase-rule { color: #94a3b8; font-size: 6px; line-height: 1.2; }
+.boss-hud-kicker { color: #fb7185; font-size: 8px; font-weight: 1000; letter-spacing: 1px; }
+.boss-hud-heading strong { font-size: 17px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.boss-phase { width: fit-content; padding: 3px 6px; border: 1px solid rgba(245,158,11,.72); border-radius: 3px; color: #fbbf24; font-size: 8px; font-weight: 1000; }
+.boss-phase-rule { color: #a8b4c6; font-size: 7px; line-height: 1.25; }
 .boss-round-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; color: #cbd5e1; font-size: 6px; font-weight: 800; line-height: 1.2; }
 .boss-round-summary i { color: #64748b; font-style: normal; }
 .boss-round-summary #bossCurrentActor { color: #6ee7b7; }
@@ -72,7 +72,7 @@ body[data-boss-id='dominadora'] .boss-round-summary #bossCurrentActor { color: #
 .boss-meter { min-width: 0; }
 .boss-meter-label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 7px; font-weight: 1000; color: #94a3b8; }
 .boss-meter-label strong { color: #fff; font-size: 9px; }
-.boss-meter-track { position: relative; height: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.19); border-radius: 3px; background: rgba(2,6,23,.9); }
+.boss-meter-track { position: relative; height: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,.22); border-radius: 3px; background: rgba(2,6,23,.9); }
 .boss-meter-track > span { display: block; width: 0; height: 100%; transition: width .45s ease, background .35s ease; }
 .boss-hp-meter .boss-meter-track > span { background: linear-gradient(90deg, #dc2626, #fb7185); box-shadow: 0 0 9px rgba(244,63,94,.5); }
 .boss-debt-meter .boss-meter-track > span { background: linear-gradient(90deg, #d97706, #fbbf24); box-shadow: 0 0 9px rgba(245,158,11,.38); }
@@ -87,7 +87,7 @@ body[data-boss-id='dominadora'] .boss-round-summary #bossCurrentActor { color: #
 .boss-dominated-notice strong { color: #fb7185; font-size: 7px; letter-spacing: .5px; }
 .boss-controlled-notice { border-left-color: #f472b6; background: rgba(80,7,45,.42); }
 .boss-controlled-notice strong { color: #f9a8d4; }
-.boss-intent { min-width: 0; padding: 8px 10px; border: 1px solid rgba(245,158,11,.42); border-radius: 5px; display: grid; gap: 3px; background: rgba(54,20,7,.26); box-shadow: inset 0 1px rgba(255,255,255,.035); }
+.boss-intent { min-width: 0; padding: 10px 12px; border: 1px solid rgba(245,158,11,.48); border-radius: 5px; display: grid; gap: 4px; background: rgba(54,20,7,.3); box-shadow: inset 0 1px rgba(255,255,255,.05), 0 0 16px rgba(245,158,11,.06); }
 .boss-intent > span { color: #f59e0b; font-size: 7px; font-weight: 1000; letter-spacing: 1px; }
 .boss-intent strong { font-size: 12px; color: #fff; }
 .boss-intent small { color: #cbd5e1; font-size: 8px; line-height: 1.25; }
@@ -210,7 +210,37 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span { color: #be1
 .boss-mode .carta.boss-card-exposed { position: relative; box-shadow: inset 0 0 0 2px #f59e0b, 0 0 9px rgba(245,158,11,.38) !important; }
 .boss-mode .carta.boss-card-exposed::after { content: '◉'; position: absolute; right: 3px; bottom: 3px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; color: #fde68a; background: rgba(69,10,10,.88); font-size: 10px; font-weight: 1000; pointer-events: none; }
 .boss-mode .meld-line.possessed-by-boss { position: relative; filter: saturate(.58); }
-.boss-mode .meld-line.possessed-by-boss::after { content: '👑 POSSUÍDO · SEM DANO'; position: absolute; inset: 0; display: grid; place-items: center; color: #f9a8d4; background: rgba(50,5,32,.58); font-size: 8px; font-weight: 1000; pointer-events: none; }
+.boss-mode .meld-line.possessed-by-boss::after { content: 'POSSE · DANO SUSPENSO · +1 CARTA LIBERTA'; position: absolute; inset: 0; display: grid; place-items: center; color: #f9a8d4; background: rgba(50,5,32,.58); font-size: 8px; font-weight: 1000; pointer-events: none; }
+
+.boss-mode .carta.boss-card-financed {
+  box-shadow: 0 0 0 2px #22c55e, 0 0 14px rgba(34,197,94,.58) !important;
+}
+.boss-mode .carta.boss-card-financed::after {
+  content: '$';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #86efac;
+  border-radius: 50%;
+  background: #052e16;
+  color: #86efac;
+  font-size: 10px;
+  font-weight: 1000;
+  z-index: 5;
+}
+.boss-financed-chip { border-color: rgba(34,197,94,.55) !important; color: #86efac !important; }
+.boss-mode .carta.boss-swap-received {
+  animation: bossSwapReceived 3.2s ease both;
+}
+
+@keyframes bossSwapReceived {
+  0%, 100% { box-shadow: none; }
+  18%, 68% { box-shadow: 0 0 0 2px #f472b6, 0 0 20px rgba(244,114,182,.8); }
+}
 
 .boss-result-section { position: fixed; inset: 0; z-index: 100010; align-items: center; justify-content: center; padding: 20px; background: rgba(2,6,23,.94); }
 .boss-result-card { width: min(680px, 100%); overflow: hidden; border: 1px solid rgba(248,113,113,.55); border-radius: 7px; background: #090d18; color: #fff; box-shadow: 0 24px 70px rgba(0,0,0,.65); }

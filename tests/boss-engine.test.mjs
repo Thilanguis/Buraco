@@ -10,6 +10,7 @@ import {
   canBossUseMeld,
   completeBossPlayerTurn,
   consumeBossExtraDraw,
+  registerBossFinancedCards,
   createBossState,
   getBossChains,
   getBossCardEffect,
@@ -70,16 +71,16 @@ test('dano de canastra usa somente a diferenca e e idempotente', () => {
   const state = game();
   const first = applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [] });
   assert.equal(first.damage, 100);
-  assert.equal(state.boss.hp, 2100);
+  assert.equal(state.boss.hp, 2400);
 
   const duplicate = applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [] });
   assert.equal(duplicate, null);
-  assert.equal(state.boss.hp, 2100);
+  assert.equal(state.boss.hp, 2400);
 
   const upgrade = applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, oldKind: 'suja', newKind: 'limpa', cardsAdded: [] });
   assert.equal(upgrade.damage, 80);
   assert.equal(upgrade.debtReduction, 4);
-  assert.equal(state.boss.hp, 2020);
+  assert.equal(state.boss.hp, 2320);
 });
 
 test('morto reduz divida uma vez por morto', () => {
@@ -179,6 +180,39 @@ test('bloqueios e compra extra derivam do estado serializado', () => {
   assert.equal(consumeBossExtraDraw(state, 0), 0);
 });
 
+test('Carta Financiada usada não gera Dívida e a marca é removida', () => {
+  const state = game();
+  state.boss.effects = [{ id: 'maintenance_fee', extraDraw: 1, financedDebt: 3, pendingPlayerIds: [0] }];
+  assert.equal(consumeBossExtraDraw(state, 0), 1);
+  const financed = { id: 'financed-used', rank: '7', suit: '♣' };
+  state.players[0].hand.push(financed);
+  registerBossFinancedCards(state, 0, [financed]);
+  state.players[0].hand = state.players[0].hand.filter((card) => card.id !== financed.id);
+  completeBossPlayerTurn(state, 0);
+  assert.equal(state.boss.danger, 0);
+  assert.equal(state.boss.effects.some((effect) => effect.id === 'financed_card'), false);
+});
+
+test('Carta Financiada restante cobra uma vez e Fase 3 trata duas cartas separadamente', () => {
+  const state = game();
+  state.boss.phase = 3;
+  state.boss.effects = [{ id: 'maintenance_fee', extraDraw: 2, financedDebt: 4, pendingPlayerIds: [0] }];
+  assert.equal(consumeBossExtraDraw(state, 0), 2);
+  const cards = [
+    { id: 'financed-held', rank: '8', suit: '♣' },
+    { id: 'financed-played', rank: '9', suit: '♣' },
+  ];
+  state.players[0].hand.push(...cards);
+  const registered = registerBossFinancedCards(state, 0, cards);
+  assert.deepEqual(registered.cardIds, cards.map((card) => card.id));
+  state.players[0].hand = state.players[0].hand.filter((card) => card.id !== 'financed-played');
+  completeBossPlayerTurn(state, 0);
+  assert.equal(state.boss.danger, 4);
+  state.turnNumber += 1;
+  completeBossPlayerTurn(state, 0);
+  assert.equal(state.boss.danger, 4);
+});
+
 test('ataque final decide vitoria ou derrota imediatamente', () => {
   const victory = game();
   victory.boss.hp = 550;
@@ -199,7 +233,7 @@ test('estado recarregado preserva a idempotencia do dano', () => {
   const restored = JSON.parse(JSON.stringify(state));
   const duplicate = applyBossMeldTransition(restored, { teamId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'real', cardsAdded: [] });
   assert.equal(duplicate, null);
-  assert.equal(restored.boss.hp, 1900);
+  assert.equal(restored.boss.hp, 2200);
 });
 
 test('fase tres mantem habilidade de rodada ate os dois jogadores agirem', () => {
@@ -289,10 +323,10 @@ test('intencao anunciada permanece ate o fim da rodada', () => {
   assert.notEqual(state.boss.currentIntent?.id, 'announced');
 });
 
-test('Dominadora usa 1800 HP e bloqueia cartas individuais', () => {
+test('Dominadora usa 2100 HP e bloqueia cartas individuais', () => {
   const state = dominatrixGame();
   state.teams[0].melds = [[{ id: 'effect-base-5', rank: '5', suit: '♠' }, { id: 'effect-base-6', rank: '6', suit: '♠' }]];
-  assert.equal(state.boss.hp, 1800);
+  assert.equal(state.boss.hp, 2100);
   state.boss.currentIntent = { abilityId: 'collar', payload: { targetPlayerId: 0, cardId: 'd0-a' } };
   assert.equal(isBossCardBlocked(state, 0, 'd0-a', 'play'), true);
   assert.equal(isBossCardBlocked(state, 0, 'd0-a', 'discard'), true);
@@ -302,6 +336,11 @@ test('Dominadora usa 1800 HP e bloqueia cartas individuais', () => {
   assert.equal(getBossCardEffect(state, 0, 'd0-b'), 'exposed');
   assert.equal(isBossCardBlocked(state, 0, 'd0-b', 'play'), false);
   assert.equal(isBossCardBlocked(state, 0, 'd0-b', 'discard'), true);
+});
+
+test('HP máximo atualizado para os dois chefes', () => {
+  assert.equal(game().boss.maxHp, 2500);
+  assert.equal(dominatrixGame().boss.maxHp, 2100);
 });
 
 test('Correntes são individuais e derrotam a equipe somente quando ambos chegam a quatro', () => {
@@ -333,23 +372,29 @@ test('Mãos Atadas e Separação persistem no estado da intenção', () => {
   assert.equal(canBossUseMeld(state, 1, 0), false);
 });
 
-test('Posse segura o dano até a equipe romper o controle', () => {
+test('Posse restaura o dano do jogo e uma carta legal reaplica o dano uma única vez', () => {
   const state = dominatrixGame();
-  state.teams[0].melds = [[{ id: 'base-possession', rank: '3', suit: '♠' }]];
-  state.boss.currentIntent = { id: 'another-order', abilityId: 'hands_tied', name: 'Mãos Atadas', payload: { newMeldCounts: {} } };
-  state.boss.possessions = [{ id: 'possession-0', teamId: 0, meldIndex: 0, progress: 0, required: 2 }];
-  const suppressed = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [{ id: 'p1' }] });
-  assert.equal(suppressed.damage, 0);
-  assert.equal(state.boss.hp, 1800);
-  assert.equal(state.boss.possessions[0].progress, 1);
-  const breakEvent = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [{ id: 'p2' }] });
+  const meld = ['3', '4', '5', '6', '7', '8', '9'].map((rank) => ({ id: `pos-${rank}`, rank, suit: '♠' }));
+  state.teams[0].melds = [meld];
+  const original = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: meld, isNewMeld: true });
+  assert.equal(original.damage, 225);
+  assert.equal(state.boss.hp, 1875);
+  state.boss.currentIntent = { id: 'possession-order', abilityId: 'possession', name: 'Posse', duration: 'full_round', payload: { meldIndex: 0 } };
+  completeBossPlayerTurn(state, 0);
+  const possessionEvent = completeBossPlayerTurn(state, 1);
+  assert.equal(possessionEvent.suppressedDamage, 225);
+  assert.equal(state.boss.hp, 2100);
+  const added = { id: 'pos-10', rank: '10', suit: '♠' };
+  state.teams[0].melds[0].push(added);
+  const breakEvent = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [added] });
   assert.equal(breakEvent.possessionReleased, true);
-  assert.equal(breakEvent.damage, 100);
+  assert.equal(breakEvent.possessionReappliedDamage, 225);
+  assert.equal(breakEvent.cardDamage, 10);
+  assert.equal(breakEvent.damage, 235);
   assert.equal(state.boss.possessions.length, 0);
-  assert.equal(state.boss.currentIntent.abilityId, 'hands_tied');
-  const released = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [{ id: 'p3' }] });
-  assert.equal(released, null);
-  assert.equal(state.boss.hp, 1700);
+  assert.equal(state.boss.hp, 1865);
+  assert.equal(applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [added] }), null);
+  assert.equal(state.boss.hp, 1865);
 });
 
 test('Resistência remove Corrente de quem causou dano', () => {
@@ -368,6 +413,8 @@ test('Troca Forçada e Favorita alteram as mãos e Correntes sem destruir cartas
   completeBossPlayerTurn(swapState, 0);
   const swapEvent = completeBossPlayerTurn(swapState, 1);
   assert.equal(swapEvent.abilityId, 'forced_swap');
+  assert.equal(swapEvent.receivedCards.length, 2);
+  assert.ok(swapEvent.receivedCards.every((entry) => entry.cardId && entry.cardLabel && entry.fromPlayerId !== entry.playerId));
   assert.deepEqual(swapState.players.flatMap((player) => player.hand.map((card) => card.id)).sort(), beforeIds);
   assert.ok(swapState.players[0].hand.some((card) => card.id.startsWith('d1-')));
 
@@ -587,10 +634,10 @@ test('habilidade anunciada na virada so resolve no ciclo seguinte', () => {
   assert.ok(state.boss.eventLog.filter((entry) => entry.type === 'bossAbility').length <= 2);
 });
 
-test('Posse 0 de 2 atravessa a rodada e termina exatamente em 2 de 2', () => {
+test('Posse atravessa a rodada e termina ao receber uma carta legal', () => {
   const state = dominatrixGame();
   state.teams[0].melds = [[{ id: 'base-possession-round', rank: '3', suit: '♠' }]];
-  state.boss.possessions = [{ id: 'possession-r1', teamId: 0, meldIndex: 0, progress: 0, required: 2 }];
+  state.boss.possessions = [{ id: 'possession-r1', teamId: 0, meldIndex: 0, progress: 0, required: 1, suppressedDamage: 0 }];
   state.boss.currentIntent = { id: 'hands-r1', abilityId: 'hands_tied', name: 'Mãos Atadas', duration: 'full_round', activatedRound: 1, payload: { newMeldCounts: {} } };
   completeBossPlayerTurn(state, 0);
   completeBossPlayerTurn(state, 1);
@@ -598,8 +645,6 @@ test('Posse 0 de 2 atravessa a rodada e termina exatamente em 2 de 2', () => {
   assert.equal(state.boss.possessions[0].id, 'possession-r1');
   assert.equal(state.boss.possessions[0].progress, 0);
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [{ id: 'pos-1' }] });
-  assert.equal(state.boss.possessions[0].progress, 1);
-  applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [{ id: 'pos-2' }] });
   assert.equal(state.boss.possessions.length, 0);
   assert.match(state.boss.lastEvent.outcome, /rompeu a Posse/);
 });
@@ -1031,6 +1076,27 @@ test('Penhora ignora As-a-As completo e jogos sem extensao legal', () => {
   assert.equal(pledge.payload.meldIndex, 1);
 });
 
+test('Posse nunca escolhe Ás-a-Ás completa e exige jogo com extensão legal', () => {
+  const state = dominatrixGame();
+  const completeAceToAce = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    .map((rank, index) => ({ id: `asas-${index}`, rank, suit: '♣', forceNatural: rank === '2' }));
+  state.teams[0].melds = [
+    completeAceToAce,
+    ['4', '5', '6'].map((rank) => ({ id: `eligible-${rank}`, rank, suit: '♥' })),
+  ];
+  let possession = null;
+  for (let seed = 1; seed <= 400 && !possession; seed += 1) {
+    state.boss.seed = seed;
+    state.boss.phase = 2;
+    state.boss.phaseIntroPending = 2;
+    state.boss.currentIntent = null;
+    const intent = selectNextBossIntent(state);
+    if (intent?.abilityId === 'possession') possession = intent;
+  }
+  assert.ok(possession);
+  assert.equal(possession.payload.meldIndex, 1);
+});
+
 test('Exposicao so escolhe carta com jogada legal imediata', () => {
   let exposure = null;
   for (let seed = 1; seed <= 300 && !exposure; seed += 1) {
@@ -1096,8 +1162,8 @@ test('Posse acumula progresso entre turnos, aceita duas simultaneas e volta ao s
     ['9', '10', 'J'].map((rank) => ({ id: `p2-${rank}`, rank, suit: '♠' })),
   ];
   state.boss.possessions = [
-    { id: 'pos-0', teamId: 0, meldIndex: 0, progress: 1, required: 2 },
-    { id: 'pos-1', teamId: 0, meldIndex: 1, progress: 0, required: 2 },
+    { id: 'pos-0', teamId: 0, meldIndex: 0, progress: 0, required: 1, suppressedDamage: 0 },
+    { id: 'pos-1', teamId: 0, meldIndex: 1, progress: 0, required: 1, suppressedDamage: 0 },
   ];
   assert.equal(isBossMeldPossessed(state, 0, 0), true);
   for (let seed = 1; seed <= 80; seed += 1) {
@@ -1183,20 +1249,19 @@ test('cartas causam dano individual uma vez sem aliviar Corrente', () => {
   assert.equal(canastra.chainsRemoved, 1);
 });
 
-test('cartas colocadas sob Posse nunca recebem dano retroativo', () => {
+test('dano reaplicado pela Posse não duplica em snapshot ou reorganização', () => {
   const state = dominatrixGame();
   state.teams[0].melds = [[{ id: 'possession-base', rank: '3', suit: '♥' }]];
-  state.boss.possessions = [{ id: 'persistent-possession', teamId: 0, meldIndex: 0, progress: 0, required: 2, progressCardIds: [] }];
-  const first = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [{ id: 'possessed-1', rank: 'K', suit: '♥' }] });
-  const release = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [{ id: 'possessed-2', rank: 'K', suit: '♥' }] });
-  assert.equal(first.damage, 0);
-  assert.equal(release.damage, 0);
-  assert.equal(state.boss.hp, state.boss.maxHp);
-  assert.deepEqual(new Set(state.boss.suppressedDamageCardIds), new Set(['possessed-1', 'possessed-2']));
-
-  const replay = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [{ id: 'possessed-2', rank: 'K', suit: '♥' }] });
+  state.boss.hp = 2100;
+  state.boss.possessions = [{ id: 'persistent-possession', teamId: 0, meldIndex: 0, progress: 0, required: 1, progressCardIds: [], suppressedDamage: 75 }];
+  const card = { id: 'possessed-release', rank: 'K', suit: '♥' };
+  const release = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [card] });
+  assert.equal(release.damage, 85);
+  assert.equal(state.boss.hp, 2015);
+  const restored = JSON.parse(JSON.stringify(state));
+  const replay = applyBossMeldTransition(restored, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [card] });
   assert.equal(replay, null);
-  assert.equal(state.boss.hp, state.boss.maxHp);
+  assert.equal(restored.boss.hp, 2015);
 });
 
 test('snapshot remove Cofre, Posse e Exposicao invalidos sem criar Corrente', () => {
