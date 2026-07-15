@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="styles/hud.css" />
     <link rel="stylesheet" href="styles/responsive.css" />
     <link rel="stylesheet" href="styles/effects.css" />
+    <link rel="stylesheet" href="styles/boss-mode.css" />
   </head>
   <body data-deck-theme="classico">
     <div id="loadingScreen">
@@ -74,6 +75,20 @@
                     <option value="1x3">1x3 (Solo vs Trio)</option>
                     <option value="1x1_duploMorto">1x1 Humilhação</option>
                     <option value="1x1_dominacao">1x1 Dominação Completa</option>
+                    <option value="cooperative">🤝 Cooperativo</option>
+                  </select>
+                </div>
+
+                <div id="bossSelectField" class="menu-field" style="display: none">
+                  <label for="bossSelect">Chefe</label>
+                  <select
+                    id="bossSelect"
+                    onchange="
+                      updateMenuDynamic();
+                      pushLobby();
+                    ">
+                    <option value="banker" selected>O Banqueiro</option>
+                    <option value="dominadora">A Dominadora</option>
                   </select>
                 </div>
 
@@ -114,7 +129,12 @@
                   </span>
                 </div>
 
-                <div class="menu-field">
+                <div id="bossModeRules" class="boss-menu-rules" style="display: none">
+                  <strong>Chefe da Mesa</strong>
+                  <span>Dois jogadores cooperam, compartilham os jogos e enfrentam um chefe em três fases.</span>
+                </div>
+
+                <div id="variantMenuField" class="menu-field">
                   <label for="variantSelect">Regra</label>
                   <select id="variantSelect" required onchange="pushLobby()">
                     <option value="" disabled selected>Selecione...</option>
@@ -136,7 +156,7 @@
               </div>
             </div>
 
-            <div class="menu-block">
+            <div id="visualMenuBlock" class="menu-block">
               <div class="menu-block-title">🎨 Visual</div>
               <div class="menu-block-grid">
                 <div class="menu-field">
@@ -186,7 +206,7 @@
               </div>
             </div>
 
-            <div class="menu-block">
+            <div id="moneyMenuBlock" class="menu-block">
               <div class="menu-block-title">💰 Dinheiro / PIX</div>
               <div class="menu-field">
                 <label for="betToggle" style="color: #facc15; font-weight: bold">Valendo dinheiro?</label>
@@ -262,7 +282,7 @@
             </div>
 
             <div id="playersMenuBlock" class="menu-block" style="display: none">
-              <div class="menu-block-title">👥 Jogadores</div>
+              <div class="menu-block-title">👥 JOGADORES</div>
               <div id="playersContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px">
                 <div id="boxP1" style="position: relative; margin-top: 4px; margin-bottom: 5px">
                   <label id="lblP1" style="display: block; margin-bottom: 2px; color: #cbd5e1">Jogador 1</label>
@@ -338,10 +358,12 @@
               id="menuDebugPanel"
               style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px dashed #ef4444; padding: 12px; border-radius: 8px; margin-top: 12px; flex-direction: column; gap: 8px; box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5)">
               <strong style="color: #ef4444; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px">🔧 Menu Dev Tools</strong>
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px">
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px">
                 <button onclick="window.debugInstantStart('1x1_dominacao', 1)" style="background: #a855f7; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">👑 DOMINADOR</button>
                 <button onclick="window.debugInstantStart('1x1_dominacao', 0)" style="background: #16a34a; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">⛓️ ESCRAVO</button>
                 <button onclick="window.debugInstantStart('1x1', 0)" style="background: #3b82f6; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">🃏 CLÁSSICO</button>
+                <button onclick="window.debugInstantStart('boss_banker', 0)" style="background: #991b1b; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">👹 BANQUEIRO</button>
+                <button onclick="window.debugInstantStart('boss_dominadora', 0)" style="background: #be185d; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">👑 DOMINADORA</button>
               </div>
             </div>
           </div>
@@ -496,6 +518,83 @@
             </div>
           </div>
 
+          <section id="bossHud" class="boss-hud" aria-live="polite" style="display: none">
+            <div class="boss-hud-heading">
+              <span class="boss-portrait" aria-hidden="true"><img id="bossPortraitImage" src="assets/images/boss-banqueiro.png" alt="" /></span>
+              <div>
+                <span class="boss-hud-kicker">CHEFE DA MESA</span>
+                <strong id="bossName">O BANQUEIRO</strong>
+                <span id="bossPhase" class="boss-phase">FASE 1</span>
+                <small id="bossPhaseRule" class="boss-phase-rule">Sem mortos · monte acima de 40</small>
+                <div id="bossRoundSummary" class="boss-round-summary">
+                  <span id="bossRoundNumber">Rodada 1</span><i>·</i>
+                  <span id="bossRoundTurn">Turno 1/2</span><i>·</i>
+                  <span id="bossCurrentActor">Agora: aguardando</span>
+                </div>
+              </div>
+            </div>
+            <div class="boss-vitals">
+              <div class="boss-meter boss-hp-meter">
+                <div class="boss-meter-label"><span>HP DO CHEFE</span><strong id="bossHpText">2200 / 2200</strong></div>
+                <div class="boss-meter-track"><span id="bossHpBar"></span></div>
+              </div>
+              <div id="bossDangerMeter" class="boss-meter boss-debt-meter">
+                <div class="boss-meter-label"><span id="bossDangerLabel">DÍVIDA COLETIVA</span><strong id="bossDebtText">0 / 100</strong></div>
+                <div class="boss-meter-track"><span id="bossDebtBar"></span></div>
+              </div>
+              <div id="bossChainStatus" class="boss-chain-status" style="display: none"></div>
+            </div>
+            <div id="bossIntent" class="boss-intent">
+              <span id="bossActionType">AÇÃO ATUAL</span>
+              <strong id="bossIntentName">Preparando contrato...</strong>
+              <small id="bossIntentDescription"></small>
+              <em id="bossIntentProgress"></em>
+            </div>
+            <div id="bossDialoguePresentation" class="boss-dialogue-presentation" style="display: none" aria-live="assertive">
+              <span id="bossDialogueType">O CHEFE DIZ</span>
+              <strong id="bossDialogueName"></strong>
+              <b id="bossDialogueSpeech"></b>
+              <small id="bossDialogueConsequence"></small>
+            </div>
+            <div id="bossResolvedPresentation" class="boss-result-presentation" style="display: none">
+              <span id="bossResultType">RESULTADO RECENTE</span>
+              <strong id="bossLastImpact">Aguardando ataque</strong>
+              <small id="bossResultDescription"></small>
+              <em id="bossResultDetails"></em>
+            </div>
+            <div id="bossDamageReaction" class="boss-dialogue-presentation boss-damage-reaction" style="display: none" aria-live="polite"></div>
+            <details id="bossBattleDetails" class="boss-battle-details">
+              <summary><span aria-hidden="true">ⓘ</span> Detalhes da batalha</summary>
+              <div class="boss-detail-content">
+                <div id="bossPhaseTrack" class="boss-phase-track" aria-label="Progresso das fases">
+                  <span data-phase="1"><i></i>Fase 1</span>
+                  <span data-phase="2"><i></i>Fase 2</span>
+                  <span data-phase="3"><i></i>Fase 3</span>
+                </div>
+                <div class="boss-damage-guide" aria-label="Dano das canastras">
+                  <span>SUJA <strong>100</strong></span>
+                  <span>LIMPA <strong>180</strong></span>
+                  <span>REAL <strong>300</strong></span>
+                  <span>ÁS-A-ÁS <strong>450</strong></span>
+                </div>
+                <small id="bossTotalDamage" class="boss-total-damage">0 de dano total</small>
+                <div id="bossActionDetails" class="boss-action-details"></div>
+                <div id="bossEffects" class="boss-effects"></div>
+                <section class="boss-log-card">
+                  <div class="boss-log-title">
+                    <span>REGISTRO DA BATALHA</span>
+                    <strong id="bossLogCount">0</strong>
+                  </div>
+                  <div id="bossEventLog" class="boss-event-log"></div>
+                </section>
+              </div>
+            </details>
+            <div id="bossChoicePanel" class="boss-choice-panel" style="display: none">
+              <span id="bossChoicePrompt"></span>
+              <div id="bossChoiceActions"></div>
+            </div>
+          </section>
+
           <div id="opponentTop" class="opponent-hand opponent-hand-top"></div>
           <div id="opponentLeft" class="opponent-hand opponent-hand-left"></div>
           <div id="opponentRight" class="opponent-hand opponent-hand-right"></div>
@@ -573,6 +672,8 @@
             <!-- 🔥 Badge local com a cor corrigida explicitamente para ficar idêntico ao dos bots -->
             <div id="localPlayerLabel" class="opponent-label" style="position: relative; margin: 12px auto 4px auto; display: none; pointer-events: none; text-shadow: none !important; width: fit-content; color: #e5e7eb !important"></div>
 
+            <div id="bossLocalVaultSlot" class="boss-vault-slot" style="display: none"></div>
+
             <div id="handContainer" class="hand-container">
               <div class="cards-row"></div>
             </div>
@@ -583,6 +684,27 @@
             <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
             <div id="scoreBoard" style="display: flex; flex-direction: column; gap: 10px"></div>
             <button id="closeScoreBtn" style="width: 100%; margin-top: 10px; background: #334155">Voltar à Mesa</button>
+          </div>
+        </div>
+        <div id="bossResultSection" class="boss-result-section" style="display: none">
+          <div class="boss-result-card">
+            <header class="boss-result-header">
+              <img id="bossResultPortrait" class="boss-result-portrait" src="assets/images/boss-banqueiro.png" alt="" />
+              <div>
+                <span>CHEFE DA MESA</span>
+                <h2 id="bossResultTitle">VITÓRIA</h2>
+                <strong id="bossResultBossName">O BANQUEIRO</strong>
+              </div>
+            </header>
+            <div class="boss-result-copy">
+              <p id="bossResultDetail"></p>
+              <blockquote id="bossFinalSpeech" class="boss-dialogue-presentation boss-final-dialogue"></blockquote>
+            </div>
+            <div id="bossResultStats" class="boss-result-stats"></div>
+            <div class="boss-result-actions">
+              <button id="bossRematchBtn" type="button">JOGAR NOVAMENTE</button>
+              <button id="closeBossResultBtn" type="button">VOLTAR À MESA</button>
+            </div>
           </div>
         </div>
       </div>

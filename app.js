@@ -1,9 +1,71 @@
       import { CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSteal, stopAllGameSfx } from './js/audio.js';
       import { db, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from './js/firebase.js';
+      import { createDeck, dealInitialDeck } from './js/deck.js';
       import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
+      import {
+        BOSS_MODE_DOMINATRIX,
+        applyBossDeadTaken,
+        applyBossFinalStrike,
+        applyBossMeldTransition,
+        applyBossResourceDefeat,
+        advanceBossTurn,
+        beginBossTurn,
+        completeBossPlayerTurn,
+        consumeBossExtraDraw,
+        createBossStateForMode,
+        canBossCreateMeld,
+        canBossUseMeld,
+        getBossChains,
+        getBossCardEffect,
+        getBossPendingChoice,
+        getBossVault,
+        hasPendingBossChoices,
+        canBossPerformCommonAction,
+        getBossPhaseName,
+        isBossCardBlocked,
+        isBossDiscardBlocked,
+        isBossMeldLocked,
+        isBossMeldPossessed,
+        isBossMode,
+        isBossPlayerDominated,
+        isBossTurnActive,
+        isBossVaultDrawRequired,
+        normalizeBossState,
+        reclaimBossVault,
+        resolveBossChoice,
+        validateBossClosedDiscardSelection,
+        validateBossMeldPlay,
+        isValidBossSequence,
+      } from './js/boss/boss-engine.js';
+      import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } from './js/boss/boss-registry.js';
+      import { buildBossActionPresentation, buildBossFinalPresentation, buildBossResultPresentation } from './js/boss/boss-presentation.js';
 
       // Importa a IA do Bot
       import { BuracoBot } from './bot.js';
+
+      const COOPERATIVE_MENU_MODE = 'cooperative';
+
+      function getSelectedBossDefinition() {
+        return getBossDefinition(document.getElementById('bossSelect')?.value || 'banker');
+      }
+
+      function getEffectiveMenuMode() {
+        const menuMode = document.getElementById('modeSelect')?.value || '';
+        return menuMode === COOPERATIVE_MENU_MODE ? getSelectedBossDefinition()?.mode || '' : menuMode;
+      }
+
+      function applyCooperativeBossPreset() {
+        if (document.getElementById('modeSelect')?.value !== COOPERATIVE_MENU_MODE) return null;
+        const definition = getSelectedBossDefinition();
+        if (!definition) return null;
+
+        document.getElementById('variantSelect').value = 'fechado';
+        document.getElementById('betToggle').value = 'nao';
+        document.getElementById('deckThemeSelect').value = definition.deckTheme;
+        document.getElementById('tableThemeSelect').value = definition.tableTheme;
+        document.getElementById('betConfig').style.display = 'none';
+        return definition;
+      }
 
       // --- LÓGICA DE LOADING E ROTAÇÃO DE VÍDEOS ---
       const loadingScreen = document.getElementById('loadingScreen');
@@ -249,18 +311,32 @@
       let lastMyTurn = false;
       let lastSeenActionId = null;
       let ignoreOwnActionId = null;
+      let lastRenderedBossEventId = null;
+      let renderedBossFeedbackCount = null;
+      let bossPresentationTimer = null;
+      let bossPresentationKey = '';
+      let bossDamageReactionTimer = null;
 
       let movingWild = null;
       let localUndoStack = []; // Pilha para o botão voltar
       window.isStealModeActive = false; // Controle da visão da mesa
 
       function cancelGameAnimations() {
+        if (bossPresentationTimer) {
+          clearTimeout(bossPresentationTimer);
+          bossPresentationTimer = null;
+        }
+        if (bossDamageReactionTimer) {
+          clearTimeout(bossDamageReactionTimer);
+          bossDamageReactionTimer = null;
+        }
+        bossPresentationKey = '';
         const gameSection = document.getElementById('gameSection');
         (document.getAnimations?.() || []).forEach((animation) => {
           const target = animation.effect?.target;
           if (target && (gameSection?.contains(target) || target.classList?.contains('dice-scene'))) animation.cancel();
         });
-        document.querySelectorAll('.fly-card, .impact-ring, .spark, .dice-scene').forEach((element) => element.remove());
+        document.querySelectorAll('.fly-card, .impact-ring, .spark, .dice-scene, .boss-floating-number').forEach((element) => element.remove());
       }
 
       function invalidateGameSession({ stopMedia = true } = {}) {
@@ -296,6 +372,53 @@
 
       function isGameSessionActive(sessionId, signal) {
         return !signal?.aborted && !window.isClosingGame && !localExitPending && !!state && window.gameSessionId === sessionId && document.getElementById('gameSection')?.style.display === 'flex';
+      }
+
+      function isCurrentBossMode() {
+        return isBossMode(state);
+      }
+
+      function getCooperativeProjectedScore() {
+        if (!state?.teams?.[0]) return 0;
+        const team = state.teams[0];
+        const boardScore = computeTeamMeldScore(team).total;
+        const handPenalty = state.players.filter((player) => player.teamId === 0).reduce((sum, player) => sum + player.hand.reduce((handSum, card) => handSum + cardBasePoints(card), 0), 0);
+        return boardScore - handPenalty - ((state.deadChunksTaken?.[0] || 0) === 0 ? 100 : 0);
+      }
+
+      async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsAdded, isNewMeld = false) {
+        if (!isCurrentBossMode()) return null;
+        const event = applyBossMeldTransition(state, {
+          teamId: player.teamId,
+          playerId: player.id,
+          meldIndex,
+          oldKind,
+          newKind,
+          cardsAdded,
+          isNewMeld,
+        });
+        if (state.boss?.defeated && !state.boss.result) {
+          const definition = getBossDefinition(state.boss.id);
+          state.boss.result = {
+            victory: true,
+            reason: 'boss_defeated',
+            title: `${definition?.name || 'O chefe'} foi derrotado`,
+            detail: 'A última canastra encerrou a batalha.',
+          };
+          state.boss.stats.finalDebt = state.boss.danger;
+          await finishGame(0, { skipFinalStrike: true, bossEvent: event });
+        }
+        return event;
+      }
+
+      function processBossDeadReward() {
+        return isCurrentBossMode() ? applyBossDeadTaken(state) : null;
+      }
+
+      function confirmBossFinalStrike() {
+        if (!isCurrentBossMode()) return true;
+        const name = getBossDefinition(state.boss?.id)?.name || 'o chefe';
+        return window.confirm(`Finalizar o ataque contra ${name}?\n\nCaso sobreviva, a equipe perderá a batalha.`);
       }
 
       function saveStateForUndo() {
@@ -782,6 +905,10 @@
 
       function pickWildFromMeld(teamId, meldIdx, cardIdx) {
         if (!state || state.finished) return;
+        if (!canBossPerformCommonAction(state)) {
+          showPendingBossChoiceMessage();
+          return;
+        }
 
         const myTurn = state.currentPlayer === myPlayerIndex;
         if (!myTurn || !state.hasDrawnThisTurn) {
@@ -1229,6 +1356,12 @@
           return;
         }
 
+        if (!canBossPerformCommonAction(state)) {
+          el.classList.remove('timer-critical');
+          el.textContent = hasPendingBossChoices(state) ? 'PAUSADO · ESCOLHA' : 'TURNO DO CHEFE';
+          return;
+        }
+
         if (turnTimerRemaining <= 10) {
           el.classList.add('timer-critical');
           el.textContent = `⏳ ${turnTimerRemaining}s`;
@@ -1247,6 +1380,11 @@
       }
 
       function resetTurnTimer() {
+        if (state && hasPendingBossChoices(state)) {
+          stopTurnTimer();
+          updateTimerLabel();
+          return;
+        }
         if (turnTimerId !== null) {
           turnTimerRemaining = 60;
           updateTimerLabel();
@@ -1294,10 +1432,21 @@
       }
 
       function passTurn() {
+        if (!canBossPerformCommonAction(state)) {
+          if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
+          return false;
+        }
         localUndoStack = []; // Zera o histórico ao passar a vez
         state.powerActiveThisTurn = false; // Desativa o poder do Dominador ao fim do turno
         window.isStealModeActive = false; // Força fechar a visão
-        if (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao' || state.mode === '1x1') {
+        if (isCurrentBossMode()) {
+          state._pendingBossEvent = completeBossPlayerTurn(state, state.currentPlayer);
+          state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+          if (state.boss?.result) {
+            state.finished = true;
+            state.winnerTeamId = state.boss.result.victory ? 0 : 1;
+          }
+        } else if (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao' || state.mode === '1x1') {
           state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
         } else {
           // Roda sequencial limpo para 1x2 (3 jogadores: 0 -> 1 -> 2) e 2x2 (4 jogadores: 0 -> 1 -> 2 -> 3)
@@ -1309,9 +1458,15 @@
         state.boughtCardIds = []; // Limpa os brilhos
         state.requiredDiscardCard = null;
         state.pickedDiscardCardId = null;
+        return true;
       }
 
       async function autoPlayTimeout() {
+        if (!canBossPerformCommonAction(state)) {
+          window.isAutoPlaying = false;
+          if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
+          return;
+        }
         if (!ensureMyTurn()) return;
 
         let actionDraw = null;
@@ -1494,6 +1649,13 @@
           return;
         }
 
+        if (!canBossPerformCommonAction(state)) {
+          stopTurnTimer();
+          activeTurnNumber = -1;
+          updateTimerLabel();
+          return;
+        }
+
         if (activeTurnNumber === state.turnNumber && turnTimerId !== null) return;
 
         stopTurnTimer();
@@ -1504,6 +1666,7 @@
         turnTimerId = setInterval(() => {
           if (window.isAutoPlaying || (state && state.debugPaused)) return; // Congela o relógio se o debug exigir
 
+          if (!canBossPerformCommonAction(state)) return;
           turnTimerRemaining--;
 
           if (turnTimerRemaining <= 0) {
@@ -1516,6 +1679,11 @@
               document.querySelector('.board-middle').style.pointerEvents = 'none';
 
               setTimeout(() => {
+                if (!canBossPerformCommonAction(state)) {
+                  window.isAutoPlaying = false;
+                  renderAll();
+                  return;
+                }
                 // Checa se ainda é a vez dele depois do delay (pode ter jogado no milissegundo final)
                 if (!state.finished && state.currentPlayer === myPlayerIndex) {
                   autoPlayTimeout().catch(console.error);
@@ -1534,19 +1702,6 @@
             }
           }
         }, 1000);
-      }
-
-      function createDeck() {
-        const deck = [];
-        for (let d = 0; d < 2; d++) {
-          const back = d === 0 ? 'red' : 'blue';
-          for (const s of SUITS) {
-            for (const r of RANKS) deck.push({ rank: r, suit: s, joker: false, back });
-          }
-          deck.push({ rank: 'JOKER', suit: '★', joker: true, back });
-          deck.push({ rank: 'JOKER', suit: '★', joker: true, back });
-        }
-        return deck;
       }
 
       function shuffle(array) {
@@ -1690,6 +1845,7 @@
 
       async function startGame(mode, names, variant, pixKeys = []) {
         activateGameSession();
+        const effectiveVariant = normalizeVariantForMode(mode, variant);
         const players = [];
         const teams = [];
         let playerConfigs = [];
@@ -1718,6 +1874,11 @@
             { name: names[2] || 'T2', team: 1 },
             { name: names[3] || 'T3', team: 1 },
           ];
+        } else if (isBossMode(mode)) {
+          playerConfigs = [
+            { name: names[0] || 'Agente 1', team: 0 },
+            { name: names[1] || 'Agente 2', team: 0 },
+          ];
         }
         playerConfigs.forEach((cfg, idx) => {
           players.push({ id: idx, name: cfg.name, teamId: cfg.team, hand: [] });
@@ -1732,28 +1893,28 @@
             tName = t === 0 ? 'Solo' : 'Dupla';
           } else if (mode === '1x3') {
             tName = t === 0 ? 'Solo' : 'Trio';
+          } else if (isBossMode(mode)) {
+            tName = t === 0 ? 'Cooperadores' : getBossDefinition(mode === BOSS_MODE_DOMINATRIX ? 'dominadora' : 'banker')?.name || 'Chefe';
           }
 
           // O PIX AGORA PERTENCE AO TIME, NÃO AO JOGADOR!
           teams.push({ id: t, name: tName, playerIndexes, melds: [], pix: pixKeys[t] || '' });
         }
-        let stock = shuffle(createDeck());
-        const discard = [];
-        const deadPiles = [[], []];
+        const preparedDeck = shuffle(createDeck(SUITS, RANKS));
         const HAND_SIZE = 11;
-        for (let i = 0; i < HAND_SIZE; i++) for (let pIdx = 0; pIdx < players.length; pIdx++) players[pIdx].hand.push(stock.pop());
-        for (let i = 0; i < DEAD_CHUNK_SIZE; i++) {
-          deadPiles[0].push(stock.pop());
-          deadPiles[1].push(stock.pop());
-        }
+        const initialDeal = dealInitialDeck(preparedDeck, players.length, HAND_SIZE, DEAD_CHUNK_SIZE);
+        const { stock, discard, deadPiles } = initialDeal;
+        players.forEach((player, index) => {
+          player.hand = initialDeal.hands[index];
+        });
         players.forEach((p) => sortHand(p.hand));
-        discard.push(stock.pop());
 
         let deadChunksMax = [1, 1];
         if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') deadChunksMax = [1, 2];
+        if (isBossMode(mode)) deadChunksMax = [2, 0];
         const deckTheme = document.getElementById('deckThemeSelect').value || 'classico';
         const tableTheme = document.getElementById('tableThemeSelect').value || 'feltro'; // Captura novo tema
-        const isBetting = document.getElementById('betToggle').value === 'sim';
+        const isBetting = isBossMode(mode) ? false : document.getElementById('betToggle').value === 'sim';
         const betBase = parseFloat(document.getElementById('betBase').value) || 0;
         const betPerPoint = parseFloat(document.getElementById('betPerPoint').value) || 0;
 
@@ -1766,7 +1927,7 @@
 
         const newState = {
           mode,
-          variant,
+          variant: effectiveVariant,
           deckTheme,
           tableTheme,
           players,
@@ -1792,6 +1953,12 @@
           dominatorUsedPower: false,
           powerActiveThisTurn: false,
         };
+        if (isBossMode(mode)) {
+          newState.boss = createBossStateForMode(mode, Date.now());
+          beginBossTurn(newState, { first: true, now: Date.now() });
+        }
+        const battleDetails = document.getElementById('bossBattleDetails');
+        if (battleDetails) battleDetails.open = false;
         await setDoc(gameRef, { stateJson: JSON.stringify(newState), createdAt: Date.now() });
         showMessage('Partida iniciada!');
       }
@@ -1802,6 +1969,14 @@
       function currentTeam() {
         return state.teams[currentPlayer().teamId];
       }
+      function showPendingBossChoiceMessage(playerId = myPlayerIndex) {
+        const localChoice = state?.boss?.pendingChoices?.find((entry) => entry.playerId === playerId);
+        const choice = localChoice || state?.boss?.pendingChoices?.[0];
+        if (!choice) return;
+        const target = state.players?.find((player) => player.id === choice.playerId);
+        if (localChoice) showMessage('Voce precisa decidir antes de continuar.');
+        else showMessage(`Aguardando ${target?.name || 'o jogador alvo'} decidir.`);
+      }
       function ensureMyTurn() {
         if (!state || state.finished) {
           showMessage('Fim de jogo.');
@@ -1809,6 +1984,11 @@
         }
         if (state.debugPaused) {
           showMessage('⚠️ Jogo congelado pelo DevTools.');
+          return false;
+        }
+        if (!canBossPerformCommonAction(state)) {
+          if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
+          else showMessage(`${getBossDefinition(state.boss?.id)?.name || 'O chefe'} esta executando a acao da rodada.`);
           return false;
         }
         if (state.currentPlayer !== myPlayerIndex) {
@@ -1826,6 +2006,7 @@
         const taken = state.deadChunksTaken?.[teamId] ?? 0;
         const max = state.deadChunksMax?.[teamId] ?? 1;
         if (taken >= max) return false;
+        if (isCurrentBossMode() && teamId === 0) return state.deadPiles.some((pile) => pile && pile.length > 0);
         let deadIndex = teamId;
         if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && teamId === 1 && taken >= 1) {
           if (!state.deadPiles?.[deadIndex]?.length) deadIndex = 0;
@@ -1843,10 +2024,36 @@
         });
       }
 
+      async function drawBossTurnExtras(player) {
+        if (hasPendingBossChoices(state)) {
+          showPendingBossChoiceMessage(player?.id);
+          return [];
+        }
+        const extraCount = consumeBossExtraDraw(state, player.id);
+        const cards = [];
+        for (let i = 0; i < extraCount; i++) {
+          if (!state.stock.length) await recycleDeadToStockIfPossible();
+          if (!state.stock.length) {
+            await finishGame(null);
+            break;
+          }
+          const card = state.stock.pop();
+          ensureCardId(card);
+          player.hand.push(card);
+          cards.push(card);
+        }
+        if (cards.length) sortHand(player.hand);
+        return cards;
+      }
+
       async function drawFromStock() {
         if (!ensureMyTurn()) return;
         if (state.hasDrawnThisTurn) {
           showMessage('⚠️ Compra bloqueada: Você já puxou carta neste turno.');
+          return;
+        }
+        if (isBossVaultDrawRequired(state, state.currentPlayer)) {
+          showMessage('Cofre: recupere sua garantia. Ela substitui a compra normal deste turno.');
           return;
         }
 
@@ -1855,7 +2062,8 @@
 
         // Se for J2 na Humilhação ou Dominação, puxa 2 (se já puxou do lixo, puxa só mais 1)
         const isDominador = (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1;
-        const drawCount = isDominador ? (state.partialDraw ? 1 : 2) : 1;
+        const bossExtraDraw = consumeBossExtraDraw(state, state.currentPlayer);
+        const drawCount = (isDominador ? (state.partialDraw ? 1 : 2) : 1) + bossExtraDraw;
         const drawnCards = [];
 
         let recycledIndex = null;
@@ -1942,7 +2150,23 @@
 
       async function drawFromDiscard() {
         if (!ensureMyTurn()) return;
+        if (!state.hasDrawnThisTurn && isBossVaultDrawRequired(state, state.currentPlayer)) {
+          showMessage('Cofre: recupere sua garantia antes de continuar. Monte e lixo estão bloqueados.');
+          return;
+        }
         localUndoStack = []; // 🔒 TRAVA DE SEGURANÇA: Interagiu com o lixo, apaga histórico do voltar
+
+        if (!state.hasDrawnThisTurn && isBossDiscardBlocked(state)) {
+          showMessage('🔒 Bloqueio de Crédito: o lixo está indisponível nesta cobrança.');
+          return;
+        }
+
+        if (hasPendingBossChoices(state)) {
+          stopTurnTimer();
+          turnTimerRemaining = 60;
+          updateTimerLabel();
+          return;
+        }
 
         // NOVO: Se já comprou, o clique no lixo funciona como botão de Descartar
         if (state.hasDrawnThisTurn) {
@@ -1976,6 +2200,11 @@
         if (state.variant === 'fechado') {
           const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
           const selectedCards = indexes.map((i) => hand[i]);
+          const bossSelection = validateBossClosedDiscardSelection(state, me.id, selectedCards);
+          if (!bossSelection.allowed) {
+            showMessage(`⛓ ${bossSelection.message}`);
+            return;
+          }
 
           selectedCards.forEach((c) => {
             c.forceNatural = false;
@@ -1992,9 +2221,11 @@
           if (selectedMeldTarget) {
             const [tId, mIdx] = selectedMeldTarget.split(':');
             // Checagem extra: só tenta empurrar pro jogo se ele de fato existir na memória!
-            if (parseInt(tId) === team.id && team.melds[parseInt(mIdx)]) targetIndexes.push(parseInt(mIdx));
+            if (parseInt(tId) === team.id && team.melds[parseInt(mIdx)] && !isBossMeldLocked(state, team.id, parseInt(mIdx)) && canBossUseMeld(state, me.id, parseInt(mIdx))) targetIndexes.push(parseInt(mIdx));
           } else {
-            team.melds.forEach((m, i) => targetIndexes.push(i));
+            team.melds.forEach((m, i) => {
+              if (!isBossMeldLocked(state, team.id, i) && canBossUseMeld(state, me.id, i)) targetIndexes.push(i);
+            });
           }
 
           // 🧠 Simulador Fantasma Injetado na validação da compra do Lixo
@@ -2020,9 +2251,19 @@
           }
           // 2. Se não encaixou na mesa, tenta formar um NOVO JOGO
           else if (selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
+            if (!canBossCreateMeld(state, me.id)) {
+              showMessage('⛓ Você não pode criar outro jogo durante esta ordem.');
+              return;
+            }
             isNewMeld = true;
           } else {
             showMessage('🔒 FECHADO: Selecione na mão as cartas que justificam a compra do lixo!');
+            return;
+          }
+
+          const bossMeldValidation = validateBossMeldPlay(state, me.id, selectedCards, state.discard.slice(0, -1));
+          if (!bossMeldValidation.allowed) {
+            showMessage(bossMeldValidation.message);
             return;
           }
 
@@ -2045,6 +2286,7 @@
               return;
             }
           }
+          if (futureHandSize === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return;
 
           // --- SE ENCAIXOU, FAZ A MÁGICA ---
           const pile = state.discard.splice(0, state.discard.length);
@@ -2090,6 +2332,8 @@
             hand.push(...pile);
             sortHand(hand);
           }
+          const bossExtraCards = await drawBossTurnExtras(me);
+          if (state.finished) return;
 
           if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1 && !state.partialDraw) {
             state.partialDraw = true;
@@ -2109,7 +2353,12 @@
 
           renderAll();
 
-          let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(isNewMeld ? team.melds[team.melds.length - 1] : team.melds[extendedMeldIndex]).kind, isNewMeld ? team.melds.length - 1 : extendedMeldIndex);
+          const bossMeldIndex = isNewMeld ? team.melds.length - 1 : extendedMeldIndex;
+          const bossMeld = team.melds[bossMeldIndex];
+          const kindAfterFechado = classifyMeldForUi(bossMeld).kind;
+          let domReward = await processDominationReward(me, kindBeforeFechado, kindAfterFechado, bossMeldIndex);
+          const bossEvent = await processBossMeldChange(me, kindBeforeFechado || 'simple', kindAfterFechado, bossMeldIndex, finalMeldCards, isNewMeld);
+          if (state.finished) return;
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             renderHand();
@@ -2146,6 +2395,8 @@
             playerId: state.currentPlayer,
             tookDead: tookDead,
             drawnCards: domReward?.drawnCards,
+            bossExtraCards: bossExtraCards.map(packCard),
+            bossEvent,
             ts: Date.now(),
           };
           ignoreOwnActionId = state.lastAction.id;
@@ -2164,6 +2415,8 @@
 
         me.hand.push(...pile);
         sortHand(me.hand);
+        const bossExtraCards = await drawBossTurnExtras(me);
+        if (state.finished) return;
 
         if (!state.boughtCardIds) state.boughtCardIds = [];
         pile.forEach((c) => state.boughtCardIds.push(c.id));
@@ -2189,6 +2442,7 @@
           playerId: state.currentPlayer,
           card: packCard(top),
           count: pile.length + 1,
+          bossExtraCards: bossExtraCards.map(packCard),
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
@@ -2199,6 +2453,10 @@
       }
 
       function isValidSequenceMeld(cards) {
+        return isValidBossSequence(cards);
+      }
+
+      function legacyIsValidSequenceMeld(cards) {
         if (!cards) return false;
         cards = cards.filter((c) => c != null); // Remove os fantasmas da matemática
         if (cards.length < 3) return false;
@@ -2443,6 +2701,14 @@
         };
 
         if (forcedIndex !== null) {
+          if (isBossMeldLocked(state, team.id, forcedIndex)) {
+            showMessage('🔒 Penhora ativa: este jogo está bloqueado até a próxima cobrança.');
+            return false;
+          }
+          if (!canBossUseMeld(state, currentPlayer().id, forcedIndex)) {
+            showMessage('⛓ Separação ativa: seu cooperador já usou este jogo na rodada.');
+            return false;
+          }
           const targetMeld = team.melds[forcedIndex];
           const combined = simulateMeld(targetMeld, cards);
 
@@ -2461,6 +2727,7 @@
               return false;
             }
           }
+          if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return false;
 
           const key = team.id + ':' + forcedIndex;
           const baseDrop = meldDropRect(key, 0);
@@ -2495,6 +2762,8 @@
           selectedMeldTarget = null;
 
           let domReward = await processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind, forcedIndex);
+          const bossEvent = await processBossMeldChange(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind, forcedIndex, cards);
+          if (state.finished) return true;
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             renderHand();
@@ -2534,6 +2803,7 @@
             cards: cards.map(packCard),
             tookDead: tookDead,
             drawnCards: domReward?.drawnCards,
+            bossEvent,
             ts: Date.now(),
           };
           ignoreOwnActionId = state.lastAction.id;
@@ -2547,6 +2817,8 @@
 
         const candidateMeldIndexes = [];
         team.melds.forEach((meld, idx) => {
+          if (isBossMeldLocked(state, team.id, idx)) return;
+          if (!canBossUseMeld(state, currentPlayer().id, idx)) return;
           const combinedCheck = simulateMeld(meld, cards);
           if (isValidSequenceMeld(combinedCheck)) candidateMeldIndexes.push(idx);
         });
@@ -2570,6 +2842,7 @@
             return false;
           }
         }
+        if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return false;
 
         const kindBefore2 = classifyMeldForUi(teamMeld).kind;
 
@@ -2590,6 +2863,8 @@
         selectedMeldTarget = null;
 
         let domReward = await processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind, candidateMeldIndexes[0]);
+        const bossEvent = await processBossMeldChange(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind, candidateMeldIndexes[0], cards);
+        if (state.finished) return true;
 
         if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
           renderHand();
@@ -2629,6 +2904,7 @@
           cards: cards.map(packCard),
           tookDead: tookDead,
           drawnCards: domReward?.drawnCards,
+          bossEvent,
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
@@ -2659,6 +2935,15 @@
             return;
           }
           const cards = indexes.map((i) => hand[i]);
+          if (cards.some((card) => isBossCardBlocked(state, currentPlayer().id, card?.id, 'play'))) {
+            showMessage('⛓ A Dominadora prendeu uma das cartas selecionadas.');
+            return;
+          }
+          const bossMeldValidation = validateBossMeldPlay(state, currentPlayer().id, cards);
+          if (!bossMeldValidation.allowed) {
+            showMessage(bossMeldValidation.message);
+            return;
+          }
 
           // TRAVA ANTI-CLONE: Limpa a seleção imediatamente e renderiza
           selectedHandIndexes.clear();
@@ -2705,6 +2990,13 @@
             }
           }
 
+          if (!canBossCreateMeld(state, currentPlayer().id)) {
+            const chains = getBossChains(state, currentPlayer().id);
+            showMessage(chains >= 4 ? '👑 Você está Dominado e não pode criar um jogo novo.' : chains >= 3 ? '⛓ Sob Controle: você pode alimentar jogos, mas não criar um novo.' : '⛓ Mãos Atadas: você já criou seu jogo nesta rodada.');
+            return;
+          }
+          if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(teamId) && !confirmBossFinalStrike()) return;
+
           cards.forEach(ensureCardId);
           saveStateForUndo(); // Salva estado antes de criar novo jogo
 
@@ -2738,6 +3030,8 @@
 
           // Avaliação Plus Dominação (CORRIGIDO: meldIdx numérico)
           let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx);
+          const bossEvent = await processBossMeldChange(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx, cards, true);
+          if (state.finished) return;
 
           if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
             renderHand(); // Força as cartas a existirem no DOM para voarem até elas
@@ -2777,6 +3071,7 @@
             cards: cards.map(packCard),
             tookDead: tookDead,
             drawnCards: domReward?.drawnCards, // <- Envia para o oponente animar
+            bossEvent,
             ts: Date.now(),
           };
 
@@ -2811,6 +3106,7 @@
         p.hand.push(...dead.splice(0, chunkSize));
         sortHand(p.hand);
         state.deadChunksTaken[teamId] = taken + 1;
+        processBossDeadReward();
 
         return { deadIndex, count: chunkSize };
       }
@@ -2855,6 +3151,12 @@
         }
 
         ensureCardId(card);
+        if (isBossCardBlocked(state, pInitial.id, card.id, 'discard')) {
+          showMessage('⛓ Esta carta está sob controle da Dominadora e não pode ser descartada.');
+          selectedHandIndexes.clear();
+          renderHand();
+          return;
+        }
         selectedHandIndexes.clear();
 
         // Optional chaining para evitar crash se id for nulo na leitura
@@ -2866,6 +3168,10 @@
         if (pInitial.hand.length === 1 && !canTeamTakeDeadNow(pInitial.teamId)) {
           if (!teamHasGoodCanastra(pInitial.teamId)) {
             showMessage('❌ Você não pode bater sem ter uma canastra limpa!');
+            renderHand();
+            return;
+          }
+          if (isCurrentBossMode() && !confirmBossFinalStrike()) {
             renderHand();
             return;
           }
@@ -2911,8 +3217,10 @@
           playerId: myPlayerIndex,
           card: packCard(card),
           tookDead,
+          bossEvent: state._pendingBossEvent || null,
           ts: Date.now(),
         };
+        delete state._pendingBossEvent;
         ignoreOwnActionId = state.lastAction.id;
 
         renderAll();
@@ -3075,8 +3383,24 @@
       }
 
       // Função que encerra a partida
-      async function finishGame(winnerTeamId) {
+      async function finishGame(winnerTeamId, options = {}) {
         if (!state || state.finished) return;
+        let bossEvent = options.bossEvent || null;
+        if (isCurrentBossMode()) {
+          normalizeBossState(state);
+          if (!options.skipFinalStrike && !state.boss.result) {
+            bossEvent = winnerTeamId === null ? applyBossResourceDefeat(state) : applyBossFinalStrike(state, getCooperativeProjectedScore());
+          }
+          if (!state.boss.result) {
+            state.boss.result = {
+              victory: !!state.boss.defeated,
+              reason: state.boss.defeated ? 'boss_defeated' : 'battle_interrupted',
+              title: state.boss.defeated ? 'O Banqueiro foi derrotado' : 'Cobrança interrompida',
+              detail: state.boss.defeated ? 'A equipe encerrou a cobrança.' : 'A equipe não concluiu o confronto.',
+            };
+          }
+          winnerTeamId = state.boss.result.victory ? 0 : 1;
+        }
         state.finished = true;
         state.winnerTeamId = winnerTeamId;
 
@@ -3084,6 +3408,7 @@
           id: newActionId(),
           type: 'endGame',
           playerId: myPlayerIndex,
+          bossEvent,
           ts: Date.now(),
         };
         ignoreOwnActionId = state.lastAction.id;
@@ -3111,6 +3436,445 @@
         el.classList.remove('back-red', 'back-blue');
         if (wantedClass) el.classList.add(wantedClass);
         return true;
+      }
+
+      function renderBossDetailFields(element, details) {
+        if (!element) return;
+        element.replaceChildren();
+        details.forEach((detail) => {
+          const separator = detail.indexOf(':');
+          const row = document.createElement('div');
+          if (separator < 0) {
+            row.textContent = detail;
+          } else {
+            const label = document.createElement('span');
+            const value = document.createElement('strong');
+            label.textContent = detail.slice(0, separator).trim();
+            value.textContent = detail.slice(separator + 1).trim();
+            row.append(label, value);
+          }
+          element.appendChild(row);
+        });
+      }
+
+      function bossFlowHostIndex() {
+        const humanIndex = state?.players?.findIndex((player) => player && !player.name?.toUpperCase().includes('BOT')) ?? -1;
+        return humanIndex >= 0 ? humanIndex : myPlayerIndex;
+      }
+
+      function scheduleBossTurnAdvance() {
+        const flow = state?.boss?.bossFlow;
+        const active = isCurrentBossMode() && isBossTurnActive(state) && flow && !hasPendingBossChoices(state);
+        const isHost = active && myPlayerIndex === bossFlowHostIndex();
+        const key = active ? `${flow.id}:${flow.stage}:${flow.endsAt}` : '';
+        if (!isHost) {
+          if (bossPresentationTimer) clearTimeout(bossPresentationTimer);
+          bossPresentationTimer = null;
+          bossPresentationKey = '';
+          return;
+        }
+        if (bossPresentationTimer && bossPresentationKey === key) return;
+        if (bossPresentationTimer) clearTimeout(bossPresentationTimer);
+        bossPresentationKey = key;
+        const sessionId = window.gameSessionId;
+        const signal = botTurnController.signal;
+        const delay = Math.max(0, Number(flow.endsAt || 0) - Date.now()) + 40;
+        bossPresentationTimer = setTimeout(async () => {
+          bossPresentationTimer = null;
+          bossPresentationKey = '';
+          if (!isGameSessionActive(sessionId, signal) || !state || state.finished) return;
+          const currentFlow = state.boss?.bossFlow;
+          if (!currentFlow || `${currentFlow.id}:${currentFlow.stage}:${currentFlow.endsAt}` !== key) return;
+          const step = advanceBossTurn(state, Date.now());
+          if (!step) {
+            renderAll();
+            return;
+          }
+          state.lastAction = { id: newActionId(), type: 'bossTurn', stage: step.stage, flowId: step.flowId, ts: Date.now() };
+          ignoreOwnActionId = state.lastAction.id;
+          renderAll();
+          await commitState();
+          startTurnTimerIfNeeded();
+        }, delay);
+      }
+
+      async function reclaimLocalBossVault() {
+        if (!ensureMyTurn() || !isBossVaultDrawRequired(state, myPlayerIndex)) return;
+        const slot = document.getElementById('bossLocalVaultSlot');
+        const fromRect = slot ? getRect(slot) : null;
+        const vault = getBossVault(state, myPlayerIndex);
+        const event = reclaimBossVault(state, myPlayerIndex);
+        if (!event || !vault?.card) return;
+        sortHand(state.players[myPlayerIndex].hand);
+        state.boughtCardIds = [vault.card.id];
+        state.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: myPlayerIndex, bossEvent: event, ts: Date.now() };
+        renderAll();
+        const commitPromise = commitState();
+        const toEl = cardElById(vault.card.id);
+        if (fromRect && toEl) {
+          toEl.style.visibility = 'hidden';
+          await flyRectToRect(vault.card, fromRect, getRect(toEl), 'front');
+          toEl.style.visibility = '';
+        }
+        await commitPromise;
+        showMessage('Garantia recuperada. Esta foi a compra obrigatoria do seu turno.');
+      }
+
+      function renderBossVaultSlot(root, player, isLocal = false) {
+        if (!root) return;
+        if (!player) {
+          root.style.display = 'none';
+          root.innerHTML = '';
+          root.onclick = null;
+          return;
+        }
+        const vault = getBossVault(state, player.id);
+        if (!vault) {
+          root.style.display = 'none';
+          root.innerHTML = '';
+          root.onclick = null;
+          return;
+        }
+        const cardFace = isLocal ? cardFrontHTML(vault.card) : '<span class="boss-vault-hidden">?</span>';
+        const reclaimRequired = isBossVaultDrawRequired(state, player.id) && state.currentPlayer === player.id;
+        root.style.display = 'grid';
+        root.classList.toggle('boss-vault-required', reclaimRequired);
+        root.innerHTML = `<span class="boss-vault-kicker">COFRE DO BANQUEIRO</span><div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : 'boss-vault-card-back'}">${cardFace}</div><small>${player.name}</small><strong>${reclaimRequired ? 'Resgate sua carta do Cofre para comprar' : 'Compra obrigatória no próximo turno'}</strong>`;
+        root.onclick = isLocal ? reclaimLocalBossVault : null;
+      }
+
+      function renderBossHud() {
+        const hud = document.getElementById('bossHud');
+        const resultSection = document.getElementById('bossResultSection');
+        const bossMode = isCurrentBossMode();
+        document.body.classList.toggle('boss-mode', bossMode);
+        if (!bossMode) {
+          document.body.removeAttribute('data-boss-id');
+          if (hud) hud.style.display = 'none';
+          if (resultSection) resultSection.style.display = 'none';
+          renderBossVaultSlot(document.getElementById('bossLocalVaultSlot'), null, true);
+          return;
+        }
+
+        const boss = normalizeBossState(state);
+        const definition = getBossDefinition(boss.id);
+        const isDominatrix = boss.id === 'dominadora';
+        document.body.dataset.bossId = boss.id;
+        const flow = boss.bossFlow;
+        const resolvingEvent = flow?.stage === 'result'
+          ? boss.eventLog?.find((entry) => entry.actionId === flow.eventActionId) || null
+          : null;
+        hud.style.display = 'grid';
+        hud.classList.remove('boss-resolving');
+        hud.classList.toggle('boss-turn-active', isBossTurnActive(state));
+        document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
+        document.getElementById('bossPortraitImage').src = definition?.portrait || 'assets/images/boss-banqueiro.png';
+        document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
+        const phaseRules = {
+          1: 'Próxima fase: primeiro morto, monte com 40 cartas ou HP em 70%.',
+          2: 'Próxima fase: segundo morto, monte com 18 cartas ou HP em 35%.',
+          3: 'Fase final.',
+        };
+        document.getElementById('bossPhaseRule').textContent = phaseRules[boss.phase];
+        document.getElementById('bossHpText').textContent = `${boss.hp} / ${boss.maxHp}`;
+        document.getElementById('bossHpBar').style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
+        const dangerMeter = document.getElementById('bossDangerMeter');
+        const chainStatus = document.getElementById('bossChainStatus');
+        dangerMeter.style.display = isDominatrix ? 'none' : 'block';
+        chainStatus.style.display = isDominatrix ? 'grid' : 'none';
+        if (isDominatrix) {
+          chainStatus.innerHTML = state.players
+            .map((player) => {
+              const chains = getBossChains(state, player.id);
+              const links = Array.from({ length: 4 }, (_, index) => `<i class="boss-chain-link${index < chains ? ' active' : ''}"></i>`).join('');
+              const dominated = chains >= 4;
+              const controlled = chains === 3;
+              const notice = dominated
+                ? '<small class="boss-dominated-notice"><strong>DOMINADO — 4 CORRENTES</strong><span>Não pode pegar o lixo nem criar jogos novos. Pode comprar do monte, alimentar jogos existentes e descartar.</span></small>'
+                : controlled
+                  ? '<small class="boss-dominated-notice boss-controlled-notice"><strong>SOB CONTROLE — 3 CORRENTES</strong><span>Não pode criar jogos novos, mas pode alimentar jogos existentes.</span></small>'
+                  : '';
+              return `<div class="boss-chain-player${dominated ? ' dominated' : ''}" data-player-id="${player.id}"><span>${player.name}</span><span class="boss-chain-links">${links}</span>${notice}</div>`;
+            })
+            .join('');
+        } else {
+          document.getElementById('bossDangerLabel').textContent = 'DÍVIDA COLETIVA';
+          document.getElementById('bossDebtText').textContent = `${boss.danger} / ${boss.maxDanger}`;
+          document.getElementById('bossDebtBar').style.width = `${Math.max(0, (boss.danger / boss.maxDanger) * 100)}%`;
+        }
+        renderBossVaultSlot(document.getElementById('bossLocalVaultSlot'), state.players[myPlayerIndex], true);
+
+        const actionPresentation = buildBossActionPresentation(state);
+        document.getElementById('bossActionType').textContent = actionPresentation.category.toUpperCase();
+        document.getElementById('bossIntentName').textContent = actionPresentation.name;
+        document.getElementById('bossIntentDescription').textContent = actionPresentation.instruction;
+        document.getElementById('bossIntentProgress').textContent = [actionPresentation.progress, actionPresentation.consequence].filter(Boolean).join(' · ');
+        renderBossDetailFields(document.getElementById('bossActionDetails'), actionPresentation.details);
+
+        const dialoguePanel = document.getElementById('bossDialoguePresentation');
+        const dialogueVisible = ['ability', 'phase', 'taunt'].includes(flow?.stage) && !hasPendingBossChoices(state);
+        dialoguePanel.style.display = dialogueVisible ? 'grid' : 'none';
+        if (dialogueVisible) {
+          const objective = [
+            actionPresentation.instruction !== actionPresentation.speech ? actionPresentation.instruction : '',
+            actionPresentation.consequence,
+          ].filter(Boolean).join(' · ') || `A Fase ${boss.phase} está ativa.`;
+          document.getElementById('bossDialogueType').textContent = flow.stage === 'ability' ? 'NOVA HABILIDADE' : 'O CHEFE DIZ';
+          document.getElementById('bossDialogueName').textContent = actionPresentation.name;
+          document.getElementById('bossDialogueSpeech').textContent = actionPresentation.speech ? `“${actionPresentation.speech}”` : '';
+          document.getElementById('bossDialogueConsequence').textContent = objective;
+        }
+        document.querySelectorAll('#bossPhaseTrack [data-phase]').forEach((phaseNode) => {
+          const phaseNumber = Number(phaseNode.dataset.phase);
+          phaseNode.classList.toggle('complete', phaseNumber < boss.phase);
+          phaseNode.classList.toggle('active', phaseNumber === boss.phase);
+        });
+        const persistentPossessions = (boss.possessions || []).map((possession) => ({
+          id: 'possession',
+          meldIndex: possession.meldIndex,
+          progress: possession.progress || 0,
+          required: possession.required || 2,
+        }));
+        document.getElementById('bossEffects').innerHTML = [...(boss.effects || []), ...persistentPossessions]
+          .map((effect) => {
+            if (effect.id === 'maintenance_fee') return `<span class="boss-effect-chip">Tarifa: +${effect.extraDraw} compra</span>`;
+            if (effect.id === 'choice_lock') {
+              const owner = state.players.find((player) => player.id === effect.playerId);
+              const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
+              const label = card ? `${card.rank}${card.suit}` : 'carta';
+              return `<span class="boss-effect-chip">⛓ ${owner?.name || 'Jogador'}: ${label} presa</span>`;
+            }
+            if (effect.id === 'possession') return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required}</span>`;
+            return `<span class="boss-effect-chip">${effect.id}</span>`;
+          })
+          .join('');
+
+        const choicePanel = document.getElementById('bossChoicePanel');
+        const myChoice = getBossPendingChoice(state, myPlayerIndex);
+        const pendingChoice = boss.pendingChoices?.[0] || null;
+        const choiceLabels = {
+          draw2: 'Comprar 2 cartas',
+          chain: 'Receber 1 Corrente',
+          lock_card: 'Prender 1 carta',
+          break_meld: 'Retirar carta da canastra',
+          full: 'Pagar valor integral',
+        };
+        const animateForcedChoiceDraw = async (event, playerId, fromRect) => {
+          if (playerId !== myPlayerIndex || !fromRect) return;
+          const player = state.players.find((entry) => entry.id === playerId);
+          const receivedCards = event.drawnCardIds.slice(0, 2).map((cardId) => player?.hand.find((card) => card.id === cardId)).filter(Boolean);
+          await Promise.all(receivedCards.map((card) => {
+            const toEl = cardElById(card.id);
+            if (!toEl) return Promise.resolve();
+            toEl.style.visibility = 'hidden';
+            return flyRectToRect(card, fromRect, getRect(toEl), 'back').then(() => {
+              if (toEl) toEl.style.visibility = '';
+            });
+          }));
+        };
+        if (myChoice && !state.finished) {
+          choicePanel.style.display = 'flex';
+          document.getElementById('bossChoicePrompt').textContent = myChoice.type === 'break_will'
+            ? 'Quebra de Vontade: escolha sua punição.'
+            : myChoice.type === 'fixed_interest_payment'
+              ? 'Juros Fixos: pague o valor integral ou escolha um garantidor.'
+              : myChoice.type === 'banker_collateral_card'
+                ? 'Escolha uma carta sua para enviar ao Cofre.'
+                : 'A Dominadora exige uma escolha.';
+          const actions = document.getElementById('bossChoiceActions');
+          actions.innerHTML = myChoice.options.map((option) => {
+            let label = choiceLabels[option] || option;
+            if (option.startsWith('guarantee:')) {
+              const player = state.players.find((entry) => entry.id === Number(option.split(':')[1]));
+              label = `Garantia: ${player?.name || 'Jogador'}`;
+            } else if (option.startsWith('card:')) {
+              const card = state.players[myPlayerIndex]?.hand?.find((entry) => entry.id === option.slice(5));
+              label = card ? `${card.rank}${card.suit}` : 'Carta';
+            }
+            return `<button type="button" data-boss-choice="${option}">${label}</button>`;
+          }).join('');
+          actions.querySelectorAll('[data-boss-choice]').forEach((button) => {
+            button.onclick = async () => {
+              if (!state || state.finished || !getBossPendingChoice(state, myPlayerIndex)) return;
+              const stockEl = document.querySelector('#drawStockBtn .pile-card');
+              const stockRect = stockEl ? getRect(stockEl) : null;
+              const selectedCollateralId = button.dataset.bossChoice.startsWith('card:') ? button.dataset.bossChoice.slice(5) : '';
+              const selectedCollateralEl = selectedCollateralId ? cardElById(selectedCollateralId) : null;
+              const selectedCollateralRect = selectedCollateralEl ? getRect(selectedCollateralEl) : null;
+              const event = resolveBossChoice(state, myPlayerIndex, button.dataset.bossChoice);
+              if (!event) return;
+              if (state.boss?.result) {
+                state.finished = true;
+                state.winnerTeamId = state.boss.result.victory ? 0 : 1;
+              }
+              if (event.drawnCardIds?.length) {
+                state.boughtCardIds = [...event.drawnCardIds];
+                const lockedMessage = event.lockedCardLabels?.length ? ` ${event.lockedCardLabels.join(' e ')} ficaram presas.` : ' As duas cartas ficaram presas.';
+                showMessage(`2 cartas adicionadas à sua mão.${lockedMessage} Sua compra normal do turno continua sendo 1 carta.`);
+              }
+              sortHand(state.players[myPlayerIndex].hand);
+              state.lastAction = { id: newActionId(), type: 'bossChoice', playerId: myPlayerIndex, bossEvent: event, ts: Date.now() };
+              renderAll();
+              const commitPromise = commitState();
+              if (event.drawnCardIds?.length) await animateForcedChoiceDraw(event, myPlayerIndex, stockRect);
+              if (event.collateralCardId && selectedCollateralRect) {
+                const vaultSlot = document.getElementById('bossLocalVaultSlot');
+                const vaultCard = getBossVault(state, myPlayerIndex)?.card;
+                if (vaultSlot && vaultCard) await flyRectToRect(vaultCard, selectedCollateralRect, getRect(vaultSlot), 'front');
+              }
+              await commitPromise;
+              if (!hasPendingBossChoices(state)) startTurnTimerIfNeeded();
+            };
+          });
+        } else if (pendingChoice && !state.finished) {
+          const target = state.players.find((player) => player.id === pendingChoice.playerId);
+          choicePanel.style.display = 'flex';
+          document.getElementById('bossChoicePrompt').textContent = `Aguardando ${target?.name || 'o jogador alvo'} decidir.`;
+          document.getElementById('bossChoiceActions').innerHTML = '';
+        } else {
+          choicePanel.style.display = 'none';
+          document.getElementById('bossChoiceActions').innerHTML = '';
+        }
+
+        const resultPresentation = buildBossResultPresentation(resolvingEvent);
+        const resultPanel = document.getElementById('bossResolvedPresentation');
+        resultPanel.style.display = resolvingEvent ? 'grid' : 'none';
+        document.getElementById('bossResultType').textContent = `RESULTADO RECENTE · ${resultPresentation.category}`;
+        document.getElementById('bossLastImpact').textContent = resultPresentation.name;
+        document.getElementById('bossResultDescription').textContent = resultPresentation.description;
+        document.getElementById('bossResultDetails').textContent = resultPresentation.details.join(' · ');
+        document.getElementById('bossTotalDamage').textContent = `${boss.stats.totalDamage || 0} de dano total`;
+
+        const reactionPanel = document.getElementById('bossDamageReaction');
+        const reaction = boss.damageReaction;
+        const reactionRemaining = Number(reaction?.until || 0) - Date.now();
+        if (bossDamageReactionTimer) {
+          clearTimeout(bossDamageReactionTimer);
+          bossDamageReactionTimer = null;
+        }
+        if (reaction?.text && reactionRemaining > 0) {
+          reactionPanel.textContent = `“${reaction.text}”`;
+          reactionPanel.style.display = 'block';
+          reactionPanel.dataset.reactionId = reaction.id || '';
+          bossDamageReactionTimer = setTimeout(() => {
+            reactionPanel.style.display = 'none';
+            bossDamageReactionTimer = null;
+          }, reactionRemaining);
+        } else reactionPanel.style.display = 'none';
+
+        const playersInRound = state.players.length || 2;
+        const turnsCompleted = boss.playersActedThisRound?.length || 0;
+        const displayedTurn = Math.min(turnsCompleted + 1, playersInRound);
+        const actor = state.players?.[state.currentPlayer];
+        document.getElementById('bossRoundNumber').textContent = `Rodada ${boss.roundNumber}`;
+        document.getElementById('bossRoundTurn').textContent = `Turno ${displayedTurn}/${playersInRound}`;
+        document.getElementById('bossCurrentActor').textContent = isBossTurnActive(state) ? `Agora: ${definition?.name || 'Chefe'}` : actor ? `Agora: ${actor.name}` : 'Agora: aguardando';
+
+        const kindLabels = { suja: 'Canastra suja', limpa: 'Canastra limpa', real: 'Canastra real', asas: 'Canastra Ás-a-Ás' };
+        const describeBossEvent = (entry) => {
+          if (entry.type === 'bossDamage') return { icon: '💥', title: kindLabels[entry.newKind] || 'Ataque da equipe', detail: `${entry.damage} de dano${entry.dangerChangeLabel ? ` · ${entry.dangerChangeLabel}` : ''}${entry.chainsRemoved ? ` · ${entry.chainsRemoved} Corrente removida` : ''}${entry.possessionProgress != null ? ` · Posse ${entry.possessionProgress}/2` : ''}` };
+          if (entry.type === 'bossAbility') return { icon: '💼', title: entry.name || 'Cobrança', detail: entry.outcome || 'Habilidade resolvida' };
+          if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Corrente aplicada' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${entry.chains}/3 Correntes` };
+          if (entry.type === 'bossChoice') return { icon: '👑', title: 'Escolha cumprida', detail: entry.outcome };
+          if (entry.type === 'debtReduction') return { icon: '🛡️', title: 'Morto conquistado', detail: entry.dangerChangeLabel || `Morto conquistado: Dívida -${entry.amount}` };
+          if (entry.type === 'playerTurn') return { icon: '👥', title: `${entry.playerName} concluiu o turno`, detail: `${entry.cardsInHand} carta(s) na mão` };
+          if (entry.type === 'finalStrike') return { icon: '⚔️', title: 'Ataque final', detail: `${entry.damage} de dano` };
+          return { icon: '📋', title: 'Evento da batalha', detail: entry.outcome || entry.reason || 'Estado atualizado' };
+        };
+        const reversedEvents = [...(boss.eventLog || [])].reverse();
+        const importantEventTypes = new Set(['bossDamage', 'bossAbility', 'chainChange', 'bossChoice', 'debtReduction', 'phase', 'finalStrike']);
+        const logEntries = [...reversedEvents.filter((entry) => importantEventTypes.has(entry.type)), ...reversedEvents.filter((entry) => !importantEventTypes.has(entry.type))].slice(0, 8);
+        document.getElementById('bossLogCount').textContent = String(boss.eventLog?.length || 0);
+        document.getElementById('bossEventLog').innerHTML = logEntries.length
+          ? logEntries
+              .map((entry) => {
+                const info = describeBossEvent(entry);
+                const time = entry.at ? new Date(entry.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : `R${entry.round || boss.roundNumber}`;
+                return `<div class="boss-log-entry"><span class="boss-log-icon">${info.icon}</span><span class="boss-log-copy"><strong>${info.title}</strong><br>${info.detail}</span><span class="boss-log-time">${time}</span></div>`;
+              })
+              .join('')
+          : '<div class="boss-log-empty">A batalha ainda não registrou impactos.</div>';
+
+        const discardButton = document.getElementById('drawDiscardBtn');
+        if (discardButton) discardButton.classList.toggle('boss-locked', isBossDiscardBlocked(state) && !state.hasDrawnThisTurn);
+
+        const event = resolvingEvent || (boss.lastEvent?.type === 'bossAbility' ? null : boss.lastEvent);
+        if (event?.actionId && event.actionId !== lastRenderedBossEventId) {
+          lastRenderedBossEventId = event.actionId;
+          if (event.type !== 'playerTurn') {
+            hud.classList.remove('boss-hit');
+            void hud.offsetWidth;
+            hud.classList.add('boss-hit');
+          }
+          const amount = event.damage ? `-${event.damage} HP` : '';
+          if (amount) {
+            const floating = document.createElement('div');
+            floating.className = `boss-floating-number${event.damage ? '' : event.dangerDelta > 0 ? ' debt-up' : ' debt-down'}`;
+            floating.textContent = amount;
+            const rect = hud.getBoundingClientRect();
+            floating.style.left = `${rect.left + rect.width / 2}px`;
+            floating.style.top = `${rect.top + rect.height / 2}px`;
+            document.body.appendChild(floating);
+            setTimeout(() => floating.remove(), 2600);
+          }
+        }
+
+        const feedbackEvents = boss.eventLog || [];
+        if (renderedBossFeedbackCount == null || renderedBossFeedbackCount > feedbackEvents.length) {
+          renderedBossFeedbackCount = feedbackEvents.length;
+        } else if (feedbackEvents.length > renderedBossFeedbackCount) {
+          const newFeedback = feedbackEvents.slice(renderedBossFeedbackCount);
+          renderedBossFeedbackCount = feedbackEvents.length;
+          newFeedback.forEach((feedback, index) => {
+            const isChain = feedback.type === 'chainChange' && feedback.amount;
+            const isDebt = feedback.dangerChangeLabel && (feedback.type === 'bossAbility' || feedback.type === 'bossDamage' || feedback.type === 'debtReduction');
+            if (!isChain && !isDebt) return;
+            const floating = document.createElement('div');
+            floating.className = `boss-floating-number ${isChain ? (feedback.amount > 0 ? 'chain-up' : 'chain-down') : (feedback.dangerDelta > 0 ? 'debt-up' : 'debt-down')}`;
+            floating.textContent = isChain
+              ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Corrente`
+              : feedback.dangerChangeLabel;
+            const chainPlayer = isChain
+              ? [...document.querySelectorAll('#bossChainStatus .boss-chain-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId))
+              : null;
+            const anchor = isChain
+              ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
+              : document.getElementById('bossDangerMeter')?.getBoundingClientRect();
+            if (!anchor) return;
+            floating.style.left = `${anchor.left + anchor.width / 2}px`;
+            floating.style.top = `${anchor.top + anchor.height / 2 + index * 8}px`;
+            document.body.appendChild(floating);
+            setTimeout(() => floating.remove(), 2600);
+          });
+        }
+        scheduleBossTurnAdvance();
+      }
+
+      function renderBossResult() {
+        const section = document.getElementById('bossResultSection');
+        if (!isCurrentBossMode() || !state.finished || !state.boss?.result) {
+          section.style.display = 'none';
+          return;
+        }
+        const boss = normalizeBossState(state);
+        const presentation = buildBossFinalPresentation(state);
+        section.dataset.outcome = boss.result.victory ? 'victory' : 'defeat';
+        document.getElementById('bossResultTitle').textContent = presentation.outcome;
+        document.getElementById('bossResultBossName').textContent = presentation.bossName.toUpperCase();
+        document.getElementById('bossResultPortrait').src = presentation.portrait;
+        document.getElementById('bossResultPortrait').alt = presentation.bossName;
+        document.getElementById('bossResultDetail').textContent = presentation.reason;
+        document.getElementById('bossFinalSpeech').textContent = `“${presentation.speech}”`;
+        const stats = [
+          ['HP restante', presentation.hp],
+          [presentation.dangerLabel, presentation.danger],
+          ['Dano total', presentation.totalDamage],
+          ['Canastras', presentation.canastras],
+          ['Rodadas', presentation.rounds],
+          ['Ataque final', presentation.finalStrike],
+        ];
+        document.getElementById('bossResultStats').innerHTML = stats.map(([label, value]) => `<div class="boss-result-stat"><span>${label}</span><strong>${value}</strong></div>`).join('');
+        section.style.display = 'flex';
       }
 
       function renderAll() {
@@ -3199,10 +3963,14 @@
           let modeDisplay = state.mode;
           if (modeDisplay === '1x1_duploMorto') modeDisplay = '1x1 Humilhação';
           if (modeDisplay === '1x1_dominacao') modeDisplay = '1x1 Dominação';
+          if (isBossMode(modeDisplay)) modeDisplay = `Chefe da Mesa · ${getBossDefinition(state.boss?.id)?.name || 'Chefe'}`;
           badge.textContent = `${modeDisplay} • Buraco ${state.variant}`;
         }
 
-        const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex;
+        renderBossHud();
+
+        const commonActionsAllowed = canBossPerformCommonAction(state);
+        const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex && commonActionsAllowed;
 
         const currP = currentPlayer();
         const pName = currP ? currP.name : 'Aguardando...';
@@ -3360,7 +4128,7 @@
         renderHand();
         renderMelds();
 
-        const myTurn = !state.finished && state.currentPlayer === myPlayerIndex;
+        const myTurn = !state.finished && state.currentPlayer === myPlayerIndex && commonActionsAllowed;
 
         // Toca o som e vibra o celular SOMENTE na virada pro seu turno (Ignora turno 0 para não dar spoiler do Dado)
         const isDicePhase = state.turnNumber === 0 && !state.hasDrawnThisTurn;
@@ -3383,14 +4151,16 @@
         }
         lastMyTurn = myTurn;
 
-        document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn ? 'auto' : 'none';
-        document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn ? '1' : '0.5';
+        const bossControlsLocked = isCurrentBossMode() && isBossTurnActive(state);
+        const vaultDrawRequired = isBossVaultDrawRequired(state, myPlayerIndex);
+        document.getElementById('drawStockBtn').style.pointerEvents = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked ? 'auto' : 'none';
+        document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && !vaultDrawRequired ? '1' : '0.5';
 
         // NOVO: Libera o clique no lixo tanto para comprar quanto para descartar
-        const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && state.discard.length;
-        const canDiscardToPile = myTurn && state.hasDrawnThisTurn;
+        const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && (vaultDrawRequired || (state.discard.length && !isBossDiscardBlocked(state)));
+        const canDiscardToPile = myTurn && state.hasDrawnThisTurn && !bossControlsLocked;
         document.getElementById('drawDiscardBtn').style.pointerEvents = canDrawDiscard || canDiscardToPile ? 'auto' : 'none';
-        document.getElementById('drawDiscardBtn').style.opacity = canDrawDiscard || canDiscardToPile ? '1' : '0.5';
+        document.getElementById('drawDiscardBtn').style.opacity = vaultDrawRequired ? '0.5' : (canDrawDiscard || canDiscardToPile ? '1' : '0.5');
 
         const me = state.players[myPlayerIndex];
         const myTeamId = me ? me.teamId : null; // Protege o Team ID
@@ -3424,7 +4194,7 @@
         // Oculta botões se o jogo acabou OU se for o Espectador (-1)
         const isFin = !!state.finished;
         const isSpec = myPlayerIndex === -1;
-        document.getElementById('showScoreBtn').style.display = isFin ? 'block' : 'none';
+        document.getElementById('showScoreBtn').style.display = isFin && !isCurrentBossMode() ? 'block' : 'none';
 
         // 🔥 NOVO: Controle de render do botão de revanche com contagem de votos síncrona
         const rematchBtn = document.getElementById('rematchBtn');
@@ -3457,7 +4227,12 @@
         }
         specBadge.style.display = isSpec && !isFin ? 'block' : 'none';
 
-        if (state.finished) renderScores(computeScores(), state.winnerTeamId);
+        if (state.finished) {
+          if (isCurrentBossMode()) renderBossResult();
+          else renderScores(computeScores(), state.winnerTeamId);
+        } else if (isCurrentBossMode()) {
+          document.getElementById('bossResultSection').style.display = 'none';
+        }
 
         syncCanastraSfxFromState();
 
@@ -3561,8 +4336,20 @@
           div.className = `carta ${suitClass(card)} ${deckFaceClass(card)}`;
 
           // O Brilho visual, isolado da lógica de clique
-          if (state.boughtCardIds && state.boughtCardIds.includes(card.id)) {
+          const bossChoiceBoughtIds = state.boss?.choiceDrawnCardIdsByPlayer?.[me.id] || [];
+          if ((state.boughtCardIds && state.boughtCardIds.includes(card.id)) || bossChoiceBoughtIds.includes(card.id)) {
             div.classList.add('just-bought');
+          }
+
+          const bossCardEffect = getBossCardEffect(state, me.id, card.id);
+          const bossCardLocked = bossCardEffect === 'locked';
+          if (bossCardLocked) {
+            div.classList.add('boss-card-locked');
+            div.title = 'Carta presa pela Dominadora';
+          }
+          if (bossCardEffect === 'exposed') {
+            div.classList.add('boss-card-exposed');
+            div.title = 'Carta exposta: não pode ser descartada';
           }
 
           div.innerHTML = cardFrontHTML(card);
@@ -3571,7 +4358,15 @@
           if (selectedHandIndexes.has(idx)) div.classList.add('selected');
 
           div.onclick = () => {
+            if (!canBossPerformCommonAction(state)) {
+              showPendingBossChoiceMessage();
+              return;
+            }
             if (state.currentPlayer !== myPlayerIndex) return;
+            if (bossCardLocked) {
+              showMessage('⛓ Esta carta está presa pela Dominadora.');
+              return;
+            }
             // Lógica limpa: apenas adiciona ou remove o index do Set
             if (selectedHandIndexes.has(idx)) {
               selectedHandIndexes.delete(idx);
@@ -3599,7 +4394,10 @@
         for (let i = 1; i < total; i++) others.push((baseIdx + i) % total);
 
         const seats = { top: null, left: null, right: null };
-        if (total === 2) seats.top = others[0];
+        if (total === 2) {
+          if (isCurrentBossMode()) seats.right = others[0];
+          else seats.top = others[0];
+        }
         else if (total === 3) {
           seats.right = others[0];
           seats.left = others[1];
@@ -3729,7 +4527,8 @@
         }
 
         if (total === 2) {
-          seats.top = others[0];
+          if (isCurrentBossMode()) seats.right = others[0];
+          else seats.top = others[0];
         } else if (total === 3) {
           seats.right = others[0];
           seats.left = others[1];
@@ -3764,6 +4563,14 @@
             rootEl.appendChild(label);
           }
           label.innerHTML = `${p.name} (${p.hand.length})`;
+
+          let vaultSlot = rootEl.querySelector('.boss-vault-slot');
+          if (!vaultSlot) {
+            vaultSlot = document.createElement('div');
+            vaultSlot.className = 'boss-vault-slot boss-vault-opponent';
+            rootEl.appendChild(vaultSlot);
+          }
+          renderBossVaultSlot(vaultSlot, p, false);
 
           let cardsDiv = rootEl.querySelector('.opponent-cards');
           if (!cardsDiv) {
@@ -3876,6 +4683,10 @@
 
             // Clique no fundo da caixa cria um NOVO JOGO
             panel.onclick = (ev) => {
+              if (!canBossPerformCommonAction(state)) {
+                showPendingBossChoiceMessage();
+                return;
+              }
               if (meLocal && t.id === meLocal.teamId && myTurnLocal && selectedHandIndexes.size > 0) {
                 selectedMeldTarget = null; // Zera o alvo para garantir jogo limpo
                 makeMeldFromSelection(true); // Força criação de jogo novo
@@ -3960,6 +4771,9 @@
             div.className = 'meld-line';
             const key = t.id + ':' + midx;
             div.dataset.meldKey = key;
+            div.classList.toggle('locked-by-boss', isBossMeldLocked(state, t.id, midx));
+            const possessed = isBossMeldPossessed(state, t.id, midx);
+            div.classList.toggle('possessed-by-boss', possessed);
 
             const row = document.createElement('div');
             row.className = 'meld-line-cards';
@@ -4012,6 +4826,20 @@
             div.onclick = (ev) => {
               ev.stopPropagation(); // Impede o clique de vazar pro fundo da caixa
 
+              if (!canBossPerformCommonAction(state)) {
+                showPendingBossChoiceMessage();
+                return;
+              }
+
+              if (isBossMeldLocked(state, t.id, midx)) {
+                showMessage('🔒 Penhora ativa: este jogo está bloqueado até a próxima cobrança.');
+                return;
+              }
+              if (meLocal && !canBossUseMeld(state, meLocal.id, midx)) {
+                showMessage('⛓ Separação ativa: seu cooperador já usou este jogo na rodada.');
+                return;
+              }
+
               if (meLocal && t.id === meLocal.teamId && myTurnLocal && selectedHandIndexes.size > 0) {
                 // ESTENDE O JOGO IMEDIATAMENTE
                 selectedMeldTarget = key;
@@ -4051,7 +4879,7 @@
                   { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
                   { transform: `translate(${sr.left - (pr.left + pr.width / 2)}px, ${sr.top - (pr.top + pr.height / 2)}px) scale(0.5)`, opacity: 0 },
                 ],
-                { duration: 900, easing: 'ease-in' },
+                { duration: 1800, easing: 'ease-in' },
               )
               .finished.catch(() => {}).then(() => flyEl.remove());
           }
@@ -4315,7 +5143,7 @@
                       { transform: 'translate(-50%, -50%) scale(1.1)', opacity: 1, offset: 0.1 }, // Offset menor para ele ficar grande mais rápido e demorar mais sumindo
                       { transform: `translate(-50%, calc(-50% + ${yMove}px)) scale(1)`, opacity: 0 },
                     ],
-                    { duration: 3000, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }, // Alterado de 2000 para 3000 (3 segundos)
+                    { duration: 6000, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
                   )
                   .finished.catch(() => {}).then(() => flyEl.remove());
               }
@@ -4871,6 +5699,37 @@
         isValidSequenceMeld: (cards) => isValidSequenceMeld(cards),
         canTeamTakeDeadNow: (teamId) => canTeamTakeDeadNow(teamId),
         teamHasGoodCanastra: (teamId) => teamHasGoodCanastra(teamId),
+        isDiscardBlocked: () => isBossDiscardBlocked(state),
+        isMeldLocked: (teamId, meldIndex) => isBossMeldLocked(state, teamId, meldIndex) || !canBossUseMeld(state, state.currentPlayer, meldIndex),
+        isCardBlocked: (playerId, cardId, action = 'play') => isBossCardBlocked(state, playerId, cardId, action),
+        canCreateMeld: (playerId) => canBossCreateMeld(state, playerId),
+        hasPendingBossChoice: () => hasPendingBossChoices(state),
+
+        async resolvePendingBossChoice(playerId) {
+          const choice = getBossPendingChoice(state, playerId);
+          if (!choice) return null;
+          const player = state.players.find((entry) => entry.id === playerId);
+          const hasCanastra = state.teams?.[0]?.melds?.some((meld) => meld?.length >= 7);
+          let option = choice.options[0];
+          if (choice.type === 'fixed_interest_payment') option = choice.options.find((entry) => entry.startsWith('guarantee:')) || 'full';
+          if (choice.type === 'banker_collateral_card') option = choice.options.find((entry) => entry.startsWith('card:')) || choice.options[0];
+          if (choice.options.includes('chain') && getBossChains(state, playerId) >= 2) option = choice.options.find((entry) => entry !== 'chain') || 'chain';
+          if (choice.options.includes('break_meld') && !hasCanastra) option = 'chain';
+          if (choice.options.includes('lock_card') && (player?.hand?.length || 0) <= 2) option = 'chain';
+          const event = resolveBossChoice(state, playerId, option);
+          if (state.boss?.result) {
+            state.finished = true;
+            state.winnerTeamId = state.boss.result.victory ? 0 : 1;
+          }
+          if (player) sortHand(player.hand);
+          if (event?.drawnCardIds?.length) state.boughtCardIds = [...event.drawnCardIds];
+          if (event) {
+            state.lastAction = { id: newActionId(), type: 'bossChoice', playerId, bossEvent: event, ts: Date.now() };
+            await this.commitState();
+            if (!hasPendingBossChoices(state)) startTurnTimerIfNeeded();
+          }
+          return event;
+        },
 
         normalizeMeld(meld) {
           optimizeMeld(meld);
@@ -4900,8 +5759,11 @@
           const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
+          if (!canBossCreateMeld(s, me.id)) return false;
           const team = s.teams[me.teamId];
           const cards = handIndexes.map((i) => me.hand[i]);
+          if (cards.some((card) => isBossCardBlocked(s, me.id, card?.id, 'play'))) return false;
+          if (!validateBossMeldPlay(s, me.id, cards).allowed) return false;
 
           handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
 
@@ -4911,6 +5773,8 @@
 
           // CORRIGIDO: meldIdx no lugar do array
           let domReward = await processDominationReward(me, 'simple', classifyMeldForUi(cards).kind, meldIdx);
+          const bossEvent = await processBossMeldChange(me, 'simple', classifyMeldForUi(cards).kind, meldIdx, cards, true);
+          if (s.finished) return;
           const tookDead = domReward?.tookDead || (await this._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
@@ -4925,6 +5789,7 @@
               cards: cards.map(packCard),
               tookDead,
               drawnCards: domReward?.drawnCards,
+              bossEvent,
               ts: Date.now(),
             };
             await this.commitState();
@@ -4935,8 +5800,11 @@
           const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
+          if (!canBossUseMeld(s, me.id, meldIndex)) return false;
           const team = s.teams[me.teamId];
           const cards = handIndexes.map((i) => me.hand[i]);
+          if (cards.some((card) => isBossCardBlocked(s, me.id, card?.id, 'play'))) return false;
+          if (!validateBossMeldPlay(s, me.id, cards).allowed) return false;
 
           handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
 
@@ -4945,6 +5813,8 @@
           this.normalizeMeld(team.melds[meldIndex]);
 
           let domReward = await processDominationReward(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind, meldIndex);
+          const bossEvent = await processBossMeldChange(me, kindBefore, classifyMeldForUi(team.melds[meldIndex]).kind, meldIndex, cards);
+          if (s.finished) return;
           const tookDead = domReward?.tookDead || (await this._checkBotMortoOrWin(botIndex));
           if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
@@ -4959,6 +5829,7 @@
               cards: cards.map(packCard),
               tookDead,
               drawnCards: domReward?.drawnCards,
+              bossEvent,
               ts: Date.now(),
             };
             await this.commitState();
@@ -4969,7 +5840,15 @@
           const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
-          const drawCount = (s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw ? 2 : 1;
+          if (isBossVaultDrawRequired(s, botIndex)) {
+            const vaultEvent = reclaimBossVault(s, botIndex);
+            if (!vaultEvent) return;
+            sortHand(me.hand);
+            s.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: botIndex, bossEvent: vaultEvent, ts: Date.now() };
+            await this.commitState();
+            return;
+          }
+          const drawCount = ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw ? 2 : 1) + consumeBossExtraDraw(s, botIndex);
           const drawnCards = [];
           let recycledIndex = null;
 
@@ -5013,6 +5892,7 @@
         async executeDrawDiscard(botIndex) {
           const s = this.getState();
           if (!s) return false;
+          if (isBossDiscardBlocked(s)) return false;
           if (!Array.isArray(s.discard) || s.discard.length === 0) {
             console.warn('[BOT] executeDrawDiscard chamado com lixo vazio. Possível jogada duplicada.');
             return false;
@@ -5027,6 +5907,15 @@
           }
 
           me.hand.push(...pile);
+
+          const bossExtraCount = consumeBossExtraDraw(s, botIndex);
+          for (let i = 0; i < bossExtraCount; i++) {
+            if (!s.stock.length) await recycleDeadToStockIfPossible();
+            if (!s.stock.length) break;
+            const extraCard = s.stock.pop();
+            ensureCardId(extraCard);
+            me.hand.push(extraCard);
+          }
 
           // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
@@ -5058,12 +5947,24 @@
         async executeDrawDiscardFechado(botIndex, intent) {
           const s = this.getState();
           if (!s) return false;
+          if (isBossDiscardBlocked(s)) return false;
           if (!Array.isArray(s.discard) || s.discard.length === 0) {
             console.warn('[BOT] executeDrawDiscardFechado chamado com lixo vazio. Possível jogada duplicada.');
             return false;
           }
           const me = s.players[botIndex];
           const team = s.teams[me.teamId];
+          const selectedHandCards = intent.action === 'new'
+            ? (intent.handIndexes || []).map((index) => me.hand[index]).filter(Boolean)
+            : [];
+          if (intent.action === 'extend' && !canBossUseMeld(s, me.id, intent.meldIndex)) return false;
+          if (intent.action === 'new') {
+            if (!canBossCreateMeld(s, me.id)) return false;
+            if (selectedHandCards.length !== (intent.handIndexes || []).length) return false;
+            if (selectedHandCards.some((card) => isBossCardBlocked(s, me.id, card.id, 'play'))) return false;
+          }
+          const bossMeldValidation = validateBossMeldPlay(s, me.id, selectedHandCards, s.discard.slice(0, -1));
+          if (!bossMeldValidation.allowed) return false;
           const pile = s.discard.splice(0, s.discard.length);
           pile.forEach(ensureCardId);
           const topCard = pile.pop();
@@ -5074,6 +5975,7 @@
 
           let kindBeforeFechado = '';
           let meldToCheck = null;
+          let bossAddedCards = [topCard];
 
           if (intent.action === 'extend') {
             kindBeforeFechado = classifyMeldForUi(team.melds[intent.meldIndex]).kind;
@@ -5082,7 +5984,8 @@
             meldToCheck = team.melds[intent.meldIndex];
           } else if (intent.action === 'new') {
             kindBeforeFechado = 'simple';
-            const cardsFromHand = intent.handIndexes.map((i) => me.hand[i]);
+            const cardsFromHand = selectedHandCards;
+            bossAddedCards = [...cardsFromHand, topCard];
             intent.handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
             const newMeld = [...cardsFromHand, topCard];
             this.normalizeMeld(newMeld);
@@ -5092,6 +5995,15 @@
 
           if (pile.length > 0) {
             me.hand.push(...pile);
+          }
+
+          const bossExtraCount = consumeBossExtraDraw(s, botIndex);
+          for (let i = 0; i < bossExtraCount; i++) {
+            if (!s.stock.length) await recycleDeadToStockIfPossible();
+            if (!s.stock.length) break;
+            const extraCard = s.stock.pop();
+            ensureCardId(extraCard);
+            me.hand.push(extraCard);
           }
 
           if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
@@ -5109,6 +6021,8 @@
 
           const targetIdx = intent.action === 'extend' ? intent.meldIndex : team.melds.length - 1;
           let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind, targetIdx);
+          const bossEvent = await processBossMeldChange(me, kindBeforeFechado || 'simple', classifyMeldForUi(meldToCheck).kind, targetIdx, bossAddedCards, intent.action === 'new');
+          if (s.finished) return true;
 
           sortHand(me.hand);
           s.hasDrawnThisTurn = true;
@@ -5125,6 +6039,7 @@
               playerId: botIndex,
               tookDead,
               drawnCards: domReward?.drawnCards,
+              bossEvent,
               ts: Date.now(),
             };
             await this.commitState();
@@ -5136,6 +6051,10 @@
           const s = this.getState();
           if (!s) return;
           const me = s.players[botIndex];
+          if (isBossCardBlocked(s, me.id, me.hand[cardIndex]?.id, 'discard')) {
+            cardIndex = me.hand.findIndex((card) => !isBossCardBlocked(s, me.id, card?.id, 'discard') && card?.id !== s.pickedDiscardCardId);
+          }
+          if (cardIndex < 0) return false;
           const card = me.hand[cardIndex];
 
           me.hand.splice(cardIndex, 1);
@@ -5154,7 +6073,8 @@
 
           const freshS = this.getState();
           if (freshS) {
-            freshS.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, ts: Date.now() };
+            freshS.lastAction = { id: newActionId(), type: 'discard', playerId: botIndex, card: packCard(card), tookDead, bossEvent: freshS._pendingBossEvent || null, ts: Date.now() };
+            delete freshS._pendingBossEvent;
             await this.commitState();
           }
         },
@@ -5331,6 +6251,12 @@
           document.getElementById('gameSection').style.display = 'none';
           document.getElementById('scoreSection').style.display = 'none';
           document.getElementById('surrenderSection').style.display = 'none';
+          document.getElementById('bossResultSection').style.display = 'none';
+          document.getElementById('bossHud').style.display = 'none';
+          document.body.classList.remove('boss-mode');
+          document.body.removeAttribute('data-boss-id');
+          lastRenderedBossEventId = null;
+          renderedBossFeedbackCount = null;
 
           const overlay = document.getElementById('countdownOverlay');
           if (overlay) overlay.style.display = 'none';
@@ -5388,15 +6314,18 @@
             document.getElementById('gameSection').style.display = 'none';
           }
 
-          const l = data.lobby;
-          currentLobby = l;
+          const l = { ...data.lobby };
 
           const setIfUnfocused = (id, val) => {
             const el = document.getElementById(id);
             if (document.activeElement !== el && el.value !== String(val)) el.value = val;
           };
 
-          setIfUnfocused('modeSelect', l.mode || '');
+          const lobbyBoss = getBossDefinitionForMode(l.mode);
+          l.variant = normalizeVariantForMode(l.mode, l.variant || '');
+          currentLobby = l;
+          setIfUnfocused('modeSelect', lobbyBoss ? COOPERATIVE_MENU_MODE : l.mode || '');
+          if (lobbyBoss) setIfUnfocused('bossSelect', lobbyBoss.id);
           setIfUnfocused('variantSelect', l.variant || '');
           setIfUnfocused('deckThemeSelect', l.deckTheme || 'classico');
           setIfUnfocused('tableThemeSelect', l.tableTheme || 'feltro'); // Sincroniza inputs entre abas
@@ -5539,6 +6468,7 @@
         if (!data.stateJson) return;
 
         const newState = JSON.parse(data.stateJson);
+        newState.variant = normalizeVariantForMode(newState.mode, newState.variant);
         if (newState.surrender?.active) {
           state = newState;
           if (!window.isClosingGame) invalidateGameSession({ stopMedia: false });
@@ -5616,6 +6546,11 @@
               });
 
               setTimeout(() => {
+                if (hasPendingBossChoices(state)) {
+                  window.isAutoPlaying = false;
+                  renderAll();
+                  return;
+                }
                 showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
                 if (pi) pi.style.pointerEvents = 'auto';
                 if (bm) bm.style.pointerEvents = 'auto';
@@ -5640,7 +6575,21 @@
         }
 
         // --- GATILHO DA INTELIGÊNCIA ARTIFICIAL (SINCRONIZADO) ---
-        if (!state.finished) {
+        const pendingBotChoice = state.boss?.pendingChoices?.find((choice) => state.players?.find((player) => player.id === choice.playerId)?.name?.toUpperCase().includes('BOT'));
+        if (!state.finished && pendingBotChoice) {
+          let hostIdx = state.players.findIndex((player) => player && !player.name.toUpperCase().includes('BOT'));
+          if (hostIdx === -1) hostIdx = myPlayerIndex;
+          if (myPlayerIndex === hostIdx && !window.botPlayTimeoutId) {
+            const sessionId = window.gameSessionId;
+            const signal = botTurnController.signal;
+            window.botPlayTimeoutId = setTimeout(async () => {
+              window.botPlayTimeoutId = null;
+              if (!isGameSessionActive(sessionId, signal) || !hasPendingBossChoices(state)) return;
+              const sessionEngine = createBotEngineForSession(sessionId, signal);
+              await sessionEngine.resolvePendingBossChoice(pendingBotChoice.playerId);
+            }, 700);
+          }
+        } else if (!state.finished && !hasPendingBossChoices(state) && !isBossTurnActive(state)) {
           const currentPlayerObj = state.players[state.currentPlayer];
 
           if (currentPlayerObj && currentPlayerObj.name.toUpperCase().includes('BOT')) {
@@ -5667,6 +6616,7 @@
 
                   if (!isGameSessionActive(scheduledSessionId, scheduledSignal)) return;
                   if (!state || state.finished) return;
+                  if (isBossTurnActive(state) || hasPendingBossChoices(state)) return;
                   if (document.getElementById('gameSection').style.display !== 'flex') return;
                   if (state.debugPaused) return; // 🛑 CORTA A IA IMEDIATAMENTE
                   if (state.turnNumber !== scheduledTurn) return;
@@ -5687,7 +6637,8 @@
       });
 
       window.pushLobby = function () {
-        const mode = document.getElementById('modeSelect').value;
+        applyCooperativeBossPreset();
+        const mode = getEffectiveMenuMode();
         const resetReady = currentLobby && currentLobby.mode !== mode;
 
         const pt1 = document.getElementById('pixTeam1');
@@ -5699,7 +6650,8 @@
 
         const lobby = {
           mode: mode,
-          variant: document.getElementById('variantSelect').value,
+          bossId: getBossDefinitionForMode(mode)?.id || null,
+          variant: normalizeVariantForMode(mode, document.getElementById('variantSelect').value),
           deckTheme: document.getElementById('deckThemeSelect').value,
           tableTheme: document.getElementById('tableThemeSelect').value, // Sincroniza escolha no lobby do Firebase
           betToggle: document.getElementById('betToggle').value,
@@ -5771,7 +6723,7 @@
           'Natália',
         ];
 
-        const mode = document.getElementById('modeSelect').value;
+        const mode = getEffectiveMenuMode();
         if (!mode) return;
 
         let reqPlayers = 2;
@@ -5900,7 +6852,19 @@
 
       // Função que atualiza a quantidade de inputs e os labels do menu
       window.updateMenuDynamic = function () {
-        const mode = document.getElementById('modeSelect').value;
+        const menuMode = document.getElementById('modeSelect').value;
+        const cooperative = menuMode === COOPERATIVE_MENU_MODE;
+        const bossDefinition = cooperative ? applyCooperativeBossPreset() : null;
+        const mode = cooperative ? bossDefinition?.mode || '' : menuMode;
+
+        const bossSelectField = document.getElementById('bossSelectField');
+        const variantMenuField = document.getElementById('variantMenuField');
+        const visualMenuBlock = document.getElementById('visualMenuBlock');
+        const moneyMenuBlock = document.getElementById('moneyMenuBlock');
+        if (bossSelectField) bossSelectField.style.display = cooperative ? '' : 'none';
+        if (variantMenuField) variantMenuField.style.display = cooperative ? 'none' : '';
+        if (visualMenuBlock) visualMenuBlock.style.display = cooperative ? 'none' : '';
+        if (moneyMenuBlock) moneyMenuBlock.style.display = cooperative ? 'none' : '';
 
         // 🎨 ATUALIZA A MINIATURA DO BARALHO NO LOBBY
         const themeSelect = document.getElementById('deckThemeSelect');
@@ -5913,6 +6877,7 @@
         const playersContainer = document.getElementById('playersContainer');
         const playersMenuBlock = document.getElementById('playersMenuBlock');
         const humiliationRules = document.getElementById('humiliationRules');
+        const bossModeRules = document.getElementById('bossModeRules');
 
         const p1 = document.getElementById('boxP1');
         const lbl1 = document.getElementById('lblP1');
@@ -5930,16 +6895,18 @@
         const opt2 = localSelect.querySelector('option[value="2"]');
         const opt3 = localSelect.querySelector('option[value="3"]');
 
-        if (!mode) {
+        if (!menuMode) {
           if (playersMenuBlock) playersMenuBlock.style.display = 'none';
           playersContainer.style.display = 'none';
           humiliationRules.style.display = 'none';
+          if (bossModeRules) bossModeRules.style.display = 'none';
           return;
         }
 
         if (playersMenuBlock) playersMenuBlock.style.display = 'block';
         playersContainer.style.display = 'grid';
         humiliationRules.style.display = 'none';
+        if (bossModeRules) bossModeRules.style.display = 'none';
 
         // 1. Cores e Estilos dos Times para facilitar a visualização (Identidade visual da mesa)
         const styleT1 = 'position: relative; border-left: 4px solid #22c55e; background: rgba(34, 197, 94, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;';
@@ -5960,7 +6927,26 @@
         opt3.disabled = false;
         opt3.textContent = 'Jogador 4';
 
-        if (mode === '1x1') {
+        if (isBossMode(mode)) {
+          const isDominatrixMenu = mode === BOSS_MODE_DOMINATRIX;
+          const cooperativeColor = bossDefinition?.accent || (isDominatrixMenu ? '#ec4899' : '#22c55e');
+          const cooperativeStyle = `position: relative; border-left: 4px solid ${cooperativeColor}; background: rgba(${isDominatrixMenu ? '236, 72, 153' : '34, 197, 94'}, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;`;
+          p1.style.cssText = cooperativeStyle;
+          p2.style.cssText = cooperativeStyle;
+          p3.style.cssText = styleNone;
+          p4.style.cssText = styleNone;
+          lbl1.innerHTML = `Agente 1 <span style="color:${cooperativeColor}; font-size:9px;">(Cooperadores)</span>`;
+          lbl2.innerHTML = `Agente 2 <span style="color:${cooperativeColor}; font-size:9px;">(Cooperadores)</span>`;
+          opt0.textContent = 'Agente 1';
+          opt1.textContent = 'Agente 2';
+          opt2.hidden = true;
+          opt2.disabled = true;
+          opt3.hidden = true;
+          opt3.disabled = true;
+          const betToggle = document.getElementById('betToggle');
+          betToggle.value = 'nao';
+          document.getElementById('betConfig').style.display = 'none';
+        } else if (mode === '1x1') {
           p1.style.cssText = styleT1;
           p2.style.cssText = styleT2;
           p3.style.cssText = styleNone;
@@ -6066,6 +7052,7 @@
         let myTeam = -1;
         if (myPlayerIndex === 0 || myPlayerIndex === 2) myTeam = 0; // Time 1
         if (myPlayerIndex === 1 || myPlayerIndex === 3) myTeam = 1; // Time 2
+        if (isBossMode(mode) && (myPlayerIndex === 0 || myPlayerIndex === 1)) myTeam = 0;
 
         // Sincroniza o Cache Imutável (Dataset) com o Banco de Dados
         if (currentLobby && currentLobby.pixKeys) {
@@ -6200,11 +7187,13 @@
 
         // 🔥 Preenche as configurações e inverte dinamicamente os BOTs de lugar baseado na sua cadeira de teste
         window.debugInstantStart = async (selectedMode, preferredSeat = 0) => {
-          document.getElementById('modeSelect').value = selectedMode;
-          document.getElementById('variantSelect').value = 'aberto';
-          document.getElementById('deckThemeSelect').value = 'dominacao';
-          document.getElementById('tableThemeSelect').value = 'cassino';
-          document.getElementById('betToggle').value = 'sim';
+          const selectedBoss = getBossDefinitionForMode(selectedMode);
+          document.getElementById('modeSelect').value = selectedBoss ? COOPERATIVE_MENU_MODE : selectedMode;
+          if (selectedBoss) document.getElementById('bossSelect').value = selectedBoss.id;
+          document.getElementById('variantSelect').value = normalizeVariantForMode(selectedMode, 'aberto');
+          document.getElementById('deckThemeSelect').value = selectedBoss?.deckTheme || 'dominacao';
+          document.getElementById('tableThemeSelect').value = selectedBoss?.tableTheme || 'cassino';
+          document.getElementById('betToggle').value = selectedBoss ? 'nao' : 'sim';
 
           const targetSeat = String(preferredSeat);
           document.getElementById('localPlayerSelect').value = targetSeat;
@@ -6237,7 +7226,7 @@
 
           window.updateMenuDynamic();
 
-          await startGame(selectedMode, names, 'aberto', ['biel@financeiro.com', 'bot@rebeca.com']);
+          await startGame(selectedMode, names, normalizeVariantForMode(selectedMode, 'aberto'), ['biel@financeiro.com', 'bot@rebeca.com']);
         };
       }
 
@@ -6352,6 +7341,22 @@
         await commitState(); // Salva no Firebase para paralisar a sala inteira
       };
 
+      function showDebugBossDamageReaction() {
+        if (!isCurrentBossMode() || !state?.boss) return;
+        const lines = getBossDefinition(state.boss.id)?.damageReactions || [];
+        if (!lines.length) return;
+        const now = Date.now();
+        const index = Math.abs((state.boss.actionSequence || 0) + now) % lines.length;
+        state.boss.damageReaction = {
+          id: `debug_reaction_${now}_${state.boss.actionSequence || 0}`,
+          round: state.boss.roundNumber,
+          text: lines[index],
+          at: now,
+          until: now + 2500,
+          debugPreview: true,
+        };
+      }
+
       window.debugMeld = async (type) => {
         if (!ensureMyTurn()) return;
         const team = currentTeam();
@@ -6375,6 +7380,9 @@
 
         // Passando o meldIdx corretamente no lugar do array "meld"
         let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx);
+        await processBossMeldChange(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx, meld, true);
+        showDebugBossDamageReaction();
+        if (state.finished) return;
 
         if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
           renderHand(); // Força as cartas a existirem no DOM para voarem até a mão
@@ -6451,8 +7459,9 @@
       // VALIDAÇÃO E ENVIO DO "ESTOU PRONTO"
       document.getElementById('startBtn').onclick = () => {
         const errorDiv = document.getElementById('menuError');
-        const mode = document.getElementById('modeSelect').value;
-        const variant = document.getElementById('variantSelect').value;
+        applyCooperativeBossPreset();
+        const mode = getEffectiveMenuMode();
+        const variant = normalizeVariantForMode(mode, document.getElementById('variantSelect').value);
         const localPlayer = document.getElementById('localPlayerSelect').value;
         const betToggle = document.getElementById('betToggle').value;
         const tableTheme = document.getElementById('tableThemeSelect').value; // 🔥 CORREÇÃO: Declaração adicionada aqui
@@ -6491,7 +7500,7 @@
         }
 
         // 4. Verifica se os nomes visíveis estão preenchidos
-        if (mode.startsWith('1x1') && (!p1 || !p2)) {
+        if ((mode.startsWith('1x1') || isBossMode(mode)) && (!p1 || !p2)) {
           errorDiv.textContent = 'Preencha o nome dos 2 jogadores.';
           errorDiv.style.display = 'block';
           return;
@@ -6666,8 +7675,9 @@
 
         // 4. Salva a fuga no Firebase
         const fullLobby = {
-          mode: document.getElementById('modeSelect').value,
-          variant: document.getElementById('variantSelect').value,
+          mode: getEffectiveMenuMode(),
+          bossId: getBossDefinitionForMode(getEffectiveMenuMode())?.id || null,
+          variant: normalizeVariantForMode(getEffectiveMenuMode(), document.getElementById('variantSelect').value),
           betToggle: document.getElementById('betToggle').value,
           betBase: document.getElementById('betBase').value,
           betPerPoint: document.getElementById('betPerPoint').value,
@@ -6791,6 +7801,8 @@
         document.getElementById('voteNoBtn').style.display = alreadyVoted ? 'none' : 'block';
       }
       document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
+      document.getElementById('closeBossResultBtn').onclick = () => (document.getElementById('bossResultSection').style.display = 'none');
+      document.getElementById('bossRematchBtn').onclick = () => window.voteRematch();
       // Abre o placar manualmente pela mesa
       document.getElementById('showScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'flex');
 

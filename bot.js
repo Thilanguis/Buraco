@@ -47,6 +47,15 @@ export class BuracoBot {
         return;
       }
 
+      if (typeof engine.resolvePendingBossChoice === 'function') {
+        await engine.resolvePendingBossChoice(botIndex);
+        state = engine.getState();
+        me = state.players[botIndex];
+        team = state.teams[me.teamId];
+        oppTeam = state.teams[me.teamId === 0 ? 1 : 0];
+      }
+      if (typeof engine.hasPendingBossChoice === 'function' && engine.hasPendingBossChoice()) return;
+
       const myScore = engine.computeTeamMeldScore(team).total;
       const oppScore = engine.computeTeamMeldScore(oppTeam).total;
       const stockCount = state.stock.length;
@@ -68,7 +77,7 @@ export class BuracoBot {
       // isDesperate absorve o Pânico, forçando o bot a quebrar as regras de segurar carta
       const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25) || isPanicDump;
       const isRushingMorto = !tookMorto && me.hand.length <= 5;
-      const isDuo = state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes && team.playerIndexes.length > 1);
+      const isDuo = state.mode?.startsWith('boss_') || state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes && team.playerIndexes.length > 1);
 
       // 🛡️ Identifica se o bot faz parte do time "Apelão" (Vantagem)
       const isVip = ((state.mode === '1x1_dominacao' || state.mode === '1x1_duploMorto') && botIndex === 1) || ((state.mode === '1x2' || state.mode === '1x3') && me.teamId === 1);
@@ -87,13 +96,14 @@ export class BuracoBot {
       try {
         this.assertActive(engine, signal);
         let boughtFromDiscard = false;
-        if (state.discard.length > 0) {
+        if (state.discard.length > 0 && !engine.isDiscardBlocked?.()) {
           const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
           if (intent && intent.wants) {
             engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
 
             this.assertActive(engine, signal);
-            const drawOk = state.variant === 'fechado' ? await engine.executeDrawDiscardFechado(botIndex, intent) : await engine.executeDrawDiscard(botIndex);
+            const usesClosedDiscard = state.variant === 'fechado' || state.mode?.startsWith('boss_');
+            const drawOk = usesClosedDiscard ? await engine.executeDrawDiscardFechado(botIndex, intent) : await engine.executeDrawDiscard(botIndex);
             boughtFromDiscard = drawOk !== false;
           }
         }
@@ -260,6 +270,7 @@ export class BuracoBot {
     // FASE 1: Tenta comprar usando jogo LIMPO (Encaixe perfeito)
     if (team.melds && team.melds.length > 0) {
       for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+        if (engine.isMeldLocked?.(team.id, mIdx)) continue;
         const meld = team.melds[mIdx];
         if (topIsWildOrTwo && this.isMeldDirty(meld)) continue;
 
@@ -351,6 +362,7 @@ export class BuracoBot {
     if (allowDirty) {
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+          if (engine.isMeldLocked?.(team.id, mIdx)) continue;
           const meld = team.melds[mIdx];
           if (topIsWildOrTwo && this.isMeldDirty(meld)) continue;
 
@@ -496,6 +508,7 @@ export class BuracoBot {
 
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+          if (engine.isMeldLocked?.(team.id, mIdx)) continue;
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
             if (c.joker || c.rank === '2') continue;
@@ -512,8 +525,8 @@ export class BuracoBot {
 
             if (engine.isValidSequenceMeld(testMeld)) {
               this.assertActive(engine, signal);
-              await engine.executeMeldExtend(botIndex, mIdx, [i]);
-              madeMove = true;
+              const moved = await engine.executeMeldExtend(botIndex, mIdx, [i]);
+              madeMove = moved !== false;
               await this.sleep(300, engine, signal);
               break;
             }
@@ -525,6 +538,7 @@ export class BuracoBot {
 
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+          if (engine.isMeldLocked?.(team.id, mIdx)) continue;
           const meld = team.melds[mIdx];
           if (this.isMeldDirty(meld)) continue;
 
@@ -552,8 +566,8 @@ export class BuracoBot {
 
               if (engine.isValidSequenceMeld(testMeld)) {
                 this.assertActive(engine, signal);
-                await engine.executeMeldExtend(botIndex, mIdx, [i]);
-                madeMove = true;
+                const moved = await engine.executeMeldExtend(botIndex, mIdx, [i]);
+                madeMove = moved !== false;
                 await this.sleep(300, engine, signal);
                 break;
               }
@@ -605,8 +619,8 @@ export class BuracoBot {
 
               if (engine.isValidSequenceMeld(combo)) {
                 this.assertActive(engine, signal);
-                await engine.executeMeldNew(botIndex, [i, j, k]);
-                madeMove = true;
+                const moved = await engine.executeMeldNew(botIndex, [i, j, k]);
+                madeMove = moved !== false;
                 await this.sleep(400, engine, signal);
                 break;
               }
@@ -635,6 +649,7 @@ export class BuracoBot {
       if (allowDirty) {
         if (team.melds && team.melds.length > 0) {
           for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+            if (engine.isMeldLocked?.(team.id, mIdx)) continue;
             const meld = team.melds[mIdx];
             if (this.isMeldDirty(meld)) continue;
 
@@ -686,8 +701,8 @@ export class BuracoBot {
 
               if (engine.isValidSequenceMeld(testMeld)) {
                 this.assertActive(engine, signal);
-                await engine.executeMeldExtend(botIndex, mIdx, [i]);
-                madeMove = true;
+                const moved = await engine.executeMeldExtend(botIndex, mIdx, [i]);
+                madeMove = moved !== false;
                 await this.sleep(400, engine, signal);
                 break;
               }
@@ -721,8 +736,8 @@ export class BuracoBot {
 
                 if (engine.isValidSequenceMeld(combo)) {
                   this.assertActive(engine, signal);
-                  await engine.executeMeldNew(botIndex, [i, j, k]);
-                  madeMove = true;
+                  const moved = await engine.executeMeldNew(botIndex, [i, j, k]);
+                  madeMove = moved !== false;
                   await this.sleep(400, engine, signal);
                   break;
                 }
