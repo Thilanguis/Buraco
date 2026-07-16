@@ -506,6 +506,55 @@ export class BuracoBot {
       // A trava VIP agora vem do contexto global para operar de forma unificada
       const isVipSniper = ctx.isVipSniper;
 
+      const naturePriorities = engine.getNaturePriorities?.(me.id);
+      if (naturePriorities && (naturePriorities.markedCardIds.length || naturePriorities.meldIndexes.length)) {
+        const markedCards = new Set(naturePriorities.markedCardIds);
+        const markedMelds = new Set(naturePriorities.meldIndexes);
+        const cardIndexes = me.hand.map((card, index) => ({ card, index })).sort((a, b) => Number(markedCards.has(b.card?.id)) - Number(markedCards.has(a.card?.id)));
+        const meldIndexes = (team.melds || []).map((meld, index) => ({ meld, index })).sort((a, b) => Number(markedMelds.has(b.index)) - Number(markedMelds.has(a.index)));
+
+        for (const { meld, index: meldIndex } of meldIndexes) {
+          if (engine.isMeldLocked?.(team.id, meldIndex)) continue;
+          for (const { card, index: handIndex } of cardIndexes) {
+            if (!card || (!markedCards.has(card.id) && !markedMelds.has(meldIndex))) continue;
+            const testMeld = this.simulateMeld(meld, [card], engine);
+            if (!engine.isValidSequenceMeld(testMeld) || !this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
+            this.assertActive(engine, signal);
+            const moved = await engine.executeMeldExtend(botIndex, meldIndex, [handIndex]);
+            if (moved !== false) {
+              madeMove = true;
+              await this.sleep(300, engine, signal);
+              break;
+            }
+          }
+          if (madeMove) break;
+        }
+        if (madeMove) continue;
+
+        if (markedCards.size && engine.canCreateMeld?.(me.id) !== false && me.hand.length >= 3) {
+          const markedIndex = me.hand.findIndex((card) => markedCards.has(card?.id));
+          if (markedIndex >= 0) {
+            outerNatureCombo: for (let first = 0; first < me.hand.length - 1; first += 1) {
+              if (first === markedIndex) continue;
+              for (let second = first + 1; second < me.hand.length; second += 1) {
+                if (second === markedIndex) continue;
+                const indexes = [markedIndex, first, second];
+                const combo = indexes.map((index) => me.hand[index]);
+                if (!engine.isValidSequenceMeld(combo) || !this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
+                this.assertActive(engine, signal);
+                const moved = await engine.executeMeldNew(botIndex, indexes);
+                if (moved !== false) {
+                  madeMove = true;
+                  await this.sleep(400, engine, signal);
+                  break outerNatureCombo;
+                }
+              }
+            }
+          }
+        }
+        if (madeMove) continue;
+      }
+
       if (team.melds && team.melds.length > 0) {
         for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
           if (engine.isMeldLocked?.(team.id, mIdx)) continue;

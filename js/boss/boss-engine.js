@@ -13,6 +13,7 @@ const BOSS_RANKS_LOW = Object.freeze(['A', '2', '3', '4', '5', '6', '7', '8', '9
 
 export const BOSS_MODE_BANKER = 'boss_banker';
 export const BOSS_MODE_DOMINATRIX = 'boss_dominadora';
+export const BOSS_MODE_MATRIARCH = 'boss_matriarca';
 
 export function isBossMode(stateOrMode) {
   const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
@@ -22,6 +23,11 @@ export function isBossMode(stateOrMode) {
 export function isDominatrixMode(stateOrMode) {
   const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
   return mode === BOSS_MODE_DOMINATRIX;
+}
+
+export function isMatriarchMode(stateOrMode) {
+  const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
+  return mode === BOSS_MODE_MATRIARCH;
 }
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -179,8 +185,52 @@ function possessionDamageForMeld(gameState, meldIndex) {
   const individualDamage = meld.reduce((total, card) => (
     card?.id && damagedCardIds.has(card.id) ? total + bossCardDamage(card) : total
   ), 0);
-  const canastraDamage = Math.max(0, Number(boss.meldProgress?.[`0:${meldIndex}`]?.damageValue) || 0);
+  const meldId = resolveBossMeldId(gameState, 0, meldIndex, false);
+  const canastraDamage = Math.max(0, Number(boss.meldProgress?.[meldId || `0:${meldIndex}`]?.damageValue) || 0);
   return individualDamage + canastraDamage;
+}
+
+function resolveBossMeldId(gameState, teamId, meldIndex, create = true) {
+  const boss = gameState?.boss;
+  const meld = gameState?.teams?.[teamId]?.melds?.[meldIndex];
+  if (!boss || !Array.isArray(meld)) return null;
+  boss.meldIdsByCardId ||= {};
+  boss.meldIdsByPosition ||= {};
+  const positionKey = `${teamId}:${meldIndex}`;
+  let meldId = meld
+    .map((card) => card?.id && boss.meldIdsByCardId[card.id])
+    .find(Boolean) || boss.meldIdsByPosition[positionKey] || null;
+  if (!meldId && create) {
+    boss.meldIdSequence = (Number(boss.meldIdSequence) || 0) + 1;
+    meldId = `meld_${teamId}_${boss.meldIdSequence}`;
+  }
+  if (!meldId) return null;
+  boss.meldIdsByPosition[positionKey] = meldId;
+  meld.forEach((card) => {
+    if (card?.id) boss.meldIdsByCardId[card.id] = meldId;
+  });
+  return meldId;
+}
+
+function ensureBossMeldContribution(boss, meldId) {
+  if (!boss || !meldId) return null;
+  boss.meldContributions ||= {};
+  boss.meldContributions[meldId] ||= {
+    damageDone: 0,
+    bankerDebtRelief: 0,
+    dominatrixChainsBroken: 0,
+    matriarchBloomRemoved: 0,
+    matriarchBloomTier: 0,
+  };
+  return boss.meldContributions[meldId];
+}
+
+export function getBossMeldContribution(gameState, teamId, meldIndex) {
+  if (!isBossMode(gameState) || !gameState?.boss) return null;
+  const meldId = resolveBossMeldId(gameState, teamId, meldIndex, false);
+  if (!meldId) return null;
+  const contribution = gameState.boss.meldContributions?.[meldId];
+  return contribution ? { meldId, ...contribution } : null;
 }
 
 function cardCanBePlayedNow(gameState, player, card) {
@@ -198,7 +248,16 @@ function cardCanBePlayedNow(gameState, player, card) {
 }
 
 function isCardBlockedByBossState(boss, playerId, cardId, action = 'play') {
-  if (!boss || boss.id !== 'dominadora' || !cardId) return false;
+  if (!boss || !cardId) return false;
+  if (boss.id === 'matriarca_esmeralda') {
+    if (action !== 'discard') return false;
+    return activeNatureThreats(boss).some((threat) => (
+      threat.targetPlayerId === playerId
+      && threat.cardId === cardId
+      && ['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type)
+    ));
+  }
+  if (boss.id !== 'dominadora') return false;
   const intent = boss.currentIntent;
   if (intent?.abilityId === 'collar' && intent.payload?.targetPlayerId === playerId) {
     const cardIds = intent.payload?.cardIds || (intent.payload?.cardId ? [intent.payload.cardId] : []);
@@ -235,6 +294,54 @@ function canApplyDiscardLock(gameState, player, cardIds) {
 
 function eligibleExposureCards(gameState, player) {
   return (player?.hand || []).filter((card) => cardCanBePlayedNow(gameState, player, card) && canApplyDiscardLock(gameState, player, [card.id]));
+}
+
+const MATRIARCH_THREAT_LIMIT = Object.freeze({ 1: 1, 2: 2, 3: 3 });
+const MATRIARCH_HEAL_LIMIT = Object.freeze({ 1: 150, 2: 220, 3: 300 });
+const MATRIARCH_ABILITIES = new Set([
+  'living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft',
+  'discard_pollen', 'harvest', 'royal_bloom', 'emerald_cocoon', 'spring_crown',
+]);
+
+function activeNatureThreats(boss) {
+  return (boss?.natureThreats || []).filter((threat) => threat?.status === 'active');
+}
+
+function natureThreatSlots(gameState) {
+  const boss = gameState.boss;
+  return Math.max(0, (MATRIARCH_THREAT_LIMIT[boss.phase] || 1) - activeNatureThreats(boss).length);
+}
+
+function matriarchSeedCandidates(gameState) {
+  const markedCardIds = new Set(activeNatureThreats(gameState.boss).map((threat) => threat.cardId).filter(Boolean));
+  return (gameState.players || []).flatMap((player) => eligibleExposureCards(gameState, player)
+    .filter((card) => !markedCardIds.has(card.id) && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play'))
+    .map((card) => ({ player, card })));
+}
+
+function matriarchRootCandidates(gameState) {
+  return eligibleMeldIndexes(gameState).map((meldIndex) => ({
+    meldIndex,
+    meldId: resolveBossMeldId(gameState, 0, meldIndex, true),
+  })).filter((entry) => entry.meldId && !activeNatureThreats(gameState.boss).some((threat) => (
+    threat.meldId === entry.meldId || threat.meldIds?.includes(entry.meldId)
+  )));
+}
+
+function matriarchDiscardCandidate(gameState) {
+  return gameState.discard?.at?.(-1) || gameState.discard?.[gameState.discard.length - 1] || null;
+}
+
+function buildRoyalBloomObjectives(gameState) {
+  const objectives = [];
+  const slots = Math.min(3, natureThreatSlots(gameState));
+  const seed = chooseSeeded(matriarchSeedCandidates(gameState), gameState, 211);
+  if (seed && objectives.length < slots) objectives.push({ type: 'seed', targetPlayerId: seed.player.id, cardId: seed.card.id });
+  const root = chooseSeeded(matriarchRootCandidates(gameState), gameState, 223);
+  if (root && objectives.length < slots) objectives.push({ type: 'root', ...root });
+  const discard = matriarchDiscardCandidate(gameState);
+  if (discard?.id && objectives.length < slots) objectives.push({ type: 'pollen', discardCardId: discard.id });
+  return objectives;
 }
 
 function createPayload(gameState, abilityId) {
@@ -304,6 +411,38 @@ function createPayload(gameState, abilityId) {
     if (abilityId === 'final_order') return { orderedPlayerIds: (gameState.players || []).map((player) => player.id) };
   }
 
+  if (boss.id === 'matriarca_esmeralda') {
+    if (abilityId === 'living_seed') {
+      const candidate = chooseSeeded(matriarchSeedCandidates(gameState), gameState, 181);
+      return { targetPlayerId: candidate?.player?.id ?? null, cardId: candidate?.card?.id ?? null };
+    }
+    if (abilityId === 'hungry_root') {
+      return chooseSeeded(matriarchRootCandidates(gameState), gameState, 183) || { meldIndex: null, meldId: null };
+    }
+    if (abilityId === 'restorative_dew') return { baseHeal: 100, reductionPerCard: 20, countedCardIds: [] };
+    if (abilityId === 'twin_vines') {
+      const candidates = matriarchRootCandidates(gameState);
+      const first = chooseSeeded(candidates, gameState, 185);
+      const remaining = candidates.filter((entry) => entry.meldId !== first?.meldId);
+      const second = chooseSeeded(remaining, gameState, 187);
+      return { targets: [first, second].filter(Boolean), targetCount: [first, second].filter(Boolean).length };
+    }
+    if (abilityId === 'graft') {
+      const candidates = matriarchRootCandidates(gameState);
+      const first = chooseSeeded(candidates, gameState, 189);
+      const second = chooseSeeded(candidates.filter((entry) => entry.meldId !== first?.meldId), gameState, 191);
+      return { targets: [first, second].filter(Boolean) };
+    }
+    if (abilityId === 'discard_pollen') return { discardCardId: matriarchDiscardCandidate(gameState)?.id ?? null };
+    if (abilityId === 'harvest') return { targetPlayerId: choosePlayer(gameState, 193)?.id ?? null };
+    if (abilityId === 'royal_bloom') {
+      const objectives = buildRoyalBloomObjectives(gameState);
+      return { objectives, targetCount: objectives.length };
+    }
+    if (abilityId === 'emerald_cocoon') return { amount: 180 };
+    if (abilityId === 'spring_crown') return { activeThreatIds: activeNatureThreats(boss).map((threat) => threat.id) };
+  }
+
   return {};
 }
 
@@ -346,6 +485,19 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'forced_swap' || abilityId === 'hands_tied' || abilityId === 'separation') {
     return players.length >= 2;
   }
+  if (abilityId === 'living_seed') return playerHasCard(gameState, payload.targetPlayerId, payload.cardId) && natureThreatSlots(gameState) > 0;
+  if (abilityId === 'hungry_root') return !!payload.meldId && natureThreatSlots(gameState) > 0;
+  if (abilityId === 'restorative_dew' || abilityId === 'harvest' || abilityId === 'discard_pollen') {
+    if (natureThreatSlots(gameState) <= 0) return false;
+    if (abilityId === 'harvest') return players.some((player) => player.id === payload.targetPlayerId);
+    if (abilityId === 'discard_pollen') return !!payload.discardCardId;
+    return true;
+  }
+  if (abilityId === 'twin_vines') return payload.targets?.length > 0 && natureThreatSlots(gameState) > 0;
+  if (abilityId === 'graft') return payload.targets?.length === 2 && natureThreatSlots(gameState) > 0;
+  if (abilityId === 'royal_bloom') return payload.objectives?.length > 0 && natureThreatSlots(gameState) > 0;
+  if (abilityId === 'emerald_cocoon') return !gameState.boss?.emeraldCocoon;
+  if (abilityId === 'spring_crown') return activeNatureThreats(gameState.boss).length > 0;
   return true;
 }
 
@@ -382,6 +534,17 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     dangerType: definition.dangerType || 'debt',
     danger: 0,
     maxDanger: definition.maxDanger,
+    bloom: 0,
+    natureThreats: [],
+    natureHealingThisRound: 0,
+    natureHealingRound: 1,
+    emeraldCocoon: null,
+    springCrown: null,
+    rebirthUsed: false,
+    lastBloomEventId: null,
+    lastHealEventId: null,
+    resolvedNatureEventIds: [],
+    natureFailureCountThisRound: 0,
     roundNumber: 1,
     playersActedThisRound: [],
     currentIntent: null,
@@ -397,6 +560,10 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     possessions: [],
     pendingChoices: [],
     meldProgress: {},
+    meldContributions: {},
+    meldIdsByCardId: {},
+    meldIdsByPosition: {},
+    meldIdSequence: 0,
     deadRewardsApplied: 0,
     resolvedTurnIds: [],
     phaseTransitions: [1],
@@ -448,6 +615,17 @@ export function normalizeBossState(gameState) {
     boss.chainsByPlayer[player.id] = clamp(Number(boss.chainsByPlayer[player.id]) || 0, 0, 4);
   });
   boss.meldProgress ||= {};
+  boss.meldContributions ||= {};
+  Object.values(boss.meldContributions).forEach((entry) => {
+    entry.damageDone ||= 0;
+    entry.bankerDebtRelief ||= 0;
+    entry.dominatrixChainsBroken ||= 0;
+    entry.matriarchBloomRemoved ||= 0;
+    entry.matriarchBloomTier ||= 0;
+  });
+  boss.meldIdsByCardId ||= {};
+  boss.meldIdsByPosition ||= {};
+  boss.meldIdSequence ||= 0;
   boss.resolvedTurnIds ||= [];
   boss.playersActedThisRound ||= [];
   boss.phaseTransitions ||= [boss.phase || 1];
@@ -459,6 +637,20 @@ export function normalizeBossState(gameState) {
   boss.eventLog ||= [];
   boss.damageReaction ||= null;
   boss.lastDamageReactionRound ||= 0;
+  boss.healReaction ||= null;
+  boss.lastHealReactionRound ||= 0;
+  boss.bloom = clamp(Number(boss.bloom ?? (boss.id === 'matriarca_esmeralda' ? boss.danger : 0)) || 0, 0, 5);
+  if (boss.id === 'matriarca_esmeralda') boss.danger = boss.bloom;
+  boss.natureThreats ||= [];
+  boss.natureHealingThisRound ||= 0;
+  boss.natureHealingRound ||= boss.roundNumber || 1;
+  boss.emeraldCocoon ||= null;
+  boss.springCrown ||= null;
+  boss.rebirthUsed ||= false;
+  boss.lastBloomEventId ||= null;
+  boss.lastHealEventId ||= null;
+  boss.resolvedNatureEventIds ||= [];
+  boss.natureFailureCountThisRound ||= 0;
   boss.stats ||= { totalDamage: 0, canastrasFormed: 0, largestAttack: 0, finalStrike: 0, finalDebt: 0 };
 
   Object.entries(boss.vaultsByPlayer).forEach(([playerId, vault]) => {
@@ -551,6 +743,42 @@ export function normalizeBossState(gameState) {
         });
       }
     }
+  }
+  if (boss.id === 'matriarca_esmeralda') {
+    const playerById = (playerId) => (gameState.players || []).find((player) => player.id === playerId);
+    const meldIndexById = (meldId) => (gameState.teams?.[0]?.melds || []).findIndex((meld, meldIndex) => (
+      resolveBossMeldId(gameState, 0, meldIndex, false) === meldId
+    ));
+    const cardIsOnTable = (cardId) => (gameState.teams?.[0]?.melds || []).some((meld) => (
+      (meld || []).some((card) => card?.id === cardId)
+    ));
+
+    for (const threat of [...activeNatureThreats(boss)]) {
+      if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId != null) {
+        const target = playerById(threat.targetPlayerId);
+        if (cardIsOnTable(threat.cardId)) {
+          succeedNatureThreat(gameState, threat, `${target?.name || 'O alvo'} usou a carta marcada.`);
+        } else if (!target?.hand?.some((card) => card?.id === threat.cardId)) {
+          cancelNatureThreat(gameState, threat, 'A carta marcada deixou de ser um alvo valido.');
+        }
+      } else if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
+        const currentIndex = meldIndexById(threat.meldId);
+        if (currentIndex < 0) cancelNatureThreat(gameState, threat, 'O jogo marcado deixou de existir.');
+        else threat.meldIndex = currentIndex;
+      } else if (threat.type === 'graft') {
+        const indexes = (threat.meldIds || []).map(meldIndexById);
+        if (indexes.length !== 2 || indexes.some((index) => index < 0)) {
+          cancelNatureThreat(gameState, threat, 'O Enxerto perdeu um dos jogos ligados.');
+        } else threat.meldIndexes = indexes;
+      } else if (threat.type === 'harvest' && !playerById(threat.targetPlayerId)) {
+        cancelNatureThreat(gameState, threat, 'A Colheita perdeu o jogador alvo.');
+      } else if (['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null) {
+        const discardTopId = gameState.discard?.[gameState.discard.length - 1]?.id || null;
+        if (discardTopId !== threat.discardCardId) cancelNatureThreat(gameState, threat, 'O topo do lixo mudou antes de ser pego.');
+      }
+    }
+
+    if (boss.emeraldCocoon && boss.emeraldCocoon.status !== 'active') boss.emeraldCocoon = null;
   }
   if (boss.phaseModel !== 'progress-v1') {
     boss.phaseModel = 'progress-v1';
@@ -674,10 +902,11 @@ export function advanceBossTurn(gameState, now = Date.now()) {
   if (flow.stage !== 'pending' && flow.stage !== 'players' && now < flow.endsAt) return null;
   if (flow.stage === 'ability') {
     const announcedIntent = boss.currentIntent;
-    const resolvesBeforePlayers = announcedIntent?.duration === 'immediate' || announcedIntent?.abilityId === 'forced_choice';
+    const matriarchActivation = boss.id === 'matriarca_esmeralda' && MATRIARCH_ABILITIES.has(announcedIntent?.abilityId);
+    const resolvesBeforePlayers = announcedIntent?.duration === 'immediate' || announcedIntent?.abilityId === 'forced_choice' || matriarchActivation;
     if (resolvesBeforePlayers && !announcedIntent.immediateApplied) {
       const immediateEvent = resolveIntent(gameState, { keepIntent: true, appliedAt: now });
-      if (immediateEvent) flow.queue.unshift({ kind: 'result', eventActionId: immediateEvent.actionId });
+      if (immediateEvent && !matriarchActivation) flow.queue.unshift({ kind: 'result', eventActionId: immediateEvent.actionId });
       if (announcedIntent?.abilityId === 'forced_choice' && boss.pendingChoices.length) {
         flow.stage = 'choice';
         flow.startedAt = now;
@@ -734,6 +963,311 @@ function recordEvent(boss, event) {
   boss.eventLog.push(recordedEvent);
   if (boss.eventLog.length > 30) boss.eventLog.splice(0, boss.eventLog.length - 30);
   return recordedEvent;
+}
+
+function natureEventWasResolved(boss, eventId) {
+  return !!eventId && boss.resolvedNatureEventIds.includes(eventId);
+}
+
+function markNatureEventResolved(boss, eventId) {
+  if (!eventId || boss.resolvedNatureEventIds.includes(eventId)) return;
+  boss.resolvedNatureEventIds.push(eventId);
+  if (boss.resolvedNatureEventIds.length > 80) boss.resolvedNatureEventIds.splice(0, boss.resolvedNatureEventIds.length - 80);
+}
+
+export function changeMatriarchBloom(gameState, amount, origin = 'Florescimento', eventId = null) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'matriarca_esmeralda' || boss.result || !amount || natureEventWasResolved(boss, eventId)) return null;
+  const before = boss.bloom;
+  boss.bloom = clamp(before + amount, 0, boss.maxDanger || 5);
+  boss.danger = boss.bloom;
+  const applied = boss.bloom - before;
+  if (!applied) return null;
+  markNatureEventResolved(boss, eventId);
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'bloomChange',
+    actionId: eventId || `bloom_${boss.actionSequence}`,
+    amount: applied,
+    bloom: boss.bloom,
+    origin,
+    outcome: `${origin}: ${applied > 0 ? '+' : ''}${applied} Flor${Math.abs(applied) === 1 ? '' : 'es'}.`,
+  });
+  boss.lastBloomEventId = event.actionId;
+  if (boss.bloom >= boss.maxDanger && !boss.result) {
+    boss.result = {
+      victory: false,
+      reason: 'max_bloom',
+      title: 'Primavera Eterna',
+      detail: 'O quinto Florescimento transformou a mesa no jardim da Matriarca.',
+    };
+  }
+  return event;
+}
+
+export function healMatriarch(gameState, requested, origin = 'Cura natural', eventId = null) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'matriarca_esmeralda' || boss.result || requested <= 0 || natureEventWasResolved(boss, eventId)) return null;
+  if (boss.natureHealingRound !== boss.roundNumber) {
+    boss.natureHealingRound = boss.roundNumber;
+    boss.natureHealingThisRound = 0;
+    boss.natureFailureCountThisRound = 0;
+  }
+  const roundLimit = MATRIARCH_HEAL_LIMIT[boss.phase] || 150;
+  const availableByRound = Math.max(0, roundLimit - boss.natureHealingThisRound);
+  const availableHp = Math.max(0, boss.maxHp - boss.hp);
+  const applied = Math.min(Math.max(0, Number(requested) || 0), availableByRound, availableHp);
+  markNatureEventResolved(boss, eventId);
+  if (!applied) return null;
+  boss.hp += applied;
+  boss.natureHealingThisRound += applied;
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'bossHeal',
+    actionId: eventId || `heal_${boss.actionSequence}`,
+    amount: applied,
+    requested: Number(requested) || 0,
+    hp: boss.hp,
+    origin,
+    outcome: `${origin}: +${applied} HP.`,
+  });
+  boss.lastHealEventId = event.actionId;
+  if (boss.lastHealReactionRound !== boss.roundNumber) {
+    boss.lastHealReactionRound = boss.roundNumber;
+    event.reaction = getBossDefinition(boss.id)?.healReactions?.[0] || '';
+    if (event.reaction) {
+      boss.healReaction = {
+        id: `heal_reaction_${boss.roundNumber}`,
+        text: event.reaction,
+        at: Date.now(),
+        until: Date.now() + 2500,
+      };
+    }
+  }
+  return event;
+}
+
+function triggerMatriarchRebirth(gameState, sourceActionId) {
+  const boss = gameState.boss;
+  if (boss.id !== 'matriarca_esmeralda' || boss.hp > 0 || boss.phase !== 3 || boss.bloom < 3 || boss.rebirthUsed || boss.result) return false;
+  boss.rebirthUsed = true;
+  boss.bloom -= 3;
+  boss.danger = boss.bloom;
+  boss.hp = 300;
+  boss.actionSequence += 1;
+  recordEvent(boss, {
+    type: 'rebirth',
+    actionId: `rebirth_${sourceActionId || boss.actionSequence}`,
+    hp: boss.hp,
+    bloom: boss.bloom,
+    outcome: 'RENASCIMENTO - 300 HP. Tres Florescimentos foram consumidos.',
+  });
+  return true;
+}
+
+function applyDamageToBoss(gameState, damage, { breaksCocoon = false, sourceActionId = '' } = {}) {
+  const boss = gameState.boss;
+  let remaining = Math.max(0, Number(damage) || 0);
+  let absorbed = 0;
+  let cocoonBroken = false;
+  if (boss.id === 'matriarca_esmeralda' && boss.emeraldCocoon?.status === 'active') {
+    if (breaksCocoon) {
+      boss.emeraldCocoon.remaining = 0;
+      boss.emeraldCocoon.status = 'broken';
+      cocoonBroken = true;
+    } else {
+      absorbed = Math.min(remaining, boss.emeraldCocoon.remaining);
+      boss.emeraldCocoon.remaining -= absorbed;
+      remaining -= absorbed;
+      if (boss.emeraldCocoon.remaining <= 0) {
+        boss.emeraldCocoon.status = 'broken';
+        cocoonBroken = true;
+      }
+    }
+  }
+  const before = boss.hp;
+  boss.hp = clamp(boss.hp - remaining, 0, boss.maxHp);
+  const hpDamage = before - boss.hp;
+  const reborn = triggerMatriarchRebirth(gameState, sourceActionId);
+  return { hpDamage, absorbed, cocoonBroken, reborn, remainingDamage: remaining };
+}
+
+function addNatureThreat(gameState, data) {
+  const boss = gameState.boss;
+  if (natureThreatSlots(gameState) <= 0) return null;
+  boss.actionSequence += 1;
+  const threat = {
+    id: data.id || `nature_${boss.roundNumber}_${boss.actionSequence}_${data.type}`,
+    createdRound: boss.roundNumber,
+    deadlineRound: boss.roundNumber,
+    healAmount: 0,
+    bloomAmount: 0,
+    status: 'active',
+    resolvedEventId: null,
+    ...data,
+  };
+  boss.natureThreats.push(threat);
+  return threat;
+}
+
+function completeNatureThreat(boss, threat, status, outcome = '') {
+  if (!threat || threat.status !== 'active') return null;
+  threat.status = status;
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'natureThreat',
+    actionId: `threat_${threat.id}_${status}`,
+    threatId: threat.id,
+    threatType: threat.type,
+    status,
+    outcome,
+  });
+  threat.resolvedEventId = event.actionId;
+  return event;
+}
+
+function failNatureThreat(gameState, threat, { bloom = threat?.bloomAmount || 0, heal = threat?.healAmount || 0, outcome = '' } = {}) {
+  const boss = gameState.boss;
+  if (!threat || threat.status !== 'active') return null;
+  boss.natureFailureCountThisRound = (boss.natureFailureCountThisRound || 0) + 1;
+  const crownBonus = boss.springCrown?.status === 'active' && boss.natureFailureCountThisRound > 1 ? 30 : 0;
+  const event = completeNatureThreat(boss, threat, 'failed', outcome || 'A ameaca natural nao foi contida.');
+  const bloomEvent = bloom ? changeMatriarchBloom(gameState, bloom, threat.name || 'Ameaca natural', `${threat.id}:bloom`) : null;
+  const healEvent = heal || crownBonus
+    ? healMatriarch(gameState, heal + crownBonus, threat.name || 'Ameaca natural', `${threat.id}:heal`)
+    : null;
+  if (event) {
+    event.bloomApplied = bloomEvent?.amount || 0;
+    event.healApplied = healEvent?.amount || 0;
+    event.crownBonus = crownBonus;
+  }
+  return event;
+}
+
+function succeedNatureThreat(gameState, threat, outcome = '') {
+  return completeNatureThreat(gameState.boss, threat, 'success', outcome || 'A ameaca natural foi contida.');
+}
+
+function cancelNatureThreat(gameState, threat, outcome = '') {
+  return completeNatureThreat(gameState.boss, threat, 'cancelled', outcome || 'A ameaca perdeu o alvo e foi cancelada.');
+}
+
+function resolveMatriarchPlayerDeadline(gameState, playerId) {
+  const boss = gameState.boss;
+  if (boss?.id !== 'matriarca_esmeralda') return [];
+  const player = gameState.players?.find((entry) => entry.id === playerId);
+  const events = [];
+  for (const threat of activeNatureThreats(boss).filter((entry) => entry.deadlinePlayerId === playerId)) {
+    if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type)) {
+      const remainsInHand = !!player?.hand?.some((card) => card?.id === threat.cardId);
+      events.push(remainsInHand
+        ? failNatureThreat(gameState, threat, { outcome: `${player?.name || 'O alvo'} terminou o turno com a carta marcada.` })
+        : succeedNatureThreat(gameState, threat, `${player?.name || 'O alvo'} usou a carta marcada.`));
+    } else if (threat.type === 'harvest') {
+      const cards = player?.hand?.length || 0;
+      if (cards <= 7) events.push(succeedNatureThreat(gameState, threat, `Colheita: ${cards} cartas, sem cura.`));
+      else if (cards <= 10) events.push(failNatureThreat(gameState, threat, { bloom: 0, heal: 40, outcome: `Colheita: ${cards} cartas, cura de 40 HP.` }));
+      else events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 80, outcome: `Colheita: ${cards} cartas, +1 Flor e cura de 80 HP.` }));
+    }
+  }
+  return events.filter(Boolean);
+}
+
+function resolveMatriarchRound(gameState) {
+  const boss = gameState.boss;
+  if (boss?.id !== 'matriarca_esmeralda') return [];
+  const events = [];
+  const discardTopId = gameState.discard?.[gameState.discard.length - 1]?.id || null;
+  for (const threat of [...activeNatureThreats(boss)]) {
+    if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
+      events.push(failNatureThreat(gameState, threat, { outcome: `O jogo ${Number(threat.meldIndex) + 1} nao alimentou a raiz.` }));
+    } else if (threat.type === 'graft') {
+      const fed = new Set(threat.fedMeldIds || []).size;
+      if (fed >= 2) events.push(succeedNatureThreat(gameState, threat, 'Os dois jogos alimentaram o Enxerto.'));
+      else if (fed === 1) events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 50, outcome: 'Apenas um jogo alimentou o Enxerto.' }));
+      else events.push(failNatureThreat(gameState, threat, { bloom: 2, heal: 100, outcome: 'Nenhum jogo alimentou o Enxerto.' }));
+    } else if (threat.type === 'dew') {
+      const uniqueCards = new Set(threat.countedCardIds || []).size;
+      const healing = Math.max(0, (threat.healAmount || 100) - uniqueCards * (threat.reductionPerCard || 20));
+      events.push(healing
+        ? failNatureThreat(gameState, threat, { bloom: 0, heal: healing, outcome: `Orvalho Restaurador: ${uniqueCards} carta(s) reduziram a cura para ${healing} HP.` })
+        : succeedNatureThreat(gameState, threat, 'O Orvalho foi totalmente dissipado pelas cartas jogadas.'));
+    } else if (['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null) {
+      if (discardTopId !== threat.discardCardId) {
+        events.push(cancelNatureThreat(gameState, threat, 'O topo do lixo mudou sem entrar em uma mao.'));
+      }
+    }
+  }
+  if (boss.emeraldCocoon?.status === 'active') {
+    const remaining = Math.max(0, Number(boss.emeraldCocoon.remaining) || 0);
+    if (remaining) healMatriarch(gameState, Math.floor(remaining / 2), 'Casulo Esmeralda', `${boss.emeraldCocoon.id}:heal`);
+    boss.emeraldCocoon.status = 'expired';
+  }
+  boss.emeraldCocoon = null;
+  boss.springCrown = null;
+  return events.filter(Boolean);
+}
+
+export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'matriarca_esmeralda') return [];
+  const takenIds = new Set(takenCards.map((card) => card?.id).filter(Boolean));
+  const activated = [];
+  for (const threat of activeNatureThreats(boss)) {
+    if (!['pollen', 'royal_pollen'].includes(threat.type) || threat.targetPlayerId != null || !takenIds.has(threat.discardCardId)) continue;
+    threat.targetPlayerId = playerId;
+    threat.deadlinePlayerId = playerId;
+    threat.cardId = threat.discardCardId;
+    activated.push(threat);
+  }
+  return activated;
+}
+
+export function getBossNatureThreats(gameState) {
+  const boss = normalizeBossState(gameState);
+  return boss?.id === 'matriarca_esmeralda' ? activeNatureThreats(boss).map((threat) => ({ ...threat })) : [];
+}
+
+export function getBossNaturePriorities(gameState, playerId) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'matriarca_esmeralda') return null;
+  const player = (gameState.players || []).find((entry) => entry.id === playerId);
+  if (!player) return null;
+  const threats = activeNatureThreats(boss);
+  const markedCardIds = threats
+    .filter((threat) => threat.targetPlayerId === playerId && ['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type))
+    .map((threat) => threat.cardId)
+    .filter((cardId) => player.hand?.some((card) => card?.id === cardId));
+  const meldIds = new Set();
+  threats.forEach((threat) => {
+    if (['root', 'twin_root', 'royal_root'].includes(threat.type) && threat.meldId) meldIds.add(threat.meldId);
+    if (threat.type === 'graft') {
+      const fed = new Set(threat.fedMeldIds || []);
+      (threat.meldIds || []).filter((meldId) => !fed.has(meldId)).forEach((meldId) => meldIds.add(meldId));
+    }
+  });
+  const meldIndexes = (gameState.teams?.[player.teamId]?.melds || [])
+    .map((meld, meldIndex) => ({ meldIndex, meldId: resolveBossMeldId(gameState, player.teamId, meldIndex, false) }))
+    .filter(({ meldId }) => meldId && meldIds.has(meldId))
+    .map(({ meldIndex }) => meldIndex);
+  return {
+    urgent: boss.bloom >= 4,
+    bloom: boss.bloom,
+    markedCardIds,
+    meldIndexes,
+    harvestActive: threats.some((threat) => threat.type === 'harvest' && threat.targetPlayerId === playerId),
+    pollenOnDiscard: threats.some((threat) => ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null),
+  };
+}
+
+export function getBossMeldNatureThreats(gameState, teamId, meldIndex) {
+  if (teamId !== 0) return [];
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'matriarca_esmeralda') return [];
+  const meldId = resolveBossMeldId(gameState, teamId, meldIndex, false);
+  return activeNatureThreats(boss)
+    .filter((threat) => threat.meldId === meldId || threat.meldIds?.includes(meldId))
+    .map((threat) => ({ ...threat, matchedMeldId: meldId }));
 }
 
 function dominatrixDefeatIfNeeded(gameState) {
@@ -799,7 +1333,13 @@ export function validateBossClosedDiscardSelection(gameState, playerId, selected
 
 export function getBossCardEffect(gameState, playerId, cardId) {
   const boss = normalizeBossState(gameState);
-  if (!boss || boss.id !== 'dominadora' || !cardId) return null;
+  if (!boss || !cardId) return null;
+  if (boss.id === 'matriarca_esmeralda') {
+    const threat = activeNatureThreats(boss).find((entry) => entry.targetPlayerId === playerId && entry.cardId === cardId);
+    if (!threat) return null;
+    return ['pollen', 'royal_pollen'].includes(threat.type) ? 'nature-pollen' : 'nature-seed';
+  }
+  if (boss.id !== 'dominadora') return null;
   const intent = boss.currentIntent;
   if (intent?.abilityId === 'exposure' && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId === cardId) return 'exposed';
   if (boss.effects.some((effect) => effect.id === 'choice_exposure' && effect.playerId === playerId && effect.cardId === cardId)) return 'exposed';
@@ -1079,8 +1619,10 @@ function activatePendingPhase(gameState) {
 export function applyBossMeldTransition(gameState, { teamId, playerId = null, meldIndex, oldKind = 'simple', newKind = 'simple', cardsAdded = [], isNewMeld = false }) {
   const boss = normalizeBossState(gameState);
   if (!boss || teamId !== 0 || boss.result) return null;
-  const key = `${teamId}:${meldIndex}`;
-  const previous = boss.meldProgress[key] || {
+  const legacyKey = `${teamId}:${meldIndex}`;
+  const meldId = resolveBossMeldId(gameState, teamId, meldIndex, true);
+  const key = meldId || legacyKey;
+  const previous = boss.meldProgress[key] || boss.meldProgress[legacyKey] || {
     damageValue: BOSS_DAMAGE_BY_KIND[oldKind] || 0,
     debtValue: DEBT_REDUCTION_BY_KIND[oldKind] || 0,
     highestKind: oldKind,
@@ -1138,6 +1680,7 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     debtValue: nextDebtValue,
     highestKind: canastraDamage > 0 ? newKind : previous.highestKind,
   };
+  if (key !== legacyKey) delete boss.meldProgress[legacyKey];
 
   if (boss.currentIntent?.abilityId === 'suit_audit') {
     const suit = boss.currentIntent.payload.suit;
@@ -1148,19 +1691,67 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     boss.currentIntent.payload.progress = clamp((boss.currentIntent.payload.progress || 0) + matching, 0, boss.currentIntent.payload.required);
   }
 
-  if (damage <= 0 && debtReduction <= 0 && !possessionProgressed) return null;
-  boss.hp = clamp(boss.hp - damage, 0, boss.maxHp);
+  const contribution = ensureBossMeldContribution(boss, meldId);
+  let bloomRemoved = 0;
+  if (boss.id === 'matriarca_esmeralda') {
+    const addedIds = new Set(cardsAdded.map((card) => card?.id).filter(Boolean));
+    for (const threat of [...activeNatureThreats(boss)]) {
+      if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type) && addedIds.has(threat.cardId)) {
+        succeedNatureThreat(gameState, threat, 'A carta marcada foi usada legalmente.');
+      } else if (['root', 'twin_root', 'royal_root'].includes(threat.type) && threat.meldId === meldId && addedIds.size) {
+        succeedNatureThreat(gameState, threat, `O jogo ${meldIndex + 1} alimentou a raiz.`);
+      } else if (threat.type === 'graft' && threat.meldIds?.includes(meldId) && addedIds.size) {
+        threat.fedMeldIds ||= [];
+        if (!threat.fedMeldIds.includes(meldId)) threat.fedMeldIds.push(meldId);
+        if (new Set(threat.fedMeldIds).size >= 2) succeedNatureThreat(gameState, threat, 'Os dois lados do Enxerto foram alimentados.');
+      } else if (threat.type === 'dew' && addedIds.size) {
+        threat.countedCardIds ||= [];
+        addedIds.forEach((cardId) => {
+          if (!threat.countedCardIds.includes(cardId)) threat.countedCardIds.push(cardId);
+        });
+      }
+    }
+    if (contribution) {
+      const bloomTier = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 }[newKind] || 0;
+      const previousTier = Number(contribution.matriarchBloomTier) || 0;
+      const tierIncrease = Math.max(0, bloomTier - previousTier);
+      contribution.matriarchBloomTier = Math.max(previousTier, bloomTier);
+      if (tierIncrease && boss.bloom > 0) {
+        const bloomEvent = changeMatriarchBloom(gameState, -Math.min(tierIncrease, boss.bloom), `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}`, `meld_bloom_${meldId}_${bloomTier}`);
+        bloomRemoved = Math.abs(bloomEvent?.amount || 0);
+        contribution.matriarchBloomRemoved += bloomRemoved;
+      }
+    }
+  }
+
+  if (damage <= 0 && debtReduction <= 0 && !possessionProgressed && bloomRemoved <= 0) return null;
+  const dangerBefore = boss.danger;
+  const breaksCocoon = boss.id === 'matriarca_esmeralda'
+    && canastraDamage > 0
+    && ({ limpa: 1, real: 2, asas: 3 }[newKind] || 0) >= 1;
+  const damageResult = applyDamageToBoss(gameState, damage, {
+    breaksCocoon,
+    sourceActionId: `meld_${key}_${boss.actionSequence + 1}`,
+  });
   boss.danger = clamp(boss.danger - debtReduction, 0, boss.maxDanger);
-  boss.stats.totalDamage += damage;
-  boss.stats.largestAttack = Math.max(boss.stats.largestAttack, damage);
+  const appliedDamage = damageResult.hpDamage;
+  const appliedDebtReduction = Math.max(0, dangerBefore - boss.danger);
+  boss.stats.totalDamage += appliedDamage;
+  boss.stats.largestAttack = Math.max(boss.stats.largestAttack, appliedDamage);
   if ((BOSS_DAMAGE_BY_KIND[newKind] || 0) >= BOSS_DAMAGE_BY_KIND.suja && (BOSS_DAMAGE_BY_KIND[oldKind] || 0) < BOSS_DAMAGE_BY_KIND.suja) boss.stats.canastrasFormed += 1;
-  if (boss.hp === 0) boss.defeated = true;
+  if (boss.hp === 0 && !damageResult.reborn) boss.defeated = true;
   let chainsRemoved = 0;
   if (boss.id === 'dominadora' && canastraDamage > 0 && playerId != null) {
     if (boss.chainReliefRoundByPlayer[playerId] !== boss.roundNumber) {
       chainsRemoved = Math.abs(Math.min(0, changeChains(gameState, playerId, -1, 'resistance')));
       if (chainsRemoved) boss.chainReliefRoundByPlayer[playerId] = boss.roundNumber;
     }
+  }
+  if (contribution) {
+    // Damage restored after breaking Possession was already credited before possession.
+    contribution.damageDone += Math.min(appliedDamage, canastraDamage + cardDamage);
+    contribution.bankerDebtRelief += appliedDebtReduction;
+    contribution.dominatrixChainsBroken += chainsRemoved;
   }
   boss.actionSequence += 1;
   const pendingPhase = detectPendingPhase(gameState);
@@ -1173,13 +1764,19 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     possessionReappliedDamage,
     debtReduction,
     chainsRemoved,
+    bloomRemoved,
+    absorbedDamage: damageResult.absorbed,
+    cocoonBroken: damageResult.cocoonBroken,
+    reborn: damageResult.reborn,
     possessionProgress: possessionProgressed ? possessionProgress : null,
     possessionReleased,
     oldKind,
     newKind,
     hp: boss.hp,
     danger: boss.danger,
-    dangerChangeLabel: debtReduction ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Dívida -${debtReduction}` : '',
+    dangerChangeLabel: debtReduction
+      ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Dívida -${debtReduction}`
+      : bloomRemoved ? `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}: Florescimento -${bloomRemoved}` : '',
     pendingPhase,
   };
   const definition = getBossDefinition(boss.id);
@@ -1433,6 +2030,91 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else {
       outcome = `${intent.name} foi encerrada.`;
     }
+  } else if (boss.id === 'matriarca_esmeralda') {
+    const baseThreat = {
+      sourceAbilityId: intent.abilityId,
+      sourceIntentId: intent.id,
+      deadlineRound: boss.roundNumber,
+    };
+    if (intent.abilityId === 'living_seed') {
+      const threat = addNatureThreat(gameState, {
+        ...baseThreat,
+        type: 'seed',
+        targetPlayerId: intent.payload.targetPlayerId,
+        deadlinePlayerId: intent.payload.targetPlayerId,
+        cardId: intent.payload.cardId,
+        healAmount: 50,
+        bloomAmount: 1,
+      });
+      outcome = threat ? 'A Semente foi marcada e precisa ser usada no proximo turno do alvo.' : 'Nenhuma Semente valida foi encontrada.';
+      resultData = { threatIds: threat ? [threat.id] : [] };
+    } else if (intent.abilityId === 'hungry_root') {
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'root', ...intent.payload, healAmount: 60, bloomAmount: 1, progressCardIds: [] });
+      outcome = threat ? `A Raiz envolve o jogo ${Number(threat.meldIndex) + 1}.` : 'Nenhuma Raiz valida foi criada.';
+      resultData = { threatIds: threat ? [threat.id] : [] };
+    } else if (intent.abilityId === 'restorative_dew') {
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'dew', healAmount: 100, bloomAmount: 0, countedCardIds: [], reductionPerCard: 20 });
+      outcome = threat ? 'O Orvalho prepara 100 HP de cura; cada carta nova reduz 20.' : 'O Orvalho nao encontrou espaco entre as ameacas.';
+      resultData = { threatIds: threat ? [threat.id] : [] };
+    } else if (intent.abilityId === 'twin_vines') {
+      const threats = (intent.payload.targets || []).slice(0, natureThreatSlots(gameState)).map((target, index) => addNatureThreat(gameState, {
+        ...baseThreat,
+        id: `${intent.id}_vine_${index}`,
+        type: 'twin_root',
+        ...target,
+        healAmount: 70,
+        bloomAmount: 1,
+        progressCardIds: [],
+      })).filter(Boolean);
+      outcome = `${threats.length} Trepadeira${threats.length === 1 ? '' : 's'} criadas; cada jogo resolve separadamente.`;
+      resultData = { threatIds: threats.map((threat) => threat.id) };
+    } else if (intent.abilityId === 'graft') {
+      const threat = addNatureThreat(gameState, {
+        ...baseThreat,
+        type: 'graft',
+        meldIds: (intent.payload.targets || []).map((target) => target.meldId),
+        meldIndexes: (intent.payload.targets || []).map((target) => target.meldIndex),
+        fedMeldIds: [],
+        healAmount: 100,
+        bloomAmount: 2,
+      });
+      outcome = threat ? 'O Enxerto ligou dois jogos; ambos precisam receber uma carta.' : 'O Enxerto nao encontrou dois jogos validos.';
+      resultData = { threatIds: threat ? [threat.id] : [] };
+    } else if (intent.abilityId === 'discard_pollen') {
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'pollen', discardCardId: intent.payload.discardCardId, healAmount: 60, bloomAmount: 1, targetPlayerId: null });
+      outcome = threat ? 'O topo do lixo foi contaminado pelo Polen.' : 'O Polen nao encontrou uma carta valida no lixo.';
+      resultData = { threatIds: threat ? [threat.id] : [] };
+    } else if (intent.abilityId === 'harvest') {
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'harvest', targetPlayerId: intent.payload.targetPlayerId, deadlinePlayerId: intent.payload.targetPlayerId });
+      outcome = threat ? 'A mao do alvo sera avaliada pela Colheita ao fim do turno.' : 'A Colheita nao encontrou um alvo valido.';
+      resultData = { threatIds: threat ? [threat.id] : [] };
+    } else if (intent.abilityId === 'royal_bloom') {
+      const threats = [];
+      for (const [index, objective] of (intent.payload.objectives || []).entries()) {
+        if (natureThreatSlots(gameState) <= 0) break;
+        const threat = addNatureThreat(gameState, {
+          ...baseThreat,
+          id: `${intent.id}_royal_${index}`,
+          ...objective,
+          type: objective.type === 'root' ? 'royal_root' : objective.type === 'seed' ? 'royal_seed' : 'royal_pollen',
+          deadlinePlayerId: objective.targetPlayerId ?? null,
+          healAmount: 80,
+          bloomAmount: 1,
+          progressCardIds: [],
+        });
+        if (threat) threats.push(threat);
+      }
+      outcome = `Florescimento Real criou ${threats.length} objetivo${threats.length === 1 ? '' : 's'} independente${threats.length === 1 ? '' : 's'}.`;
+      resultData = { threatIds: threats.map((threat) => threat.id) };
+    } else if (intent.abilityId === 'emerald_cocoon') {
+      boss.emeraldCocoon = { id: `cocoon_${intent.id}`, remaining: intent.payload.amount || 180, createdRound: boss.roundNumber, status: 'active' };
+      outcome = 'O Casulo Esmeralda absorvera ate 180 de dano nesta rodada.';
+      resultData = { cocoonId: boss.emeraldCocoon.id, remaining: boss.emeraldCocoon.remaining };
+    } else if (intent.abilityId === 'spring_crown') {
+      boss.springCrown = { id: `crown_${intent.id}`, round: boss.roundNumber, failureCount: 0, status: 'active' };
+      outcome = 'A Coroa da Primavera ampliara as curas depois da primeira ameaca que falhar.';
+      resultData = { crownId: boss.springCrown.id };
+    }
   } else if (intent.abilityId === 'fixed_interest') {
     const amount = intent.payload.amount ?? (intent.announcedPhase === 3 ? 8 : 6);
     const collateralAmount = intent.payload.collateralAmount ?? (intent.announcedPhase === 3 ? 5 : 3);
@@ -1557,12 +2239,21 @@ export function completeBossPlayerTurn(gameState, playerId) {
     exposedCardsHeld.forEach((effect) => changeChains(gameState, playerId, 1, `forced_choice_exposure:${effect.cardId}`));
   }
 
+  let natureEvents = [];
+  if (boss.id === 'matriarca_esmeralda') {
+    natureEvents = resolveMatriarchPlayerDeadline(gameState, playerId);
+  }
+
   const allPlayersActed = gameState.players.every((player) => boss.playersActedThisRound.includes(player.id));
   const duration = boss.currentIntent?.duration || 'full_round';
   const targetTurnFinished = duration === 'target_turn' && boss.currentIntent?.payload?.targetPlayerId === playerId;
   const shouldResolve = targetTurnFinished || (duration !== 'until_released' && allPlayersActed);
   let event = null;
   if (shouldResolve) event = resolveIntent(gameState);
+  if (allPlayersActed && boss.id === 'matriarca_esmeralda') {
+    natureEvents.push(...resolveMatriarchRound(gameState));
+    event ||= natureEvents.filter(Boolean).at(-1) || null;
+  }
   if (event) {
     boss.resolvedRoundEventActionId = event.actionId;
   }
@@ -1593,19 +2284,34 @@ export function applyBossFinalStrike(gameState, projectedTeamScore, playerId = g
   if (!boss || boss.result) return null;
   const baseDamage = 500 + Math.max(0, Math.floor((Number(projectedTeamScore) || 0) * 0.25));
   const damage = boss.id === 'dominadora' && isBossPlayerDominated(gameState, playerId) ? Math.floor(baseDamage * 0.65) : baseDamage;
-  boss.hp = clamp(boss.hp - damage, 0, boss.maxHp);
+  const damageResult = applyDamageToBoss(gameState, damage, { breaksCocoon: true, sourceActionId: `final_${boss.actionSequence + 1}` });
   boss.stats.totalDamage += damage;
   boss.stats.finalStrike = damage;
   boss.stats.largestAttack = Math.max(boss.stats.largestAttack, damage);
   boss.stats.finalDebt = boss.danger;
   boss.actionSequence += 1;
-  if (boss.hp === 0) {
+  if (damageResult.reborn) {
+    boss.defeated = false;
+  } else if (boss.hp === 0) {
     boss.defeated = true;
     boss.result = { victory: true, reason: 'boss_defeated', title: `${getBossDefinition(boss.id)?.name || 'O chefe'} foi derrotado`, detail: 'O ataque final encerrou a batalha.' };
   } else {
-    boss.result = { victory: false, reason: 'insufficient_final_strike', title: boss.id === 'dominadora' ? 'Vontade Quebrada' : 'Execução da Dívida', detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP.` };
+    const survivalTitle = boss.id === 'dominadora'
+      ? 'Vontade Quebrada'
+      : boss.id === 'matriarca_esmeralda'
+        ? 'Primavera Eterna'
+        : 'Execução da Dívida';
+    boss.result = { victory: false, reason: 'insufficient_final_strike', title: survivalTitle, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP.` };
   }
-  return recordEvent(boss, { type: 'finalStrike', actionId: `final_${boss.actionSequence}`, damage, hp: boss.hp, victory: boss.result.victory });
+  return recordEvent(boss, {
+    type: 'finalStrike',
+    actionId: `final_${boss.actionSequence}`,
+    damage,
+    absorbedDamage: damageResult.absorbed,
+    hp: boss.hp,
+    reborn: damageResult.reborn,
+    victory: boss.result?.victory ?? false,
+  });
 }
 
 export function applyBossResourceDefeat(gameState) {

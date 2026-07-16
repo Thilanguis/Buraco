@@ -6,6 +6,7 @@ import {
   applyBossMeldTransition,
   advanceBossTurn,
   beginBossTurn,
+  changeMatriarchBloom,
   canBossCreateMeld,
   canBossUseMeld,
   completeBossPlayerTurn,
@@ -14,9 +15,14 @@ import {
   createBossState,
   getBossChains,
   getBossCardEffect,
+  getBossMeldContribution,
+  getBossMeldNatureThreats,
+  getBossNaturePriorities,
+  getBossNatureThreats,
   getBossPendingChoice,
   getBossVault,
   hasPendingBossChoices,
+  healMatriarch,
   canBossPerformCommonAction,
   isBossCardBlocked,
   isBossDiscardBlocked,
@@ -25,6 +31,7 @@ import {
   isBossTurnActive,
   isBossVaultDrawRequired,
   normalizeBossState,
+  notifyBossDiscardTaken,
   reclaimBossVault,
   resolveBossChoice,
   selectNextBossIntent,
@@ -67,6 +74,66 @@ function dominatrixGame() {
   return state;
 }
 
+function matriarchGame() {
+  const state = game();
+  state.mode = 'boss_matriarca';
+  state.variant = 'fechado';
+  state.boss = createBossState('matriarca_esmeralda', 2468);
+  state.discard = [{ id: 'mat-discard-7', rank: '7', suit: '♦' }];
+  state.players[0] = {
+    id: 0,
+    teamId: 0,
+    name: 'Biel',
+    hand: [
+      { id: 'mat-0-3', rank: '3', suit: '♠' },
+      { id: 'mat-0-4', rank: '4', suit: '♠' },
+      { id: 'mat-0-5', rank: '5', suit: '♠' },
+      { id: 'mat-0-q', rank: 'Q', suit: '♦' },
+    ],
+  };
+  state.players[1] = {
+    id: 1,
+    teamId: 0,
+    name: 'BOT Luana',
+    hand: [
+      { id: 'mat-1-6', rank: '6', suit: '♥' },
+      { id: 'mat-1-7', rank: '7', suit: '♥' },
+      { id: 'mat-1-8', rank: '8', suit: '♥' },
+      { id: 'mat-1-k', rank: 'K', suit: '♣' },
+    ],
+  };
+  state.teams[0].melds = [
+    ['3', '4', '5'].map((rank) => ({ id: `mat-m0-${rank}`, rank, suit: '♣' })),
+    ['7', '8', '9'].map((rank) => ({ id: `mat-m1-${rank}`, rank, suit: '♦' })),
+  ];
+  return state;
+}
+
+function applyMatriarchAbility(state, abilityId, payload, phase = state.boss.phase) {
+  state.boss.phase = phase;
+  state.boss.currentIntent = {
+    id: `test-${abilityId}-${state.boss.actionSequence}`,
+    abilityId,
+    name: abilityId,
+    description: abilityId,
+    duration: 'full_round',
+    announcedPhase: phase,
+    payload,
+  };
+  state.boss.bossFlow = {
+    id: `flow-${abilityId}-${state.boss.actionSequence}`,
+    stage: 'ability',
+    queue: [],
+    startedAt: 0,
+    endsAt: 0,
+    eventActionId: null,
+    phase,
+  };
+  advanceBossTurn(state, Date.now());
+  assert.equal(state.boss.bossFlow.stage, 'players');
+  return state.boss.lastEvent;
+}
+
 test('dano de canastra usa somente a diferenca e e idempotente', () => {
   const state = game();
   const first = applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [] });
@@ -81,6 +148,83 @@ test('dano de canastra usa somente a diferenca e e idempotente', () => {
   assert.equal(upgrade.damage, 80);
   assert.equal(upgrade.debtReduction, 4);
   assert.equal(state.boss.hp, 2320);
+});
+
+test('contribuicao de dano por jogo usa meldId estavel e nao duplica apos reload', () => {
+  const state = game();
+  const meld = [
+    { id: 'contrib-3', rank: '3', suit: 'â™£' },
+    { id: 'contrib-4', rank: '4', suit: 'â™£' },
+    { id: 'contrib-5', rank: '5', suit: 'â™£' },
+  ];
+  state.teams[0].melds = [meld];
+  const event = applyBossMeldTransition(state, {
+    teamId: 0,
+    playerId: 0,
+    meldIndex: 0,
+    oldKind: 'simple',
+    newKind: 'limpa',
+    cardsAdded: meld,
+    isNewMeld: true,
+  });
+  const first = getBossMeldContribution(state, 0, 0);
+  assert.ok(first.meldId);
+  assert.equal(first.damageDone, event.cardDamage + event.canastraDamage);
+
+  state.teams[0].melds = [[], meld];
+  const reorganizedDuplicate = applyBossMeldTransition(state, {
+    teamId: 0,
+    playerId: 0,
+    meldIndex: 1,
+    oldKind: 'simple',
+    newKind: 'limpa',
+    cardsAdded: meld,
+    isNewMeld: true,
+  });
+  assert.equal(reorganizedDuplicate, null);
+  assert.deepEqual(getBossMeldContribution(state, 0, 1), first);
+
+  const restored = JSON.parse(JSON.stringify(state));
+  const duplicate = applyBossMeldTransition(restored, {
+    teamId: 0,
+    playerId: 0,
+    meldIndex: 1,
+    oldKind: 'simple',
+    newKind: 'limpa',
+    cardsAdded: restored.teams[0].melds[1],
+    isNewMeld: true,
+  });
+  assert.equal(duplicate, null);
+  assert.deepEqual(getBossMeldContribution(restored, 0, 1), first);
+});
+
+test('cada chefe credita ao jogo somente seu recurso especifico', () => {
+  const banker = game();
+  banker.boss.danger = 20;
+  banker.teams[0].melds = [[{ id: 'banker-meld-card', rank: '3', suit: 'â™£' }]];
+  applyBossMeldTransition(banker, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
+  const bankerContribution = getBossMeldContribution(banker, 0, 0);
+  assert.equal(bankerContribution.bankerDebtRelief, 4);
+  assert.equal(bankerContribution.dominatrixChainsBroken, 0);
+
+  const dominatrix = dominatrixGame();
+  dominatrix.boss.chainsByPlayer[0] = 2;
+  dominatrix.teams[0].melds = [[{ id: 'dominatrix-meld-card', rank: '4', suit: 'â™¥' }]];
+  applyBossMeldTransition(dominatrix, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
+  const dominatrixContribution = getBossMeldContribution(dominatrix, 0, 0);
+  assert.equal(dominatrixContribution.bankerDebtRelief, 0);
+  assert.equal(dominatrixContribution.dominatrixChainsBroken, 1);
+});
+
+test('contribuicoes por jogo nao sao expostas nos modos comuns', () => {
+  const state = game();
+  state.mode = '1x1';
+  state.teams[0].melds = [[{ id: 'common-meld-card', rank: '5', suit: 'â™£' }]];
+  state.boss.meldContributions = {
+    meld_0_1: { damageDone: 999, bankerDebtRelief: 99, dominatrixChainsBroken: 3 },
+  };
+  state.boss.meldIdsByCardId = { 'common-meld-card': 'meld_0_1' };
+  assert.equal(getBossMeldContribution(state, 0, 0), null);
 });
 
 test('morto reduz divida uma vez por morto', () => {
@@ -1314,4 +1458,282 @@ test('reload libera fluxo de escolha obsoleto e preserva escolha real', () => {
   advanceBossTurn(interrupted, Date.now());
   assert.equal(interrupted.boss.bossFlow.stage, 'players');
   assert.equal(canBossPerformCommonAction(interrupted), true);
+});
+
+test('Matriarca inicia registrada com 2000 HP, Buraco Fechado e zero Florescimento', () => {
+  const state = matriarchGame();
+  assert.equal(state.boss.id, 'matriarca_esmeralda');
+  assert.equal(state.boss.maxHp, 2000);
+  assert.equal(state.boss.hp, 2000);
+  assert.equal(state.boss.bloom, 0);
+  assert.equal(state.boss.maxDanger, 5);
+  assert.equal(state.variant, 'fechado');
+  const intent = selectNextBossIntent(state);
+  assert.ok(intent);
+  assert.ok(intent.abilityId);
+});
+
+test('quinta Flor derrota uma vez e cura respeita o limite de cada fase', () => {
+  const fatal = matriarchGame();
+  assert.equal(changeMatriarchBloom(fatal, 4, 'teste', 'bloom-4').amount, 4);
+  assert.equal(changeMatriarchBloom(fatal, 4, 'teste', 'bloom-4'), null);
+  assert.equal(fatal.boss.bloom, 4);
+  changeMatriarchBloom(fatal, 1, 'teste final', 'bloom-5');
+  assert.equal(fatal.boss.result.reason, 'max_bloom');
+  assert.equal(changeMatriarchBloom(fatal, 1, 'duplicado', 'bloom-6'), null);
+
+  for (const [phase, limit] of [[1, 150], [2, 220], [3, 300]]) {
+    const state = matriarchGame();
+    state.boss.phase = phase;
+    state.boss.hp = 1000;
+    const first = healMatriarch(state, limit - 20, 'primeira cura', `heal-${phase}-a`);
+    const second = healMatriarch(state, 100, 'segunda cura', `heal-${phase}-b`);
+    assert.equal(first.amount + second.amount, limit);
+    assert.equal(state.boss.natureHealingThisRound, limit);
+    assert.equal(healMatriarch(state, 100, 'excesso', `heal-${phase}-c`), null);
+    assert.equal(healMatriarch(state, 100, 'duplicada', `heal-${phase}-b`), null);
+  }
+});
+
+test('limpa, real e As-a-As removem Flores e atualizam o mesmo marcador sem duplicar no reload', () => {
+  const state = matriarchGame();
+  state.boss.bloom = 3;
+  state.boss.danger = 3;
+  const clean = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
+  const real = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'real', cardsAdded: [] });
+  const aceToAce = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'real', newKind: 'asas', cardsAdded: [] });
+  assert.equal(clean.bloomRemoved, 1);
+  assert.equal(real.bloomRemoved, 1);
+  assert.equal(aceToAce.bloomRemoved, 1);
+  assert.equal(state.boss.bloom, 0);
+  const contribution = getBossMeldContribution(state, 0, 0);
+  assert.equal(contribution.matriarchBloomRemoved, 3);
+  assert.equal(contribution.matriarchBloomTier, 3);
+
+  const restored = JSON.parse(JSON.stringify(state));
+  const duplicate = applyBossMeldTransition(restored, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'real', newKind: 'asas', cardsAdded: [] });
+  assert.equal(duplicate, null);
+  assert.equal(getBossMeldContribution(restored, 0, 0).matriarchBloomRemoved, 3);
+});
+
+test('Semente usa alvo legal, resolve ao ser jogada e cancela alvo desaparecido sem punicao', () => {
+  const success = matriarchGame();
+  applyMatriarchAbility(success, 'living_seed', { targetPlayerId: 0, cardId: 'mat-0-3' });
+  assert.equal(getBossNatureThreats(success).length, 1);
+  assert.equal(getBossCardEffect(success, 0, 'mat-0-3'), 'nature-seed');
+  const seedCard = success.players[0].hand.find((card) => card.id === 'mat-0-3');
+  success.players[0].hand = success.players[0].hand.filter((card) => card.id !== seedCard.id);
+  applyBossMeldTransition(success, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: [seedCard] });
+  assert.equal(getBossNatureThreats(success).length, 0);
+  assert.equal(success.boss.bloom, 0);
+
+  const cancelled = matriarchGame();
+  applyMatriarchAbility(cancelled, 'living_seed', { targetPlayerId: 0, cardId: 'mat-0-3' });
+  cancelled.players[0].hand = cancelled.players[0].hand.filter((card) => card.id !== 'mat-0-3');
+  normalizeBossState(cancelled);
+  assert.equal(getBossNatureThreats(cancelled).length, 0);
+  assert.equal(cancelled.boss.bloom, 0);
+  assert.equal(cancelled.boss.hp, 2000);
+});
+
+test('limites de ameacas por fase impedem novas marcacoes', () => {
+  for (const [phase, limit] of [[1, 1], [2, 2], [3, 3]]) {
+    const state = matriarchGame();
+    state.boss.phase = phase;
+    for (let index = 0; index < limit + 1; index += 1) {
+      applyMatriarchAbility(state, 'restorative_dew', { baseHeal: 100, reductionPerCard: 20, countedCardIds: [] }, phase);
+    }
+    assert.equal(getBossNatureThreats(state).length, limit);
+  }
+});
+
+test('Raiz e Enxerto resolvem sucesso, falha parcial e falha total separadamente', () => {
+  const rootSuccess = matriarchGame();
+  applyBossMeldTransition(rootSuccess, { teamId: 0, meldIndex: 0, cardsAdded: [] });
+  const rootMeldId = getBossMeldContribution(rootSuccess, 0, 0).meldId;
+  applyMatriarchAbility(rootSuccess, 'hungry_root', { meldIndex: 0, meldId: rootMeldId });
+  assert.equal(getBossMeldNatureThreats(rootSuccess, 0, 0).length, 1);
+  applyBossMeldTransition(rootSuccess, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: [{ id: 'root-fed', rank: '6', suit: '♣' }] });
+  assert.equal(getBossNatureThreats(rootSuccess).length, 0);
+
+  const rootFailure = matriarchGame();
+  rootFailure.boss.hp = 1900;
+  applyBossMeldTransition(rootFailure, { teamId: 0, meldIndex: 0, cardsAdded: [] });
+  applyMatriarchAbility(rootFailure, 'hungry_root', { meldIndex: 0, meldId: getBossMeldContribution(rootFailure, 0, 0).meldId });
+  completeBossPlayerTurn(rootFailure, 0);
+  completeBossPlayerTurn(rootFailure, 1);
+  assert.equal(rootFailure.boss.bloom, 1);
+  assert.equal(rootFailure.boss.hp, 1960);
+
+  for (const fedCount of [0, 1, 2]) {
+    const state = matriarchGame();
+    state.boss.phase = 2;
+    state.boss.phaseTransitions = [1, 2];
+    state.boss.hp = 1700;
+    applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, cardsAdded: [] });
+    applyBossMeldTransition(state, { teamId: 0, meldIndex: 1, cardsAdded: [] });
+    const targets = [0, 1].map((meldIndex) => ({ meldIndex, meldId: getBossMeldContribution(state, 0, meldIndex).meldId }));
+    applyMatriarchAbility(state, 'graft', { targets }, 2);
+    for (let index = 0; index < fedCount; index += 1) {
+      applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: index, cardsAdded: [{ id: `graft-${fedCount}-${index}`, rank: index ? '10' : '6', suit: index ? '♦' : '♣' }] });
+    }
+    completeBossPlayerTurn(state, 0);
+    completeBossPlayerTurn(state, 1);
+    assert.equal(state.boss.bloom, fedCount === 2 ? 0 : fedCount === 1 ? 1 : 2);
+    const cardDamage = fedCount === 2 ? 15 : fedCount === 1 ? 5 : 0;
+    const healing = fedCount === 2 ? 0 : fedCount === 1 ? 50 : 100;
+    assert.equal(state.boss.hp, 1700 - cardDamage + healing);
+  }
+});
+
+test('Polen acompanha o lixo, Colheita usa as tres faixas e Orvalho conta IDs unicos', () => {
+  const pollen = matriarchGame();
+  pollen.boss.hp = 1900;
+  applyMatriarchAbility(pollen, 'discard_pollen', { discardCardId: 'mat-discard-7' });
+  const contaminated = pollen.discard[0];
+  pollen.players[0].hand.push(contaminated);
+  assert.equal(notifyBossDiscardTaken(pollen, 0, [contaminated]).length, 1);
+  assert.equal(getBossCardEffect(pollen, 0, contaminated.id), 'nature-pollen');
+  completeBossPlayerTurn(pollen, 0);
+  assert.equal(pollen.boss.bloom, 1);
+  assert.equal(pollen.boss.hp, 1960);
+
+  const changedTop = matriarchGame();
+  applyMatriarchAbility(changedTop, 'discard_pollen', { discardCardId: 'mat-discard-7' });
+  changedTop.discard.push({ id: 'new-top', rank: '8', suit: '♦' });
+  normalizeBossState(changedTop);
+  assert.equal(getBossNatureThreats(changedTop).length, 0);
+  assert.equal(changedTop.boss.bloom, 0);
+
+  for (const [cards, expectedHeal, expectedBloom] of [[7, 0, 0], [9, 40, 0], [11, 80, 1]]) {
+    const state = matriarchGame();
+    state.boss.phase = 2;
+    state.boss.hp = 1700;
+    state.players[0].hand = Array.from({ length: cards }, (_, index) => ({ id: `harvest-${cards}-${index}`, rank: 'Q', suit: '♣' }));
+    applyMatriarchAbility(state, 'harvest', { targetPlayerId: 0 }, 2);
+    completeBossPlayerTurn(state, 0);
+    assert.equal(state.boss.hp, 1700 + expectedHeal);
+    assert.equal(state.boss.bloom, expectedBloom);
+  }
+
+  const dew = matriarchGame();
+  dew.boss.hp = 1800;
+  applyMatriarchAbility(dew, 'restorative_dew', { baseHeal: 100, reductionPerCard: 20, countedCardIds: [] });
+  const cards = [{ id: 'dew-a', rank: '6', suit: '♣' }, { id: 'dew-b', rank: '10', suit: '♦' }];
+  applyBossMeldTransition(dew, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: cards });
+  applyBossMeldTransition(dew, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: cards });
+  completeBossPlayerTurn(dew, 0);
+  completeBossPlayerTurn(dew, 1);
+  assert.equal(dew.boss.hp, 1845);
+});
+
+test('Casulo absorve, rompe e cura; Coroa adiciona cura somente depois da primeira falha', () => {
+  const cocoon = matriarchGame();
+  cocoon.boss.phase = 3;
+  cocoon.boss.phaseTransitions = [1, 2, 3];
+  applyMatriarchAbility(cocoon, 'emerald_cocoon', { amount: 180 }, 3);
+  const hit = applyBossMeldTransition(cocoon, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: [{ id: 'cocoon-hit', rank: 'JOKER', suit: 'JOKER', joker: true }] });
+  assert.equal(hit.absorbedDamage, 20);
+  assert.equal(cocoon.boss.hp, 2000);
+  const breakEvent = applyBossMeldTransition(cocoon, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
+  assert.equal(breakEvent.cocoonBroken, true);
+  assert.equal(cocoon.boss.hp, 1820);
+
+  const healing = matriarchGame();
+  healing.boss.phase = 3;
+  healing.boss.phaseTransitions = [1, 2, 3];
+  healing.boss.hp = 1500;
+  applyMatriarchAbility(healing, 'emerald_cocoon', { amount: 180 }, 3);
+  completeBossPlayerTurn(healing, 0);
+  completeBossPlayerTurn(healing, 1);
+  assert.equal(healing.boss.hp, 1590);
+  assert.equal(healing.boss.emeraldCocoon, null);
+
+  const crown = matriarchGame();
+  crown.boss.phase = 3;
+  crown.boss.phaseTransitions = [1, 2, 3];
+  crown.boss.hp = 1500;
+  applyBossMeldTransition(crown, { teamId: 0, meldIndex: 0, cardsAdded: [] });
+  applyBossMeldTransition(crown, { teamId: 0, meldIndex: 1, cardsAdded: [] });
+  crown.boss.natureThreats = [0, 1].map((meldIndex) => ({
+    id: `crown-root-${meldIndex}`,
+    type: 'root',
+    meldIndex,
+    meldId: getBossMeldContribution(crown, 0, meldIndex).meldId,
+    healAmount: 60,
+    bloomAmount: 1,
+    status: 'active',
+  }));
+  applyMatriarchAbility(crown, 'spring_crown', { activeThreatIds: crown.boss.natureThreats.map((entry) => entry.id) }, 3);
+  completeBossPlayerTurn(crown, 0);
+  completeBossPlayerTurn(crown, 1);
+  assert.equal(crown.boss.hp, 1650);
+  assert.equal(crown.boss.bloom, 2);
+});
+
+test('Renascimento ocorre uma vez, inclusive no ataque final, e prioridades do bot refletem urgencia', () => {
+  const state = matriarchGame();
+  state.boss.phase = 3;
+  state.boss.phaseTransitions = [1, 2, 3];
+  state.boss.hp = 20;
+  state.boss.bloom = 3;
+  state.boss.danger = 3;
+  applyBossMeldTransition(state, {
+    teamId: 0,
+    playerId: 0,
+    meldIndex: 0,
+    oldKind: 'simple',
+    newKind: 'simple',
+    cardsAdded: [{ id: 'rebirth-hit-1', rank: 'JOKER', suit: 'JOKER', joker: true }],
+  });
+  assert.equal(state.boss.hp, 300);
+  assert.equal(state.boss.bloom, 0);
+  assert.equal(state.boss.rebirthUsed, true);
+  state.boss.hp = 20;
+  state.boss.bloom = 3;
+  state.boss.danger = 3;
+  applyBossMeldTransition(state, {
+    teamId: 0,
+    playerId: 0,
+    meldIndex: 1,
+    oldKind: 'simple',
+    newKind: 'simple',
+    cardsAdded: [{ id: 'rebirth-hit-2', rank: 'JOKER', suit: 'JOKER', joker: true }],
+  });
+  assert.equal(state.boss.hp, 0);
+  assert.equal(state.boss.defeated, true);
+
+  const final = matriarchGame();
+  final.boss.phase = 3;
+  final.boss.phaseTransitions = [1, 2, 3];
+  final.boss.hp = 100;
+  final.boss.bloom = 3;
+  final.boss.danger = 3;
+  applyBossFinalStrike(final, 0, 0);
+  assert.equal(final.boss.hp, 300);
+  assert.equal(final.boss.result, null);
+  assert.equal(final.boss.rebirthUsed, true);
+
+  const priorities = matriarchGame();
+  priorities.boss.phase = 3;
+  priorities.boss.bloom = 4;
+  priorities.boss.danger = 4;
+  priorities.boss.natureThreats = [{ id: 'urgent-seed', type: 'seed', targetPlayerId: 0, cardId: 'mat-0-3', status: 'active' }];
+  const botPlan = getBossNaturePriorities(priorities, 0);
+  assert.equal(botPlan.urgent, true);
+  assert.deepEqual(botPlan.markedCardIds, ['mat-0-3']);
+});
+
+test('fase hibrida e introducao de fase usam habilidades exclusivas da Matriarca', () => {
+  const state = matriarchGame();
+  state.boss.hp = 1400;
+  state.boss.currentIntent = { id: 'phase-trigger', abilityId: 'restorative_dew', name: 'Orvalho', duration: 'full_round', payload: { baseHeal: 100, reductionPerCard: 20, countedCardIds: [] } };
+  completeBossPlayerTurn(state, 0);
+  assert.equal(state.boss.pendingPhase, 2);
+  completeBossPlayerTurn(state, 1);
+  assert.equal(state.boss.phase, 2);
+  state.boss.currentIntent = null;
+  const intro = selectNextBossIntent(state);
+  assert.equal(intro.selectionSource, 'phase_intro');
+  assert.ok(['twin_vines', 'graft', 'discard_pollen', 'harvest'].includes(intro.abilityId));
 });

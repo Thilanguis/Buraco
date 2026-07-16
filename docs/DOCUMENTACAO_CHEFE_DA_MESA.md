@@ -2,13 +2,13 @@
 
 ## Status
 
-**Implementação verificada no pacote `Buraco(14)` em 15/07/2026.**
+**Banqueiro e Dominadora verificados no pacote `Buraco(14)` em 15/07/2026.**
 
 - 110 testes executados;
 - 110 testes aprovados;
 - sintaxe válida;
 - Buraco Fechado obrigatório nos modos de chefe;
-- documentação alinhada ao comportamento atual do motor.
+- A Matriarca Esmeralda está documentada como **especificação planejada**, ainda não implementada.
 
 A validação automatizada não substitui uma partida multicliente completa em tablet/celular.
 
@@ -465,9 +465,429 @@ Cada cooperador recebe uma decisão diferente; o jogo só continua após ambas.
 
 ---
 
-# 5. HUD e feedback
 
-## 5.1 HUD compacto
+# 5. A Matriarca Esmeralda — planejada
+
+> **Status:** especificação de design e implementação. Ainda não faz parte dos 110 testes verificados.
+
+## 5.1 Identidade
+
+Chefe de ocupação da mesa, regeneração e objetivos persistentes.
+
+- **ID sugerido:** `matriarca_esmeralda`
+- **Modo sugerido:** `boss_matriarca`
+- **HP:** 2.000
+- **Perigo:** Florescimento, de 0 a 5
+- **Tema de mesa:** verde claro/esmeralda já existente
+- **Retrato sugerido:** `assets/bosses/matriarca-esmeralda.png`
+
+### Frase mecânica
+
+> Ela transforma cartas, jogos e o lixo em um jardim vivo. Objetivos ignorados florescem, curam a chefe e aproximam a derrota.
+
+## 5.2 Condição especial de derrota
+
+Cada ameaça não resolvida pode gerar uma Flor.
+
+- `0–4 Florescimentos`: a partida continua;
+- `5 Florescimentos`: a floresta domina a mesa e a equipe perde imediatamente;
+- Florescimentos surgem mesmo se o HP da chefe já estiver cheio;
+- a cura nunca ultrapassa o HP máximo.
+
+## 5.3 Remoção de Florescimentos
+
+A equipe poda o Jardim por evolução real de canastra:
+
+| Evolução | Florescimentos removidos |
+|---|---:|
+| Canastra limpa | 1 |
+| Canastra real | +1 adicional |
+| Ás-a-Ás | +1 adicional |
+
+Uma canastra que evolui de limpa até Ás-a-Ás pode remover até 3 no total, uma vez por nível atingido.
+
+Dano individual das cartas não remove Florescimento.
+
+## 5.4 Limite de cura por rodada
+
+| Fase | Cura máxima por rodada |
+|---|---:|
+| Fase 1 | 150 HP |
+| Fase 2 | 220 HP |
+| Fase 3 | 300 HP |
+
+O Florescimento ainda aumenta mesmo quando o limite de cura já foi atingido.
+
+## 5.5 Ameaças persistentes
+
+Sementes, Raízes, Enxertos e Pólen são estados persistentes independentes da intenção atual.
+
+Limite simultâneo:
+
+| Fase | Ameaças ativas |
+|---|---:|
+| Fase 1 | 1 |
+| Fase 2 | 2 |
+| Fase 3 | 3 |
+
+Se o limite estiver cheio, habilidades que criam novas ameaças ficam inelegíveis.
+
+Cada ameaça precisa guardar:
+
+- ID próprio;
+- tipo;
+- alvo;
+- rodada e prazo;
+- condição de sucesso;
+- cura prevista;
+- valor de Florescimento;
+- status `active`, `completed`, `failed` ou `cancelled`;
+- evento de resolução para impedir duplicação.
+
+---
+
+## 5.6 Fase 1 — Germinação
+
+### Semente Viva
+
+Marca uma carta da mão que tenha pelo menos uma jogada legal no turno do alvo.
+
+- a carta pode ser jogada;
+- não pode ser descartada;
+- se for usada no turno, a Semente é destruída;
+- se permanecer na mão no fim do turno:
+  - `+1 Florescimento`;
+  - cura `50 HP`.
+
+Se a carta deixar de ter qualquer jogada legal antes do turno, cancelar sem cura e sem Flor.
+
+### Raiz Faminta
+
+Marca um jogo que aceite ao menos uma continuação legal.
+
+- adicionar `1 carta legal` durante a rodada corta a Raiz;
+- se ninguém alimentar o jogo:
+  - `+1 Florescimento`;
+  - cura `60 HP`.
+
+O jogo permanece utilizável e a camada visual nunca cobre as cartas.
+
+### Orvalho Restaurador
+
+Prepara uma cura de `100 HP` para o fim da rodada.
+
+- cada carta nova colocada legalmente na mesa reduz a cura em `20`;
+- mínimo de zero;
+- o HUD mostra a cura prevista em tempo real;
+- não cria Florescimento.
+
+Exemplo:
+
+```text
+ORVALHO RESTAURADOR
+Cura prevista: 40 HP
+Cada carta baixada reduz 20 HP.
+```
+
+---
+
+## 5.7 Fase 2 — Jardim Voraz
+
+A primeira habilidade da fase deve priorizar uma habilidade nova desta seção.
+
+### Trepadeiras Gêmeas
+
+Cria duas Raízes em jogos diferentes.
+
+Para cada jogo:
+
+- adicionar `1 carta legal` corta sua Raiz;
+- falhar gera:
+  - `+1 Florescimento`;
+  - cura `70 HP`.
+
+Cada Raiz é resolvida separadamente.
+
+### Enxerto
+
+Liga dois jogos elegíveis.
+
+Durante a rodada, a equipe precisa adicionar pelo menos uma carta em cada um.
+
+- dois lados alimentados: sucesso;
+- apenas um lado alimentado:
+  - `+1 Florescimento`;
+  - cura `50 HP`;
+- nenhum lado alimentado:
+  - `+2 Florescimentos`;
+  - cura `100 HP`.
+
+Os jogos continuam aceitando cartas normalmente.
+
+### Pólen do Lixo
+
+Contamina a carta atual do topo do lixo.
+
+- se o lixo for pego, a carta contaminada precisa ser usada naquele turno;
+- se for usada: Pólen limpo;
+- se continuar na mão ao fim do turno:
+  - `+1 Florescimento`;
+  - cura `60 HP`;
+- se o topo mudar sem a carta entrar na mão de alguém, cancelar o Pólen sem punição;
+- não revelar informação secreta indevida ao outro jogador.
+
+### Colheita
+
+Marca um jogador e avalia sua mão no fim do turno.
+
+| Cartas restantes | Efeito |
+|---:|---|
+| 0–7 | nenhum |
+| 8–10 | cura 40 HP |
+| 11 ou mais | cura 80 HP e +1 Florescimento |
+
+Colheita não bloqueia cartas e não impede descarte.
+
+---
+
+## 5.8 Fase 3 — Primavera Eterna
+
+A primeira habilidade da fase deve priorizar uma habilidade nova desta seção.
+
+### Florescimento Real
+
+Cria até três objetivos simultâneos em alvos de tipos diferentes:
+
+- uma carta;
+- um jogo;
+- o topo do lixo.
+
+Cada objetivo válido e não cumprido gera separadamente:
+
+- `+1 Florescimento`;
+- cura `80 HP`.
+
+Não criar um objetivo sem alvo legal apenas para completar três.
+
+### Casulo Esmeralda
+
+Cria um escudo de `180 pontos`.
+
+- o dano recebido reduz primeiro o Casulo;
+- dano absorvido não reduz o HP;
+- completar uma canastra limpa ou superior rompe imediatamente o Casulo;
+- ao romper, o dano restante do evento atual atinge a chefe;
+- se a rodada terminar com Casulo ativo, metade do valor restante vira cura;
+- depois da cura, o Casulo termina;
+- não absorver cura nem alterar Florescimento.
+
+### Coroa da Primavera
+
+Fortalece as ameaças já existentes durante uma rodada.
+
+- a primeira ameaça que falhar gera sua consequência normal;
+- cada ameaça adicional que falhar na mesma rodada cura `+30 HP`;
+- não aumenta o Florescimento além do valor normal de cada ameaça;
+- se não houver ameaça ativa, a habilidade fica inelegível.
+
+### Renascimento — passiva única
+
+Uma vez por partida, na Fase 3:
+
+- se o HP chegar a zero e houver pelo menos `3 Florescimentos`;
+- consumir exatamente `3`;
+- retornar com `300 HP`;
+- cancelar ameaças pendentes já resolvidas, preservando apenas estados ainda válidos;
+- mostrar uma apresentação exclusiva;
+- sem 3 Florescimentos, a chefe é derrotada normalmente.
+
+Também pode ocorrer durante o ataque final.
+
+---
+
+## 5.9 Habilidades e pesos sugeridos
+
+| Habilidade | Peso | Fases |
+|---|---:|---|
+| Semente Viva | 5 | 1, 2 e 3 |
+| Raiz Faminta | 5 | 1, 2 e 3 |
+| Orvalho Restaurador | 3 | 1, 2 e 3 |
+| Trepadeiras Gêmeas | 4 | 2 e 3 |
+| Enxerto | 3 | 2 e 3 |
+| Pólen do Lixo | 3 | 2 e 3 |
+| Colheita | 2 | 2 e 3 |
+| Florescimento Real | 4 | 3 |
+| Casulo Esmeralda | 3 | 3 |
+| Coroa da Primavera | 3 | 3 |
+
+Habilidades introdutórias sugeridas:
+
+```text
+Fase 2: Trepadeiras Gêmeas, Enxerto, Pólen do Lixo ou Colheita
+Fase 3: Florescimento Real, Casulo Esmeralda ou Coroa da Primavera
+```
+
+## 5.10 Falas
+
+### Início
+
+> “Toda mesa pode virar um jardim. A de vocês já começou a criar raízes.”
+
+### Fase 2
+
+> “Vocês cortaram um galho. Eu trouxe a floresta inteira.”
+
+### Fase 3
+
+> “Agora cada carta de vocês alimenta a minha primavera.”
+
+### Ao curar
+
+> “A floresta sempre recupera o que lhe pertence.”
+
+### Ao receber dano
+
+> “Podem cortar as folhas. As raízes continuam.”
+
+### Vitória
+
+> “Não restou mesa. Apenas o meu jardim.”
+
+### Derrota
+
+> “Até a primavera... pode terminar.”
+
+## 5.11 HUD da Matriarca
+
+Mostrar no HUD compacto:
+
+- HP;
+- fase;
+- Florescimento `0/5`;
+- número de ameaças ativas;
+- habilidade atual;
+- objetivo mais urgente;
+- cura prevista, quando houver.
+
+Medidor:
+
+- cinco flores individuais;
+- uma flor abre ao ganhar Florescimento;
+- uma flor murcha ao remover;
+- texto alternativo e número continuam visíveis sem animação.
+
+Exemplo:
+
+```text
+FLORESCIMENTO 3/5
+RAIZ FAMINTA — Jogo 2
+Adicione 1 carta nesta rodada.
+Falha: +1 Flor e cura 60 HP.
+```
+
+## 5.12 Linguagem visual e animações
+
+### Retrato e tema
+
+- usar o fundo verde claro/esmeralda já existente;
+- retrato com moldura dourada e folhas;
+- não adicionar animação contínua ao fundo;
+- preservar a desativação de `#gameSection::before` e `::after` em touch/tablet.
+
+### Semente Viva
+
+- pequena flor esmeralda sobre a carta;
+- borda verde e dourada própria;
+- etiqueta `SEMENTE`;
+- não reutilizar destaque de carta nova, selecionada, presa ou financiada;
+- número e naipe permanecem legíveis;
+- clique e desseleção seguem o comportamento normal.
+
+### Raiz Faminta e Trepadeiras
+
+- vinhas ao redor do contêiner do jogo;
+- decoração atrás das cartas;
+- `pointer-events: none`;
+- última carta fica sempre acima da camada;
+- selo curto: `RAIZ — adicione 1 carta`;
+- duas Raízes não podem invadir uma à outra.
+
+### Enxerto
+
+- linha vegetal ligando os dois jogos;
+- recalcular ao redimensionar a tela;
+- nunca cobrir cartas ou bloquear cliques;
+- em telas estreitas, substituir a linha por selos pareados `ENXERTO A` e `ENXERTO B`.
+
+### Pólen do Lixo
+
+- contorno esmeralda no topo do lixo;
+- partículas curtas apenas ao aplicar;
+- etiqueta `PÓLEN`;
+- sem brilho ou pulso contínuo.
+
+### Cura
+
+- número verde `+60 HP` próximo à barra;
+- origem visível: `Raiz Faminta: +60 HP`;
+- barra sobe suavemente;
+- não piscar a tela;
+- um evento visual por cura real.
+
+### Florescimento
+
+- animação curta de flor abrindo;
+- indicador flutuante `+1 Flor`;
+- ao remover: pétalas murcham e aparece `−1 Flor`;
+- não repetir por snapshot.
+
+### Casulo
+
+- camada esmeralda ao redor do retrato e da barra, não sobre a mesa;
+- mostrar `Casulo 180/180`;
+- rachaduras conforme perde valor;
+- animação curta ao romper.
+
+### Renascimento
+
+Sequência máxima aproximada de 2,5 segundos:
+
+1. HP chega a zero;
+2. três flores são consumidas;
+3. flor grande se abre atrás do retrato;
+4. `RENASCIMENTO — 300 HP`;
+5. a partida continua.
+
+Sem estroboscópio, flash branco ou animação contínua.
+
+### Redução de movimento
+
+Com `prefers-reduced-motion`, touch ou tablet:
+
+- substituir movimentos por fades curtos;
+- remover partículas contínuas;
+- manter estado, rótulos e números;
+- nenhuma animação deve causar flash.
+
+## 5.13 Regras de segurança
+
+- nenhuma ameaça pode nascer com alvo nulo;
+- não marcar carta sem jogada legal;
+- não marcar jogo sem continuação legal;
+- alvo que deixa de existir cancela apenas sua ameaça;
+- falha só é aplicada uma vez;
+- cura e Florescimento são idempotentes;
+- recarregar preserva ameaças e prazos;
+- bot reconhece objetivos e tenta cumpri-los;
+- não deixar o jogador sem compra ou descarte legal;
+- ameaça inválida usa fallback seguro;
+- nenhuma animação reaparece apenas porque chegou um snapshot.
+
+---
+
+# 6. HUD e feedback
+
+## 6.1 HUD compacto
 
 Visível:
 
@@ -482,7 +902,7 @@ Visível:
 
 Histórico, tabela de dano e regras extensas ficam em **Detalhes da batalha**, fechado por padrão.
 
-## 5.2 Indicadores flutuantes
+## 6.2 Indicadores flutuantes
 
 ### Banqueiro
 
@@ -496,9 +916,16 @@ Histórico, tabela de dano e regras extensas ficam em **Detalhes da batalha**, f
 - `-1 Corrente`;
 - identidade rosa/roxa.
 
+### Matriarca Esmeralda
+
+- `+1 Flor`;
+- `−1 Flor`;
+- `+60 HP`;
+- identidade esmeralda/dourada.
+
 Aparecem uma vez por alteração real e não bloqueiam controles.
 
-## 5.3 Tela final
+## 6.3 Tela final
 
 Mostra claramente:
 
@@ -517,7 +944,175 @@ Mostra claramente:
 
 ---
 
-# 6. Segurança e soft locks
+
+## 6.4 Marcadores por jogo (boss mode)
+
+No modo Chefe da Mesa, cada jogo/canastra da equipe deve mostrar **marcadores de contribuição** próximos ao rótulo do jogo, na mesma linha dos chips como `Suja`, `Limpa`, `Real` e `Ás-a-Ás`.
+
+### Objetivo
+
+Dar leitura imediata de:
+
+- quanto **dano total** aquele jogo já causou ao chefe;
+- quanto aquele jogo já contribuiu para enfraquecer a mecânica principal do chefe atual.
+
+### Posição
+
+- mostrar os marcadores na parte inferior do bloco do jogo, ao lado ou logo abaixo do rótulo do tipo de canastra;
+- manter alinhamento consistente entre jogos;
+- em telas estreitas, permitir quebra para uma segunda linha curta;
+- nunca cobrir cartas;
+- nunca usar tooltip como única fonte de informação.
+
+### Marcador universal — dano
+
+Todo jogo mostra um marcador universal de dano com ícone de explosão.
+
+Exemplo visual:
+
+```text
+💥 180
+```
+
+Regras:
+
+- valor acumulado de dano que aquele jogo já causou;
+- inclui dano individual das cartas já contabilizado;
+- inclui bônus de canastra já aplicados;
+- usa o dano **realmente aplicado**, não potencial futuro;
+- ao evoluir o jogo, o valor atualiza incrementalmente;
+- não duplicar por reorganização, snapshot ou recarregamento.
+
+### Marcador específico do chefe
+
+Além do dano, o jogo mostra um segundo marcador contextual, com ícone próprio do chefe.
+
+#### Banqueiro
+
+Mostrar quanto de **Dívida reduzida** aquele jogo já gerou.
+
+Exemplo:
+
+```text
+💥 180   🪙 -4
+```
+
+Regras:
+- somente reduções realmente aplicadas;
+- cada jogo acumula sua própria contribuição;
+- exemplo típico:
+  - limpa: `🪙 -4`
+  - real: `🪙 -8`
+  - Ás-a-Ás: `🪙 -12`
+- se a redução for incremental por evolução, o marcador exibe o total daquele jogo.
+
+#### Dominadora
+
+Mostrar quantas **Correntes foram removidas** por ações de Resistência acionadas a partir daquele jogo.
+
+Exemplo:
+
+```text
+💥 180   ⛓️ -1
+```
+
+Regras:
+- contar apenas remoções reais de Corrente;
+- cada jogo exibe o total que ajudou a remover;
+- usar o jogo que causou a evolução/impacto correspondente;
+- não contar dano individual das cartas.
+
+#### Matriarca Esmeralda
+
+Quando implementada, mostrar quantos **Florescimentos foram removidos** por aquele jogo.
+
+Exemplo:
+
+```text
+💥 180   🌸 -1
+```
+
+Regras:
+- contar somente remoções reais de Florescimento;
+- limpar, real e Ás-a-Ás atualizam o total do próprio jogo conforme a regra da chefe.
+
+### Atualização e animação
+
+Quando um marcador subir:
+
+- fazer um pop curto no chip alterado;
+- usar um número flutuante pequeno e rápido;
+- duração aproximada entre 400 e 700 ms;
+- não bloquear interação;
+- respeitar `prefers-reduced-motion`;
+- em tablet/touch, usar apenas animação curta, sem brilho pulsante contínuo.
+
+Exemplos:
+
+- dano novo no jogo:
+  - chip `💥` dá pop;
+  - sobe `+10` ou `+80`;
+- redução de Dívida:
+  - chip `🪙` dá pop;
+  - sobe `-4`;
+- remoção de Corrente:
+  - chip `⛓️` dá pop;
+  - sobe `-1`;
+- remoção de Flor:
+  - chip `🌸` dá pop;
+  - sobe `-1`.
+
+### Identidade visual
+
+- `💥` em vermelho/laranja;
+- `🪙` em dourado/verde para o Banqueiro;
+- `⛓️` em rosa/roxo para a Dominadora;
+- `🌸` ou folha/flor esmeralda para a Matriarca;
+- contraste alto;
+- números sempre legíveis;
+- não reutilizar o visual de cartas novas, presas, financiadas ou expostas.
+
+### Persistência e dados
+
+Cada jogo deve guardar uma estrutura persistente de contribuição, por exemplo:
+
+```text
+meldContribution = {
+  damageDone: number,
+  bankerDebtRelief: number,
+  dominatrixChainsBroken: number,
+  matriarchBloomRemoved: number
+}
+```
+
+Regras:
+
+- atualizar somente com eventos reais aplicados;
+- persistir no save/snapshot;
+- restaurar corretamente após recarregamento;
+- nunca recomputar de forma que duplique efeitos já confirmados;
+- ao desfazer um estado inválido antigo, preservar apenas os valores efetivamente aplicados.
+
+### Escopo
+
+- aparece somente no modo Chefe da Mesa;
+- não aparece nos modos comuns;
+- se o chefe atual não usar o segundo marcador, mostrar apenas o `💥`;
+- o segundo marcador sempre reflete o chefe atual da partida.
+
+### Testes futuros esperados
+
+Quando essa funcionalidade for implementada, cobrir:
+
+- marcador de dano soma cartas e bônus sem duplicar;
+- marcador do Banqueiro soma somente Dívida realmente reduzida;
+- marcador da Dominadora soma somente Correntes realmente removidas;
+- marcador da Matriarca soma somente Florescimentos realmente removidos;
+- chips persistem após recarregar;
+- reorganização visual não perde nem duplica os números;
+- layout continua legível em desktop e tablet.
+
+# 7. Segurança e soft locks
 
 O sistema protege contra:
 
@@ -536,7 +1131,7 @@ Quando necessário, cancela somente o efeito temporário inválido.
 
 ---
 
-# 7. Tablet, desempenho e acessibilidade
+# 8. Tablet, desempenho e acessibilidade
 
 Em dispositivos touch/tablet e para `prefers-reduced-motion`:
 
@@ -549,7 +1144,7 @@ Essa configuração deve ser preservada.
 
 ---
 
-# 8. Persistência
+# 9. Persistência
 
 O estado preserva:
 
@@ -563,27 +1158,28 @@ O estado preserva:
 - Posses e dano suprimido;
 - jogos penhorados;
 - IDs que já causaram dano;
-- eventos e estatísticas.
+- eventos e estatísticas;
+- quando a Matriarca for implementada: Florescimento, ameaças, prazos, Casulo e Renascimento.
 
 Recarregar não pode duplicar nem apagar efeitos válidos.
 
 ---
 
-# 9. Comparação
+# 10. Comparação
 
-| Característica | Banqueiro | Dominadora |
-|---|---|---|
-| HP | 2.500 | 2.100 |
-| Perigo | Dívida coletiva | Correntes individuais |
-| Derrota especial | Dívida 100 | ambos com 4 |
-| Pressão | econômica | controle direto |
-| Counterplay | Garantia, uso das financiadas, Auditoria | Resistência e cumprimento de obrigações |
-| Controle de compra | Cofre, Tarifa, lixo | cartas presas/expostas |
-| Controle de jogos | Penhora | Posse e Separação |
+| Característica | Banqueiro | Dominadora | Matriarca |
+|---|---|---|---|
+| HP | 2.500 | 2.100 | 2.000 sugerido |
+| Perigo | Dívida coletiva | Correntes individuais | Florescimento |
+| Derrota especial | Dívida 100 | ambos com 4 | 5 Flores |
+| Pressão | econômica | controle direto | ocupação da mesa |
+| Counterplay | Garantia, financiadas, Auditoria | Resistência e obrigações | podar Flores e cumprir ameaças |
+| Controle de compra | Cofre, Tarifa, lixo | cartas presas/expostas | Pólen do Lixo |
+| Controle de jogos | Penhora | Posse e Separação | Raízes, Enxerto e Casulo |
 
 ---
 
-# 10. Estado dos testes
+# 11. Estado dos testes
 
 No pacote `Buraco(14)`:
 
@@ -593,7 +1189,9 @@ No pacote `Buraco(14)`:
 0 falhas
 ```
 
-Principais áreas cobertas:
+Os 110 testes cobrem Banqueiro e Dominadora. A Matriarca só deve entrar neste total depois da implementação.
+
+Principais áreas cobertas atualmente:
 
 - dano incremental e individual;
 - fases por mortos, monte e HP;

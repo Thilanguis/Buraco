@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { normalizeVariantForMode } from '../js/boss/boss-registry.js';
 
-const [app, bot, html, serviceWorker, cardsCss, bossCss, banker, dominatrix, engine] = await Promise.all([
+const [app, bot, html, serviceWorker, cardsCss, bossCss, banker, dominatrix, matriarch, engine] = await Promise.all([
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../bot.js', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
@@ -12,6 +12,7 @@ const [app, bot, html, serviceWorker, cardsCss, bossCss, banker, dominatrix, eng
   readFile(new URL('../styles/boss-mode.css', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/bosses/banker.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/bosses/dominatrix.js', import.meta.url), 'utf8'),
+  readFile(new URL('../js/boss/bosses/matriarch.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/boss-engine.js', import.meta.url), 'utf8'),
 ]);
 
@@ -20,10 +21,11 @@ test('menu e HUD expõem o modo Chefe da Mesa', () => {
   assert.match(html, /id="bossSelect"/);
   assert.match(html, /option value="banker"/);
   assert.match(html, /option value="dominadora"/);
-  assert.doesNotMatch(html, /<option value="boss_(?:banker|dominadora)"/);
+  assert.match(html, /option value="matriarca_esmeralda"/);
+  assert.doesNotMatch(html, /<option value="boss_(?:banker|dominadora|matriarca)"/);
   assert.match(html, /id="bossChainStatus"/);
   assert.match(html, /id="bossChoicePanel"/);
-  for (const id of ['bossHud', 'bossHpBar', 'bossDebtBar', 'bossIntentName', 'bossLastImpact', 'bossRoundNumber', 'bossEventLog', 'bossResultSection']) {
+  for (const id of ['bossHud', 'bossHpBar', 'bossDebtBar', 'bossIntentName', 'bossRoundNumber', 'bossEventLog', 'bossResultSection']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
 });
@@ -35,12 +37,19 @@ test('cada chefe fixa sua identidade visual no menu cooperativo', () => {
   assert.match(dominatrix, /tableTheme: 'submissao'/);
   assert.match(dominatrix, /deckTheme: 'mythic'/);
   assert.match(dominatrix, /accent: '#ec4899'/);
+  assert.match(matriarch, /mode: 'boss_matriarca'/);
+  assert.match(matriarch, /tableTheme: 'feltro'/);
+  assert.match(matriarch, /deckTheme: 'classico'/);
+  assert.match(matriarch, /accent: '#34d399'/);
+  assert.match(matriarch, /maxHp: 2000/);
+  assert.match(matriarch, /dangerType: 'bloom'/);
   assert.match(app, /applyCooperativeBossPreset/);
   assert.match(app, /visualMenuBlock\.style\.display = cooperative \? 'none'/);
   assert.match(app, /moneyMenuBlock\.style\.display = cooperative \? 'none'/);
   assert.match(bossCss, /data-boss-id='banker'.*boss-hud/);
   assert.equal(normalizeVariantForMode('boss_banker', 'aberto'), 'fechado');
   assert.equal(normalizeVariantForMode('boss_dominadora', 'aberto'), 'fechado');
+  assert.equal(normalizeVariantForMode('boss_matriarca', 'aberto'), 'fechado');
   assert.equal(normalizeVariantForMode('1x1', 'aberto'), 'aberto');
   assert.match(app, /const effectiveVariant = normalizeVariantForMode\(mode, variant\)/);
   assert.match(app, /newState\.variant = normalizeVariantForMode\(newState\.mode, newState\.variant\)/);
@@ -56,6 +65,34 @@ test('cartas compradas ficam destacadas sem substituir a face do baralho', () =>
   assert.match(cardsCss, /outline: 2px solid/);
   const highlightRule = cardsCss.match(/body\[data-deck-theme\] #handContainer \.carta\.just-bought \{[^}]+\}/)?.[0] || '';
   assert.doesNotMatch(highlightRule, /background(?:-color)?:/);
+});
+
+test('bloqueios da Dominadora possuem estados visuais proprios e selecao reversivel', () => {
+  assert.match(app, /boss-card-status-locked[\s\S]*?<b>PRESA<\/b>/);
+  assert.match(app, /boss-card-status-exposed[\s\S]*?<b>USE NESTE TURNO<\/b>/);
+  assert.match(bossCss, /\.boss-mode \.carta\.boss-card-locked \{/);
+  assert.match(bossCss, /\.boss-mode \.carta\.boss-card-exposed \{/);
+  assert.doesNotMatch(bossCss, /\.carta\.boss-card-locked::after/);
+  assert.match(app, /if \(!bossCardEffect && \(\(state\.boughtCardIds/);
+  const handClick = app.match(/div\.onclick = \(\) => \{[\s\S]*?container\.appendChild\(div\);/)?.[0] || '';
+  assert.match(handClick, /selectedHandIndexes\.has\(idx\)[\s\S]*?selectedHandIndexes\.delete\(idx\)/);
+  assert.doesNotMatch(handClick, /if \(bossCardLocked\)[\s\S]*?return/);
+  assert.match(bossCss, /@media \(hover: none\), \(pointer: coarse\)[\s\S]*?\.carta:hover:not\(\.selected\)/);
+});
+
+test('acoes negadas restauram a posicao visual sem liberar a carta', () => {
+  assert.match(app, /function resetDeniedCardSelection\(\)[\s\S]*?selectedHandIndexes\.clear\(\)[\s\S]*?renderHand\(\)/);
+  assert.match(app, /isBossCardBlocked\(state, currentPlayer\(\)\.id, card\?\.id, 'play'\)[\s\S]*?resetDeniedCardSelection\(\)/);
+  assert.match(app, /isBossCardBlocked\(state, pInitial\.id, card\.id, 'discard'\)[\s\S]*?resetDeniedCardSelection\(\)/);
+});
+
+test('Posse decora cada jogo sem cobrir cartas ou bloquear cliques', () => {
+  assert.match(bossCss, /\.meld-line\.possessed-by-boss \{[^}]*isolation:\s*isolate/);
+  assert.match(bossCss, /\.meld-line\.possessed-by-boss::before \{[\s\S]*?pointer-events:\s*none/);
+  assert.match(bossCss, /\.meld-line\.possessed-by-boss::after \{[\s\S]*?POSSE — adicione 1 carta[\s\S]*?pointer-events:\s*none/);
+  assert.match(bossCss, /\.meld-line\.possessed-by-boss \.carta:last-child \{ z-index: 3; \}/);
+  assert.doesNotMatch(bossCss, /\.meld-line\.possessed-by-boss::after[^}]*inset:\s*0/);
+  assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.meld-line\.possessed-by-boss/);
 });
 
 test('escolha de comprar duas destaca exatamente as duas cartas recebidas', () => {
@@ -94,32 +131,32 @@ test('fluxos humanos e do bot chamam o motor do chefe fora do render', () => {
   assert.match(app, /isCurrentBossMode\(\)\) seats\.right = others\[0\]/);
 });
 
-test('HUD usa apresentadores separados para acao atual e resultado recente', () => {
+test('HUD usa a apresentacao da acao atual e mantem resultados no historico recolhido', () => {
   assert.match(app, /buildBossActionPresentation\(state\)/);
-  assert.match(app, /buildBossResultPresentation\(resolvingEvent\)/);
+  assert.doesNotMatch(app, /buildBossResultPresentation\(resolvingEvent\)/);
+  assert.doesNotMatch(html, /id="bossResolvedPresentation"/);
+  assert.match(html, /id="bossBattleDetails"/);
   assert.doesNotMatch(app, /bossSpeeches\[intent/);
 });
 
 test('acao e resultado usam falas separadas sem misturar seus payloads', () => {
   assert.match(html, /id="bossDialoguePresentation" class="boss-dialogue-presentation"/);
-  assert.match(html, /id="bossResolvedPresentation"/);
+  assert.doesNotMatch(html, /id="bossResolvedPresentation"/);
   assert.match(html, /id="bossDialogueSpeech"/);
   assert.doesNotMatch(html, /id="bossResultSpeech"/);
-  assert.match(app, /buildBossResultPresentation\(resolvingEvent\)/);
-  assert.match(app, /resultPanel\.style\.display = resolvingEvent/);
+  assert.doesNotMatch(app, /resultPanel\.style\.display = resolvingEvent/);
   assert.doesNotMatch(bossCss, /boss-resolving[^\n{]*\.boss-intent/);
 });
 
-test('dialogo em quadrinho e resultado recente usam apresentacoes independentes', () => {
+test('dialogo em quadrinho fica separado do historico de resultados', () => {
   assert.match(app, /\['ability', 'phase', 'taunt'\]\.includes\(flow\?\.stage\)/);
   assert.match(app, /dialoguePanel\.style\.display = dialogueVisible \? 'grid' : 'none'/);
-  assert.match(app, /resultPanel\.style\.display = resolvingEvent \? 'grid' : 'none'/);
   const dialogueRule = bossCss.match(/\.boss-dialogue-presentation \{[^}]+\}/)?.[0] || '';
   assert.match(dialogueRule, /background:\s*#f8fafc/);
   assert.match(dialogueRule, /border:\s*2px solid #111827/);
   assert.match(dialogueRule, /animation:\s*bossSpeechPop/);
-  assert.match(bossCss, /\.boss-result-presentation \{[^}]*background:\s*rgba\(7,10,18,\.97\)/s);
-  assert.doesNotMatch(app.match(/const resultPresentation[\s\S]*?bossTotalDamage/)?.[0] || '', /bossDialogue/);
+  assert.doesNotMatch(bossCss, /\.boss-result-presentation \{/);
+  assert.match(html, /id="bossEventLog"/);
 });
 
 test('DevTools permite revisar toda canastra no balao sem alterar o limite do jogo real', () => {
@@ -180,14 +217,15 @@ test('Cofre fica junto ao jogador, bloqueia compras e anima o resgate sem entrar
   const detailsBlock = html.match(/<details id="bossBattleDetails"[\s\S]*?<\/details>/)?.[0] || '';
   assert.doesNotMatch(detailsBlock, /bossLocalVaultSlot/);
   assert.match(app, /function renderBossVaultSlot\(root, player, isLocal = false\)/);
-  assert.match(app, /COFRE DO BANQUEIRO/);
-  assert.match(app, /Compra obrigatória no próximo turno/);
+  assert.match(app, /GARANTIA NO COFRE/);
+  assert.match(app, /Substitui a próxima compra/);
   assert.match(app, /isBossVaultDrawRequired\(state, myPlayerIndex\)/);
   assert.match(app, /recupere sua garantia antes de continuar\. Monte e lixo estão bloqueados/);
   assert.match(app, /flyRectToRect\(vaultCard, selectedCollateralRect, getRect\(vaultSlot\), 'front'\)/);
   assert.match(app, /flyRectToRect\(vault\.card, fromRect, getRect\(toEl\), 'front'\)/);
   assert.match(app, /if \(isBossVaultDrawRequired\(s, botIndex\)\)/);
   assert.match(bossCss, /\.boss-vault-slot \{/);
+  assert.match(bossCss, /\.boss-vault-seal \{/);
   assert.match(bossCss, /\.boss-vault-required \{/);
 });
 
@@ -201,10 +239,11 @@ test('HUD mostra quatro Correntes, estado Sob Controle e Posses independentes', 
 
 test('HUD do chefe acompanha a largura responsiva da mesa', () => {
   const hudRule = bossCss.match(/\.boss-hud \{[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(hudRule, /width:\s*calc\(100% - 130px\)/);
-  assert.match(hudRule, /max-width:\s*1200px/);
-  assert.match(hudRule, /min-height:\s*138px/);
-  assert.match(bossCss, /\.boss-portrait \{[^}]*width:\s*160px;[^}]*height:\s*98px/);
+  assert.match(hudRule, /width:\s*calc\(100% - 240px\)/);
+  assert.match(hudRule, /max-width:\s*1080px/);
+  assert.match(hudRule, /min-height:\s*168px/);
+  assert.match(bossCss, /\.boss-portrait \{[^}]*width:\s*184px;[^}]*height:\s*116px/);
+  assert.match(bossCss, /@media \(max-width: 900px\)[\s\S]*?\.boss-portrait \{ width: 134px; height: 86px/);
 });
 
 test('Tarifa identifica e anima separadamente as Cartas Financiadas em todos os fluxos', () => {
@@ -283,7 +322,7 @@ test('humano e bot validam descarte livre antes de mover cartas', () => {
 });
 
 test('service worker inclui os novos módulos sem trocar sua versão', () => {
-  assert.match(serviceWorker, /const CACHE_NAME = 'buraco-v120'/);
+  assert.match(serviceWorker, /const CACHE_NAME = 'buraco-v122'/);
   assert.match(serviceWorker, /js\/boss\/boss-engine\.js/);
   assert.match(serviceWorker, /js\/deck\.js/);
   assert.match(serviceWorker, /js\/boss\/boss-presentation\.js/);
@@ -291,4 +330,38 @@ test('service worker inclui os novos módulos sem trocar sua versão', () => {
   assert.match(serviceWorker, /assets\/images\/boss-banqueiro\.png/);
   assert.match(serviceWorker, /js\/boss\/bosses\/dominatrix\.js/);
   assert.match(serviceWorker, /assets\/images\/boss-dominadora\.png/);
+});
+
+test('Matriarca integra motor, HUD, ameacas, bot e feedback sem reutilizar estados de outros chefes', () => {
+  for (const ability of ['living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft', 'discard_pollen', 'harvest', 'royal_bloom', 'emerald_cocoon', 'spring_crown']) {
+    assert.match(matriarch, new RegExp(`['"]${ability}['"]`));
+    assert.match(engine, new RegExp(`['"]${ability}['"]`));
+  }
+  assert.match(html, /id="bossBloomFlowers"/);
+  assert.match(app, /boss\.id === 'matriarca_esmeralda'/);
+  assert.match(app, /boss-card-nature-seed/);
+  assert.match(app, /boss-card-nature-pollen/);
+  assert.match(app, /rooted-by-matriarch/);
+  assert.match(app, /grafted-by-matriarch/);
+  assert.match(app, /matriarchBloomRemoved/);
+  assert.match(bot, /getNaturePriorities/);
+  assert.match(bot, /naturePriorities/);
+});
+
+test('tema da Matriarca e estatico, responsivo e respeita movimento reduzido', () => {
+  assert.match(bossCss, /body\[data-boss-id='matriarca_esmeralda'\] \.boss-hud/);
+  assert.match(bossCss, /\.boss-bloom-flower/);
+  assert.match(bossCss, /\.boss-mode \.carta\.boss-card-nature-seed/);
+  assert.match(bossCss, /\.boss-mode \.carta\.boss-card-nature-pollen/);
+  assert.match(bossCss, /\.meld-line\.rooted-by-matriarch::before/);
+  assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?rooted-by-matriarch/);
+  const matriarchTheme = bossCss.slice(bossCss.indexOf("body[data-boss-id='matriarca_esmeralda']"));
+  assert.doesNotMatch(matriarchTheme, /animation:\s*[^;]*(?:infinite|linear\s+infinite)/);
+});
+
+test('marcador de Florescimento fica isolado dos outros chefes', () => {
+  assert.match(app, /state\.boss\?\.id === 'matriarca_esmeralda' && contribution\?\.matriarchBloomRemoved > 0/);
+  assert.match(app, /contributionChip\('bloom', contribution\.matriarchBloomRemoved/);
+  assert.doesNotMatch(app, /state\.boss\?\.id === 'banker'[^\n]*matriarchBloomRemoved/);
+  assert.doesNotMatch(app, /state\.boss\?\.id === 'dominadora'[^\n]*matriarchBloomRemoved/);
 });

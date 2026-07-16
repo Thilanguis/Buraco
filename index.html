@@ -89,6 +89,7 @@
                     ">
                     <option value="banker" selected>O Banqueiro</option>
                     <option value="dominadora">A Dominadora</option>
+                    <option value="matriarca_esmeralda">A Matriarca Esmeralda</option>
                   </select>
                 </div>
 
@@ -364,6 +365,7 @@
                 <button onclick="window.debugInstantStart('1x1', 0)" style="background: #3b82f6; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">🃏 CLÁSSICO</button>
                 <button onclick="window.debugInstantStart('boss_banker', 0)" style="background: #991b1b; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">👹 BANQUEIRO</button>
                 <button onclick="window.debugInstantStart('boss_dominadora', 0)" style="background: #be185d; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">👑 DOMINADORA</button>
+                <button onclick="window.debugInstantStart('boss_matriarca', 0)" style="background: #047857; font-size: 9px; padding: 8px 4px; font-weight: 900; margin: 0; border-radius: 6px; white-space: nowrap">🌿 MATRIARCA</button>
               </div>
             </div>
           </div>
@@ -541,6 +543,7 @@
               <div id="bossDangerMeter" class="boss-meter boss-debt-meter">
                 <div class="boss-meter-label"><span id="bossDangerLabel">DÍVIDA COLETIVA</span><strong id="bossDebtText">0 / 100</strong></div>
                 <div class="boss-meter-track"><span id="bossDebtBar"></span></div>
+                <div id="bossBloomFlowers" class="boss-bloom-flowers" aria-hidden="true"></div>
               </div>
               <div id="bossChainStatus" class="boss-chain-status" style="display: none"></div>
             </div>
@@ -555,12 +558,6 @@
               <strong id="bossDialogueName"></strong>
               <b id="bossDialogueSpeech"></b>
               <small id="bossDialogueConsequence"></small>
-            </div>
-            <div id="bossResolvedPresentation" class="boss-result-presentation" style="display: none">
-              <span id="bossResultType">RESULTADO RECENTE</span>
-              <strong id="bossLastImpact">Aguardando ataque</strong>
-              <small id="bossResultDescription"></small>
-              <em id="bossResultDetails"></em>
             </div>
             <div id="bossDamageReaction" class="boss-dialogue-presentation boss-damage-reaction" style="display: none" aria-live="polite"></div>
             <details id="bossBattleDetails" class="boss-battle-details">
