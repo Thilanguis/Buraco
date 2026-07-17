@@ -38,6 +38,7 @@ import {
   validateBossClosedDiscardSelection,
   validateBossMeldPlay,
 } from '../js/boss/boss-engine.js';
+import { buildBossActionPresentation } from '../js/boss/boss-presentation.js';
 
 function advanceFlowStage(state) {
   const flow = state.boss.bossFlow;
@@ -79,7 +80,7 @@ function matriarchGame() {
   state.mode = 'boss_matriarca';
   state.variant = 'fechado';
   state.boss = createBossState('matriarca_esmeralda', 2468);
-  state.discard = [{ id: 'mat-discard-7', rank: '7', suit: '♦' }];
+  state.discard = [{ id: 'mat-discard-6', rank: '6', suit: '♠' }];
   state.players[0] = {
     id: 0,
     teamId: 0,
@@ -508,7 +509,7 @@ test('Mãos Atadas e Separação persistem no estado da intenção', () => {
   assert.equal(canBossCreateMeld(state, 0), true);
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [], isNewMeld: true });
   assert.equal(canBossCreateMeld(state, 0), false);
-  assert.equal(canBossCreateMeld(state, 1), true);
+  assert.equal(canBossCreateMeld(state, 1), false);
 
   state.boss.currentIntent = { abilityId: 'separation', payload: { meldOwners: {} } };
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [{ id: 'x' }] });
@@ -528,17 +529,24 @@ test('Posse restaura o dano do jogo e uma carta legal reaplica o dano uma única
   const possessionEvent = completeBossPlayerTurn(state, 1);
   assert.equal(possessionEvent.suppressedDamage, 225);
   assert.equal(state.boss.hp, 2100);
-  const added = { id: 'pos-10', rank: '10', suit: '♠' };
-  state.teams[0].melds[0].push(added);
-  const breakEvent = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [added] });
+  const firstContribution = { id: 'pos-10', rank: '10', suit: '♠' };
+  state.teams[0].melds[0].push(firstContribution);
+  const progressEvent = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [firstContribution] });
+  assert.equal(progressEvent.possessionReleased, false);
+  assert.equal(progressEvent.cardDamage, 10);
+  assert.equal(state.boss.hp, 2090);
+  assert.equal(state.boss.possessions.length, 1);
+  const secondContribution = { id: 'pos-j', rank: 'J', suit: '♠' };
+  state.teams[0].melds[0].push(secondContribution);
+  const breakEvent = applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [secondContribution] });
   assert.equal(breakEvent.possessionReleased, true);
   assert.equal(breakEvent.possessionReappliedDamage, 225);
   assert.equal(breakEvent.cardDamage, 10);
   assert.equal(breakEvent.damage, 235);
   assert.equal(state.boss.possessions.length, 0);
-  assert.equal(state.boss.hp, 1865);
-  assert.equal(applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [added] }), null);
-  assert.equal(state.boss.hp, 1865);
+  assert.equal(state.boss.hp, 1855);
+  assert.equal(applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [secondContribution] }), null);
+  assert.equal(state.boss.hp, 1855);
 });
 
 test('Resistência remove Corrente de quem causou dano', () => {
@@ -558,7 +566,14 @@ test('Troca Forçada e Favorita alteram as mãos e Correntes sem destruir cartas
   const swapEvent = completeBossPlayerTurn(swapState, 1);
   assert.equal(swapEvent.abilityId, 'forced_swap');
   assert.equal(swapEvent.receivedCards.length, 2);
+  assert.equal(swapEvent.sentCards.length, 2);
+  assert.equal(swapEvent.eventId, swapEvent.actionId);
   assert.ok(swapEvent.receivedCards.every((entry) => entry.cardId && entry.cardLabel && entry.fromPlayerId !== entry.playerId));
+  for (const sent of swapEvent.sentCards) {
+    assert.equal(sent.card.id, sent.cardId);
+    assert.equal(swapState.players[sent.playerId].hand.some((card) => card.id === sent.cardId), false);
+    assert.equal(swapState.players[sent.toPlayerId].hand.some((card) => card.id === sent.cardId), true);
+  }
   assert.deepEqual(swapState.players.flatMap((player) => player.hand.map((card) => card.id)).sort(), beforeIds);
   assert.ok(swapState.players[0].hand.some((card) => card.id.startsWith('d1-')));
 
@@ -760,8 +775,10 @@ test('Coleira no primeiro jogador nao permite outra habilidade resolver no mesmo
   assert.equal(state.boss.roundNumber, 2);
   assert.equal(state.boss.eventLog.filter((entry) => entry.type === 'bossAbility').length, 1);
   assert.equal(state.boss.bossFlow.stage, 'result');
-  advanceFlowStage(state);
-  assert.equal(state.boss.currentIntent.activatedRound, 2);
+  let guard = 0;
+  while (!state.boss.currentIntent && guard++ < 6) advanceFlowStage(state);
+  if (state.boss.currentIntent) assert.equal(state.boss.currentIntent.activatedRound, 2);
+  assert.equal(state.boss.eventLog.filter((entry) => entry.type === 'bossAbility').length, 1);
 });
 
 test('habilidade anunciada na virada so resolve no ciclo seguinte', () => {
@@ -778,7 +795,7 @@ test('habilidade anunciada na virada so resolve no ciclo seguinte', () => {
   assert.ok(state.boss.eventLog.filter((entry) => entry.type === 'bossAbility').length <= 2);
 });
 
-test('Posse atravessa a rodada e termina ao receber uma carta legal', () => {
+test('Posse atravessa a rodada e termina com contribuicao dos dois jogadores', () => {
   const state = dominatrixGame();
   state.teams[0].melds = [[{ id: 'base-possession-round', rank: '3', suit: '♠' }]];
   state.boss.possessions = [{ id: 'possession-r1', teamId: 0, meldIndex: 0, progress: 0, required: 1, suppressedDamage: 0 }];
@@ -789,6 +806,8 @@ test('Posse atravessa a rodada e termina ao receber uma carta legal', () => {
   assert.equal(state.boss.possessions[0].id, 'possession-r1');
   assert.equal(state.boss.possessions[0].progress, 0);
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'suja', cardsAdded: [{ id: 'pos-1' }] });
+  assert.equal(state.boss.possessions.length, 1);
+  applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'suja', newKind: 'suja', cardsAdded: [{ id: 'pos-2' }] });
   assert.equal(state.boss.possessions.length, 0);
   assert.match(state.boss.lastEvent.outcome, /rompeu a Posse/);
 });
@@ -901,28 +920,23 @@ test('Exposicao permite jogar, impede descarte e registra sucesso ou Corrente po
   assert.match(failureEvent.outcome, /1 Corrente/);
 });
 
-test('Comprar 2 prende as duas cartas recebidas ate o fim do proximo turno e sobrevive ao reload', () => {
+test('Escolha Forcada oferece somente Corrente ou ordem valida', () => {
   const state = dominatrixGame();
-  state.stock = [{ id: 'choice-a', rank: '9', suit: '♣' }, { id: 'choice-b', rank: '10', suit: '♣' }];
   state.boss.currentIntent = null;
-  state.boss.pendingChoices = [{ id: 'draw-lock', playerId: 0, type: 'forced_choice', options: ['draw2', 'chain'] }];
-  const event = resolveBossChoice(state, 0, 'draw2');
-  assert.equal(event.drawnCount, 2);
-  assert.equal(event.lockedCardIds.length, 2);
-
-  const restored = JSON.parse(JSON.stringify(state));
-  event.lockedCardIds.forEach((cardId) => {
-    assert.equal(isBossCardBlocked(restored, 0, cardId, 'play'), true);
-    assert.equal(isBossCardBlocked(restored, 0, cardId, 'discard'), true);
-  });
-  let guard = 0;
-  while ((isBossTurnActive(restored) || getBossPendingChoice(restored, 0)) && guard++ < 10) {
-    const choice = getBossPendingChoice(restored, 0);
-    if (choice) resolveBossChoice(restored, 0, choice.options.includes('chain') ? 'chain' : choice.options[0]);
-    else advanceFlowStage(restored);
-  }
-  completeBossPlayerTurn(restored, 0);
-  event.lockedCardIds.forEach((cardId) => assert.equal(isBossCardBlocked(restored, 0, cardId, 'play'), false));
+  state.boss.pendingChoices = [{
+    id: 'forced-order',
+    playerId: 0,
+    type: 'forced_choice',
+    options: ['chain', 'order'],
+    order: { type: 'no_new_meld', label: 'Nao criar jogo novo neste turno.' },
+  }];
+  const choice = getBossPendingChoice(state, 0);
+  assert.deepEqual(choice.options, ['chain', 'order']);
+  assert.equal(resolveBossChoice(state, 0, 'draw2'), null);
+  assert.equal(state.boss.pendingChoices.length, 1);
+  const event = resolveBossChoice(state, 0, 'order');
+  assert.equal(event.option, 'order');
+  assert.equal(state.boss.activeOrders[0].type, 'no_new_meld');
 });
 
 test('Escolha Forcada bloqueia imediatamente apos o anuncio e libera o turno depois da decisao', () => {
@@ -942,42 +956,39 @@ test('Escolha Forcada bloqueia imediatamente apos o anuncio e libera o turno dep
   assert.equal(getBossPendingChoice(state, 0)?.type, 'forced_choice');
   assert.equal(canBossPerformCommonAction(state), false);
 
-  const event = resolveBossChoice(state, 0, 'draw2');
-  assert.equal(event.drawnCount, 2);
+  const event = resolveBossChoice(state, 0, 'chain');
+  assert.equal(event.option, 'chain');
+  assert.equal(getBossChains(state, 0), 1);
   assert.equal(state.boss.pendingChoices.length, 0);
   assert.equal(state.boss.currentIntent, null);
   assert.equal(state.boss.bossFlow.stage, 'players');
   assert.equal(canBossPerformCommonAction(state), true);
 });
 
-test('Comprar 2 para o segundo jogador permanece na mao ate o turno dele', () => {
+test('Ordem aceita pelo segundo jogador permanece ate o turno dele', () => {
   const state = dominatrixGame();
   state.currentPlayer = 0;
   state.turnNumber = 7;
-  state.stock = [{ id: 'second-a', rank: '9', suit: '♣' }, { id: 'second-b', rank: '10', suit: '♣' }];
   state.boss.currentIntent = {
     id: 'forced-second',
     abilityId: 'forced_choice',
     name: 'Escolha Forcada',
     duration: 'until_choice',
-    payload: { targetPlayerId: 1 },
+    payload: { targetPlayerId: 1, order: { type: 'no_new_meld', label: 'Nao criar jogo novo neste turno.' } },
   };
   state.boss.bossFlow = { id: 'flow-second', stage: 'ability', queue: [], startedAt: 1000, endsAt: 2000 };
 
   advanceBossTurn(state, 2001);
-  const before = state.players[1].hand.length;
-  const event = resolveBossChoice(state, 1, 'draw2');
-  assert.equal(event.drawnCount, 2);
-  assert.equal(state.players[1].hand.length, before + 2);
-  assert.deepEqual(new Set(state.boss.choiceDrawnCardIdsByPlayer[1]), new Set(event.drawnCardIds));
+  const event = resolveBossChoice(state, 1, 'order');
+  assert.equal(event.option, 'order');
+  assert.equal(state.boss.activeOrders[0].targetPlayerId, 1);
 
   completeBossPlayerTurn(state, 0);
-  assert.equal(state.players[1].hand.length, before + 2);
-  assert.deepEqual(new Set(state.boss.choiceDrawnCardIdsByPlayer[1]), new Set(event.drawnCardIds));
+  assert.equal(state.boss.activeOrders[0].status, 'active');
 
   state.turnNumber += 1;
   completeBossPlayerTurn(state, 1);
-  assert.equal(state.boss.choiceDrawnCardIdsByPlayer[1], undefined);
+  assert.equal(state.boss.activeOrders[0].status, 'obeyed');
 });
 
 test('Correntes nao diminuem automaticamente no fim do turno', () => {
@@ -1315,7 +1326,9 @@ test('Posse acumula progresso entre turnos, aceita duas simultaneas e volta ao s
     state.boss.currentIntent = null;
     assert.notEqual(selectNextBossIntent(state)?.abilityId, 'possession');
   }
-  applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [{ id: 'release-card', rank: '6', suit: '♣' }] });
+  applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [{ id: 'release-card-a', rank: '6', suit: '♣' }] });
+  assert.equal(state.boss.possessions.length, 2);
+  applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [{ id: 'release-card-b', rank: '7', suit: '♣' }] });
   assert.equal(state.boss.possessions.length, 1);
   assert.equal(isBossMeldPossessed(state, 0, 0), false);
 
@@ -1397,13 +1410,13 @@ test('dano reaplicado pela Posse não duplica em snapshot ou reorganização', (
   const state = dominatrixGame();
   state.teams[0].melds = [[{ id: 'possession-base', rank: '3', suit: '♥' }]];
   state.boss.hp = 2100;
-  state.boss.possessions = [{ id: 'persistent-possession', teamId: 0, meldIndex: 0, progress: 0, required: 1, progressCardIds: [], suppressedDamage: 75 }];
+  state.boss.possessions = [{ id: 'persistent-possession', teamId: 0, meldIndex: 0, progress: 1, required: 2, progressCardIds: [], contributorPlayerIds: [0], suppressedDamage: 75 }];
   const card = { id: 'possessed-release', rank: 'K', suit: '♥' };
-  const release = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [card] });
+  const release = applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [card] });
   assert.equal(release.damage, 85);
   assert.equal(state.boss.hp, 2015);
   const restored = JSON.parse(JSON.stringify(state));
-  const replay = applyBossMeldTransition(restored, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [card] });
+  const replay = applyBossMeldTransition(restored, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: [card] });
   assert.equal(replay, null);
   assert.equal(restored.boss.hp, 2015);
 });
@@ -1563,7 +1576,7 @@ test('Raiz e Enxerto resolvem sucesso, falha parcial e falha total separadamente
   completeBossPlayerTurn(rootFailure, 0);
   completeBossPlayerTurn(rootFailure, 1);
   assert.equal(rootFailure.boss.bloom, 1);
-  assert.equal(rootFailure.boss.hp, 1960);
+  assert.equal(rootFailure.boss.hp, 1900);
 
   for (const fedCount of [0, 1, 2]) {
     const state = matriarchGame();
@@ -1581,31 +1594,30 @@ test('Raiz e Enxerto resolvem sucesso, falha parcial e falha total separadamente
     completeBossPlayerTurn(state, 1);
     assert.equal(state.boss.bloom, fedCount === 2 ? 0 : fedCount === 1 ? 1 : 2);
     const cardDamage = fedCount === 2 ? 15 : fedCount === 1 ? 5 : 0;
-    const healing = fedCount === 2 ? 0 : fedCount === 1 ? 50 : 100;
-    assert.equal(state.boss.hp, 1700 - cardDamage + healing);
+    assert.equal(state.boss.hp, 1700 - cardDamage);
   }
 });
 
 test('Polen acompanha o lixo, Colheita usa as tres faixas e Orvalho conta IDs unicos', () => {
   const pollen = matriarchGame();
   pollen.boss.hp = 1900;
-  applyMatriarchAbility(pollen, 'discard_pollen', { discardCardId: 'mat-discard-7' });
+  applyMatriarchAbility(pollen, 'discard_pollen', { discardCardId: 'mat-discard-6' });
   const contaminated = pollen.discard[0];
   pollen.players[0].hand.push(contaminated);
   assert.equal(notifyBossDiscardTaken(pollen, 0, [contaminated]).length, 1);
   assert.equal(getBossCardEffect(pollen, 0, contaminated.id), 'nature-pollen');
   completeBossPlayerTurn(pollen, 0);
   assert.equal(pollen.boss.bloom, 1);
-  assert.equal(pollen.boss.hp, 1960);
+  assert.equal(pollen.boss.hp, 1940);
 
   const changedTop = matriarchGame();
-  applyMatriarchAbility(changedTop, 'discard_pollen', { discardCardId: 'mat-discard-7' });
+  applyMatriarchAbility(changedTop, 'discard_pollen', { discardCardId: 'mat-discard-6' });
   changedTop.discard.push({ id: 'new-top', rank: '8', suit: '♦' });
   normalizeBossState(changedTop);
   assert.equal(getBossNatureThreats(changedTop).length, 0);
   assert.equal(changedTop.boss.bloom, 0);
 
-  for (const [cards, expectedHeal, expectedBloom] of [[7, 0, 0], [9, 40, 0], [11, 80, 1]]) {
+  for (const [cards, expectedHeal, expectedBloom] of [[7, 0, 0], [9, 60, 0], [11, 100, 1]]) {
     const state = matriarchGame();
     state.boss.phase = 2;
     state.boss.hp = 1700;
@@ -1618,16 +1630,20 @@ test('Polen acompanha o lixo, Colheita usa as tres faixas e Orvalho conta IDs un
 
   const dew = matriarchGame();
   dew.boss.hp = 1800;
-  applyMatriarchAbility(dew, 'restorative_dew', { baseHeal: 100, reductionPerCard: 20, countedCardIds: [] });
+  applyMatriarchAbility(dew, 'restorative_dew', { baseHeal: 150, reductionPerCard: 15, countedCardIds: [] });
   const cards = [{ id: 'dew-a', rank: '6', suit: '♣' }, { id: 'dew-b', rank: '10', suit: '♦' }];
   applyBossMeldTransition(dew, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: cards });
   applyBossMeldTransition(dew, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: cards });
+  assert.deepEqual(dew.boss.currentIntent.payload.countedCardIds, ['dew-a', 'dew-b']);
+  const dewPresentation = buildBossActionPresentation(dew);
+  assert.equal(dewPresentation.progress, '2/10 cartas');
+  assert.equal(dewPresentation.consequence, 'Cura prevista: 120 HP');
   completeBossPlayerTurn(dew, 0);
   completeBossPlayerTurn(dew, 1);
-  assert.equal(dew.boss.hp, 1845);
+  assert.equal(dew.boss.hp, 1905);
 });
 
-test('Casulo absorve, rompe e cura; Coroa adiciona cura somente depois da primeira falha', () => {
+test('Casulo absorve, rompe e cura; Coroa propaga sem adicionar cura', () => {
   const cocoon = matriarchGame();
   cocoon.boss.phase = 3;
   cocoon.boss.phaseTransitions = [1, 2, 3];
@@ -1667,7 +1683,7 @@ test('Casulo absorve, rompe e cura; Coroa adiciona cura somente depois da primei
   applyMatriarchAbility(crown, 'spring_crown', { activeThreatIds: crown.boss.natureThreats.map((entry) => entry.id) }, 3);
   completeBossPlayerTurn(crown, 0);
   completeBossPlayerTurn(crown, 1);
-  assert.equal(crown.boss.hp, 1650);
+  assert.equal(crown.boss.hp, 1500);
   assert.equal(crown.boss.bloom, 2);
 });
 

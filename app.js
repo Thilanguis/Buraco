@@ -11,17 +11,27 @@ import {
   advanceBossTurn,
   beginBossTurn,
   completeBossPlayerTurn,
+  consumeBossDiscardSurcharge,
   consumeBossExtraDraw,
   registerBossFinancedCards,
   createBossStateForMode,
   canBossCreateMeld,
   canBossUseMeld,
   getBossChains,
+  getBossCreditLimitQuote,
+  chooseBossFixedInterestBotOption,
+  shouldBossBotAcceptCreditPlay,
+  shouldBossBotTakeDiscard,
+  getBossCardBlockFeedback,
   getBossCardEffect,
   getBossPendingChoice,
   getBossMeldContribution,
   getBossMeldNatureThreats,
+  getBossDominatrixPriorities,
   getBossNaturePriorities,
+  getBossNatureThreatSummaries,
+  getBossDiscardSurcharge,
+  getBossInterdictAttempt,
   getBossVault,
   hasPendingBossChoices,
   canBossPerformCommonAction,
@@ -36,14 +46,18 @@ import {
   isBossVaultDrawRequired,
   normalizeBossState,
   notifyBossDiscardTaken,
+  notifyBossCardDiscarded,
   reclaimBossVault,
   resolveBossChoice,
+  resolveBossInterdictAttempt,
   validateBossClosedDiscardSelection,
   validateBossMeldPlay,
   isValidBossSequence,
 } from './js/boss/boss-engine.js';
 import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } from './js/boss/boss-registry.js';
 import { buildBossActionPresentation, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
+import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
+import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
 
 // Importa a IA do Bot
 import { BuracoBot } from './bot.js';
@@ -319,10 +333,17 @@ let ignoreOwnActionId = null;
 let lastRenderedBossEventId = null;
 let lastAnimatedBossSwapId = null;
 let renderedBossFeedbackCount = null;
+let lastRenderedBossBloom = null;
+let lastRenderedBossBloomEventId = null;
 let bossPresentationTimer = null;
 let bossPresentationKey = '';
 let bossDamageReactionTimer = null;
 const renderedBossMeldContributions = new Map();
+const bossSwapReceivedHighlights = new Map();
+
+function isBossLabAutomationPaused(gameState = state) {
+  return gameState?.debugScenario?.active === true && gameState.debugScenario.pauseAutomation === true;
+}
 
 let movingWild = null;
 
@@ -401,7 +422,7 @@ function getCooperativeProjectedScore() {
   return boardScore - handPenalty - ((state.deadChunksTaken?.[0] || 0) === 0 ? 100 : 0);
 }
 
-async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsAdded, isNewMeld = false) {
+async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsAdded, isNewMeld = false, options = {}) {
   if (!isCurrentBossMode()) return null;
   const event = applyBossMeldTransition(state, {
     teamId: player.teamId,
@@ -411,6 +432,8 @@ async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsA
     newKind,
     cardsAdded,
     isNewMeld,
+    creditEligibleCardIds: options.creditEligibleCardIds ?? null,
+    cardOriginsById: options.cardOriginsById ?? null,
   });
   if (state.boss?.defeated && !state.boss.result) {
     const definition = getBossDefinition(state.boss.id);
@@ -422,8 +445,60 @@ async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsA
     };
     state.boss.stats.finalDebt = state.boss.danger;
     await finishGame(0, { skipFinalStrike: true, bossEvent: event });
+  } else if (state.boss?.result && !state.finished) {
+    await finishGame(state.boss.result.victory ? 0 : 1, { skipFinalStrike: true, bossEvent: event });
   }
   return event;
+}
+
+function confirmBossDiscardPickup(playerId) {
+  const surcharge = getBossDiscardSurcharge(state);
+  if (!surcharge) return { allowed: true, surcharge: null };
+  const confirmed = window.confirm(`Agio do Lixo: esta retirada gera Divida +${surcharge.amount}.\n\nConfirmar a retirada?`);
+  if (!confirmed) {
+    showMessage('Retirada cancelada. Voce ainda pode comprar do monte.');
+    return { allowed: false, surcharge: null };
+  }
+  return { allowed: true, surcharge };
+}
+
+async function prepareBossMeldMutation(player, meldIndex, oldKind, newKind, cardsAdded, undoType, selectedCardIds = [], options = {}) {
+  const quote = getBossCreditLimitQuote(state, cardsAdded, {
+    creditEligibleCardIds: options.creditEligibleCardIds ?? null,
+    cardOriginsById: options.cardOriginsById ?? null,
+  });
+  if (quote?.debt > 0) {
+    const confirmed = window.confirm(
+      `Limite de Credito: esta jogada coloca ${quote.newCardIds.length} carta(s) nova(s) na mesa e gera Divida +${quote.debt}.\n\nConfirmar a jogada?`,
+    );
+    if (!confirmed) {
+      showMessage('Jogada cancelada sem alterar cartas ou Divida.');
+      return { allowed: false, undoSaved: false, event: null };
+    }
+  }
+
+  const interdict = Number.isInteger(meldIndex)
+    ? getBossInterdictAttempt(state, player.teamId, meldIndex, oldKind, newKind)
+    : null;
+  if (!interdict) return { allowed: true, undoSaved: false, event: null };
+
+  saveStateForUndo(undoType, selectedCardIds);
+  const mustObey = getBossChains(state, player.id) >= 4;
+  const disobey = !mustObey && window.confirm(
+    'Interdito: esta jogada evolui o jogo.\n\nOK: desobedecer, concluir a evolucao e receber +1 Corrente.\nCancelar: obedecer e cancelar somente esta tentativa.',
+  );
+  const event = resolveBossInterdictAttempt(state, player.id, interdict.id, disobey ? 'disobey' : 'obey');
+  if (!event?.allowEvolution) {
+    selectedHandIndexes.clear();
+    selectedMeldTarget = null;
+    showMessage(mustObey
+      ? 'Interdito: com 4 Correntes, voce deve obedecer. A tentativa foi cancelada.'
+      : 'Interdito obedecido. A tentativa foi cancelada e suas cartas permaneceram na mao.');
+    renderAll();
+    await commitState();
+    return { allowed: false, undoSaved: true, event };
+  }
+  return { allowed: true, undoSaved: true, event };
 }
 
 function processBossDeadReward() {
@@ -436,17 +511,49 @@ function confirmBossFinalStrike() {
   return window.confirm(`Finalizar o ataque contra ${name}?\n\nCaso sobreviva, a equipe perderá a batalha.`);
 }
 
-function saveStateForUndo() {
+function captureUndoUiState(selectedCardIds = null) {
+  const hand = currentPlayer()?.hand || [];
+  return {
+    selectedCardIds: selectedCardIds || [...selectedHandIndexes].map((index) => hand[index]?.id).filter(Boolean),
+    selectedMeldTarget,
+    movingWild: movingWild ? JSON.parse(JSON.stringify(movingWild)) : null,
+    isStealModeActive: !!window.isStealModeActive,
+    turnTimerRemaining,
+  };
+}
+
+function saveStateForUndo(actionType = 'gameAction', selectedCardIds = null) {
   if (!state) return;
-  // Deep copy padrão para isolar a memória antes da mutação
-  const snap = JSON.parse(JSON.stringify(state));
-  localUndoStack.push(snap);
+  const transaction = createUndoTransaction(state, captureUndoUiState(selectedCardIds), {
+    actorPlayerId: myPlayerIndex,
+    actionType,
+  });
+  if (transaction) localUndoStack.push(transaction);
+}
+
+function restoreUndoUiState(ui = {}) {
+  selectedMeldTarget = ui.selectedMeldTarget || null;
+  movingWild = ui.movingWild || null;
+  window.isStealModeActive = !!ui.isStealModeActive;
+  turnTimerRemaining = Number.isFinite(ui.turnTimerRemaining) ? ui.turnTimerRemaining : turnTimerRemaining;
+  selectedHandIndexes.clear();
+  const hand = state?.players?.[myPlayerIndex]?.hand || [];
+  const wanted = new Set(ui.selectedCardIds || []);
+  hand.forEach((card, index) => {
+    if (wanted.has(card?.id)) selectedHandIndexes.add(index);
+  });
 }
 
 window.executeUndo = async () => {
-  if (!ensureMyTurn() || localUndoStack.length === 0) return;
+  const transaction = localUndoStack[localUndoStack.length - 1];
+  if (!canRestoreUndoTransaction(transaction, state, myPlayerIndex)) {
+    showMessage('Esta acao nao pode mais ser desfeita.');
+    return;
+  }
 
-  const previousState = localUndoStack.pop();
+  localUndoStack.pop();
+  const restored = restoreUndoTransaction(transaction);
+  const previousState = restored.state;
   const actionToUndo = state.lastAction; // Pega a ação que estamos revertendo
 
   // 1. Descobrir de onde as cartas vão sair (da mesa) ANTES de reverter o DOM
@@ -477,7 +584,8 @@ window.executeUndo = async () => {
   }
 
   // Trava a interface para evitar duplo clique durante o voo
-  document.querySelector('.player-interface').style.pointerEvents = 'none';
+  const playerInterface = document.querySelector('.player-interface');
+  if (playerInterface) playerInterface.style.pointerEvents = 'none';
 
   // 2. Restaura o estado e renderiza a tela (as cartas voltam pra posição original no DOM)
   previousState.lastAction = {
@@ -487,13 +595,15 @@ window.executeUndo = async () => {
     ts: Date.now(),
   };
   state = previousState;
+  restoreUndoUiState(restored.ui);
   ignoreOwnActionId = state.lastAction.id;
 
   renderAll();
 
   // 3. Executa a animação de voo reversa
-  if (cardsToAnimate.length > 0 && originRect) {
-    const anims = cardsToAnimate.map((c, i) => {
+  try {
+    if (cardsToAnimate.length > 0 && originRect) {
+      const anims = cardsToAnimate.map((c, i) => {
       let toEl = cardElById(c.id); // Acha a carta na mão
       let toRect = null;
 
@@ -519,12 +629,14 @@ window.executeUndo = async () => {
         if (toEl) toEl.style.visibility = ''; // Revela a carta no lugar certo
         impactAtRect(toRect);
       });
-    });
-    await Promise.all(anims);
+      });
+      await Promise.all(anims);
+    }
+  } finally {
+    if (playerInterface) playerInterface.style.pointerEvents = '';
   }
 
   // Libera a interface e salva no Firebase
-  document.querySelector('.player-interface').style.pointerEvents = 'auto';
   resetTurnTimer();
   await commitState();
   showMessage('🔄 Jogada desfeita!');
@@ -920,7 +1032,7 @@ function clearMovingWild(msg = null) {
 
 function pickWildFromMeld(teamId, meldIdx, cardIdx) {
   if (!state || state.finished) return;
-  if (!canBossPerformCommonAction(state)) {
+  if (!canPerformCommonGameAction(state)) {
     showPendingBossChoiceMessage();
     return;
   }
@@ -1020,26 +1132,21 @@ async function movePickedWildToSelectedMeld() {
   const card = fromMeld[fromIdx];
 
   const sameMeld = fromMeldIdx === toMeldIdx;
+  let fromAfter = fromMeld.slice();
+  let toAfter = sameMeld ? fromAfter : toMeld.slice();
 
   if (sameMeld) {
     const targetIndex = fromIdx === fromMeld.length - 1 ? 0 : fromMeld.length - 1;
-    const after = fromMeld.slice();
-    const [moved] = after.splice(fromIdx, 1);
-    if (targetIndex === 0) after.unshift(moved);
-    else after.push(moved);
+    const [moved] = toAfter.splice(fromIdx, 1);
+    if (targetIndex === 0) toAfter.unshift(moved);
+    else toAfter.push(moved);
 
-    if (after.length < 3) {
+    if (toAfter.length < 3) {
       showMessage('Não pode quebrar o jogo (mínimo 3 cartas).');
       return;
     }
-    if (!isValidSequenceMeld(after)) {
-      showMessage('Mover assim deixa o jogo inválido.');
-      return;
-    }
   } else {
-    const fromAfter = fromMeld.slice();
     fromAfter.splice(fromIdx, 1);
-    const toAfter = toMeld.slice();
     toAfter.push(card);
 
     if (fromAfter.length < 3) {
@@ -1050,13 +1157,14 @@ async function movePickedWildToSelectedMeld() {
       showMessage('Remover isso quebra o jogo origem.');
       return;
     }
-    if (!isValidSequenceMeld(toAfter)) {
-      showMessage('Mover pra esse destino deixa o jogo inválido.');
-      return;
-    }
   }
 
-  saveStateForUndo(); // Salva antes de reposicionar o coringa
+  if (!isValidSequenceMeld(toAfter)) {
+    showMessage(sameMeld ? 'Mover assim deixa o jogo inválido.' : 'Mover pra esse destino deixa o jogo inválido.');
+    return;
+  }
+
+  saveStateForUndo('meldMoveWild');
 
   const fromEl = miniCardElByMeld(myTeamId, fromMeldIdx, fromIdx);
   const fromRect = fromEl ? getRect(fromEl) : meldCardsRect(myTeamId, fromMeldIdx);
@@ -1087,19 +1195,10 @@ async function movePickedWildToSelectedMeld() {
   if (fromEl) fromEl.style.visibility = '';
 
   if (sameMeld) {
-    const targetIndex = fromIdx === fromMeld.length - 1 ? 0 : fromMeld.length - 1;
-    const [moved] = fromMeld.splice(fromIdx, 1);
-
-    if (targetIndex === 0) {
-      fromMeld.unshift(moved);
-      if (moved.rank === '2' || moved.rank === 2) moved.forceWild = false;
-    } else {
-      fromMeld.push(moved);
-      if (moved.rank === '2' || moved.rank === 2) moved.forceWild = true;
-    }
+    fromMeld.splice(0, fromMeld.length, ...toAfter);
   } else {
-    const [moved] = fromMeld.splice(fromIdx, 1);
-    toMeld.push(moved);
+    fromMeld.splice(0, fromMeld.length, ...fromAfter);
+    toMeld.splice(0, toMeld.length, ...toAfter);
     normalizeMeldOrder(fromMeld);
     normalizeMeldOrder(toMeld);
   }
@@ -1374,7 +1473,7 @@ function updateTimerLabel() {
     return;
   }
 
-  if (!canBossPerformCommonAction(state)) {
+  if (!canPerformCommonGameAction(state)) {
     el.classList.remove('timer-critical');
     el.textContent = hasPendingBossChoices(state) ? 'PAUSADO · ESCOLHA' : 'TURNO DO CHEFE';
     return;
@@ -1449,12 +1548,12 @@ async function commitState() {
   }
 }
 
-function passTurn() {
-  if (!canBossPerformCommonAction(state)) {
+function passTurn({ preserveUndo = false } = {}) {
+  if (!canPerformCommonGameAction(state)) {
     if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
     return false;
   }
-  localUndoStack = []; // Zera o histórico ao passar a vez
+  if (!preserveUndo) localUndoStack = [];
   state.powerActiveThisTurn = false; // Desativa o poder do Dominador ao fim do turno
   window.isStealModeActive = false; // Força fechar a visão
   if (isCurrentBossMode()) {
@@ -1480,9 +1579,13 @@ function passTurn() {
 }
 
 async function autoPlayTimeout() {
-  if (!canBossPerformCommonAction(state)) {
+  if (!canPerformCommonGameAction(state)) {
     window.isAutoPlaying = false;
     if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
+    return;
+  }
+  if (isBossLabAutomationPaused()) {
+    window.isAutoPlaying = false;
     return;
   }
   if (!ensureMyTurn()) return;
@@ -1667,7 +1770,14 @@ function startTurnTimerIfNeeded() {
     return;
   }
 
-  if (!canBossPerformCommonAction(state)) {
+  if (isBossLabAutomationPaused()) {
+    stopTurnTimer();
+    activeTurnNumber = -1;
+    updateTimerLabel();
+    return;
+  }
+
+  if (!canPerformCommonGameAction(state)) {
     stopTurnTimer();
     activeTurnNumber = -1;
     updateTimerLabel();
@@ -1682,9 +1792,9 @@ function startTurnTimerIfNeeded() {
   updateTimerLabel();
 
   turnTimerId = setInterval(() => {
-    if (window.isAutoPlaying || (state && state.debugPaused)) return; // Congela o relógio se o debug exigir
+    if (window.isAutoPlaying || (state && state.debugPaused) || isBossLabAutomationPaused()) return; // Congela o relógio se o debug exigir
 
-    if (!canBossPerformCommonAction(state)) return;
+    if (!canPerformCommonGameAction(state)) return;
     turnTimerRemaining--;
 
     if (turnTimerRemaining <= 0) {
@@ -1697,7 +1807,7 @@ function startTurnTimerIfNeeded() {
         document.querySelector('.board-middle').style.pointerEvents = 'none';
 
         setTimeout(() => {
-          if (!canBossPerformCommonAction(state)) {
+          if (!canPerformCommonGameAction(state)) {
             window.isAutoPlaying = false;
             renderAll();
             return;
@@ -1930,8 +2040,9 @@ async function startGame(mode, names, variant, pixKeys = []) {
   let deadChunksMax = [1, 1];
   if (mode === '1x1_duploMorto' || mode === '1x1_dominacao') deadChunksMax = [1, 2];
   if (isBossMode(mode)) deadChunksMax = [2, 0];
-  const deckTheme = document.getElementById('deckThemeSelect').value || 'classico';
-  const tableTheme = document.getElementById('tableThemeSelect').value || 'feltro'; // Captura novo tema
+  const bossDefinition = isBossMode(mode) ? getBossDefinitionForMode(mode) : null;
+  const deckTheme = bossDefinition?.deckTheme || document.getElementById('deckThemeSelect').value || 'classico';
+  const tableTheme = bossDefinition?.tableTheme || document.getElementById('tableThemeSelect').value || 'feltro'; // Captura novo tema
   const isBetting = isBossMode(mode) ? false : document.getElementById('betToggle').value === 'sim';
   const betBase = parseFloat(document.getElementById('betBase').value) || 0;
   const betPerPoint = parseFloat(document.getElementById('betPerPoint').value) || 0;
@@ -1979,6 +2090,7 @@ async function startGame(mode, names, variant, pixKeys = []) {
   if (battleDetails) battleDetails.open = false;
   await setDoc(gameRef, { stateJson: JSON.stringify(newState), createdAt: Date.now() });
   showMessage('Partida iniciada!');
+  return newState;
 }
 
 function currentPlayer() {
@@ -1995,6 +2107,9 @@ function showPendingBossChoiceMessage(playerId = myPlayerIndex) {
   if (localChoice) showMessage('Voce precisa decidir antes de continuar.');
   else showMessage(`Aguardando ${target?.name || 'o jogador alvo'} decidir.`);
 }
+function canPerformCommonGameAction(gameState = state) {
+  return canBossPerformCommonAction(gameState);
+}
 function ensureMyTurn() {
   if (!state || state.finished) {
     showMessage('Fim de jogo.');
@@ -2004,7 +2119,7 @@ function ensureMyTurn() {
     showMessage('⚠️ Jogo congelado pelo DevTools.');
     return false;
   }
-  if (!canBossPerformCommonAction(state)) {
+  if (!canPerformCommonGameAction(state)) {
     if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
     else showMessage(`${getBossDefinition(state.boss?.id)?.name || 'O chefe'} esta executando a acao da rodada.`);
     return false;
@@ -2097,6 +2212,8 @@ async function drawFromStock() {
   const fromEl = document.querySelector('#drawStockBtn .pile-card');
   const fromRect = fromEl ? getRect(fromEl) : null;
 
+  saveStateForUndo('drawStock');
+
   // Se for J2 na Humilhação ou Dominação, puxa 2 (se já puxou do lixo, puxa só mais 1)
   const isDominador = (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1;
   const bossExtraDraw = consumeBossExtraDraw(state, state.currentPlayer);
@@ -2126,7 +2243,6 @@ async function drawFromStock() {
   const financedEvent = registerBossFinancedCards(state, state.currentPlayer, bossExtraCards);
 
   sortHand(currentPlayer().hand);
-  localUndoStack = []; // 🔒 TRAVA DE SEGURANÇA: Limpa o botão voltar para impedir trapaça
   state.hasDrawnThisTurn = true;
   state.partialDraw = false; // Finalizou as compras
   window.isStealModeActive = false; // 👁️ Desativa a visão se tiver comprado do monte
@@ -2201,8 +2317,6 @@ async function drawFromDiscard() {
     showMessage('Cofre: recupere sua garantia antes de continuar. Monte e lixo estão bloqueados.');
     return;
   }
-  localUndoStack = []; // 🔒 TRAVA DE SEGURANÇA: Interagiu com o lixo, apaga histórico do voltar
-
   if (!state.hasDrawnThisTurn && isBossDiscardBlocked(state)) {
     showMessage('🔒 Bloqueio de Crédito: o lixo está indisponível nesta cobrança.');
     return;
@@ -2249,7 +2363,8 @@ async function drawFromDiscard() {
     const selectedCards = indexes.map((i) => hand[i]);
     const bossSelection = validateBossClosedDiscardSelection(state, me.id, selectedCards);
     if (!bossSelection.allowed) {
-      showMessage(`⛓ ${bossSelection.message}`);
+      showMessage(bossSelection.message);
+      resetDeniedCardSelection();
       return;
     }
 
@@ -2335,6 +2450,33 @@ async function drawFromDiscard() {
     }
     if (futureHandSize === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return;
 
+    const pickupDecision = confirmBossDiscardPickup(me.id);
+    if (!pickupDecision.allowed) return;
+
+    const previewMeldIndex = isNewMeld ? team.melds.length : extendedMeldIndex;
+    const previewOldKind = isNewMeld ? 'simple' : classifyMeldForUi(team.melds[extendedMeldIndex]).kind;
+    const previewCards = [...selectedCards, top].filter(Boolean);
+    const creditEligibleCardIds = selectedCards.map((card) => card.id);
+    const cardOriginsById = Object.fromEntries(previewCards.map((card) => [
+      card.id,
+      creditEligibleCardIds.includes(card.id) ? 'hand' : 'discard',
+    ]));
+    const previewMeld = isNewMeld ? previewCards : [...team.melds[extendedMeldIndex], ...previewCards];
+    const previewNewKind = classifyMeldForUi(previewMeld).kind;
+    const bossPreparation = await prepareBossMeldMutation(
+      me,
+      previewMeldIndex,
+      previewOldKind,
+      previewNewKind,
+      previewCards,
+      'drawDiscardFechado',
+      selectedCards.map((card) => card.id),
+      { creditEligibleCardIds, cardOriginsById },
+    );
+    if (!bossPreparation.allowed) return;
+    if (!bossPreparation.undoSaved) saveStateForUndo('drawDiscardFechado', selectedCards.map((card) => card.id));
+    const surchargeEvent = pickupDecision.surcharge ? consumeBossDiscardSurcharge(state, me.id) : null;
+
     // --- SE ENCAIXOU, FAZ A MÁGICA ---
     const pile = state.discard.splice(0, state.discard.length);
     pile.forEach(ensureCardId);
@@ -2405,7 +2547,15 @@ async function drawFromDiscard() {
     const bossMeld = team.melds[bossMeldIndex];
     const kindAfterFechado = classifyMeldForUi(bossMeld).kind;
     let domReward = await processDominationReward(me, kindBeforeFechado, kindAfterFechado, bossMeldIndex);
-    const bossEvent = await processBossMeldChange(me, kindBeforeFechado || 'simple', kindAfterFechado, bossMeldIndex, finalMeldCards, isNewMeld);
+    const bossEvent = await processBossMeldChange(
+      me,
+      kindBeforeFechado || 'simple',
+      kindAfterFechado,
+      bossMeldIndex,
+      finalMeldCards,
+      isNewMeld,
+      { creditEligibleCardIds, cardOriginsById },
+    );
     if (state.finished) return;
 
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -2444,6 +2594,7 @@ async function drawFromDiscard() {
       tookDead: tookDead,
       drawnCards: domReward?.drawnCards,
       bossExtraCards: bossExtraCards.map(packCard),
+      bossFinanceEvent: surchargeEvent,
       bossEvent,
       ts: Date.now(),
     };
@@ -2458,6 +2609,10 @@ async function drawFromDiscard() {
   // =========================================================
   // LÓGICA: BURACO ABERTO
   // =========================================================
+  const pickupDecision = confirmBossDiscardPickup(me.id);
+  if (!pickupDecision.allowed) return;
+  saveStateForUndo('drawDiscard');
+  const surchargeEvent = pickupDecision.surcharge ? consumeBossDiscardSurcharge(state, me.id) : null;
   const pile = state.discard.splice(0, state.discard.length);
   pile.forEach(ensureCardId);
 
@@ -2492,6 +2647,7 @@ async function drawFromDiscard() {
     card: packCard(top),
     count: pile.length + 1,
     bossExtraCards: bossExtraCards.map(packCard),
+    bossFinanceEvent: surchargeEvent,
     ts: Date.now(),
   };
   ignoreOwnActionId = state.lastAction.id;
@@ -2765,7 +2921,6 @@ async function attemptExtendExistingMeld(cards, indexes) {
       showMessage('❌ Combinação inválida: As cartas selecionadas não encaixam neste jogo.');
       return false;
     }
-
     const cardsLeft = hand.length - indexes.length;
     if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(team.id)) {
       const hasCanasta = teamHasGoodCanastra(team.id);
@@ -2777,6 +2932,19 @@ async function attemptExtendExistingMeld(cards, indexes) {
       }
     }
     if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return false;
+
+    const kindBefore1 = classifyMeldForUi(targetMeld).kind;
+    const kindAfter1 = classifyMeldForUi(combined).kind;
+    const bossPreparation = await prepareBossMeldMutation(
+      currentPlayer(),
+      forcedIndex,
+      kindBefore1,
+      kindAfter1,
+      cards,
+      'meldExtend',
+      cards.map((card) => card.id),
+    );
+    if (!bossPreparation.allowed) return false;
 
     const key = team.id + ':' + forcedIndex;
     const baseDrop = meldDropRect(key, 0);
@@ -2792,9 +2960,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
       await Promise.all(anims);
     }
 
-    const kindBefore1 = classifyMeldForUi(targetMeld).kind;
-
-    saveStateForUndo(); // Salva antes de estender jogo forçado
+    if (!bossPreparation.undoSaved) saveStateForUndo('meldExtend', cards.map((card) => card.id));
 
     for (const idx of indexes) {
       targetMeld.push(hand[idx]);
@@ -2880,6 +3046,10 @@ async function attemptExtendExistingMeld(cards, indexes) {
 
   const teamMeld = team.melds[candidateMeldIndexes[0]];
   const combinedCheck = simulateMeld(teamMeld, cards);
+  if (enumerateWildcardOptions(combinedCheck, isValidBossSequence).length > 1) {
+    showMessage('Clique no jogo que deseja completar.');
+    return 'select-target';
+  }
 
   const cardsLeft = hand.length - indexes.length;
   if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(team.id)) {
@@ -2894,8 +3064,19 @@ async function attemptExtendExistingMeld(cards, indexes) {
   if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return false;
 
   const kindBefore2 = classifyMeldForUi(teamMeld).kind;
+  const kindAfter2 = classifyMeldForUi(combinedCheck).kind;
+  const bossPreparation = await prepareBossMeldMutation(
+    currentPlayer(),
+    candidateMeldIndexes[0],
+    kindBefore2,
+    kindAfter2,
+    cards,
+    'meldExtend',
+    cards.map((card) => card.id),
+  );
+  if (!bossPreparation.allowed) return false;
 
-  saveStateForUndo(); // Salva antes de estender jogo livre
+  if (!bossPreparation.undoSaved) saveStateForUndo('meldExtend', cards.map((card) => card.id));
 
   for (const idx of indexes) {
     teamMeld.push(hand[idx]);
@@ -2984,8 +3165,9 @@ async function makeMeldFromSelection(forceNew = false) {
       return;
     }
     const cards = indexes.map((i) => hand[i]);
-    if (cards.some((card) => isBossCardBlocked(state, currentPlayer().id, card?.id, 'play'))) {
-      showMessage('⛓ A Dominadora prendeu uma das cartas selecionadas.');
+    const blockedPlay = cards.map((card) => getBossCardBlockFeedback(state, currentPlayer().id, card?.id, 'play')).find(Boolean);
+    if (blockedPlay) {
+      showMessage(blockedPlay.message);
       resetDeniedCardSelection();
       return;
     }
@@ -2996,11 +3178,6 @@ async function makeMeldFromSelection(forceNew = false) {
       return;
     }
 
-    // TRAVA ANTI-CLONE: Limpa a seleção imediatamente e renderiza
-    selectedHandIndexes.clear();
-    renderHand();
-    renderMelds(); // Limpa o efeito de Dropzone do fundo
-
     cards.forEach((c) => {
       c.forceNatural = false;
       c.forceWild = false;
@@ -3008,6 +3185,10 @@ async function makeMeldFromSelection(forceNew = false) {
 
     if (!forceNew) {
       const extended = await attemptExtendExistingMeld(cards, indexes);
+      if (extended === 'select-target') {
+        renderHand();
+        return;
+      }
       if (extended) return;
 
       // Se tentou colocar as cartas num jogo específico mas elas não encaixaram, aborta!
@@ -3029,7 +3210,6 @@ async function makeMeldFromSelection(forceNew = false) {
       renderHand();
       return;
     }
-
     const teamId = currentTeam().id;
     const cardsLeft = hand.length - indexes.length;
     if ((cardsLeft === 0 || cardsLeft === 1) && !canTeamTakeDeadNow(teamId)) {
@@ -3049,7 +3229,17 @@ async function makeMeldFromSelection(forceNew = false) {
     if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(teamId) && !confirmBossFinalStrike()) return;
 
     cards.forEach(ensureCardId);
-    saveStateForUndo(); // Salva estado antes de criar novo jogo
+    const bossPreparation = await prepareBossMeldMutation(
+      currentPlayer(),
+      currentTeam().melds.length,
+      'simple',
+      classifyMeldForUi(cards).kind,
+      cards,
+      'meldNew',
+      cards.map((card) => card.id),
+    );
+    if (!bossPreparation.allowed) return;
+    if (!bossPreparation.undoSaved) saveStateForUndo('meldNew', cards.map((card) => card.id));
 
     const targetContainer = document.getElementById(teamId === 0 ? 'meldsP1' : 'meldsP2');
 
@@ -3202,13 +3392,12 @@ async function discardSelectedCard() {
   }
 
   ensureCardId(card);
-  if (isBossCardBlocked(state, pInitial.id, card.id, 'discard')) {
-    showMessage('⛓ Esta carta está sob controle da Dominadora e não pode ser descartada.');
+  const blockedDiscard = getBossCardBlockFeedback(state, pInitial.id, card.id, 'discard');
+  if (blockedDiscard) {
+    showMessage(blockedDiscard.message);
     resetDeniedCardSelection();
     return;
   }
-  selectedHandIndexes.clear();
-
   // Optional chaining para evitar crash se id for nulo na leitura
   if (state.pickedDiscardCardId && state.pickedDiscardCardId === card.id) {
     showMessage('Você não pode descartar a carta que acabou de pegar do lixo.');
@@ -3227,6 +3416,10 @@ async function discardSelectedCard() {
       return;
     }
   }
+
+  saveStateForUndo('discard', [card.id]);
+  const discardOrderEvents = notifyBossCardDiscarded(state, pInitial.id, card);
+  if (discardOrderEvents.length) state._pendingBossEvent = discardOrderEvents[discardOrderEvents.length - 1];
 
   const fromEl = cardElById(card.id);
   const toEl = document.querySelector('#drawDiscardBtn .pile-card');
@@ -3260,7 +3453,7 @@ async function discardSelectedCard() {
 
   if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
-  passTurn();
+  passTurn({ preserveUndo: true });
 
   state.lastAction = {
     id: newActionId(),
@@ -3301,6 +3494,7 @@ function computeTeamMeldScore(team) {
 
 function normalizeMeldOrder(meld) {
   if (!meld || !meld.length) return;
+  if (meld.some((card) => card?.wildTargetRank) && isValidSequenceMeld(meld)) return;
   const nonWild = meld.filter((c) => !isWildcard(c, meld));
   const wild = meld.filter((c) => isWildcard(c, meld));
   if (!nonWild.length) {
@@ -3608,22 +3802,76 @@ function renderBossVaultSlot(root, player, isLocal = false) {
 }
 
 async function animateBossForcedSwap(feedback) {
+  const eventId = feedback.eventId || feedback.actionId;
+  if (!eventId || lastAnimatedBossSwapId === eventId) return;
+  lastAnimatedBossSwapId = eventId;
+  const handContainer = document.getElementById('handContainer');
+  handContainer?.classList.add('boss-swap-updating');
+  const sentCards = feedback.sentCards || [];
+  const previews = sentCards.map((sent) => {
+    const fromRect = opponentAnchorRect(sent.playerId);
+    if (!fromRect || !sent.card) return null;
+    const preview = document.createElement('div');
+    preview.className = `carta boss-swap-preview ${suitClass(sent.card)} ${deckFaceClass(sent.card)}`;
+    preview.innerHTML = cardFrontHTML(sent.card);
+    Object.assign(preview.style, { left: `${fromRect.left}px`, top: `${fromRect.top}px`, width: `${fromRect.width}px`, height: `${fromRect.height}px` });
+    document.body.appendChild(preview);
+    return { preview, sent, fromRect };
+  }).filter(Boolean);
+  try {
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise((resolve) => setTimeout(resolve, 480));
+    await Promise.all(
+      previews.map(async ({ sent, fromRect }) => {
+        const toRect = opponentAnchorRect(sent.toPlayerId);
+        if (toRect) await flyRectToRect(sent.card, fromRect, toRect, 'front');
+      }),
+    );
+  } finally {
+    previews.forEach(({ preview }) => preview.remove());
+    handContainer?.classList.remove('boss-swap-updating');
+  }
+  const expiresAt = Date.now() + 4200;
+  feedback.receivedCards.forEach((received) => bossSwapReceivedHighlights.set(received.cardId, { eventId, fromPlayerId: received.fromPlayerId, expiresAt }));
   renderHand();
-  const flights = feedback.receivedCards.map(async (received) => {
-    const owner = state.players.find((player) => player.id === received.playerId);
-    const card = owner?.hand?.find((entry) => entry.id === received.cardId);
-    const fromRect = opponentAnchorRect(received.fromPlayerId);
-    const localCardEl = received.playerId === myPlayerIndex ? cardElById(received.cardId) : null;
-    const toRect = localCardEl ? getRect(localCardEl) : opponentAnchorRect(received.playerId);
-    if (localCardEl) localCardEl.classList.add('boss-swap-received');
-    if (card && fromRect && toRect) await flyRectToRect(card, fromRect, toRect, 'front');
-  });
-  await Promise.all(flights);
   const mine = feedback.receivedCards.find((received) => received.playerId === myPlayerIndex);
   if (mine) {
     const sender = state.players.find((player) => player.id === mine.fromPlayerId);
     showMessage(`Você recebeu ${mine.cardLabel} de ${sender?.name || 'outro jogador'}.`);
   }
+  setTimeout(() => {
+    feedback.receivedCards.forEach((received) => bossSwapReceivedHighlights.delete(received.cardId));
+    renderHand();
+  }, 4300);
+}
+
+function setBossPortrait(image, definition) {
+  if (!image || !definition) return;
+  const frame = image.closest('.boss-portrait');
+  const source = definition.portrait || 'assets/images/boss-banqueiro.png';
+  const fallbackLabel = String(definition.name || 'Chefe')
+    .split(/\s+/)
+    .filter((part) => part.length > 2)
+    .slice(-2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'CM';
+  if (frame) frame.dataset.fallbackLabel = fallbackLabel;
+  image.onload = () => {
+    image.style.display = '';
+    frame?.classList.remove('boss-portrait-fallback');
+  };
+  image.onerror = () => {
+    image.onerror = null;
+    image.style.display = 'none';
+    frame?.classList.add('boss-portrait-fallback');
+  };
+  if (image.dataset.portraitSource !== source) {
+    frame?.classList.remove('boss-portrait-fallback');
+    image.dataset.portraitSource = source;
+    image.style.display = '';
+    image.src = source;
+  }
+
 }
 
 function renderBossHud() {
@@ -3659,7 +3907,7 @@ function renderBossHud() {
           : 'full'
       : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
-  document.getElementById('bossPortraitImage').src = definition?.portrait || 'assets/images/boss-banqueiro.png';
+  setBossPortrait(document.getElementById('bossPortraitImage'), definition);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
   const phaseRules = {
     1: 'Próxima fase: primeiro morto, monte com 40 cartas ou HP em 70%.',
@@ -3695,7 +3943,20 @@ function renderBossHud() {
     document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : 'DÍVIDA COLETIVA';
     document.getElementById('bossDebtText').textContent = `${boss.danger} / ${boss.maxDanger}`;
     document.getElementById('bossDebtBar').style.width = `${Math.max(0, (boss.danger / boss.maxDanger) * 100)}%`;
-    bloomFlowers.innerHTML = isMatriarch ? Array.from({ length: 5 }, (_, index) => `<i class="${index < boss.bloom ? 'open' : ''}" title="Flor ${index + 1}">✿</i>`).join('') : '';
+    const bloomEventChanged = isMatriarch && boss.lastBloomEventId && boss.lastBloomEventId !== lastRenderedBossBloomEventId;
+    const previousBloom = lastRenderedBossBloom;
+    bloomFlowers.innerHTML = isMatriarch
+      ? Array.from({ length: 5 }, (_, index) => {
+          const isOpen = index < boss.bloom;
+          const isOpening = bloomEventChanged && previousBloom != null && boss.bloom > previousBloom && index >= previousBloom && index < boss.bloom;
+          const isWilting = bloomEventChanged && previousBloom != null && boss.bloom < previousBloom && index >= boss.bloom && index < previousBloom;
+          return `<i class="${[isOpen ? 'open' : '', isOpening ? 'opening' : '', isWilting ? 'wilting' : ''].filter(Boolean).join(' ')}" title="Flor ${index + 1}">✿</i>`;
+        }).join('')
+      : '';
+    if (isMatriarch) {
+      lastRenderedBossBloom = boss.bloom;
+      lastRenderedBossBloomEventId = boss.lastBloomEventId || null;
+    }
   }
   renderBossVaultSlot(document.getElementById('bossLocalVaultSlot'), state.players[myPlayerIndex], true);
 
@@ -3725,13 +3986,21 @@ function renderBossHud() {
     id: 'possession',
     meldIndex: possession.meldIndex,
     progress: possession.progress || 0,
-    required: possession.required || 1,
+    required: possession.required || state.players.length || 2,
+    contributorPlayerIds: possession.contributorPlayerIds || [],
     suppressedDamage: possession.suppressedDamage || 0,
   }));
-  const natureEffects = (boss.natureThreats || []).filter((threat) => threat.status === 'active').map((threat) => ({ ...threat, id: `nature:${threat.type}` }));
+  const natureSummaries = isMatriarch ? getBossNatureThreatSummaries(state) : [];
+  const natureEffects = [];
   if (boss.emeraldCocoon?.status === 'active') natureEffects.push({ id: 'emerald_cocoon', remaining: boss.emeraldCocoon.remaining });
   if (boss.springCrown?.status === 'active') natureEffects.push({ id: 'spring_crown' });
-  document.getElementById('bossEffects').innerHTML = [...(boss.effects || []), ...persistentPossessions, ...natureEffects]
+  const tacticalEffects = [];
+  if (boss.currentIntent?.abilityId === 'hands_tied') tacticalEffects.push({ id: 'hands_tied_team', ...boss.currentIntent.payload });
+  (boss.activeOrders || []).filter((order) => order.status === 'active').forEach((order) => tacticalEffects.push({ id: 'dominatrix_order', ...order }));
+  (boss.interdicts || []).filter((interdict) => interdict.status === 'active').forEach((interdict) => tacticalEffects.push({ id: 'interdict', ...interdict }));
+  if (boss.creditLimit?.status === 'active') tacticalEffects.push({ id: 'credit_limit', ...boss.creditLimit });
+  if (boss.discardSurcharge?.status === 'active') tacticalEffects.push({ id: 'discard_surcharge', ...boss.discardSurcharge });
+  document.getElementById('bossEffects').innerHTML = [...(boss.effects || []), ...persistentPossessions, ...natureEffects, ...tacticalEffects]
     .map((effect) => {
       if (effect.id === 'maintenance_fee') return `<span class="boss-effect-chip">Tarifa: +${effect.extraDraw} carta${effect.extraDraw === 1 ? '' : 's'} financiada${effect.extraDraw === 1 ? '' : 's'} · Dívida +${effect.financedDebt} cada</span>`;
       if (effect.id === 'financed_card') {
@@ -3745,19 +4014,31 @@ function renderBossHud() {
         const label = card ? `${card.rank}${card.suit}` : 'carta';
         return `<span class="boss-effect-chip">⛓ ${owner?.name || 'Jogador'}: ${label} presa</span>`;
       }
-      if (effect.id === 'possession') return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required} · ${effect.suppressedDamage} dano suspenso</span>`;
+      if (effect.id === 'possession') {
+        const contributors = (effect.contributorPlayerIds || []).map((playerId) => state.players.find((player) => player.id === playerId)?.name).filter(Boolean);
+        return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required} (${contributors.join(' + ') || 'sem contribuicoes'}) · ${effect.suppressedDamage} dano suspenso</span>`;
+      }
       if (effect.id === 'emerald_cocoon') return `<span class="boss-effect-chip boss-nature-chip">Casulo: ${effect.remaining}/180</span>`;
       if (effect.id === 'spring_crown') return '<span class="boss-effect-chip boss-nature-chip">Coroa da Primavera ativa</span>';
-      if (String(effect.id).startsWith('nature:')) {
-        const owner = state.players.find((player) => player.id === effect.targetPlayerId);
-        const names = { seed: 'Semente', royal_seed: 'Semente Real', root: 'Raiz', twin_root: 'Trepadeira', royal_root: 'Raiz Real', pollen: 'Pólen', royal_pollen: 'Pólen Real', graft: 'Enxerto', dew: 'Orvalho', harvest: 'Colheita' };
-        const target = owner?.name || (Number.isInteger(effect.meldIndex) ? `jogo ${effect.meldIndex + 1}` : 'mesa');
-        const predicted = effect.type === 'dew' ? ` · cura ${Math.max(0, (effect.healAmount || 100) - new Set(effect.countedCardIds || []).size * (effect.reductionPerCard || 20))}` : '';
-        return `<span class="boss-effect-chip boss-nature-chip">${names[effect.type] || 'Ameaça'}: ${target}${predicted}</span>`;
-      }
+      if (effect.id === 'hands_tied_team') return `<span class="boss-effect-chip">Maos Atadas: ${effect.teamMeldAvailable === false ? `criacao consumida por ${state.players.find((player) => player.id === effect.consumedByPlayerId)?.name || 'cooperador'}` : '1 criacao disponivel para a equipe'}</span>`;
+      if (effect.id === 'dominatrix_order') return `<span class="boss-effect-chip">Ordem: ${effect.label || effect.suitLabel || effect.type} · ${state.players.find((player) => player.id === effect.targetPlayerId)?.name || 'alvo'}</span>`;
+      if (effect.id === 'interdict') return `<span class="boss-effect-chip">Interdito: jogo ${Number(effect.meldIndex) + 1} · primeira evolucao</span>`;
+      if (effect.id === 'credit_limit') return `<span class="boss-effect-chip">Credito ${new Set(effect.countedCardIds || []).size}/${effect.allowance} · cobranca ${effect.chargedDebt || 0}/${effect.maxCharge}</span>`;
+      if (effect.id === 'discard_surcharge') return `<span class="boss-effect-chip">Agio do Lixo: +${effect.amount} Divida na primeira retirada valida</span>`;
       return `<span class="boss-effect-chip">${effect.id}</span>`;
     })
-    .join('');
+    .join('') + natureSummaries.map((summary) => `
+      <article class="boss-nature-threat-detail${summary.urgent ? ' is-urgent' : ''}" data-threat-id="${summary.id}">
+        <header><strong>${summary.name}</strong>${summary.urgent ? '<span>MAIS URGENTE</span>' : ''}</header>
+        <dl>
+          <div><dt>Alvo</dt><dd>${summary.target}</dd></div>
+          <div><dt>Prazo</dt><dd>${summary.deadline}</dd></div>
+          <div><dt>Condição</dt><dd>${summary.condition}</dd></div>
+          <div><dt>Falha</dt><dd>${summary.consequence}</dd></div>
+          <div><dt>Cura prevista</dt><dd>${summary.predictedHeal} HP</dd></div>
+        </dl>
+      </article>
+    `).join('');
 
   const choicePanel = document.getElementById('bossChoicePanel');
   const myChoice = getBossPendingChoice(state, myPlayerIndex);
@@ -3765,6 +4046,7 @@ function renderBossHud() {
   const choiceLabels = {
     draw2: 'Comprar 2 cartas',
     chain: 'Receber 1 Corrente',
+    order: 'Aceitar a ordem',
     lock_card: 'Prender 1 carta',
     break_meld: 'Retirar carta da canastra',
     full: 'Pagar valor integral',
@@ -3793,7 +4075,9 @@ function renderBossHud() {
           ? 'Juros Fixos: pague o valor integral ou escolha um garantidor.'
           : myChoice.type === 'banker_collateral_card'
             ? 'Escolha uma carta sua para enviar ao Cofre.'
-            : 'A Dominadora exige uma escolha.';
+            : myChoice.type === 'forced_choice' && myChoice.order?.description
+              ? `Escolha Forçada: receba 1 Corrente agora ou aceite a ordem: ${myChoice.order.description}`
+              : 'A Dominadora exige uma escolha.';
     const actions = document.getElementById('bossChoiceActions');
     actions.innerHTML = myChoice.options
       .map((option) => {
@@ -3816,6 +4100,7 @@ function renderBossHud() {
         const selectedCollateralId = button.dataset.bossChoice.startsWith('card:') ? button.dataset.bossChoice.slice(5) : '';
         const selectedCollateralEl = selectedCollateralId ? cardElById(selectedCollateralId) : null;
         const selectedCollateralRect = selectedCollateralEl ? getRect(selectedCollateralEl) : null;
+        localUndoStack = [];
         const event = resolveBossChoice(state, myPlayerIndex, button.dataset.bossChoice);
         if (!event) return;
         if (state.boss?.result) {
@@ -3889,7 +4174,11 @@ function renderBossHud() {
         detail: `${entry.damage} de dano${entry.dangerChangeLabel ? ` · ${entry.dangerChangeLabel}` : ''}${entry.chainsRemoved ? ` · ${entry.chainsRemoved} Corrente removida` : ''}${entry.possessionProgress != null ? ` · Posse ${entry.possessionProgress}/2` : ''}`,
       };
     if (entry.type === 'bossAbility') return { icon: '💼', title: entry.name || 'Cobrança', detail: entry.outcome || 'Habilidade resolvida' };
-    if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Corrente aplicada' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${entry.chains}/3 Correntes` };
+    if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Corrente aplicada' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${entry.chains}/4 Correntes` };
+    if (entry.type === 'chainOverflow') return { icon: '⛓', title: 'Corrente transferida', detail: entry.outcome || 'O excesso de Correntes foi transferido ao parceiro.' };
+    if (entry.type === 'dominatrixOrder') return { icon: '👑', title: 'Ordem da Dominadora', detail: entry.outcome || 'A ordem foi resolvida.' };
+    if (entry.type === 'creditLimit') return { icon: '🪙', title: 'Limite de Crédito', detail: entry.outcome || `Dívida +${entry.debtAdded || 0}` };
+    if (entry.type === 'discardSurcharge') return { icon: '🪙', title: 'Sobretaxa do Lixo', detail: entry.outcome || `Dívida +${entry.amount || 0}` };
     if (entry.type === 'bossChoice') return { icon: '👑', title: 'Escolha cumprida', detail: entry.outcome };
     if (entry.type === 'debtReduction') return { icon: '🛡️', title: 'Morto conquistado', detail: entry.dangerChangeLabel || `Morto conquistado: Dívida -${entry.amount}` };
     if (entry.type === 'bossHeal') return { icon: '✿', title: entry.origin || 'Cura natural', detail: `HP +${entry.amount}` };
@@ -3901,7 +4190,7 @@ function renderBossHud() {
     return { icon: '📋', title: 'Evento da batalha', detail: entry.outcome || entry.reason || 'Estado atualizado' };
   };
   const reversedEvents = [...(boss.eventLog || [])].reverse();
-  const importantEventTypes = new Set(['bossDamage', 'bossAbility', 'chainChange', 'bossChoice', 'debtReduction', 'phase', 'finalStrike', 'bossHeal', 'bloomChange', 'natureThreat', 'rebirth']);
+  const importantEventTypes = new Set(['bossDamage', 'bossAbility', 'chainChange', 'chainOverflow', 'dominatrixOrder', 'creditLimit', 'discardSurcharge', 'bossChoice', 'debtReduction', 'phase', 'finalStrike', 'bossHeal', 'bloomChange', 'natureThreat', 'rebirth']);
   const logEntries = [...reversedEvents.filter((entry) => importantEventTypes.has(entry.type)), ...reversedEvents.filter((entry) => !importantEventTypes.has(entry.type))].slice(0, 8);
   document.getElementById('bossLogCount').textContent = String(boss.eventLog?.length || 0);
   document.getElementById('bossEventLog').innerHTML = logEntries.length
@@ -3953,7 +4242,6 @@ function renderBossHud() {
     renderedBossFeedbackCount = feedbackEvents.length;
     newFeedback.forEach((feedback, index) => {
       if (feedback.type === 'bossAbility' && feedback.abilityId === 'forced_swap' && feedback.actionId !== lastAnimatedBossSwapId && feedback.receivedCards?.length === 2) {
-        lastAnimatedBossSwapId = feedback.actionId;
         void animateBossForcedSwap(feedback);
       }
       const isChain = feedback.type === 'chainChange' && feedback.amount;
@@ -3961,7 +4249,9 @@ function renderBossHud() {
       const isHeal = feedback.type === 'bossHeal' && feedback.amount;
       const isBloom = feedback.type === 'bloomChange' && feedback.amount;
       const isRebirth = feedback.type === 'rebirth';
-      if (!isChain && !isDebt && !isHeal && !isBloom && !isRebirth) return;
+      const isCocoonBreak = feedback.type === 'bossDamage' && feedback.cocoonBroken;
+      const isNatureCreated = feedback.type === 'bossAbility' && Array.isArray(feedback.threatIds) && feedback.threatIds.length > 0;
+      if (!isChain && !isDebt && !isHeal && !isBloom && !isRebirth && !isCocoonBreak && !isNatureCreated) return;
       const floating = document.createElement('div');
       const visualClass = isChain
         ? feedback.amount > 0
@@ -3975,6 +4265,10 @@ function renderBossHud() {
               : 'bloom-down'
             : isRebirth
               ? 'nature-rebirth'
+              : isCocoonBreak
+                ? 'nature-cocoon-break'
+                : isNatureCreated
+                  ? 'nature-threat-created'
               : feedback.dangerDelta > 0
                 ? 'debt-up'
                 : 'debt-down';
@@ -3987,18 +4281,26 @@ function renderBossHud() {
             ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Flor${Math.abs(feedback.amount) === 1 ? '' : 'es'}`
             : isRebirth
               ? 'RENASCIMENTO +300 HP'
+              : isCocoonBreak
+                ? 'CASULO ROMPIDO'
+                : isNatureCreated
+                  ? ({ living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA')
               : feedback.dangerChangeLabel;
       const chainPlayer = isChain ? [...document.querySelectorAll('#bossChainStatus .boss-chain-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId)) : null;
       const anchor = isChain
         ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
         : isHeal || isRebirth
           ? document.getElementById('bossHpBar')?.parentElement?.getBoundingClientRect()
+          : isCocoonBreak
+            ? document.querySelector('.boss-portrait')?.getBoundingClientRect()
+            : isNatureCreated
+              ? document.getElementById('bossIntentName')?.parentElement?.getBoundingClientRect()
           : document.getElementById('bossDangerMeter')?.getBoundingClientRect();
       if (!anchor) return;
       floating.style.left = `${anchor.left + anchor.width / 2}px`;
       floating.style.top = `${anchor.top + anchor.height / 2 + index * 8}px`;
       document.body.appendChild(floating);
-      setTimeout(() => floating.remove(), 2600);
+      setTimeout(() => floating.remove(), isRebirth || isCocoonBreak ? 2500 : 2600);
     });
   }
   scheduleBossTurnAdvance();
@@ -4123,7 +4425,7 @@ function renderAll() {
 
   renderBossHud();
 
-  const commonActionsAllowed = canBossPerformCommonAction(state);
+  const commonActionsAllowed = canPerformCommonGameAction(state);
   const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex && commonActionsAllowed;
 
   const currP = currentPlayer();
@@ -4328,7 +4630,10 @@ function renderAll() {
   // Controle de exibição do botão Voltar
   const undoBtn = document.getElementById('undoBtn');
   if (undoBtn) {
-    undoBtn.style.display = myTurn && localUndoStack.length > 0 ? 'block' : 'none';
+    const canUndo = canRestoreUndoTransaction(localUndoStack[localUndoStack.length - 1], state, myPlayerIndex);
+    undoBtn.style.display = canUndo ? 'block' : 'none';
+    undoBtn.disabled = !canUndo;
+    undoBtn.title = canUndo ? 'Desfazer a ultima acao completa' : 'Esta acao nao pode ser desfeita';
   }
 
   const powerBtn = document.getElementById('powerBtn');
@@ -4494,6 +4799,7 @@ function renderHand() {
     div.className = `carta ${suitClass(card)} ${deckFaceClass(card)}`;
 
     const bossCardEffect = getBossCardEffect(state, me.id, card.id);
+    const bossDiscardFeedback = getBossCardBlockFeedback(state, me.id, card.id, 'discard');
     const bossCardLocked = bossCardEffect === 'locked';
 
     // O brilho de compra nunca compete com um estado visual da Dominadora.
@@ -4504,7 +4810,7 @@ function renderHand() {
 
     if (bossCardLocked) {
       div.classList.add('boss-card-locked');
-      div.title = 'Carta presa pela Dominadora';
+      div.title = bossDiscardFeedback?.message || 'Carta temporariamente presa';
     }
     if (bossCardEffect === 'exposed') {
       div.classList.add('boss-card-exposed');
@@ -4512,12 +4818,15 @@ function renderHand() {
     }
     if (bossCardEffect === 'nature-seed') {
       div.classList.add('boss-card-nature-seed');
-      div.title = 'Semente Viva: use esta carta antes do fim do turno';
+      div.title = bossDiscardFeedback?.message || 'Semente Viva: use esta carta antes do fim do turno';
     }
     if (bossCardEffect === 'nature-pollen') {
       div.classList.add('boss-card-nature-pollen');
-      div.title = 'Polen marcado pela Matriarca';
+      div.title = bossDiscardFeedback?.message || 'Pólen da Matriarca: use esta carta neste turno';
     }
+    const swapHighlight = bossSwapReceivedHighlights.get(card.id);
+    if (swapHighlight && swapHighlight.expiresAt > Date.now()) div.classList.add('boss-swap-received');
+    if (bossDiscardFeedback) div.setAttribute('aria-label', `${card.rank}${card.suit}. ${bossDiscardFeedback.message}`);
     const financedCard = state.boss?.effects?.find((effect) => effect.id === 'financed_card' && effect.playerId === me.id && effect.cardId === card.id);
     if (financedCard) {
       div.classList.add('boss-card-financed');
@@ -4534,12 +4843,16 @@ function renderHand() {
     } else if (bossCardEffect === 'nature-pollen') {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>POLEN</b></span>');
     }
+    if (swapHighlight && swapHighlight.expiresAt > Date.now()) {
+      const sender = state.players.find((player) => player.id === swapHighlight.fromPlayerId);
+      div.insertAdjacentHTML('beforeend', `<span class="boss-swap-origin">DO PARCEIRO${sender?.name ? `: ${sender.name}` : ''}</span>`);
+    }
 
     // A seleção visual agora aplica a classe 'selected' isoladamente
     if (selectedHandIndexes.has(idx)) div.classList.add('selected');
 
     div.onclick = () => {
-      if (!canBossPerformCommonAction(state)) {
+      if (!canPerformCommonGameAction(state)) {
         showPendingBossChoiceMessage();
         return;
       }
@@ -4826,6 +5139,52 @@ function renderOpponentHands() {
   }
 }
 
+let bossGraftLinkFrame = null;
+
+function renderMatriarchGraftLinks() {
+  document.getElementById('bossGraftLinks')?.remove();
+  if (state?.boss?.id !== 'matriarca_esmeralda' || window.innerWidth <= 900) return;
+  const gameSection = document.getElementById('gameSection');
+  if (!gameSection) return;
+  const groups = new Map();
+  document.querySelectorAll('.meld-line.grafted-by-matriarch[data-graft-id]').forEach((meld) => {
+    const id = meld.dataset.graftId;
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push(meld);
+  });
+  const linkedGroups = [...groups.values()].filter((melds) => melds.length === 2);
+  if (!linkedGroups.length) return;
+  const rootRect = gameSection.getBoundingClientRect();
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'bossGraftLinks';
+  svg.classList.add('boss-graft-links');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('viewBox', `0 0 ${Math.max(1, rootRect.width)} ${Math.max(1, rootRect.height)}`);
+  linkedGroups.forEach(([first, second]) => {
+    const a = first.getBoundingClientRect();
+    const b = second.getBoundingClientRect();
+    const x1 = a.left - rootRect.left + a.width / 2;
+    const y1 = a.bottom - rootRect.top + 3;
+    const x2 = b.left - rootRect.left + b.width / 2;
+    const y2 = b.bottom - rootRect.top + 3;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${Math.max(y1, y2) + 22} ${x2} ${y2}`);
+    svg.appendChild(path);
+  });
+  gameSection.appendChild(svg);
+}
+
+function scheduleMatriarchGraftLinks() {
+  if (bossGraftLinkFrame != null) cancelAnimationFrame(bossGraftLinkFrame);
+  bossGraftLinkFrame = requestAnimationFrame(() => {
+    bossGraftLinkFrame = null;
+    renderMatriarchGraftLinks();
+  });
+}
+
+window.addEventListener('resize', scheduleMatriarchGraftLinks);
+document.addEventListener('scroll', scheduleMatriarchGraftLinks, true);
+
 function renderMelds() {
   const m1 = document.getElementById('meldsP1');
   m1.innerHTML = '';
@@ -4859,7 +5218,7 @@ function renderMelds() {
 
       // Clique no fundo da caixa cria um NOVO JOGO
       panel.onclick = (ev) => {
-        if (!canBossPerformCommonAction(state)) {
+        if (!canPerformCommonGameAction(state)) {
           showPendingBossChoiceMessage();
           return;
         }
@@ -4955,6 +5314,11 @@ function renderMelds() {
       const graftThreat = natureThreats.find((threat) => threat.type === 'graft');
       div.classList.toggle('rooted-by-matriarch', !!rootThreat);
       div.classList.toggle('grafted-by-matriarch', !!graftThreat);
+      if (graftThreat) {
+        const graftSideIndex = (graftThreat.meldIds || []).indexOf(graftThreat.matchedMeldId);
+        div.dataset.graftId = graftThreat.id;
+        div.dataset.graftSide = graftSideIndex === 1 ? 'B' : 'A';
+      }
 
       const row = document.createElement('div');
       row.className = 'meld-line-cards';
@@ -5004,9 +5368,10 @@ function renderMelds() {
       const contributionChips = [];
       const contributionChip = (type, value, icon, title) => {
         const renderKey = `${gameId}:${state.boss?.id}:${contribution?.meldId}:${type}`;
+        const hadPreviousValue = renderedBossMeldContributions.has(renderKey);
         const previousValue = renderedBossMeldContributions.get(renderKey) || 0;
         renderedBossMeldContributions.set(renderKey, value);
-        const increasedClass = value > previousValue ? ' is-increased' : '';
+        const increasedClass = hadPreviousValue && value > previousValue ? ' is-increased' : '';
         return `<span class="boss-meld-contribution boss-meld-contribution-${type}${increasedClass}" title="${title}"><span aria-hidden="true">${icon}</span> ${type === 'damage' ? '' : '-'}${value}</span>`;
       };
       if (contribution?.damageDone > 0) {
@@ -5025,8 +5390,9 @@ function renderMelds() {
       if (rootThreat) natureLabels.push(`<span class="boss-meld-nature-seal">RAIZ ${rootThreat.progress || 0}/${rootThreat.required || 1}</span>`);
       if (graftThreat) {
         const fed = new Set(graftThreat.fedMeldIds || []);
-        const side = (graftThreat.meldIds || []).indexOf(graftThreat.matchedMeldId) + 1;
-        natureLabels.push(`<span class="boss-meld-nature-seal boss-meld-nature-graft">ENXERTO ${fed.size}/${graftThreat.required || 2}${side ? ` &middot; lado ${side}` : ''}</span>`);
+        const sideIndex = (graftThreat.meldIds || []).indexOf(graftThreat.matchedMeldId);
+        const sideLabel = sideIndex === 1 ? 'B' : 'A';
+        natureLabels.push(`<span class="boss-meld-nature-seal boss-meld-nature-graft">ENXERTO ${sideLabel} · ${fed.size}/${graftThreat.required || 2}</span>`);
       }
       meta.innerHTML = `
               <span class="meld-meta-label">${mInfo.base}${mInfo.tag ? ` <span class="meld-tag ${mInfo.tag.cls}">${mInfo.tag.text}</span>` : ''}</span>
@@ -5039,7 +5405,7 @@ function renderMelds() {
       div.onclick = (ev) => {
         ev.stopPropagation(); // Impede o clique de vazar pro fundo da caixa
 
-        if (!canBossPerformCommonAction(state)) {
+        if (!canPerformCommonGameAction(state)) {
           showPendingBossChoiceMessage();
           return;
         }
@@ -5065,6 +5431,8 @@ function renderMelds() {
       target.appendChild(div);
     });
   });
+
+  scheduleMatriarchGraftLinks();
 
   if (typeof window.lastScores === 'undefined') window.lastScores = [0, 0];
 
@@ -5937,6 +6305,8 @@ const botEngine = {
   canCreateMeld: (playerId) => canBossCreateMeld(state, playerId),
   hasPendingBossChoice: () => hasPendingBossChoices(state),
   getNaturePriorities: (playerId) => getBossNaturePriorities(state, playerId),
+  getDominatrixPriorities: (playerId) => getBossDominatrixPriorities(state, playerId),
+  shouldTakeBossDiscard: (playerId, intent, naturePlan) => shouldBossBotTakeDiscard(state, playerId, { intent, naturePlan }),
 
   async resolvePendingBossChoice(playerId) {
     const choice = getBossPendingChoice(state, playerId);
@@ -5944,9 +6314,19 @@ const botEngine = {
     const player = state.players.find((entry) => entry.id === playerId);
     const hasCanastra = state.teams?.[0]?.melds?.some((meld) => meld?.length >= 7);
     let option = choice.options[0];
-    if (choice.type === 'fixed_interest_payment') option = choice.options.find((entry) => entry.startsWith('guarantee:')) || 'full';
-    if (choice.type === 'banker_collateral_card') option = choice.options.find((entry) => entry.startsWith('card:')) || choice.options[0];
-    if (choice.options.includes('chain') && getBossChains(state, playerId) >= 2) option = choice.options.find((entry) => entry !== 'chain') || 'chain';
+    if (choice.type === 'fixed_interest_payment' || choice.type === 'banker_collateral_card') {
+      option = chooseBossFixedInterestBotOption(state, choice) || option;
+    }
+    if (choice.type === 'forced_choice' && choice.options.includes('chain') && choice.options.includes('order')) {
+      const ownChains = getBossChains(state, playerId);
+      const partnerChains = Math.max(0, ...(state.players || [])
+        .filter((entry) => entry.id !== playerId)
+        .map((entry) => getBossChains(state, entry.id)));
+      const practicalOrder = ['discard_suit', 'no_new_meld', 'feed_specific_meld'].includes(choice.order?.type);
+      option = choice.order && (ownChains >= 3 || partnerChains >= 3 || practicalOrder) ? 'order' : 'chain';
+    } else if (choice.options.includes('chain') && getBossChains(state, playerId) >= 2) {
+      option = choice.options.find((entry) => entry !== 'chain') || 'chain';
+    }
     if (choice.options.includes('break_meld') && !hasCanastra) option = 'chain';
     if (choice.options.includes('lock_card') && (player?.hand?.length || 0) <= 2) option = 'chain';
     const event = resolveBossChoice(state, playerId, option);
@@ -5962,6 +6342,45 @@ const botEngine = {
       if (!hasPendingBossChoices(state)) startTurnTimerIfNeeded();
     }
     return event;
+  },
+
+  async evaluateBossMeldMutation(botIndex, meldIndex, oldKind, newKind, cards, options = {}) {
+    const s = this.getState();
+    const me = s?.players?.[botIndex];
+    if (!s || !me) return false;
+    const quote = getBossCreditLimitQuote(s, cards, {
+      creditEligibleCardIds: options.creditEligibleCardIds ?? null,
+    });
+    if (quote?.debt > 0 && !shouldBossBotAcceptCreditPlay(s, me.id, {
+      cards,
+      oldKind,
+      newKind,
+      creditEligibleCardIds: options.creditEligibleCardIds ?? null,
+    })) return false;
+
+    const interdict = Number.isInteger(meldIndex)
+      ? getBossInterdictAttempt(s, me.teamId, meldIndex, oldKind, newKind)
+      : null;
+    if (!interdict) return true;
+    const chains = getBossChains(s, me.id);
+    const valuableEvolution = ['real', 'asas'].includes(newKind);
+    const decision = chains < 3 && valuableEvolution ? 'disobey' : 'obey';
+    const event = resolveBossInterdictAttempt(s, me.id, interdict.id, decision);
+    if (event) s._pendingBossEvent = event;
+    if (!event?.allowEvolution) {
+      await this.commitState();
+      return false;
+    }
+    return true;
+  },
+
+  acceptBossDiscardSurcharge(playerId, intent = null, naturePlan = null) {
+    const s = this.getState();
+    const surcharge = getBossDiscardSurcharge(s);
+    if (!surcharge) return { allowed: true, event: null };
+    if (intent && !shouldBossBotTakeDiscard(s, playerId, { intent, naturePlan })) return { allowed: false, event: null };
+    if (!intent && (s.boss?.danger || 0) + surcharge.amount >= (s.boss?.maxDanger || 100)) return { allowed: false, event: null };
+    return { allowed: true, event: consumeBossDiscardSurcharge(s, playerId) };
   },
 
   normalizeMeld(meld) {
@@ -5997,6 +6416,7 @@ const botEngine = {
     const cards = handIndexes.map((i) => me.hand[i]);
     if (cards.some((card) => isBossCardBlocked(s, me.id, card?.id, 'play'))) return false;
     if (!validateBossMeldPlay(s, me.id, cards).allowed) return false;
+    if (!(await this.evaluateBossMeldMutation(botIndex, team.melds.length, 'simple', classifyMeldForUi(cards).kind, cards))) return false;
 
     handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
 
@@ -6039,9 +6459,15 @@ const botEngine = {
     if (cards.some((card) => isBossCardBlocked(s, me.id, card?.id, 'play'))) return false;
     if (!validateBossMeldPlay(s, me.id, cards).allowed) return false;
 
+    const kindBefore = classifyMeldForUi(team.melds[meldIndex]).kind;
+    const previewMeld = [...team.melds[meldIndex], ...cards].map((card) => ({ ...card }));
+    optimizeMeld(previewMeld);
+    normalizeMeldOrder(previewMeld);
+    const kindAfter = classifyMeldForUi(previewMeld).kind;
+    if (!(await this.evaluateBossMeldMutation(botIndex, meldIndex, kindBefore, kindAfter, cards))) return false;
+
     handIndexes.sort((a, b) => b - a).forEach((idx) => me.hand.splice(idx, 1));
 
-    const kindBefore = classifyMeldForUi(team.melds[meldIndex]).kind;
     team.melds[meldIndex].push(...cards);
     this.normalizeMeld(team.melds[meldIndex]);
 
@@ -6137,6 +6563,8 @@ const botEngine = {
       return false;
     }
     const me = s.players[botIndex];
+    const surchargeDecision = this.acceptBossDiscardSurcharge(me.id);
+    if (!surchargeDecision.allowed) return false;
     const pile = s.discard.splice(0, s.discard.length);
     pile.forEach(ensureCardId);
     const topCard = pile[pile.length - 1];
@@ -6181,7 +6609,7 @@ const botEngine = {
 
     const freshS = this.getState();
     if (freshS) {
-      freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, bossExtraCards: bossExtraCards.map(packCard), bossEvent: financedEvent, ts: Date.now() };
+      freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, bossExtraCards: bossExtraCards.map(packCard), bossFinanceEvent: surchargeDecision.event, bossEvent: financedEvent, ts: Date.now() };
       await this.commitState();
     }
     return true;
@@ -6206,6 +6634,25 @@ const botEngine = {
     }
     const bossMeldValidation = validateBossMeldPlay(s, me.id, selectedHandCards, s.discard.slice(0, -1));
     if (!bossMeldValidation.allowed) return false;
+    const previewTop = s.discard[s.discard.length - 1];
+    const previewAddedCards = intent.action === 'new' ? [...selectedHandCards, previewTop] : [previewTop];
+    const previewOldKind = intent.action === 'extend' ? classifyMeldForUi(team.melds[intent.meldIndex]).kind : 'simple';
+    const previewMeld = intent.action === 'extend'
+      ? [...team.melds[intent.meldIndex], previewTop]
+      : [...selectedHandCards, previewTop];
+    const previewNewKind = classifyMeldForUi(previewMeld).kind;
+    const previewMeldIndex = intent.action === 'extend' ? intent.meldIndex : team.melds.length;
+    const creditEligibleCardIds = selectedHandCards.map((card) => card.id);
+    if (!(await this.evaluateBossMeldMutation(
+      botIndex,
+      previewMeldIndex,
+      previewOldKind,
+      previewNewKind,
+      previewAddedCards,
+      { creditEligibleCardIds },
+    ))) return false;
+    const surchargeDecision = this.acceptBossDiscardSurcharge(me.id, intent, getBossNaturePriorities(s, me.id));
+    if (!surchargeDecision.allowed) return false;
     const pile = s.discard.splice(0, s.discard.length);
     pile.forEach(ensureCardId);
     const topCard = pile.pop();
@@ -6266,7 +6713,19 @@ const botEngine = {
 
     const targetIdx = intent.action === 'extend' ? intent.meldIndex : team.melds.length - 1;
     let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind, targetIdx);
-    const bossEvent = await processBossMeldChange(me, kindBeforeFechado || 'simple', classifyMeldForUi(meldToCheck).kind, targetIdx, bossAddedCards, intent.action === 'new');
+    const cardOriginsById = Object.fromEntries(bossAddedCards.map((card) => [
+      card.id,
+      creditEligibleCardIds.includes(card.id) ? 'hand' : 'discard',
+    ]));
+    const bossEvent = await processBossMeldChange(
+      me,
+      kindBeforeFechado || 'simple',
+      classifyMeldForUi(meldToCheck).kind,
+      targetIdx,
+      bossAddedCards,
+      intent.action === 'new',
+      { creditEligibleCardIds, cardOriginsById },
+    );
     if (s.finished) return true;
 
     sortHand(me.hand);
@@ -6285,7 +6744,8 @@ const botEngine = {
         tookDead,
         drawnCards: domReward?.drawnCards,
         bossExtraCards: bossExtraCards.map(packCard),
-        bossFinanceEvent: financedEvent,
+        bossFinanceEvent: financedEvent || surchargeDecision.event,
+        bossSurchargeEvent: surchargeDecision.event,
         bossEvent,
         ts: Date.now(),
       };
@@ -6304,6 +6764,9 @@ const botEngine = {
     if (cardIndex < 0) return false;
     const card = me.hand[cardIndex];
 
+    const discardOrderEvents = notifyBossCardDiscarded(s, me.id, card);
+    if (discardOrderEvents.length) s._pendingBossEvent = discardOrderEvents[discardOrderEvents.length - 1];
+
     me.hand.splice(cardIndex, 1);
     s.discard.push(card);
 
@@ -6316,7 +6779,7 @@ const botEngine = {
       return;
     }
 
-    passTurn();
+  passTurn({ preserveUndo: true });
 
     const freshS = this.getState();
     if (freshS) {
@@ -6505,6 +6968,9 @@ onSnapshot(gameRef, async (snap) => {
     lastRenderedBossEventId = null;
     lastAnimatedBossSwapId = null;
     renderedBossFeedbackCount = null;
+    lastRenderedBossBloom = null;
+    lastRenderedBossBloomEventId = null;
+    renderedBossMeldContributions.clear();
 
     const overlay = document.getElementById('countdownOverlay');
     if (overlay) overlay.style.display = 'none';
@@ -6716,6 +7182,8 @@ onSnapshot(gameRef, async (snap) => {
   if (!data.stateJson) return;
 
   const newState = JSON.parse(data.stateJson);
+  // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.
+  delete newState.pendingWildcardChoice;
   newState.variant = normalizeVariantForMode(newState.mode, newState.variant);
   if (newState.surrender?.active) {
     state = newState;
@@ -6733,6 +7201,7 @@ onSnapshot(gameRef, async (snap) => {
   const isNewRemoteAction = a && a.id !== lastSeenActionId && a.id !== ignoreOwnActionId;
 
   if (isNewRemoteAction) {
+    localUndoStack = [];
     lastSeenActionId = a.id;
     resetTurnTimer();
 
@@ -6829,7 +7298,7 @@ onSnapshot(gameRef, async (snap) => {
       ?.name?.toUpperCase()
       .includes('BOT'),
   );
-  if (!state.finished && pendingBotChoice) {
+  if (!state.finished && !isBossLabAutomationPaused() && pendingBotChoice) {
     let hostIdx = state.players.findIndex((player) => player && !player.name.toUpperCase().includes('BOT'));
     if (hostIdx === -1) hostIdx = myPlayerIndex;
     if (myPlayerIndex === hostIdx && !window.botPlayTimeoutId) {
@@ -6842,7 +7311,7 @@ onSnapshot(gameRef, async (snap) => {
         await sessionEngine.resolvePendingBossChoice(pendingBotChoice.playerId);
       }, 700);
     }
-  } else if (!state.finished && !hasPendingBossChoices(state) && !isBossTurnActive(state)) {
+  } else if (!state.finished && !isBossLabAutomationPaused() && !hasPendingBossChoices(state) && !isBossTurnActive(state)) {
     const currentPlayerObj = state.players[state.currentPlayer];
 
     if (currentPlayerObj && currentPlayerObj.name.toUpperCase().includes('BOT')) {
@@ -6872,6 +7341,7 @@ onSnapshot(gameRef, async (snap) => {
             if (isBossTurnActive(state) || hasPendingBossChoices(state)) return;
             if (document.getElementById('gameSection').style.display !== 'flex') return;
             if (state.debugPaused) return; // 🛑 CORTA A IA IMEDIATAMENTE
+            if (isBossLabAutomationPaused()) return;
             if (state.turnNumber !== scheduledTurn) return;
             if (state.currentPlayer !== scheduledPlayerId) return;
 
@@ -7479,8 +7949,222 @@ if (isDebugMode) {
 
     window.updateMenuDynamic();
 
-    await startGame(selectedMode, names, normalizeVariantForMode(selectedMode, 'aberto'), ['biel@financeiro.com', 'bot@rebeca.com']);
+    return startGame(selectedMode, names, normalizeVariantForMode(selectedMode, 'aberto'), ['biel@financeiro.com', 'bot@rebeca.com']);
   };
+
+  let bossDebugLabModulePromise = null;
+  let bossDebugLabCatalog = [];
+  let bossDebugLabBaseSnapshot = null;
+  let bossDebugLabObservedBaseline = null;
+  let bossDebugLabLastConfig = null;
+
+  const loadBossDebugLabModule = () => {
+    bossDebugLabModulePromise ||= import('./js/boss/boss-debug-scenarios.js');
+    return bossDebugLabModulePromise;
+  };
+
+  const bossLabElement = (id) => document.getElementById(id);
+  const setBossLabOptions = (select, options, selectedValue = null) => {
+    if (!select) return;
+    select.innerHTML = '';
+    options.forEach((option) => {
+      const element = document.createElement('option');
+      element.value = String(option.id);
+      element.textContent = option.label;
+      element.disabled = option.disabled === true;
+      select.appendChild(element);
+    });
+    if (selectedValue != null && options.some((option) => String(option.id) === String(selectedValue) && !option.disabled)) {
+      select.value = String(selectedValue);
+    }
+  };
+
+  const setBossLabError = (message = '') => {
+    const element = bossLabElement('debugBossLabError');
+    if (element) element.textContent = message;
+  };
+
+  function selectedBossLabAbility() {
+    const boss = bossDebugLabCatalog.find((entry) => entry.id === bossLabElement('debugBossLabBoss')?.value);
+    return boss?.abilities.find((entry) => entry.id === bossLabElement('debugBossLabAbility')?.value) || null;
+  }
+
+  function syncBossLabAbilityControls({ preservePhase = true } = {}) {
+    const ability = selectedBossLabAbility();
+    if (!ability) return;
+    const phaseSelect = bossLabElement('debugBossLabPhase');
+    const previousPhase = preservePhase ? phaseSelect?.value : 'auto';
+    setBossLabOptions(phaseSelect, [
+      { id: 'auto', label: 'Automatica' },
+      ...[1, 2, 3].map((phase) => ({ id: phase, label: `Fase ${phase}`, disabled: !ability.phases.includes(phase) })),
+    ], previousPhase);
+    setBossLabOptions(bossLabElement('debugBossLabVariant'), ability.variants, bossLabElement('debugBossLabVariant')?.value || 'interactive');
+    setBossLabOptions(bossLabElement('debugBossLabTarget'), ability.targets, bossLabElement('debugBossLabTarget')?.value || 'auto');
+    const technical = bossLabElement('debugBossLabTechnical');
+    if (technical) technical.textContent = `${ability.id} - Fases ${ability.phases.join('/')} - peso ${ability.weight}`;
+    document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => {
+      button.hidden = !ability.variants.some((variant) => variant.id === button.dataset.bossLabVariant);
+    });
+    validateBossLabSelection();
+  }
+
+  function syncBossLabBossControls() {
+    const boss = bossDebugLabCatalog.find((entry) => entry.id === bossLabElement('debugBossLabBoss')?.value) || bossDebugLabCatalog[0];
+    if (!boss) return;
+    setBossLabOptions(
+      bossLabElement('debugBossLabAbility'),
+      boss.abilities.map((ability) => ({ id: ability.id, label: `${ability.name} - Fases ${ability.phases.join('/')} - peso ${ability.weight}` })),
+    );
+    syncBossLabAbilityControls({ preservePhase: false });
+  }
+
+  function validateBossLabSelection() {
+    const ability = selectedBossLabAbility();
+    const phase = bossLabElement('debugBossLabPhase')?.value || 'auto';
+    const button = bossLabElement('debugBossLabPrepare');
+    const compatible = !!ability && (phase === 'auto' || ability.phases.includes(Number(phase)));
+    if (button) button.disabled = !compatible;
+    setBossLabError(compatible ? '' : `${ability?.name || 'A habilidade'} nao e elegivel na Fase ${phase}.`);
+    return compatible;
+  }
+
+  function currentBossLabConfig(overrides = {}) {
+    return {
+      bossId: bossLabElement('debugBossLabBoss')?.value,
+      abilityId: bossLabElement('debugBossLabAbility')?.value,
+      phase: bossLabElement('debugBossLabPhase')?.value || 'auto',
+      variant: bossLabElement('debugBossLabVariant')?.value || 'interactive',
+      target: bossLabElement('debugBossLabTarget')?.value || 'auto',
+      ...overrides,
+    };
+  }
+
+  async function refreshBossLabObserved() {
+    if (!state || !bossDebugLabObservedBaseline) return;
+    const module = await loadBossDebugLabModule();
+    const element = bossLabElement('debugBossLabObserved');
+    if (element) element.textContent = module.summarizeBossDebugResult(bossDebugLabObservedBaseline, state);
+  }
+
+  async function activatePreparedBossLabState(prepared, config, { rememberBase = true } = {}) {
+    const module = await loadBossDebugLabModule();
+    if (window.botPlayTimeoutId) {
+      clearTimeout(window.botPlayTimeoutId);
+      window.botPlayTimeoutId = null;
+    }
+    BuracoBot.cancelPendingTurns();
+    stopTurnTimer();
+    localUndoStack = [];
+    selectedHandIndexes.clear();
+    selectedMeldTarget = null;
+    movingWild = null;
+    state = prepared.state;
+    state.debugScenario.pauseAutomation = true;
+    if (rememberBase) bossDebugLabBaseSnapshot = module.createBossDebugSnapshot(state);
+    beginBossTurn(state, { first: true, now: Date.now(), debug: true });
+    if (state.boss?.currentIntent?.abilityId !== config.abilityId) {
+      throw new Error(`O motor selecionou ${state.boss?.currentIntent?.abilityId || 'nenhuma habilidade'} em vez de ${config.abilityId}.`);
+    }
+    bossDebugLabObservedBaseline = module.restoreBossDebugSnapshot(module.createBossDebugSnapshot(state));
+    bossDebugLabLastConfig = { ...config };
+    state.lastAction = { id: newActionId(), type: 'bossDebugScenario', abilityId: config.abilityId, ts: Date.now() };
+    renderAll();
+    await commitState();
+    startTurnTimerIfNeeded();
+    window.toggleDebugPanel(true);
+    const details = bossLabElement('debugBossLab');
+    if (details) details.open = true;
+    await refreshBossLabObserved();
+  }
+
+  async function prepareBossLab(overrides = {}) {
+    if (!validateBossLabSelection()) return;
+    const config = currentBossLabConfig(overrides);
+    const instructions = bossLabElement('debugBossLabInstructions');
+    const prepareButton = bossLabElement('debugBossLabPrepare');
+    setBossLabError('');
+    if (prepareButton) prepareButton.disabled = true;
+    try {
+      const module = await loadBossDebugLabModule();
+      const definition = bossDebugLabCatalog.find((entry) => entry.id === config.bossId);
+      if (!definition) throw new Error('Chefe invalido no laboratorio.');
+      const prepared = module.buildBossDebugScenario(null, config);
+      await window.debugInstantStart(definition.mode, 0);
+      await activatePreparedBossLabState(prepared, config);
+      if (instructions) instructions.textContent = prepared.instructions;
+      showMessage(`${definition.name}: ${state.boss.currentIntent.name} preparada no laboratorio.`);
+    } catch (error) {
+      setBossLabError(error.message || String(error));
+    } finally {
+      validateBossLabSelection();
+    }
+  }
+
+  async function resetBossLabScenario() {
+    if (!bossDebugLabBaseSnapshot || !bossDebugLabLastConfig) {
+      setBossLabError('Prepare um cenario antes de resetar.');
+      return;
+    }
+    try {
+      const module = await loadBossDebugLabModule();
+      const restored = module.restoreBossDebugSnapshot(bossDebugLabBaseSnapshot);
+      await activatePreparedBossLabState({ state: restored }, bossDebugLabLastConfig, { rememberBase: false });
+    } catch (error) {
+      setBossLabError(error.message || String(error));
+    }
+  }
+
+  async function simulateBossLabReload() {
+    if (!state?.debugScenario?.active) {
+      setBossLabError('Prepare um cenario antes de simular reload.');
+      return;
+    }
+    const module = await loadBossDebugLabModule();
+    state = module.simulateBossDebugReload(state);
+    renderAll();
+    await commitState();
+    await refreshBossLabObserved();
+  }
+
+  async function sweepBossLab() {
+    const module = await loadBossDebugLabModule();
+    const report = module.runBossDebugSweep();
+    const byBoss = bossDebugLabCatalog.map((boss) => {
+      const entries = report.results.filter((entry) => entry.bossId === boss.id);
+      return `${boss.name}: ${entries.filter((entry) => entry.ok).length}/${entries.length}`;
+    });
+    const failures = report.failed.map((entry) => `${entry.abilityId}: ${entry.reason}`);
+    bossLabElement('debugBossLabObserved').textContent = [
+      'VARREDURA DE CENARIOS',
+      ...byBoss,
+      '',
+      failures.length ? failures.join('\n') : `OK - ${report.passed}/${report.total} habilidades preparadas`,
+    ].join('\n');
+  }
+
+  async function initBossDebugLab() {
+    const module = await loadBossDebugLabModule();
+    bossDebugLabCatalog = module.getBossDebugCatalog();
+    setBossLabOptions(bossLabElement('debugBossLabBoss'), bossDebugLabCatalog.map((boss) => ({ id: boss.id, label: boss.name })));
+    syncBossLabBossControls();
+    bossLabElement('debugBossLabBoss')?.addEventListener('change', syncBossLabBossControls);
+    bossLabElement('debugBossLabAbility')?.addEventListener('change', () => syncBossLabAbilityControls({ preservePhase: false }));
+    bossLabElement('debugBossLabPhase')?.addEventListener('change', validateBossLabSelection);
+    bossLabElement('debugBossLabPrepare')?.addEventListener('click', () => prepareBossLab());
+    document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => button.addEventListener('click', () => prepareBossLab({ variant: button.dataset.bossLabVariant })));
+    bossLabElement('debugBossLabReload')?.addEventListener('click', simulateBossLabReload);
+    bossLabElement('debugBossLabUndo')?.addEventListener('click', async () => {
+      await window.executeUndo();
+      await refreshBossLabObserved();
+    });
+    bossLabElement('debugBossLabReset')?.addEventListener('click', resetBossLabScenario);
+    bossLabElement('debugBossLabSweep')?.addEventListener('click', sweepBossLab);
+    setInterval(() => {
+      if (bossLabElement('debugBossLab')?.open && state?.debugScenario?.active) refreshBossLabObserved().catch(console.error);
+    }, 1500);
+  }
+
+  initBossDebugLab().catch((error) => setBossLabError(`Falha ao carregar laboratorio: ${error.message}`));
 }
 
 window.debugDraw5 = async () => {
@@ -8133,7 +8817,7 @@ window.stealCard = async (cardId) => {
     return;
   }
 
-  saveStateForUndo();
+  saveStateForUndo('stealCard');
 
   const card = p1.hand.splice(cardIndex, 1)[0];
   p2.hand.push(card);

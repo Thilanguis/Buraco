@@ -1227,6 +1227,7 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
   }
   .boss-mode .carta.boss-card-locked,
   .boss-mode .carta.boss-card-exposed,
+  .boss-mode .carta.boss-swap-received,
   .boss-mode .meld-line.possessed-by-boss {
     animation: none !important;
   }
@@ -1260,6 +1261,22 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
 }
 .boss-mode .carta.boss-swap-received {
   animation: bossSwapReceived 3.2s ease both;
+}
+.boss-swap-updating .cards-row { visibility: hidden; }
+.boss-swap-preview { position: fixed; z-index: 100030; pointer-events: none; }
+.boss-swap-origin {
+  position: absolute;
+  left: 50%;
+  bottom: -17px;
+  translate: -50% 0;
+  padding: 2px 4px;
+  border: 1px solid #f472b6;
+  border-radius: 3px;
+  background: #500724;
+  color: #fce7f3;
+  font-size: 6px;
+  font-weight: 1000;
+  white-space: nowrap;
 }
 
 @keyframes bossSwapReceived {
@@ -1589,6 +1606,17 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
   transform: scale(1.13);
   transform-origin: 50% 28%;
 }
+.boss-portrait.boss-portrait-fallback::after {
+  content: attr(data-fallback-label);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #052e16, #111827);
+  color: #a7f3d0;
+  font-size: 28px;
+  font-weight: 1000;
+}
 body[data-boss-id='matriarca_esmeralda'] .boss-dialogue-presentation > span { color: #047857; }
 body[data-boss-id='matriarca_esmeralda'] .boss-intent { border-color: rgba(52, 211, 153, 0.42); }
 body[data-boss-id='matriarca_esmeralda'] .boss-effect-chip.boss-nature-chip {
@@ -1697,3 +1725,81 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   .boss-mode .meld-line.rooted-by-matriarch::before,
   .boss-mode .meld-line.grafted-by-matriarch::before { animation: none !important; }
 }
+
+#debugPanel {
+  width: min(320px, calc(100vw - 24px));
+  max-height: calc(100vh - 78px);
+  overflow-y: auto;
+}
+
+.debug-boss-lab {
+  margin-top: 4px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #e5e7eb;
+}
+
+.debug-boss-lab > summary {
+  padding: 8px;
+  color: #facc15;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.debug-boss-lab-body {
+  display: grid;
+  gap: 7px;
+  padding: 0 8px 8px;
+}
+
+.debug-boss-lab label {
+  display: grid;
+  gap: 3px;
+  color: #facc15;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.debug-boss-lab select {
+  width: 100%;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid rgba(250, 204, 21, 0.36);
+  border-radius: 5px;
+  background: #0b1220;
+  color: #f8fafc;
+  font-size: 10px;
+}
+
+.debug-boss-lab button {
+  width: 100%;
+  margin: 0;
+  padding: 7px;
+  border-radius: 5px;
+  background: #334155;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.debug-boss-lab .debug-boss-lab-primary { background: #ca8a04; color: #09090b; }
+.debug-boss-lab .debug-boss-lab-sweep { border: 1px solid #0ea5e9; background: #082f49; color: #bae6fd; }
+.debug-boss-lab-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.debug-boss-lab-technical { min-height: 13px; color: #94a3b8; font-size: 8px; }
+.debug-boss-lab-error { min-height: 13px; color: #fca5a5; font-size: 9px; line-height: 1.35; }
+.debug-boss-lab-report {
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 5px;
+  padding: 7px;
+  background: rgba(2, 6, 23, 0.9);
+  color: #cbd5e1;
+  font: 8px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.debug-boss-lab-observed:empty { display: none; }

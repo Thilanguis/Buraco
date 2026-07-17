@@ -39,7 +39,7 @@ test('cada chefe fixa sua identidade visual no menu cooperativo', () => {
   assert.match(dominatrix, /accent: '#ec4899'/);
   assert.match(matriarch, /mode: 'boss_matriarca'/);
   assert.match(matriarch, /tableTheme: 'feltro'/);
-  assert.match(matriarch, /deckTheme: 'classico'/);
+  assert.match(matriarch, /deckTheme: 'holografico'/);
   assert.match(matriarch, /accent: '#34d399'/);
   assert.match(matriarch, /maxHp: 2000/);
   assert.match(matriarch, /dangerType: 'bloom'/);
@@ -82,8 +82,8 @@ test('bloqueios da Dominadora possuem estados visuais proprios e selecao reversi
 
 test('acoes negadas restauram a posicao visual sem liberar a carta', () => {
   assert.match(app, /function resetDeniedCardSelection\(\)[\s\S]*?selectedHandIndexes\.clear\(\)[\s\S]*?renderHand\(\)/);
-  assert.match(app, /isBossCardBlocked\(state, currentPlayer\(\)\.id, card\?\.id, 'play'\)[\s\S]*?resetDeniedCardSelection\(\)/);
-  assert.match(app, /isBossCardBlocked\(state, pInitial\.id, card\.id, 'discard'\)[\s\S]*?resetDeniedCardSelection\(\)/);
+  assert.match(app, /getBossCardBlockFeedback\(state, currentPlayer\(\)\.id, card\?\.id, 'play'\)[\s\S]*?resetDeniedCardSelection\(\)/);
+  assert.match(app, /getBossCardBlockFeedback\(state, pInitial\.id, card\.id, 'discard'\)[\s\S]*?resetDeniedCardSelection\(\)/);
 });
 
 test('Posse decora cada jogo sem cobrir cartas ou bloquear cliques', () => {
@@ -125,7 +125,7 @@ test('fluxos humanos e do bot chamam o motor do chefe fora do render', () => {
   assert.match(bot, /engine\.isMeldLocked/);
   assert.match(bot, /state\.mode\?\.startsWith\('boss_'\)[\s\S]*?executeDrawDiscardFechado/);
   assert.match(bot, /resolvePendingBossChoice/);
-  assert.match(app, /isBossCardBlocked\(state/);
+  assert.match(app, /getBossCardBlockFeedback\(state/);
   assert.match(app, /canBossCreateMeld\(state/);
   assert.match(app, /canBossUseMeld\(state/);
   assert.match(app, /isCurrentBossMode\(\)\) seats\.right = others\[0\]/);
@@ -259,10 +259,13 @@ test('Tarifa identifica e anima separadamente as Cartas Financiadas em todos os 
 
 test('Troca Forçada apresenta os dois voos e identifica a carta recebida', () => {
   assert.match(app, /function animateBossForcedSwap\(feedback\)/);
-  assert.match(app, /feedback\.receivedCards\.map/);
-  assert.match(app, /flyRectToRect\(card, fromRect, toRect, 'front'\)/);
+  assert.match(app, /const sentCards = feedback\.sentCards \|\| \[\]/);
+  assert.match(app, /Promise\.all\([\s\S]*?flyRectToRect\(sent\.card, fromRect, toRect, 'front'\)/);
+  assert.match(app, /bossSwapReceivedHighlights\.set/);
   assert.match(app, /Você recebeu \$\{mine\.cardLabel\} de/);
+  assert.match(app, /finally \{[\s\S]*?preview\.remove\(\)[\s\S]*?boss-swap-updating/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-swap-received/);
+  assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?boss-swap-received/);
 });
 
 test('tela final mostra resultado explicito, chefe, fala e duas acoes', () => {
@@ -285,15 +288,16 @@ test('primeira ordem usa o turno formal de seis segundos e trava controles', () 
 });
 
 test('acoes humanas e cronometro consultam a trava obrigatoria de escolhas', () => {
-  assert.match(app, /function ensureMyTurn\(\)[\s\S]*?canBossPerformCommonAction\(state\)/);
+  assert.match(app, /function ensureMyTurn\(\)[\s\S]*?canPerformCommonGameAction\(state\)/);
   assert.match(app, /async function drawFromStock\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
   assert.match(app, /async function drawFromDiscard\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
   assert.match(app, /async function makeMeldFromSelection[\s\S]*?if \(!ensureMyTurn\(\)\) return/);
   assert.match(app, /async function discardSelectedCard\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
-  assert.match(app, /window\.executeUndo = async \(\) => \{\s*if \(!ensureMyTurn\(\)/);
-  assert.match(app, /function passTurn\(\) \{\s*if \(!canBossPerformCommonAction\(state\)\)/);
-  assert.match(app, /async function autoPlayTimeout\(\) \{\s*if \(!canBossPerformCommonAction\(state\)\)/);
-  assert.match(app, /function startTurnTimerIfNeeded[\s\S]*?if \(!canBossPerformCommonAction\(state\)\)/);
+  assert.match(app, /window\.executeUndo = async \(\) => \{[\s\S]*?canRestoreUndoTransaction/);
+  assert.match(app, /function passTurn\(\{ preserveUndo = false \} = \{\}\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
+  assert.match(app, /async function autoPlayTimeout\(\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
+  assert.match(app, /function resetTurnTimer\(\)[\s\S]*?hasPendingBossChoices\(state\)/);
+  assert.match(app, /function startTurnTimerIfNeeded[\s\S]*?if \(!canPerformCommonGameAction\(state\)\)/);
 });
 
 test('turno formal do chefe pausa bot e cronometro ate o estagio dos jogadores', () => {
@@ -322,7 +326,7 @@ test('humano e bot validam descarte livre antes de mover cartas', () => {
 });
 
 test('service worker inclui os novos módulos sem trocar sua versão', () => {
-  assert.match(serviceWorker, /const CACHE_NAME = 'buraco-v122'/);
+  assert.match(serviceWorker, /const CACHE_NAME = 'buraco-v123'/);
   assert.match(serviceWorker, /js\/boss\/boss-engine\.js/);
   assert.match(serviceWorker, /js\/deck\.js/);
   assert.match(serviceWorker, /js\/boss\/boss-presentation\.js/);

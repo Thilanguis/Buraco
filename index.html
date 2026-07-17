@@ -468,6 +468,31 @@
             </select>
           </label>
 
+          <details id="debugBossLab" class="debug-boss-lab">
+            <summary>Laboratorio de Chefes</summary>
+            <div class="debug-boss-lab-body">
+              <label>Chefe<select id="debugBossLabBoss"></select></label>
+              <label>Fase<select id="debugBossLabPhase"></select></label>
+              <label>Habilidade<select id="debugBossLabAbility"></select></label>
+              <div id="debugBossLabTechnical" class="debug-boss-lab-technical"></div>
+              <label>Cenario<select id="debugBossLabVariant"></select></label>
+              <label>Alvo<select id="debugBossLabTarget"></select></label>
+              <div id="debugBossLabError" class="debug-boss-lab-error" role="status"></div>
+              <button id="debugBossLabPrepare" type="button" class="debug-boss-lab-primary">Preparar e testar</button>
+              <div class="debug-boss-lab-actions">
+                <button type="button" data-boss-lab-variant="success">Preparar sucesso</button>
+                <button type="button" data-boss-lab-variant="failure">Preparar falha</button>
+                <button type="button" data-boss-lab-variant="external_cancel">Cancelamento externo</button>
+                <button id="debugBossLabReload" type="button">Simular reload</button>
+                <button id="debugBossLabUndo" type="button">Voltar</button>
+                <button id="debugBossLabReset" type="button">Resetar cenario</button>
+              </div>
+              <pre id="debugBossLabInstructions" class="debug-boss-lab-report">Selecione uma habilidade e prepare o cenario.</pre>
+              <pre id="debugBossLabObserved" class="debug-boss-lab-report debug-boss-lab-observed"></pre>
+              <button id="debugBossLabSweep" type="button" class="debug-boss-lab-sweep">Testar todas as habilidades</button>
+            </div>
+          </details>
+
           <div style="border-top: 1px dashed rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 6px; display: flex; flex-direction: column; gap: 6px">
             <button onclick="debugRestartGame()" style="font-size: 10px; padding: 6px; background: #7c3aed; font-weight: bold">🔄 Reiniciar Partida</button>
             <button onclick="debugEndGame()" style="font-size: 10px; padding: 6px; background: #000; border: 1px solid #ef4444">❌ Terminar Jogo</button>

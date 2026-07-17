@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v122';
+const CACHE_NAME = 'buraco-v123';
 
 const ASSETS = [
   './',
@@ -9,11 +9,14 @@ const ASSETS = [
   './js/audio.js',
   './js/firebase.js',
   './js/themes.js',
+  './js/game/undo-transaction.js',
+  './js/game/wildcard-choice.js',
   './js/boss/boss-engine.js',
   './js/boss/boss-presentation.js',
   './js/boss/boss-registry.js',
   './js/boss/bosses/banker.js',
   './js/boss/bosses/dominatrix.js',
+  './js/boss/bosses/matriarch.js',
   './styles/base-menu.css',
   './styles/game.css',
   './styles/table-themes.css',
@@ -25,6 +28,7 @@ const ASSETS = [
   './styles/boss-mode.css',
   './assets/images/boss-banqueiro.png',
   './assets/images/boss-dominadora.png',
+  './assets/images/boss-elfa.png',
   './manifest.json',
   './manifest.webmanifest',
   './icon-192.png',

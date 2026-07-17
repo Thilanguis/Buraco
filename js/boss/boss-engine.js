@@ -32,6 +32,34 @@ export function isMatriarchMode(stateOrMode) {
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
+const MELD_TIER = Object.freeze({ simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 });
+const BANKER_CONTRACTS = Object.freeze({
+  early: Object.freeze([
+    Object.freeze({ tier: 'mild', fullDebt: 5, guaranteedDebt: 2 }),
+    Object.freeze({ tier: 'standard', fullDebt: 6, guaranteedDebt: 3 }),
+    Object.freeze({ tier: 'severe', fullDebt: 7, guaranteedDebt: 4 }),
+  ]),
+  late: Object.freeze([
+    Object.freeze({ tier: 'mild', fullDebt: 7, guaranteedDebt: 4 }),
+    Object.freeze({ tier: 'standard', fullDebt: 8, guaranteedDebt: 5 }),
+    Object.freeze({ tier: 'severe', fullDebt: 9, guaranteedDebt: 6 }),
+  ]),
+});
+
+function weightedContract(gameState) {
+  const roll = seededUnit(bossSeed(gameState, 13));
+  const index = roll < 0.25 ? 0 : roll < 0.75 ? 1 : 2;
+  const contract = (gameState.boss.phase === 3 ? BANKER_CONTRACTS.late : BANKER_CONTRACTS.early)[index];
+  return {
+    contractTier: contract.tier,
+    fullDebt: contract.fullDebt,
+    guaranteedDebt: contract.guaranteedDebt,
+    amount: contract.fullDebt,
+    collateralAmount: contract.guaranteedDebt,
+    rollEventId: `contract_${gameState.boss.roundNumber}_${gameState.boss.actionSequence + 1}`,
+  };
+}
+
 function bossCardDamage(card) {
   if (!card) return 0;
   if (card.joker || card.rank === 'JOKER') return 20;
@@ -86,6 +114,67 @@ function chooseCards(player, gameState, salt, count) {
     available.splice(available.findIndex((entry) => entry.id === card.id), 1);
   }
   return selected;
+}
+
+function legalDiscardCards(gameState, player) {
+  return (player?.hand || []).filter((card) => card?.id
+    && card.id !== gameState.pickedDiscardCardId
+    && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'discard'));
+}
+
+function discardSuitOrderCandidates(gameState, player) {
+  const legal = legalDiscardCards(gameState, player);
+  return SUITS.filter((suit) => {
+    const matching = legal.filter((card) => !card.joker && card.suit === suit.value);
+    const alternatives = legal.filter((card) => card.joker || card.suit !== suit.value);
+    return matching.length >= 2 && alternatives.length >= 1;
+  });
+}
+
+function buildDominatrixOrder(gameState, targetPlayer, salt = 0) {
+  if (!targetPlayer) return null;
+  const melds = gameState.teams?.[targetPlayer.teamId]?.melds || [];
+  const feedable = melds.map((meld, meldIndex) => ({ meld, meldIndex }))
+    .filter(({ meld }) => (targetPlayer.hand || []).some((card) => card?.id
+      && !isCardBlockedByBossState(gameState.boss, targetPlayer.id, card.id, 'play')
+      && isValidBossSequence([...(meld || []), card])
+      && hasLegalDiscard(gameState, targetPlayer, [card.id])));
+  const evolvable = melds.map((meld, meldIndex) => ({
+    meld,
+    meldIndex,
+    evolutionOptions: bossMeldEvolutionOptions(gameState, targetPlayer, meldIndex),
+  })).filter(({ evolutionOptions }) => evolutionOptions.length > 0);
+  const suits = discardSuitOrderCandidates(gameState, targetPlayer);
+  const candidates = [];
+  if (feedable.length > 1) {
+    const selected = chooseSeeded(feedable, gameState, 301 + salt);
+    const label = `alimente o jogo ${selected.meldIndex + 1} antes de outro jogo`;
+    candidates.push({ type: 'feed_specific_meld', meldIndex: selected.meldIndex, meldId: resolveBossMeldId(gameState, targetPlayer.teamId, selected.meldIndex, true), label, description: label });
+  }
+  if ((targetPlayer.hand || []).length >= 3) candidates.push({ type: 'no_new_meld', label: 'nao crie um jogo novo no proximo turno', description: 'não crie um jogo novo no próximo turno' });
+  if (evolvable.length) {
+    const selected = chooseSeeded(evolvable, gameState, 307 + salt);
+    const label = `tente evoluir o jogo ${selected.meldIndex + 1}`;
+    candidates.push({
+      type: 'evolve_specific_meld',
+      meldIndex: selected.meldIndex,
+      meldId: resolveBossMeldId(gameState, targetPlayer.teamId, selected.meldIndex, true),
+      eligibleCardIds: [...new Set(selected.evolutionOptions.flatMap((option) => option.cardIds))],
+      label,
+      description: label,
+    });
+  }
+  if ((targetPlayer.hand || []).length >= 6) {
+    const limit = Math.max(3, targetPlayer.hand.length - 2);
+    const label = `termine o turno com no máximo ${limit} cartas`;
+    candidates.push({ type: 'reduce_hand', handLimit: limit, label, description: label });
+  }
+  if (suits.length) {
+    const selected = chooseSeeded(suits, gameState, 311 + salt);
+    const label = `descarte uma carta de ${selected.label}`;
+    candidates.push({ type: 'discard_suit', suit: selected.value, suitLabel: selected.label, label, description: label });
+  }
+  return chooseSeeded(candidates, gameState, 313 + salt);
 }
 
 function playerHasCard(gameState, playerId, cardId) {
@@ -169,6 +258,99 @@ function meldCanReceiveAnyCard(meld) {
   return candidates.some((card) => isValidBossSequence([...meld, card]));
 }
 
+function isNaturalBossSequence(meld) {
+  const cards = (meld || []).filter(Boolean);
+  if (!cards.length || cards.some((card) => card.joker || card.forceWild)) return false;
+  if (!cards.every((card) => card.suit === cards[0].suit)) return false;
+
+  const ranks = cards.map((card) => String(card.rank));
+  if (new Set(ranks).size !== ranks.length) return false;
+
+  return [BOSS_RANKS_HIGH, BOSS_RANKS_LOW].some((order) => {
+    const indexes = ranks.map((rank) => order.indexOf(rank)).sort((a, b) => a - b);
+    if (indexes.some((index) => index < 0)) return false;
+    return indexes.every((index, position) => position === 0 || index === indexes[position - 1] + 1);
+  });
+}
+
+function classifyBossMeldKind(meld) {
+  const cards = (meld || []).filter(Boolean);
+  if (cards.length < 7 || !isValidBossSequence(cards)) return 'simple';
+  if (isCompleteAceToAce(cards)) return 'asas';
+  if (!isNaturalBossSequence(cards)) return 'suja';
+  return cards.length === 13 ? 'real' : 'limpa';
+}
+
+function combinationsOfSize(items, size, visit, start = 0, chosen = []) {
+  if (chosen.length === size) return visit(chosen);
+  const missing = size - chosen.length;
+  for (let index = start; index <= items.length - missing; index += 1) {
+    chosen.push(items[index]);
+    if (combinationsOfSize(items, size, visit, index + 1, chosen) === false) return false;
+    chosen.pop();
+  }
+  return true;
+}
+
+function evolutionCandidateCards(gameState, player, meld) {
+  const suit = (meld || []).find((card) => card && !isBossWildcard(card))?.suit;
+  const seen = new Map();
+  return (player?.hand || []).filter((card) => card?.id
+    && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play')
+    && (isBossWildcard(card) || !suit || card.suit === suit))
+    .filter((card) => {
+      const base = isBossWildcard(card) ? 'wild' : `${card.suit}:${card.rank}`;
+      const count = seen.get(base) || 0;
+      const allowed = base.endsWith(':A') ? 2 : 1;
+      seen.set(base, count + 1);
+      return count < allowed;
+    });
+}
+
+function bossMeldEvolutionOptions(gameState, player, meldIndex, limit = 12) {
+  const meld = gameState.teams?.[player?.teamId]?.melds?.[meldIndex];
+  if (!player || !Array.isArray(meld) || isCompleteAceToAce(meld)) return [];
+  const oldKind = classifyBossMeldKind(meld);
+  const oldTier = MELD_TIER[oldKind] || 0;
+  if (oldKind === 'suja' || oldTier >= 3) return [];
+  const targetLengths = oldTier === 0 ? [7, 13, 14] : oldTier === 1 ? [13, 14] : [14];
+  const candidates = evolutionCandidateCards(gameState, player, meld);
+  const options = [];
+  for (const targetLength of targetLengths) {
+    const needed = targetLength - meld.length;
+    if (needed <= 0 || needed > candidates.length) continue;
+    combinationsOfSize(candidates, needed, (combination) => {
+      const finalMeld = [...meld, ...combination];
+      const newKind = classifyBossMeldKind(finalMeld);
+      if ((MELD_TIER[newKind] || 0) <= oldTier) return true;
+      if (!hasLegalDiscard(gameState, player, combination.map((card) => card.id))) return true;
+      options.push({
+        playerId: player.id,
+        meldIndex,
+        oldKind,
+        newKind,
+        cardIds: combination.map((card) => card.id),
+      });
+      return options.length < limit;
+    });
+    if (options.length >= limit) break;
+  }
+  return options;
+}
+
+export function getBossMeldEvolutionOptions(gameState, playerId, meldIndex) {
+  const boss = normalizeBossState(gameState);
+  if (!boss) return [];
+  const player = (gameState.players || []).find((entry) => entry.id === playerId);
+  return bossMeldEvolutionOptions(gameState, player, meldIndex).map((option) => ({ ...option, cardIds: [...option.cardIds] }));
+}
+
+function meldEvolutionPlayers(gameState, meldIndex) {
+  return (gameState.players || [])
+    .filter((player) => bossMeldEvolutionOptions(gameState, player, meldIndex, 1).length > 0)
+    .map((player) => player.id);
+}
+
 function eligibleMeldIndexes(gameState, { excludePossessed = false } = {}) {
   const boss = gameState.boss;
   const possessed = new Set((boss.possessions || []).map((entry) => entry.meldIndex));
@@ -219,6 +401,7 @@ function ensureBossMeldContribution(boss, meldId) {
     damageDone: 0,
     bankerDebtRelief: 0,
     dominatrixChainsBroken: 0,
+    dominatrixResistanceTier: 0,
     matriarchBloomRemoved: 0,
     matriarchBloomTier: 0,
   };
@@ -242,6 +425,22 @@ function cardCanBePlayedNow(gameState, player, card) {
   for (let first = 0; first < others.length; first += 1) {
     for (let second = first + 1; second < others.length; second += 1) {
       if (isValidBossSequence([card, others[first], others[second]])) return true;
+    }
+  }
+  return false;
+}
+
+function cardHasSafeLegalPlay(gameState, player, card) {
+  if (!player || !card?.id) return false;
+  const melds = gameState.teams?.[player.teamId]?.melds || [];
+  if (melds.some((meld) => isValidBossSequence([...(meld || []), card])
+    && hasLegalDiscard(gameState, player, [card.id]))) return true;
+  if ((gameState.boss?.chainsByPlayer?.[player.id] || 0) >= 3) return false;
+  const others = (player.hand || []).filter((entry) => entry?.id && entry.id !== card.id);
+  for (let first = 0; first < others.length; first += 1) {
+    for (let second = first + 1; second < others.length; second += 1) {
+      const cards = [card, others[first], others[second]];
+      if (isValidBossSequence(cards) && hasLegalDiscard(gameState, player, cards.map((entry) => entry.id))) return true;
     }
   }
   return false;
@@ -314,8 +513,12 @@ function natureThreatSlots(gameState) {
 
 function matriarchSeedCandidates(gameState) {
   const markedCardIds = new Set(activeNatureThreats(gameState.boss).map((threat) => threat.cardId).filter(Boolean));
-  return (gameState.players || []).flatMap((player) => eligibleExposureCards(gameState, player)
-    .filter((card) => !markedCardIds.has(card.id) && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play'))
+  return (gameState.players || []).flatMap((player) => (player.hand || [])
+    .filter((card) => card?.id
+      && !markedCardIds.has(card.id)
+      && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play')
+      && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'discard')
+      && cardHasSafeLegalPlay(gameState, player, card))
     .map((card) => ({ player, card })));
 }
 
@@ -346,10 +549,7 @@ function buildRoyalBloomObjectives(gameState) {
 
 function createPayload(gameState, abilityId) {
   const boss = gameState.boss;
-  if (abilityId === 'fixed_interest') return {
-    amount: boss.phase === 3 ? 8 : 6,
-    collateralAmount: boss.phase === 3 ? 5 : 3,
-  };
+  if (abilityId === 'fixed_interest') return weightedContract(gameState);
   if (abilityId === 'maintenance_fee') return {
     extraDraw: boss.phase === 3 ? 2 : 1,
     financedDebt: boss.phase === 3 ? 4 : 3,
@@ -358,6 +558,11 @@ function createPayload(gameState, abilityId) {
     const suit = SUITS[Math.floor(seededUnit(bossSeed(gameState, 17)) * SUITS.length) % SUITS.length];
     return { suit: suit.value, suitLabel: suit.label, required: boss.phase === 3 ? 4 : 3, progress: 0, successDelta: -5, failureDelta: boss.phase === 3 ? 12 : 10 };
   }
+  if (abilityId === 'credit_limit') {
+    const config = { 1: { allowance: 7, maxCharge: 4 }, 2: { allowance: 6, maxCharge: 5 }, 3: { allowance: 5, maxCharge: 6 } }[boss.phase];
+    return { ...config, debtPerCard: 1 };
+  }
+  if (abilityId === 'discard_surcharge') return { amount: boss.phase === 3 ? 6 : 4 };
 
   if (abilityId === 'pledge') {
     const candidates = eligibleMeldIndexes(gameState)
@@ -383,7 +588,9 @@ function createPayload(gameState, abilityId) {
       const card = needsCard
         ? chooseSeeded(abilityId === 'exposure' ? eligibleExposureCards(gameState, target) : (target?.hand || []).filter((entry) => entry?.id), gameState, 53)
         : null;
-      return { targetPlayerId: target?.id ?? null, cardId: card?.id ?? null };
+      const payload = { targetPlayerId: target?.id ?? null, cardId: card?.id ?? null };
+      if (abilityId === 'forced_choice') payload.order = buildDominatrixOrder(gameState, target, 1);
+      return payload;
     }
     if (abilityId === 'double_collar') {
       return {
@@ -395,20 +602,39 @@ function createPayload(gameState, abilityId) {
     }
     if (abilityId === 'possession') {
       const meldIndex = chooseSeeded(eligibleMeldIndexes(gameState, { excludePossessed: true }), gameState, 71);
-      return { meldIndex, progress: 0, required: 1 };
+      const meldId = Number.isInteger(meldIndex) ? resolveBossMeldId(gameState, 0, meldIndex, true) : null;
+      const kind = boss.meldProgress?.[meldId]?.highestKind || 'simple';
+      return { meldIndex, meldId, createdTier: MELD_TIER[kind] || 0, contributorPlayerIds: [] };
     }
     if (abilityId === 'favorite') {
       const protectedPlayer = choosePlayer(gameState, 73);
       const punishedPlayer = (gameState.players || []).find((player) => player.id !== protectedPlayer?.id) || protectedPlayer;
       return { protectedPlayerId: protectedPlayer?.id ?? null, punishedPlayerId: punishedPlayer?.id ?? null };
     }
-    if (abilityId === 'hands_tied') return { newMeldCounts: {} };
+    if (abilityId === 'hands_tied') return { teamMeldAvailable: true, consumedByPlayerId: null, consumedMeldId: null };
     if (abilityId === 'separation') return { meldOwners: {} };
     if (abilityId === 'break_will') {
       const target = choosePlayer(gameState, 79, (player) => (boss.chainsByPlayer?.[player.id] || 0) >= 2);
       return { targetPlayerId: target?.id ?? null };
     }
     if (abilityId === 'final_order') return { orderedPlayerIds: (gameState.players || []).map((player) => player.id) };
+    if (abilityId === 'iron_etiquette') {
+      const candidates = (gameState.players || []).flatMap((player) => discardSuitOrderCandidates(gameState, player).map((suit) => ({ player, suit })));
+      const selected = chooseSeeded(candidates, gameState, 83);
+      return { targetPlayerId: selected?.player?.id ?? null, suit: selected?.suit?.value ?? null, suitLabel: selected?.suit?.label ?? '' };
+    }
+    if (abilityId === 'interdict') {
+      const candidates = (gameState.teams?.[0]?.melds || []).map((meld, meldIndex) => ({
+        meldIndex,
+        eligiblePlayerIds: meldEvolutionPlayers(gameState, meldIndex),
+      })).filter((entry) => entry.eligiblePlayerIds.length > 0);
+      const selected = chooseSeeded(candidates, gameState, 89);
+      return {
+        meldIndex: selected?.meldIndex ?? null,
+        meldId: Number.isInteger(selected?.meldIndex) ? resolveBossMeldId(gameState, 0, selected.meldIndex, true) : null,
+        eligiblePlayerIds: selected?.eligiblePlayerIds || [],
+      };
+    }
   }
 
   if (boss.id === 'matriarca_esmeralda') {
@@ -419,7 +645,7 @@ function createPayload(gameState, abilityId) {
     if (abilityId === 'hungry_root') {
       return chooseSeeded(matriarchRootCandidates(gameState), gameState, 183) || { meldIndex: null, meldId: null };
     }
-    if (abilityId === 'restorative_dew') return { baseHeal: 100, reductionPerCard: 20, countedCardIds: [] };
+    if (abilityId === 'restorative_dew') return { baseHeal: ({ 1: 150, 2: 180, 3: 220 }[boss.phase] || 150), reductionPerCard: 15, countedCardIds: [] };
     if (abilityId === 'twin_vines') {
       const candidates = matriarchRootCandidates(gameState);
       const first = chooseSeeded(candidates, gameState, 185);
@@ -460,7 +686,8 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
     return !!target && eligibleExposureCards(gameState, target).some((card) => card.id === payload.cardId);
   }
   if (abilityId === 'forced_choice' || abilityId === 'absolute_control' || abilityId === 'break_will') {
-    return players.some((player) => player.id === payload.targetPlayerId);
+    return players.some((player) => player.id === payload.targetPlayerId)
+      && (abilityId !== 'forced_choice' || !!payload.order);
   }
   if (abilityId === 'double_collar') {
     return payload.lockedCards?.length === players.length && payload.lockedCards.every((entry) => {
@@ -476,6 +703,14 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
       && Number.isInteger(payload.meldIndex)
       && eligibleMeldIndexes(gameState, { excludePossessed: true }).includes(payload.meldIndex);
   }
+  if (abilityId === 'iron_etiquette') {
+    const target = players.find((player) => player.id === payload.targetPlayerId);
+    return !!target && discardSuitOrderCandidates(gameState, target).some((suit) => suit.value === payload.suit);
+  }
+  if (abilityId === 'interdict') {
+    return !!payload.meldId && Number.isInteger(payload.meldIndex)
+      && meldEvolutionPlayers(gameState, payload.meldIndex).length > 0;
+  }
   if (abilityId === 'favorite') {
     return players.some((player) => player.id === payload.protectedPlayerId) && players.some((player) => player.id === payload.punishedPlayerId);
   }
@@ -485,7 +720,9 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'forced_swap' || abilityId === 'hands_tied' || abilityId === 'separation') {
     return players.length >= 2;
   }
-  if (abilityId === 'living_seed') return playerHasCard(gameState, payload.targetPlayerId, payload.cardId) && natureThreatSlots(gameState) > 0;
+  if (abilityId === 'living_seed') {
+    return natureThreatSlots(gameState) > 0 && matriarchSeedCandidates(gameState).some((candidate) => candidate.player?.id === payload.targetPlayerId && candidate.card?.id === payload.cardId);
+  }
   if (abilityId === 'hungry_root') return !!payload.meldId && natureThreatSlots(gameState) > 0;
   if (abilityId === 'restorative_dew' || abilityId === 'harvest' || abilityId === 'discard_pollen') {
     if (natureThreatSlots(gameState) <= 0) return false;
@@ -511,6 +748,8 @@ const ABILITY_DURATION = Object.freeze({
   possession: 'immediate',
   forced_swap: 'immediate',
   favorite: 'immediate',
+  iron_etiquette: 'full_round',
+  interdict: 'full_round',
 });
 
 export const BOSS_PRESENTATION_MS = Object.freeze({
@@ -545,6 +784,10 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     lastHealEventId: null,
     resolvedNatureEventIds: [],
     natureFailureCountThisRound: 0,
+    propagationRound: 0,
+    propagationUsedThisRound: false,
+    pendingRootPropagation: null,
+    lastPropagationEventId: null,
     roundNumber: 1,
     playersActedThisRound: [],
     currentIntent: null,
@@ -558,6 +801,10 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     suppressedDamageCardIds: [],
     vaultsByPlayer: {},
     possessions: [],
+    activeOrders: [],
+    interdicts: [],
+    creditLimit: null,
+    discardSurcharge: null,
     pendingChoices: [],
     meldProgress: {},
     meldContributions: {},
@@ -607,9 +854,15 @@ export function normalizeBossState(gameState) {
   boss.choiceDrawnCardIdsByPlayer ||= {};
   boss.pendingFinancedDrawsByPlayer ||= {};
   boss.damagedCardIds ||= [];
-  boss.suppressedDamageCardIds ||= [];
+  // Possession suppresses only its stored historical damage. New contribution
+  // cards are always accounted immediately, including migrated snapshots.
+  boss.suppressedDamageCardIds = [];
   boss.vaultsByPlayer ||= {};
   boss.possessions ||= [];
+  boss.activeOrders ||= [];
+  boss.interdicts ||= [];
+  boss.creditLimit ||= null;
+  boss.discardSurcharge ||= null;
   boss.pendingChoices ||= [];
   (gameState.players || []).forEach((player) => {
     boss.chainsByPlayer[player.id] = clamp(Number(boss.chainsByPlayer[player.id]) || 0, 0, 4);
@@ -620,6 +873,7 @@ export function normalizeBossState(gameState) {
     entry.damageDone ||= 0;
     entry.bankerDebtRelief ||= 0;
     entry.dominatrixChainsBroken ||= 0;
+    entry.dominatrixResistanceTier ||= 0;
     entry.matriarchBloomRemoved ||= 0;
     entry.matriarchBloomTier ||= 0;
   });
@@ -651,6 +905,10 @@ export function normalizeBossState(gameState) {
   boss.lastHealEventId ||= null;
   boss.resolvedNatureEventIds ||= [];
   boss.natureFailureCountThisRound ||= 0;
+  boss.propagationRound ||= 0;
+  boss.propagationUsedThisRound ||= false;
+  boss.pendingRootPropagation ||= null;
+  boss.lastPropagationEventId ||= null;
   boss.stats ||= { totalDamage: 0, canastrasFormed: 0, largestAttack: 0, finalStrike: 0, finalDebt: 0 };
 
   Object.entries(boss.vaultsByPlayer).forEach(([playerId, vault]) => {
@@ -659,7 +917,27 @@ export function normalizeBossState(gameState) {
   });
 
   const teamMelds = gameState.teams?.[0]?.melds || [];
-  boss.possessions = boss.possessions.filter((possession) => Number.isInteger(possession?.meldIndex) && Array.isArray(teamMelds[possession.meldIndex]));
+  const meldIndexForStableId = (meldId) => teamMelds.findIndex((meld, meldIndex) => resolveBossMeldId(gameState, 0, meldIndex, false) === meldId);
+  boss.possessions = boss.possessions.filter((possession) => {
+    const stableIndex = possession?.meldId ? meldIndexForStableId(possession.meldId) : possession?.meldIndex;
+    if (!Number.isInteger(stableIndex) || !Array.isArray(teamMelds[stableIndex])) return false;
+    possession.meldIndex = stableIndex;
+    possession.contributorPlayerIds ||= [];
+    possession.progressCardIds ||= [];
+    return true;
+  });
+  boss.interdicts = boss.interdicts.filter((interdict) => {
+    if (interdict.status !== 'active') return true;
+    const stableIndex = interdict.meldId ? meldIndexForStableId(interdict.meldId) : interdict.meldIndex;
+    if (!Number.isInteger(stableIndex) || !Array.isArray(teamMelds[stableIndex])
+      || isCompleteAceToAce(teamMelds[stableIndex])
+      || meldEvolutionPlayers(gameState, stableIndex).length === 0) {
+      interdict.status = 'cancelled';
+      return true;
+    }
+    interdict.meldIndex = stableIndex;
+    return true;
+  });
 
   const activePlayerId = gameState.players?.[gameState.currentPlayer]?.id ?? gameState.currentPlayer;
   if (boss.currentIntent?.abilityId === 'exposure') {
@@ -690,6 +968,30 @@ export function normalizeBossState(gameState) {
   }
 
   if (boss.id === 'dominadora') {
+    for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active')) {
+      const target = (gameState.players || []).find((player) => player.id === order.targetPlayerId);
+      if (!target) {
+        finishDominatrixOrder(gameState, order, 'cancelled', 'A ordem perdeu o jogador alvo.');
+        continue;
+      }
+      const targetTurnStarted = activePlayerId === target.id || boss.playersActedThisRound.includes(target.id);
+      if (['feed_specific_meld', 'evolve_specific_meld'].includes(order.type)) {
+        const stableIndex = order.meldId ? meldIndexForStableId(order.meldId) : order.meldIndex;
+        const meld = teamMelds[stableIndex];
+        const hasLegalOrderedAction = order.type === 'evolve_specific_meld'
+          ? bossMeldEvolutionOptions(gameState, target, stableIndex, 1).length > 0
+          : Array.isArray(meld) && (target.hand || []).some((card) => card?.id
+            && !isCardBlockedByBossState(boss, target.id, card.id, 'play')
+            && isValidBossSequence([...meld, card])
+            && hasLegalDiscard(gameState, target, [card.id]));
+        if (!targetTurnStarted && (!Array.isArray(meld) || !hasLegalOrderedAction)) {
+          finishDominatrixOrder(gameState, order, 'cancelled', 'O jogo ordenado deixou de aceitar uma acao legal antes do turno do alvo.');
+        } else if (Array.isArray(meld)) order.meldIndex = stableIndex;
+      } else if (order.type === 'discard_suit' && !targetTurnStarted) {
+        const possible = legalDiscardCards(gameState, target).some((card) => !card.joker && card.suit === order.suit);
+        if (!possible) finishDominatrixOrder(gameState, order, 'cancelled', 'O naipe ordenado deixou de ter descarte legal antes do turno do alvo.');
+      }
+    }
     for (const player of gameState.players || []) {
       if (!player.hand?.length || hasLegalDiscard(gameState, player)) continue;
       let effectIndex = -1;
@@ -754,27 +1056,54 @@ export function normalizeBossState(gameState) {
     ));
 
     for (const threat of [...activeNatureThreats(boss)]) {
+      if (['seed', 'royal_seed', 'root', 'twin_root', 'royal_root', 'graft'].includes(threat.type)) threat.healAmount = 0;
+      if (threat.type === 'pollen') threat.healAmount = 40;
+      if (threat.type === 'royal_pollen') threat.healAmount = 0;
+      if (threat.type === 'dew') {
+        threat.healAmount = Number(threat.healAmount) || ({ 1: 150, 2: 180, 3: 220 }[boss.phase] || 150);
+        threat.reductionPerCard = 15;
+      }
       if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId != null) {
         const target = playerById(threat.targetPlayerId);
+        const markedCard = target?.hand?.find((card) => card?.id === threat.cardId) || null;
         if (cardIsOnTable(threat.cardId)) {
           succeedNatureThreat(gameState, threat, `${target?.name || 'O alvo'} usou a carta marcada.`);
-        } else if (!target?.hand?.some((card) => card?.id === threat.cardId)) {
+        } else if (!markedCard) {
           cancelNatureThreat(gameState, threat, 'A carta marcada deixou de ser um alvo valido.');
+        } else if (!cardHasSafeLegalPlay(gameState, target, markedCard)) {
+          cancelNatureThreat(gameState, threat, 'A carta marcada deixou de possuir uma jogada legal segura.');
         }
       } else if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
         const currentIndex = meldIndexById(threat.meldId);
         if (currentIndex < 0) cancelNatureThreat(gameState, threat, 'O jogo marcado deixou de existir.');
-        else threat.meldIndex = currentIndex;
+        else if (threat.strengthened && (gameState.players || []).length < Math.max(1, Number(threat.requiredContributorCount) || 2)) {
+          cancelNatureThreat(gameState, threat, 'Um dos cooperadores deixou de poder contribuir com a Raiz Fortalecida.');
+        }
+        else if (!meldCanReceiveAnyCard(gameState.teams?.[0]?.melds?.[currentIndex])) {
+          cancelNatureThreat(gameState, threat, 'O jogo marcado nao aceita mais nenhuma continuacao legal.');
+        } else threat.meldIndex = currentIndex;
       } else if (threat.type === 'graft') {
         const indexes = (threat.meldIds || []).map(meldIndexById);
         if (indexes.length !== 2 || indexes.some((index) => index < 0)) {
           cancelNatureThreat(gameState, threat, 'O Enxerto perdeu um dos jogos ligados.');
+        } else if (indexes.some((index) => !meldCanReceiveAnyCard(gameState.teams?.[0]?.melds?.[index]))) {
+          cancelNatureThreat(gameState, threat, 'Um dos lados do Enxerto deixou de aceitar continuacoes legais.');
         } else threat.meldIndexes = indexes;
       } else if (threat.type === 'harvest' && !playerById(threat.targetPlayerId)) {
         cancelNatureThreat(gameState, threat, 'A Colheita perdeu o jogador alvo.');
       } else if (['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null) {
         const discardTopId = gameState.discard?.[gameState.discard.length - 1]?.id || null;
         if (discardTopId !== threat.discardCardId) cancelNatureThreat(gameState, threat, 'O topo do lixo mudou antes de ser pego.');
+      }
+    }
+
+    if (boss.currentIntent?.abilityId === 'restorative_dew') {
+      const activeDew = activeNatureThreats(boss).find((threat) => (
+        threat.type === 'dew' && threat.sourceIntentId === boss.currentIntent.id
+      ));
+      if (activeDew) {
+        boss.currentIntent.payload ||= {};
+        boss.currentIntent.payload.countedCardIds = [...new Set(activeDew.countedCardIds || [])];
       }
     }
 
@@ -809,14 +1138,46 @@ function eligibleAbilityCandidates(gameState, entries, { avoidLast = false } = {
     .filter(({ entry, payload }) => hasValidAbilityPayload(gameState, entry.id, payload));
 }
 
-export function selectNextBossIntent(gameState) {
+export function inspectBossAbilityEligibility(gameState, abilityId) {
+  const boss = normalizeBossState(gameState);
+  if (!boss) return { eligible: false, reason: 'O estado nao pertence a um modo Chefe da Mesa.', entry: null, payload: null };
+  const definition = getBossDefinition(boss.id);
+  const entry = definition?.abilities?.find((ability) => ability.id === abilityId) || null;
+  if (!entry) return { eligible: false, reason: `Habilidade desconhecida para ${definition?.name || boss.id}: ${abilityId}.`, entry: null, payload: null };
+  if (!entry.phases.includes(boss.phase)) {
+    return { eligible: false, reason: `${entry.name} nao e elegivel na Fase ${boss.phase}.`, entry, payload: null };
+  }
+  const candidate = eligibleAbilityCandidates(gameState, [entry])[0] || null;
+  if (!candidate) {
+    return { eligible: false, reason: `${entry.name} nao encontrou um alvo legal no estado atual.`, entry, payload: null };
+  }
+  return { eligible: true, reason: '', entry: candidate.entry, payload: candidate.payload };
+}
+
+export function queueDebugBossAbility(gameState, abilityId) {
+  const boss = normalizeBossState(gameState);
+  if (!boss) throw new Error('O laboratorio exige uma partida Chefe da Mesa.');
+  boss.debugForcedAbilityId = abilityId;
+  return abilityId;
+}
+
+export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId = null } = {}) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.defeated || boss.result || boss.pendingChoices.length) return null;
   const definition = getBossDefinition(boss.id);
   const normalEntries = definition.abilities.filter((entry) => entry.phases.includes(boss.phase));
   let candidates = [];
   let selectionSource = 'normal';
-  if (boss.phaseIntroPending === boss.phase) {
+  const queuedDebugAbilityId = debug ? (forcedAbilityId || boss.debugForcedAbilityId || null) : null;
+  if (debug && boss.debugForcedAbilityId) delete boss.debugForcedAbilityId;
+  if (queuedDebugAbilityId) {
+    const forcedEntry = definition.abilities.find((entry) => entry.id === queuedDebugAbilityId);
+    if (!forcedEntry) throw new Error(`Habilidade debug desconhecida para ${definition.name}: ${queuedDebugAbilityId}.`);
+    if (!forcedEntry.phases.includes(boss.phase)) throw new Error(`${forcedEntry.name} nao e elegivel na Fase ${boss.phase}.`);
+    candidates = eligibleAbilityCandidates(gameState, [forcedEntry]);
+    if (!candidates.length) throw new Error(`${forcedEntry.name} nao encontrou um alvo legal no cenario preparado.`);
+    selectionSource = 'debug_forced';
+  } else if (boss.phaseIntroPending === boss.phase) {
     const introIds = definition.phaseIntroAbilities?.[boss.phase] || [];
     const introEntries = introIds.map((id) => normalEntries.find((entry) => entry.id === id)).filter(Boolean);
     candidates = eligibleAbilityCandidates(gameState, introEntries);
@@ -825,14 +1186,16 @@ export function selectNextBossIntent(gameState) {
   if (!candidates.length) candidates = eligibleAbilityCandidates(gameState, normalEntries, { avoidLast: true });
   if (!candidates.length) return null;
 
-  const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.entry.weight, 0);
-  let cursor = seededUnit(bossSeed(gameState, 43)) * totalWeight;
   let selected = candidates[0];
-  for (const candidate of candidates) {
-    cursor -= candidate.entry.weight;
-    if (cursor <= 0) {
-      selected = candidate;
-      break;
+  if (!queuedDebugAbilityId) {
+    const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.entry.weight, 0);
+    let cursor = seededUnit(bossSeed(gameState, 43)) * totalWeight;
+    for (const candidate of candidates) {
+      cursor -= candidate.entry.weight;
+      if (cursor <= 0) {
+        selected = candidate;
+        break;
+      }
     }
   }
 
@@ -869,7 +1232,7 @@ export function isBossTurnActive(gameState) {
   return !!boss?.bossFlow && boss.bossFlow.stage !== 'players';
 }
 
-export function beginBossTurn(gameState, { first = false, phaseChanged = false, resultEvent = null, now = Date.now() } = {}) {
+export function beginBossTurn(gameState, { first = false, phaseChanged = false, resultEvent = null, now = Date.now(), debug = false } = {}) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.result || boss.defeated) return null;
   if (boss.pendingChoices.length) {
@@ -891,6 +1254,7 @@ export function beginBossTurn(gameState, { first = false, phaseChanged = false, 
     eventActionId: null,
     phase: boss.phase,
     phaseTransitionId,
+    debugSelection: debug === true,
   };
   return advanceBossTurn(gameState, now);
 }
@@ -935,7 +1299,9 @@ export function advanceBossTurn(gameState, now = Date.now()) {
     const persistentIntent = boss.currentIntent?.duration === 'until_released' && !boss.currentIntent?.payload?.released
       ? boss.currentIntent
       : null;
-    const intent = persistentIntent || selectNextBossIntent(gameState);
+    const debugSelection = flow.debugSelection === true;
+    const intent = persistentIntent || selectNextBossIntent(gameState, { debug: debugSelection });
+    if (debugSelection) delete flow.debugSelection;
     if (!intent) {
       flow.queue = [];
       return advanceBossTurn(gameState, now);
@@ -1055,13 +1421,14 @@ function triggerMatriarchRebirth(gameState, sourceActionId) {
   boss.danger = boss.bloom;
   boss.hp = 300;
   boss.actionSequence += 1;
-  recordEvent(boss, {
+  const event = recordEvent(boss, {
     type: 'rebirth',
     actionId: `rebirth_${sourceActionId || boss.actionSequence}`,
     hp: boss.hp,
     bloom: boss.bloom,
     outcome: 'RENASCIMENTO - 300 HP. Tres Florescimentos foram consumidos.',
   });
+  boss.lastBloomEventId = event.actionId;
   return true;
 }
 
@@ -1126,20 +1493,87 @@ function completeNatureThreat(boss, threat, status, outcome = '') {
   return event;
 }
 
+function requestRootPropagation(gameState, sourceThreat, { strengthen = false } = {}) {
+  const boss = gameState.boss;
+  if (boss?.id !== 'matriarca_esmeralda') return false;
+  if (boss.pendingRootPropagation) {
+    if (strengthen) boss.pendingRootPropagation.strengthened = true;
+    return true;
+  }
+  boss.pendingRootPropagation = {
+    id: `propagation_request_${sourceThreat?.id || boss.actionSequence}_${boss.roundNumber}`,
+    sourceThreatId: sourceThreat?.id || null,
+    sourceMeldId: sourceThreat?.meldId || null,
+    requestedRound: boss.roundNumber,
+    strengthened: !!strengthen,
+    status: 'pending',
+  };
+  return true;
+}
+
+function createPendingRootPropagation(gameState) {
+  const boss = gameState.boss;
+  const pending = boss?.pendingRootPropagation;
+  if (!pending || pending.status !== 'pending' || boss.propagationRound === boss.roundNumber || natureThreatSlots(gameState) <= 0) return null;
+  const candidates = matriarchRootCandidates(gameState);
+  const preferred = candidates.filter((entry) => entry.meldId !== pending.sourceMeldId);
+  const target = chooseSeeded(preferred.length ? preferred : candidates, gameState, 367);
+  boss.pendingRootPropagation = null;
+  if (!target) return null;
+  const threat = addNatureThreat(gameState, {
+    type: 'root',
+    sourceAbilityId: 'propagation',
+    sourceIntentId: pending.id,
+    sourceThreatId: pending.sourceThreatId,
+    ...target,
+    createdRound: boss.roundNumber,
+    deadlineRound: boss.roundNumber,
+    healAmount: 0,
+    bloomAmount: 1,
+    progressCardIds: [],
+    contributorPlayerIds: [],
+    strengthened: !!pending.strengthened,
+    requiredContributorCount: pending.strengthened ? Math.min(2, (gameState.players || []).length) : 1,
+    crownEventId: pending.strengthened ? boss.springCrown?.id || null : null,
+    propagated: true,
+  });
+  if (!threat) return null;
+  boss.propagationRound = boss.roundNumber;
+  boss.propagationUsedThisRound = true;
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'naturePropagation',
+    actionId: `propagation_${threat.id}_${boss.actionSequence}`,
+    threatId: threat.id,
+    sourceThreatId: pending.sourceThreatId,
+    strengthened: !!threat.strengthened,
+    outcome: threat.strengthened
+      ? `Uma Raiz Faminta Fortalecida nasceu no jogo ${target.meldIndex + 1}.`
+      : `Uma nova Raiz Faminta nasceu no jogo ${target.meldIndex + 1}.`,
+  });
+  boss.lastPropagationEventId = event.actionId;
+  return event;
+}
+
 function failNatureThreat(gameState, threat, { bloom = threat?.bloomAmount || 0, heal = threat?.healAmount || 0, outcome = '' } = {}) {
   const boss = gameState.boss;
   if (!threat || threat.status !== 'active') return null;
   boss.natureFailureCountThisRound = (boss.natureFailureCountThisRound || 0) + 1;
-  const crownBonus = boss.springCrown?.status === 'active' && boss.natureFailureCountThisRound > 1 ? 30 : 0;
+  const crownActive = boss.springCrown?.status === 'active' && boss.springCrown.round === boss.roundNumber;
+  if (crownActive && boss.natureFailureCountThisRound === 1) requestRootPropagation(gameState, threat);
+  if (crownActive && boss.natureFailureCountThisRound === 2 && boss.pendingRootPropagation) {
+    boss.pendingRootPropagation.strengthened = true;
+    boss.springCrown.strengthenedCreated = true;
+  }
   const event = completeNatureThreat(boss, threat, 'failed', outcome || 'A ameaca natural nao foi contida.');
   const bloomEvent = bloom ? changeMatriarchBloom(gameState, bloom, threat.name || 'Ameaca natural', `${threat.id}:bloom`) : null;
-  const healEvent = heal || crownBonus
-    ? healMatriarch(gameState, heal + crownBonus, threat.name || 'Ameaca natural', `${threat.id}:heal`)
+  const healEvent = heal
+    ? healMatriarch(gameState, heal, threat.name || 'Ameaca natural', `${threat.id}:heal`)
     : null;
   if (event) {
     event.bloomApplied = bloomEvent?.amount || 0;
     event.healApplied = healEvent?.amount || 0;
-    event.crownBonus = crownBonus;
+    event.crownBonus = 0;
   }
   return event;
 }
@@ -1157,17 +1591,21 @@ function resolveMatriarchPlayerDeadline(gameState, playerId) {
   if (boss?.id !== 'matriarca_esmeralda') return [];
   const player = gameState.players?.find((entry) => entry.id === playerId);
   const events = [];
-  for (const threat of activeNatureThreats(boss).filter((entry) => entry.deadlinePlayerId === playerId)) {
+  for (const threat of activeNatureThreats(boss).filter((entry) => (
+    entry.deadlinePlayerId === playerId
+    && (!Number.isFinite(Number(entry.deadlineRound)) || Number(entry.deadlineRound) <= boss.roundNumber)
+  ))) {
     if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type)) {
       const remainsInHand = !!player?.hand?.some((card) => card?.id === threat.cardId);
+      const pollenHeal = threat.type === 'pollen' ? 40 : 0;
       events.push(remainsInHand
-        ? failNatureThreat(gameState, threat, { outcome: `${player?.name || 'O alvo'} terminou o turno com a carta marcada.` })
+        ? failNatureThreat(gameState, threat, { bloom: 1, heal: pollenHeal, outcome: `${player?.name || 'O alvo'} terminou o turno com a carta marcada.` })
         : succeedNatureThreat(gameState, threat, `${player?.name || 'O alvo'} usou a carta marcada.`));
     } else if (threat.type === 'harvest') {
       const cards = player?.hand?.length || 0;
       if (cards <= 7) events.push(succeedNatureThreat(gameState, threat, `Colheita: ${cards} cartas, sem cura.`));
-      else if (cards <= 10) events.push(failNatureThreat(gameState, threat, { bloom: 0, heal: 40, outcome: `Colheita: ${cards} cartas, cura de 40 HP.` }));
-      else events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 80, outcome: `Colheita: ${cards} cartas, +1 Flor e cura de 80 HP.` }));
+      else if (cards <= 10) events.push(failNatureThreat(gameState, threat, { bloom: 0, heal: 60, outcome: `Colheita: ${cards} cartas, cura de 60 HP.` }));
+      else events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 100, outcome: `Colheita: ${cards} cartas, +1 Flor e cura de 100 HP.` }));
     }
   }
   return events.filter(Boolean);
@@ -1178,17 +1616,24 @@ function resolveMatriarchRound(gameState) {
   if (boss?.id !== 'matriarca_esmeralda') return [];
   const events = [];
   const discardTopId = gameState.discard?.[gameState.discard.length - 1]?.id || null;
-  for (const threat of [...activeNatureThreats(boss)]) {
+  for (const threat of [...activeNatureThreats(boss)].filter((entry) => (
+    !Number.isFinite(Number(entry.deadlineRound)) || Number(entry.deadlineRound) <= boss.roundNumber
+  ))) {
     if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
-      events.push(failNatureThreat(gameState, threat, { outcome: `O jogo ${Number(threat.meldIndex) + 1} nao alimentou a raiz.` }));
+      const event = failNatureThreat(gameState, threat, { bloom: 1, heal: 0, outcome: `O jogo ${Number(threat.meldIndex) + 1} nao alimentou a raiz.` });
+      events.push(event);
+      if (threat.type === 'root' || threat.type === 'royal_root') requestRootPropagation(gameState, threat);
     } else if (threat.type === 'graft') {
       const fed = new Set(threat.fedMeldIds || []).size;
       if (fed >= 2) events.push(succeedNatureThreat(gameState, threat, 'Os dois jogos alimentaram o Enxerto.'));
-      else if (fed === 1) events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 50, outcome: 'Apenas um jogo alimentou o Enxerto.' }));
-      else events.push(failNatureThreat(gameState, threat, { bloom: 2, heal: 100, outcome: 'Nenhum jogo alimentou o Enxerto.' }));
+      else if (fed === 1) events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 0, outcome: 'Apenas um jogo alimentou o Enxerto.' }));
+      else {
+        events.push(failNatureThreat(gameState, threat, { bloom: 2, heal: 0, outcome: 'Nenhum jogo alimentou o Enxerto.' }));
+        requestRootPropagation(gameState, threat);
+      }
     } else if (threat.type === 'dew') {
       const uniqueCards = new Set(threat.countedCardIds || []).size;
-      const healing = Math.max(0, (threat.healAmount || 100) - uniqueCards * (threat.reductionPerCard || 20));
+      const healing = Math.max(0, (threat.healAmount || 150) - uniqueCards * (threat.reductionPerCard || 15));
       events.push(healing
         ? failNatureThreat(gameState, threat, { bloom: 0, heal: healing, outcome: `Orvalho Restaurador: ${uniqueCards} carta(s) reduziram a cura para ${healing} HP.` })
         : succeedNatureThreat(gameState, threat, 'O Orvalho foi totalmente dissipado pelas cartas jogadas.'));
@@ -1198,13 +1643,26 @@ function resolveMatriarchRound(gameState) {
       }
     }
   }
+  const failedTwinGroups = new Map();
+  events.filter((event) => event?.status === 'failed').forEach((event) => {
+    const threat = boss.natureThreats.find((entry) => entry.id === event.threatId);
+    if (threat?.type !== 'twin_root') return;
+    const group = threat.sourceIntentId || threat.id;
+    failedTwinGroups.set(group, (failedTwinGroups.get(group) || 0) + 1);
+  });
+  failedTwinGroups.forEach((count, group) => {
+    const total = boss.natureThreats.filter((entry) => entry.type === 'twin_root' && (entry.sourceIntentId || entry.id) === group).length;
+    if (total >= 2 && count >= 2) {
+      const source = boss.natureThreats.find((entry) => entry.type === 'twin_root' && (entry.sourceIntentId || entry.id) === group);
+      requestRootPropagation(gameState, source);
+    }
+  });
   if (boss.emeraldCocoon?.status === 'active') {
     const remaining = Math.max(0, Number(boss.emeraldCocoon.remaining) || 0);
     if (remaining) healMatriarch(gameState, Math.floor(remaining / 2), 'Casulo Esmeralda', `${boss.emeraldCocoon.id}:heal`);
     boss.emeraldCocoon.status = 'expired';
   }
   boss.emeraldCocoon = null;
-  boss.springCrown = null;
   return events.filter(Boolean);
 }
 
@@ -1226,6 +1684,99 @@ export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
 export function getBossNatureThreats(gameState) {
   const boss = normalizeBossState(gameState);
   return boss?.id === 'matriarca_esmeralda' ? activeNatureThreats(boss).map((threat) => ({ ...threat })) : [];
+}
+
+export function getBossNatureSeedCandidates(gameState) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'matriarca_esmeralda') return [];
+  return matriarchSeedCandidates(gameState).map(({ player, card }) => ({
+    playerId: player.id,
+    cardId: card.id,
+  }));
+}
+
+export function getBossNatureThreatSummaries(gameState) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'matriarca_esmeralda') return [];
+  const threats = activeNatureThreats(boss);
+  const deadlineValue = (threat) => Number.isFinite(Number(threat.deadlineRound)) ? Number(threat.deadlineRound) : boss.roundNumber;
+  const urgentThreatId = threats
+    .slice()
+    .sort((a, b) => deadlineValue(a) - deadlineValue(b) || Number(a.createdRound || 0) - Number(b.createdRound || 0))[0]?.id || null;
+  const names = {
+    seed: 'Semente Viva',
+    royal_seed: 'Semente Real',
+    root: 'Raiz Faminta',
+    twin_root: 'Trepadeira',
+    royal_root: 'Raiz Real',
+    pollen: 'Pólen do Lixo',
+    royal_pollen: 'Pólen Real',
+    graft: 'Enxerto',
+    dew: 'Orvalho Restaurador',
+    harvest: 'Colheita',
+  };
+  const playerName = (playerId) => gameState.players?.find((player) => player.id === playerId)?.name || 'Jogador';
+  const cardLabel = (playerId, cardId) => {
+    const card = gameState.players?.find((player) => player.id === playerId)?.hand?.find((entry) => entry?.id === cardId);
+    return card ? `${card.rank}${card.suit}` : 'carta marcada';
+  };
+
+  return threats.map((threat) => {
+    const uniqueDewCards = new Set(threat.countedCardIds || []).size;
+    const predictedHeal = threat.type === 'dew'
+      ? Math.max(0, Number(threat.healAmount || 150) - uniqueDewCards * Number(threat.reductionPerCard || 15))
+      : Math.max(0, Number(threat.healAmount) || 0);
+    const target = ['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId != null
+      ? `${playerName(threat.targetPlayerId)} · ${cardLabel(threat.targetPlayerId, threat.cardId)}`
+      : ['root', 'twin_root', 'royal_root'].includes(threat.type)
+        ? `Jogo ${Number(threat.meldIndex) + 1}`
+        : threat.type === 'graft'
+          ? (threat.meldIndexes || []).map((index) => `Jogo ${Number(index) + 1}`).join(' + ')
+          : threat.type === 'harvest'
+            ? playerName(threat.targetPlayerId)
+            : ['pollen', 'royal_pollen'].includes(threat.type)
+              ? 'Topo do lixo'
+              : 'Mesa cooperativa';
+    let condition = '';
+    let consequence = '';
+    if (['seed', 'royal_seed'].includes(threat.type)) {
+      condition = `Jogar ${cardLabel(threat.targetPlayerId, threat.cardId)} antes do fim do turno.`;
+      consequence = `Falha: +${threat.bloomAmount || 1} Flor, sem cura.`;
+    } else if (['pollen', 'royal_pollen'].includes(threat.type)) {
+      condition = threat.targetPlayerId == null ? 'Não pegar o lixo, ou usar a carta contaminada no mesmo turno.' : `Jogar ${cardLabel(threat.targetPlayerId, threat.cardId)} neste turno.`;
+      consequence = threat.type === 'pollen' ? 'Falha: +1 Flor e cura 40 HP.' : 'Falha: +1 Flor, sem cura.';
+    } else if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
+      const contributors = new Set(threat.contributorPlayerIds || []).size;
+      condition = threat.strengthened
+        ? `Cada cooperador deve adicionar 1 carta legal (${contributors}/${threat.requiredContributorCount || 2}).`
+        : 'Adicionar 1 carta legal ao jogo marcado nesta rodada.';
+      consequence = `Falha: +${threat.bloomAmount || 1} Flor e pode propagar uma Raiz.`;
+    } else if (threat.type === 'graft') {
+      const fed = new Set(threat.fedMeldIds || []).size;
+      condition = `Alimentar os dois jogos ligados (${fed}/2).`;
+      consequence = fed ? 'Falha parcial: +1 Flor, sem cura.' : 'Falha total: +2 Flores, sem cura, e pode propagar.';
+    } else if (threat.type === 'dew') {
+      condition = `Cada carta nova na mesa reduz ${threat.reductionPerCard || 15} HP (${uniqueDewCards} contabilizada${uniqueDewCards === 1 ? '' : 's'}).`;
+      consequence = `Cura prevista: ${predictedHeal} HP.`;
+    } else if (threat.type === 'harvest') {
+      condition = 'Encerrar o turno com no máximo 7 cartas.';
+      consequence = '8–10: cura 60 HP · 11+: +1 Flor e cura 100 HP.';
+    }
+    const deadline = threat.deadlinePlayerId != null
+      ? `Fim do turno de ${playerName(threat.deadlinePlayerId)} · rodada ${deadlineValue(threat)}`
+      : `Fim da rodada ${deadlineValue(threat)}`;
+    return {
+      id: threat.id,
+      type: threat.type,
+      name: names[threat.type] || 'Ameaça natural',
+      target,
+      deadline,
+      condition,
+      consequence,
+      predictedHeal,
+      urgent: threat.id === urgentThreatId,
+    };
+  });
 }
 
 export function getBossNaturePriorities(gameState, playerId) {
@@ -1260,6 +1811,41 @@ export function getBossNaturePriorities(gameState, playerId) {
   };
 }
 
+export function getBossDominatrixPriorities(gameState, playerId) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'dominadora') return null;
+  const player = (gameState.players || []).find((entry) => entry.id === playerId);
+  if (!player) return null;
+
+  const priorityMeldIds = new Set();
+  (boss.possessions || []).forEach((possession) => {
+    if (possession.teamId !== player.teamId) return;
+    if (!(possession.contributorPlayerIds || []).includes(playerId) && possession.meldId) {
+      priorityMeldIds.add(possession.meldId);
+    }
+  });
+  (boss.activeOrders || [])
+    .filter((order) => order.status === 'active' && order.targetPlayerId === playerId)
+    .forEach((order) => {
+      if (['feed_specific_meld', 'evolve_specific_meld'].includes(order.type) && order.meldId) {
+        priorityMeldIds.add(order.meldId);
+      }
+    });
+
+  const meldIndexes = (gameState.teams?.[player.teamId]?.melds || [])
+    .map((meld, meldIndex) => ({ meldIndex, meldId: resolveBossMeldId(gameState, player.teamId, meldIndex, false) }))
+    .filter(({ meldId }) => meldId && priorityMeldIds.has(meldId))
+    .map(({ meldIndex }) => meldIndex);
+  const discardOrder = activeOrderForPlayer(boss, playerId, 'discard_suit');
+  return {
+    urgent: getBossChains(gameState, playerId) >= 3,
+    meldIndexes,
+    discardSuit: discardOrder?.suit || null,
+    discardSuitLabel: discardOrder?.suitLabel || null,
+    orderType: activeOrderForPlayer(boss, playerId)?.type || null,
+  };
+}
+
 export function getBossMeldNatureThreats(gameState, teamId, meldIndex) {
   if (teamId !== 0) return [];
   const boss = normalizeBossState(gameState);
@@ -1288,6 +1874,27 @@ function changeChains(gameState, playerId, amount, reason = '') {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.id !== 'dominadora' || playerId == null || !amount) return 0;
   const before = boss.chainsByPlayer[playerId] || 0;
+  if (amount > 0 && boss.phase === 3 && before >= 4) {
+    const partner = (gameState.players || []).find((player) => player.id !== playerId);
+    if (partner && (boss.chainsByPlayer[partner.id] || 0) < 4) {
+      const overflowApplied = changeChains(gameState, partner.id, amount, `overflow:${reason}`);
+      if (overflowApplied) {
+        boss.actionSequence += 1;
+        recordEvent(boss, {
+          type: 'chainOverflow',
+          actionId: `chain_overflow_${playerId}_${partner.id}_${boss.actionSequence}`,
+          originalTargetPlayerId: playerId,
+          overflowTargetPlayerId: partner.id,
+          amount: overflowApplied,
+          reason,
+          outcome: `A Corrente destinada ao alvo dominado transbordou para ${partner.name || 'o parceiro'}.`,
+        });
+      }
+      return overflowApplied;
+    }
+    dominatrixDefeatIfNeeded(gameState);
+    return 0;
+  }
   const after = clamp(before + amount, 0, 4);
   boss.chainsByPlayer[playerId] = after;
   dominatrixDefeatIfNeeded(gameState);
@@ -1321,13 +1928,54 @@ export function isBossCardBlocked(gameState, playerId, cardId, action = 'play') 
   return isCardBlockedByBossState(boss, playerId, cardId, action);
 }
 
+export function getBossCardBlockFeedback(gameState, playerId, cardId, action = 'discard') {
+  const boss = normalizeBossState(gameState);
+  if (!boss || !cardId || !isCardBlockedByBossState(boss, playerId, cardId, action)) return null;
+
+  const natureThreat = activeNatureThreats(boss).find((threat) => (
+    threat.targetPlayerId === playerId && threat.cardId === cardId
+  ));
+  if (natureThreat && ['seed', 'royal_seed'].includes(natureThreat.type)) {
+    return {
+      effect: 'nature-seed',
+      reason: 'matriarch_seed',
+      message: '🌱 Esta carta é uma Semente Viva e não pode ser descartada. Jogue-a antes do fim do próximo turno.',
+    };
+  }
+  if (natureThreat && ['pollen', 'royal_pollen'].includes(natureThreat.type)) {
+    return {
+      effect: 'nature-pollen',
+      reason: 'matriarch_pollen',
+      message: '🌿 Esta carta está contaminada pelo Pólen da Matriarca e precisa ser usada neste turno. Ela não pode ser descartada.',
+    };
+  }
+
+  if (boss.id === 'dominadora') {
+    return {
+      effect: getBossCardEffect(gameState, playerId, cardId) || 'locked',
+      reason: 'dominatrix_lock',
+      message: action === 'play'
+        ? '⛓ Esta carta está presa pela Dominadora e não pode ser usada nesta jogada.'
+        : '⛓ Esta carta está sob controle da Dominadora e não pode ser descartada.',
+    };
+  }
+
+  return {
+    effect: 'locked',
+    reason: 'boss_lock',
+    message: 'Esta carta está temporariamente bloqueada para esta ação.',
+  };
+}
+
 export function validateBossClosedDiscardSelection(gameState, playerId, selectedCards = []) {
-  const blockedCard = selectedCards.find((card) => isBossCardBlocked(gameState, playerId, card?.id, 'play'));
+  const blockedCard = selectedCards.find((card) => getBossCardBlockFeedback(gameState, playerId, card?.id, 'play'));
   if (!blockedCard) return { allowed: true, message: '' };
+  const feedback = getBossCardBlockFeedback(gameState, playerId, blockedCard.id, 'play');
   return {
     allowed: false,
     blockedCardId: blockedCard.id,
-    message: 'Uma das cartas selecionadas está presa pela Dominadora.',
+    reason: feedback.reason,
+    message: feedback.message,
   };
 }
 
@@ -1352,7 +2000,7 @@ export function canBossCreateMeld(gameState, playerId) {
   if ((boss.chainsByPlayer[playerId] || 0) >= 3 || isBossPlayerDominated(gameState, playerId)) return false;
   const intent = boss.currentIntent;
   if (intent?.abilityId !== 'hands_tied') return true;
-  return (intent.payload?.newMeldCounts?.[playerId] || 0) < 1;
+  return intent.payload?.teamMeldAvailable !== false;
 }
 
 export function canBossUseMeld(gameState, playerId, meldIndex) {
@@ -1362,6 +2010,267 @@ export function canBossUseMeld(gameState, playerId, meldIndex) {
   if (intent?.abilityId !== 'separation') return true;
   const owner = intent.payload?.meldOwners?.[meldIndex];
   return owner == null || owner === playerId;
+}
+
+function finishDominatrixOrder(gameState, order, status, outcome, { addChain = false } = {}) {
+  const boss = gameState.boss;
+  if (!order || order.status !== 'active') return null;
+  order.status = status;
+  if (addChain) changeChains(gameState, order.targetPlayerId, 1, `${order.sourceAbilityId || 'order'}:${order.type}`);
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'dominatrixOrder',
+    actionId: `order_${order.id}_${status}_${boss.actionSequence}`,
+    orderId: order.id,
+    orderType: order.type,
+    playerId: order.targetPlayerId,
+    status,
+    chainApplied: !!addChain,
+    outcome,
+  });
+  order.resolvedEventId = event.actionId;
+  return event;
+}
+
+function activeOrderForPlayer(boss, playerId, type = null) {
+  return (boss?.activeOrders || []).find((order) => order.status === 'active'
+    && order.targetPlayerId === playerId
+    && (!type || order.type === type)) || null;
+}
+
+function resolveOrdersFromMeldAction(gameState, playerId, meldId, isNewMeld, oldKind, newKind, cardsAdded = []) {
+  const boss = gameState.boss;
+  if (boss?.id !== 'dominadora' || playerId == null) return [];
+  const events = [];
+  for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active' && entry.targetPlayerId === playerId)) {
+    if (order.type === 'discard_suit' && cardsAdded.some((card) => order.eligibleCardIds?.includes(card?.id))) {
+      order.ownOptionsConsumed = true;
+    }
+    if (order.type === 'no_new_meld' && isNewMeld) {
+      events.push(finishDominatrixOrder(gameState, order, 'disobeyed', 'A ordem proibia criar um jogo novo.', { addChain: true }));
+    } else if (order.type === 'feed_specific_meld') {
+      events.push(finishDominatrixOrder(
+        gameState,
+        order,
+        order.meldId === meldId ? 'obeyed' : 'disobeyed',
+        order.meldId === meldId ? 'O jogo ordenado foi alimentado primeiro.' : 'Outro jogo foi alimentado antes do jogo ordenado.',
+        { addChain: order.meldId !== meldId },
+      ));
+    } else if (order.type === 'evolve_specific_meld' && order.meldId === meldId && MELD_TIER[newKind] > MELD_TIER[oldKind]) {
+      events.push(finishDominatrixOrder(gameState, order, 'obeyed', 'O jogo ordenado evoluiu de tier.'));
+    }
+  }
+  return events.filter(Boolean);
+}
+
+export function notifyBossCardDiscarded(gameState, playerId, card) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'dominadora' || !card?.id) return [];
+  const events = [];
+  for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active'
+    && entry.targetPlayerId === playerId && entry.type === 'discard_suit')) {
+    const player = gameState.players?.find((entry) => entry.id === playerId);
+    const currentlyPossible = legalDiscardCards(gameState, player)
+      .some((entry) => !entry.joker && entry.suit === order.suit);
+    if (!card.joker && card.suit === order.suit) {
+      events.push(finishDominatrixOrder(gameState, order, 'obeyed', `A ordem de descartar ${order.suitLabel || order.suit} foi cumprida.`));
+    } else if (!currentlyPossible && order.ownOptionsConsumed) {
+      events.push(finishDominatrixOrder(gameState, order, 'disobeyed', 'O jogador usou as próprias opções do naipe e tornou a ordem impossível.', { addChain: true }));
+    } else if (!currentlyPossible) {
+      events.push(finishDominatrixOrder(gameState, order, 'cancelled', 'A ordem perdeu todas as opções válidas por uma mudança externa.'));
+    } else {
+      events.push(finishDominatrixOrder(gameState, order, 'disobeyed', `O jogador descartou outro naipe e desobedeceu a ordem.`, { addChain: true }));
+    }
+  }
+  return events.filter(Boolean);
+}
+
+export function getBossInterdictAttempt(gameState, teamId, meldIndex, oldKind, newKind) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'dominadora' || teamId !== 0 || MELD_TIER[newKind] <= MELD_TIER[oldKind]) return null;
+  const meldId = resolveBossMeldId(gameState, teamId, meldIndex, false);
+  const interdict = (boss.interdicts || []).find((entry) => entry.status === 'active'
+    && (entry.meldId ? entry.meldId === meldId : entry.meldIndex === meldIndex));
+  return interdict ? { ...interdict } : null;
+}
+
+export function resolveBossInterdictAttempt(gameState, playerId, interdictId, decision) {
+  const boss = normalizeBossState(gameState);
+  const interdict = boss?.id === 'dominadora'
+    ? (boss.interdicts || []).find((entry) => entry.id === interdictId && entry.status === 'active')
+    : null;
+  if (!interdict || !['obey', 'disobey'].includes(decision)) return null;
+  const mustObey = (boss.chainsByPlayer[playerId] || 0) >= 4;
+  const finalDecision = mustObey ? 'obey' : decision;
+  interdict.status = finalDecision === 'obey' ? 'obeyed' : 'disobeyed';
+  if (finalDecision === 'disobey') changeChains(gameState, playerId, 1, 'interdict');
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'interdictDecision',
+    actionId: `interdict_${interdict.id}_${boss.actionSequence}`,
+    interdictId: interdict.id,
+    playerId,
+    decision: finalDecision,
+    allowEvolution: finalDecision === 'disobey',
+    chainApplied: finalDecision === 'disobey',
+    outcome: finalDecision === 'obey'
+      ? 'A tentativa de evolucao foi cancelada e o Interdito foi consumido.'
+      : 'A evolucao foi concluida por desobediencia; 1 Corrente foi aplicada.',
+  });
+  interdict.resolvedEventId = event.actionId;
+  return event;
+}
+
+export function getBossCreditLimitQuote(gameState, cards = [], { creditEligibleCardIds = null, cardOriginsById = null } = {}) {
+  const boss = normalizeBossState(gameState);
+  const limit = boss?.id === 'banker' ? boss.creditLimit : null;
+  if (!limit || limit.status !== 'active' || limit.round !== boss.roundNumber) return null;
+  const counted = new Set(limit.countedCardIds || []);
+  const eligible = Array.isArray(creditEligibleCardIds) ? new Set(creditEligibleCardIds.filter(Boolean)) : null;
+  const newCardIds = [...new Set((cards || []).map((card) => card?.id).filter((cardId) => {
+    if (!cardId || counted.has(cardId)) return false;
+    if (eligible && !eligible.has(cardId)) return false;
+    if (cardOriginsById && cardOriginsById[cardId] !== 'hand') return false;
+    return true;
+  }))];
+  const countBefore = counted.size;
+  const countAfter = countBefore + newCardIds.length;
+  const allowance = Math.max(0, Number(limit.allowance) || 0);
+  const debtPerCard = Math.max(0, Number(limit.debtPerCard) || 1);
+  const maxCharge = Math.max(0, Number(limit.maxCharge) || 0);
+  const chargedDebt = Math.max(0, Number(limit.chargedDebt) || 0);
+  const excessBefore = Math.max(0, countBefore - allowance);
+  const excessAfter = Math.max(0, countAfter - allowance);
+  const rawDebt = Math.max(0, excessAfter - excessBefore) * debtPerCard;
+  const debt = Math.max(0, Math.min(rawDebt, maxCharge - chargedDebt));
+  return {
+    round: boss.roundNumber,
+    allowance,
+    countBefore,
+    countAfter,
+    newCardIds,
+    excessCards: Math.max(0, excessAfter - excessBefore),
+    debt,
+    debtPerCard,
+    chargedDebt,
+    maxCharge,
+  };
+}
+
+function confirmBankerDebtDefeat(gameState, sourceActionId = 'debt') {
+  const boss = gameState?.boss;
+  if (!boss || boss.id !== 'banker') return null;
+  boss.danger = clamp(Number(boss.danger) || 0, 0, boss.maxDanger);
+  if (boss.danger < boss.maxDanger) return null;
+  const actionId = `banker_debt_defeat_${sourceActionId}`;
+  const existing = (boss.eventLog || []).find((event) => event.actionId === actionId) || null;
+  if (!boss.result) {
+    boss.result = {
+      victory: false,
+      reason: 'max_debt',
+      title: 'Execucao da Divida',
+      detail: 'A Divida coletiva chegou ao limite.',
+    };
+    boss.stats.finalDebt = boss.danger;
+  }
+  if (existing) return existing;
+  return recordEvent(boss, {
+    type: 'bossDefeat',
+    actionId,
+    reason: 'max_debt',
+    danger: boss.danger,
+    outcome: 'A Divida coletiva chegou ao limite.',
+  });
+}
+
+function botCardUtility(gameState, player, card) {
+  if (!card) return Number.POSITIVE_INFINITY;
+  let utility = bossCardDamage(card);
+  if (card.joker) utility += 35;
+  else if (String(card.rank) === '2' || String(card.rank) === 'A') utility += 12;
+  const melds = gameState.teams?.[player?.teamId]?.melds || [];
+  if (melds.some((meld) => isValidBossSequence([...(meld || []), card]))) utility += 30;
+  if (activeNatureThreats(gameState.boss).some((threat) => threat.targetPlayerId === player?.id && threat.cardId === card.id)) utility += 35;
+  return utility;
+}
+
+export function chooseBossFixedInterestBotOption(gameState, choice) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'banker' || !choice?.options?.length) return choice?.options?.[0] || null;
+  if (choice.type === 'banker_collateral_card') {
+    const player = (gameState.players || []).find((entry) => entry.id === choice.playerId);
+    return choice.options
+      .filter((option) => option.startsWith('card:'))
+      .map((option) => ({ option, card: player?.hand?.find((entry) => entry?.id === option.slice(5)) }))
+      .filter((entry) => entry.card)
+      .sort((a, b) => botCardUtility(gameState, player, a.card) - botCardUtility(gameState, player, b.card))[0]?.option
+      || choice.options[0];
+  }
+  if (choice.type !== 'fixed_interest_payment') return choice.options[0];
+  const amount = Math.max(0, Number(choice.amount) || 0);
+  const collateralAmount = Math.max(0, Number(choice.collateralAmount) || 0);
+  const candidates = choice.options.filter((option) => option.startsWith('guarantee:')).map((option) => {
+    const playerId = Number(option.split(':')[1]);
+    const player = (gameState.players || []).find((entry) => entry.id === playerId);
+    const card = (player?.hand || []).filter((entry) => entry?.id)
+      .sort((a, b) => botCardUtility(gameState, player, a) - botCardUtility(gameState, player, b))[0];
+    return { option, utility: card ? botCardUtility(gameState, player, card) : Number.POSITIVE_INFINITY };
+  }).filter((entry) => Number.isFinite(entry.utility)).sort((a, b) => a.utility - b.utility);
+  if (!candidates.length) return 'full';
+  const fullRisk = (boss.danger + amount) / Math.max(1, boss.maxDanger);
+  const savings = Math.max(0, amount - collateralAmount);
+  if (fullRisk >= 1 || fullRisk >= 0.72 || candidates[0].utility <= savings * 12) return candidates[0].option;
+  return 'full';
+}
+
+export function shouldBossBotAcceptCreditPlay(gameState, playerId, {
+  cards = [],
+  oldKind = 'simple',
+  newKind = 'simple',
+  creditEligibleCardIds = null,
+} = {}) {
+  const boss = normalizeBossState(gameState);
+  const quote = getBossCreditLimitQuote(gameState, cards, { creditEligibleCardIds });
+  if (!boss || boss.id !== 'banker' || !quote?.debt) return true;
+  if (boss.danger + quote.debt >= boss.maxDanger) return false;
+  const eligible = creditEligibleCardIds ? new Set(creditEligibleCardIds) : null;
+  const cardDamage = cards.filter((card) => !eligible || eligible.has(card?.id)).reduce((sum, card) => sum + bossCardDamage(card), 0);
+  const tierDamage = Math.max(0, (BOSS_DAMAGE_BY_KIND[newKind] || 0) - (BOSS_DAMAGE_BY_KIND[oldKind] || 0));
+  const debtRelief = Math.max(0, (DEBT_REDUCTION_BY_KIND[newKind] || 0) - (DEBT_REDUCTION_BY_KIND[oldKind] || 0));
+  const risk = (boss.danger + quote.debt) / Math.max(1, boss.maxDanger);
+  const decisive = boss.hp <= cardDamage + tierDamage
+    || (MELD_TIER[newKind] || 0) >= 2
+    || debtRelief >= quote.debt
+    || (gameState.stock?.length || 0) <= 8;
+  if (decisive) return true;
+  const value = cardDamage + tierDamage + debtRelief * 10;
+  const cost = quote.debt * (8 + risk * 14);
+  return value >= cost;
+}
+
+function botPileCardValue(card) {
+  if (!card) return 0;
+  if (card.joker) return 50;
+  if (['A', '2'].includes(String(card.rank))) return 20;
+  if (['8', '9', '10', 'J', 'Q', 'K'].includes(String(card.rank))) return 10;
+  return 5;
+}
+
+export function shouldBossBotTakeDiscard(gameState, playerId, { intent = null, naturePlan = null } = {}) {
+  const boss = normalizeBossState(gameState);
+  if (!intent?.wants) return false;
+  const surcharge = boss?.id === 'banker' ? getBossDiscardSurcharge(gameState) : null;
+  const pile = (gameState.discard || []).filter(Boolean);
+  const pileValue = pile.reduce((sum, card) => sum + botPileCardValue(card), 0);
+  const immediatePollenUse = !!intent && intent.usesTopImmediately !== false && ['new', 'extend'].includes(intent.action);
+  if (naturePlan?.pollenOnDiscard && naturePlan.bloom >= 4 && !immediatePollenUse) return false;
+  if (!surcharge) return !naturePlan?.pollenOnDiscard || immediatePollenUse;
+  if (boss.danger + surcharge.amount >= boss.maxDanger) return false;
+  const risk = (boss.danger + surcharge.amount) / Math.max(1, boss.maxDanger);
+  const decisive = !!intent.decisive || pile.length >= 5 || ['real', 'asas'].includes(intent.newKind);
+  const value = pileValue + (decisive ? 55 : 0) + (naturePlan?.pollenOnDiscard && immediatePollenUse ? 20 : 0);
+  const cost = surcharge.amount * (10 + risk * 14);
+  return value >= cost;
 }
 
 export function getBossPendingChoice(gameState, playerId) {
@@ -1374,7 +2283,8 @@ export function hasPendingBossChoices(gameState) {
 }
 
 export function canBossPerformCommonAction(gameState) {
-  return !hasPendingBossChoices(gameState) && !isBossTurnActive(gameState);
+  const boss = normalizeBossState(gameState);
+  return !boss?.result && !hasPendingBossChoices(gameState) && !isBossTurnActive(gameState);
 }
 
 function drawChoiceCards(gameState, playerId, count) {
@@ -1471,10 +2381,7 @@ export function resolveBossChoice(gameState, playerId, option) {
       collateralPlayerId,
       collateralCardId,
     });
-    if (boss.danger >= boss.maxDanger) {
-      boss.result = { victory: false, reason: 'max_debt', title: 'Execucao da Divida', detail: 'A Divida coletiva chegou ao limite.' };
-      boss.stats.finalDebt = boss.danger;
-    }
+    confirmBankerDebtDefeat(gameState, event.actionId);
     if (!boss.pendingChoices.length && !boss.currentIntent && !boss.result) {
       const awaiting = boss.awaitingBossTurn || {};
       beginBossTurn(gameState, {
@@ -1534,6 +2441,24 @@ export function resolveBossChoice(gameState, playerId, option) {
   else if (option === 'chain') {
     changeChains(gameState, playerId, 1, choice.type);
     outcome = '1 Corrente recebida.';
+  } else if (option === 'order' && choice.type === 'forced_choice' && choice.order?.type) {
+    const order = {
+      ...choice.order,
+      id: `order_${choice.id}`,
+      sourceAbilityId: 'forced_choice',
+      targetPlayerId: playerId,
+      createdRound: boss.roundNumber,
+      deadlinePlayerId: playerId,
+      status: 'active',
+      resolvedEventId: null,
+      eligibleCardIds: choice.order.type === 'discard_suit'
+        ? legalDiscardCards(gameState, gameState.players?.find((entry) => entry.id === playerId))
+          .filter((card) => !card.joker && card.suit === choice.order.suit)
+          .map((card) => card.id)
+        : [],
+    };
+    boss.activeOrders.push(order);
+    outcome = `Ordem aceita: ${order.label}.`;
   } else if (option === 'lock_card') {
     const player = gameState.players.find((entry) => entry.id === playerId);
     const card = chooseSeeded((player?.hand || []).filter((entry) => entry?.id && canApplyDiscardLock(gameState, player, [entry.id])), gameState, 97);
@@ -1568,6 +2493,7 @@ export function resolveBossChoice(gameState, playerId, option) {
     lockedCardLabel: compactCardLabel(drawnCards.find((card) => card.id === lockedCardId)),
     lockedCardLabels: drawnCards.map(compactCardLabel),
     exposedCardIds: drawnCards.filter((card) => boss.effects.some((effect) => effect.id === 'choice_exposure' && effect.cardId === card.id)).map((card) => card.id),
+    order: option === 'order' ? { ...choice.order } : null,
   });
   const resumesPlayers = !boss.pendingChoices.length
     && boss.awaitingBossTurn?.resumePlayersAfterChoice
@@ -1616,7 +2542,17 @@ function activatePendingPhase(gameState) {
   return recordEvent(boss, { type: 'phase', phase: nextPhase, actionId: boss.phaseTransitionId });
 }
 
-export function applyBossMeldTransition(gameState, { teamId, playerId = null, meldIndex, oldKind = 'simple', newKind = 'simple', cardsAdded = [], isNewMeld = false }) {
+export function applyBossMeldTransition(gameState, {
+  teamId,
+  playerId = null,
+  meldIndex,
+  oldKind = 'simple',
+  newKind = 'simple',
+  cardsAdded = [],
+  isNewMeld = false,
+  creditEligibleCardIds = null,
+  cardOriginsById = null,
+}) {
   const boss = normalizeBossState(gameState);
   if (!boss || teamId !== 0 || boss.result) return null;
   const legacyKey = `${teamId}:${meldIndex}`;
@@ -1637,41 +2573,66 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
   let possessionProgress = null;
   let possessionSuppressesDamage = false;
   let possessionReappliedDamage = 0;
+  let possessionQualifiedByTier = false;
+  let creditLimitDebt = 0;
+  let creditLimitEventId = null;
+  let orderEvents = [];
 
   if (boss.id === 'dominadora') {
     const intent = boss.currentIntent;
-    const possession = boss.possessions.find((entry) => entry.teamId === teamId && entry.meldIndex === meldIndex);
+    const possession = boss.possessions.find((entry) => entry.teamId === teamId
+      && (entry.meldId ? entry.meldId === meldId : entry.meldIndex === meldIndex));
     if (possession) {
       possession.progressCardIds ||= [];
+      possession.contributorPlayerIds ||= [];
       const newProgressCards = cardsAdded.filter((card) => card?.id && !possession.progressCardIds.includes(card.id));
       newProgressCards.forEach((card) => possession.progressCardIds.push(card.id));
       possessionProgressed = newProgressCards.length > 0;
-      possession.progress = clamp((possession.progress || 0) + newProgressCards.length, 0, possession.required || 1);
+      if (possessionProgressed && playerId != null && !possession.contributorPlayerIds.includes(playerId)) possession.contributorPlayerIds.push(playerId);
+      possession.progress = possession.contributorPlayerIds.length;
+      possession.required = Math.max(1, (gameState.players || []).length);
       possessionProgress = possession.progress;
-      if (possession.progress >= (possession.required || 1)) {
+      possessionQualifiedByTier = MELD_TIER[newKind] > Math.max(Number(possession.createdTier) || 0, MELD_TIER[oldKind] || 0);
+      if (possession.contributorPlayerIds.length >= possession.required || possessionQualifiedByTier) {
         possessionReleased = true;
         possessionReappliedDamage = Math.max(0, Number(possession.suppressedDamage) || 0);
+        possession.releasedEventId = `possession_release_${possession.id}_${boss.roundNumber}`;
         boss.possessions = boss.possessions.filter((entry) => entry.id !== possession.id);
       } else possessionSuppressesDamage = true;
       if (possessionSuppressesDamage) canastraDamage = 0;
     }
     if (intent?.abilityId === 'hands_tied' && isNewMeld && playerId != null) {
-      intent.payload.newMeldCounts ||= {};
-      intent.payload.newMeldCounts[playerId] = (intent.payload.newMeldCounts[playerId] || 0) + 1;
+      intent.payload.teamMeldAvailable = false;
+      intent.payload.consumedByPlayerId = playerId;
+      intent.payload.consumedMeldId = meldId;
     }
     if (intent?.abilityId === 'separation' && playerId != null) {
       intent.payload.meldOwners ||= {};
       if (intent.payload.meldOwners[meldIndex] == null) intent.payload.meldOwners[meldIndex] = playerId;
     }
+    orderEvents = resolveOrdersFromMeldAction(gameState, playerId, meldId, isNewMeld, oldKind, newKind, cardsAdded);
   }
 
   const accountedCardIds = new Set(boss.damagedCardIds);
-  const suppressedCardIds = new Set(boss.suppressedDamageCardIds);
   for (const card of cardsAdded) {
-    if (!card?.id || accountedCardIds.has(card.id) || suppressedCardIds.has(card.id)) continue;
+    if (!card?.id || accountedCardIds.has(card.id)) continue;
     accountedCardIds.add(card.id);
     boss.damagedCardIds.push(card.id);
     cardDamage += bossCardDamage(card);
+  }
+  if (boss.id === 'banker' && boss.creditLimit?.status === 'active' && boss.creditLimit.round === boss.roundNumber) {
+    const limit = boss.creditLimit;
+    limit.countedCardIds ||= [];
+    limit.eventIds ||= [];
+    const quote = getBossCreditLimitQuote(gameState, cardsAdded, { creditEligibleCardIds, cardOriginsById });
+    quote?.newCardIds.forEach((cardId) => limit.countedCardIds.push(cardId));
+    creditLimitDebt = quote?.debt || 0;
+    limit.chargedDebt = Math.min(limit.maxCharge, (limit.chargedDebt || 0) + creditLimitDebt);
+    if (quote?.newCardIds.length) {
+      const eventId = `credit_limit_${limit.round}_${quote.newCardIds.slice().sort().join('_')}`;
+      if (!limit.eventIds.includes(eventId)) limit.eventIds.push(eventId);
+      creditLimitEventId = eventId;
+    }
   }
   const damage = canastraDamage + cardDamage + possessionReappliedDamage;
 
@@ -1699,7 +2660,20 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
       if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type) && addedIds.has(threat.cardId)) {
         succeedNatureThreat(gameState, threat, 'A carta marcada foi usada legalmente.');
       } else if (['root', 'twin_root', 'royal_root'].includes(threat.type) && threat.meldId === meldId && addedIds.size) {
-        succeedNatureThreat(gameState, threat, `O jogo ${meldIndex + 1} alimentou a raiz.`);
+        threat.progressCardIds ||= [];
+        addedIds.forEach((cardId) => {
+          if (!threat.progressCardIds.includes(cardId)) threat.progressCardIds.push(cardId);
+        });
+        if (threat.strengthened) {
+          threat.contributorPlayerIds ||= [];
+          if (playerId != null && !threat.contributorPlayerIds.includes(playerId)) threat.contributorPlayerIds.push(playerId);
+          const required = Math.max(1, Number(threat.requiredContributorCount) || Math.min(2, (gameState.players || []).length));
+          if (threat.contributorPlayerIds.length >= required) {
+            succeedNatureThreat(gameState, threat, `Cada cooperador alimentou a Raiz Fortalecida do jogo ${meldIndex + 1}.`);
+          }
+        } else {
+          succeedNatureThreat(gameState, threat, `O jogo ${meldIndex + 1} alimentou a raiz.`);
+        }
       } else if (threat.type === 'graft' && threat.meldIds?.includes(meldId) && addedIds.size) {
         threat.fedMeldIds ||= [];
         if (!threat.fedMeldIds.includes(meldId)) threat.fedMeldIds.push(meldId);
@@ -1709,6 +2683,10 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
         addedIds.forEach((cardId) => {
           if (!threat.countedCardIds.includes(cardId)) threat.countedCardIds.push(cardId);
         });
+        if (boss.currentIntent?.abilityId === 'restorative_dew' && threat.sourceIntentId === boss.currentIntent.id) {
+          boss.currentIntent.payload ||= {};
+          boss.currentIntent.payload.countedCardIds = [...threat.countedCardIds];
+        }
       }
     }
     if (contribution) {
@@ -1724,8 +2702,7 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     }
   }
 
-  if (damage <= 0 && debtReduction <= 0 && !possessionProgressed && bloomRemoved <= 0) return null;
-  const dangerBefore = boss.danger;
+  if (damage <= 0 && debtReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length) return null;
   const breaksCocoon = boss.id === 'matriarca_esmeralda'
     && canastraDamage > 0
     && ({ limpa: 1, real: 2, asas: 3 }[newKind] || 0) >= 1;
@@ -1733,18 +2710,35 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     breaksCocoon,
     sourceActionId: `meld_${key}_${boss.actionSequence + 1}`,
   });
-  boss.danger = clamp(boss.danger - debtReduction, 0, boss.maxDanger);
+  const dangerAfterRelief = clamp(boss.danger - debtReduction, 0, boss.maxDanger);
+  const appliedDebtReduction = Math.max(0, boss.danger - dangerAfterRelief);
+  boss.danger = dangerAfterRelief;
+  if (creditLimitDebt) boss.danger = clamp(boss.danger + creditLimitDebt, 0, boss.maxDanger);
   const appliedDamage = damageResult.hpDamage;
-  const appliedDebtReduction = Math.max(0, dangerBefore - boss.danger);
   boss.stats.totalDamage += appliedDamage;
   boss.stats.largestAttack = Math.max(boss.stats.largestAttack, appliedDamage);
   if ((BOSS_DAMAGE_BY_KIND[newKind] || 0) >= BOSS_DAMAGE_BY_KIND.suja && (BOSS_DAMAGE_BY_KIND[oldKind] || 0) < BOSS_DAMAGE_BY_KIND.suja) boss.stats.canastrasFormed += 1;
   if (boss.hp === 0 && !damageResult.reborn) boss.defeated = true;
   let chainsRemoved = 0;
-  if (boss.id === 'dominadora' && canastraDamage > 0 && playerId != null) {
-    if (boss.chainReliefRoundByPlayer[playerId] !== boss.roundNumber) {
-      chainsRemoved = Math.abs(Math.min(0, changeChains(gameState, playerId, -1, 'resistance')));
-      if (chainsRemoved) boss.chainReliefRoundByPlayer[playerId] = boss.roundNumber;
+  if (boss.id === 'dominadora' && playerId != null && (!possessionSuppressesDamage || possessionReleased)) {
+    const tier = MELD_TIER[newKind] || 0;
+    const previousResistanceTier = Number(contribution?.dominatrixResistanceTier) || 0;
+    if (contribution) contribution.dominatrixResistanceTier = Math.max(previousResistanceTier, tier);
+    if (tier > previousResistanceTier && tier > 0) {
+      if (boss.chainReliefRoundByPlayer[playerId] !== boss.roundNumber) {
+        chainsRemoved = Math.abs(Math.min(0, changeChains(gameState, playerId, -1, 'resistance')));
+        if (chainsRemoved) boss.chainReliefRoundByPlayer[playerId] = boss.roundNumber;
+      } else {
+        boss.actionSequence += 1;
+        recordEvent(boss, {
+          type: 'resistanceQualified',
+          actionId: `resistance_limit_${meldId}_${tier}_${boss.roundNumber}`,
+          playerId,
+          meldId,
+          tier,
+          outcome: 'A evolucao qualificou a Resistencia, mas o limite desta rodada ja foi usado.',
+        });
+      }
     }
   }
   if (contribution) {
@@ -1763,6 +2757,7 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     canastraDamage,
     possessionReappliedDamage,
     debtReduction,
+    creditLimitDebt,
     chainsRemoved,
     bloomRemoved,
     absorbedDamage: damageResult.absorbed,
@@ -1770,11 +2765,15 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     reborn: damageResult.reborn,
     possessionProgress: possessionProgressed ? possessionProgress : null,
     possessionReleased,
+    possessionQualifiedByTier,
+    orderEventIds: orderEvents.map((entry) => entry.actionId),
     oldKind,
     newKind,
     hp: boss.hp,
     danger: boss.danger,
-    dangerChangeLabel: debtReduction
+    dangerChangeLabel: creditLimitDebt
+      ? `Limite de Credito: Divida +${creditLimitDebt}`
+      : debtReduction
       ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Dívida -${debtReduction}`
       : bloomRemoved ? `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}: Florescimento -${bloomRemoved}` : '',
     pendingPhase,
@@ -1794,6 +2793,9 @@ export function applyBossMeldTransition(gameState, { teamId, playerId = null, me
     event.reaction = { ...boss.damageReaction };
   }
   const damageEvent = recordEvent(boss, event);
+  if (creditLimitDebt > 0) {
+    damageEvent.defeatEvent = confirmBankerDebtDefeat(gameState, creditLimitEventId || damageEvent.actionId);
+  }
   if (possessionReleased) {
     boss.actionSequence += 1;
     damageEvent.possessionEvent = recordEvent(boss, {
@@ -1835,6 +2837,36 @@ export function isBossDiscardBlocked(gameState) {
   const playerId = gameState.players?.[gameState.currentPlayer]?.id ?? gameState.currentPlayer;
   if (boss.id === 'banker') return boss.currentIntent?.abilityId === 'credit_block' || isBossVaultDrawRequired(gameState, playerId);
   return (boss.chainsByPlayer?.[playerId] || 0) >= 4;
+}
+
+export function getBossDiscardSurcharge(gameState) {
+  const boss = normalizeBossState(gameState);
+  const surcharge = boss?.id === 'banker' ? boss.discardSurcharge : null;
+  if (!surcharge || surcharge.status !== 'active' || surcharge.createdRound !== boss.roundNumber) return null;
+  return { ...surcharge };
+}
+
+export function consumeBossDiscardSurcharge(gameState, playerId) {
+  const boss = normalizeBossState(gameState);
+  const surcharge = getBossDiscardSurcharge(gameState);
+  if (!boss || !surcharge || boss.discardSurcharge.resolvedEventId) return null;
+  const amount = Math.max(0, Number(surcharge.amount) || 0);
+  boss.discardSurcharge.status = 'consumed';
+  boss.discardSurcharge.consumedByPlayerId = playerId;
+  boss.danger = clamp(boss.danger + amount, 0, boss.maxDanger);
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'discardSurcharge',
+    actionId: `discard_surcharge_${surcharge.createdRound}_${boss.actionSequence}`,
+    playerId,
+    amount,
+    danger: boss.danger,
+    dangerChangeLabel: `Agio do Lixo: Divida +${amount}`,
+    outcome: `A retirada do lixo foi confirmada; Divida +${amount}.`,
+  });
+  boss.discardSurcharge.resolvedEventId = event.actionId;
+  event.defeatEvent = confirmBankerDebtDefeat(gameState, event.actionId);
+  return event;
 }
 
 export function isBossMeldLocked(gameState, teamId, meldIndex) {
@@ -1939,6 +2971,8 @@ function swapCooperatorCards(gameState) {
   const firstIndex = players[0].hand.findIndex((card) => card.id === firstCard?.id);
   const secondIndex = players[1].hand.findIndex((card) => card.id === secondCard?.id);
   if (firstIndex < 0 || secondIndex < 0) return null;
+  const firstSnapshot = { ...firstCard };
+  const secondSnapshot = { ...secondCard };
   players[0].hand[firstIndex] = secondCard;
   players[1].hand[secondIndex] = firstCard;
   return {
@@ -1948,6 +2982,10 @@ function swapCooperatorCards(gameState) {
     secondCardId: secondCard.id,
     firstCardLabel: compactCardLabel(firstCard),
     secondCardLabel: compactCardLabel(secondCard),
+    sentCards: [
+      { playerId: players[0].id, toPlayerId: players[1].id, cardId: firstCard.id, cardLabel: compactCardLabel(firstCard), card: firstSnapshot },
+      { playerId: players[1].id, toPlayerId: players[0].id, cardId: secondCard.id, cardLabel: compactCardLabel(secondCard), card: secondSnapshot },
+    ],
     receivedCards: [
       { playerId: players[0].id, fromPlayerId: players[1].id, cardId: secondCard.id, cardLabel: compactCardLabel(secondCard) },
       { playerId: players[1].id, fromPlayerId: players[0].id, cardId: firstCard.id, cardLabel: compactCardLabel(firstCard) },
@@ -1971,7 +3009,10 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
 
   if (boss.id === 'dominadora') {
     if (intent.abilityId === 'forced_choice') {
-      enqueueChoice(boss, intent.payload.targetPlayerId, 'forced_choice', ['draw2', 'chain'], { announcedPhase: intent.announcedPhase });
+      enqueueChoice(boss, intent.payload.targetPlayerId, 'forced_choice', ['chain', 'order'], {
+        announcedPhase: intent.announcedPhase,
+        order: { ...intent.payload.order },
+      });
       outcome = 'A escolha pessoal foi imposta.';
     } else if (intent.abilityId === 'forced_swap') {
       const swap = swapCooperatorCards(gameState);
@@ -2015,18 +3056,52 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
           id: `possession_${intent.id}`,
           teamId: 0,
           meldIndex: intent.payload.meldIndex,
+          meldId: intent.payload.meldId || resolveBossMeldId(gameState, 0, intent.payload.meldIndex, true),
           progress: 0,
           progressCardIds: [],
-          required: 1,
+          contributorPlayerIds: [],
+          required: Math.max(1, (gameState.players || []).length),
+          createdTier: Number(intent.payload.createdTier) || 0,
+          releasedEventId: null,
           suppressedDamage,
           calculatedDamage,
           appliedRound: boss.roundNumber,
         });
-        outcome = `O jogo ${intent.payload.meldIndex + 1} foi possuído; ${suppressedDamage} de dano ficaram suspensos até receber 1 carta legal.`;
+        outcome = `O jogo ${intent.payload.meldIndex + 1} foi possuído; ${suppressedDamage} de dano ficam suspensos até ambos cooperarem ou o jogo evoluir.`;
         resultData = { meldIndex: intent.payload.meldIndex, suppressedDamage, calculatedDamage };
       } else {
         outcome = 'A Posse não encontrou um jogo elegível.';
       }
+    } else if (intent.abilityId === 'iron_etiquette') {
+      const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);
+      boss.activeOrders.push({
+        id: `etiquette_${intent.id}`,
+        sourceAbilityId: 'iron_etiquette',
+        type: 'discard_suit',
+        targetPlayerId: intent.payload.targetPlayerId,
+        suit: intent.payload.suit,
+        suitLabel: intent.payload.suitLabel,
+        createdRound: boss.roundNumber,
+        deadlinePlayerId: intent.payload.targetPlayerId,
+        eligibleCardIds: legalDiscardCards(gameState, target)
+          .filter((card) => !card.joker && card.suit === intent.payload.suit)
+          .map((card) => card.id),
+        ownOptionsConsumed: false,
+        status: 'active',
+        resolvedEventId: null,
+      });
+      outcome = `Etiqueta: o alvo deve descartar ${intent.payload.suitLabel} no próximo turno.`;
+    } else if (intent.abilityId === 'interdict') {
+      boss.interdicts.push({
+        id: `interdict_${intent.id}`,
+        sourceAbilityId: 'interdict',
+        meldIndex: intent.payload.meldIndex,
+        meldId: intent.payload.meldId,
+        createdRound: boss.roundNumber,
+        status: 'active',
+        resolvedEventId: null,
+      });
+      outcome = `Interdito aplicado ao jogo ${intent.payload.meldIndex + 1}; a primeira evolução exigirá uma decisão.`;
     } else {
       outcome = `${intent.name} foi encerrada.`;
     }
@@ -2043,18 +3118,18 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         targetPlayerId: intent.payload.targetPlayerId,
         deadlinePlayerId: intent.payload.targetPlayerId,
         cardId: intent.payload.cardId,
-        healAmount: 50,
+        healAmount: 0,
         bloomAmount: 1,
       });
       outcome = threat ? 'A Semente foi marcada e precisa ser usada no proximo turno do alvo.' : 'Nenhuma Semente valida foi encontrada.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'hungry_root') {
-      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'root', ...intent.payload, healAmount: 60, bloomAmount: 1, progressCardIds: [] });
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'root', ...intent.payload, healAmount: 0, bloomAmount: 1, progressCardIds: [], contributorPlayerIds: [] });
       outcome = threat ? `A Raiz envolve o jogo ${Number(threat.meldIndex) + 1}.` : 'Nenhuma Raiz valida foi criada.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'restorative_dew') {
-      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'dew', healAmount: 100, bloomAmount: 0, countedCardIds: [], reductionPerCard: 20 });
-      outcome = threat ? 'O Orvalho prepara 100 HP de cura; cada carta nova reduz 20.' : 'O Orvalho nao encontrou espaco entre as ameacas.';
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'dew', healAmount: intent.payload.baseHeal, bloomAmount: 0, countedCardIds: [], reductionPerCard: intent.payload.reductionPerCard });
+      outcome = threat ? `O Orvalho prepara ${intent.payload.baseHeal} HP de cura; cada carta nova reduz ${intent.payload.reductionPerCard}.` : 'O Orvalho nao encontrou espaco entre as ameacas.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'twin_vines') {
       const threats = (intent.payload.targets || []).slice(0, natureThreatSlots(gameState)).map((target, index) => addNatureThreat(gameState, {
@@ -2062,7 +3137,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         id: `${intent.id}_vine_${index}`,
         type: 'twin_root',
         ...target,
-        healAmount: 70,
+        healAmount: 0,
         bloomAmount: 1,
         progressCardIds: [],
       })).filter(Boolean);
@@ -2075,13 +3150,13 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         meldIds: (intent.payload.targets || []).map((target) => target.meldId),
         meldIndexes: (intent.payload.targets || []).map((target) => target.meldIndex),
         fedMeldIds: [],
-        healAmount: 100,
+        healAmount: 0,
         bloomAmount: 2,
       });
       outcome = threat ? 'O Enxerto ligou dois jogos; ambos precisam receber uma carta.' : 'O Enxerto nao encontrou dois jogos validos.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'discard_pollen') {
-      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'pollen', discardCardId: intent.payload.discardCardId, healAmount: 60, bloomAmount: 1, targetPlayerId: null });
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'pollen', discardCardId: intent.payload.discardCardId, healAmount: 40, bloomAmount: 1, targetPlayerId: null });
       outcome = threat ? 'O topo do lixo foi contaminado pelo Polen.' : 'O Polen nao encontrou uma carta valida no lixo.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'harvest') {
@@ -2098,7 +3173,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
           ...objective,
           type: objective.type === 'root' ? 'royal_root' : objective.type === 'seed' ? 'royal_seed' : 'royal_pollen',
           deadlinePlayerId: objective.targetPlayerId ?? null,
-          healAmount: 80,
+          healAmount: 0,
           bloomAmount: 1,
           progressCardIds: [],
         });
@@ -2111,13 +3186,13 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       outcome = 'O Casulo Esmeralda absorvera ate 180 de dano nesta rodada.';
       resultData = { cocoonId: boss.emeraldCocoon.id, remaining: boss.emeraldCocoon.remaining };
     } else if (intent.abilityId === 'spring_crown') {
-      boss.springCrown = { id: `crown_${intent.id}`, round: boss.roundNumber, failureCount: 0, status: 'active' };
-      outcome = 'A Coroa da Primavera ampliara as curas depois da primeira ameaca que falhar.';
+      boss.springCrown = { id: `crown_${intent.id}`, round: boss.roundNumber, failureCount: 0, strengthenedCreated: false, status: 'active' };
+      outcome = 'A Coroa da Primavera pode propagar uma Raiz e fortalecer a nova ameaca na segunda falha.';
       resultData = { crownId: boss.springCrown.id };
     }
   } else if (intent.abilityId === 'fixed_interest') {
-    const amount = intent.payload.amount ?? (intent.announcedPhase === 3 ? 8 : 6);
-    const collateralAmount = intent.payload.collateralAmount ?? (intent.announcedPhase === 3 ? 5 : 3);
+    const amount = intent.payload.fullDebt ?? intent.payload.amount ?? (intent.announcedPhase === 3 ? 8 : 6);
+    const collateralAmount = intent.payload.guaranteedDebt ?? intent.payload.collateralAmount ?? (intent.announcedPhase === 3 ? 5 : 3);
     const eligibleGuarantors = (gameState.players || []).filter((player) => !boss.vaultsByPlayer[player.id] && player.hand?.some((card) => card?.id));
     if (eligibleGuarantors.length) {
       const decisionPlayer = gameState.players.find((player) => !String(player.name || '').toUpperCase().includes('BOT')) || gameState.players[0];
@@ -2149,15 +3224,39 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     const totalCards = gameState.players.reduce((sum, player) => sum + (player.hand?.length || 0), 0);
     dangerDelta = Math.min(12, 4 + Math.floor(totalCards / 4));
     outcome = `Juros Compostos: Dívida +${dangerDelta}.`;
+  } else if (intent.abilityId === 'credit_limit') {
+    boss.creditLimit = {
+      round: boss.roundNumber,
+      allowance: intent.payload.allowance,
+      debtPerCard: intent.payload.debtPerCard || 1,
+      countedCardIds: [],
+      chargedDebt: 0,
+      maxCharge: intent.payload.maxCharge,
+      eventIds: [],
+      status: 'active',
+      sourceIntentId: intent.id,
+    };
+    outcome = `Limite de Crédito: franquia compartilhada de ${intent.payload.allowance} cartas; cobrança máxima de ${intent.payload.maxCharge}.`;
+  } else if (intent.abilityId === 'discard_surcharge') {
+    boss.discardSurcharge = {
+      amount: intent.payload.amount,
+      createdRound: boss.roundNumber,
+      status: 'active',
+      consumedByPlayerId: null,
+      resolvedEventId: null,
+    };
+    outcome = `Ágio do Lixo: a primeira retirada confirmada custará Dívida +${intent.payload.amount}.`;
   }
 
   boss.danger = clamp(boss.danger + dangerDelta, 0, boss.maxDanger);
   boss.actionSequence += 1;
   boss.lastAbilityId = intent.abilityId;
   boss.lastResolvedActionId = intent.id;
+  const eventActionId = `boss_${boss.actionSequence}_${intent.abilityId}`;
   const event = {
     type: 'bossAbility',
-    actionId: `boss_${boss.actionSequence}_${intent.abilityId}`,
+    actionId: eventActionId,
+    eventId: eventActionId,
     abilityId: intent.abilityId,
     name: intent.name,
     outcome,
@@ -2179,6 +3278,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     },
   };
   const recorded = recordEvent(boss, event);
+  if (boss.id === 'banker' && dangerDelta > 0) recorded.defeatEvent = confirmBankerDebtDefeat(gameState, recorded.actionId);
   if (keepIntent) {
     intent.immediateApplied = true;
     intent.immediateEventActionId = recorded.actionId;
@@ -2237,6 +3337,28 @@ export function completeBossPlayerTurn(gameState, playerId) {
     delete boss.choiceDrawnCardIdsByPlayer[playerId];
     boss.effects = boss.effects.filter((effect) => !(effect.expiresAfterTurn && effect.playerId === playerId));
     exposedCardsHeld.forEach((effect) => changeChains(gameState, playerId, 1, `forced_choice_exposure:${effect.cardId}`));
+    for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active' && entry.targetPlayerId === playerId)) {
+      if (order.type === 'no_new_meld') {
+        finishDominatrixOrder(gameState, order, 'obeyed', 'O jogador encerrou o turno sem criar um jogo novo.');
+      } else if (order.type === 'reduce_hand') {
+        const obeyed = (player?.hand?.length || 0) <= Number(order.handLimit);
+        finishDominatrixOrder(
+          gameState,
+          order,
+          obeyed ? 'obeyed' : 'disobeyed',
+          obeyed ? `A mao terminou dentro do limite de ${order.handLimit}.` : `A mao terminou acima do limite de ${order.handLimit}.`,
+          { addChain: !obeyed },
+        );
+      } else {
+        finishDominatrixOrder(
+          gameState,
+          order,
+          'disobeyed',
+          'O turno terminou sem cumprir a ordem aceita.',
+          { addChain: true },
+        );
+      }
+    }
   }
 
   let natureEvents = [];
@@ -2245,6 +3367,23 @@ export function completeBossPlayerTurn(gameState, playerId) {
   }
 
   const allPlayersActed = gameState.players.every((player) => boss.playersActedThisRound.includes(player.id));
+  if (allPlayersActed && boss.id === 'dominadora') {
+    (boss.interdicts || []).filter((entry) => entry.status === 'active').forEach((interdict) => {
+      interdict.status = 'expired';
+      boss.actionSequence += 1;
+      const expired = recordEvent(boss, {
+        type: 'interdictExpired',
+        actionId: `interdict_expired_${interdict.id}_${boss.actionSequence}`,
+        interdictId: interdict.id,
+        outcome: 'O Interdito expirou sem uma tentativa de evolucao.',
+      });
+      interdict.resolvedEventId = expired.actionId;
+    });
+  }
+  if (allPlayersActed && boss.id === 'banker') {
+    if (boss.creditLimit?.status === 'active' && boss.creditLimit.round === boss.roundNumber) boss.creditLimit.status = 'expired';
+    if (boss.discardSurcharge?.status === 'active' && boss.discardSurcharge.createdRound === boss.roundNumber) boss.discardSurcharge.status = 'expired';
+  }
   const duration = boss.currentIntent?.duration || 'full_round';
   const targetTurnFinished = duration === 'target_turn' && boss.currentIntent?.payload?.targetPlayerId === playerId;
   const shouldResolve = targetTurnFinished || (duration !== 'until_released' && allPlayersActed);
@@ -2259,14 +3398,19 @@ export function completeBossPlayerTurn(gameState, playerId) {
   }
   let phaseEvent = null;
   if (allPlayersActed) {
+    if (boss.id === 'matriarca_esmeralda' && boss.springCrown?.status === 'active') boss.springCrown.status = 'expired';
     boss.roundNumber += 1;
     boss.playersActedThisRound = [];
+    if (boss.id === 'matriarca_esmeralda') {
+      boss.natureHealingRound = boss.roundNumber;
+      boss.natureHealingThisRound = 0;
+      boss.natureFailureCountThisRound = 0;
+      boss.propagationUsedThisRound = false;
+      createPendingRootPropagation(gameState);
+    }
     phaseEvent = activatePendingPhase(gameState);
   }
-  if (boss.id === 'banker' && boss.danger >= boss.maxDanger) {
-    boss.result = { victory: false, reason: 'max_debt', title: 'Execução da Dívida', detail: 'A Dívida coletiva chegou ao limite.' };
-    boss.stats.finalDebt = boss.danger;
-  }
+  if (boss.id === 'banker') confirmBankerDebtDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
   if (allPlayersActed && !boss.result) {
     const resultEvent = boss.eventLog.find((entry) => entry.actionId === boss.resolvedRoundEventActionId) || event;
     boss.resolvedRoundEventActionId = null;

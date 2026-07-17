@@ -7,6 +7,8 @@ const BANKER_SPEECHES = Object.freeze({
   suit_audit: 'Vamos conferir cada carta dessa conta.',
   pledge: 'Este jogo agora esta sob penhora.',
   compound_interest: 'Quanto mais cartas, maior sera a divida.',
+  credit_limit: 'O credito continua aberto. O excesso e que tem preco.',
+  discard_surcharge: 'O lixo tambem tem cotacao nesta mesa.',
 });
 
 const DOMINATRIX_SPEECHES = Object.freeze({
@@ -22,6 +24,8 @@ const DOMINATRIX_SPEECHES = Object.freeze({
   absolute_control: 'Neste turno, sua vontade e minha.',
   break_will: 'Vamos descobrir quanto vale sua resistencia.',
   final_order: 'Cada uma recebera exatamente o que merece.',
+  iron_etiquette: 'Ate o seu descarte obedecera a minha etiqueta.',
+  interdict: 'Este jogo evolui somente se eu permitir.',
 });
 
 const MATRIARCH_SPEECHES = Object.freeze({
@@ -44,6 +48,8 @@ const RESULT_CATEGORY_BY_ABILITY = Object.freeze({
   suit_audit: 'Objetivo resolvido',
   pledge: 'Restricao encerrada',
   compound_interest: 'Cobranca variavel',
+  credit_limit: 'Cobranca variavel',
+  discard_surcharge: 'Cobranca aplicada',
   collar: 'Restricao encerrada',
   forced_choice: 'Escolha exigida',
   exposure: 'Restricao encerrada',
@@ -56,6 +62,8 @@ const RESULT_CATEGORY_BY_ABILITY = Object.freeze({
   absolute_control: 'Restricao encerrada',
   break_will: 'Escolha exigida',
   final_order: 'Escolha exigida',
+  iron_etiquette: 'Ordem resolvida',
+  interdict: 'Restricao encerrada',
   living_seed: 'Objetivo resolvido',
   hungry_root: 'Objetivo resolvido',
   restorative_dew: 'Cura resolvida',
@@ -69,8 +77,8 @@ const RESULT_CATEGORY_BY_ABILITY = Object.freeze({
 });
 
 const PREPARED_CHOICE_ABILITIES = new Set(['break_will', 'final_order']);
-const ACTIVE_RESTRICTIONS = new Set(['credit_block', 'pledge', 'collar', 'exposure', 'hands_tied', 'double_collar', 'separation', 'absolute_control']);
-const ROUND_OBJECTIVES = new Set(['suit_audit', 'possession']);
+const ACTIVE_RESTRICTIONS = new Set(['credit_block', 'pledge', 'collar', 'exposure', 'hands_tied', 'double_collar', 'separation', 'absolute_control', 'interdict']);
+const ROUND_OBJECTIVES = new Set(['suit_audit', 'possession', 'iron_etiquette', 'credit_limit', 'discard_surcharge']);
 const NATURE_OBJECTIVES = new Set(['living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft', 'discard_pollen', 'harvest', 'royal_bloom']);
 
 function actionCategory(intent) {
@@ -99,20 +107,26 @@ function dominatrixDetails(gameState, intent) {
   const target = playerName(gameState, payload.targetPlayerId);
   const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
   const collarCards = cardLabels(gameState, payload.targetPlayerId, payload.cardIds || (payload.cardId ? [payload.cardId] : []));
+  const possession = (gameState.boss?.possessions || []).find((entry) => (
+    payload.meldId ? entry.meldId === payload.meldId : entry.meldIndex === payload.meldIndex
+  ));
+  const contributors = (possession?.contributorPlayerIds || []).map((playerId) => playerName(gameState, playerId));
 
   switch (intent.abilityId) {
     case 'collar': return detailFields([['Alvo', target], [collarCards.length > 1 ? 'Cartas' : 'Carta', collarCards.join(' e ')], ['Duracao', 'ate o fim do turno do alvo'], ['Restricao', 'nao pode jogar nem descartar']]);
-    case 'forced_choice': return detailFields([['Alvo', target], ['Resolucao', 'imediatamente apos o anuncio'], ['Escolha', 'comprar 2 cartas ou receber 1 Corrente']]);
+    case 'forced_choice': return detailFields([['Alvo', target], ['Resolucao', 'imediatamente apos o anuncio'], ['Escolha', `receber 1 Corrente ou aceitar: ${payload.order?.label || 'uma ordem valida para o proximo turno'}`]]);
     case 'exposure': return detailFields([['Alvo', target], ['Carta', card], ['Duracao', 'ate o fim do turno do alvo'], ['Obrigacao', 'baixar ou adicionar a um jogo'], ['Falha', '1 Corrente se permanecer na mao']]);
     case 'forced_swap': return detailFields([['Alvos', 'os dois cooperadores'], ['Cartas', 'uma carta de cada mao'], ['Efeito', 'a troca acontece depois deste anuncio']]);
-    case 'hands_tied': return detailFields([['Alvos', 'os dois cooperadores'], ['Duracao', 'rodada completa'], ['Restricao', 'cada jogador cria apenas 1 jogo novo']]);
-    case 'possession': return detailFields([['Jogo', `#${Number(payload.meldIndex) + 1}`], ['Progresso', `${payload.progress || 0}/${payload.required || 2}`], ['Duracao', 'ate romper a Posse'], ['Restricao', 'o jogo nao causa dano'], ['Encerramento', 'adicionar 2 cartas ao jogo']]);
+    case 'hands_tied': return detailFields([['Alvos', 'equipe inteira'], ['Duracao', 'rodada completa'], ['Criacao compartilhada', payload.teamMeldAvailable === false ? 'consumida' : 'disponivel'], ['Consumida por', playerName(gameState, payload.consumedByPlayerId)], ['Restricao', 'a equipe pode criar somente 1 jogo novo']]);
+    case 'possession': return detailFields([['Jogo', `#${Number(payload.meldIndex) + 1}`], ['Contribuicoes', contributors.length ? contributors.join(' e ') : 'nenhum cooperador'], ['Progresso', `${contributors.length}/${possession?.required || gameState.players?.length || 2}`], ['Duracao', 'ate romper a Posse'], ['Restricao', 'o dano do jogo permanece suspenso'], ['Encerramento', 'uma contribuicao de cada jogador ou evolucao de tier']]);
     case 'favorite': return detailFields([['Protegido', playerName(gameState, payload.protectedPlayerId)], ['Punido', playerName(gameState, payload.punishedPlayerId)], ['Correntes do punido', `${chains(gameState, payload.punishedPlayerId)}/4`], ['Efeito', 'protecao e 1 Corrente depois deste anuncio']]);
     case 'double_collar': return detailFields([['Alvos', (payload.lockedCards || []).map((entry) => `${playerName(gameState, entry.playerId)}: ${cardLabel(gameState, entry.playerId, entry.cardId)}`).join('; ')], ['Duracao', 'rodada completa'], ['Restricao', 'nao pode jogar nem descartar as cartas presas']]);
     case 'separation': return detailFields([['Alvos', 'os dois cooperadores'], ['Duracao', 'rodada completa'], ['Restricao', 'cada jogo so pode ser alimentado por um cooperador']]);
     case 'absolute_control': return detailFields([['Alvo', target], ['Duracao', 'turno do jogador alvo'], ['Restricao', 'nao pode criar jogos novos'], ['Encerramento', 'o alvo concluir o turno']]);
     case 'break_will': return detailFields([['Alvo', target], ['Correntes', `${chains(gameState, payload.targetPlayerId)}/4`], ['Resolucao', 'ao final da rodada'], ['Escolha', 'receber 1 Corrente ou retirar carta de canastra']]);
     case 'final_order': return detailFields([['Alvos', 'os dois cooperadores'], ['Resolucao', 'ao final da rodada'], ['Escolha', 'cada jogador recebera uma decisao individual']]);
+    case 'iron_etiquette': return detailFields([['Alvo', target], ['Ordem', `descartar ${payload.suitLabel}`], ['Prazo', 'fim do proximo turno do alvo'], ['Desobediencia', '+1 Corrente']]);
+    case 'interdict': return detailFields([['Jogo', `#${Number(payload.meldIndex) + 1}`], ['Gatilho', 'primeira tentativa valida de evolucao'], ['Obedecer', 'cancelar somente a tentativa'], ['Desobedecer', 'evoluir e receber +1 Corrente'], ['Duracao', 'esta rodada']]);
     default: return detailFields([['Duracao', 'rodada completa'], ['Efeito', intent.description || 'ordem ativa']]);
   }
 }
@@ -123,16 +137,22 @@ function matriarchDetails(gameState, intent) {
   const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
   const meldLabel = (index) => Number.isInteger(index) ? `Jogo #${index + 1}` : '';
   switch (intent.abilityId) {
-    case 'living_seed': return detailFields([['Alvo', target], ['Carta', card], ['Prazo', 'fim do proximo turno do alvo'], ['Falha', '+1 Flor e +50 HP']]);
-    case 'hungry_root': return detailFields([['Jogo', meldLabel(payload.meldIndex)], ['Prazo', 'fim da rodada'], ['Objetivo', 'adicionar 1 carta legal'], ['Falha', '+1 Flor e +60 HP']]);
-    case 'restorative_dew': return detailFields([['Cura prevista', `${Math.max(0, (payload.baseHeal || 100) - new Set(payload.countedCardIds || []).size * (payload.reductionPerCard || 20))} HP`], ['Reducao', '-20 por carta nova unica'], ['Prazo', 'fim da rodada']]);
-    case 'twin_vines': return detailFields([['Jogos', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'alimentar cada jogo separadamente'], ['Falha por raiz', '+1 Flor e +70 HP']]);
-    case 'graft': return detailFields([['Jogos ligados', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'adicionar 1 carta em cada jogo'], ['Falha parcial', '+1 Flor e +50 HP'], ['Falha total', '+2 Flores e +100 HP']]);
-    case 'discard_pollen': return detailFields([['Carta', gameState.discard?.find((entry) => entry.id === payload.discardCardId) ? `${gameState.discard.find((entry) => entry.id === payload.discardCardId).rank}${gameState.discard.find((entry) => entry.id === payload.discardCardId).suit}` : 'topo do lixo'], ['Objetivo', 'usar a carta no turno em que o lixo for pego'], ['Falha', '+1 Flor e +60 HP']]);
-    case 'harvest': return detailFields([['Alvo', target], ['Avaliacao', 'quantidade de cartas no fim do turno'], ['8-10 cartas', '+40 HP'], ['11+ cartas', '+1 Flor e +80 HP']]);
-    case 'royal_bloom': return detailFields([['Objetivos', `${payload.targetCount || payload.objectives?.length || 0}`], ['Tipos', (payload.objectives || []).map((entry) => ({ seed: 'carta', root: 'jogo', pollen: 'lixo' }[entry.type] || entry.type)).join(', ')], ['Falha por objetivo', '+1 Flor e +80 HP']]);
+    case 'living_seed': return detailFields([['Alvo', target], ['Carta', card], ['Prazo', 'fim do proximo turno do alvo'], ['Falha', '+1 Flor, sem cura']]);
+    case 'hungry_root': return detailFields([['Jogo', meldLabel(payload.meldIndex)], ['Prazo', 'fim da rodada'], ['Objetivo', 'adicionar 1 carta legal'], ['Falha', '+1 Flor, sem cura, e pode propagar uma Raiz']]);
+    case 'restorative_dew': {
+      const counted = new Set(payload.countedCardIds || []).size;
+      const baseHeal = payload.baseHeal || 150;
+      const reduction = payload.reductionPerCard || 15;
+      const required = Math.ceil(baseHeal / reduction);
+      return detailFields([['Cartas contabilizadas', `${counted}/${required}`], ['Cura prevista', `${Math.max(0, baseHeal - counted * reduction)} HP`], ['Reducao', `-${reduction} por carta nova unica`], ['Prazo', 'fim da rodada']]);
+    }
+    case 'twin_vines': return detailFields([['Jogos', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'alimentar cada jogo separadamente'], ['Falha por raiz', '+1 Flor, sem cura'], ['Falha dupla', 'pode propagar uma Raiz']]);
+    case 'graft': return detailFields([['Jogos ligados', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'adicionar 1 carta em cada jogo'], ['Falha parcial', '+1 Flor, sem cura'], ['Falha total', '+2 Flores, sem cura, e pode propagar uma Raiz']]);
+    case 'discard_pollen': return detailFields([['Carta', gameState.discard?.find((entry) => entry.id === payload.discardCardId) ? `${gameState.discard.find((entry) => entry.id === payload.discardCardId).rank}${gameState.discard.find((entry) => entry.id === payload.discardCardId).suit}` : 'topo do lixo'], ['Objetivo', 'usar a carta no turno em que o lixo for pego'], ['Falha', '+1 Flor e +40 HP']]);
+    case 'harvest': return detailFields([['Alvo', target], ['Avaliacao', 'quantidade de cartas no fim do turno'], ['0-7 cartas', 'sem efeito'], ['8-10 cartas', '+60 HP'], ['11+ cartas', '+100 HP e +1 Flor']]);
+    case 'royal_bloom': return detailFields([['Objetivos', `${payload.targetCount || payload.objectives?.length || 0}`], ['Tipos', (payload.objectives || []).map((entry) => ({ seed: 'carta', root: 'jogo', pollen: 'lixo' }[entry.type] || entry.type)).join(', ')], ['Falha por objetivo', '+1 Flor, sem cura'], ['Raiz falha', 'pode solicitar uma propagacao']]);
     case 'emerald_cocoon': return detailFields([['Casulo', `${payload.amount || 180} de absorcao`], ['Ruptura', 'canastra limpa ou superior'], ['Fim da rodada', 'cura metade do valor restante']]);
-    case 'spring_crown': return detailFields([['Duracao', 'esta rodada'], ['Primeira falha', 'cura normal'], ['Falhas seguintes', '+30 HP de cura adicional']]);
+    case 'spring_crown': return detailFields([['Duracao', 'esta rodada'], ['Primeira falha', 'pode solicitar a propagacao normal'], ['Segunda falha', 'fortalece a Raiz propagada valida'], ['Raiz Fortalecida', 'exige uma contribuicao de cada jogador'], ['Cura adicional', 'nenhuma']]);
     default: return detailFields([['Efeito', intent.description || 'ameaca natural ativa']]);
   }
 }
@@ -143,7 +163,7 @@ function compactAction(gameState, intent) {
   const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
   const collarCards = cardLabels(gameState, payload.targetPlayerId, payload.cardIds || (payload.cardId ? [payload.cardId] : []));
   switch (intent.abilityId) {
-    case 'fixed_interest': return { instruction: 'Ao fim da rodada, a equipe escolhe pagar tudo ou deixar uma carta como garantia.', progress: '', consequence: `Integral: +${payload.amount} · Cofre: +${payload.collateralAmount}` };
+    case 'fixed_interest': return { instruction: `Contrato ${payload.contractTier || 'Padrao'}: ao fim da rodada, pague tudo ou deixe uma garantia.`, progress: '', consequence: `Integral: +${payload.fullDebt ?? payload.amount} · Garantia: +${payload.guaranteedDebt ?? payload.collateralAmount}` };
     case 'maintenance_fee': return { instruction: `Cada jogador comprara +${payload.extraDraw} carta(s).`, progress: '', consequence: 'Compra extra inevitavel' };
     case 'credit_block': return { instruction: 'O lixo esta bloqueado nesta rodada.', progress: '', consequence: 'Encerra na virada da rodada' };
     case 'suit_audit': return { instruction: `Joguem ${payload.required} cartas de ${payload.suitLabel}.`, progress: `${payload.progress || 0}/${payload.required}`, consequence: `Sucesso: ${payload.successDelta} | Falha: +${payload.failureDelta}` };
@@ -152,32 +172,47 @@ function compactAction(gameState, intent) {
       const total = gameState.players?.reduce((sum, player) => sum + (player.hand?.length || 0), 0) || 0;
       return { instruction: `${total} cartas nas maos.`, progress: '', consequence: `Estimativa: +${Math.min(12, 4 + Math.floor(total / 4))} de Divida` };
     }
+    case 'credit_limit': {
+      const limit = gameState.boss?.creditLimit || payload;
+      const counted = new Set(limit.countedCardIds || []).size;
+      const allowance = limit.allowance || payload.allowance || 0;
+      return { instruction: `A equipe possui franquia de ${allowance} cartas novas na mesa.`, progress: `Credito ${counted}/${allowance}`, consequence: `Cobranca acumulada: ${limit.chargedDebt || 0}/${limit.maxCharge || payload.maxCharge || 0} · excedente: +${limit.debtPerCard || 1}` };
+    }
+    case 'discard_surcharge': return { instruction: `A primeira retirada valida do lixo custa Divida +${payload.amount}.`, progress: '', consequence: 'O jogador pode desistir e comprar do monte' };
     case 'collar': return { instruction: `${target} nao pode jogar nem descartar ${collarCards.join(' e ')} ate o fim do turno.`, progress: '', consequence: '' };
     case 'exposure': return { instruction: `${target} precisa usar ${card} neste turno.`, progress: '', consequence: 'Se permanecer na mao, recebe 1 Corrente' };
-    case 'forced_choice': return { instruction: `${target} devera escolher agora entre comprar duas cartas ou receber uma Corrente.`, progress: '', consequence: 'A partida aguarda a decisao' };
+    case 'forced_choice': return { instruction: `${target} devera escolher agora entre receber 1 Corrente ou aceitar: ${payload.order?.label || 'uma ordem valida para o proximo turno'}.`, progress: '', consequence: 'A partida aguarda a decisao' };
     case 'forced_swap': return { instruction: 'Uma carta de cada cooperador sera trocada depois deste anuncio.', progress: '', consequence: 'Controles bloqueados ate o resultado' };
-    case 'possession': return { instruction: `Jogo ${Number(payload.meldIndex) + 1} nao causa dano. Adicione cartas para liberta-lo.`, progress: `${payload.progress || 0}/${payload.required || 2}`, consequence: 'Permanece ate ser rompida' };
+    case 'possession': {
+      const possession = (gameState.boss?.possessions || []).find((entry) => payload.meldId ? entry.meldId === payload.meldId : entry.meldIndex === payload.meldIndex);
+      return { instruction: `Jogo ${Number(payload.meldIndex) + 1} mantem o dano suspenso. Cada cooperador deve contribuir, ou o jogo precisa evoluir.`, progress: `${possession?.contributorPlayerIds?.length || 0}/${possession?.required || gameState.players?.length || 2}`, consequence: 'Permanece ate coordenacao ou evolucao' };
+    }
     case 'absolute_control': return { instruction: `${target} nao pode criar jogos novos.`, progress: '', consequence: 'Ate concluir o turno' };
     case 'double_collar': return { instruction: 'Uma carta de cada cooperador esta presa.', progress: '', consequence: 'Dura a rodada completa' };
     case 'separation': return { instruction: 'Cada jogo so pode ser alimentado por um cooperador.', progress: '', consequence: 'Dura a rodada completa' };
-    case 'hands_tied': return { instruction: 'Cada cooperador pode criar somente um jogo novo.', progress: '', consequence: 'Dura a rodada completa' };
+    case 'hands_tied': return { instruction: 'A equipe inteira pode criar somente um jogo novo.', progress: payload.teamMeldAvailable === false ? 'Criacao consumida' : 'Criacao disponivel', consequence: payload.consumedByPlayerId == null ? 'Dura a rodada completa' : `Consumida por ${playerName(gameState, payload.consumedByPlayerId)}` };
     case 'favorite': return { instruction: `${playerName(gameState, payload.protectedPlayerId)} sera protegida; ${playerName(gameState, payload.punishedPlayerId)} recebera 1 Corrente.`, progress: '', consequence: 'Aplicado depois deste anuncio' };
     case 'break_will': return { instruction: `Ao final da rodada, ${target} devera escolher sua punicao.`, progress: '', consequence: 'Corrente ou retirada de canastra' };
     case 'final_order': return { instruction: 'Ao final da rodada, cada cooperador devera cumprir uma escolha.', progress: '', consequence: '' };
-    case 'living_seed': return { instruction: `${target} precisa usar ${card} no proximo turno.`, progress: '', consequence: 'Falha: +1 Flor e +50 HP' };
-    case 'hungry_root': return { instruction: `Adicione uma carta legal ao jogo ${Number(payload.meldIndex) + 1}.`, progress: '', consequence: 'Falha: +1 Flor e +60 HP' };
+    case 'iron_etiquette': return { instruction: `${target} deve encerrar o proximo turno descartando ${payload.suitLabel}.`, progress: '', consequence: 'Outro naipe enquanto houver opcao: +1 Corrente' };
+    case 'interdict': return { instruction: `A primeira tentativa de evoluir o jogo ${Number(payload.meldIndex) + 1} exigira obedecer ou receber +1 Corrente.`, progress: '', consequence: 'Expira no fim da rodada' };
+    case 'living_seed': return { instruction: `${target} precisa usar ${card} no proximo turno.`, progress: '', consequence: 'Falha: +1 Flor, sem cura' };
+    case 'hungry_root': return { instruction: `Adicione uma carta legal ao jogo ${Number(payload.meldIndex) + 1}.`, progress: '', consequence: 'Falha: +1 Flor e pode propagar uma Raiz' };
     case 'restorative_dew': {
       const counted = new Set(payload.countedCardIds || []).size;
-      const healing = Math.max(0, (payload.baseHeal || 100) - counted * (payload.reductionPerCard || 20));
-      return { instruction: 'Cada carta nova na mesa reduz a cura preparada.', progress: `${counted} carta(s)`, consequence: `Cura prevista: ${healing} HP` };
+      const baseHeal = payload.baseHeal || 150;
+      const reduction = payload.reductionPerCard || 15;
+      const required = Math.ceil(baseHeal / reduction);
+      const healing = Math.max(0, baseHeal - counted * reduction);
+      return { instruction: 'Cada carta nova na mesa reduz a cura preparada.', progress: `${counted}/${required} cartas`, consequence: `Cura prevista: ${healing} HP` };
     }
-    case 'twin_vines': return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogo(s), cada um separadamente.`, progress: '', consequence: 'Cada raiz falha: +1 Flor e +70 HP' };
-    case 'graft': return { instruction: 'Adicione uma carta legal em cada um dos dois jogos ligados.', progress: '', consequence: 'Falha parcial ou total gera Flores e cura' };
-    case 'discard_pollen': return { instruction: 'Se o lixo for pego, use a carta contaminada no mesmo turno.', progress: '', consequence: 'Falha: +1 Flor e +60 HP' };
-    case 'harvest': return { instruction: `${target} deve reduzir a mao antes de encerrar o turno.`, progress: '', consequence: '11+ cartas: +1 Flor e +80 HP' };
-    case 'royal_bloom': return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos independentes.`, progress: '', consequence: 'Cada falha: +1 Flor e +80 HP' };
+    case 'twin_vines': return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogo(s), cada um separadamente.`, progress: '', consequence: 'Cada raiz falha: +1 Flor, sem cura' };
+    case 'graft': return { instruction: 'Adicione uma carta legal em cada um dos dois jogos ligados.', progress: '', consequence: '0 lados: +2 Flores e pode propagar · 1 lado: +1 Flor' };
+    case 'discard_pollen': return { instruction: 'Se o lixo for pego, use a carta contaminada no mesmo turno.', progress: '', consequence: 'Falha: +1 Flor e +40 HP' };
+    case 'harvest': return { instruction: `${target} deve reduzir a mao antes de encerrar o turno.`, progress: '', consequence: '8-10: +60 HP · 11+: +100 HP e +1 Flor' };
+    case 'royal_bloom': return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos independentes.`, progress: '', consequence: 'Cada falha: +1 Flor, sem cura' };
     case 'emerald_cocoon': return { instruction: 'O dano atinge primeiro o Casulo.', progress: `0/${payload.amount || 180}`, consequence: 'Canastra limpa ou superior rompe a protecao' };
-    case 'spring_crown': return { instruction: 'A segunda falha e as seguintes curam 30 HP adicionais.', progress: '', consequence: 'Florescimento permanece inalterado' };
+    case 'spring_crown': return { instruction: 'A primeira falha pode propagar; a segunda fortalece a Raiz propagada valida.', progress: '', consequence: 'Raiz Fortalecida: uma contribuicao de cada jogador' };
     default: return { instruction: intent.description || 'Habilidade ativa.', progress: '', consequence: '' };
   }
 }
@@ -197,7 +232,7 @@ function pendingChoicePresentation(gameState, choice) {
     name: names[choice.type] || 'Decisao obrigatoria',
     speech: '',
     description: '',
-    details: detailFields([['Alvo', target], ['Estado', 'a partida permanece pausada ate a decisao']]),
+    details: detailFields([['Alvo', target], ['Ordem oferecida', choice.order?.label], ['Estado', 'a partida permanece pausada ate a decisao']]),
     instruction: `${target} precisa decidir antes de a partida continuar.`,
     progress: '',
     consequence: 'Acoes comuns bloqueadas',
@@ -232,8 +267,9 @@ export function buildBossActionPresentation(gameState) {
 
   if (gameState.boss.id === 'banker') {
     if (intent.abilityId === 'fixed_interest') details = [
-      `Pagamento integral: +${payload.amount ?? (phase === 3 ? 8 : 6)} de Divida`,
-      `Com garantia no Cofre: +${payload.collateralAmount ?? (phase === 3 ? 5 : 3)} de Divida`,
+      `Contrato: ${payload.contractTier || 'Padrao'}`,
+      `Pagamento integral: +${payload.fullDebt ?? payload.amount ?? (phase === 3 ? 8 : 6)} de Divida`,
+      `Com garantia no Cofre: +${payload.guaranteedDebt ?? payload.collateralAmount ?? (phase === 3 ? 5 : 3)} de Divida`,
       'A carta dada em garantia substitui a compra normal do proximo turno do dono',
       'Duracao: resolve ao fim da rodada',
     ];
@@ -244,6 +280,23 @@ export function buildBossActionPresentation(gameState) {
     else if (intent.abilityId === 'compound_interest') {
       const totalCards = gameState.players?.reduce((sum, player) => sum + (player.hand?.length || 0), 0) || 0;
       details = [`Cartas nas maos agora: ${totalCards}`, `Estimativa atual: +${Math.min(12, 4 + Math.floor(totalCards / 4))} de Divida`, 'O valor e recalculado quando a cobranca resolver'];
+    } else if (intent.abilityId === 'credit_limit') {
+      const limit = gameState.boss.creditLimit || payload;
+      const counted = new Set(limit.countedCardIds || []).size;
+      details = [
+        `Franquia compartilhada: ${limit.allowance || payload.allowance} cartas`,
+        `Cartas contadas: ${counted}/${limit.allowance || payload.allowance}`,
+        `Cobranca acumulada: ${limit.chargedDebt || 0}/${limit.maxCharge || payload.maxCharge}`,
+        `Proxima carta excedente: +${limit.debtPerCard || payload.debtPerCard || 1} de Divida`,
+      ];
+    } else if (intent.abilityId === 'discard_surcharge') {
+      const surcharge = gameState.boss.discardSurcharge || payload;
+      details = [
+        `Custo: +${surcharge.amount || payload.amount} de Divida`,
+        'Gatilho: primeira retirada valida do lixo',
+        'O jogador pode desistir e comprar do monte',
+        `Estado: ${surcharge.status === 'consumed' ? 'consumido' : 'ativo nesta rodada'}`,
+      ];
     }
   } else if (gameState.boss.id === 'dominadora') details = dominatrixDetails(gameState, intent);
   else details = matriarchDetails(gameState, intent);

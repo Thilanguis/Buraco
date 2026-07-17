@@ -46,11 +46,13 @@ export const bankerDefinition = Object.freeze({
     3: Object.freeze(['compound_interest', 'suit_audit', 'maintenance_fee']),
   }),
   abilities: Object.freeze([
-    ability('fixed_interest', 'Juros Fixos', 5, [1, 2, 3], ({ phase }) => `A Dívida aumentará em ${phase === 3 ? 8 : 6} pontos.`),
+    ability('fixed_interest', 'Juros Fixos', 5, [1, 2, 3], () => 'Um contrato fechado define os valores com e sem Garantia.'),
     ability('maintenance_fee', 'Tarifa de Manutenção', 3, [1, 2, 3], ({ phase }) => `Cada jogador comprará ${phase === 3 ? 'até 2 cartas extras' : '1 carta extra'} no próximo turno.`),
     ability('credit_block', 'Bloqueio de Crédito', 3, [1, 2, 3], () => 'O lixo ficará bloqueado durante esta rodada.'),
     ability('suit_audit', 'Auditoria de Naipe', 4, [2, 3], ({ phase, suitLabel }) => `Baixem ${phase === 3 ? 4 : 3} cartas de ${suitLabel} nesta rodada.`),
     ability('pledge', 'Penhora', 2, [2, 3], () => 'Um jogo da equipe ficará bloqueado até a próxima cobrança.'),
     ability('compound_interest', 'Juros Compostos', 4, [2, 3], () => 'A Dívida aumentará conforme as cartas restantes nas mãos.'),
+    ability('credit_limit', 'Limite de Crédito', 4, [1, 2, 3], () => 'Cartas colocadas além da franquia compartilhada geram Dívida.'),
+    ability('discard_surcharge', 'Ágio do Lixo', 3, [2, 3], () => 'A primeira retirada confirmada do lixo nesta rodada cobra um ágio.'),
   ]),
 });

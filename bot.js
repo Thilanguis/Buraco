@@ -96,9 +96,12 @@ export class BuracoBot {
       try {
         this.assertActive(engine, signal);
         let boughtFromDiscard = false;
+        const naturePlan = engine.getNaturePriorities?.(me.id);
         if (state.discard.length > 0 && !engine.isDiscardBlocked?.()) {
           const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
-          if (intent && intent.wants) {
+          const bossAllowsDiscard = !intent || typeof engine.shouldTakeBossDiscard !== 'function'
+            || engine.shouldTakeBossDiscard(me.id, intent, naturePlan);
+          if (intent && intent.wants && bossAllowsDiscard) {
             engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
 
             this.assertActive(engine, signal);
@@ -156,7 +159,12 @@ export class BuracoBot {
         const s = engine.getState();
         if (s && s.players && s.players[botIndex]) {
           this.assertActive(engine, signal);
-          await engine.executeDiscard(botIndex, 0);
+          const fallbackIndex = s.players[botIndex].hand.findIndex((card) => (
+            card?.id
+            && card.id !== s.pickedDiscardCardId
+            && !engine.isCardBlocked?.(s.players[botIndex].id, card.id, 'discard')
+          ));
+          if (fallbackIndex >= 0) await engine.executeDiscard(botIndex, fallbackIndex);
         }
       }
     } finally {
@@ -507,9 +515,19 @@ export class BuracoBot {
       const isVipSniper = ctx.isVipSniper;
 
       const naturePriorities = engine.getNaturePriorities?.(me.id);
-      if (naturePriorities && (naturePriorities.markedCardIds.length || naturePriorities.meldIndexes.length)) {
-        const markedCards = new Set(naturePriorities.markedCardIds);
-        const markedMelds = new Set(naturePriorities.meldIndexes);
+      const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
+      const markedCards = new Set(naturePriorities?.markedCardIds || []);
+      const markedMelds = new Set([
+        ...(naturePriorities?.meldIndexes || []),
+        ...(dominatrixPriorities?.meldIndexes || []),
+      ]);
+      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive;
+      if (markedCards.size || markedMelds.size || priorityUrgent) {
+        if (priorityUrgent) {
+          (team.melds || []).forEach((meld, index) => {
+            if (meld?.length) markedMelds.add(index);
+          });
+        }
         const cardIndexes = me.hand.map((card, index) => ({ card, index })).sort((a, b) => Number(markedCards.has(b.card?.id)) - Number(markedCards.has(a.card?.id)));
         const meldIndexes = (team.melds || []).map((meld, index) => ({ meld, index })).sort((a, b) => Number(markedMelds.has(b.index)) - Number(markedMelds.has(a.index)));
 
@@ -820,11 +838,13 @@ export class BuracoBot {
 
     let discardIndex = -1;
     let minDanger = 9999;
+    const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
+    const orderedSuit = dominatrixPriorities?.discardSuit || null;
 
     for (let i = 0; i < me.hand.length; i++) {
       const c = me.hand[i];
       // Ignora cartas fantasmas (null)
-      if (!c || state.pickedDiscardCardId === c.id) continue;
+      if (!c || state.pickedDiscardCardId === c.id || engine.isCardBlocked?.(me.id, c.id, 'discard')) continue;
 
       let danger = 0;
       // Nunca joga coringa fora a não ser que seja a última opção da vida
@@ -866,6 +886,11 @@ export class BuracoBot {
         }
       }
 
+      if (orderedSuit) {
+        if (!c.joker && c.suit === orderedSuit) danger -= 600;
+        else danger += 150;
+      }
+
       if (danger < minDanger) {
         minDanger = danger;
         discardIndex = i;
@@ -874,11 +899,14 @@ export class BuracoBot {
 
     // Fallback de segurança se tudo der errado
     if (discardIndex === -1 || (state.pickedDiscardCardId && state.pickedDiscardCardId === me.hand[discardIndex]?.id)) {
-      discardIndex = me.hand.findIndex((c) => c && c.id !== state.pickedDiscardCardId);
+      discardIndex = me.hand.findIndex((c) => c
+        && c.id !== state.pickedDiscardCardId
+        && !engine.isCardBlocked?.(me.id, c.id, 'discard'));
 
       // Se não achou, pega a primeira carta real disponível na mão
       if (discardIndex === -1) {
-        discardIndex = me.hand.findIndex((c) => c !== null && c !== undefined);
+        discardIndex = me.hand.findIndex((c) => c
+          && !engine.isCardBlocked?.(me.id, c.id, 'discard'));
       }
 
       // Prevenção extrema: se a mão inteira for fantasma, aborta para não crashar o motor
