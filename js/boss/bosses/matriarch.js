@@ -30,7 +30,7 @@ export const matriarchDefinition = Object.freeze({
   abilities: Object.freeze([
     ability('living_seed', 'Semente Viva', 5, [1, 2, 3], () => 'Use a carta marcada no proximo turno para impedir que a semente floresca.'),
     ability('hungry_root', 'Raiz Faminta', 5, [1, 2, 3], () => 'Adicione uma carta legal ao jogo marcado antes do fim da rodada.'),
-    ability('restorative_dew', 'Orvalho Restaurador', 3, [1, 2, 3], () => 'A cura prevista diminui 15 HP por carta nova colocada legalmente na mesa.'),
+    ability('restorative_dew', 'Orvalho Restaurador', 3, [1, 2, 3], () => 'A cura prevista cai por faixas conforme cartas novas entram legalmente na mesa e zera com 6 cartas.'),
     ability('twin_vines', 'Trepadeiras Gemeas', 4, [2, 3], ({ targetCount = 2 }) => `${targetCount} jogo(s) precisam receber uma carta legal nesta rodada.`),
     ability('graft', 'Enxerto', 3, [2, 3], () => 'Os dois jogos ligados precisam receber uma carta legal nesta rodada.'),
     ability('discard_pollen', 'Polen do Lixo', 3, [2, 3], () => 'Se o lixo for pego, a carta contaminada precisa ser usada no mesmo turno.'),

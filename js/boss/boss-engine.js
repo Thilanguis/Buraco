@@ -1,6 +1,9 @@
 import { getBossDefinition, getBossDefinitionForMode } from './boss-registry.js';
 import { BOSS_DAMAGE_BY_KIND, DEBT_REDUCTION_BY_KIND } from './bosses/banker.js';
 import { buildBossActionPresentation } from './boss-presentation.js';
+import { getRestorativeDewHealing } from './boss-balance.js';
+
+export { getRestorativeDewHealing } from './boss-balance.js';
 
 const SUITS = Object.freeze([
   { value: '♠', label: 'Espadas' },
@@ -645,7 +648,11 @@ function createPayload(gameState, abilityId) {
     if (abilityId === 'hungry_root') {
       return chooseSeeded(matriarchRootCandidates(gameState), gameState, 183) || { meldIndex: null, meldId: null };
     }
-    if (abilityId === 'restorative_dew') return { baseHeal: ({ 1: 150, 2: 180, 3: 220 }[boss.phase] || 150), reductionPerCard: 15, countedCardIds: [] };
+    if (abilityId === 'restorative_dew') return {
+      announcedPhase: boss.phase,
+      baseHeal: getRestorativeDewHealing(boss.phase, 0),
+      countedCardIds: [],
+    };
     if (abilityId === 'twin_vines') {
       const candidates = matriarchRootCandidates(gameState);
       const first = chooseSeeded(candidates, gameState, 185);
@@ -783,6 +790,7 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     lastBloomEventId: null,
     lastHealEventId: null,
     resolvedNatureEventIds: [],
+    resolvedNatureRoundIds: [],
     natureFailureCountThisRound: 0,
     propagationRound: 0,
     propagationUsedThisRound: false,
@@ -904,6 +912,7 @@ export function normalizeBossState(gameState) {
   boss.lastBloomEventId ||= null;
   boss.lastHealEventId ||= null;
   boss.resolvedNatureEventIds ||= [];
+  boss.resolvedNatureRoundIds ||= [];
   boss.natureFailureCountThisRound ||= 0;
   boss.propagationRound ||= 0;
   boss.propagationUsedThisRound ||= false;
@@ -1161,7 +1170,7 @@ export function queueDebugBossAbility(gameState, abilityId) {
   return abilityId;
 }
 
-export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId = null } = {}) {
+export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId = null, fallbackOnIneligible = false } = {}) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.defeated || boss.result || boss.pendingChoices.length) return null;
   const definition = getBossDefinition(boss.id);
@@ -1169,21 +1178,28 @@ export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId
   let candidates = [];
   let selectionSource = 'normal';
   const queuedDebugAbilityId = debug ? (forcedAbilityId || boss.debugForcedAbilityId || null) : null;
+  const allowDebugFallback = fallbackOnIneligible || (debug && boss.debugFallbackOnIneligible === true);
   if (debug && boss.debugForcedAbilityId) delete boss.debugForcedAbilityId;
+  if (debug && boss.debugFallbackOnIneligible) delete boss.debugFallbackOnIneligible;
   if (queuedDebugAbilityId) {
     const forcedEntry = definition.abilities.find((entry) => entry.id === queuedDebugAbilityId);
     if (!forcedEntry) throw new Error(`Habilidade debug desconhecida para ${definition.name}: ${queuedDebugAbilityId}.`);
     if (!forcedEntry.phases.includes(boss.phase)) throw new Error(`${forcedEntry.name} nao e elegivel na Fase ${boss.phase}.`);
     candidates = eligibleAbilityCandidates(gameState, [forcedEntry]);
-    if (!candidates.length) throw new Error(`${forcedEntry.name} nao encontrou um alvo legal no cenario preparado.`);
-    selectionSource = 'debug_forced';
+    if (!candidates.length && !allowDebugFallback) throw new Error(`${forcedEntry.name} nao encontrou um alvo legal no cenario preparado.`);
+    selectionSource = candidates.length ? 'debug_forced' : 'debug_fallback';
   } else if (boss.phaseIntroPending === boss.phase) {
     const introIds = definition.phaseIntroAbilities?.[boss.phase] || [];
     const introEntries = introIds.map((id) => normalEntries.find((entry) => entry.id === id)).filter(Boolean);
     candidates = eligibleAbilityCandidates(gameState, introEntries);
     selectionSource = candidates.length ? 'phase_intro' : 'phase_intro_fallback';
   }
-  if (!candidates.length) candidates = eligibleAbilityCandidates(gameState, normalEntries, { avoidLast: true });
+  if (!candidates.length) {
+    const fallbackEntries = queuedDebugAbilityId
+      ? normalEntries.filter((entry) => entry.id !== queuedDebugAbilityId)
+      : normalEntries;
+    candidates = eligibleAbilityCandidates(gameState, fallbackEntries, { avoidLast: true });
+  }
   if (!candidates.length) return null;
 
   let selected = candidates[0];
@@ -1267,10 +1283,15 @@ export function advanceBossTurn(gameState, now = Date.now()) {
   if (flow.stage === 'ability') {
     const announcedIntent = boss.currentIntent;
     const matriarchActivation = boss.id === 'matriarca_esmeralda' && MATRIARCH_ABILITIES.has(announcedIntent?.abilityId);
-    const resolvesBeforePlayers = announcedIntent?.duration === 'immediate' || announcedIntent?.abilityId === 'forced_choice' || matriarchActivation;
+    const dominatrixPersistentActivation = boss.id === 'dominadora'
+      && ['iron_etiquette', 'interdict'].includes(announcedIntent?.abilityId);
+    const persistentActivation = matriarchActivation || dominatrixPersistentActivation;
+    const resolvesBeforePlayers = announcedIntent?.duration === 'immediate'
+      || announcedIntent?.abilityId === 'forced_choice'
+      || persistentActivation;
     if (resolvesBeforePlayers && !announcedIntent.immediateApplied) {
       const immediateEvent = resolveIntent(gameState, { keepIntent: true, appliedAt: now });
-      if (immediateEvent && !matriarchActivation) flow.queue.unshift({ kind: 'result', eventActionId: immediateEvent.actionId });
+      if (immediateEvent && !persistentActivation) flow.queue.unshift({ kind: 'result', eventActionId: immediateEvent.actionId });
       if (announcedIntent?.abilityId === 'forced_choice' && boss.pendingChoices.length) {
         flow.stage = 'choice';
         flow.startedAt = now;
@@ -1614,6 +1635,10 @@ function resolveMatriarchPlayerDeadline(gameState, playerId) {
 function resolveMatriarchRound(gameState) {
   const boss = gameState.boss;
   if (boss?.id !== 'matriarca_esmeralda') return [];
+  const roundResolutionId = `nature_round_${boss.roundNumber}`;
+  if (boss.resolvedNatureRoundIds.includes(roundResolutionId)) return [];
+  boss.resolvedNatureRoundIds.push(roundResolutionId);
+  if (boss.resolvedNatureRoundIds.length > 30) boss.resolvedNatureRoundIds.splice(0, boss.resolvedNatureRoundIds.length - 30);
   const events = [];
   const discardTopId = gameState.discard?.[gameState.discard.length - 1]?.id || null;
   for (const threat of [...activeNatureThreats(boss)].filter((entry) => (
@@ -1633,7 +1658,7 @@ function resolveMatriarchRound(gameState) {
       }
     } else if (threat.type === 'dew') {
       const uniqueCards = new Set(threat.countedCardIds || []).size;
-      const healing = Math.max(0, (threat.healAmount || 150) - uniqueCards * (threat.reductionPerCard || 15));
+      const healing = getRestorativeDewHealing(threat.announcedPhase || 1, uniqueCards);
       events.push(healing
         ? failNatureThreat(gameState, threat, { bloom: 0, heal: healing, outcome: `Orvalho Restaurador: ${uniqueCards} carta(s) reduziram a cura para ${healing} HP.` })
         : succeedNatureThreat(gameState, threat, 'O Orvalho foi totalmente dissipado pelas cartas jogadas.'));
@@ -1724,7 +1749,7 @@ export function getBossNatureThreatSummaries(gameState) {
   return threats.map((threat) => {
     const uniqueDewCards = new Set(threat.countedCardIds || []).size;
     const predictedHeal = threat.type === 'dew'
-      ? Math.max(0, Number(threat.healAmount || 150) - uniqueDewCards * Number(threat.reductionPerCard || 15))
+      ? getRestorativeDewHealing(threat.announcedPhase || boss.phase, uniqueDewCards)
       : Math.max(0, Number(threat.healAmount) || 0);
     const target = ['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId != null
       ? `${playerName(threat.targetPlayerId)} · ${cardLabel(threat.targetPlayerId, threat.cardId)}`
@@ -1756,7 +1781,7 @@ export function getBossNatureThreatSummaries(gameState) {
       condition = `Alimentar os dois jogos ligados (${fed}/2).`;
       consequence = fed ? 'Falha parcial: +1 Flor, sem cura.' : 'Falha total: +2 Flores, sem cura, e pode propagar.';
     } else if (threat.type === 'dew') {
-      condition = `Cada carta nova na mesa reduz ${threat.reductionPerCard || 15} HP (${uniqueDewCards} contabilizada${uniqueDewCards === 1 ? '' : 's'}).`;
+      condition = `Cartas novas na mesa: ${uniqueDewCards}/6. A cura cai por faixas e zera com 6 cartas.`;
       consequence = `Cura prevista: ${predictedHeal} HP.`;
     } else if (threat.type === 'harvest') {
       condition = 'Encerrar o turno com no máximo 7 cartas.';
@@ -1865,7 +1890,7 @@ function dominatrixDefeatIfNeeded(gameState) {
     victory: false,
     reason: 'both_players_dominated',
     title: 'Vontades Subjugadas',
-    detail: 'Os dois cooperadores chegaram a 4 Correntes ao mesmo tempo.',
+    detail: 'Os dois cooperadores chegaram a 4 Chicotes ao mesmo tempo.',
   };
   return true;
 }
@@ -1887,7 +1912,7 @@ function changeChains(gameState, playerId, amount, reason = '') {
           overflowTargetPlayerId: partner.id,
           amount: overflowApplied,
           reason,
-          outcome: `A Corrente destinada ao alvo dominado transbordou para ${partner.name || 'o parceiro'}.`,
+          outcome: `O Chicote destinado ao alvo dominado transbordou para ${partner.name || 'o parceiro'}.`,
         });
       }
       return overflowApplied;
@@ -2115,7 +2140,7 @@ export function resolveBossInterdictAttempt(gameState, playerId, interdictId, de
     chainApplied: finalDecision === 'disobey',
     outcome: finalDecision === 'obey'
       ? 'A tentativa de evolucao foi cancelada e o Interdito foi consumido.'
-      : 'A evolucao foi concluida por desobediencia; 1 Corrente foi aplicada.',
+      : 'A evolucao foi concluida por desobediencia; 1 Chicote foi aplicado.',
   });
   interdict.resolvedEventId = event.actionId;
   return event;
@@ -2396,11 +2421,12 @@ export function resolveBossChoice(gameState, playerId, option) {
   if (boss.id !== 'dominadora') return null;
   let outcome = '';
   let drawnCards = [];
+  let lockedCard = null;
   let lockedCardId = null;
   if (option === 'draw2') {
     if (availableChoiceDraws(gameState) < 2) {
       changeChains(gameState, playerId, 1, `${choice.type}_draw_unavailable`);
-      outcome = 'Compra indisponivel: 1 Corrente recebida.';
+      outcome = 'Compra indisponivel: 1 Chicote recebido.';
     } else {
       if (!gameState.stock?.length) recycleChoiceDead(gameState);
       drawnCards = drawChoiceCards(gameState, playerId, 2);
@@ -2423,7 +2449,7 @@ export function resolveBossChoice(gameState, playerId, option) {
         });
         lockedCardId = drawnCards[0]?.id || null;
         outcome = phase3Exposure
-          ? `2 cartas compradas; ${drawnCards.map(compactCardLabel).join(' e ')} podem ser jogadas, mas cada uma que permanecer na mão ao fim do próximo turno aplicará 1 Corrente.`
+          ? `2 cartas compradas; ${drawnCards.map(compactCardLabel).join(' e ')} podem ser jogadas, mas cada uma que permanecer na mão ao fim do próximo turno aplicará 1 Chicote.`
           : `2 cartas compradas; ${drawnCards.map(compactCardLabel).join(' e ')} ficaram presas durante o proximo turno completo.`;
       } else {
         drawnCards.forEach((card) => {
@@ -2434,13 +2460,13 @@ export function resolveBossChoice(gameState, playerId, option) {
         });
         drawnCards = [];
         changeChains(gameState, playerId, 1, `${choice.type}_draw_incomplete`);
-        outcome = 'Compra incompleta cancelada: 1 Corrente recebida.';
+        outcome = 'Compra incompleta cancelada: 1 Chicote recebido.';
       }
     }
   }
   else if (option === 'chain') {
     changeChains(gameState, playerId, 1, choice.type);
-    outcome = '1 Corrente recebida.';
+    outcome = '1 Chicote recebido.';
   } else if (option === 'order' && choice.type === 'forced_choice' && choice.order?.type) {
     const order = {
       ...choice.order,
@@ -2463,8 +2489,17 @@ export function resolveBossChoice(gameState, playerId, option) {
     const player = gameState.players.find((entry) => entry.id === playerId);
     const card = chooseSeeded((player?.hand || []).filter((entry) => entry?.id && canApplyDiscardLock(gameState, player, [entry.id])), gameState, 97);
     if (!card) return null;
-    boss.effects.push({ id: 'choice_lock', playerId, cardId: card?.id || null, expiresAfterTurn: true });
-    outcome = '1 carta ficou presa neste turno.';
+    lockedCard = card;
+    lockedCardId = card.id;
+    boss.effects.push({
+      id: 'choice_lock',
+      source: choice.type,
+      playerId,
+      cardId: card.id,
+      expiresAfterTurn: true,
+      appliedAtRound: boss.roundNumber,
+    });
+    outcome = `${compactCardLabel(card)} ficou presa durante o proximo turno completo.`;
   } else if (option === 'break_meld') {
     const melds = gameState.teams?.[0]?.melds || [];
     const meld = melds.find((entry) => entry?.length >= 7);
@@ -2474,7 +2509,7 @@ export function resolveBossChoice(gameState, playerId, option) {
       outcome = '1 carta voltou de uma canastra para a mão.';
     } else {
       changeChains(gameState, playerId, 1, choice.type);
-      outcome = 'Sem canastra disponível: 1 Corrente recebida.';
+      outcome = 'Sem canastra disponível: 1 Chicote recebido.';
     }
   } else return null;
   boss.pendingChoices = boss.pendingChoices.filter((entry) => entry.id !== choice.id);
@@ -2489,9 +2524,9 @@ export function resolveBossChoice(gameState, playerId, option) {
     drawnCount: drawnCards.length,
     drawnCardIds: drawnCards.map((card) => card.id),
     lockedCardId,
-    lockedCardIds: drawnCards.map((card) => card.id),
-    lockedCardLabel: compactCardLabel(drawnCards.find((card) => card.id === lockedCardId)),
-    lockedCardLabels: drawnCards.map(compactCardLabel),
+    lockedCardIds: lockedCard ? [lockedCard.id] : drawnCards.map((card) => card.id),
+    lockedCardLabel: compactCardLabel(lockedCard || drawnCards.find((card) => card.id === lockedCardId)),
+    lockedCardLabels: lockedCard ? [compactCardLabel(lockedCard)] : drawnCards.map(compactCardLabel),
     exposedCardIds: drawnCards.filter((card) => boss.effects.some((effect) => effect.id === 'choice_exposure' && effect.cardId === card.id)).map((card) => card.id),
     order: option === 'order' ? { ...choice.order } : null,
   });
@@ -2552,6 +2587,7 @@ export function applyBossMeldTransition(gameState, {
   isNewMeld = false,
   creditEligibleCardIds = null,
   cardOriginsById = null,
+  suppressDominatrixResistance = false,
 }) {
   const boss = normalizeBossState(gameState);
   if (!boss || teamId !== 0 || boss.result) return null;
@@ -2720,12 +2756,24 @@ export function applyBossMeldTransition(gameState, {
   if ((BOSS_DAMAGE_BY_KIND[newKind] || 0) >= BOSS_DAMAGE_BY_KIND.suja && (BOSS_DAMAGE_BY_KIND[oldKind] || 0) < BOSS_DAMAGE_BY_KIND.suja) boss.stats.canastrasFormed += 1;
   if (boss.hp === 0 && !damageResult.reborn) boss.defeated = true;
   let chainsRemoved = 0;
+  let resistanceSuppressedByInterdict = false;
   if (boss.id === 'dominadora' && playerId != null && (!possessionSuppressesDamage || possessionReleased)) {
     const tier = MELD_TIER[newKind] || 0;
     const previousResistanceTier = Number(contribution?.dominatrixResistanceTier) || 0;
     if (contribution) contribution.dominatrixResistanceTier = Math.max(previousResistanceTier, tier);
     if (tier > previousResistanceTier && tier > 0) {
-      if (boss.chainReliefRoundByPlayer[playerId] !== boss.roundNumber) {
+      if (suppressDominatrixResistance) {
+        resistanceSuppressedByInterdict = true;
+        boss.actionSequence += 1;
+        recordEvent(boss, {
+          type: 'resistanceSuppressed',
+          actionId: `resistance_interdict_${meldId}_${tier}_${boss.roundNumber}`,
+          playerId,
+          meldId,
+          tier,
+          outcome: 'A desobediencia ao Interdito anulou a remocao de Chicote desta evolucao.',
+        });
+      } else if (boss.chainReliefRoundByPlayer[playerId] !== boss.roundNumber) {
         chainsRemoved = Math.abs(Math.min(0, changeChains(gameState, playerId, -1, 'resistance')));
         if (chainsRemoved) boss.chainReliefRoundByPlayer[playerId] = boss.roundNumber;
       } else {
@@ -2759,6 +2807,7 @@ export function applyBossMeldTransition(gameState, {
     debtReduction,
     creditLimitDebt,
     chainsRemoved,
+    resistanceSuppressedByInterdict,
     bloomRemoved,
     absorbedDamage: damageResult.absorbed,
     cocoonBroken: damageResult.cocoonBroken,
@@ -3027,7 +3076,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       changeChains(gameState, intent.payload.punishedPlayerId, 1, 'favorite_punishment');
       const protectedPlayer = gameState.players.find((player) => player.id === intent.payload.protectedPlayerId);
       const punishedPlayer = gameState.players.find((player) => player.id === intent.payload.punishedPlayerId);
-      outcome = `${protectedPlayer?.name || 'A favorita'} foi protegida; ${punishedPlayer?.name || 'o outro cooperador'} recebeu 1 Corrente.`;
+      outcome = `${protectedPlayer?.name || 'A favorita'} foi protegida; ${punishedPlayer?.name || 'o outro cooperador'} recebeu 1 Chicote.`;
       resultData = { protectedPlayerId: intent.payload.protectedPlayerId, punishedPlayerId: intent.payload.punishedPlayerId };
     } else if (intent.abilityId === 'exposure') {
       const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);
@@ -3035,8 +3084,8 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       exposureSuccess = !remainsInHand;
       if (remainsInHand) changeChains(gameState, intent.payload.targetPlayerId, 1, 'exposure_failed');
       outcome = remainsInHand
-        ? `${target?.name || 'O jogador alvo'} não usou a carta exposta e recebeu 1 Corrente.`
-        : `${target?.name || 'O jogador alvo'} usou a carta exposta e evitou a Corrente.`;
+        ? `${target?.name || 'O jogador alvo'} não usou a carta exposta e recebeu 1 Chicote.`
+        : `${target?.name || 'O jogador alvo'} usou a carta exposta e evitou o Chicote.`;
     } else if (intent.abilityId === 'break_will') {
       enqueueChoice(boss, intent.payload.targetPlayerId, 'break_will', ['chain', 'break_meld']);
       outcome = 'A Quebra de Vontade aguarda uma decisão.';
@@ -3095,6 +3144,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       boss.interdicts.push({
         id: `interdict_${intent.id}`,
         sourceAbilityId: 'interdict',
+        teamId: 0,
         meldIndex: intent.payload.meldIndex,
         meldId: intent.payload.meldId,
         createdRound: boss.roundNumber,
@@ -3128,8 +3178,16 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       outcome = threat ? `A Raiz envolve o jogo ${Number(threat.meldIndex) + 1}.` : 'Nenhuma Raiz valida foi criada.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'restorative_dew') {
-      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'dew', healAmount: intent.payload.baseHeal, bloomAmount: 0, countedCardIds: [], reductionPerCard: intent.payload.reductionPerCard });
-      outcome = threat ? `O Orvalho prepara ${intent.payload.baseHeal} HP de cura; cada carta nova reduz ${intent.payload.reductionPerCard}.` : 'O Orvalho nao encontrou espaco entre as ameacas.';
+      const announcedPhase = intent.payload.announcedPhase || intent.announcedPhase || boss.phase;
+      const threat = addNatureThreat(gameState, {
+        ...baseThreat,
+        type: 'dew',
+        announcedPhase,
+        healAmount: getRestorativeDewHealing(announcedPhase, 0),
+        bloomAmount: 0,
+        countedCardIds: [],
+      });
+      outcome = threat ? `O Orvalho prepara ${getRestorativeDewHealing(announcedPhase, 0)} HP de cura e enfraquece por faixas conforme novas cartas entram na mesa.` : 'O Orvalho nao encontrou espaco entre as ameacas.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'twin_vines') {
       const threats = (intent.payload.targets || []).slice(0, natureThreatSlots(gameState)).map((target, index) => addNatureThreat(gameState, {

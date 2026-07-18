@@ -220,6 +220,30 @@ test('ordem aceita persiste, desobediencia cobra Corrente e impossibilidade exte
   assert.equal(getBossChains(cancelled, 0), 0);
 });
 
+test('Etiqueta de Ferro ativa antes do turno dos jogadores e pune descarte de outro naipe', () => {
+  const state = bossGame();
+  state.currentPlayer = 0;
+  state.players[0].hand = [
+    { id: 'etiquette-heart-a', rank: '3', suit: '♥' },
+    { id: 'etiquette-heart-b', rank: '4', suit: '♥' },
+    { id: 'etiquette-club-a', rank: '5', suit: '♣' },
+  ];
+
+  applyAbility(state, 'iron_etiquette', {
+    targetPlayerId: 0,
+    suit: '♥',
+    suitLabel: 'Copas',
+  });
+
+  const order = state.boss.activeOrders.find((entry) => entry.sourceAbilityId === 'iron_etiquette');
+  assert.ok(order, 'a ordem precisa estar ativa antes do descarte do alvo');
+  assert.equal(order.status, 'active');
+
+  const events = notifyBossCardDiscarded(state, 0, state.players[0].hand[2]);
+  assert.equal(events.at(-1)?.status, 'disobeyed');
+  assert.equal(getBossChains(state, 0), 1);
+});
+
 test('Etiqueta de Ferro usa naipe e diferencia obediencia, desobediencia e cancelamento externo', () => {
   const ability = dominatrixDefinition.abilities.find((entry) => entry.id === 'iron_etiquette');
   assert.ok(ability);
@@ -297,6 +321,38 @@ test('Interdito consome a primeira evolucao, força obediencia com quatro Corren
   completeBossPlayerTurn(expired, 0);
   completeBossPlayerTurn(expired, 1);
   assert.equal(expired.boss.interdicts[0].status, 'expired');
+});
+
+test('Interdito desobedecido aplica Chicote liquido e anula Resistencia da mesma evolucao', () => {
+  const state = bossGame();
+  state.boss.phase = 2;
+  state.boss.chainsByPlayer[0] = 1;
+  state.players[0].hand = [
+    ...cards('interdict-evolve', ['2', '9', '10', 'J', 'Q', 'K', 'A'], '♦'),
+    { id: 'interdict-discard', rank: '7', suit: '♥' },
+  ];
+  const meldId = establishMeldId(state, 0);
+  const contribution = getBossMeldContribution(state, 0, 0);
+  contribution.dominatrixResistanceTier = 1;
+  state.boss.interdicts = [{ id: 'interdict-net-cost', meldIndex: 0, meldId, status: 'active', createdRound: 1 }];
+
+  const decision = resolveBossInterdictAttempt(state, 0, 'interdict-net-cost', 'disobey');
+  assert.equal(getBossChains(state, 0), 2);
+
+  const evolution = applyBossMeldTransition(state, {
+    teamId: 0,
+    playerId: 0,
+    meldIndex: 0,
+    oldKind: 'limpa',
+    newKind: 'real',
+    cardsAdded: [],
+    suppressDominatrixResistance: decision.decision === 'disobey',
+  });
+
+  assert.equal(evolution.chainsRemoved, 0);
+  assert.equal(evolution.resistanceSuppressedByInterdict, true);
+  assert.equal(getBossChains(state, 0), 2);
+  assert.equal(getBossMeldContribution(state, 0, 0).dominatrixResistanceTier, 2);
 });
 
 test('Hierarquia nao existe no registro da Dominadora', () => {
@@ -432,8 +488,8 @@ test('Semente e Raiz falham sem cura, e a Raiz propaga somente na rodada seguint
   assert.equal(propagated[0].deadlineRound, 2);
 });
 
-test('Orvalho usa 150/180/220, reduz 15 por ID unico e nunca abaixo de zero', () => {
-  for (const [phase, baseHeal] of [[1, 150], [2, 180], [3, 220]]) {
+test('Orvalho usa faixas por fase, conta IDs unicos e pode ser dissipado', () => {
+  for (const [phase, baseHeal] of [[1, 150], [2, 150], [3, 180]]) {
     const state = bossGame('matriarca_esmeralda');
     state.boss.hp = 1000;
     applyAbility(state, 'restorative_dew', { baseHeal, reductionPerCard: 15, countedCardIds: [] }, phase);

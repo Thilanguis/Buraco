@@ -1247,6 +1247,31 @@
           0 0 8px rgba(0, 210, 255, 0.5) !important;
       }
 
+      /* O tema mantém os gradientes, mas evita repintura contínua por carta. */
+      body[data-deck-theme='mythic'] .back-red,
+      body[data-deck-theme='mythic'] .back-blue,
+      body[data-deck-theme='mythic'] .fly-card.back,
+      body[data-deck-theme='mythic'] .opponent-card-back,
+      body[data-deck-theme='mythic'] .morto-card-back,
+      body[data-deck-theme='mythic'] #drawStockBtn .pile-card,
+      body[data-deck-theme='mythic'] .carta.mini.back {
+        animation: none !important;
+        filter: none !important;
+        background-position: center !important;
+      }
+
+      body[data-boss-id='matriarca_esmeralda'][data-deck-theme='holografico'] .back-red,
+      body[data-boss-id='matriarca_esmeralda'][data-deck-theme='holografico'] .back-blue,
+      body[data-boss-id='matriarca_esmeralda'][data-deck-theme='holografico'] .fly-card.back,
+      body[data-boss-id='matriarca_esmeralda'][data-deck-theme='holografico'] .opponent-card-back,
+      body[data-boss-id='matriarca_esmeralda'][data-deck-theme='holografico'] .morto-card-back,
+      body[data-boss-id='matriarca_esmeralda'][data-deck-theme='holografico'] #drawStockBtn .pile-card,
+      body[data-boss-id='matriarca_esmeralda'][data-deck-theme='holografico'] .carta.mini.back {
+        animation: none !important;
+        filter: none !important;
+        background-position: center !important;
+      }
+
       /* Efeitos Especiais */
       .impact-ring {
         position: fixed;

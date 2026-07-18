@@ -25,15 +25,15 @@ export class BuracoBot {
     this.assertActive(engine, signal);
     let state = engine.getState();
     if (!state || !state.players || !state.players[botIndex] || !state.teams) {
-      if (typeof window !== 'undefined' && window.isClosingGame) return;
+      if (typeof window !== 'undefined' && window.isClosingGame) return false;
       console.error('[BOT] Estado inicial inválido em playTurn:', state);
-      return;
+      return false;
     }
 
     const turnKey = `${state.turnNumber}:${state.currentPlayer}:${botIndex}`;
     if (this._turnLocks.has(turnKey)) {
       console.warn('[BOT] Jogada duplicada bloqueada para o mesmo turno:', turnKey);
-      return;
+      return false;
     }
     this._turnLocks.add(turnKey);
 
@@ -48,6 +48,7 @@ export class BuracoBot {
       }
 
       if (typeof engine.resolvePendingBossChoice === 'function') {
+        await this.sleep(this.randomDelay(700, 1300), engine, signal);
         await engine.resolvePendingBossChoice(botIndex);
         state = engine.getState();
         me = state.players[botIndex];
@@ -123,7 +124,7 @@ export class BuracoBot {
           await engine.executeDrawStock(botIndex);
         }
 
-        await this.sleep(1000, engine, signal);
+        await this.sleep(this.randomDelay(900, 1300), engine, signal);
 
         state = engine.getState();
         if (!state || !state.players || !state.players[botIndex]) {
@@ -136,7 +137,7 @@ export class BuracoBot {
         engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
 
         await this.processMelds(botIndex, ctx, engine, signal);
-        await this.sleep(1000, engine, signal);
+        await this.sleep(this.randomDelay(900, 1300), engine, signal);
       } catch (error) {
         if (this.isCancellationError(error)) throw error;
         console.error('Erro interno:', error);
@@ -150,13 +151,20 @@ export class BuracoBot {
         const botName = s && s.players && s.players[botIndex] ? s.players[botIndex].name : 'BOT';
 
         engine.showMessage(`🤖 ${botName} descartando...`);
-        await this.sleep(1200, engine, signal);
-        await this.processDiscard(botIndex, me.teamId === 0 ? 1 : 0, engine, signal);
+        await this.sleep(this.randomDelay(800, 1400), engine, signal);
+        let discarded = await this.processDiscard(botIndex, me.teamId === 0 ? 1 : 0, engine, signal);
+        if (!discarded && typeof engine.recoverBotTurn === 'function') discarded = await engine.recoverBotTurn(botIndex);
+        if (!discarded) {
+          const error = new Error('O bot terminou as jogadas sem encontrar um descarte legal.');
+          error.code = 'BOT_TURN_INCOMPLETE';
+          throw error;
+        }
       } catch (error) {
         if (this.isCancellationError(error)) throw error;
         console.error('Erro fatal:', error);
 
         const s = engine.getState();
+        let recovered = false;
         if (s && s.players && s.players[botIndex]) {
           this.assertActive(engine, signal);
           const fallbackIndex = s.players[botIndex].hand.findIndex((card) => (
@@ -164,8 +172,11 @@ export class BuracoBot {
             && card.id !== s.pickedDiscardCardId
             && !engine.isCardBlocked?.(s.players[botIndex].id, card.id, 'discard')
           ));
-          if (fallbackIndex >= 0) await engine.executeDiscard(botIndex, fallbackIndex);
+          if (fallbackIndex >= 0) recovered = (await engine.executeDiscard(botIndex, fallbackIndex)) !== false;
+          else if (typeof engine.recoverBotTurn === 'function') recovered = await engine.recoverBotTurn(botIndex);
         }
+        const afterRecovery = engine.getState();
+        if (!recovered && afterRecovery && !afterRecovery.finished && afterRecovery.currentPlayer === botIndex) throw error;
       }
     } finally {
       this._turnLocks.delete(turnKey);
@@ -541,7 +552,7 @@ export class BuracoBot {
             const moved = await engine.executeMeldExtend(botIndex, meldIndex, [handIndex]);
             if (moved !== false) {
               madeMove = true;
-              await this.sleep(300, engine, signal);
+              await this.paceBetweenActions(engine, signal);
               break;
             }
           }
@@ -563,7 +574,7 @@ export class BuracoBot {
                 const moved = await engine.executeMeldNew(botIndex, indexes);
                 if (moved !== false) {
                   madeMove = true;
-                  await this.sleep(400, engine, signal);
+                  await this.paceBetweenActions(engine, signal);
                   break outerNatureCombo;
                 }
               }
@@ -594,7 +605,7 @@ export class BuracoBot {
               this.assertActive(engine, signal);
               const moved = await engine.executeMeldExtend(botIndex, mIdx, [i]);
               madeMove = moved !== false;
-              await this.sleep(300, engine, signal);
+              await this.paceBetweenActions(engine, signal);
               break;
             }
           }
@@ -635,7 +646,7 @@ export class BuracoBot {
                 this.assertActive(engine, signal);
                 const moved = await engine.executeMeldExtend(botIndex, mIdx, [i]);
                 madeMove = moved !== false;
-                await this.sleep(300, engine, signal);
+                await this.paceBetweenActions(engine, signal);
                 break;
               }
             }
@@ -688,7 +699,7 @@ export class BuracoBot {
                 this.assertActive(engine, signal);
                 const moved = await engine.executeMeldNew(botIndex, [i, j, k]);
                 madeMove = moved !== false;
-                await this.sleep(400, engine, signal);
+                await this.paceBetweenActions(engine, signal);
                 break;
               }
             }
@@ -770,7 +781,7 @@ export class BuracoBot {
                 this.assertActive(engine, signal);
                 const moved = await engine.executeMeldExtend(botIndex, mIdx, [i]);
                 madeMove = moved !== false;
-                await this.sleep(400, engine, signal);
+                await this.paceBetweenActions(engine, signal);
                 break;
               }
             }
@@ -805,7 +816,7 @@ export class BuracoBot {
                   this.assertActive(engine, signal);
                   const moved = await engine.executeMeldNew(botIndex, [i, j, k]);
                   madeMove = moved !== false;
-                  await this.sleep(400, engine, signal);
+                  await this.paceBetweenActions(engine, signal);
                   break;
                 }
               }
@@ -834,7 +845,7 @@ export class BuracoBot {
       return;
     }
 
-    if (me.hand.length === 0) return;
+    if (me.hand.length === 0) return true;
 
     let discardIndex = -1;
     let minDanger = 9999;
@@ -910,11 +921,19 @@ export class BuracoBot {
       }
 
       // Prevenção extrema: se a mão inteira for fantasma, aborta para não crashar o motor
-      if (discardIndex === -1) return;
+      if (discardIndex === -1) return false;
     }
 
     this.assertActive(engine, signal);
-    await engine.executeDiscard(botIndex, discardIndex);
+    return (await engine.executeDiscard(botIndex, discardIndex)) !== false;
+  }
+
+  static randomDelay(min, max) {
+    return Math.floor(min + Math.random() * (max - min + 1));
+  }
+
+  static async paceBetweenActions(engine, signal) {
+    await this.sleep(this.randomDelay(1700, 2300), engine, signal);
   }
 
   static async sleep(ms, engine, signal) {

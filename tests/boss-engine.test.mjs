@@ -681,6 +681,25 @@ test('lock_card exige carta valida', () => {
   assert.equal(state.boss.effects.length, 0);
 });
 
+
+test('Ordem Final identifica a carta presa no evento e no efeito ativo', () => {
+  const state = dominatrixGame();
+  state.boss.currentIntent = null;
+  state.boss.pendingChoices = [{ id: 'lock-id', playerId: 0, type: 'final_order_lock', options: ['lock_card', 'chain'] }];
+
+  const event = resolveBossChoice(state, 0, 'lock_card');
+
+  assert.equal(event.choiceType, 'final_order_lock');
+  assert.ok(event.lockedCardId);
+  assert.ok(event.lockedCardLabel);
+  assert.deepEqual(event.lockedCardIds, [event.lockedCardId]);
+  assert.deepEqual(event.lockedCardLabels, [event.lockedCardLabel]);
+  const effect = state.boss.effects.find((entry) => entry.id === 'choice_lock' && entry.playerId === 0);
+  assert.equal(effect.cardId, event.lockedCardId);
+  assert.equal(isBossCardBlocked(state, 0, event.lockedCardId, 'play'), true);
+  assert.ok(event.outcome.includes(event.lockedCardLabel));
+});
+
 test('Dupla Coleira afeta os dois durante a rodada', () => {
   const state = dominatrixGame();
   state.boss.currentIntent = {
@@ -900,7 +919,7 @@ test('Coleira escolhe ate duas cartas distintas e nunca anuncia alvo nulo', () =
   assert.equal(oneCardIntent, null);
 });
 
-test('Exposicao permite jogar, impede descarte e registra sucesso ou Corrente por falha', () => {
+test('Exposicao permite jogar, impede descarte e registra sucesso ou Chicote por falha', () => {
   const success = dominatrixGame();
   success.teams[0].melds = [[{ id: 'exposure-success-1', rank: '4', suit: '♠' }, { id: 'exposure-success-2', rank: '5', suit: '♠' }]];
   success.boss.currentIntent = { id: 'exposure-success', abilityId: 'exposure', name: 'Exposicao', duration: 'target_turn', payload: { targetPlayerId: 0, cardId: 'd0-a' } };
@@ -917,7 +936,7 @@ test('Exposicao permite jogar, impede descarte e registra sucesso ou Corrente po
   const failureEvent = completeBossPlayerTurn(failure, 0);
   assert.equal(failureEvent.exposureSuccess, false);
   assert.equal(getBossChains(failure, 0), 1);
-  assert.match(failureEvent.outcome, /1 Corrente/);
+  assert.match(failureEvent.outcome, /1 Chicote/);
 });
 
 test('Escolha Forcada oferece somente Corrente ou ordem valida', () => {
@@ -1636,11 +1655,33 @@ test('Polen acompanha o lixo, Colheita usa as tres faixas e Orvalho conta IDs un
   applyBossMeldTransition(dew, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: cards });
   assert.deepEqual(dew.boss.currentIntent.payload.countedCardIds, ['dew-a', 'dew-b']);
   const dewPresentation = buildBossActionPresentation(dew);
-  assert.equal(dewPresentation.progress, '2/10 cartas');
-  assert.equal(dewPresentation.consequence, 'Cura prevista: 120 HP');
+  assert.equal(dewPresentation.progress, '2/6 cartas para dissipar');
+  assert.equal(dewPresentation.consequence, 'Cura prevista: 100 HP');
   completeBossPlayerTurn(dew, 0);
   completeBossPlayerTurn(dew, 1);
-  assert.equal(dew.boss.hp, 1905);
+  assert.equal(dew.boss.hp, 1885);
+});
+
+test('Matriarca nao repete a resolucao da mesma rodada depois de normalizar o snapshot', () => {
+  const state = matriarchGame();
+  state.boss.hp = 1800;
+  applyMatriarchAbility(state, 'restorative_dew', { countedCardIds: [] });
+  completeBossPlayerTurn(state, 0);
+  completeBossPlayerTurn(state, 1);
+
+  const restored = JSON.parse(JSON.stringify(state));
+  normalizeBossState(restored);
+  const hpAfterResolution = restored.boss.hp;
+  const bloomAfterResolution = restored.boss.bloom;
+  const resolvedRoundIds = [...restored.boss.resolvedNatureRoundIds];
+  const eventCount = restored.boss.eventLog.length;
+
+  completeBossPlayerTurn(restored, 1);
+
+  assert.equal(restored.boss.hp, hpAfterResolution);
+  assert.equal(restored.boss.bloom, bloomAfterResolution);
+  assert.deepEqual(restored.boss.resolvedNatureRoundIds, resolvedRoundIds);
+  assert.equal(restored.boss.eventLog.length, eventCount);
 });
 
 test('Casulo absorve, rompe e cura; Coroa propaga sem adicionar cura', () => {

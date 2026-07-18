@@ -480,9 +480,10 @@
               <div id="debugBossLabError" class="debug-boss-lab-error" role="status"></div>
               <button id="debugBossLabPrepare" type="button" class="debug-boss-lab-primary">Preparar e testar</button>
               <div class="debug-boss-lab-actions">
-                <button type="button" data-boss-lab-variant="success">Preparar sucesso</button>
-                <button type="button" data-boss-lab-variant="failure">Preparar falha</button>
-                <button type="button" data-boss-lab-variant="external_cancel">Cancelamento externo</button>
+                <button type="button" data-boss-lab-variant="success">Executar sucesso</button>
+                <button type="button" data-boss-lab-variant="failure">Executar falha</button>
+                <button type="button" data-boss-lab-variant="external_cancel">Executar cancelamento externo</button>
+                <button id="debugBossLabBotRun" type="button">Executar acao do bot</button>
                 <button id="debugBossLabReload" type="button">Simular reload</button>
                 <button id="debugBossLabUndo" type="button">Voltar</button>
                 <button id="debugBossLabReset" type="button">Resetar cenario</button>
@@ -605,6 +606,7 @@
                 <section class="boss-log-card">
                   <div class="boss-log-title">
                     <span>REGISTRO DA BATALHA</span>
+                    <span id="bossLogNew" class="boss-log-new" hidden>NOVO</span>
                     <strong id="bossLogCount">0</strong>
                   </div>
                   <div id="bossEventLog" class="boss-event-log"></div>

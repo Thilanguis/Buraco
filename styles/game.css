@@ -118,6 +118,23 @@
 #gameSection:has(.board-melds.has-domination-status)::after {
   opacity: calc(var(--table-flash-opacity) + 0.04);
 }
+
+body[data-boss-id='matriarca_esmeralda'] #gameSection {
+  --table-light-animation: none !important;
+  --table-flash-animation: none !important;
+  --table-light-opacity: 0 !important;
+  --table-flash-opacity: 0 !important;
+  --table-light-filter: none !important;
+  --table-flash-filter: none !important;
+}
+body[data-boss-id='matriarca_esmeralda'] #gameSection::before,
+body[data-boss-id='matriarca_esmeralda'] #gameSection::after {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+}
 @media (hover: none) and (pointer: coarse), (prefers-reduced-motion: reduce) {
   #gameSection {
     --table-light-animation: none !important;

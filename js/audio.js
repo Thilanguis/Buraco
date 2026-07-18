@@ -3,8 +3,29 @@ export const CANASTRA_SFX = {
   limpa: new Audio('assets/sfx/canastra-limpa.mp3'),
   real: new Audio('assets/sfx/canastra-real.mp3'),
   asas: new Audio('assets/sfx/canastra-as-a-as.mp3'),
-  fim: new Audio('assets/sfx/fim-de-jogo.mp3'),
 };
+
+function createBossSfx(src, volume = 0.9) {
+  const audio = new Audio(src);
+  audio.preload = 'auto';
+  audio.volume = volume;
+  return audio;
+}
+
+export const BOSS_SFX = Object.freeze({
+  banker: Object.freeze({
+    resource: createBossSfx('assets/sfx/habilidade-banqueiro.mp3'),
+    victory: createBossSfx('assets/sfx/fim-de-jogo-banqueiro.mp3'),
+  }),
+  dominadora: Object.freeze({
+    resource: createBossSfx('assets/sfx/habilidade-dominadora.mp3'),
+    victory: createBossSfx('assets/sfx/fim-de-jogo-dominadora.mp3'),
+  }),
+  matriarca_esmeralda: Object.freeze({
+    resource: createBossSfx('assets/sfx/habilidade-matriarca.mp3'),
+    victory: createBossSfx('assets/sfx/fim-de-jogo-matriarca.mp3'),
+  }),
+});
 
 export const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');
 sfxCardMove.preload = 'auto';
@@ -36,7 +57,8 @@ export const TABLE_AMBIENT_MUSIC = Object.freeze({
 export const TABLE_AMBIENT_MAX_VOLUME = 0.35;
 export const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
 
-const GAME_SFX = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
+const BOSS_AUDIO_ELEMENTS = Object.values(BOSS_SFX).flatMap((sounds) => Object.values(sounds));
+const GAME_SFX = [...Object.values(CANASTRA_SFX), ...BOSS_AUDIO_ELEMENTS, sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
 const transientSfx = new Set();
 
 export function playSfxClone(source) {

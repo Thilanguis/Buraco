@@ -3,13 +3,15 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { normalizeVariantForMode } from '../js/boss/boss-registry.js';
 
-const [app, bot, html, serviceWorker, cardsCss, bossCss, banker, dominatrix, matriarch, engine] = await Promise.all([
+const [app, bot, html, serviceWorker, cardsCss, bossCss, gameCss, tableThemesCss, banker, dominatrix, matriarch, engine] = await Promise.all([
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../bot.js', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
   readFile(new URL('../service-worker.js', import.meta.url), 'utf8'),
   readFile(new URL('../styles/cards.css', import.meta.url), 'utf8'),
   readFile(new URL('../styles/boss-mode.css', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/game.css', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/table-themes.css', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/bosses/banker.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/bosses/dominatrix.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/bosses/matriarch.js', import.meta.url), 'utf8'),
@@ -361,6 +363,10 @@ test('tema da Matriarca e estatico, responsivo e respeita movimento reduzido', (
   assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?rooted-by-matriarch/);
   const matriarchTheme = bossCss.slice(bossCss.indexOf("body[data-boss-id='matriarca_esmeralda']"));
   assert.doesNotMatch(matriarchTheme, /animation:\s*[^;]*(?:infinite|linear\s+infinite)/);
+  assert.match(cardsCss, /matriarca_esmeralda[^}]+animation:\s*none\s*!important/s);
+  assert.match(gameCss, /matriarca_esmeralda[^}]+--table-light-animation:\s*none\s*!important/s);
+  assert.match(gameCss, /matriarca_esmeralda[^}]+--table-flash-animation:\s*none\s*!important/s);
+  assert.match(tableThemesCss, /matriarca_esmeralda[^}]+--table-light-animation:\s*none\s*!important/s);
 });
 
 test('marcador de Florescimento fica isolado dos outros chefes', () => {

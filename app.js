@@ -1,4 +1,4 @@
-import { CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSteal, stopAllGameSfx } from './js/audio.js';
+import { BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSteal, stopAllGameSfx } from './js/audio.js';
 import { db, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from './js/firebase.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
@@ -140,6 +140,17 @@ window.addEventListener('load', () => {
       }, 1000);
     }, 2500);
   }
+});
+
+window.addEventListener('load', () => {
+  const battleDetails = document.getElementById('bossBattleDetails');
+  battleDetails?.addEventListener('toggle', () => {
+    if (!battleDetails.open || !state?.boss?.eventLog?.length) return;
+    const latest = state.boss.eventLog[state.boss.eventLog.length - 1];
+    lastSeenBossLogKey = `${latest.actionId || latest.id || latest.type}:${latest.at || latest.round || 0}`;
+    const marker = document.getElementById('bossLogNew');
+    if (marker) marker.hidden = true;
+  });
 });
 
 document.addEventListener(
@@ -335,6 +346,11 @@ let lastAnimatedBossSwapId = null;
 let renderedBossFeedbackCount = null;
 let lastRenderedBossBloom = null;
 let lastRenderedBossBloomEventId = null;
+let lastSeenBossLogKey = null;
+let lastBossVictorySoundKey = null;
+let lastBossIntroSoundKey = null;
+let seenBossResourceSoundEventIds = null;
+let bossResourceSoundScope = null;
 let bossPresentationTimer = null;
 let bossPresentationKey = '';
 let bossDamageReactionTimer = null;
@@ -343,6 +359,45 @@ const bossSwapReceivedHighlights = new Map();
 
 function isBossLabAutomationPaused(gameState = state) {
   return gameState?.debugScenario?.active === true && gameState.debugScenario.pauseAutomation === true;
+}
+
+function bossEventAddsResource(boss, event) {
+  if (!boss || !event) return false;
+  if (boss.id === 'banker') {
+    return Number(event.dangerDelta) > 0
+      || (event.type === 'discardSurcharge' && Number(event.amount) > 0)
+      || (event.type === 'bossDamage' && Number(event.creditLimitDebt) > 0);
+  }
+  if (boss.id === 'dominadora') return event.type === 'chainChange' && Number(event.amount) > 0;
+  if (boss.id === 'matriarca_esmeralda') return event.type === 'bloomChange' && Number(event.amount) > 0;
+  return false;
+}
+
+function syncBossResourceSounds(boss) {
+  const events = boss?.eventLog || [];
+  const scope = `${gameId}:${boss?.id || ''}:${boss?.seed || 0}`;
+  if (seenBossResourceSoundEventIds == null || bossResourceSoundScope !== scope) {
+    bossResourceSoundScope = scope;
+    seenBossResourceSoundEventIds = new Set(events.map((event) => event.actionId).filter(Boolean));
+    return;
+  }
+
+  for (const event of events) {
+    if (!event.actionId || seenBossResourceSoundEventIds.has(event.actionId)) continue;
+    seenBossResourceSoundEventIds.add(event.actionId);
+    if (audioUnlocked && bossEventAddsResource(boss, event)) playSfxClone(BOSS_SFX[boss.id]?.resource);
+  }
+}
+
+function playBossIntroSoundOnce(gameState = state) {
+  const boss = gameState?.boss;
+  if (!audioUnlocked || !boss?.id) return;
+  const introKey = `${gameId}:${boss.id}:${boss.seed || 0}`;
+  const persistedIntroKey = sessionStorage.getItem('buraco_boss_intro_sound');
+  if (introKey === lastBossIntroSoundKey || introKey === persistedIntroKey) return;
+  lastBossIntroSoundKey = introKey;
+  sessionStorage.setItem('buraco_boss_intro_sound', introKey);
+  playSfxClone(BOSS_SFX[boss.id]?.resource);
 }
 
 let movingWild = null;
@@ -424,6 +479,14 @@ function getCooperativeProjectedScore() {
 
 async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsAdded, isNewMeld = false, options = {}) {
   if (!isCurrentBossMode()) return null;
+  const pendingInterdictEvent = state._pendingBossEvent?.type === 'interdictDecision'
+    && state._pendingBossEvent?.decision === 'disobey'
+    && state._pendingBossEvent?.allowEvolution === true
+    && state._pendingBossEvent?.resistanceSuppressionConsumed !== true
+    ? state._pendingBossEvent
+    : null;
+  const suppressDominatrixResistance = options.suppressDominatrixResistance
+    ?? !!pendingInterdictEvent;
   const event = applyBossMeldTransition(state, {
     teamId: player.teamId,
     playerId: player.id,
@@ -434,7 +497,11 @@ async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsA
     isNewMeld,
     creditEligibleCardIds: options.creditEligibleCardIds ?? null,
     cardOriginsById: options.cardOriginsById ?? null,
+    suppressDominatrixResistance,
   });
+  if (suppressDominatrixResistance && pendingInterdictEvent) {
+    pendingInterdictEvent.resistanceSuppressionConsumed = true;
+  }
   if (state.boss?.defeated && !state.boss.result) {
     const definition = getBossDefinition(state.boss.id);
     state.boss.result = {
@@ -468,32 +535,24 @@ async function prepareBossMeldMutation(player, meldIndex, oldKind, newKind, card
     cardOriginsById: options.cardOriginsById ?? null,
   });
   if (quote?.debt > 0) {
-    const confirmed = window.confirm(
-      `Limite de Credito: esta jogada coloca ${quote.newCardIds.length} carta(s) nova(s) na mesa e gera Divida +${quote.debt}.\n\nConfirmar a jogada?`,
-    );
+    const confirmed = window.confirm(`Limite de Credito: esta jogada coloca ${quote.newCardIds.length} carta(s) nova(s) na mesa e gera Divida +${quote.debt}.\n\nConfirmar a jogada?`);
     if (!confirmed) {
       showMessage('Jogada cancelada sem alterar cartas ou Divida.');
       return { allowed: false, undoSaved: false, event: null };
     }
   }
 
-  const interdict = Number.isInteger(meldIndex)
-    ? getBossInterdictAttempt(state, player.teamId, meldIndex, oldKind, newKind)
-    : null;
+  const interdict = Number.isInteger(meldIndex) ? getBossInterdictAttempt(state, player.teamId, meldIndex, oldKind, newKind) : null;
   if (!interdict) return { allowed: true, undoSaved: false, event: null };
 
   saveStateForUndo(undoType, selectedCardIds);
   const mustObey = getBossChains(state, player.id) >= 4;
-  const disobey = !mustObey && window.confirm(
-    'Interdito: esta jogada evolui o jogo.\n\nOK: desobedecer, concluir a evolucao e receber +1 Corrente.\nCancelar: obedecer e cancelar somente esta tentativa.',
-  );
+  const disobey = !mustObey && window.confirm('Interdito: esta jogada evolui o jogo.\n\nOK: desobedecer, concluir a evolucao e receber +1 Chicote.\nCancelar: obedecer e cancelar somente esta tentativa.');
   const event = resolveBossInterdictAttempt(state, player.id, interdict.id, disobey ? 'disobey' : 'obey');
   if (!event?.allowEvolution) {
     selectedHandIndexes.clear();
     selectedMeldTarget = null;
-    showMessage(mustObey
-      ? 'Interdito: com 4 Correntes, voce deve obedecer. A tentativa foi cancelada.'
-      : 'Interdito obedecido. A tentativa foi cancelada e suas cartas permaneceram na mao.');
+    showMessage(mustObey ? 'Interdito: com 4 Chicotes, voce deve obedecer. A tentativa foi cancelada.' : 'Interdito obedecido. A tentativa foi cancelada e suas cartas permaneceram na mao.');
     renderAll();
     await commitState();
     return { allowed: false, undoSaved: true, event };
@@ -604,31 +663,31 @@ window.executeUndo = async () => {
   try {
     if (cardsToAnimate.length > 0 && originRect) {
       const anims = cardsToAnimate.map((c, i) => {
-      let toEl = cardElById(c.id); // Acha a carta na mão
-      let toRect = null;
+        let toEl = cardElById(c.id); // Acha a carta na mão
+        let toRect = null;
 
-      if (actionToUndo.type === 'stealCard') {
-        // Se desfez um roubo, a carta volta pro escravo no topo
-        toRect = opponentAnchorRect(0);
-      } else if (toEl) {
-        toRect = getRect(toEl);
-      } else if (actionToUndo.type === 'meldMoveWild') {
-        // Se foi o coringa movido, a carta não vai pra mão, volta pro jogo de origem
-        toRect = meldCardsRect(actionToUndo.teamId, actionToUndo.fromMeldIndex);
-      }
+        if (actionToUndo.type === 'stealCard') {
+          // Se desfez um roubo, a carta volta pro escravo no topo
+          toRect = opponentAnchorRect(0);
+        } else if (toEl) {
+          toRect = getRect(toEl);
+        } else if (actionToUndo.type === 'meldMoveWild') {
+          // Se foi o coringa movido, a carta não vai pra mão, volta pro jogo de origem
+          toRect = meldCardsRect(actionToUndo.teamId, actionToUndo.fromMeldIndex);
+        }
 
-      if (!toRect) return Promise.resolve();
+        if (!toRect) return Promise.resolve();
 
-      if (toEl) toEl.style.visibility = 'hidden'; // Esconde o elemento original enquanto voa
+        if (toEl) toEl.style.visibility = 'hidden'; // Esconde o elemento original enquanto voa
 
-      // Cria um pequeno espalhamento se forem várias cartas saindo da mesma pilha
-      const fromRect = { ...originRect, left: originRect.left + i * 10, top: originRect.top - i * 2 };
+        // Cria um pequeno espalhamento se forem várias cartas saindo da mesma pilha
+        const fromRect = { ...originRect, left: originRect.left + i * 10, top: originRect.top - i * 2 };
 
-      // Voa usando a física já existente do sistema
-      return flyRectToRect(c, fromRect, toRect, 'front').then(() => {
-        if (toEl) toEl.style.visibility = ''; // Revela a carta no lugar certo
-        impactAtRect(toRect);
-      });
+        // Voa usando a física já existente do sistema
+        return flyRectToRect(c, fromRect, toRect, 'front').then(() => {
+          if (toEl) toEl.style.visibility = ''; // Revela a carta no lugar certo
+          impactAtRect(toRect);
+        });
       });
       await Promise.all(anims);
     }
@@ -974,7 +1033,8 @@ function unlockAudio() {
   } catch (e) {}
 
   // Injeta o novo som de coração na lista global para garantir que o navegador libere o autoplay
-  const allAudios = [...Object.values(CANASTRA_SFX), sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
+  const bossAudios = Object.values(BOSS_SFX).flatMap((sounds) => Object.values(sounds));
+  const allAudios = [...Object.values(CANASTRA_SFX), ...bossAudios, sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
   for (const a of allAudios) {
     try {
       a.pause();
@@ -1761,6 +1821,24 @@ function classifyMeldForUi(meld) {
   return { kind: 'limpa', base: 'Canastra', tag: { cls: 'limpa', text: 'Limpa' } };
 }
 
+// Classifica uma jogada futura do mesmo modo que o jogo real ficará depois
+// de otimizar o 2 natural/coringa. Sem isso, o preview podia enxergar o 2
+// como coringa, ignorar uma evolução Limpa -> Real e deixar o Interdito
+// ser cancelado somente depois que a canastra já havia evoluído.
+function classifyMeldPreview(meld) {
+  const preview = (meld || [])
+    .filter(Boolean)
+    .map((card) => ({ ...card }));
+
+  optimizeMeld(preview);
+  normalizeMeldOrder(preview);
+  autoSwapWildWhenFillingGap(preview);
+  optimizeMeld(preview);
+  normalizeMeldOrder(preview);
+
+  return classifyMeldForUi(preview);
+}
+
 let activeTurnNumber = -1;
 function startTurnTimerIfNeeded() {
   if (!state || state.finished) {
@@ -2088,6 +2166,7 @@ async function startGame(mode, names, variant, pixKeys = []) {
   }
   const battleDetails = document.getElementById('bossBattleDetails');
   if (battleDetails) battleDetails.open = false;
+  lastSeenBossLogKey = null;
   await setDoc(gameRef, { stateJson: JSON.stringify(newState), createdAt: Date.now() });
   showMessage('Partida iniciada!');
   return newState;
@@ -2179,7 +2258,6 @@ async function drawBossTurnExtras(player) {
   }
   const financedEvent = registerBossFinancedCards(state, player.id, cards);
   if (cards.length) {
-    sortHand(player.hand);
     state.boughtCardIds = [...new Set([...(state.boughtCardIds || []), ...cards.map((card) => card.id)])];
     if (player.id === myPlayerIndex) {
       renderHand();
@@ -2457,12 +2535,9 @@ async function drawFromDiscard() {
     const previewOldKind = isNewMeld ? 'simple' : classifyMeldForUi(team.melds[extendedMeldIndex]).kind;
     const previewCards = [...selectedCards, top].filter(Boolean);
     const creditEligibleCardIds = selectedCards.map((card) => card.id);
-    const cardOriginsById = Object.fromEntries(previewCards.map((card) => [
-      card.id,
-      creditEligibleCardIds.includes(card.id) ? 'hand' : 'discard',
-    ]));
+    const cardOriginsById = Object.fromEntries(previewCards.map((card) => [card.id, creditEligibleCardIds.includes(card.id) ? 'hand' : 'discard']));
     const previewMeld = isNewMeld ? previewCards : [...team.melds[extendedMeldIndex], ...previewCards];
-    const previewNewKind = classifyMeldForUi(previewMeld).kind;
+    const previewNewKind = classifyMeldPreview(previewMeld).kind;
     const bossPreparation = await prepareBossMeldMutation(
       me,
       previewMeldIndex,
@@ -2474,7 +2549,11 @@ async function drawFromDiscard() {
       { creditEligibleCardIds, cardOriginsById },
     );
     if (!bossPreparation.allowed) return;
-    if (!bossPreparation.undoSaved) saveStateForUndo('drawDiscardFechado', selectedCards.map((card) => card.id));
+    if (!bossPreparation.undoSaved)
+      saveStateForUndo(
+        'drawDiscardFechado',
+        selectedCards.map((card) => card.id),
+      );
     const surchargeEvent = pickupDecision.surcharge ? consumeBossDiscardSurcharge(state, me.id) : null;
 
     // --- SE ENCAIXOU, FAZ A MÁGICA ---
@@ -2547,15 +2626,12 @@ async function drawFromDiscard() {
     const bossMeld = team.melds[bossMeldIndex];
     const kindAfterFechado = classifyMeldForUi(bossMeld).kind;
     let domReward = await processDominationReward(me, kindBeforeFechado, kindAfterFechado, bossMeldIndex);
-    const bossEvent = await processBossMeldChange(
-      me,
-      kindBeforeFechado || 'simple',
-      kindAfterFechado,
-      bossMeldIndex,
-      finalMeldCards,
-      isNewMeld,
-      { creditEligibleCardIds, cardOriginsById },
-    );
+    const bossEvent = await processBossMeldChange(me, kindBeforeFechado || 'simple', kindAfterFechado, bossMeldIndex, finalMeldCards, isNewMeld, {
+      creditEligibleCardIds,
+      cardOriginsById,
+      suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
+        && bossPreparation.event?.decision === 'disobey',
+    });
     if (state.finished) return;
 
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -2934,7 +3010,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
     if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return false;
 
     const kindBefore1 = classifyMeldForUi(targetMeld).kind;
-    const kindAfter1 = classifyMeldForUi(combined).kind;
+    const kindAfter1 = classifyMeldPreview(combined).kind;
     const bossPreparation = await prepareBossMeldMutation(
       currentPlayer(),
       forcedIndex,
@@ -2948,23 +3024,40 @@ async function attemptExtendExistingMeld(cards, indexes) {
 
     const key = team.id + ':' + forcedIndex;
     const baseDrop = meldDropRect(key, 0);
+
     if (baseDrop) {
-      const anims = cards.map((c, i) => {
-        const from = cardElById(c.id);
-        if (!from) return Promise.resolve();
+      const anims = cards.map((card, index) => {
+        const from = cardElById(card.id);
+
+        if (!from) {
+          return Promise.resolve();
+        }
+
         const fromRect = getRect(from);
         from.style.visibility = 'hidden';
-        const toRect = { ...baseDrop, left: baseDrop.left - i * 10, top: baseDrop.top + i * 2 };
-        return flyRectToRect(c, fromRect, toRect, 'front').then(() => impactAtRect(toRect));
+
+        const toRect = {
+          ...baseDrop,
+          left: baseDrop.left - index * 10,
+          top: baseDrop.top + index * 2,
+        };
+
+        return flyRectToRect(card, fromRect, toRect, 'front').then(() => impactAtRect(toRect));
       });
+
       await Promise.all(anims);
     }
 
-    if (!bossPreparation.undoSaved) saveStateForUndo('meldExtend', cards.map((card) => card.id));
+    if (!bossPreparation.undoSaved) {
+      saveStateForUndo(
+        'meldExtend',
+        cards.map((card) => card.id),
+      );
+    }
 
-    for (const idx of indexes) {
-      targetMeld.push(hand[idx]);
-      hand.splice(idx, 1);
+    for (const index of indexes) {
+      targetMeld.push(hand[index]);
+      hand.splice(index, 1);
     }
 
     optimizeMeld(targetMeld);
@@ -2972,12 +3065,25 @@ async function attemptExtendExistingMeld(cards, indexes) {
     autoSwapWildWhenFillingGap(targetMeld);
     optimizeMeld(targetMeld);
     normalizeMeldOrder(targetMeld);
+
     sortHand(hand);
+
     selectedHandIndexes.clear();
     selectedMeldTarget = null;
 
     let domReward = await processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind, forcedIndex);
-    const bossEvent = await processBossMeldChange(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind, forcedIndex, cards);
+    const bossEvent = await processBossMeldChange(
+      currentPlayer(),
+      kindBefore1,
+      classifyMeldForUi(targetMeld).kind,
+      forcedIndex,
+      cards,
+      false,
+      {
+        suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
+          && bossPreparation.event?.decision === 'disobey',
+      },
+    );
     if (state.finished) return true;
 
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -3064,7 +3170,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
   if (cardsLeft === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return false;
 
   const kindBefore2 = classifyMeldForUi(teamMeld).kind;
-  const kindAfter2 = classifyMeldForUi(combinedCheck).kind;
+  const kindAfter2 = classifyMeldPreview(combinedCheck).kind;
   const bossPreparation = await prepareBossMeldMutation(
     currentPlayer(),
     candidateMeldIndexes[0],
@@ -3076,7 +3182,11 @@ async function attemptExtendExistingMeld(cards, indexes) {
   );
   if (!bossPreparation.allowed) return false;
 
-  if (!bossPreparation.undoSaved) saveStateForUndo('meldExtend', cards.map((card) => card.id));
+  if (!bossPreparation.undoSaved)
+    saveStateForUndo(
+      'meldExtend',
+      cards.map((card) => card.id),
+    );
 
   for (const idx of indexes) {
     teamMeld.push(hand[idx]);
@@ -3093,7 +3203,18 @@ async function attemptExtendExistingMeld(cards, indexes) {
   selectedMeldTarget = null;
 
   let domReward = await processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind, candidateMeldIndexes[0]);
-  const bossEvent = await processBossMeldChange(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind, candidateMeldIndexes[0], cards);
+  const bossEvent = await processBossMeldChange(
+    currentPlayer(),
+    kindBefore2,
+    classifyMeldForUi(teamMeld).kind,
+    candidateMeldIndexes[0],
+    cards,
+    false,
+    {
+      suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
+        && bossPreparation.event?.decision === 'disobey',
+    },
+  );
   if (state.finished) return true;
 
   if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -3239,7 +3360,11 @@ async function makeMeldFromSelection(forceNew = false) {
       cards.map((card) => card.id),
     );
     if (!bossPreparation.allowed) return;
-    if (!bossPreparation.undoSaved) saveStateForUndo('meldNew', cards.map((card) => card.id));
+    if (!bossPreparation.undoSaved)
+      saveStateForUndo(
+        'meldNew',
+        cards.map((card) => card.id),
+      );
 
     const targetContainer = document.getElementById(teamId === 0 ? 'meldsP1' : 'meldsP2');
 
@@ -3271,7 +3396,18 @@ async function makeMeldFromSelection(forceNew = false) {
 
     // Avaliação Plus Dominação (CORRIGIDO: meldIdx numérico)
     let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx);
-    const bossEvent = await processBossMeldChange(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx, cards, true);
+    const bossEvent = await processBossMeldChange(
+      currentPlayer(),
+      'simple',
+      classifyMeldForUi(meld).kind,
+      meldIdx,
+      cards,
+      true,
+      {
+        suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
+          && bossPreparation.event?.decision === 'disobey',
+      },
+    );
     if (state.finished) return;
 
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -3763,7 +3899,6 @@ async function reclaimLocalBossVault() {
   const vault = getBossVault(state, myPlayerIndex);
   const event = reclaimBossVault(state, myPlayerIndex);
   if (!event || !vault?.card) return;
-  sortHand(state.players[myPlayerIndex].hand);
   state.boughtCardIds = [vault.card.id];
   state.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: myPlayerIndex, bossEvent: event, ts: Date.now() };
   renderAll();
@@ -3803,43 +3938,103 @@ function renderBossVaultSlot(root, player, isLocal = false) {
 
 async function animateBossForcedSwap(feedback) {
   const eventId = feedback.eventId || feedback.actionId;
+
   if (!eventId || lastAnimatedBossSwapId === eventId) return;
+
   lastAnimatedBossSwapId = eventId;
-  const handContainer = document.getElementById('handContainer');
-  handContainer?.classList.add('boss-swap-updating');
+
   const sentCards = feedback.sentCards || [];
-  const previews = sentCards.map((sent) => {
-    const fromRect = opponentAnchorRect(sent.playerId);
-    if (!fromRect || !sent.card) return null;
-    const preview = document.createElement('div');
-    preview.className = `carta boss-swap-preview ${suitClass(sent.card)} ${deckFaceClass(sent.card)}`;
-    preview.innerHTML = cardFrontHTML(sent.card);
-    Object.assign(preview.style, { left: `${fromRect.left}px`, top: `${fromRect.top}px`, width: `${fromRect.width}px`, height: `${fromRect.height}px` });
-    document.body.appendChild(preview);
-    return { preview, sent, fromRect };
-  }).filter(Boolean);
+  const receivedCards = feedback.receivedCards || [];
+
+  const mine = receivedCards.find((received) => received.playerId === myPlayerIndex);
+
+  // O estado já contém a carta recebida antes de a animação começar.
+  // Esconde somente essa carta para ela não aparecer duplicada durante o voo.
+  const receivedCardElement = mine ? cardElById(mine.cardId) : null;
+
+  if (receivedCardElement) {
+    receivedCardElement.style.visibility = 'hidden';
+  }
+
+  // Mostra previamente as duas cartas que serão trocadas,
+  // sem esconder o restante das mãos.
+  const previews = sentCards
+    .map((sent) => {
+      const fromRect = opponentAnchorRect(sent.playerId);
+
+      if (!fromRect || !sent.card) return null;
+
+      const preview = document.createElement('div');
+
+      preview.className = `carta boss-swap-preview ${suitClass(sent.card)} ${deckFaceClass(sent.card)}`;
+
+      preview.innerHTML = cardFrontHTML(sent.card);
+
+      Object.assign(preview.style, {
+        left: `${fromRect.left}px`,
+        top: `${fromRect.top}px`,
+        width: `${fromRect.width}px`,
+        height: `${fromRect.height}px`,
+      });
+
+      document.body.appendChild(preview);
+
+      return {
+        preview,
+        sent,
+        fromRect,
+      };
+    })
+    .filter(Boolean);
+
   try {
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise((resolve) => setTimeout(resolve, 480));
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      await new Promise((resolve) => setTimeout(resolve, 480));
+    }
+
+    // Remove as prévias quando o movimento realmente começa.
+    previews.forEach(({ preview }) => preview.remove());
+
     await Promise.all(
       previews.map(async ({ sent, fromRect }) => {
         const toRect = opponentAnchorRect(sent.toPlayerId);
-        if (toRect) await flyRectToRect(sent.card, fromRect, toRect, 'front');
+
+        if (toRect) {
+          await flyRectToRect(sent.card, fromRect, toRect, 'front');
+        }
       }),
     );
   } finally {
     previews.forEach(({ preview }) => preview.remove());
-    handContainer?.classList.remove('boss-swap-updating');
+
+    if (receivedCardElement) {
+      receivedCardElement.style.visibility = '';
+    }
   }
+
   const expiresAt = Date.now() + 4200;
-  feedback.receivedCards.forEach((received) => bossSwapReceivedHighlights.set(received.cardId, { eventId, fromPlayerId: received.fromPlayerId, expiresAt }));
+
+  receivedCards.forEach((received) => {
+    bossSwapReceivedHighlights.set(received.cardId, {
+      eventId,
+      fromPlayerId: received.fromPlayerId,
+      expiresAt,
+    });
+  });
+
   renderHand();
-  const mine = feedback.receivedCards.find((received) => received.playerId === myPlayerIndex);
+
   if (mine) {
     const sender = state.players.find((player) => player.id === mine.fromPlayerId);
+
     showMessage(`Você recebeu ${mine.cardLabel} de ${sender?.name || 'outro jogador'}.`);
   }
+
   setTimeout(() => {
-    feedback.receivedCards.forEach((received) => bossSwapReceivedHighlights.delete(received.cardId));
+    receivedCards.forEach((received) => {
+      bossSwapReceivedHighlights.delete(received.cardId);
+    });
+
     renderHand();
   }, 4300);
 }
@@ -3848,13 +4043,14 @@ function setBossPortrait(image, definition) {
   if (!image || !definition) return;
   const frame = image.closest('.boss-portrait');
   const source = definition.portrait || 'assets/images/boss-banqueiro.png';
-  const fallbackLabel = String(definition.name || 'Chefe')
-    .split(/\s+/)
-    .filter((part) => part.length > 2)
-    .slice(-2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase() || 'CM';
+  const fallbackLabel =
+    String(definition.name || 'Chefe')
+      .split(/\s+/)
+      .filter((part) => part.length > 2)
+      .slice(-2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'CM';
   if (frame) frame.dataset.fallbackLabel = fallbackLabel;
   image.onload = () => {
     image.style.display = '';
@@ -3871,7 +4067,6 @@ function setBossPortrait(image, definition) {
     image.style.display = '';
     image.src = source;
   }
-
 }
 
 function renderBossHud() {
@@ -3895,17 +4090,10 @@ function renderBossHud() {
   const flow = boss.bossFlow;
   const resolvingEvent = flow?.stage === 'result' ? boss.eventLog?.find((entry) => entry.actionId === flow.eventActionId) || null : null;
   hud.style.display = 'grid';
-        hud.classList.remove('boss-resolving');
-        hud.classList.toggle('boss-turn-active', isBossTurnActive(state));
-        hud.classList.toggle('boss-cocoon-active', isMatriarch && boss.emeraldCocoon?.status === 'active');
-  hud.dataset.cocoonStage =
-    isMatriarch && boss.emeraldCocoon?.status === 'active'
-      ? boss.emeraldCocoon.remaining <= 60
-        ? 'critical'
-        : boss.emeraldCocoon.remaining <= 120
-          ? 'cracked'
-          : 'full'
-      : '';
+  hud.classList.remove('boss-resolving');
+  hud.classList.toggle('boss-turn-active', isBossTurnActive(state));
+  hud.classList.toggle('boss-cocoon-active', isMatriarch && boss.emeraldCocoon?.status === 'active');
+  hud.dataset.cocoonStage = isMatriarch && boss.emeraldCocoon?.status === 'active' ? (boss.emeraldCocoon.remaining <= 60 ? 'critical' : boss.emeraldCocoon.remaining <= 120 ? 'cracked' : 'full') : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
   setBossPortrait(document.getElementById('bossPortraitImage'), definition);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
@@ -4000,34 +4188,39 @@ function renderBossHud() {
   (boss.interdicts || []).filter((interdict) => interdict.status === 'active').forEach((interdict) => tacticalEffects.push({ id: 'interdict', ...interdict }));
   if (boss.creditLimit?.status === 'active') tacticalEffects.push({ id: 'credit_limit', ...boss.creditLimit });
   if (boss.discardSurcharge?.status === 'active') tacticalEffects.push({ id: 'discard_surcharge', ...boss.discardSurcharge });
-  document.getElementById('bossEffects').innerHTML = [...(boss.effects || []), ...persistentPossessions, ...natureEffects, ...tacticalEffects]
-    .map((effect) => {
-      if (effect.id === 'maintenance_fee') return `<span class="boss-effect-chip">Tarifa: +${effect.extraDraw} carta${effect.extraDraw === 1 ? '' : 's'} financiada${effect.extraDraw === 1 ? '' : 's'} · Dívida +${effect.financedDebt} cada</span>`;
-      if (effect.id === 'financed_card') {
-        const owner = state.players.find((player) => player.id === effect.playerId);
-        const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
-        return `<span class="boss-effect-chip boss-financed-chip">$ ${owner?.name || 'Jogador'}: ${card ? `${card.rank}${card.suit}` : 'carta'} financiada · +${effect.debtPerCard}</span>`;
-      }
-      if (effect.id === 'choice_lock') {
-        const owner = state.players.find((player) => player.id === effect.playerId);
-        const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
-        const label = card ? `${card.rank}${card.suit}` : 'carta';
-        return `<span class="boss-effect-chip">⛓ ${owner?.name || 'Jogador'}: ${label} presa</span>`;
-      }
-      if (effect.id === 'possession') {
-        const contributors = (effect.contributorPlayerIds || []).map((playerId) => state.players.find((player) => player.id === playerId)?.name).filter(Boolean);
-        return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required} (${contributors.join(' + ') || 'sem contribuicoes'}) · ${effect.suppressedDamage} dano suspenso</span>`;
-      }
-      if (effect.id === 'emerald_cocoon') return `<span class="boss-effect-chip boss-nature-chip">Casulo: ${effect.remaining}/180</span>`;
-      if (effect.id === 'spring_crown') return '<span class="boss-effect-chip boss-nature-chip">Coroa da Primavera ativa</span>';
-      if (effect.id === 'hands_tied_team') return `<span class="boss-effect-chip">Maos Atadas: ${effect.teamMeldAvailable === false ? `criacao consumida por ${state.players.find((player) => player.id === effect.consumedByPlayerId)?.name || 'cooperador'}` : '1 criacao disponivel para a equipe'}</span>`;
-      if (effect.id === 'dominatrix_order') return `<span class="boss-effect-chip">Ordem: ${effect.label || effect.suitLabel || effect.type} · ${state.players.find((player) => player.id === effect.targetPlayerId)?.name || 'alvo'}</span>`;
-      if (effect.id === 'interdict') return `<span class="boss-effect-chip">Interdito: jogo ${Number(effect.meldIndex) + 1} · primeira evolucao</span>`;
-      if (effect.id === 'credit_limit') return `<span class="boss-effect-chip">Credito ${new Set(effect.countedCardIds || []).size}/${effect.allowance} · cobranca ${effect.chargedDebt || 0}/${effect.maxCharge}</span>`;
-      if (effect.id === 'discard_surcharge') return `<span class="boss-effect-chip">Agio do Lixo: +${effect.amount} Divida na primeira retirada valida</span>`;
-      return `<span class="boss-effect-chip">${effect.id}</span>`;
-    })
-    .join('') + natureSummaries.map((summary) => `
+  document.getElementById('bossEffects').innerHTML =
+    [...(boss.effects || []), ...persistentPossessions, ...natureEffects, ...tacticalEffects]
+      .map((effect) => {
+        if (effect.id === 'maintenance_fee') return `<span class="boss-effect-chip">Tarifa: +${effect.extraDraw} carta${effect.extraDraw === 1 ? '' : 's'} financiada${effect.extraDraw === 1 ? '' : 's'} · Dívida +${effect.financedDebt} cada</span>`;
+        if (effect.id === 'financed_card') {
+          const owner = state.players.find((player) => player.id === effect.playerId);
+          const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
+          return `<span class="boss-effect-chip boss-financed-chip">$ ${owner?.name || 'Jogador'}: ${card ? `${card.rank}${card.suit}` : 'carta'} financiada · +${effect.debtPerCard}</span>`;
+        }
+        if (effect.id === 'choice_lock') {
+          const owner = state.players.find((player) => player.id === effect.playerId);
+          const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
+          const label = card ? `${card.rank}${card.suit}` : 'carta';
+          return `<span class="boss-effect-chip">⛓ ${owner?.name || 'Jogador'}: ${label} presa</span>`;
+        }
+        if (effect.id === 'possession') {
+          const contributors = (effect.contributorPlayerIds || []).map((playerId) => state.players.find((player) => player.id === playerId)?.name).filter(Boolean);
+          return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required} (${contributors.join(' + ') || 'sem contribuicoes'}) · ${effect.suppressedDamage} dano suspenso</span>`;
+        }
+        if (effect.id === 'emerald_cocoon') return `<span class="boss-effect-chip boss-nature-chip">Casulo: ${effect.remaining}/180</span>`;
+        if (effect.id === 'spring_crown') return '<span class="boss-effect-chip boss-nature-chip">Coroa da Primavera ativa</span>';
+        if (effect.id === 'hands_tied_team')
+          return `<span class="boss-effect-chip">Maos Atadas: ${effect.teamMeldAvailable === false ? `criacao consumida por ${state.players.find((player) => player.id === effect.consumedByPlayerId)?.name || 'cooperador'}` : '1 criacao disponivel para a equipe'}</span>`;
+        if (effect.id === 'dominatrix_order') return `<span class="boss-effect-chip">Ordem: ${effect.label || effect.suitLabel || effect.type} · ${state.players.find((player) => player.id === effect.targetPlayerId)?.name || 'alvo'}</span>`;
+        if (effect.id === 'interdict') return `<span class="boss-effect-chip">Interdito: jogo ${Number(effect.meldIndex) + 1} · primeira evolucao</span>`;
+        if (effect.id === 'credit_limit') return `<span class="boss-effect-chip">Credito ${new Set(effect.countedCardIds || []).size}/${effect.allowance} · cobranca ${effect.chargedDebt || 0}/${effect.maxCharge}</span>`;
+        if (effect.id === 'discard_surcharge') return `<span class="boss-effect-chip">Agio do Lixo: +${effect.amount} Divida na primeira retirada valida</span>`;
+        return `<span class="boss-effect-chip">${effect.id}</span>`;
+      })
+      .join('') +
+    natureSummaries
+      .map(
+        (summary) => `
       <article class="boss-nature-threat-detail${summary.urgent ? ' is-urgent' : ''}" data-threat-id="${summary.id}">
         <header><strong>${summary.name}</strong>${summary.urgent ? '<span>MAIS URGENTE</span>' : ''}</header>
         <dl>
@@ -4038,14 +4231,16 @@ function renderBossHud() {
           <div><dt>Cura prevista</dt><dd>${summary.predictedHeal} HP</dd></div>
         </dl>
       </article>
-    `).join('');
+    `,
+      )
+      .join('');
 
   const choicePanel = document.getElementById('bossChoicePanel');
   const myChoice = getBossPendingChoice(state, myPlayerIndex);
   const pendingChoice = boss.pendingChoices?.[0] || null;
   const choiceLabels = {
     draw2: 'Comprar 2 cartas',
-    chain: 'Receber 1 Corrente',
+    chain: 'Receber 1 Chicote',
     order: 'Aceitar a ordem',
     lock_card: 'Prender 1 carta',
     break_meld: 'Retirar carta da canastra',
@@ -4054,7 +4249,10 @@ function renderBossHud() {
   const animateForcedChoiceDraw = async (event, playerId, fromRect) => {
     if (playerId !== myPlayerIndex || !fromRect) return;
     const player = state.players.find((entry) => entry.id === playerId);
-    const receivedCards = event.drawnCardIds.slice(0, 2).map((cardId) => player?.hand.find((card) => card.id === cardId)).filter(Boolean);
+    const receivedCards = event.drawnCardIds
+      .slice(0, 2)
+      .map((cardId) => player?.hand.find((card) => card.id === cardId))
+      .filter(Boolean);
     await Promise.all(
       receivedCards.map((card) => {
         const toEl = cardElById(card.id);
@@ -4075,9 +4273,13 @@ function renderBossHud() {
           ? 'Juros Fixos: pague o valor integral ou escolha um garantidor.'
           : myChoice.type === 'banker_collateral_card'
             ? 'Escolha uma carta sua para enviar ao Cofre.'
-            : myChoice.type === 'forced_choice' && myChoice.order?.description
-              ? `Escolha Forçada: receba 1 Corrente agora ou aceite a ordem: ${myChoice.order.description}`
-              : 'A Dominadora exige uma escolha.';
+            : myChoice.type === 'final_order_draw'
+              ? 'Ordem Final: escolha entre comprar 2 cartas que ficarao presas no proximo turno ou receber 1 Chicote.'
+              : myChoice.type === 'final_order_lock'
+                ? 'Ordem Final: escolha entre deixar 1 carta aleatoria da sua mao presa no proximo turno ou receber 1 Chicote.'
+                : myChoice.type === 'forced_choice' && myChoice.order?.description
+                  ? `Escolha Forçada: receba 1 Chicote agora ou aceite a ordem: ${myChoice.order.description}`
+                  : 'A Dominadora exige uma escolha.';
     const actions = document.getElementById('bossChoiceActions');
     actions.innerHTML = myChoice.options
       .map((option) => {
@@ -4109,10 +4311,13 @@ function renderBossHud() {
         }
         if (event.drawnCardIds?.length) {
           state.boughtCardIds = [...event.drawnCardIds];
+
           const lockedMessage = event.lockedCardLabels?.length ? ` ${event.lockedCardLabels.join(' e ')} ficaram presas.` : ' As duas cartas ficaram presas.';
+
           showMessage(`2 cartas adicionadas à sua mão.${lockedMessage} Sua compra normal do turno continua sendo 1 carta.`);
+        } else if (event.choiceType === 'final_order_lock' && event.lockedCardLabel) {
+          showMessage(`Ordem Final: ${event.lockedCardLabel} ficou presa durante o proximo turno completo.`);
         }
-        sortHand(state.players[myPlayerIndex].hand);
         state.lastAction = { id: newActionId(), type: 'bossChoice', playerId: myPlayerIndex, bossEvent: event, ts: Date.now() };
         renderAll();
         const commitPromise = commitState();
@@ -4171,11 +4376,11 @@ function renderBossHud() {
       return {
         icon: '💥',
         title: kindLabels[entry.newKind] || 'Ataque da equipe',
-        detail: `${entry.damage} de dano${entry.dangerChangeLabel ? ` · ${entry.dangerChangeLabel}` : ''}${entry.chainsRemoved ? ` · ${entry.chainsRemoved} Corrente removida` : ''}${entry.possessionProgress != null ? ` · Posse ${entry.possessionProgress}/2` : ''}`,
+        detail: `${entry.damage} de dano${entry.dangerChangeLabel ? ` · ${entry.dangerChangeLabel}` : ''}${entry.chainsRemoved ? ` · ${entry.chainsRemoved} Chicote removido` : ''}${entry.possessionProgress != null ? ` · Posse ${entry.possessionProgress}/2` : ''}`,
       };
-    if (entry.type === 'bossAbility') return { icon: '💼', title: entry.name || 'Cobrança', detail: entry.outcome || 'Habilidade resolvida' };
-    if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Corrente aplicada' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${entry.chains}/4 Correntes` };
-    if (entry.type === 'chainOverflow') return { icon: '⛓', title: 'Corrente transferida', detail: entry.outcome || 'O excesso de Correntes foi transferido ao parceiro.' };
+    if (entry.type === 'bossAbility') return { icon: '💼', title: `${definition?.name || 'Chefe'} — ${entry.name || 'Habilidade'}`, detail: entry.outcome || 'Habilidade resolvida' };
+    if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Chicote aplicado' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${entry.chains}/4 Chicotes` };
+    if (entry.type === 'chainOverflow') return { icon: '⛓', title: 'Chicote transferido', detail: entry.outcome || 'O excesso de Chicotes foi transferido ao parceiro.' };
     if (entry.type === 'dominatrixOrder') return { icon: '👑', title: 'Ordem da Dominadora', detail: entry.outcome || 'A ordem foi resolvida.' };
     if (entry.type === 'creditLimit') return { icon: '🪙', title: 'Limite de Crédito', detail: entry.outcome || `Dívida +${entry.debtAdded || 0}` };
     if (entry.type === 'discardSurcharge') return { icon: '🪙', title: 'Sobretaxa do Lixo', detail: entry.outcome || `Dívida +${entry.amount || 0}` };
@@ -4183,23 +4388,48 @@ function renderBossHud() {
     if (entry.type === 'debtReduction') return { icon: '🛡️', title: 'Morto conquistado', detail: entry.dangerChangeLabel || `Morto conquistado: Dívida -${entry.amount}` };
     if (entry.type === 'bossHeal') return { icon: '✿', title: entry.origin || 'Cura natural', detail: `HP +${entry.amount}` };
     if (entry.type === 'bloomChange') return { icon: '🌸', title: entry.origin || 'Florescimento', detail: `${entry.amount > 0 ? '+' : ''}${entry.amount} Flor${Math.abs(entry.amount) === 1 ? '' : 'es'}` };
-    if (entry.type === 'natureThreat') return { icon: '🌿', title: entry.name || 'Ameaça natural', detail: entry.outcome || 'A ameaça foi plantada na mesa.' };
+    if (entry.type === 'natureThreat') return { icon: '🌿', title: `${definition?.name || 'Matriarca'} — ${entry.name || 'Ameaça natural'}`, detail: entry.outcome || 'A ameaça foi plantada na mesa.' };
     if (entry.type === 'rebirth') return { icon: '✨', title: 'Renascimento Esmeralda', detail: entry.outcome || 'A Matriarca retornou com 300 HP.' };
     if (entry.type === 'playerTurn') return { icon: '👥', title: `${entry.playerName} concluiu o turno`, detail: `${entry.cardsInHand} carta(s) na mão` };
     if (entry.type === 'finalStrike') return { icon: '⚔️', title: 'Ataque final', detail: `${entry.damage} de dano` };
     return { icon: '📋', title: 'Evento da batalha', detail: entry.outcome || entry.reason || 'Estado atualizado' };
   };
-  const reversedEvents = [...(boss.eventLog || [])].reverse();
-  const importantEventTypes = new Set(['bossDamage', 'bossAbility', 'chainChange', 'chainOverflow', 'dominatrixOrder', 'creditLimit', 'discardSurcharge', 'bossChoice', 'debtReduction', 'phase', 'finalStrike', 'bossHeal', 'bloomChange', 'natureThreat', 'rebirth']);
-  const logEntries = [...reversedEvents.filter((entry) => importantEventTypes.has(entry.type)), ...reversedEvents.filter((entry) => !importantEventTypes.has(entry.type))].slice(0, 8);
+  const escapeLogHtml = (value) =>
+    String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  const logEntries = [...(boss.eventLog || [])].slice(-24).reverse();
+  const groupedLog = new Map();
+  logEntries.forEach((entry) => {
+    const round = Number(entry.round || boss.roundNumber || 1);
+    if (!groupedLog.has(round)) groupedLog.set(round, []);
+    groupedLog.get(round).push(entry);
+  });
+  const latestLog = boss.eventLog?.[boss.eventLog.length - 1];
+  const latestLogKey = latestLog ? `${latestLog.actionId || latestLog.id || latestLog.type}:${latestLog.at || latestLog.round || 0}` : null;
+  const detailsOpen = document.getElementById('bossBattleDetails')?.open;
+  if (detailsOpen && latestLogKey) lastSeenBossLogKey = latestLogKey;
+  const newLogMarker = document.getElementById('bossLogNew');
+  if (newLogMarker) newLogMarker.hidden = !latestLogKey || latestLogKey === lastSeenBossLogKey || !!detailsOpen;
   document.getElementById('bossLogCount').textContent = String(boss.eventLog?.length || 0);
-  document.getElementById('bossEventLog').innerHTML = logEntries.length
-    ? logEntries
-        .map((entry) => {
-          const info = describeBossEvent(entry);
-          const time = entry.at ? new Date(entry.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : `R${entry.round || boss.roundNumber}`;
-          return `<div class="boss-log-entry"><span class="boss-log-icon">${info.icon}</span><span class="boss-log-copy"><strong>${info.title}</strong><br>${info.detail}</span><span class="boss-log-time">${time}</span></div>`;
-        })
+  document.getElementById('bossEventLog').innerHTML = groupedLog.size
+    ? [...groupedLog.entries()]
+        .map(
+          ([round, entries]) => `
+        <section class="boss-log-round">
+          <h4>RODADA ${round}</h4>
+          ${entries
+            .map((entry) => {
+              const info = describeBossEvent(entry);
+              const time = entry.at ? new Date(entry.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : `R${round}`;
+              return `<div class="boss-log-entry"><span class="boss-log-icon">${info.icon}</span><span class="boss-log-copy"><strong>${escapeLogHtml(info.title)}</strong><br>${escapeLogHtml(info.detail)}</span><span class="boss-log-time">${time}</span></div>`;
+            })
+            .join('')}
+        </section>`,
+        )
         .join('')
     : '<div class="boss-log-empty">A batalha ainda não registrou impactos.</div>';
 
@@ -4207,9 +4437,7 @@ function renderBossHud() {
   if (discardButton) {
     discardButton.classList.toggle('boss-locked', isBossDiscardBlocked(state) && !state.hasDrawnThisTurn);
     const discardCardId = state.discard?.[state.discard.length - 1]?.id;
-    const pollenActive = (boss.natureThreats || []).some(
-      (threat) => threat.status === 'active' && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && threat.discardCardId === discardCardId,
-    );
+    const pollenActive = (boss.natureThreats || []).some((threat) => threat.status === 'active' && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && threat.discardCardId === discardCardId);
     discardButton.classList.toggle('boss-pollen-discard', pollenActive);
   }
 
@@ -4235,6 +4463,7 @@ function renderBossHud() {
   }
 
   const feedbackEvents = boss.eventLog || [];
+  syncBossResourceSounds(boss);
   if (renderedBossFeedbackCount == null || renderedBossFeedbackCount > feedbackEvents.length) {
     renderedBossFeedbackCount = feedbackEvents.length;
   } else if (feedbackEvents.length > renderedBossFeedbackCount) {
@@ -4269,12 +4498,12 @@ function renderBossHud() {
                 ? 'nature-cocoon-break'
                 : isNatureCreated
                   ? 'nature-threat-created'
-              : feedback.dangerDelta > 0
-                ? 'debt-up'
-                : 'debt-down';
+                  : feedback.dangerDelta > 0
+                    ? 'debt-up'
+                    : 'debt-down';
       floating.className = `boss-floating-number ${visualClass}`;
       floating.textContent = isChain
-        ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Corrente`
+        ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Chicote`
         : isHeal
           ? `HP +${feedback.amount}`
           : isBloom
@@ -4284,8 +4513,8 @@ function renderBossHud() {
               : isCocoonBreak
                 ? 'CASULO ROMPIDO'
                 : isNatureCreated
-                  ? ({ living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA')
-              : feedback.dangerChangeLabel;
+                  ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA'
+                  : feedback.dangerChangeLabel;
       const chainPlayer = isChain ? [...document.querySelectorAll('#bossChainStatus .boss-chain-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId)) : null;
       const anchor = isChain
         ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
@@ -4295,7 +4524,7 @@ function renderBossHud() {
             ? document.querySelector('.boss-portrait')?.getBoundingClientRect()
             : isNatureCreated
               ? document.getElementById('bossIntentName')?.parentElement?.getBoundingClientRect()
-          : document.getElementById('bossDangerMeter')?.getBoundingClientRect();
+              : document.getElementById('bossDangerMeter')?.getBoundingClientRect();
       if (!anchor) return;
       floating.style.left = `${anchor.left + anchor.width / 2}px`;
       floating.style.top = `${anchor.top + anchor.height / 2 + index * 8}px`;
@@ -4314,6 +4543,21 @@ function renderBossResult() {
   }
   const boss = normalizeBossState(state);
   const presentation = buildBossFinalPresentation(state);
+  const specialDefeatReasons = new Set(['max_debt', 'both_players_dominated', 'max_bloom']);
+  const bossVictoryKey = `${gameId}:${boss.id}:${boss.seed || 0}:${boss.result.reason || ''}`;
+  const persistedVictoryKey = sessionStorage.getItem('buraco_boss_victory_sound');
+  if (!boss.result.victory && bossVictoryKey !== lastBossVictorySoundKey && bossVictoryKey !== persistedVictoryKey) {
+    lastBossVictorySoundKey = bossVictoryKey;
+    sessionStorage.setItem('buraco_boss_victory_sound', bossVictoryKey);
+    playSfxClone(BOSS_SFX[boss.id]?.victory);
+  }
+  if (!boss.result.victory && specialDefeatReasons.has(boss.result.reason)) {
+    section.dataset.specialDefeat = boss.id;
+    section.classList.remove('boss-special-defeat');
+    void section.offsetWidth;
+    section.classList.add('boss-special-defeat');
+    setTimeout(() => section.classList.remove('boss-special-defeat'), 2200);
+  }
   section.dataset.outcome = boss.result.victory ? 'victory' : 'defeat';
   document.getElementById('bossResultTitle').textContent = presentation.outcome;
   document.getElementById('bossResultBossName').textContent = presentation.bossName.toUpperCase();
@@ -4543,9 +4787,7 @@ function renderAll() {
   const discardLayers = updatePile3D(discardEl, 'pile-card', discardCount, 'discard', false);
 
   const discardTop = state.discard[discardCount - 1];
-  const pollenThreat = state.boss?.id === 'matriarca_esmeralda'
-    ? (state.boss.natureThreats || []).find((threat) => threat.status === 'active' && threat.targetPlayerId == null && threat.discardCardId === discardTop?.id)
-    : null;
+  const pollenThreat = state.boss?.id === 'matriarca_esmeralda' ? (state.boss.natureThreats || []).find((threat) => threat.status === 'active' && threat.targetPlayerId == null && threat.discardCardId === discardTop?.id) : null;
   document.getElementById('drawDiscardBtn')?.classList.toggle('boss-pollen-discard', !!pollenThreat);
   if (!discardTop) {
     discardFace.style.display = 'none';
@@ -5309,6 +5551,17 @@ function renderMelds() {
       div.classList.toggle('locked-by-boss', isBossMeldLocked(state, t.id, midx));
       const possessed = isBossMeldPossessed(state, t.id, midx);
       div.classList.toggle('possessed-by-boss', possessed);
+      const activeInterdict = isCurrentBossMode() && state.boss?.id === 'dominadora'
+        ? (state.boss.interdicts || []).find((entry) => (
+            entry.status === 'active'
+            && Number(entry.teamId ?? 0) === Number(t.id)
+            && (
+              Number(entry.meldIndex) === midx
+              || (entry.meldId && entry.meldId === state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`])
+            )
+          ))
+        : null;
+      div.classList.toggle('interdicted-by-boss', !!activeInterdict);
       const natureThreats = isCurrentBossMode() ? getBossMeldNatureThreats(state, t.id, midx) : [];
       const rootThreat = natureThreats.find((threat) => ['root', 'twin_root', 'royal_root'].includes(threat.type));
       const graftThreat = natureThreats.find((threat) => threat.type === 'graft');
@@ -5329,37 +5582,52 @@ function renderMelds() {
         div.classList.add('canastra-asas-bdsm');
       }
 
-      meld.forEach((c, cidx) => {
-        if (mInfo.kind !== 'simple' && cidx === meld.length - 1) return;
+      meld.forEach((card, cardIndex) => {
+        if (!card || typeof card !== 'object') {
+          console.warn('[renderMelds] carta inválida ignorada:', card, {
+            teamId: t.id,
+            meldIndex: midx,
+            cardIndex,
+          });
 
-        // >>> ESCUDO ANTI-GHOST AQUI <<<
-        if (!c) return;
-
-        const minic = document.createElement('div');
-        if (!c) {
-          console.warn('[renderMelds] carta inválida ignorada no render');
           return;
         }
 
-        minic.className = `carta mini ${suitClass(c)} ${deckFaceClass(c)}`;
-        minic.dataset.cardIndex = cidx;
-        minic.innerHTML = cardFrontHTML(c);
+        const isClosedCard = mInfo?.kind !== 'simple' && cardIndex === meld.length - 1;
 
-        row.appendChild(minic);
+        if (isClosedCard) {
+          return;
+        }
+
+        const miniCard = document.createElement('div');
+
+        miniCard.className = `carta mini ${suitClass(card)} ${deckFaceClass(card)}`;
+
+        miniCard.dataset.cardIndex = String(cardIndex);
+        miniCard.innerHTML = cardFrontHTML(card);
+
+        row.appendChild(miniCard);
       });
 
-      if (mInfo.kind !== 'simple') {
-        const last = meld[meld.length - 1];
+      if (mInfo?.kind !== 'simple') {
+        const lastCard = meld[meld.length - 1];
 
-        // >>> ESCUDO ANTI-GHOST AQUI TAMBÉM <<<
-        if (!last) return;
+        if (lastCard && typeof lastCard === 'object') {
+          const closedCard = document.createElement('div');
 
-        const closed = document.createElement('div');
-        closed.className = `carta mini canastra-fechada ${suitClass(last)} ${deckFaceClass(last)}`;
-        closed.dataset.cardIndex = meld.length - 1;
-        closed.innerHTML = cardFrontHTML(last);
+          closedCard.className = `carta mini canastra-fechada ${suitClass(lastCard)} ${deckFaceClass(lastCard)}`;
 
-        row.appendChild(closed);
+          closedCard.dataset.cardIndex = String(meld.length - 1);
+
+          closedCard.innerHTML = cardFrontHTML(lastCard);
+
+          row.appendChild(closedCard);
+        } else {
+          console.warn('[renderMelds] carta final inválida ignorada:', lastCard, {
+            teamId: t.id,
+            meldIndex: midx,
+          });
+        }
       }
 
       const meta = document.createElement('div');
@@ -5381,12 +5649,16 @@ function renderMelds() {
         contributionChips.push(contributionChip('debt', contribution.bankerDebtRelief, '&#129689;', 'Divida reduzida por este jogo'));
       }
       if (state.boss?.id === 'dominadora' && contribution?.dominatrixChainsBroken > 0) {
-        contributionChips.push(contributionChip('chains', contribution.dominatrixChainsBroken, '&#9939;&#65039;', 'Correntes removidas por este jogo'));
+        contributionChips.push(contributionChip('chains', contribution.dominatrixChainsBroken, '&#9939;&#65039;', 'Chicotes removidos por este jogo'));
       }
       if (state.boss?.id === 'matriarca_esmeralda' && contribution?.matriarchBloomRemoved > 0) {
         contributionChips.push(contributionChip('bloom', contribution.matriarchBloomRemoved, '&#127800;', 'Florescimentos removidos por este jogo'));
       }
       const natureLabels = [];
+      if (activeInterdict) {
+        const evolutionLabel = mInfo.kind === 'real' ? 'REAL → ÁS-A-ÁS' : 'LIMPA → REAL';
+        natureLabels.push(`<span class="boss-meld-interdict-seal">INTERDITO · ${evolutionLabel}</span>`);
+      }
       if (rootThreat) natureLabels.push(`<span class="boss-meld-nature-seal">RAIZ ${rootThreat.progress || 0}/${rootThreat.required || 1}</span>`);
       if (graftThreat) {
         const fed = new Set(graftThreat.fedMeldIds || []);
@@ -6319,9 +6591,7 @@ const botEngine = {
     }
     if (choice.type === 'forced_choice' && choice.options.includes('chain') && choice.options.includes('order')) {
       const ownChains = getBossChains(state, playerId);
-      const partnerChains = Math.max(0, ...(state.players || [])
-        .filter((entry) => entry.id !== playerId)
-        .map((entry) => getBossChains(state, entry.id)));
+      const partnerChains = Math.max(0, ...(state.players || []).filter((entry) => entry.id !== playerId).map((entry) => getBossChains(state, entry.id)));
       const practicalOrder = ['discard_suit', 'no_new_meld', 'feed_specific_meld'].includes(choice.order?.type);
       option = choice.order && (ownChains >= 3 || partnerChains >= 3 || practicalOrder) ? 'order' : 'chain';
     } else if (choice.options.includes('chain') && getBossChains(state, playerId) >= 2) {
@@ -6334,7 +6604,6 @@ const botEngine = {
       state.finished = true;
       state.winnerTeamId = state.boss.result.victory ? 0 : 1;
     }
-    if (player) sortHand(player.hand);
     if (event?.drawnCardIds?.length) state.boughtCardIds = [...event.drawnCardIds];
     if (event) {
       state.lastAction = { id: newActionId(), type: 'bossChoice', playerId, bossEvent: event, ts: Date.now() };
@@ -6351,16 +6620,18 @@ const botEngine = {
     const quote = getBossCreditLimitQuote(s, cards, {
       creditEligibleCardIds: options.creditEligibleCardIds ?? null,
     });
-    if (quote?.debt > 0 && !shouldBossBotAcceptCreditPlay(s, me.id, {
-      cards,
-      oldKind,
-      newKind,
-      creditEligibleCardIds: options.creditEligibleCardIds ?? null,
-    })) return false;
+    if (
+      quote?.debt > 0 &&
+      !shouldBossBotAcceptCreditPlay(s, me.id, {
+        cards,
+        oldKind,
+        newKind,
+        creditEligibleCardIds: options.creditEligibleCardIds ?? null,
+      })
+    )
+      return false;
 
-    const interdict = Number.isInteger(meldIndex)
-      ? getBossInterdictAttempt(s, me.teamId, meldIndex, oldKind, newKind)
-      : null;
+    const interdict = Number.isInteger(meldIndex) ? getBossInterdictAttempt(s, me.teamId, meldIndex, oldKind, newKind) : null;
     if (!interdict) return true;
     const chains = getBossChains(s, me.id);
     const valuableEvolution = ['real', 'asas'].includes(newKind);
@@ -6502,7 +6773,6 @@ const botEngine = {
     if (isBossVaultDrawRequired(s, botIndex)) {
       const vaultEvent = reclaimBossVault(s, botIndex);
       if (!vaultEvent) return;
-      sortHand(me.hand);
       s.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: botIndex, bossEvent: vaultEvent, ts: Date.now() };
       await this.commitState();
       return;
@@ -6609,7 +6879,17 @@ const botEngine = {
 
     const freshS = this.getState();
     if (freshS) {
-      freshS.lastAction = { id: newActionId(), type: 'drawDiscard', playerId: botIndex, card: packCard(topCard), count: pile.length, bossExtraCards: bossExtraCards.map(packCard), bossFinanceEvent: surchargeDecision.event, bossEvent: financedEvent, ts: Date.now() };
+      freshS.lastAction = {
+        id: newActionId(),
+        type: 'drawDiscard',
+        playerId: botIndex,
+        card: packCard(topCard),
+        count: pile.length,
+        bossExtraCards: bossExtraCards.map(packCard),
+        bossFinanceEvent: surchargeDecision.event,
+        bossEvent: financedEvent,
+        ts: Date.now(),
+      };
       await this.commitState();
     }
     return true;
@@ -6637,20 +6917,11 @@ const botEngine = {
     const previewTop = s.discard[s.discard.length - 1];
     const previewAddedCards = intent.action === 'new' ? [...selectedHandCards, previewTop] : [previewTop];
     const previewOldKind = intent.action === 'extend' ? classifyMeldForUi(team.melds[intent.meldIndex]).kind : 'simple';
-    const previewMeld = intent.action === 'extend'
-      ? [...team.melds[intent.meldIndex], previewTop]
-      : [...selectedHandCards, previewTop];
+    const previewMeld = intent.action === 'extend' ? [...team.melds[intent.meldIndex], previewTop] : [...selectedHandCards, previewTop];
     const previewNewKind = classifyMeldForUi(previewMeld).kind;
     const previewMeldIndex = intent.action === 'extend' ? intent.meldIndex : team.melds.length;
     const creditEligibleCardIds = selectedHandCards.map((card) => card.id);
-    if (!(await this.evaluateBossMeldMutation(
-      botIndex,
-      previewMeldIndex,
-      previewOldKind,
-      previewNewKind,
-      previewAddedCards,
-      { creditEligibleCardIds },
-    ))) return false;
+    if (!(await this.evaluateBossMeldMutation(botIndex, previewMeldIndex, previewOldKind, previewNewKind, previewAddedCards, { creditEligibleCardIds }))) return false;
     const surchargeDecision = this.acceptBossDiscardSurcharge(me.id, intent, getBossNaturePriorities(s, me.id));
     if (!surchargeDecision.allowed) return false;
     const pile = s.discard.splice(0, s.discard.length);
@@ -6713,19 +6984,8 @@ const botEngine = {
 
     const targetIdx = intent.action === 'extend' ? intent.meldIndex : team.melds.length - 1;
     let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind, targetIdx);
-    const cardOriginsById = Object.fromEntries(bossAddedCards.map((card) => [
-      card.id,
-      creditEligibleCardIds.includes(card.id) ? 'hand' : 'discard',
-    ]));
-    const bossEvent = await processBossMeldChange(
-      me,
-      kindBeforeFechado || 'simple',
-      classifyMeldForUi(meldToCheck).kind,
-      targetIdx,
-      bossAddedCards,
-      intent.action === 'new',
-      { creditEligibleCardIds, cardOriginsById },
-    );
+    const cardOriginsById = Object.fromEntries(bossAddedCards.map((card) => [card.id, creditEligibleCardIds.includes(card.id) ? 'hand' : 'discard']));
+    const bossEvent = await processBossMeldChange(me, kindBeforeFechado || 'simple', classifyMeldForUi(meldToCheck).kind, targetIdx, bossAddedCards, intent.action === 'new', { creditEligibleCardIds, cardOriginsById });
     if (s.finished) return true;
 
     sortHand(me.hand);
@@ -6756,7 +7016,7 @@ const botEngine = {
 
   async executeDiscard(botIndex, cardIndex) {
     const s = this.getState();
-    if (!s) return;
+    if (!s) return false;
     const me = s.players[botIndex];
     if (isBossCardBlocked(s, me.id, me.hand[cardIndex]?.id, 'discard')) {
       cardIndex = me.hand.findIndex((card) => !isBossCardBlocked(s, me.id, card?.id, 'discard') && card?.id !== s.pickedDiscardCardId);
@@ -6776,10 +7036,10 @@ const botEngine = {
     if (me.hand.length === 0 && !canTeamTakeDeadNow(me.teamId)) {
       if (teamHasGoodCanastra(me.teamId)) await finishGame(me.teamId);
       else await finishGame(me.teamId === 0 ? 1 : 0);
-      return;
+      return true;
     }
 
-  passTurn({ preserveUndo: true });
+    passTurn({ preserveUndo: true });
 
     const freshS = this.getState();
     if (freshS) {
@@ -6787,6 +7047,17 @@ const botEngine = {
       delete freshS._pendingBossEvent;
       await this.commitState();
     }
+    return true;
+  },
+
+  async recoverBotTurn(botIndex) {
+    const s = this.getState();
+    const me = s?.players?.[botIndex];
+    if (!s || !me || s.finished) return false;
+    normalizeBossState(s);
+    const legalIndex = me.hand.findIndex((card) => card?.id && card.id !== s.pickedDiscardCardId && !isBossCardBlocked(s, me.id, card.id, 'discard'));
+    if (legalIndex < 0) return false;
+    return this.executeDiscard(botIndex, legalIndex);
   },
 };
 
@@ -6917,6 +7188,7 @@ window.isFirstLobbyLoad = true;
 onSnapshot(gameRef, async (snap) => {
   if (!snap.exists()) {
     invalidateGameSession();
+    window.stopBossLabReportTimer?.();
     localExitPending = false;
     releaseScreen();
     toggleMenuVideos(true);
@@ -6970,6 +7242,11 @@ onSnapshot(gameRef, async (snap) => {
     renderedBossFeedbackCount = null;
     lastRenderedBossBloom = null;
     lastRenderedBossBloomEventId = null;
+    lastSeenBossLogKey = null;
+    lastBossVictorySoundKey = null;
+    lastBossIntroSoundKey = null;
+    seenBossResourceSoundEventIds = null;
+    bossResourceSoundScope = null;
     renderedBossMeldContributions.clear();
 
     const overlay = document.getElementById('countdownOverlay');
@@ -7018,6 +7295,7 @@ onSnapshot(gameRef, async (snap) => {
   if (!data.stateJson && data.lobby) {
     if (state || document.getElementById('gameSection').style.display === 'flex') {
       invalidateGameSession();
+      window.stopBossLabReportTimer?.();
       localExitPending = false;
       state = null;
       toggleMenuVideos(true);
@@ -7246,6 +7524,7 @@ onSnapshot(gameRef, async (snap) => {
       const bm = document.querySelector('.board-middle');
 
       if (isDebugMode) {
+        playBossIntroSoundOnce(state);
         showMessage(`🎲 Sorteio: ${starterName} tirou ${maxRoll} e começa!`);
         if (pi) pi.style.pointerEvents = 'auto';
         if (bm) bm.style.pointerEvents = 'auto';
@@ -7263,6 +7542,7 @@ onSnapshot(gameRef, async (snap) => {
         });
 
         setTimeout(() => {
+          playBossIntroSoundOnce(state);
           if (hasPendingBossChoices(state)) {
             window.isAutoPlaying = false;
             renderAll();
@@ -7855,6 +8135,7 @@ window.isDevToolsOpen = true; // Começa aberto por padrão
 
 window.toggleDebugPanel = (show) => {
   window.isDevToolsOpen = show;
+  if (!show) window.stopBossLabReportTimer?.();
   if (isDebugMode) {
     document.getElementById('debugPanel').style.display = show ? 'flex' : 'none';
     document.getElementById('debugMiniBtn').style.display = show ? 'none' : 'block';
@@ -7957,6 +8238,7 @@ if (isDebugMode) {
   let bossDebugLabBaseSnapshot = null;
   let bossDebugLabObservedBaseline = null;
   let bossDebugLabLastConfig = null;
+  let bossDebugLabReportTimerId = null;
 
   const loadBossDebugLabModule = () => {
     bossDebugLabModulePromise ||= import('./js/boss/boss-debug-scenarios.js');
@@ -7994,10 +8276,7 @@ if (isDebugMode) {
     if (!ability) return;
     const phaseSelect = bossLabElement('debugBossLabPhase');
     const previousPhase = preservePhase ? phaseSelect?.value : 'auto';
-    setBossLabOptions(phaseSelect, [
-      { id: 'auto', label: 'Automatica' },
-      ...[1, 2, 3].map((phase) => ({ id: phase, label: `Fase ${phase}`, disabled: !ability.phases.includes(phase) })),
-    ], previousPhase);
+    setBossLabOptions(phaseSelect, [{ id: 'auto', label: 'Automatica' }, ...[1, 2, 3].map((phase) => ({ id: phase, label: `Fase ${phase}`, disabled: !ability.phases.includes(phase) }))], previousPhase);
     setBossLabOptions(bossLabElement('debugBossLabVariant'), ability.variants, bossLabElement('debugBossLabVariant')?.value || 'interactive');
     setBossLabOptions(bossLabElement('debugBossLabTarget'), ability.targets, bossLabElement('debugBossLabTarget')?.value || 'auto');
     const technical = bossLabElement('debugBossLabTechnical');
@@ -8046,8 +8325,30 @@ if (isDebugMode) {
     if (element) element.textContent = module.summarizeBossDebugResult(bossDebugLabObservedBaseline, state);
   }
 
+  function stopBossLabReportTimer() {
+    if (bossDebugLabReportTimerId != null) clearInterval(bossDebugLabReportTimerId);
+    bossDebugLabReportTimerId = null;
+  }
+
+  window.stopBossLabReportTimer = stopBossLabReportTimer;
+
+  function startBossLabReportTimer() {
+    stopBossLabReportTimer();
+    const details = bossLabElement('debugBossLab');
+    if (!details?.open || !state?.debugScenario?.active) return;
+    bossDebugLabReportTimerId = setInterval(() => {
+      const gameVisible = document.getElementById('gameSection')?.style.display === 'flex';
+      if (!details.open || !state?.debugScenario?.active || !gameVisible) {
+        stopBossLabReportTimer();
+        return;
+      }
+      refreshBossLabObserved().catch(console.error);
+    }, 1500);
+  }
+
   async function activatePreparedBossLabState(prepared, config, { rememberBase = true } = {}) {
     const module = await loadBossDebugLabModule();
+    stopBossLabReportTimer();
     if (window.botPlayTimeoutId) {
       clearTimeout(window.botPlayTimeoutId);
       window.botPlayTimeoutId = null;
@@ -8062,8 +8363,13 @@ if (isDebugMode) {
     state.debugScenario.pauseAutomation = true;
     if (rememberBase) bossDebugLabBaseSnapshot = module.createBossDebugSnapshot(state);
     beginBossTurn(state, { first: true, now: Date.now(), debug: true });
-    if (state.boss?.currentIntent?.abilityId !== config.abilityId) {
+    const fallbackExpected = config.variant === 'no_target';
+    if (!fallbackExpected && state.boss?.currentIntent?.abilityId !== config.abilityId) {
       throw new Error(`O motor selecionou ${state.boss?.currentIntent?.abilityId || 'nenhuma habilidade'} em vez de ${config.abilityId}.`);
+    }
+    const selectedDebugAbilityId = state.boss?.currentIntent?.abilityId || state.boss?.lastAbilityId || null;
+    if (fallbackExpected && (!selectedDebugAbilityId || selectedDebugAbilityId === config.abilityId)) {
+      throw new Error(`${config.abilityId} nao foi rejeitada pelo fallback sem alvo.`);
     }
     bossDebugLabObservedBaseline = module.restoreBossDebugSnapshot(module.createBossDebugSnapshot(state));
     bossDebugLabLastConfig = { ...config };
@@ -8075,6 +8381,7 @@ if (isDebugMode) {
     const details = bossLabElement('debugBossLab');
     if (details) details.open = true;
     await refreshBossLabObserved();
+    startBossLabReportTimer();
   }
 
   async function prepareBossLab(overrides = {}) {
@@ -8092,15 +8399,55 @@ if (isDebugMode) {
       await window.debugInstantStart(definition.mode, 0);
       await activatePreparedBossLabState(prepared, config);
       if (instructions) instructions.textContent = prepared.instructions;
-      showMessage(`${definition.name}: ${state.boss.currentIntent.name} preparada no laboratorio.`);
+      showMessage(`${definition.name}: ${state.boss.currentIntent?.name || 'fallback legal'} preparado no laboratorio.`);
+      return true;
     } catch (error) {
       setBossLabError(error.message || String(error));
     } finally {
       validateBossLabSelection();
     }
+    return false;
+  }
+
+  async function executeBossLabVariant(variant) {
+    const config = currentBossLabConfig({ variant });
+    const sameScenario = state?.debugScenario?.active && state.debugScenario.bossId === config.bossId && state.debugScenario.abilityId === config.abilityId && state.debugScenario.variant === variant;
+    if (!sameScenario && !(await prepareBossLab({ variant }))) return;
+    const module = await loadBossDebugLabModule();
+    const result = module.executeBossDebugScenarioVariant(state);
+    state.lastAction = { id: newActionId(), type: 'bossDebugExecute', variant, result, ts: Date.now() };
+    renderAll();
+    await commitState();
+    await refreshBossLabObserved();
+    showMessage(result.executed ? `Laboratorio: ${result.action}.` : result.reason);
+  }
+
+  async function executeBossLabBotAction() {
+    const pendingBotChoice = state?.boss?.pendingChoices?.some((choice) => {
+      const player = state.players?.find((entry) => entry.id === choice.playerId);
+      return player?.name?.toUpperCase().includes('BOT');
+    });
+    if (!state?.debugScenario?.active || (!pendingBotChoice && state.debugScenario.variant !== 'bot')) {
+      if (!(await prepareBossLab({ variant: 'bot', target: 'bot' }))) return;
+    }
+    const botIndex = state.players.findIndex((player) => player.name?.toUpperCase().includes('BOT'));
+    if (botIndex < 0) throw new Error('O cenario nao possui bot responsavel.');
+    state.currentPlayer = botIndex;
+    state.debugScenario.pauseAutomation = true;
+    const sessionId = window.gameSessionId;
+    const signal = botTurnController.signal;
+    const sessionEngine = createBotEngineForSession(sessionId, signal);
+    await BuracoBot.playTurn(state, botIndex, sessionEngine, { signal, sessionId });
+    if (state?.debugScenario) {
+      state.debugScenario.pauseAutomation = true;
+      state.debugScenario.executionCount = (state.debugScenario.executionCount || 0) + 1;
+      state.debugScenario.lastExecution = { action: 'bot_action', at: Date.now() };
+    }
+    await refreshBossLabObserved();
   }
 
   async function resetBossLabScenario() {
+    stopBossLabReportTimer();
     if (!bossDebugLabBaseSnapshot || !bossDebugLabLastConfig) {
       setBossLabError('Prepare um cenario antes de resetar.');
       return;
@@ -8134,24 +8481,23 @@ if (isDebugMode) {
       return `${boss.name}: ${entries.filter((entry) => entry.ok).length}/${entries.length}`;
     });
     const failures = report.failed.map((entry) => `${entry.abilityId}: ${entry.reason}`);
-    bossLabElement('debugBossLabObserved').textContent = [
-      'VARREDURA DE CENARIOS',
-      ...byBoss,
-      '',
-      failures.length ? failures.join('\n') : `OK - ${report.passed}/${report.total} habilidades preparadas`,
-    ].join('\n');
+    bossLabElement('debugBossLabObserved').textContent = ['VARREDURA DE CENARIOS', ...byBoss, '', failures.length ? failures.join('\n') : `OK - ${report.passed}/${report.total} habilidades preparadas`].join('\n');
   }
 
   async function initBossDebugLab() {
     const module = await loadBossDebugLabModule();
     bossDebugLabCatalog = module.getBossDebugCatalog();
-    setBossLabOptions(bossLabElement('debugBossLabBoss'), bossDebugLabCatalog.map((boss) => ({ id: boss.id, label: boss.name })));
+    setBossLabOptions(
+      bossLabElement('debugBossLabBoss'),
+      bossDebugLabCatalog.map((boss) => ({ id: boss.id, label: boss.name })),
+    );
     syncBossLabBossControls();
     bossLabElement('debugBossLabBoss')?.addEventListener('change', syncBossLabBossControls);
     bossLabElement('debugBossLabAbility')?.addEventListener('change', () => syncBossLabAbilityControls({ preservePhase: false }));
     bossLabElement('debugBossLabPhase')?.addEventListener('change', validateBossLabSelection);
     bossLabElement('debugBossLabPrepare')?.addEventListener('click', () => prepareBossLab());
-    document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => button.addEventListener('click', () => prepareBossLab({ variant: button.dataset.bossLabVariant })));
+    document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => button.addEventListener('click', () => executeBossLabVariant(button.dataset.bossLabVariant)));
+    bossLabElement('debugBossLabBotRun')?.addEventListener('click', () => executeBossLabBotAction().catch((error) => setBossLabError(error.message || String(error))));
     bossLabElement('debugBossLabReload')?.addEventListener('click', simulateBossLabReload);
     bossLabElement('debugBossLabUndo')?.addEventListener('click', async () => {
       await window.executeUndo();
@@ -8159,9 +8505,10 @@ if (isDebugMode) {
     });
     bossLabElement('debugBossLabReset')?.addEventListener('click', resetBossLabScenario);
     bossLabElement('debugBossLabSweep')?.addEventListener('click', sweepBossLab);
-    setInterval(() => {
-      if (bossLabElement('debugBossLab')?.open && state?.debugScenario?.active) refreshBossLabObserved().catch(console.error);
-    }, 1500);
+    bossLabElement('debugBossLab')?.addEventListener('toggle', () => {
+      if (bossLabElement('debugBossLab')?.open) startBossLabReportTimer();
+      else stopBossLabReportTimer();
+    });
   }
 
   initBossDebugLab().catch((error) => setBossLabError(`Falha ao carregar laboratorio: ${error.message}`));

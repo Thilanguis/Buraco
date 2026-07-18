@@ -95,7 +95,7 @@ Exemplos:
 
 ```text
 Auditoria concluída: Dívida -5
-Biel perdeu 1 Corrente
+Biel perdeu 1 Chicote
 Raiz Faminta falhou: +1 Flor
 Orvalho Restaurador: +60 HP
 ```
@@ -159,7 +159,7 @@ Não duplicar dano por:
 Dano individual não remove:
 
 - Dívida;
-- Corrente;
+- Chicote;
 - Florescimento.
 
 ## 2.2 Bônus de canastra
@@ -239,7 +239,7 @@ Mostra a redução real de Dívida produzida pelo jogo.
 💥 180   ⛓️ -1
 ```
 
-Mostra Correntes realmente removidas por Resistência através daquele jogo.
+Mostra Chicotes realmente removidos por Resistência através daquele jogo.
 
 ## 3.4 Matriarca
 
@@ -602,18 +602,18 @@ A habilidade já varia naturalmente pelo tamanho das mãos e não recebe randomi
 
 ## 5.1 Identidade
 
-Chefe de controle direto, ordens, Correntes individuais e perda de eficiência.
+Chefe de controle direto, ordens, Chicotes individuais e perda de eficiência.
 
-> Obedecer reduz a eficiência. Desobedecer adiciona Corrente.
+> Obedecer reduz a eficiência. Desobedecer adiciona Chicote.
 
-## 5.2 Vida e Correntes
+## 5.2 Vida e Chicotes
 
 ```text
 HP: 2100
-Correntes por jogador: 0..4
+Chicotes por jogador: 0..4
 ```
 
-| Correntes | Estado |
+| Chicotes | Estado |
 |---:|---|
 | 0–2 | Normal |
 | 3 | Sob Controle |
@@ -623,7 +623,7 @@ Os dois jogadores com 4 causam derrota imediata.
 
 ## 5.3 Sob Controle
 
-Com 3 Correntes:
+Com 3 Chicotes:
 
 - não cria jogo novo;
 - compra normalmente, salvo outro efeito;
@@ -632,18 +632,18 @@ Com 3 Correntes:
 
 ## 5.4 Dominado
 
-Com 4 Correntes:
+Com 4 Chicotes:
 
 - não pega lixo;
 - não cria jogo novo;
 - pode comprar do monte;
 - alimenta jogos existentes;
 - sofre redução no ataque final;
-- permanece Dominado até remover Corrente.
+- permanece Dominado até remover Chicote.
 
 ## 5.5 Resistência
 
-Somente produção de qualidade remove Corrente.
+Somente produção de qualidade remove Chicote.
 
 | Evolução | Efeito |
 |---|---|
@@ -655,7 +655,7 @@ Somente produção de qualidade remove Corrente.
 Regras:
 
 - remove apenas do jogador responsável;
-- no máximo uma Corrente por jogador por rodada;
+- no máximo um Chicote por jogador por rodada;
 - se vários tiers forem alcançados na mesma rodada, registrar todos, mas remover apenas uma;
 - cada tier conta uma única vez por `meldId`;
 - dano individual não ativa Resistência;
@@ -687,7 +687,7 @@ fases: 1 e 2
 - marca carta com jogada legal;
 - pode ser jogada;
 - não pode ser descartada;
-- se permanecer: +1 Corrente;
+- se permanecer: +1 Chicote;
 - se ficar impossível por mudança externa: cancelar.
 
 ## 5.8 Escolha Forçada
@@ -702,7 +702,7 @@ A versão antiga de comprar duas cartas foi removida.
 
 Escolha imediata:
 
-1. receber +1 Corrente; ou
+1. receber +1 Chicote; ou
 2. aceitar uma ordem válida para o próximo turno.
 
 Tipos permitidos:
@@ -730,7 +730,7 @@ Para `evolve_specific_meld`:
 
 Se uma mudança externa eliminar todas as formas de cumprir:
 
-- cancelar sem Corrente.
+- cancelar sem Chicote.
 
 Se o jogador usar ou desperdiçar voluntariamente os recursos necessários:
 
@@ -739,7 +739,7 @@ Se o jogador usar ou desperdiçar voluntariamente os recursos necessários:
 Ao desobedecer:
 
 - permitir a ação;
-- aplicar +1 Corrente;
+- aplicar +1 Chicote;
 - encerrar a ordem.
 
 ## 5.9 Etiqueta de Ferro
@@ -764,12 +764,12 @@ Usar somente naipe.
 Se cumprir:
 
 - sucesso;
-- nenhuma Corrente.
+- nenhum Chicote.
 
 Se descartar outro naipe possuindo opção válida:
 
 - permitir;
-- +1 Corrente.
+- +1 Chicote.
 
 Se mudança externa eliminar as opções:
 
@@ -868,7 +868,9 @@ boss.possessions[meldId].createdTier
 boss.possessions[meldId].releasedEventId
 ```
 
-## 5.13 Interdito
+## 5.13 Interdito — DESATIVADO
+
+> Esta habilidade não faz parte da rotação ativa nem aparece no Laboratório. O código interno foi preservado temporariamente apenas para compatibilidade e possível redesenho futuro.
 
 ```text
 id: interdict
@@ -896,17 +898,18 @@ Na primeira tentativa válida de evolução:
 
 - cancelar somente a tentativa;
 - restaurar estado anterior;
-- sem dano, tier ou Corrente;
+- sem dano, tier ou Chicote;
 - consumir Interdito.
 
 ### Desobedecer
 
 - concluir evolução;
 - aplicar dano;
-- +1 Corrente;
+- +1 Chicote líquido;
+- a mesma evolução não remove Chicote por Resistência;
 - consumir Interdito.
 
-Jogador em 4 Correntes deve obedecer.
+Jogador em 4 Chicotes deve obedecer.
 
 Sem tentativa, expira no fim da rodada.
 
@@ -920,7 +923,7 @@ peso: 3
 fases: 2 e 3
 ```
 
-- protegida perde 1 Corrente;
+- protegida perde 1 Chicote;
 - punida recebe 1;
 - respeita limites;
 - aplica uma vez.
@@ -929,8 +932,8 @@ fases: 2 e 3
 
 Somente na Fase 3:
 
-- alvo em 4 receberia Corrente;
-- a Corrente vai ao parceiro;
+- alvo em 4 receberia Chicote;
+- o Chicote vai ao parceiro;
 - não ultrapassa 4;
 - preserva origem;
 - feedback identifica o transbordamento;
@@ -952,11 +955,16 @@ Alvo é tratado como Dominado no próximo turno.
 
 ### Quebra de Vontade
 
-Jogador com pelo menos 2 Correntes escolhe entre Corrente ou retirar carta válida de canastra.
+Jogador com pelo menos 2 Chicotes escolhe entre Chicote ou retirar carta válida de canastra.
 
 ### Ordem Final
 
-Cada cooperador recebe decisão diferente e o jogo aguarda ambas.
+Ao fim da rodada, cada cooperador recebe uma decisão diferente e a partida permanece bloqueada até as duas respostas:
+
+- um cooperador escolhe entre comprar 2 cartas extras, que ficam presas durante o próximo turno completo, ou receber 1 Chicote;
+- o outro escolhe entre deixar 1 carta aleatória da própria mão presa durante o próximo turno completo ou receber 1 Chicote.
+
+A carta presa deve ser identificada no HUD, na mão e no histórico. Depois das duas decisões, a partida continua normalmente.
 
 **Hierarquia não faz parte do jogo e não deve ser registrada.**
 
@@ -971,7 +979,7 @@ Cada cooperador recebe decisão diferente e o jogo aguarda ambas.
 | Troca Forçada | 4 | 2 e 3 |
 | Mãos Atadas | 4 | 2 e 3 |
 | Posse | 3 | 2 e 3 |
-| Interdito | 4 | 2 e 3 |
+| Interdito (desativado) | — | — |
 | Favorita | 3 | 2 e 3 |
 | Dupla Coleira | 5 | 3 |
 | Separação | 4 | 3 |
@@ -1434,7 +1442,7 @@ Não rejeita custo apenas quando letal; compara utilidade real.
 Avalia:
 
 - custo de obedecer;
-- Correntes em 3/3, 4/2, 4/3 e 4/4;
+- Chicotes em 3/3, 4/2, 4/3 e 4/4;
 - Etiqueta;
 - Interdito;
 - Posse coordenada;
@@ -1489,7 +1497,7 @@ Mostrar:
 
 Mostrar:
 
-- Correntes de cada jogador;
+- Chicotes de cada jogador;
 - estado Normal, Sob Controle ou Dominado;
 - ordem ativa;
 - Etiqueta;
@@ -1571,7 +1579,7 @@ Snapshot não duplica:
 - dano;
 - cura;
 - Dívida;
-- Corrente;
+- Chicote;
 - Flor;
 - propagação;
 - contribuições;
@@ -1650,11 +1658,11 @@ Em touch, tablet e `prefers-reduced-motion`:
 | Característica | Banqueiro | Dominadora | Matriarca |
 |---|---|---|---|
 | HP | 2500 | 2100 | 2000 |
-| Perigo | Dívida coletiva | Correntes individuais | Florescimento |
+| Perigo | Dívida coletiva | Chicotes individuais | Florescimento |
 | Derrota | Dívida 100 | ambos com 4 | 5 Flores |
 | Pressão | preços e recursos | ordens e eficiência | ameaças e propagação |
 | Recuperação da equipe | redução de Dívida | Resistência | poda por evolução |
-| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Correntes e controle | Pólen |
+| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle | Pólen |
 | Jogos | Penhora e Limite | Posse, Mãos Atadas, Interdito | Raiz, Enxerto, Casulo |
 
 ---

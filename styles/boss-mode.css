@@ -1081,7 +1081,6 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
   position: relative;
   isolation: isolate;
   filter: none;
-  animation: bossPossessionEnter 0.38s ease-out both;
 }
 .boss-mode .meld-line.possessed-by-boss::before {
   content: '';
@@ -1120,7 +1119,6 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
   z-index: 2;
 }
 .boss-mode .meld-line.possessed-by-boss .carta {
-  position: relative;
   z-index: 2;
 }
 .boss-mode .meld-line.possessed-by-boss .carta:last-child {
@@ -1203,16 +1201,6 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
     opacity: 1;
   }
 }
-@keyframes bossPossessionEnter {
-  from {
-    opacity: 0.72;
-    transform: scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 
 @media (hover: none), (pointer: coarse) {
   .boss-mode #handContainer .carta:hover:not(.selected) {
@@ -1262,8 +1250,11 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
 .boss-mode .carta.boss-swap-received {
   animation: bossSwapReceived 3.2s ease both;
 }
-.boss-swap-updating .cards-row { visibility: hidden; }
-.boss-swap-preview { position: fixed; z-index: 100030; pointer-events: none; }
+.boss-swap-preview {
+  position: fixed;
+  z-index: 100030;
+  pointer-events: none;
+}
 .boss-swap-origin {
   position: absolute;
   left: 50%;
@@ -1411,6 +1402,35 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
 }
 .boss-result-card #bossRematchBtn {
   background: #15803d;
+}
+
+.boss-result-section.boss-special-defeat .boss-result-card {
+  animation: bossSpecialDefeat 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.boss-result-section[data-special-defeat='banker'] .boss-result-card {
+  --boss-defeat-accent: rgba(34, 197, 94, 0.62);
+}
+.boss-result-section[data-special-defeat='dominadora'] .boss-result-card {
+  --boss-defeat-accent: rgba(236, 72, 153, 0.68);
+}
+.boss-result-section[data-special-defeat='matriarca_esmeralda'] .boss-result-card {
+  --boss-defeat-accent: rgba(110, 231, 183, 0.68);
+}
+@keyframes bossSpecialDefeat {
+  0% {
+    transform: translateY(10px) scale(0.98);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+  }
+  36% {
+    transform: translateY(0) scale(1.012);
+    box-shadow:
+      0 24px 70px rgba(0, 0, 0, 0.65),
+      0 0 34px var(--boss-defeat-accent);
+  }
+  100% {
+    transform: none;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+  }
 }
 
 @media (max-width: 1100px) {
@@ -1584,27 +1604,140 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
 body[data-boss-id='matriarca_esmeralda'] .boss-hud {
   border-color: rgba(110, 231, 183, 0.86);
   background: linear-gradient(180deg, rgba(4, 35, 25, 0.98), rgba(3, 15, 14, 0.98));
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.52), inset 0 1px rgba(255, 255, 255, 0.08), 0 0 24px rgba(16, 185, 129, 0.14);
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.52),
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(16, 185, 129, 0.14);
 }
 body[data-boss-id='matriarca_esmeralda'] .boss-hud::before,
-body[data-boss-id='matriarca_esmeralda'] .boss-hud::after { border-color: #6ee7b7; }
-body[data-boss-id='matriarca_esmeralda'] .boss-hud-kicker { color: #6ee7b7; }
+body[data-boss-id='matriarca_esmeralda'] .boss-hud::after {
+  border-color: #6ee7b7;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-hud-kicker {
+  color: #6ee7b7;
+}
 body[data-boss-id='matriarca_esmeralda'] .boss-hud-heading strong {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
   font-size: 17px;
 }
-body[data-boss-id='matriarca_esmeralda'] .boss-phase { color: #fde68a; border-color: rgba(253, 230, 138, 0.66); }
-body[data-boss-id='matriarca_esmeralda'] .boss-round-summary #bossCurrentActor { color: #6ee7b7; }
+body[data-boss-id='matriarca_esmeralda'] .boss-phase {
+  color: #fde68a;
+  border-color: rgba(253, 230, 138, 0.66);
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-round-summary #bossCurrentActor {
+  color: #6ee7b7;
+}
 body[data-boss-id='matriarca_esmeralda'] .boss-portrait {
   border-color: rgba(110, 231, 183, 0.86);
-  box-shadow: 0 0 18px rgba(16, 185, 129, 0.25), inset 0 0 0 1px rgba(253, 230, 138, 0.18);
+  box-shadow:
+    0 0 18px rgba(16, 185, 129, 0.25),
+    inset 0 0 0 1px rgba(253, 230, 138, 0.18);
 }
 body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
   object-position: 50% 28%;
   transform: scale(1.13);
   transform-origin: 50% 28%;
+}
+
+body.boss-mode .brasao-dominacao {
+  display: none !important;
+}
+
+/* Histórico legível, rolável e agrupado sem ampliar o HUD recolhido. */
+.boss-log-title {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 7px;
+}
+.boss-log-title strong {
+  margin-left: auto;
+}
+.boss-log-new {
+  padding: 2px 5px;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 999px;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.42);
+  font-size: 6px;
+  letter-spacing: 0.5px;
+}
+.boss-event-log {
+  display: block;
+  max-height: min(42vh, 360px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.boss-log-round + .boss-log-round {
+  border-top: 1px solid rgba(248, 113, 113, 0.22);
+}
+.boss-log-round h4 {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 5px 8px;
+  color: #fbbf24;
+  background: rgba(7, 10, 18, 0.98);
+  font-size: 7px;
+  letter-spacing: 0.7px;
+}
+.boss-log-round .boss-log-entry {
+  border-right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+.boss-log-round .boss-log-entry:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 1100px), (hover: none) and (pointer: coarse) {
+  body.boss-mode .boss-hud {
+    margin-top: clamp(18px, 4vh, 38px);
+  }
+  body.boss-mode #gameSection .board-melds > .grow:first-child {
+    padding-top: 8px !important;
+  }
+}
+
+@media (max-width: 620px) {
+  body.boss-mode .boss-hud {
+    margin-top: 28px;
+    align-items: stretch;
+  }
+  body.boss-mode .boss-hud-heading {
+    align-items: flex-start;
+  }
+  body.boss-mode .boss-vitals,
+  body.boss-mode .boss-intent,
+  body.boss-mode .boss-choice-panel,
+  body.boss-mode .boss-battle-details {
+    width: 100%;
+    min-width: 0;
+  }
+  body.boss-mode .boss-choice-panel > div {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  body.boss-mode .boss-choice-panel button {
+    width: 100%;
+  }
+  .boss-detail-content {
+    grid-template-columns: 1fr;
+  }
+  .boss-detail-content > * {
+    grid-column: 1 !important;
+  }
+  .boss-log-copy {
+    font-size: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-result-section.boss-special-defeat .boss-result-card {
+    animation: none !important;
+  }
 }
 .boss-portrait.boss-portrait-fallback::after {
   content: attr(data-fallback-label);
@@ -1617,55 +1750,116 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
   font-size: 28px;
   font-weight: 1000;
 }
-body[data-boss-id='matriarca_esmeralda'] .boss-dialogue-presentation > span { color: #047857; }
-body[data-boss-id='matriarca_esmeralda'] .boss-intent { border-color: rgba(52, 211, 153, 0.42); }
+body[data-boss-id='matriarca_esmeralda'] .boss-dialogue-presentation > span {
+  color: #047857;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-intent {
+  border-color: rgba(52, 211, 153, 0.42);
+}
 body[data-boss-id='matriarca_esmeralda'] .boss-effect-chip.boss-nature-chip {
   border-color: rgba(52, 211, 153, 0.48);
   color: #a7f3d0;
   background: rgba(3, 28, 23, 0.96);
 }
 body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active .boss-portrait {
-  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.22), 0 0 22px rgba(110, 231, 183, 0.48), inset 0 0 0 1px rgba(253, 230, 138, 0.3);
+  box-shadow:
+    0 0 0 3px rgba(52, 211, 153, 0.22),
+    0 0 22px rgba(110, 231, 183, 0.48),
+    inset 0 0 0 1px rgba(253, 230, 138, 0.3);
 }
 body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='cracked'] .boss-portrait {
   border-style: dashed;
 }
 body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='critical'] .boss-portrait {
   border-style: dashed;
-  box-shadow: 0 0 0 2px rgba(253, 230, 138, 0.25), 0 0 15px rgba(110, 231, 183, 0.32);
+  box-shadow:
+    0 0 0 2px rgba(253, 230, 138, 0.25),
+    0 0 15px rgba(110, 231, 183, 0.32);
 }
 .boss-bloom-meter .boss-meter-track > span {
   background: linear-gradient(90deg, #10b981, #fde68a);
   box-shadow: 0 0 9px rgba(52, 211, 153, 0.38);
 }
-.boss-bloom-flowers { display: none; align-items: center; gap: 4px; margin-top: 4px; min-height: 13px; }
-.boss-bloom-flowers i { color: rgba(148, 163, 184, 0.34); font-size: 12px; font-style: normal; line-height: 1; }
-.boss-bloom-flowers i.open { color: #f9a8d4; text-shadow: 0 0 6px rgba(244, 114, 182, 0.62); animation: bossBloomOpen 0.7s ease both; }
+.boss-bloom-flowers {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  min-height: 13px;
+}
+.boss-bloom-flowers i {
+  color: rgba(148, 163, 184, 0.34);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1;
+}
+.boss-bloom-flowers i.open {
+  color: #f9a8d4;
+  text-shadow: 0 0 6px rgba(244, 114, 182, 0.62);
+  animation: bossBloomOpen 0.7s ease both;
+}
 @keyframes bossBloomOpen {
-  0% { opacity: 0; transform: scale(0.45) rotate(-18deg); }
-  70% { transform: scale(1.2) rotate(4deg); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-18deg);
+  }
+  70% {
+    transform: scale(1.2) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .boss-mode .carta.boss-card-nature-seed,
 .boss-mode .carta.boss-card-nature-pollen {
   border-color: #34d399 !important;
-  box-shadow: 0 0 0 2px rgba(253, 230, 138, 0.55), 0 0 12px rgba(16, 185, 129, 0.32) !important;
+  box-shadow:
+    0 0 0 2px rgba(253, 230, 138, 0.55),
+    0 0 12px rgba(16, 185, 129, 0.32) !important;
   animation: bossNatureMarkIn 0.5s ease both;
 }
 .boss-mode .carta.boss-card-nature-pollen {
   border-color: #a3e635 !important;
-  box-shadow: 0 0 0 2px rgba(163, 230, 53, 0.42), 0 0 12px rgba(253, 224, 71, 0.24) !important;
+  box-shadow:
+    0 0 0 2px rgba(163, 230, 53, 0.42),
+    0 0 12px rgba(253, 224, 71, 0.24) !important;
 }
 .boss-mode .boss-card-status-seed,
-.boss-mode .boss-card-status-pollen { color: #ecfdf5; background: rgba(4, 120, 87, 0.94); border-color: rgba(253, 230, 138, 0.72); }
-.boss-mode .boss-card-status-pollen { color: #1a2e05; background: rgba(190, 242, 100, 0.95); border-color: rgba(77, 124, 15, 0.72); }
+.boss-mode .boss-card-status-pollen {
+  color: #ecfdf5;
+  background: rgba(4, 120, 87, 0.94);
+  border-color: rgba(253, 230, 138, 0.72);
+}
+.boss-mode .boss-card-status-pollen {
+  color: #1a2e05;
+  background: rgba(190, 242, 100, 0.95);
+  border-color: rgba(77, 124, 15, 0.72);
+}
 .boss-mode .boss-card-status-seed i,
-.boss-mode .boss-card-status-pollen i { width: auto !important; height: auto !important; font-style: normal; line-height: 1; }
-@keyframes bossNatureMarkIn { from { opacity: 0.72; filter: saturate(0.7); } to { opacity: 1; filter: saturate(1); } }
+.boss-mode .boss-card-status-pollen i {
+  width: auto !important;
+  height: auto !important;
+  font-style: normal;
+  line-height: 1;
+}
+@keyframes bossNatureMarkIn {
+  from {
+    opacity: 0.72;
+    filter: saturate(0.7);
+  }
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
 
 .boss-mode .meld-line.rooted-by-matriarch,
-.boss-mode .meld-line.grafted-by-matriarch { position: relative; isolation: isolate; }
+.boss-mode .meld-line.grafted-by-matriarch {
+  position: relative;
+  isolation: isolate;
+}
 .boss-mode .meld-line.rooted-by-matriarch::before,
 .boss-mode .meld-line.grafted-by-matriarch::before {
   content: '';
@@ -1675,14 +1869,22 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   pointer-events: none;
   border: 2px solid rgba(52, 211, 153, 0.62);
   border-radius: 7px;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2), inset 0 0 10px rgba(52, 211, 153, 0.06);
+  box-shadow:
+    0 0 10px rgba(16, 185, 129, 0.2),
+    inset 0 0 10px rgba(52, 211, 153, 0.06);
   animation: bossNatureMeldIn 0.5s ease both;
 }
-.boss-mode .meld-line.grafted-by-matriarch::before { border-style: double; border-color: rgba(253, 230, 138, 0.7); }
+.boss-mode .meld-line.grafted-by-matriarch::before {
+  border-style: double;
+  border-color: rgba(253, 230, 138, 0.7);
+}
 .boss-mode .meld-line.rooted-by-matriarch .meld-line-cards,
 .boss-mode .meld-line.grafted-by-matriarch .meld-line-cards,
 .boss-mode .meld-line.rooted-by-matriarch .meld-meta,
-.boss-mode .meld-line.grafted-by-matriarch .meld-meta { position: relative; z-index: 2; }
+.boss-mode .meld-line.grafted-by-matriarch .meld-meta {
+  position: relative;
+  z-index: 2;
+}
 .boss-mode .boss-meld-nature-seal {
   padding: 2px 5px;
   border: 1px solid rgba(52, 211, 153, 0.45);
@@ -1693,25 +1895,72 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   font-weight: 900;
   white-space: nowrap;
 }
-.boss-mode .boss-meld-nature-graft { border-color: rgba(253, 230, 138, 0.6); color: #fde68a; }
-@keyframes bossNatureMeldIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
-.boss-mode #drawDiscardBtn.boss-pollen-discard .pile-card { box-shadow: 0 0 0 2px #84cc16, 0 0 13px rgba(190, 242, 100, 0.35) !important; }
-.boss-mode #drawDiscardBtn.boss-pollen-discard::after { content: 'POLEN'; display: block; margin-top: 3px; color: #bef264; font-size: 8px; font-weight: 1000; text-align: center; }
-.boss-mode .boss-meld-contribution-bloom { border-color: rgba(52, 211, 153, 0.48); color: #a7f3d0; background: rgba(4, 120, 87, 0.18); }
-.boss-floating-number.nature-heal-up { color: #6ee7b7; }
-.boss-floating-number.bloom-up { color: #f9a8d4; }
-.boss-floating-number.bloom-down { color: #fde68a; }
-.boss-floating-number.nature-rebirth { color: #a7f3d0; font-size: 20px; }
+.boss-mode .boss-meld-nature-graft {
+  border-color: rgba(253, 230, 138, 0.6);
+  color: #fde68a;
+}
+@keyframes bossNatureMeldIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.boss-mode #drawDiscardBtn.boss-pollen-discard .pile-card {
+  box-shadow:
+    0 0 0 2px #84cc16,
+    0 0 13px rgba(190, 242, 100, 0.35) !important;
+}
+.boss-mode #drawDiscardBtn.boss-pollen-discard::after {
+  content: 'POLEN';
+  display: block;
+  margin-top: 3px;
+  color: #bef264;
+  font-size: 8px;
+  font-weight: 1000;
+  text-align: center;
+}
+.boss-mode .boss-meld-contribution-bloom {
+  border-color: rgba(52, 211, 153, 0.48);
+  color: #a7f3d0;
+  background: rgba(4, 120, 87, 0.18);
+}
+.boss-floating-number.nature-heal-up {
+  color: #6ee7b7;
+}
+.boss-floating-number.bloom-up {
+  color: #f9a8d4;
+}
+.boss-floating-number.bloom-down {
+  color: #fde68a;
+}
+.boss-floating-number.nature-rebirth {
+  color: #a7f3d0;
+  font-size: 20px;
+}
 
 /* Keep these compact layer rules explicit for browser and regression checks. */
-.boss-mode .meld-line.possessed-by-boss .carta:last-child { z-index: 3; }
+.boss-mode .meld-line.possessed-by-boss .carta:last-child {
+  z-index: 3;
+}
 .boss-floating-number.debt-down,
-.boss-floating-number.debt-up { color: #22c55e; }
+.boss-floating-number.debt-up {
+  color: #22c55e;
+}
 .boss-floating-number.chain-up,
-.boss-floating-number.chain-down { color: #ec4899; }
+.boss-floating-number.chain-down {
+  color: #ec4899;
+}
 
 @media (max-width: 900px) {
-  .boss-portrait { width: 134px; height: 86px; flex: 0 0 134px; }
+  .boss-portrait {
+    width: 134px;
+    height: 86px;
+    flex: 0 0 134px;
+  }
   body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
     object-position: 50% 24%;
     transform: scale(1.1);
@@ -1723,7 +1972,9 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   .boss-mode .carta.boss-card-nature-seed,
   .boss-mode .carta.boss-card-nature-pollen,
   .boss-mode .meld-line.rooted-by-matriarch::before,
-  .boss-mode .meld-line.grafted-by-matriarch::before { animation: none !important; }
+  .boss-mode .meld-line.grafted-by-matriarch::before {
+    animation: none !important;
+  }
 }
 
 #debugPanel {
@@ -1785,11 +2036,31 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   font-weight: 900;
 }
 
-.debug-boss-lab .debug-boss-lab-primary { background: #ca8a04; color: #09090b; }
-.debug-boss-lab .debug-boss-lab-sweep { border: 1px solid #0ea5e9; background: #082f49; color: #bae6fd; }
-.debug-boss-lab-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-.debug-boss-lab-technical { min-height: 13px; color: #94a3b8; font-size: 8px; }
-.debug-boss-lab-error { min-height: 13px; color: #fca5a5; font-size: 9px; line-height: 1.35; }
+.debug-boss-lab .debug-boss-lab-primary {
+  background: #ca8a04;
+  color: #09090b;
+}
+.debug-boss-lab .debug-boss-lab-sweep {
+  border: 1px solid #0ea5e9;
+  background: #082f49;
+  color: #bae6fd;
+}
+.debug-boss-lab-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.debug-boss-lab-technical {
+  min-height: 13px;
+  color: #94a3b8;
+  font-size: 8px;
+}
+.debug-boss-lab-error {
+  min-height: 13px;
+  color: #fca5a5;
+  font-size: 9px;
+  line-height: 1.35;
+}
 .debug-boss-lab-report {
   max-height: 150px;
   margin: 0;
@@ -1800,6 +2071,70 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   padding: 7px;
   background: rgba(2, 6, 23, 0.9);
   color: #cbd5e1;
-  font: 8px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font:
+    8px/1.45 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
 }
-.debug-boss-lab-observed:empty { display: none; }
+.debug-boss-lab-observed:empty {
+  display: none;
+}
+
+/* Interdito usa a mesma linguagem visual da Posse. */
+.boss-mode .meld-line.interdicted-by-boss {
+  position: relative;
+  isolation: isolate;
+  filter: none;
+}
+
+.boss-mode .meld-line.interdicted-by-boss::before {
+  content: '';
+  position: absolute;
+  inset: -4px -6px 0;
+  z-index: 0;
+  border: 1px solid rgba(244, 114, 182, 0.82);
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(131, 24, 67, 0.18), transparent 38% 62%, rgba(88, 28, 135, 0.14));
+  box-shadow:
+    0 0 0 1px rgba(88, 28, 135, 0.28),
+    0 0 12px rgba(236, 72, 153, 0.24);
+  pointer-events: none;
+}
+
+.boss-mode .meld-line.interdicted-by-boss::after {
+  content: 'INTERDITO — evolução sob escolha';
+  position: absolute;
+  top: -11px;
+  right: 1px;
+  z-index: 4;
+  padding: 2px 5px;
+  border: 1px solid rgba(244, 114, 182, 0.82);
+  border-radius: 3px;
+  color: #fbcfe8;
+  background: #3b0826;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  font-size: 7px;
+  font-weight: 1000;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.boss-mode .meld-line.interdicted-by-boss .meld-line-cards,
+.boss-mode .meld-line.interdicted-by-boss .meld-meta {
+  position: relative;
+  z-index: 2;
+}
+
+.boss-mode .meld-line.interdicted-by-boss .carta {
+  z-index: 2;
+}
+
+.boss-mode .meld-line.interdicted-by-boss .carta:last-child {
+  z-index: 3;
+}
+
+.boss-mode .boss-meld-interdict-seal {
+  display: none;
+}
