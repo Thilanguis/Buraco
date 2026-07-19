@@ -1617,14 +1617,17 @@ test('Raiz e Enxerto resolvem sucesso, falha parcial e falha total separadamente
   }
 });
 
-test('Polen acompanha o lixo, Colheita usa as tres faixas e Orvalho conta IDs unicos', () => {
+test('Polen pune imediatamente a retirada do lixo, Colheita usa as tres faixas e Orvalho conta IDs unicos', () => {
   const pollen = matriarchGame();
   pollen.boss.hp = 1900;
   applyMatriarchAbility(pollen, 'discard_pollen', { discardCardId: 'mat-discard-6' });
-  const contaminated = pollen.discard[0];
-  pollen.players[0].hand.push(contaminated);
-  assert.equal(notifyBossDiscardTaken(pollen, 0, [contaminated]).length, 1);
-  assert.equal(getBossCardEffect(pollen, 0, contaminated.id), 'nature-pollen');
+  const contaminated = pollen.discard.pop();
+  const pollenEvents = notifyBossDiscardTaken(pollen, 0, [contaminated]);
+  assert.equal(pollenEvents.length, 1);
+  assert.equal(pollenEvents[0].status, 'failed');
+  assert.equal(getBossCardEffect(pollen, 0, contaminated.id), null);
+  assert.equal(pollen.boss.bloom, 1);
+  assert.equal(pollen.boss.hp, 1940);
   completeBossPlayerTurn(pollen, 0);
   assert.equal(pollen.boss.bloom, 1);
   assert.equal(pollen.boss.hp, 1940);
@@ -1633,7 +1636,12 @@ test('Polen acompanha o lixo, Colheita usa as tres faixas e Orvalho conta IDs un
   applyMatriarchAbility(changedTop, 'discard_pollen', { discardCardId: 'mat-discard-6' });
   changedTop.discard.push({ id: 'new-top', rank: '8', suit: '♦' });
   normalizeBossState(changedTop);
+  assert.equal(getBossNatureThreats(changedTop).length, 1);
+  completeBossPlayerTurn(changedTop, 0);
+  assert.equal(getBossNatureThreats(changedTop).length, 1);
+  completeBossPlayerTurn(changedTop, 1);
   assert.equal(getBossNatureThreats(changedTop).length, 0);
+  assert.equal(changedTop.boss.natureThreats.find((threat) => threat.type === 'pollen')?.status, 'cancelled');
   assert.equal(changedTop.boss.bloom, 0);
 
   for (const [cards, expectedHeal, expectedBloom] of [[7, 0, 0], [9, 60, 0], [11, 100, 1]]) {
@@ -1655,7 +1663,7 @@ test('Polen acompanha o lixo, Colheita usa as tres faixas e Orvalho conta IDs un
   applyBossMeldTransition(dew, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: cards });
   assert.deepEqual(dew.boss.currentIntent.payload.countedCardIds, ['dew-a', 'dew-b']);
   const dewPresentation = buildBossActionPresentation(dew);
-  assert.equal(dewPresentation.progress, '2/6 cartas para dissipar');
+  assert.match(dewPresentation.progress, /2\/6.*Cura sendo reduzida/i);
   assert.equal(dewPresentation.consequence, 'Cura prevista: 100 HP');
   completeBossPlayerTurn(dew, 0);
   completeBossPlayerTurn(dew, 1);
@@ -1684,7 +1692,7 @@ test('Matriarca nao repete a resolucao da mesma rodada depois de normalizar o sn
   assert.equal(restored.boss.eventLog.length, eventCount);
 });
 
-test('Casulo absorve, rompe e cura; Coroa propaga sem adicionar cura', () => {
+test('Casulo absorve, rompe e cura; Coroa encerra sem efeito extra quando a ameaca marcada e cumprida', () => {
   const cocoon = matriarchGame();
   cocoon.boss.phase = 3;
   cocoon.boss.phaseTransitions = [1, 2, 3];
@@ -1712,8 +1720,9 @@ test('Casulo absorve, rompe e cura; Coroa propaga sem adicionar cura', () => {
   crown.boss.hp = 1500;
   applyBossMeldTransition(crown, { teamId: 0, meldIndex: 0, cardsAdded: [] });
   applyBossMeldTransition(crown, { teamId: 0, meldIndex: 1, cardsAdded: [] });
-  crown.boss.natureThreats = [0, 1].map((meldIndex) => ({
-    id: `crown-root-${meldIndex}`,
+  crown.boss.natureThreats = [0].map((meldIndex) => ({
+    id: 'crown-root-marked',
+    name: 'Raiz Faminta',
     type: 'root',
     meldIndex,
     meldId: getBossMeldContribution(crown, 0, meldIndex).meldId,
@@ -1721,11 +1730,12 @@ test('Casulo absorve, rompe e cura; Coroa propaga sem adicionar cura', () => {
     bloomAmount: 1,
     status: 'active',
   }));
-  applyMatriarchAbility(crown, 'spring_crown', { activeThreatIds: crown.boss.natureThreats.map((entry) => entry.id) }, 3);
-  completeBossPlayerTurn(crown, 0);
-  completeBossPlayerTurn(crown, 1);
-  assert.equal(crown.boss.hp, 1500);
-  assert.equal(crown.boss.bloom, 2);
+  applyMatriarchAbility(crown, 'spring_crown', { markedThreatId: 'crown-root-marked', markedThreatName: 'Raiz Faminta' }, 3);
+  applyBossMeldTransition(crown, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: [{ id: 'crown-contained', rank: '9', suit: crown.teams[0].melds[0][0].suit }] });
+  assert.equal(crown.boss.hp, 1490);
+  assert.equal(crown.boss.bloom, 0);
+  assert.equal(crown.boss.springCrown.status, 'completed');
+  assert.equal(crown.boss.pendingRootPropagation, null);
 });
 
 test('Renascimento ocorre uma vez, inclusive no ataque final, e prioridades do bot refletem urgencia', () => {

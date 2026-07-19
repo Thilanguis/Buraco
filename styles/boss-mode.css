@@ -65,6 +65,7 @@
 }
 
 .boss-hud-heading {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -76,6 +77,7 @@
   min-width: 0;
 }
 .boss-portrait {
+  position: relative;
   width: 184px;
   height: 116px;
   flex: 0 0 184px;
@@ -88,6 +90,182 @@
     0 0 23px rgba(239, 68, 68, 0.27),
     inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
+.boss-hp-values {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+.boss-cocoon-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 18px;
+  position: relative;
+  border: 1px solid rgba(250, 204, 21, 0.62);
+  border-radius: 4px;
+  color: #fde68a;
+  background: rgba(6, 31, 24, 0.92);
+  box-shadow: inset 0 0 8px rgba(52, 211, 153, 0.15);
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.boss-cocoon-meter[hidden] {
+  display: none;
+}
+.boss-cocoon-meter::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  width: 7px;
+  height: 9px;
+  border: 1px solid #facc15;
+  border-radius: 5px 5px 4px 4px;
+  background: linear-gradient(160deg, rgba(253, 230, 138, 0.9), rgba(16, 185, 129, 0.42));
+  clip-path: polygon(50% 0, 100% 20%, 88% 72%, 50% 100%, 12% 72%, 0 20%);
+}
+.boss-cocoon-meter strong {
+  color: #a7f3d0;
+  font-size: inherit;
+}
+.boss-cocoon-ward {
+  position: absolute;
+  z-index: 5;
+  inset: 4px 9px 3px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.94);
+  border: 2px solid rgba(250, 204, 21, 0.92);
+  border-radius: 48% 48% 42% 42% / 44% 44% 56% 56%;
+  background:
+    radial-gradient(ellipse at 50% 12%, rgba(254, 240, 138, 0.24), transparent 38%),
+    linear-gradient(112deg, transparent 26%, rgba(253, 230, 138, 0.16) 47%, transparent 66%);
+  box-shadow:
+    0 0 7px rgba(250, 204, 21, 0.85),
+    0 0 15px rgba(52, 211, 153, 0.4),
+    inset 0 0 10px rgba(253, 230, 138, 0.16);
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+.boss-spring-crown {
+  position: absolute;
+  z-index: 9;
+  top: -22px;
+  left: 92px;
+  width: 66px;
+  height: 23px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) scale(0.78);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 251, 209, 0.3) 0 4%, rgba(250, 204, 21, 0.09) 27%, transparent 64%);
+  transition: opacity 180ms ease, transform 260ms ease;
+}
+.boss-spring-crown::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 3px;
+  right: 3px;
+  height: 13px;
+  border: 2px solid rgba(254, 240, 138, 0.94);
+  border-top-color: rgba(253, 230, 138, 0.34);
+  border-right-color: rgba(250, 204, 21, 0.28);
+  border-left-color: rgba(250, 204, 21, 0.28);
+  border-bottom-color: rgba(255, 251, 209, 0.98);
+  border-radius: 50%;
+  box-shadow:
+    0 1px 3px rgba(255, 255, 255, 0.72),
+    0 0 7px rgba(250, 204, 21, 0.62),
+    inset 0 -2px 4px rgba(254, 240, 138, 0.38);
+  transform: perspective(60px) rotateX(58deg);
+}
+.boss-spring-crown::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fffbd1;
+  box-shadow:
+    0 0 5px 1px rgba(254, 240, 138, 0.78),
+    -18px 3px 0 -1px rgba(253, 230, 138, 0.88),
+    -18px 3px 5px rgba(250, 204, 21, 0.56),
+    18px 3px 0 -1px rgba(253, 230, 138, 0.88),
+    18px 3px 5px rgba(250, 204, 21, 0.56);
+  transform: translateX(-50%);
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-spring-crown-buffed .boss-spring-crown {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  animation: bossSpringCrownEnter 560ms cubic-bezier(0.2, 0.82, 0.3, 1.15) both;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-crown-chip {
+  border-color: rgba(250, 204, 21, 0.68);
+  color: #fde68a;
+  box-shadow: inset 0 0 8px rgba(52, 211, 153, 0.13);
+}
+@keyframes bossSpringCrownEnter {
+  0% { opacity: 0; transform: translateX(-50%) translateY(7px) scale(0.72); }
+  68% { opacity: 1; transform: translateX(-50%) translateY(-1px) scale(1.08); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+.boss-cocoon-ward::before,
+.boss-cocoon-ward::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+.boss-cocoon-ward::before {
+  inset: 5px;
+  border: 1px solid rgba(167, 243, 208, 0.7);
+  border-radius: inherit;
+  opacity: var(--boss-cocoon-detail-opacity, 0.82);
+}
+.boss-cocoon-ward::after {
+  inset: 9% 13%;
+  opacity: 0.7;
+  background:
+    linear-gradient(34deg, transparent 46%, rgba(110, 231, 183, 0.65) 48% 50%, transparent 52%) 4% 8% / 38% 54% no-repeat,
+    linear-gradient(146deg, transparent 46%, rgba(253, 230, 138, 0.58) 48% 50%, transparent 52%) 96% 12% / 38% 52% no-repeat,
+    radial-gradient(ellipse at 50% 92%, rgba(52, 211, 153, 0.45), transparent 54%);
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active .boss-cocoon-ward,
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-cocoon-breaking .boss-cocoon-ward {
+  opacity: var(--boss-cocoon-opacity, 0.85);
+  transform: scale(1);
+}
+body[data-boss-id='matriarca_esmeralda'] [data-cocoon-stage='cracked'] .boss-cocoon-ward {
+  border-style: dashed;
+  opacity: 0.68;
+}
+body[data-boss-id='matriarca_esmeralda'] [data-cocoon-stage='critical'] .boss-cocoon-ward {
+  border-style: dashed;
+  opacity: 0.5;
+  box-shadow: 0 0 7px rgba(250, 204, 21, 0.65), inset 0 0 8px rgba(52, 211, 153, 0.12);
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-cocoon-impact .boss-cocoon-ward {
+  animation: bossCocoonImpact 600ms ease-out;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-cocoon-breaking .boss-cocoon-ward {
+  animation: bossCocoonBreak 800ms ease-out forwards;
+}
+@keyframes bossCocoonImpact {
+  0%, 100% { transform: scale(1); }
+  28% { opacity: 1; transform: scale(1.055); }
+  58% { transform: scale(0.985); }
+}
+@keyframes bossCocoonBreak {
+  0% { opacity: 0.95; transform: scale(1); }
+  45% { opacity: 1; transform: scale(1.07); }
+  100% { opacity: 0; transform: scale(1.15); }
+}
 .boss-portrait img {
   width: 100%;
   height: 100%;
@@ -98,13 +276,87 @@
   transform-origin: 50% 38%;
 }
 body[data-boss-id='dominadora'] .boss-portrait {
+  position: relative;
+  isolation: isolate;
+  contain: paint;
   border-color: rgba(244, 114, 182, 0.7);
   box-shadow: 0 0 16px rgba(219, 39, 119, 0.25);
 }
 body[data-boss-id='dominadora'] .boss-portrait img {
+  --dominatrix-portrait-scale: 1.32;
+  position: relative;
+  z-index: 1;
   object-position: 50% 22%;
-  transform: scale(1.32);
+  transform: translate3d(0, 0, 0) scale(var(--dominatrix-portrait-scale));
   transform-origin: 50% 22%;
+  will-change: transform;
+  animation: dominatrixPortraitBreathing 9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+body[data-boss-id='dominadora'] .boss-portrait::before,
+body[data-boss-id='dominadora'] .boss-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+body[data-boss-id='dominadora'] .boss-portrait::before {
+  z-index: 2;
+  background: radial-gradient(circle at 76% 23%, rgba(244, 114, 182, 0.26) 0 2%, transparent 10%), linear-gradient(112deg, transparent 24%, rgba(236, 72, 153, 0.18) 47%, transparent 69%);
+  mix-blend-mode: screen;
+  opacity: 0.22;
+  transform: translate3d(-16%, 0, 0);
+  will-change: transform, opacity;
+  animation: dominatrixPortraitLight 6.8s ease-in-out infinite;
+}
+body[data-boss-id='dominadora'] .boss-portrait::after {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 12% 82%, rgba(249, 168, 212, 0.8) 0 1px, transparent 2px), radial-gradient(circle at 28% 34%, rgba(216, 70, 239, 0.66) 0 1px, transparent 2px),
+    radial-gradient(circle at 53% 76%, rgba(244, 114, 182, 0.72) 0 1.2px, transparent 2.4px), radial-gradient(circle at 71% 47%, rgba(232, 121, 249, 0.62) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 68%, rgba(249, 168, 212, 0.74) 0 1px, transparent 2px);
+  opacity: 0;
+  transform: translate3d(0, 12px, 0) scale(0.98);
+  will-change: transform, opacity;
+  animation: dominatrixPortraitParticles 10.5s linear infinite;
+}
+
+@keyframes dominatrixPortraitBreathing {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(var(--dominatrix-portrait-scale));
+  }
+  48% {
+    transform: translate3d(-0.45%, -0.7%, 0) scale(calc(var(--dominatrix-portrait-scale) + 0.025));
+  }
+}
+
+@keyframes dominatrixPortraitLight {
+  0%,
+  100% {
+    opacity: 0.14;
+    transform: translate3d(-18%, 0, 0);
+  }
+  50% {
+    opacity: 0.34;
+    transform: translate3d(15%, 0, 0);
+  }
+}
+
+@keyframes dominatrixPortraitParticles {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.98);
+  }
+  18% {
+    opacity: 0.34;
+  }
+  78% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(4px, -14px, 0) scale(1.02);
+  }
 }
 body[data-boss-id='dominadora'] .boss-hud {
   border-color: rgba(244, 114, 182, 0.78);
@@ -328,6 +580,7 @@ body[data-boss-id='dominadora'] .boss-round-summary #bossCurrentActor {
   font-size: 9px;
   font-style: normal;
   font-weight: 1000;
+  white-space: pre-line;
 }
 
 .boss-impact-card {
@@ -1517,8 +1770,8 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
     transform-origin: 50% 36%;
   }
   body[data-boss-id='dominadora'] .boss-portrait img {
+    --dominatrix-portrait-scale: 1.27;
     object-position: 50% 20%;
-    transform: scale(1.27);
     transform-origin: 50% 20%;
   }
   .boss-dialogue-presentation {
@@ -1878,6 +2131,28 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   border-style: double;
   border-color: rgba(253, 230, 138, 0.7);
 }
+/* O seletor com #gameSection precisa vencer a regra genérica `#gameSection > *`,
+   que define position: relative nos filhos diretos. Sem isso, o SVG do Enxerto
+   entra no fluxo flex, ocupa a mesa inteira e empurra a interface para fora. */
+body.boss-mode #gameSection > svg.boss-graft-links {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  flex: none;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.boss-mode .boss-graft-links path {
+  fill: none;
+  stroke: rgba(253, 230, 138, 0.72);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 5 5;
+  filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.34));
+}
 .boss-mode .meld-line.rooted-by-matriarch .meld-line-cards,
 .boss-mode .meld-line.grafted-by-matriarch .meld-line-cards,
 .boss-mode .meld-line.rooted-by-matriarch .meld-meta,
@@ -1911,17 +2186,62 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
 }
 .boss-mode #drawDiscardBtn.boss-pollen-discard .pile-card {
   box-shadow:
-    0 0 0 2px #84cc16,
-    0 0 13px rgba(190, 242, 100, 0.35) !important;
+    0 0 0 2px rgba(253, 230, 138, 0.78),
+    0 0 0 5px rgba(52, 211, 153, 0.28),
+    0 0 18px rgba(16, 185, 129, 0.48) !important;
+}
+.boss-mode #drawDiscardBtn.boss-pollen-discard .discard-face.boss-discard-pollen-card {
+  border-color: #34d399 !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(253, 230, 138, 0.68),
+    0 0 0 3px rgba(52, 211, 153, 0.5),
+    0 0 16px rgba(16, 185, 129, 0.58) !important;
+  animation: bossNatureMarkIn 0.5s ease both;
+}
+.boss-mode #drawDiscardBtn.boss-pollen-discard .discard-face .boss-card-status-pollen {
+  bottom: 5px;
+  font-size: 6px;
 }
 .boss-mode #drawDiscardBtn.boss-pollen-discard::after {
-  content: 'POLEN';
+  content: 'PÓLEN';
   display: block;
   margin-top: 3px;
   color: #bef264;
   font-size: 8px;
   font-weight: 1000;
   text-align: center;
+}
+.boss-mode #drawDiscardBtn.boss-surcharge-discard .pile-card {
+  box-shadow:
+    0 0 0 2px #fbbf24,
+    0 0 13px rgba(251, 191, 36, 0.34) !important;
+}
+.boss-mode #drawDiscardBtn.boss-surcharge-discard::after {
+  content: 'AGIO ATIVO';
+  display: block;
+  margin-top: 3px;
+  color: #fde68a;
+  font-size: 8px;
+  font-weight: 1000;
+  text-align: center;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-player-targeted .opponent-label,
+body[data-boss-id='matriarca_esmeralda'] #localPlayerLabel.boss-player-targeted {
+  position: relative;
+  border-color: rgba(110, 231, 183, 0.9) !important;
+  box-shadow:
+    0 0 0 1px rgba(253, 230, 138, 0.4),
+    0 0 10px rgba(52, 211, 153, 0.34) !important;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-player-targeted .opponent-label::after,
+body[data-boss-id='matriarca_esmeralda'] #localPlayerLabel.boss-player-targeted::after {
+  content: 'ALVO';
+  display: inline-block;
+  margin-left: 5px;
+  color: #fde68a;
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: 0;
 }
 .boss-mode .boss-meld-contribution-bloom {
   border-color: rgba(52, 211, 153, 0.48);
@@ -1930,6 +2250,10 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
 }
 .boss-floating-number.nature-heal-up {
   color: #6ee7b7;
+}
+.boss-floating-number.nature-cocoon-absorb {
+  color: #fde68a;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.76), 0 2px 8px #000;
 }
 .boss-floating-number.bloom-up {
   color: #f9a8d4;
@@ -1961,6 +2285,12 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
     height: 86px;
     flex: 0 0 134px;
   }
+  .boss-spring-crown {
+    top: -19px;
+    left: 67px;
+    width: 58px;
+    height: 21px;
+  }
   body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
     object-position: 50% 24%;
     transform: scale(1.1);
@@ -1971,9 +2301,268 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
   .boss-bloom-flowers i.open,
   .boss-mode .carta.boss-card-nature-seed,
   .boss-mode .carta.boss-card-nature-pollen,
+  .boss-mode #drawDiscardBtn.boss-pollen-discard .discard-face.boss-discard-pollen-card,
   .boss-mode .meld-line.rooted-by-matriarch::before,
-  .boss-mode .meld-line.grafted-by-matriarch::before {
+  .boss-mode .meld-line.grafted-by-matriarch::before,
+  .boss-mode .boss-graft-links path {
     animation: none !important;
+    filter: none !important;
+  }
+}
+
+/* Retrato vivo da Dominadora: movimento leve, sem filtros animados pesados. */
+@media (hover: none) and (pointer: coarse) {
+  body[data-boss-id='dominadora'] .boss-portrait img {
+    animation-duration: 13s;
+  }
+  body[data-boss-id='dominadora'] .boss-portrait::before {
+    opacity: 0.14;
+    animation-duration: 10s;
+  }
+  body[data-boss-id='dominadora'] .boss-portrait::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='matriarca_esmeralda'] .boss-spring-crown-buffed .boss-spring-crown {
+    animation: none !important;
+  }
+  body[data-boss-id='dominadora'] .boss-portrait img {
+    animation: none !important;
+    transform: translate3d(0, 0, 0) scale(var(--dominatrix-portrait-scale));
+  }
+  body[data-boss-id='dominadora'] .boss-portrait::before,
+  body[data-boss-id='dominadora'] .boss-portrait::after {
+    display: none;
+    animation: none !important;
+  }
+}
+
+/* Retrato vivo do Banqueiro: pulso de poder, reflexo dourado e moedas discretas. */
+body[data-boss-id='banker'] .boss-portrait {
+  position: relative;
+  isolation: isolate;
+  contain: paint;
+  border-color: rgba(74, 222, 128, 0.72);
+  box-shadow:
+    0 0 16px rgba(34, 197, 94, 0.2),
+    inset 0 0 0 1px rgba(250, 204, 21, 0.12);
+}
+body[data-boss-id='banker'] .boss-portrait img {
+  --banker-portrait-scale: 1.2;
+  position: relative;
+  z-index: 1;
+  object-position: 50% 29%;
+  transform: translate3d(0, 0, 0) scale(var(--banker-portrait-scale));
+  transform-origin: 50% 32%;
+  will-change: transform;
+  animation: bankerPortraitBreathing 10s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+body[data-boss-id='banker'] .boss-portrait::before,
+body[data-boss-id='banker'] .boss-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+body[data-boss-id='banker'] .boss-portrait::before {
+  z-index: 2;
+  background: radial-gradient(circle at 70% 58%, rgba(250, 204, 21, 0.22) 0 2%, transparent 11%), linear-gradient(108deg, transparent 22%, rgba(253, 224, 71, 0.2) 46%, rgba(74, 222, 128, 0.1) 55%, transparent 72%);
+  mix-blend-mode: screen;
+  opacity: 0.18;
+  transform: translate3d(-18%, 0, 0);
+  will-change: transform, opacity;
+  animation: bankerPortraitLight 7.6s ease-in-out infinite;
+}
+body[data-boss-id='banker'] .boss-portrait::after {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 10% 78%, rgba(253, 224, 71, 0.82) 0 1px, transparent 2px), radial-gradient(circle at 25% 43%, rgba(74, 222, 128, 0.6) 0 1px, transparent 2px),
+    radial-gradient(circle at 48% 83%, rgba(250, 204, 21, 0.7) 0 1.2px, transparent 2.4px), radial-gradient(circle at 73% 34%, rgba(134, 239, 172, 0.58) 0 1px, transparent 2px),
+    radial-gradient(circle at 90% 70%, rgba(253, 224, 71, 0.76) 0 1px, transparent 2px);
+  opacity: 0;
+  transform: translate3d(0, 11px, 0) scale(0.99);
+  will-change: transform, opacity;
+  animation: bankerPortraitParticles 12s linear infinite;
+}
+
+@keyframes bankerPortraitBreathing {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(var(--banker-portrait-scale));
+  }
+  50% {
+    transform: translate3d(0.35%, -0.55%, 0) scale(calc(var(--banker-portrait-scale) + 0.02));
+  }
+}
+
+@keyframes bankerPortraitLight {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: translate3d(-20%, 0, 0);
+  }
+  50% {
+    opacity: 0.32;
+    transform: translate3d(17%, 0, 0);
+  }
+}
+
+@keyframes bankerPortraitParticles {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 11px, 0) scale(0.99);
+  }
+  20% {
+    opacity: 0.3;
+  }
+  76% {
+    opacity: 0.18;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-3px, -13px, 0) scale(1.02);
+  }
+}
+
+/* Retrato vivo da Matriarca: respiração suave, aura esmeralda e pólen leve. */
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait {
+  position: relative;
+  isolation: isolate;
+  contain: paint;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
+  --matriarch-portrait-scale: 1.13;
+  position: relative;
+  z-index: 1;
+  object-position: 50% 28%;
+  transform: translate3d(0, 0, 0) scale(var(--matriarch-portrait-scale));
+  transform-origin: 50% 28%;
+  will-change: transform;
+  animation: matriarchPortraitBreathing 11s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait::before,
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait::before {
+  z-index: 2;
+  background:
+    radial-gradient(circle at 25% 62%, rgba(190, 242, 100, 0.2) 0 3%, transparent 13%), radial-gradient(circle at 76% 28%, rgba(110, 231, 183, 0.2) 0 2%, transparent 12%),
+    linear-gradient(116deg, transparent 24%, rgba(52, 211, 153, 0.16) 46%, rgba(253, 230, 138, 0.1) 55%, transparent 72%);
+  mix-blend-mode: screen;
+  opacity: 0.18;
+  transform: translate3d(-15%, 0, 0);
+  will-change: transform, opacity;
+  animation: matriarchPortraitAura 8.4s ease-in-out infinite;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 12% 82%, rgba(190, 242, 100, 0.74) 0 1px, transparent 2px), radial-gradient(circle at 31% 37%, rgba(110, 231, 183, 0.66) 0 1px, transparent 2px),
+    radial-gradient(circle at 52% 77%, rgba(253, 230, 138, 0.66) 0 1.2px, transparent 2.4px), radial-gradient(circle at 72% 45%, rgba(167, 243, 208, 0.58) 0 1px, transparent 2px),
+    radial-gradient(circle at 89% 68%, rgba(190, 242, 100, 0.7) 0 1px, transparent 2px);
+  opacity: 0;
+  transform: translate3d(0, 12px, 0) scale(0.99);
+  will-change: transform, opacity;
+  animation: matriarchPortraitPollen 13s linear infinite;
+}
+
+@keyframes matriarchPortraitBreathing {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(var(--matriarch-portrait-scale));
+  }
+  50% {
+    transform: translate3d(-0.3%, -0.5%, 0) scale(calc(var(--matriarch-portrait-scale) + 0.018));
+  }
+}
+
+@keyframes matriarchPortraitAura {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: translate3d(-17%, 0, 0);
+  }
+  50% {
+    opacity: 0.3;
+    transform: translate3d(14%, 0, 0);
+  }
+}
+
+@keyframes matriarchPortraitPollen {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.99);
+  }
+  18% {
+    opacity: 0.28;
+  }
+  78% {
+    opacity: 0.16;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(3px, -14px, 0) scale(1.02);
+  }
+}
+
+@media (max-width: 900px) {
+  body[data-boss-id='banker'] .boss-portrait img {
+    --banker-portrait-scale: 1.17;
+    object-position: 50% 27%;
+    transform-origin: 50% 30%;
+  }
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
+    --matriarch-portrait-scale: 1.1;
+    object-position: 50% 24%;
+    transform-origin: 50% 24%;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  body[data-boss-id='banker'] .boss-portrait img,
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
+    animation-duration: 14s;
+  }
+  body[data-boss-id='banker'] .boss-portrait::before,
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait::before {
+    opacity: 0.12;
+    animation-duration: 11s;
+  }
+  body[data-boss-id='banker'] .boss-portrait::after,
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
+    display: none;
+  }
+  body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-ward {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='banker'] .boss-portrait img {
+    animation: none !important;
+    transform: translate3d(0, 0, 0) scale(var(--banker-portrait-scale));
+  }
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait img {
+    animation: none !important;
+    transform: translate3d(0, 0, 0) scale(var(--matriarch-portrait-scale));
+  }
+  body[data-boss-id='banker'] .boss-portrait::before,
+  body[data-boss-id='banker'] .boss-portrait::after,
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait::before,
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
+    display: none;
+    animation: none !important;
+  }
+  body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-ward {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
@@ -2137,4 +2726,73 @@ body[data-boss-id='matriarca_esmeralda'] .boss-cocoon-active[data-cocoon-stage='
 
 .boss-mode .boss-meld-interdict-seal {
   display: none;
+}
+
+/* =========================================================
+   MATRIARCA — COLHEITA
+   Mantém a tabela da habilidade visível durante todo o turno
+   e mostra abaixo apenas a contagem atual da mão.
+   ========================================================= */
+.boss-intent .boss-harvest-rules {
+  display: grid;
+  gap: 3px;
+  margin-top: 2px;
+  color: inherit;
+  white-space: normal;
+}
+
+.boss-harvest-rule {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.38);
+  color: #cbd5e1;
+  font-size: 8px;
+  line-height: 1.15;
+}
+
+.boss-harvest-rule b {
+  color: #fbbf24;
+  font-size: 8px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+
+.boss-harvest-rule span {
+  min-width: 0;
+}
+
+.boss-harvest-rule.active {
+  border-color: rgba(251, 191, 36, 0.72);
+  background: rgba(120, 53, 15, 0.38);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.08);
+}
+
+.boss-intent em.boss-harvest-count {
+  display: block;
+  margin-top: 2px;
+  color: #fbbf24;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 1000;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.boss-intent em.boss-harvest-count.safe {
+  color: #86efac;
+}
+
+.boss-intent em.boss-harvest-count.warning {
+  color: #fde047;
+}
+
+.boss-intent em.boss-harvest-count.danger {
+  color: #fda4af;
 }

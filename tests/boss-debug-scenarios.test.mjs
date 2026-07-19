@@ -3,8 +3,11 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   bossDebugScenarioRegistry,
+  applyBossDebugBotOutcome,
   buildBossDebugScenario,
+  canContinueBossDebugScenario,
   compareBossDebugExpectations,
+  completeBossDebugBotOutcome,
   createBossDebugSnapshot,
   executeBossDebugScenarioVariant,
   getBossDebugCatalog,
@@ -16,9 +19,10 @@ import {
 import { advanceBossTurn, beginBossTurn, selectNextBossIntent } from '../js/boss/boss-engine.js';
 import { listBossDefinitions } from '../js/boss/boss-registry.js';
 
-const [appSource, htmlSource] = await Promise.all([
+const [appSource, htmlSource, bossCssSource] = await Promise.all([
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/boss-mode.css', import.meta.url), 'utf8'),
 ]);
 
 function build(bossId = 'banker', abilityId = 'fixed_interest', overrides = {}) {
@@ -50,13 +54,18 @@ test('catalogo do laboratorio nasce do registro oficial e cobre as 31 habilidade
 });
 
 test('painel existe no DevTools atual e o modulo so e importado dentro do modo debug', () => {
-  for (const id of ['debugBossLab', 'debugBossLabBoss', 'debugBossLabPhase', 'debugBossLabAbility', 'debugBossLabVariant', 'debugBossLabTarget', 'debugBossLabPrepare', 'debugBossLabBotRun']) {
+  for (const id of ['debugBossLab', 'debugBossLabBoss', 'debugBossLabPhase', 'debugBossLabAbility', 'debugBossLabVariant', 'debugBossLabTarget', 'debugBossLabPrepare', 'debugBossLabBotSuccess', 'debugBossLabBotFailure']) {
     assert.match(htmlSource, new RegExp(`id="${id}"`));
   }
+  assert.doesNotMatch(htmlSource, />Executar sucesso</);
+  assert.doesNotMatch(htmlSource, />Executar falha</);
+  assert.doesNotMatch(htmlSource, />Simular reload</);
   const debugBlock = appSource.slice(appSource.indexOf('if (isDebugMode) {'), appSource.indexOf('window.debugDraw5'));
   assert.match(debugBlock, /import\('\.\/js\/boss\/boss-debug-scenarios\.js'\)/);
   assert.match(appSource, /pauseAutomation/);
   assert.match(appSource, /isBossLabAutomationPaused/);
+  assert.match(htmlSource, /class="boss-spring-crown"/);
+  assert.match(bossCssSource, /boss-spring-crown-buffed[\s\S]*?boss-spring-crown/);
 });
 
 test('Ordem Final pode criar as duas escolhas pelo Laboratorio', () => {
@@ -98,6 +107,35 @@ test('cenarios usam 108 cartas oficiais com IDs unicos e jogos validos', () => {
     assert.deepEqual(validation.duplicates, []);
     assert.equal(prepared.state.variant, 'fechado');
   }
+});
+
+test('Laboratorio fornece alvos reais sem reorganizar as maos preparadas', () => {
+  const seed = build('matriarca_esmeralda', 'living_seed', { target: 'human' });
+  const handOrder = seed.state.players.map((player) => player.hand.map((card) => card.id));
+  const seedIntent = selectNextBossIntent(seed.state, { debug: true });
+  const seedTarget = seed.state.players.find((player) => player.id === seedIntent.payload.targetPlayerId);
+  assert.ok(seedTarget?.hand.some((card) => card.id === seedIntent.payload.cardId));
+  assert.deepEqual(seed.state.players.map((player) => player.hand.map((card) => card.id)), handOrder);
+
+  const pledge = build('banker', 'pledge');
+  const pledgeIntent = selectNextBossIntent(pledge.state, { debug: true });
+  assert.ok(pledge.state.teams[0].melds[pledgeIntent.payload.meldIndex]?.length > 0);
+
+  const surcharge = build('banker', 'discard_surcharge');
+  selectNextBossIntent(surcharge.state, { debug: true });
+  assert.ok(surcharge.state.discard.at(-1)?.id);
+
+  const pollen = build('matriarca_esmeralda', 'discard_pollen');
+  assert.equal(pollen.state.boss.maxHp - pollen.state.boss.hp, 100);
+  assert.equal(pollen.state.boss.natureHealingThisRound, 0);
+});
+
+test('marcadores contextuais distinguem lixo, jogo, carta e jogador afetados', () => {
+  for (const marker of ['boss-surcharge-discard', 'boss-pollen-discard', 'boss-player-targeted', 'boss-card-nature-seed', 'rooted-by-matriarch', 'locked-by-boss']) {
+    assert.match(appSource, new RegExp(marker));
+  }
+  assert.match(bossCssSource, /boss-surcharge-discard/);
+  assert.match(bossCssSource, /boss-player-targeted/);
 });
 
 test('mesmo cenario produz alvo e payload deterministas', () => {
@@ -208,10 +246,134 @@ test('relatorio do laboratorio acusa consequencia observada incorreta', () => {
 
 test('laboratorio usa o bot real e limpa seu unico timer ao fechar ou resetar', () => {
   assert.match(appSource, /async function executeBossLabBotAction[\s\S]*?BuracoBot\.playTurn/);
+  assert.match(appSource, /executeBossLabBotAction\(outcome\)[\s\S]*?if \(!module\.canContinueBossDebugScenario\(state, activeConfig\) && !\(await prepareBossLab\(overrides\)\)\) return;/);
+  assert.match(appSource, /advanceBossLabPresentationToPlayers/);
+  assert.match(appSource, /createBotEngineForSession\(sessionId, signal, \{ delayScale: 0\.12, bossLabOutcome: outcome \}\)/);
+  assert.match(appSource, /applyBossDebugBotOutcome\(state, outcome, botPlayer\.id\)/);
+  assert.match(appSource, /completeBossDebugBotOutcome\(state, outcome, botPlayer\.id, preparedResult\)/);
+  assert.match(appSource, /completedBotTurnsAfter > completedBotTurnsBefore/);
+  assert.match(appSource, /shouldForceStockDraw/);
+  assert.match(appSource, /shouldSkipMelds/);
   assert.match(appSource, /let bossDebugLabReportTimerId = null/);
+  assert.match(appSource, /let renderedBossFeedbackEventIds = null/);
+  assert.match(appSource, /renderedBossFeedbackEventIds\.has\(event\.actionId\)/);
   assert.match(appSource, /function stopBossLabReportTimer\(\)[\s\S]*?clearInterval\(bossDebugLabReportTimerId\)/);
   assert.match(appSource, /resetBossLabScenario\(\)[\s\S]*?stopBossLabReportTimer\(\)/);
   assert.match(appSource, /debugBossLab[^\n]*addEventListener\('toggle'[\s\S]*?stopBossLabReportTimer\(\)/);
+});
+
+test('botoes do bot continuam o cenario preparado sem recriar o turno do jogador', () => {
+  const prepared = build('matriarca_esmeralda', 'royal_bloom', { phase: 3 });
+  prepared.state.boss.playersActedThisRound = [prepared.state.players[0].id];
+  prepared.state.currentPlayer = 1;
+  prepared.state.turnNumber = 1;
+
+  assert.equal(canContinueBossDebugScenario(prepared.state, {
+    bossId: 'matriarca_esmeralda',
+    abilityId: 'royal_bloom',
+  }), true);
+  assert.deepEqual(prepared.state.boss.playersActedThisRound, [prepared.state.players[0].id]);
+  assert.equal(canContinueBossDebugScenario(prepared.state, {
+    bossId: 'matriarca_esmeralda',
+    abilityId: 'graft',
+  }), false);
+  prepared.state.debugScenario.executionCount = 1;
+  assert.equal(canContinueBossDebugScenario(prepared.state, {
+    bossId: 'matriarca_esmeralda',
+    abilityId: 'royal_bloom',
+  }), false);
+});
+
+test('Laboratorio resolve resultados distintos para sucesso e falha do bot', () => {
+  const success = build('matriarca_esmeralda', 'living_seed', { variant: 'success', target: 'bot' });
+  beginBossTurn(success.state, { first: true, now: 1000, debug: true });
+  const successPrepared = applyBossDebugBotOutcome(success.state, 'success', 1);
+  assert.equal(successPrepared.executed, true);
+  assert.equal(successPrepared.action, 'bot_success_policy_active');
+  const successResult = completeBossDebugBotOutcome(success.state, 'success', 1, successPrepared);
+  assert.equal(successResult.action, 'bot_success_completed');
+
+  const failure = build('matriarca_esmeralda', 'living_seed', { variant: 'failure', target: 'bot' });
+  beginBossTurn(failure.state, { first: true, now: 1000, debug: true });
+  const failurePrepared = applyBossDebugBotOutcome(failure.state, 'failure', 1);
+  assert.equal(failurePrepared.action, 'bot_failure_policy_active');
+  const failureResult = completeBossDebugBotOutcome(failure.state, 'failure', 1, failurePrepared);
+  assert.equal(failureResult.action, 'bot_failure_completed');
+});
+
+test('Laboratorio da Coroa resolve especificamente a ameaca marcada', () => {
+  const success = build('matriarca_esmeralda', 'spring_crown', { phase: 3, variant: 'success' });
+  beginBossTurn(success.state, { first: true, now: 1000, debug: true });
+  const successPrepared = applyBossDebugBotOutcome(success.state, 'success', 1);
+  assert.equal(successPrepared.action, 'spring_crown_mark_succeeded');
+  const successResult = completeBossDebugBotOutcome(success.state, 'success', 1, successPrepared);
+  assert.equal(successResult.executed, true);
+  assert.equal(success.state.boss.springCrown.status, 'completed');
+  assert.equal(success.state.boss.pendingRootPropagation, null);
+
+  const failure = build('matriarca_esmeralda', 'spring_crown', { phase: 3, variant: 'failure' });
+  beginBossTurn(failure.state, { first: true, now: 1000, debug: true });
+  const failurePrepared = applyBossDebugBotOutcome(failure.state, 'failure', 1);
+  assert.equal(failurePrepared.action, 'spring_crown_mark_failed');
+  const failureResult = completeBossDebugBotOutcome(failure.state, 'failure', 1, failurePrepared);
+  assert.equal(failureResult.executed, true);
+  assert.ok(failure.state.boss.natureThreats.some((threat) => threat.propagated && threat.strengthened));
+  assert.match(
+    failure.state.boss.eventLog.find((event) => event.actionId === failureResult.resultActionId)?.outcome || '',
+    /Raiz Fortalecida/i,
+  );
+});
+
+
+test('BOT do Laboratorio congela o painel no resultado da habilidade selecionada', () => {
+  const prepared = build('matriarca_esmeralda', 'living_seed', { variant: 'failure', target: 'bot' });
+  beginBossTurn(prepared.state, { first: true, now: 1000, debug: true });
+  const preparedResult = applyBossDebugBotOutcome(prepared.state, 'failure', 1);
+  const result = completeBossDebugBotOutcome(prepared.state, 'failure', 1, preparedResult);
+
+  assert.equal(result.executed, true);
+  assert.equal(prepared.state.boss.bossFlow.stage, 'result');
+  assert.deepEqual(prepared.state.boss.bossFlow.queue, []);
+  assert.equal(prepared.state.boss.bossFlow.eventActionId, result.resultActionId);
+  assert.equal(prepared.state.debugScenario.heldResultActionId, result.resultActionId);
+  assert.equal(prepared.state.boss.currentIntent, null);
+
+  const heldEvent = prepared.state.boss.eventLog.find((event) => event.actionId === result.resultActionId);
+  const heldThreat = prepared.state.boss.natureThreats.find((threat) => threat.id === heldEvent?.threatId);
+  assert.equal(heldThreat?.sourceAbilityId, 'living_seed');
+});
+
+test('Laboratorio encerra Florescimento Real mesmo com marcadores de turno ja sincronizados', () => {
+  const prepared = build('matriarca_esmeralda', 'royal_bloom', { phase: 3, variant: 'success' });
+  beginBossTurn(prepared.state, { first: true, now: 1000, debug: true });
+  let guard = 0;
+  while (prepared.state.boss.bossFlow?.stage !== 'players' && guard < 20) {
+    advanceBossTurn(prepared.state, Number(prepared.state.boss.bossFlow?.endsAt || 0) + 1);
+    guard += 1;
+  }
+
+  const startingRound = prepared.state.boss.roundNumber;
+  prepared.state.boss.playersActedThisRound = prepared.state.players.map((player) => player.id);
+  prepared.state.boss.resolvedTurnIds = prepared.state.players.map(
+    (player) => `turn_${prepared.state.turnNumber}_${player.id}`,
+  );
+
+  completeBossDebugBotOutcome(prepared.state, 'success', 1, { action: 'bot_success_policy_active' });
+
+  assert.equal(prepared.state.boss.roundNumber, startingRound + 1);
+  assert.equal(prepared.state.boss.playersActedThisRound.length, 0);
+  assert.equal(
+    prepared.state.boss.natureThreats.find((threat) => threat.type === 'royal_pollen')?.status,
+    'cancelled',
+  );
+});
+
+test('Enxerto usa SVG absoluto com especificidade maior que os filhos do gameSection', () => {
+  assert.match(
+    bossCssSource,
+    /body\.boss-mode #gameSection > svg\.boss-graft-links \{[\s\S]*?position: absolute;[\s\S]*?flex: none;[\s\S]*?pointer-events: none;/,
+  );
+  assert.match(bossCssSource, /\.boss-mode \.boss-graft-links path \{[\s\S]*?fill: none;[\s\S]*?stroke:/);
 });
 
 

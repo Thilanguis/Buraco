@@ -31,7 +31,7 @@ Este documento registra os nomes publicos atuais. Nenhuma habilidade foi renomea
 | A Matriarca Esmeralda | `restorative_dew` | Orvalho Restaurador | Cura por faixas, reduzida por cartas novas na mesa. | 1, 2 e 3 |
 | A Matriarca Esmeralda | `twin_vines` | Trepadeiras Gemeas | Exige alimentacao de mais de um jogo marcado. | 2 e 3 |
 | A Matriarca Esmeralda | `graft` | Enxerto | Liga dois jogos que precisam ser alimentados na rodada. | 2 e 3 |
-| A Matriarca Esmeralda | `discard_pollen` | Polen do Lixo | Contamina uma carta retirada do lixo e exige seu uso. | 2 e 3 |
+| A Matriarca Esmeralda | `discard_pollen` | Polen do Lixo | Contamina o topo do lixo; retirá-lo concede +1 Flor e cura a Matriarca em até 40 HP. | 2 e 3 |
 | A Matriarca Esmeralda | `harvest` | Colheita | Avalia o tamanho da mao do alvo no fim do turno. | 2 e 3 |
 | A Matriarca Esmeralda | `royal_bloom` | Florescimento Real | Combina objetivos naturais que devem ser cumpridos separadamente. | 3 |
 | A Matriarca Esmeralda | `emerald_cocoon` | Casulo Esmeralda | Cria um casulo que absorve dano ate ser rompido. | 3 |

@@ -16,6 +16,7 @@ import {
   normalizeBossState,
   notifyBossCardDiscarded,
   resolveBossChoice,
+  resolveBossDebugSpringCrownThreat,
   resolveBossInterdictAttempt,
   selectNextBossIntent,
 } from '../js/boss/boss-engine.js';
@@ -558,7 +559,7 @@ test('Polen normal cura 40, Polen Real nao cura e Colheita usa as faixas finais'
   }
 });
 
-test('Coroa fortalece apenas a Raiz propagada na segunda falha e reload nao duplica', () => {
+test('Coroa prepara uma unica Raiz Fortalecida quando a ameaca marcada falha e reload nao duplica', () => {
   const state = bossGame('matriarca_esmeralda');
   state.boss.phase = 3;
   state.boss.phaseTransitions = [1, 2, 3];
@@ -577,13 +578,20 @@ test('Coroa fortalece apenas a Raiz propagada na segunda falha e reload nao dupl
     healAmount: 0,
     progressCardIds: [],
   }));
-  state.boss.springCrown = { id: 'crown-final', round: 1, failureCount: 0, strengthenedCreated: false, status: 'active' };
+  state.boss.springCrown = {
+    id: 'crown-final',
+    createdRound: 1,
+    markedThreatId: 'crown-failure-0',
+    markedThreatName: 'Raiz Faminta',
+    status: 'active',
+  };
   completeBossPlayerTurn(state, 0);
   completeBossPlayerTurn(state, 1);
   const propagated = getBossNatureThreats(state).filter((entry) => entry.status === 'active' && entry.propagated);
   assert.equal(propagated.length, 1);
   assert.equal(propagated[0].strengthened, true);
   assert.equal(propagated[0].requiredContributorCount, 2);
+  assert.equal(state.boss.springCrown.status, 'root_active');
   assert.equal(state.boss.bloom, 3);
   assert.equal(state.boss.hp, 1500);
 
@@ -591,10 +599,34 @@ test('Coroa fortalece apenas a Raiz propagada na segunda falha e reload nao dupl
   assert.equal(state.boss.natureThreats.find((entry) => entry.id === propagated[0].id).status, 'active');
   applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: propagated[0].meldIndex, cardsAdded: [{ id: 'strong-root-b', rank: '10', suit: state.teams[0].melds[propagated[0].meldIndex][0].suit }] });
   assert.equal(state.boss.natureThreats.find((entry) => entry.id === propagated[0].id).status, 'success');
+  assert.equal(state.boss.springCrown.status, 'expired');
 
   const restored = JSON.parse(JSON.stringify(state));
   const eventCount = restored.boss.eventLog.filter((entry) => entry.type === 'naturePropagation').length;
   normalizeBossState(restored);
   assert.equal(restored.boss.eventLog.filter((entry) => entry.type === 'naturePropagation').length, eventCount);
   assert.equal(restored.boss.natureThreats.filter((entry) => entry.propagated).length, 1);
+
+  const cancelled = bossGame('matriarca_esmeralda');
+  cancelled.boss.phase = 3;
+  cancelled.boss.phaseTransitions = [1, 2, 3];
+  const cancelledMeldId = establishMeldId(cancelled, 0);
+  cancelled.boss.natureThreats = [{
+    id: 'crown-cancelled-target',
+    type: 'root',
+    meldId: cancelledMeldId,
+    meldIndex: 0,
+    status: 'active',
+    progressCardIds: [],
+  }];
+  cancelled.boss.springCrown = {
+    id: 'crown-cancelled',
+    markedThreatId: 'crown-cancelled-target',
+    markedThreatName: 'Raiz Faminta',
+    status: 'active',
+  };
+  resolveBossDebugSpringCrownThreat(cancelled, 'cancelled');
+  assert.equal(cancelled.boss.natureThreats[0].status, 'cancelled');
+  assert.equal(cancelled.boss.springCrown.status, 'cancelled');
+  assert.equal(cancelled.boss.pendingRootPropagation, null);
 });

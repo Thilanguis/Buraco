@@ -471,25 +471,38 @@
           <details id="debugBossLab" class="debug-boss-lab">
             <summary>Laboratorio de Chefes</summary>
             <div class="debug-boss-lab-body">
-              <label>Chefe<select id="debugBossLabBoss"></select></label>
-              <label>Fase<select id="debugBossLabPhase"></select></label>
-              <label>Habilidade<select id="debugBossLabAbility"></select></label>
+              <label>
+                Chefe
+                <select id="debugBossLabBoss"></select>
+              </label>
+              <label>
+                Fase
+                <select id="debugBossLabPhase"></select>
+              </label>
+              <label>
+                Habilidade
+                <select id="debugBossLabAbility"></select>
+              </label>
               <div id="debugBossLabTechnical" class="debug-boss-lab-technical"></div>
-              <label>Cenario<select id="debugBossLabVariant"></select></label>
-              <label>Alvo<select id="debugBossLabTarget"></select></label>
+              <label>
+                Cenario
+                <select id="debugBossLabVariant"></select>
+              </label>
+              <label>
+                Alvo
+                <select id="debugBossLabTarget"></select>
+              </label>
               <div id="debugBossLabError" class="debug-boss-lab-error" role="status"></div>
               <button id="debugBossLabPrepare" type="button" class="debug-boss-lab-primary">Preparar e testar</button>
               <div class="debug-boss-lab-actions">
-                <button type="button" data-boss-lab-variant="success">Executar sucesso</button>
-                <button type="button" data-boss-lab-variant="failure">Executar falha</button>
                 <button type="button" data-boss-lab-variant="external_cancel">Executar cancelamento externo</button>
-                <button id="debugBossLabBotRun" type="button">Executar acao do bot</button>
-                <button id="debugBossLabReload" type="button">Simular reload</button>
+                <button id="debugBossLabBotSuccess" type="button">BOT: executar sucesso</button>
+                <button id="debugBossLabBotFailure" type="button">BOT: executar falha</button>
                 <button id="debugBossLabUndo" type="button">Voltar</button>
                 <button id="debugBossLabReset" type="button">Resetar cenario</button>
               </div>
-              <pre id="debugBossLabInstructions" class="debug-boss-lab-report">Selecione uma habilidade e prepare o cenario.</pre>
-              <pre id="debugBossLabObserved" class="debug-boss-lab-report debug-boss-lab-observed"></pre>
+              <!-- <pre id="debugBossLabInstructions" class="debug-boss-lab-report">Selecione uma habilidade e prepare o cenario.</pre>
+              <pre id="debugBossLabObserved" class="debug-boss-lab-report debug-boss-lab-observed"></pre> -->
               <button id="debugBossLabSweep" type="button" class="debug-boss-lab-sweep">Testar todas as habilidades</button>
             </div>
           </details>
@@ -548,26 +561,41 @@
 
           <section id="bossHud" class="boss-hud" aria-live="polite" style="display: none">
             <div class="boss-hud-heading">
-              <span class="boss-portrait" aria-hidden="true"><img id="bossPortraitImage" src="assets/images/boss-banqueiro.png" alt="" /></span>
+              <span class="boss-portrait" aria-hidden="true">
+                <img id="bossPortraitImage" src="assets/images/boss-banqueiro.png" alt="" />
+                <span class="boss-cocoon-ward"></span>
+              </span>
+              <span class="boss-spring-crown" aria-hidden="true"></span>
               <div>
                 <span class="boss-hud-kicker">CHEFE DA MESA</span>
                 <strong id="bossName">O BANQUEIRO</strong>
                 <span id="bossPhase" class="boss-phase">FASE 1</span>
                 <small id="bossPhaseRule" class="boss-phase-rule">Sem mortos · monte acima de 40</small>
                 <div id="bossRoundSummary" class="boss-round-summary">
-                  <span id="bossRoundNumber">Rodada 1</span><i>·</i>
-                  <span id="bossRoundTurn">Turno 1/2</span><i>·</i>
+                  <span id="bossRoundNumber">Rodada 1</span>
+                  <i>·</i>
+                  <span id="bossRoundTurn">Turno 1/2</span>
+                  <i>·</i>
                   <span id="bossCurrentActor">Agora: aguardando</span>
                 </div>
               </div>
             </div>
             <div class="boss-vitals">
               <div class="boss-meter boss-hp-meter">
-                <div class="boss-meter-label"><span>HP DO CHEFE</span><strong id="bossHpText">2200 / 2200</strong></div>
+                <div class="boss-meter-label">
+                  <span>HP DO CHEFE</span>
+                  <span class="boss-hp-values">
+                    <span id="bossCocoonMeter" class="boss-cocoon-meter" hidden>CASULO <strong id="bossCocoonText">180 / 180</strong></span>
+                    <strong id="bossHpText">2200 / 2200</strong>
+                  </span>
+                </div>
                 <div class="boss-meter-track"><span id="bossHpBar"></span></div>
               </div>
               <div id="bossDangerMeter" class="boss-meter boss-debt-meter">
-                <div class="boss-meter-label"><span id="bossDangerLabel">DÍVIDA COLETIVA</span><strong id="bossDebtText">0 / 100</strong></div>
+                <div class="boss-meter-label">
+                  <span id="bossDangerLabel">DÍVIDA COLETIVA</span>
+                  <strong id="bossDebtText">0 / 100</strong>
+                </div>
                 <div class="boss-meter-track"><span id="bossDebtBar"></span></div>
                 <div id="bossBloomFlowers" class="boss-bloom-flowers" aria-hidden="true"></div>
               </div>
@@ -587,18 +615,42 @@
             </div>
             <div id="bossDamageReaction" class="boss-dialogue-presentation boss-damage-reaction" style="display: none" aria-live="polite"></div>
             <details id="bossBattleDetails" class="boss-battle-details">
-              <summary><span aria-hidden="true">ⓘ</span> Detalhes da batalha</summary>
+              <summary>
+                <span aria-hidden="true">ⓘ</span>
+                Detalhes da batalha
+              </summary>
               <div class="boss-detail-content">
                 <div id="bossPhaseTrack" class="boss-phase-track" aria-label="Progresso das fases">
-                  <span data-phase="1"><i></i>Fase 1</span>
-                  <span data-phase="2"><i></i>Fase 2</span>
-                  <span data-phase="3"><i></i>Fase 3</span>
+                  <span data-phase="1">
+                    <i></i>
+                    Fase 1
+                  </span>
+                  <span data-phase="2">
+                    <i></i>
+                    Fase 2
+                  </span>
+                  <span data-phase="3">
+                    <i></i>
+                    Fase 3
+                  </span>
                 </div>
                 <div class="boss-damage-guide" aria-label="Dano das canastras">
-                  <span>SUJA <strong>100</strong></span>
-                  <span>LIMPA <strong>180</strong></span>
-                  <span>REAL <strong>300</strong></span>
-                  <span>ÁS-A-ÁS <strong>450</strong></span>
+                  <span>
+                    SUJA
+                    <strong>100</strong>
+                  </span>
+                  <span>
+                    LIMPA
+                    <strong>180</strong>
+                  </span>
+                  <span>
+                    REAL
+                    <strong>300</strong>
+                  </span>
+                  <span>
+                    ÁS-A-ÁS
+                    <strong>450</strong>
+                  </span>
                 </div>
                 <small id="bossTotalDamage" class="boss-total-damage">0 de dano total</small>
                 <div id="bossActionDetails" class="boss-action-details"></div>

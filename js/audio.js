@@ -5,10 +5,11 @@ export const CANASTRA_SFX = {
   asas: new Audio('assets/sfx/canastra-as-a-as.mp3'),
 };
 
-function createBossSfx(src, volume = 0.9) {
+function createBossSfx(src, volume = 0.9, systemGain = 1) {
   const audio = new Audio(src);
   audio.preload = 'auto';
   audio.volume = volume;
+  audio.dataset.systemGain = String(systemGain);
   return audio;
 }
 
@@ -22,8 +23,9 @@ export const BOSS_SFX = Object.freeze({
     victory: createBossSfx('assets/sfx/fim-de-jogo-dominadora.mp3'),
   }),
   matriarca_esmeralda: Object.freeze({
-    resource: createBossSfx('assets/sfx/habilidade-matriarca.mp3'),
-    victory: createBossSfx('assets/sfx/fim-de-jogo-matriarca.mp3'),
+    resource: createBossSfx('assets/sfx/habilidade-matriarca.mp3', 0.9, 2),
+    heal: createBossSfx('assets/sfx/cura-matriarca.mp3', 0.9, 2),
+    victory: createBossSfx('assets/sfx/fim-de-jogo-matriarca.mp3', 0.9, 2),
   }),
 });
 
@@ -60,18 +62,61 @@ export const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
 const BOSS_AUDIO_ELEMENTS = Object.values(BOSS_SFX).flatMap((sounds) => Object.values(sounds));
 const GAME_SFX = [...Object.values(CANASTRA_SFX), ...BOSS_AUDIO_ELEMENTS, sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
 const transientSfx = new Set();
+const transientSfxNodes = new Map();
 
-export function playSfxClone(source) {
+function disconnectTransientSfx(audio) {
+  const nodes = transientSfxNodes.get(audio);
+  if (!nodes) return;
+  try {
+    nodes.sourceNode.disconnect();
+  } catch (error) {}
+  try {
+    nodes.gainNode.disconnect();
+  } catch (error) {}
+  transientSfxNodes.delete(audio);
+}
+
+export function playSfxClone(source, options = {}) {
   if (!source) return null;
 
   const clone = source.cloneNode();
+  const requestedGain = Number(source.dataset?.systemGain || options.gain || 1);
+  const systemGain = Number.isFinite(requestedGain) && requestedGain > 0
+    ? requestedGain
+    : 1;
+  const audioContext = options.audioContext || null;
+
   clone.volume = source.volume;
   transientSfx.add(clone);
 
-  const release = () => transientSfx.delete(clone);
+  if (systemGain !== 1 && audioContext?.createMediaElementSource) {
+    try {
+      const sourceNode = audioContext.createMediaElementSource(clone);
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = systemGain;
+      sourceNode.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      transientSfxNodes.set(clone, { sourceNode, gainNode });
+    } catch (error) {
+      // Fallback do elemento HTML quando Web Audio não estiver disponível.
+      clone.volume = clampMediaVolume(source.volume * systemGain);
+    }
+  } else if (systemGain !== 1) {
+    clone.volume = clampMediaVolume(source.volume * systemGain);
+  }
+
+  const release = () => {
+    transientSfx.delete(clone);
+    disconnectTransientSfx(clone);
+  };
   clone.addEventListener('ended', release, { once: true });
   clone.addEventListener('error', release, { once: true });
-  clone.play().catch(release);
+
+  const startPlayback = async () => {
+    if (audioContext?.state === 'suspended') await audioContext.resume();
+    await clone.play();
+  };
+  startPlayback().catch(release);
   return clone;
 }
 
@@ -81,6 +126,7 @@ export function stopAllGameSfx() {
       audio.pause();
       audio.currentTime = 0;
     } catch (error) {}
+    disconnectTransientSfx(audio);
   }
   transientSfx.clear();
 }

@@ -354,15 +354,16 @@ test('Matriarca integra motor, HUD, ameacas, bot e feedback sem reutilizar estad
   assert.match(bot, /naturePriorities/);
 });
 
-test('tema da Matriarca e estatico, responsivo e respeita movimento reduzido', () => {
+test('tema da Matriarca mantem cartas e fundo estaticos, com retrato leve e movimento reduzido', () => {
   assert.match(bossCss, /body\[data-boss-id='matriarca_esmeralda'\] \.boss-hud/);
   assert.match(bossCss, /\.boss-bloom-flower/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-card-nature-seed/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-card-nature-pollen/);
   assert.match(bossCss, /\.meld-line\.rooted-by-matriarch::before/);
-  assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?rooted-by-matriarch/);
-  const matriarchTheme = bossCss.slice(bossCss.indexOf("body[data-boss-id='matriarca_esmeralda']"));
-  assert.doesNotMatch(matriarchTheme, /animation:\s*[^;]*(?:infinite|linear\s+infinite)/);
+  assert.match(bossCss, /matriarchPortraitBreathing/);
+  assert.match(bossCss, /matriarchPortraitAura/);
+  assert.match(bossCss, /matriarchPortraitPollen/);
+  assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?matriarca_esmeralda[\s\S]*?animation:\s*none\s*!important/);
   assert.match(cardsCss, /matriarca_esmeralda[^}]+animation:\s*none\s*!important/s);
   assert.match(gameCss, /matriarca_esmeralda[^}]+--table-light-animation:\s*none\s*!important/s);
   assert.match(gameCss, /matriarca_esmeralda[^}]+--table-flash-animation:\s*none\s*!important/s);

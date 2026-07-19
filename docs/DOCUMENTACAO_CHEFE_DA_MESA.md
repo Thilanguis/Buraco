@@ -1222,12 +1222,12 @@ peso: 3
 fases: 2 e 3
 ```
 
-- guarda ID do topo;
-- se o lixo for pego, a carta deve ser usada no turno;
-- não pode ser descartada;
-- se ficar impossível por mudança externa, cancelar.
+- guarda o ID da carta no topo do lixo;
+- se essa carta for retirada, a consequência é aplicada imediatamente;
+- a carta não recebe uma trava artificial na mão, pois no Buraco Fechado ela já entra na jogada que justificou a retirada;
+- se o topo mudar sem ser retirado, cancelar a ameaça.
 
-Falha normal:
+Ao retirar a carta contaminada:
 
 ```text
 +1 Flor
@@ -1242,12 +1242,7 @@ No subtipo Pólen de Florescimento Real:
 
 - não cura.
 
-O bot não evita automaticamente. Avalia:
-
-- uso legal imediato;
-- valor do lixo;
-- Florescimento atual;
-- alternativa do monte.
+O bot considera o valor do lixo e evita a retirada quando a Flor aplicada causaria a derrota imediata.
 
 ## 6.13 Colheita
 

@@ -500,6 +500,18 @@ function eligibleExposureCards(gameState, player) {
 
 const MATRIARCH_THREAT_LIMIT = Object.freeze({ 1: 1, 2: 2, 3: 3 });
 const MATRIARCH_HEAL_LIMIT = Object.freeze({ 1: 150, 2: 220, 3: 300 });
+const MATRIARCH_THREAT_NAMES = Object.freeze({
+  seed: 'Semente Viva',
+  royal_seed: 'Semente Real',
+  root: 'Raiz Faminta',
+  twin_root: 'Trepadeira',
+  royal_root: 'Raiz Real',
+  pollen: 'Polen do Lixo',
+  royal_pollen: 'Polen Real',
+  graft: 'Enxerto',
+  dew: 'Orvalho Restaurador',
+  harvest: 'Colheita',
+});
 const MATRIARCH_ABILITIES = new Set([
   'living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft',
   'discard_pollen', 'harvest', 'royal_bloom', 'emerald_cocoon', 'spring_crown',
@@ -673,7 +685,14 @@ function createPayload(gameState, abilityId) {
       return { objectives, targetCount: objectives.length };
     }
     if (abilityId === 'emerald_cocoon') return { amount: 180 };
-    if (abilityId === 'spring_crown') return { activeThreatIds: activeNatureThreats(boss).map((threat) => threat.id) };
+    if (abilityId === 'spring_crown') {
+      const threats = activeNatureThreats(boss);
+      const markedThreat = chooseSeeded(threats, gameState, 419);
+      return {
+        markedThreatId: markedThreat?.id || null,
+        markedThreatName: markedThreat ? (MATRIARCH_THREAT_NAMES[markedThreat.type] || markedThreat.name || 'Ameaca natural') : null,
+      };
+    }
   }
 
   return {};
@@ -741,7 +760,9 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'graft') return payload.targets?.length === 2 && natureThreatSlots(gameState) > 0;
   if (abilityId === 'royal_bloom') return payload.objectives?.length > 0 && natureThreatSlots(gameState) > 0;
   if (abilityId === 'emerald_cocoon') return !gameState.boss?.emeraldCocoon;
-  if (abilityId === 'spring_crown') return activeNatureThreats(gameState.boss).length > 0;
+  if (abilityId === 'spring_crown') {
+    return activeNatureThreats(gameState.boss).some((threat) => threat.id === payload.markedThreatId);
+  }
   return true;
 }
 
@@ -791,7 +812,6 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     lastHealEventId: null,
     resolvedNatureEventIds: [],
     resolvedNatureRoundIds: [],
-    natureFailureCountThisRound: 0,
     propagationRound: 0,
     propagationUsedThisRound: false,
     pendingRootPropagation: null,
@@ -913,11 +933,24 @@ export function normalizeBossState(gameState) {
   boss.lastHealEventId ||= null;
   boss.resolvedNatureEventIds ||= [];
   boss.resolvedNatureRoundIds ||= [];
-  boss.natureFailureCountThisRound ||= 0;
   boss.propagationRound ||= 0;
   boss.propagationUsedThisRound ||= false;
   boss.pendingRootPropagation ||= null;
   boss.lastPropagationEventId ||= null;
+  if (boss.springCrown?.status === 'active' && !boss.springCrown.markedThreatId) {
+    const markedThreat = activeNatureThreats(boss)[0];
+    if (markedThreat) {
+      boss.springCrown.markedThreatId = markedThreat.id;
+      boss.springCrown.markedThreatName = MATRIARCH_THREAT_NAMES[markedThreat.type] || markedThreat.name || 'Ameaca natural';
+      boss.springCrown.createdRound ||= boss.springCrown.round || boss.roundNumber;
+    } else {
+      boss.springCrown.status = 'cancelled';
+      boss.springCrown.resolution = 'A ameaca marcada deixou de existir. A Coroa terminou sem punicao.';
+    }
+  }
+  if (boss.pendingRootPropagation?.strengthened && !boss.pendingRootPropagation.crownId) {
+    boss.pendingRootPropagation.crownId = boss.springCrown?.id || boss.pendingRootPropagation.crownEventId || null;
+  }
   boss.stats ||= { totalDamage: 0, canastrasFormed: 0, largestAttack: 0, finalStrike: 0, finalDebt: 0 };
 
   Object.entries(boss.vaultsByPlayer).forEach(([playerId, vault]) => {
@@ -1101,8 +1134,10 @@ export function normalizeBossState(gameState) {
       } else if (threat.type === 'harvest' && !playerById(threat.targetPlayerId)) {
         cancelNatureThreat(gameState, threat, 'A Colheita perdeu o jogador alvo.');
       } else if (['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null) {
-        const discardTopId = gameState.discard?.[gameState.discard.length - 1]?.id || null;
-        if (discardTopId !== threat.discardCardId) cancelNatureThreat(gameState, threat, 'O topo do lixo mudou antes de ser pego.');
+        const contaminatedCardStillExists = (gameState.discard || []).some((card) => card?.id === threat.discardCardId)
+          || (gameState.players || []).some((player) => (player.hand || []).some((card) => card?.id === threat.discardCardId))
+          || (gameState.teams?.[0]?.melds || []).some((meld) => (meld || []).some((card) => card?.id === threat.discardCardId));
+        if (!contaminatedCardStillExists) cancelNatureThreat(gameState, threat, 'A carta contaminada deixou de existir antes do fim da rodada.');
       }
     }
 
@@ -1398,7 +1433,6 @@ export function healMatriarch(gameState, requested, origin = 'Cura natural', eve
   if (boss.natureHealingRound !== boss.roundNumber) {
     boss.natureHealingRound = boss.roundNumber;
     boss.natureHealingThisRound = 0;
-    boss.natureFailureCountThisRound = 0;
   }
   const roundLimit = MATRIARCH_HEAL_LIMIT[boss.phase] || 150;
   const availableByRound = Math.max(0, roundLimit - boss.natureHealingThisRound);
@@ -1518,7 +1552,12 @@ function requestRootPropagation(gameState, sourceThreat, { strengthen = false } 
   const boss = gameState.boss;
   if (boss?.id !== 'matriarca_esmeralda') return false;
   if (boss.pendingRootPropagation) {
-    if (strengthen) boss.pendingRootPropagation.strengthened = true;
+    if (strengthen) {
+      boss.pendingRootPropagation.strengthened = true;
+      boss.pendingRootPropagation.crownId = boss.springCrown?.id || boss.pendingRootPropagation.crownId || null;
+      boss.pendingRootPropagation.sourceThreatId = sourceThreat?.id || boss.pendingRootPropagation.sourceThreatId || null;
+      boss.pendingRootPropagation.sourceMeldId = sourceThreat?.meldId || boss.pendingRootPropagation.sourceMeldId || null;
+    }
     return true;
   }
   boss.pendingRootPropagation = {
@@ -1527,20 +1566,97 @@ function requestRootPropagation(gameState, sourceThreat, { strengthen = false } 
     sourceMeldId: sourceThreat?.meldId || null,
     requestedRound: boss.roundNumber,
     strengthened: !!strengthen,
+    crownId: strengthen ? boss.springCrown?.id || null : null,
     status: 'pending',
   };
   return true;
 }
 
+function recordSpringCrownResolution(gameState, crown, threat, status, outcome) {
+  const boss = gameState.boss;
+  if (!crown || crown.resolvedEventId && crown.markedThreatStatus === status) return null;
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'springCrown',
+    actionId: `spring_crown_${crown.id}_${threat?.id || 'sem_alvo'}_${status}`,
+    abilityId: 'spring_crown',
+    crownId: crown.id,
+    threatId: threat?.id || crown.markedThreatId || null,
+    markedThreatName: crown.markedThreatName || MATRIARCH_THREAT_NAMES[threat?.type] || threat?.name || 'Ameaca natural',
+    status,
+    outcome,
+  });
+  crown.resolvedEventId = event.actionId;
+  crown.markedThreatStatus = status;
+  crown.resolution = outcome;
+  return event;
+}
+
+function resolveSpringCrownForThreat(gameState, threat, status) {
+  const boss = gameState.boss;
+  const crown = boss?.springCrown;
+  if (!crown || !threat) return null;
+
+  if (crown.status === 'root_active' && crown.strengthenedRootThreatId === threat.id) {
+    crown.status = 'expired';
+    crown.rootResolutionStatus = status;
+    crown.rootResolvedEventId = threat.resolvedEventId || null;
+    return null;
+  }
+  if (crown.status !== 'active' || crown.markedThreatId !== threat.id) return null;
+
+  const markedName = crown.markedThreatName || MATRIARCH_THREAT_NAMES[threat.type] || threat.name || 'Ameaca natural';
+  crown.markedThreatName = markedName;
+  crown.resolvedRound = boss.roundNumber;
+  if (status === 'failed') {
+    requestRootPropagation(gameState, threat, { strengthen: true });
+    crown.status = 'root_prepared';
+    return recordSpringCrownResolution(
+      gameState,
+      crown,
+      threat,
+      status,
+      `${markedName} falhou. Uma Raiz Fortalecida foi preparada para a proxima rodada.`,
+    );
+  }
+  crown.status = status === 'success' ? 'completed' : 'cancelled';
+  return recordSpringCrownResolution(
+    gameState,
+    crown,
+    threat,
+    status,
+    status === 'success'
+      ? `${markedName} foi cumprida. A Coroa terminou sem efeito extra.`
+      : `${markedName} foi cancelada ou ficou impossivel. A Coroa terminou sem punicao.`,
+  );
+}
+
+function cancelPreparedSpringCrown(gameState, pending, outcome) {
+  const boss = gameState.boss;
+  const crown = boss?.springCrown;
+  if (!pending?.strengthened || !crown || pending.crownId !== crown.id || !['root_prepared', 'active'].includes(crown.status)) return null;
+  crown.status = 'cancelled';
+  return recordSpringCrownResolution(gameState, crown, null, 'cancelled', outcome);
+}
+
 function createPendingRootPropagation(gameState) {
   const boss = gameState.boss;
   const pending = boss?.pendingRootPropagation;
-  if (!pending || pending.status !== 'pending' || boss.propagationRound === boss.roundNumber || natureThreatSlots(gameState) <= 0) return null;
+  if (!pending || pending.status !== 'pending' || boss.propagationRound === boss.roundNumber) return null;
+  if (natureThreatSlots(gameState) <= 0) {
+    if (pending.strengthened && pending.crownId) {
+      boss.pendingRootPropagation = null;
+      return cancelPreparedSpringCrown(gameState, pending, 'Nao havia espaco para a Raiz Fortalecida. A Coroa terminou sem punicao.');
+    }
+    return null;
+  }
   const candidates = matriarchRootCandidates(gameState);
   const preferred = candidates.filter((entry) => entry.meldId !== pending.sourceMeldId);
   const target = chooseSeeded(preferred.length ? preferred : candidates, gameState, 367);
   boss.pendingRootPropagation = null;
-  if (!target) return null;
+  if (!target) {
+    return cancelPreparedSpringCrown(gameState, pending, 'A Raiz Fortalecida ficou sem alvo valido. A Coroa terminou sem punicao.');
+  }
   const threat = addNatureThreat(gameState, {
     type: 'root',
     sourceAbilityId: 'propagation',
@@ -1555,10 +1671,16 @@ function createPendingRootPropagation(gameState) {
     contributorPlayerIds: [],
     strengthened: !!pending.strengthened,
     requiredContributorCount: pending.strengthened ? Math.min(2, (gameState.players || []).length) : 1,
-    crownEventId: pending.strengthened ? boss.springCrown?.id || null : null,
+    crownEventId: pending.strengthened ? pending.crownId || null : null,
     propagated: true,
   });
-  if (!threat) return null;
+  if (!threat) {
+    return cancelPreparedSpringCrown(gameState, pending, 'A Raiz Fortalecida nao pode ser criada. A Coroa terminou sem punicao.');
+  }
+  if (pending.strengthened && boss.springCrown?.id === pending.crownId) {
+    boss.springCrown.status = 'root_active';
+    boss.springCrown.strengthenedRootThreatId = threat.id;
+  }
   boss.propagationRound = boss.roundNumber;
   boss.propagationUsedThisRound = true;
   boss.actionSequence += 1;
@@ -1579,14 +1701,8 @@ function createPendingRootPropagation(gameState) {
 function failNatureThreat(gameState, threat, { bloom = threat?.bloomAmount || 0, heal = threat?.healAmount || 0, outcome = '' } = {}) {
   const boss = gameState.boss;
   if (!threat || threat.status !== 'active') return null;
-  boss.natureFailureCountThisRound = (boss.natureFailureCountThisRound || 0) + 1;
-  const crownActive = boss.springCrown?.status === 'active' && boss.springCrown.round === boss.roundNumber;
-  if (crownActive && boss.natureFailureCountThisRound === 1) requestRootPropagation(gameState, threat);
-  if (crownActive && boss.natureFailureCountThisRound === 2 && boss.pendingRootPropagation) {
-    boss.pendingRootPropagation.strengthened = true;
-    boss.springCrown.strengthenedCreated = true;
-  }
   const event = completeNatureThreat(boss, threat, 'failed', outcome || 'A ameaca natural nao foi contida.');
+  resolveSpringCrownForThreat(gameState, threat, 'failed');
   const bloomEvent = bloom ? changeMatriarchBloom(gameState, bloom, threat.name || 'Ameaca natural', `${threat.id}:bloom`) : null;
   const healEvent = heal
     ? healMatriarch(gameState, heal, threat.name || 'Ameaca natural', `${threat.id}:heal`)
@@ -1595,16 +1711,22 @@ function failNatureThreat(gameState, threat, { bloom = threat?.bloomAmount || 0,
     event.bloomApplied = bloomEvent?.amount || 0;
     event.healApplied = healEvent?.amount || 0;
     event.crownBonus = 0;
+    threat.bloomApplied = event.bloomApplied;
+    threat.healApplied = event.healApplied;
   }
   return event;
 }
 
 function succeedNatureThreat(gameState, threat, outcome = '') {
-  return completeNatureThreat(gameState.boss, threat, 'success', outcome || 'A ameaca natural foi contida.');
+  const event = completeNatureThreat(gameState.boss, threat, 'success', outcome || 'A ameaca natural foi contida.');
+  if (event) resolveSpringCrownForThreat(gameState, threat, 'success');
+  return event;
 }
 
 function cancelNatureThreat(gameState, threat, outcome = '') {
-  return completeNatureThreat(gameState.boss, threat, 'cancelled', outcome || 'A ameaca perdeu o alvo e foi cancelada.');
+  const event = completeNatureThreat(gameState.boss, threat, 'cancelled', outcome || 'A ameaca perdeu o alvo e foi cancelada.');
+  if (event) resolveSpringCrownForThreat(gameState, threat, 'cancelled');
+  return event;
 }
 
 function resolveMatriarchPlayerDeadline(gameState, playerId) {
@@ -1624,6 +1746,7 @@ function resolveMatriarchPlayerDeadline(gameState, playerId) {
         : succeedNatureThreat(gameState, threat, `${player?.name || 'O alvo'} usou a carta marcada.`));
     } else if (threat.type === 'harvest') {
       const cards = player?.hand?.length || 0;
+      threat.observedHandSize = cards;
       if (cards <= 7) events.push(succeedNatureThreat(gameState, threat, `Colheita: ${cards} cartas, sem cura.`));
       else if (cards <= 10) events.push(failNatureThreat(gameState, threat, { bloom: 0, heal: 60, outcome: `Colheita: ${cards} cartas, cura de 60 HP.` }));
       else events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 100, outcome: `Colheita: ${cards} cartas, +1 Flor e cura de 100 HP.` }));
@@ -1640,7 +1763,6 @@ function resolveMatriarchRound(gameState) {
   boss.resolvedNatureRoundIds.push(roundResolutionId);
   if (boss.resolvedNatureRoundIds.length > 30) boss.resolvedNatureRoundIds.splice(0, boss.resolvedNatureRoundIds.length - 30);
   const events = [];
-  const discardTopId = gameState.discard?.[gameState.discard.length - 1]?.id || null;
   for (const threat of [...activeNatureThreats(boss)].filter((entry) => (
     !Number.isFinite(Number(entry.deadlineRound)) || Number(entry.deadlineRound) <= boss.roundNumber
   ))) {
@@ -1663,8 +1785,20 @@ function resolveMatriarchRound(gameState) {
         ? failNatureThreat(gameState, threat, { bloom: 0, heal: healing, outcome: `Orvalho Restaurador: ${uniqueCards} carta(s) reduziram a cura para ${healing} HP.` })
         : succeedNatureThreat(gameState, threat, 'O Orvalho foi totalmente dissipado pelas cartas jogadas.'));
     } else if (['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null) {
-      if (discardTopId !== threat.discardCardId) {
-        events.push(cancelNatureThreat(gameState, threat, 'O topo do lixo mudou sem entrar em uma mao.'));
+      const holder = (gameState.players || []).find((player) => (
+        (player.hand || []).some((card) => card?.id === threat.discardCardId)
+      ));
+      const reachedTable = (gameState.teams?.[0]?.melds || []).some((meld) => (
+        (meld || []).some((card) => card?.id === threat.discardCardId)
+      ));
+      if (holder || reachedTable) {
+        events.push(failNatureThreat(gameState, threat, {
+          bloom: threat.bloomAmount || 1,
+          heal: threat.type === 'pollen' ? 40 : 0,
+          outcome: `${holder?.name || 'Um cooperador'} recolheu a carta contaminada do lixo.`,
+        }));
+      } else {
+        events.push(cancelNatureThreat(gameState, threat, 'Os dois cooperadores evitaram a carta contaminada durante a rodada.'));
       }
     }
   }
@@ -1692,23 +1826,53 @@ function resolveMatriarchRound(gameState) {
 }
 
 export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
-  const boss = normalizeBossState(gameState);
+  const boss = gameState?.boss;
   if (!boss || boss.id !== 'matriarca_esmeralda') return [];
   const takenIds = new Set(takenCards.map((card) => card?.id).filter(Boolean));
-  const activated = [];
-  for (const threat of activeNatureThreats(boss)) {
-    if (!['pollen', 'royal_pollen'].includes(threat.type) || threat.targetPlayerId != null || !takenIds.has(threat.discardCardId)) continue;
-    threat.targetPlayerId = playerId;
-    threat.deadlinePlayerId = playerId;
-    threat.cardId = threat.discardCardId;
-    activated.push(threat);
+  const resolved = [];
+  const triggeredThreats = (boss.natureThreats || []).filter((threat) => (
+    threat?.status === 'active'
+    && ['pollen', 'royal_pollen'].includes(threat.type)
+    && threat.targetPlayerId == null
+    && takenIds.has(threat.discardCardId)
+  ));
+  for (const threat of triggeredThreats) {
+    const player = gameState.players?.find((entry) => entry.id === playerId);
+    const card = takenCards.find((entry) => entry?.id === threat.discardCardId);
+    threat.triggeredByPlayerId = playerId;
+    threat.triggeredCardId = threat.discardCardId;
+    const event = failNatureThreat(gameState, threat, {
+      bloom: threat.bloomAmount || 1,
+      heal: threat.type === 'pollen' ? 40 : 0,
+      outcome: `${player?.name || 'O jogador'} pegou ${card ? `${card.rank}${card.suit}` : 'a carta'} contaminada do lixo.`,
+    });
+    if (event) resolved.push(event);
   }
-  return activated;
+  return resolved;
 }
 
 export function getBossNatureThreats(gameState) {
   const boss = normalizeBossState(gameState);
   return boss?.id === 'matriarca_esmeralda' ? activeNatureThreats(boss).map((threat) => ({ ...threat })) : [];
+}
+
+export function resolveBossDebugSpringCrownThreat(gameState, status) {
+  const boss = normalizeBossState(gameState);
+  const crown = boss?.id === 'matriarca_esmeralda' ? boss.springCrown : null;
+  const threat = crown?.markedThreatId
+    ? (boss.natureThreats || []).find((entry) => entry.id === crown.markedThreatId)
+    : null;
+  if (!threat || threat.status !== 'active') return null;
+  if (status === 'success') return succeedNatureThreat(gameState, threat, 'A ameaca marcada pela Coroa foi cumprida no Laboratorio.');
+  if (status === 'failed') {
+    return failNatureThreat(gameState, threat, {
+      bloom: threat.bloomAmount || 0,
+      heal: threat.healAmount || 0,
+      outcome: 'A ameaca marcada pela Coroa falhou no Laboratorio.',
+    });
+  }
+  if (status === 'cancelled') return cancelNatureThreat(gameState, threat, 'A ameaca marcada pela Coroa foi cancelada no Laboratorio.');
+  return null;
 }
 
 export function getBossNatureSeedCandidates(gameState) {
@@ -1768,8 +1932,8 @@ export function getBossNatureThreatSummaries(gameState) {
       condition = `Jogar ${cardLabel(threat.targetPlayerId, threat.cardId)} antes do fim do turno.`;
       consequence = `Falha: +${threat.bloomAmount || 1} Flor, sem cura.`;
     } else if (['pollen', 'royal_pollen'].includes(threat.type)) {
-      condition = threat.targetPlayerId == null ? 'Não pegar o lixo, ou usar a carta contaminada no mesmo turno.' : `Jogar ${cardLabel(threat.targetPlayerId, threat.cardId)} neste turno.`;
-      consequence = threat.type === 'pollen' ? 'Falha: +1 Flor e cura 40 HP.' : 'Falha: +1 Flor, sem cura.';
+      condition = 'Não pegar a carta contaminada do lixo.';
+      consequence = threat.type === 'pollen' ? 'Se for pega: +1 Flor e cura 40 HP.' : 'Se for pega: +1 Flor, sem cura.';
     } else if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
       const contributors = new Set(threat.contributorPlayerIds || []).size;
       condition = threat.strengthened
@@ -1784,8 +1948,8 @@ export function getBossNatureThreatSummaries(gameState) {
       condition = `Cartas novas na mesa: ${uniqueDewCards}/6. A cura cai por faixas e zera com 6 cartas.`;
       consequence = `Cura prevista: ${predictedHeal} HP.`;
     } else if (threat.type === 'harvest') {
-      condition = 'Encerrar o turno com no máximo 7 cartas.';
-      consequence = '8–10: cura 60 HP · 11+: +1 Flor e cura 100 HP.';
+      condition = 'A quantidade de cartas na mão será conferida no fim do turno.';
+      consequence = '0–7: sem efeito · 8–10: cura 60 HP · 11+: +1 Flor e cura 100 HP.';
     }
     const deadline = threat.deadlinePlayerId != null
       ? `Fim do turno de ${playerName(threat.deadlinePlayerId)} · rodada ${deadlineValue(threat)}`
@@ -2287,13 +2451,12 @@ export function shouldBossBotTakeDiscard(gameState, playerId, { intent = null, n
   const surcharge = boss?.id === 'banker' ? getBossDiscardSurcharge(gameState) : null;
   const pile = (gameState.discard || []).filter(Boolean);
   const pileValue = pile.reduce((sum, card) => sum + botPileCardValue(card), 0);
-  const immediatePollenUse = !!intent && intent.usesTopImmediately !== false && ['new', 'extend'].includes(intent.action);
-  if (naturePlan?.pollenOnDiscard && naturePlan.bloom >= 4 && !immediatePollenUse) return false;
-  if (!surcharge) return !naturePlan?.pollenOnDiscard || immediatePollenUse;
+  if (naturePlan?.pollenOnDiscard && naturePlan.bloom >= 4) return false;
+  if (!surcharge) return true;
   if (boss.danger + surcharge.amount >= boss.maxDanger) return false;
   const risk = (boss.danger + surcharge.amount) / Math.max(1, boss.maxDanger);
   const decisive = !!intent.decisive || pile.length >= 5 || ['real', 'asas'].includes(intent.newKind);
-  const value = pileValue + (decisive ? 55 : 0) + (naturePlan?.pollenOnDiscard && immediatePollenUse ? 20 : 0);
+  const value = pileValue + (decisive ? 55 : 0);
   const cost = surcharge.amount * (10 + risk * 14);
   return value >= cost;
 }
@@ -3244,9 +3407,24 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       outcome = 'O Casulo Esmeralda absorvera ate 180 de dano nesta rodada.';
       resultData = { cocoonId: boss.emeraldCocoon.id, remaining: boss.emeraldCocoon.remaining };
     } else if (intent.abilityId === 'spring_crown') {
-      boss.springCrown = { id: `crown_${intent.id}`, round: boss.roundNumber, failureCount: 0, strengthenedCreated: false, status: 'active' };
-      outcome = 'A Coroa da Primavera pode propagar uma Raiz e fortalecer a nova ameaca na segunda falha.';
-      resultData = { crownId: boss.springCrown.id };
+      const markedThreat = activeNatureThreats(boss).find((threat) => threat.id === intent.payload.markedThreatId);
+      if (markedThreat) {
+        boss.springCrown = {
+          id: `crown_${intent.id}`,
+          createdRound: boss.roundNumber,
+          markedThreatId: markedThreat.id,
+          markedThreatName: intent.payload.markedThreatName || MATRIARCH_THREAT_NAMES[markedThreat.type] || markedThreat.name || 'Ameaca natural',
+          status: 'active',
+          resolvedEventId: null,
+          strengthenedRootThreatId: null,
+        };
+        outcome = `A Coroa da Primavera marcou ${boss.springCrown.markedThreatName}.`;
+        resultData = { crownId: boss.springCrown.id, markedThreatId: markedThreat.id, markedThreatName: boss.springCrown.markedThreatName };
+      } else {
+        boss.springCrown = null;
+        outcome = 'A Coroa da Primavera nao encontrou uma ameaca natural valida e terminou sem efeito.';
+        resultData = { crownId: null, markedThreatId: null };
+      }
     }
   } else if (intent.abilityId === 'fixed_interest') {
     const amount = intent.payload.fullDebt ?? intent.payload.amount ?? (intent.announcedPhase === 3 ? 8 : 6);
@@ -3456,13 +3634,11 @@ export function completeBossPlayerTurn(gameState, playerId) {
   }
   let phaseEvent = null;
   if (allPlayersActed) {
-    if (boss.id === 'matriarca_esmeralda' && boss.springCrown?.status === 'active') boss.springCrown.status = 'expired';
     boss.roundNumber += 1;
     boss.playersActedThisRound = [];
     if (boss.id === 'matriarca_esmeralda') {
       boss.natureHealingRound = boss.roundNumber;
       boss.natureHealingThisRound = 0;
-      boss.natureFailureCountThisRound = 0;
       boss.propagationUsedThisRound = false;
       createPendingRootPropagation(gameState);
     }

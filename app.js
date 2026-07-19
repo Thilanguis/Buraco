@@ -344,6 +344,7 @@ let ignoreOwnActionId = null;
 let lastRenderedBossEventId = null;
 let lastAnimatedBossSwapId = null;
 let renderedBossFeedbackCount = null;
+let renderedBossFeedbackEventIds = null;
 let lastRenderedBossBloom = null;
 let lastRenderedBossBloomEventId = null;
 let lastSeenBossLogKey = null;
@@ -364,13 +365,38 @@ function isBossLabAutomationPaused(gameState = state) {
 function bossEventAddsResource(boss, event) {
   if (!boss || !event) return false;
   if (boss.id === 'banker') {
-    return Number(event.dangerDelta) > 0
-      || (event.type === 'discardSurcharge' && Number(event.amount) > 0)
-      || (event.type === 'bossDamage' && Number(event.creditLimitDebt) > 0);
+    return Number(event.dangerDelta) > 0 || (event.type === 'discardSurcharge' && Number(event.amount) > 0) || (event.type === 'bossDamage' && Number(event.creditLimitDebt) > 0);
   }
   if (boss.id === 'dominadora') return event.type === 'chainChange' && Number(event.amount) > 0;
   if (boss.id === 'matriarca_esmeralda') return event.type === 'bloomChange' && Number(event.amount) > 0;
   return false;
+}
+
+function bossEventHealsMatriarch(boss, event) {
+  return boss?.id === 'matriarca_esmeralda' && event?.type === 'bossHeal' && Number(event.amount) > 0;
+}
+
+function matriarchNatureSoundPairKey(event, suffix) {
+  const actionId = String(event?.actionId || '');
+  const marker = `:${suffix}`;
+  return actionId.endsWith(marker) ? actionId.slice(0, -marker.length) : '';
+}
+
+function playBossSfxSequence(firstSource, secondSource) {
+  const firstAudio = playSfxClone(firstSource, { audioContext: audioCtx });
+  if (!firstAudio) {
+    playSfxClone(secondSource, { audioContext: audioCtx });
+    return;
+  }
+
+  let secondStarted = false;
+  const playSecond = () => {
+    if (secondStarted) return;
+    secondStarted = true;
+    playSfxClone(secondSource, { audioContext: audioCtx });
+  };
+  firstAudio.addEventListener('ended', playSecond, { once: true });
+  firstAudio.addEventListener('error', playSecond, { once: true });
 }
 
 function syncBossResourceSounds(boss) {
@@ -382,10 +408,36 @@ function syncBossResourceSounds(boss) {
     return;
   }
 
-  for (const event of events) {
-    if (!event.actionId || seenBossResourceSoundEventIds.has(event.actionId)) continue;
-    seenBossResourceSoundEventIds.add(event.actionId);
-    if (audioUnlocked && bossEventAddsResource(boss, event)) playSfxClone(BOSS_SFX[boss.id]?.resource);
+  const newEvents = events.filter((event) => event.actionId && !seenBossResourceSoundEventIds.has(event.actionId));
+  newEvents.forEach((event) => seenBossResourceSoundEventIds.add(event.actionId));
+  if (!audioUnlocked) return;
+
+  const pairedHealByKey = new Map(
+    newEvents
+      .filter((event) => bossEventHealsMatriarch(boss, event))
+      .map((event) => [matriarchNatureSoundPairKey(event, 'heal'), event])
+      .filter(([key]) => key),
+  );
+  const pairedResourceKeys = new Set(
+    newEvents
+      .filter((event) => bossEventAddsResource(boss, event))
+      .map((event) => matriarchNatureSoundPairKey(event, 'bloom'))
+      .filter(Boolean),
+  );
+  const sequencedHealIds = new Set([...pairedHealByKey].filter(([key]) => pairedResourceKeys.has(key)).map(([, event]) => event.actionId));
+
+  for (const event of newEvents) {
+    if (bossEventAddsResource(boss, event)) {
+      const pairedHeal = pairedHealByKey.get(matriarchNatureSoundPairKey(event, 'bloom'));
+      if (pairedHeal) {
+        playBossSfxSequence(BOSS_SFX[boss.id]?.resource, BOSS_SFX.matriarca_esmeralda.heal);
+      } else {
+        playSfxClone(BOSS_SFX[boss.id]?.resource, { audioContext: audioCtx });
+      }
+    }
+    if (bossEventHealsMatriarch(boss, event) && !sequencedHealIds.has(event.actionId)) {
+      playSfxClone(BOSS_SFX.matriarca_esmeralda.heal, { audioContext: audioCtx });
+    }
   }
 }
 
@@ -397,7 +449,7 @@ function playBossIntroSoundOnce(gameState = state) {
   if (introKey === lastBossIntroSoundKey || introKey === persistedIntroKey) return;
   lastBossIntroSoundKey = introKey;
   sessionStorage.setItem('buraco_boss_intro_sound', introKey);
-  playSfxClone(BOSS_SFX[boss.id]?.resource);
+  playSfxClone(BOSS_SFX[boss.id]?.resource, { audioContext: audioCtx });
 }
 
 let movingWild = null;
@@ -479,14 +531,11 @@ function getCooperativeProjectedScore() {
 
 async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsAdded, isNewMeld = false, options = {}) {
   if (!isCurrentBossMode()) return null;
-  const pendingInterdictEvent = state._pendingBossEvent?.type === 'interdictDecision'
-    && state._pendingBossEvent?.decision === 'disobey'
-    && state._pendingBossEvent?.allowEvolution === true
-    && state._pendingBossEvent?.resistanceSuppressionConsumed !== true
-    ? state._pendingBossEvent
-    : null;
-  const suppressDominatrixResistance = options.suppressDominatrixResistance
-    ?? !!pendingInterdictEvent;
+  const pendingInterdictEvent =
+    state._pendingBossEvent?.type === 'interdictDecision' && state._pendingBossEvent?.decision === 'disobey' && state._pendingBossEvent?.allowEvolution === true && state._pendingBossEvent?.resistanceSuppressionConsumed !== true
+      ? state._pendingBossEvent
+      : null;
+  const suppressDominatrixResistance = options.suppressDominatrixResistance ?? !!pendingInterdictEvent;
   const event = applyBossMeldTransition(state, {
     teamId: player.teamId,
     playerId: player.id,
@@ -1826,9 +1875,7 @@ function classifyMeldForUi(meld) {
 // como coringa, ignorar uma evolução Limpa -> Real e deixar o Interdito
 // ser cancelado somente depois que a canastra já havia evoluído.
 function classifyMeldPreview(meld) {
-  const preview = (meld || [])
-    .filter(Boolean)
-    .map((card) => ({ ...card }));
+  const preview = (meld || []).filter(Boolean).map((card) => ({ ...card }));
 
   optimizeMeld(preview);
   normalizeMeldOrder(preview);
@@ -2629,8 +2676,7 @@ async function drawFromDiscard() {
     const bossEvent = await processBossMeldChange(me, kindBeforeFechado || 'simple', kindAfterFechado, bossMeldIndex, finalMeldCards, isNewMeld, {
       creditEligibleCardIds,
       cardOriginsById,
-      suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
-        && bossPreparation.event?.decision === 'disobey',
+      suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision' && bossPreparation.event?.decision === 'disobey',
     });
     if (state.finished) return;
 
@@ -3072,18 +3118,9 @@ async function attemptExtendExistingMeld(cards, indexes) {
     selectedMeldTarget = null;
 
     let domReward = await processDominationReward(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind, forcedIndex);
-    const bossEvent = await processBossMeldChange(
-      currentPlayer(),
-      kindBefore1,
-      classifyMeldForUi(targetMeld).kind,
-      forcedIndex,
-      cards,
-      false,
-      {
-        suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
-          && bossPreparation.event?.decision === 'disobey',
-      },
-    );
+    const bossEvent = await processBossMeldChange(currentPlayer(), kindBefore1, classifyMeldForUi(targetMeld).kind, forcedIndex, cards, false, {
+      suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision' && bossPreparation.event?.decision === 'disobey',
+    });
     if (state.finished) return true;
 
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -3203,18 +3240,9 @@ async function attemptExtendExistingMeld(cards, indexes) {
   selectedMeldTarget = null;
 
   let domReward = await processDominationReward(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind, candidateMeldIndexes[0]);
-  const bossEvent = await processBossMeldChange(
-    currentPlayer(),
-    kindBefore2,
-    classifyMeldForUi(teamMeld).kind,
-    candidateMeldIndexes[0],
-    cards,
-    false,
-    {
-      suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
-        && bossPreparation.event?.decision === 'disobey',
-    },
-  );
+  const bossEvent = await processBossMeldChange(currentPlayer(), kindBefore2, classifyMeldForUi(teamMeld).kind, candidateMeldIndexes[0], cards, false, {
+    suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision' && bossPreparation.event?.decision === 'disobey',
+  });
   if (state.finished) return true;
 
   if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -3396,18 +3424,9 @@ async function makeMeldFromSelection(forceNew = false) {
 
     // Avaliação Plus Dominação (CORRIGIDO: meldIdx numérico)
     let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx);
-    const bossEvent = await processBossMeldChange(
-      currentPlayer(),
-      'simple',
-      classifyMeldForUi(meld).kind,
-      meldIdx,
-      cards,
-      true,
-      {
-        suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision'
-          && bossPreparation.event?.decision === 'disobey',
-      },
-    );
+    const bossEvent = await processBossMeldChange(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx, cards, true, {
+      suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision' && bossPreparation.event?.decision === 'disobey',
+    });
     if (state.finished) return;
 
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
@@ -4092,8 +4111,18 @@ function renderBossHud() {
   hud.style.display = 'grid';
   hud.classList.remove('boss-resolving');
   hud.classList.toggle('boss-turn-active', isBossTurnActive(state));
-  hud.classList.toggle('boss-cocoon-active', isMatriarch && boss.emeraldCocoon?.status === 'active');
-  hud.dataset.cocoonStage = isMatriarch && boss.emeraldCocoon?.status === 'active' ? (boss.emeraldCocoon.remaining <= 60 ? 'critical' : boss.emeraldCocoon.remaining <= 120 ? 'cracked' : 'full') : '';
+  const cocoonActive = isMatriarch && boss.emeraldCocoon?.status === 'active';
+  const cocoonMaximum = 180;
+  const cocoonRemaining = cocoonActive ? Math.max(0, Number(boss.emeraldCocoon.remaining) || 0) : 0;
+  hud.classList.toggle('boss-cocoon-active', cocoonActive);
+  hud.dataset.cocoonStage = cocoonActive ? (cocoonRemaining <= 60 ? 'critical' : cocoonRemaining <= 120 ? 'cracked' : 'full') : '';
+  const cocoonStrength = cocoonActive ? cocoonRemaining / cocoonMaximum : 0;
+  hud.style.setProperty('--boss-cocoon-strength', String(cocoonStrength));
+  hud.style.setProperty('--boss-cocoon-opacity', String(0.5 + cocoonStrength * 0.35));
+  hud.style.setProperty('--boss-cocoon-detail-opacity', String(0.42 + cocoonStrength * 0.4));
+  const springCrownBuffed = isMatriarch && ['root_prepared', 'root_active'].includes(boss.springCrown?.status);
+  hud.classList.toggle('boss-spring-crown-buffed', springCrownBuffed);
+  hud.dataset.springCrownStage = springCrownBuffed ? boss.springCrown.status : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
   setBossPortrait(document.getElementById('bossPortraitImage'), definition);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
@@ -4105,6 +4134,13 @@ function renderBossHud() {
   document.getElementById('bossPhaseRule').textContent = phaseRules[boss.phase];
   document.getElementById('bossHpText').textContent = `${boss.hp} / ${boss.maxHp}`;
   document.getElementById('bossHpBar').style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
+  const cocoonMeter = document.getElementById('bossCocoonMeter');
+  const cocoonText = document.getElementById('bossCocoonText');
+  if (cocoonMeter && cocoonText) {
+    cocoonMeter.hidden = !cocoonActive;
+    cocoonText.textContent = `${cocoonRemaining} / ${cocoonMaximum}`;
+    cocoonMeter.setAttribute('aria-label', cocoonActive ? `Casulo Esmeralda: ${cocoonRemaining} de ${cocoonMaximum} de protecao restante` : 'Casulo Esmeralda inativo');
+  }
   const dangerMeter = document.getElementById('bossDangerMeter');
   const chainStatus = document.getElementById('bossChainStatus');
   const bloomFlowers = document.getElementById('bossBloomFlowers');
@@ -4151,8 +4187,50 @@ function renderBossHud() {
   const actionPresentation = buildBossActionPresentation(state);
   document.getElementById('bossActionType').textContent = actionPresentation.category.toUpperCase();
   document.getElementById('bossIntentName').textContent = actionPresentation.name;
-  document.getElementById('bossIntentDescription').textContent = actionPresentation.instruction;
-  document.getElementById('bossIntentProgress').textContent = [actionPresentation.progress, actionPresentation.consequence].filter(Boolean).join(' · ');
+
+  const intentDescription = document.getElementById('bossIntentDescription');
+  const intentProgress = document.getElementById('bossIntentProgress');
+  const activeHarvestThreat = [...(boss.natureThreats || [])].reverse().find((threat) => threat.type === 'harvest' && threat.status === 'active');
+  const harvestIntent = boss.currentIntent?.abilityId === 'harvest' ? boss.currentIntent : null;
+  const isHarvestLive = isMatriarch && flow?.stage !== 'result' && Boolean(activeHarvestThreat || harvestIntent);
+
+  if (isHarvestLive) {
+    const targetPlayerId = activeHarvestThreat?.targetPlayerId || harvestIntent?.payload?.targetPlayerId;
+    const targetPlayer = state.players.find((player) => player.id === targetPlayerId);
+    const cards = targetPlayer?.hand?.length ?? Number(activeHarvestThreat?.observedHandSize || 0);
+    const discardNeeded = Math.max(0, cards - 7);
+    const currentBand = cards <= 7 ? 'safe' : cards <= 10 ? 'warning' : 'danger';
+    const countText = cards <= 7 ? `✅ ${cards} carta${cards === 1 ? '' : 's'} · meta atingida` : `${cards >= 11 ? '🔴' : '🟡'} ${cards} cartas · descarte ${discardNeeded}`;
+
+    intentDescription.className = 'boss-harvest-panel';
+    intentDescription.innerHTML = `
+      <span class="boss-harvest-hint">
+       ${targetPlayer ? `${targetPlayer.name} ` : ''}: Descarte cartas. O total na sua mão ao fim do turno define o efeito.
+      </span>
+      <span class="boss-harvest-count ${currentBand}">${countText}</span>
+      <span class="boss-harvest-rules">
+        <span class="boss-harvest-rule ${currentBand === 'safe' ? 'active' : ''}">
+          <b>0–7</b><span>Sem efeito</span>
+        </span>
+        <span class="boss-harvest-rule ${currentBand === 'warning' ? 'active' : ''}">
+          <b>8–10</b><span>Cura 60 HP</span>
+        </span>
+        <span class="boss-harvest-rule ${currentBand === 'danger' ? 'active' : ''}">
+          <b>11+</b><span>+1 Flor e cura 100 HP</span>
+        </span>
+      </span>
+    `;
+
+    intentProgress.className = '';
+    intentProgress.textContent = '';
+  } else {
+    intentDescription.className = '';
+    intentDescription.textContent = actionPresentation.instruction;
+    intentProgress.className = '';
+    const intentProgressParts = [actionPresentation.progress, actionPresentation.consequence].filter(Boolean);
+    intentProgress.textContent = intentProgressParts.join(actionPresentation.progress?.includes('\n') ? '\n' : ' · ');
+  }
+
   renderBossDetailFields(document.getElementById('bossActionDetails'), actionPresentation.details);
 
   const dialoguePanel = document.getElementById('bossDialoguePresentation');
@@ -4181,7 +4259,14 @@ function renderBossHud() {
   const natureSummaries = isMatriarch ? getBossNatureThreatSummaries(state) : [];
   const natureEffects = [];
   if (boss.emeraldCocoon?.status === 'active') natureEffects.push({ id: 'emerald_cocoon', remaining: boss.emeraldCocoon.remaining });
-  if (boss.springCrown?.status === 'active') natureEffects.push({ id: 'spring_crown' });
+  if (boss.springCrown && ['active', 'root_prepared', 'root_active'].includes(boss.springCrown.status)) {
+    const markedThreat = (boss.natureThreats || []).find((threat) => threat.id === boss.springCrown.markedThreatId);
+    natureEffects.push({
+      id: 'spring_crown',
+      status: boss.springCrown.status,
+      markedThreatName: boss.springCrown.markedThreatName || markedThreat?.name || 'Ameaca natural',
+    });
+  }
   const tacticalEffects = [];
   if (boss.currentIntent?.abilityId === 'hands_tied') tacticalEffects.push({ id: 'hands_tied_team', ...boss.currentIntent.payload });
   (boss.activeOrders || []).filter((order) => order.status === 'active').forEach((order) => tacticalEffects.push({ id: 'dominatrix_order', ...order }));
@@ -4208,7 +4293,11 @@ function renderBossHud() {
           return `<span class="boss-effect-chip">Posse: jogo ${effect.meldIndex + 1} · ${effect.progress}/${effect.required} (${contributors.join(' + ') || 'sem contribuicoes'}) · ${effect.suppressedDamage} dano suspenso</span>`;
         }
         if (effect.id === 'emerald_cocoon') return `<span class="boss-effect-chip boss-nature-chip">Casulo: ${effect.remaining}/180</span>`;
-        if (effect.id === 'spring_crown') return '<span class="boss-effect-chip boss-nature-chip">Coroa da Primavera ativa</span>';
+        if (effect.id === 'spring_crown') {
+          if (effect.status === 'root_active') return '<span class="boss-effect-chip boss-nature-chip boss-crown-chip">Coroa fortalecida · Raiz Fortalecida ativa</span>';
+          if (effect.status === 'root_prepared') return '<span class="boss-effect-chip boss-nature-chip boss-crown-chip">Coroa fortalecida · Raiz Fortalecida preparada</span>';
+          return `<span class="boss-effect-chip boss-nature-chip">A Coroa marcou: ${effect.markedThreatName}</span>`;
+        }
         if (effect.id === 'hands_tied_team')
           return `<span class="boss-effect-chip">Maos Atadas: ${effect.teamMeldAvailable === false ? `criacao consumida por ${state.players.find((player) => player.id === effect.consumedByPlayerId)?.name || 'cooperador'}` : '1 criacao disponivel para a equipe'}</span>`;
         if (effect.id === 'dominatrix_order') return `<span class="boss-effect-chip">Ordem: ${effect.label || effect.suitLabel || effect.type} · ${state.players.find((player) => player.id === effect.targetPlayerId)?.name || 'alvo'}</span>`;
@@ -4436,9 +4525,12 @@ function renderBossHud() {
   const discardButton = document.getElementById('drawDiscardBtn');
   if (discardButton) {
     discardButton.classList.toggle('boss-locked', isBossDiscardBlocked(state) && !state.hasDrawnThisTurn);
-    const discardCardId = state.discard?.[state.discard.length - 1]?.id;
-    const pollenActive = (boss.natureThreats || []).some((threat) => threat.status === 'active' && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && threat.discardCardId === discardCardId);
+    const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
+    const pollenActive = (boss.natureThreats || []).some((threat) => threat.status === 'active' && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId));
     discardButton.classList.toggle('boss-pollen-discard', pollenActive);
+    if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
+    else discardButton.removeAttribute('aria-label');
+    discardButton.classList.toggle('boss-surcharge-discard', boss.id === 'banker' && boss.discardSurcharge?.status === 'active');
   }
 
   const event = resolvingEvent || (boss.lastEvent?.type === 'bossAbility' ? null : boss.lastEvent);
@@ -4464,11 +4556,20 @@ function renderBossHud() {
 
   const feedbackEvents = boss.eventLog || [];
   syncBossResourceSounds(boss);
-  if (renderedBossFeedbackCount == null || renderedBossFeedbackCount > feedbackEvents.length) {
+  if (renderedBossFeedbackEventIds == null) {
+    renderedBossFeedbackEventIds = new Set(feedbackEvents.map((event) => event.actionId).filter(Boolean));
     renderedBossFeedbackCount = feedbackEvents.length;
-  } else if (feedbackEvents.length > renderedBossFeedbackCount) {
-    const newFeedback = feedbackEvents.slice(renderedBossFeedbackCount);
+  } else {
+    const newFeedback = feedbackEvents.filter((event) => {
+      if (!event.actionId || renderedBossFeedbackEventIds.has(event.actionId)) return false;
+      renderedBossFeedbackEventIds.add(event.actionId);
+      return true;
+    });
     renderedBossFeedbackCount = feedbackEvents.length;
+    if (renderedBossFeedbackEventIds.size > 120) {
+      const liveIds = new Set(feedbackEvents.map((event) => event.actionId).filter(Boolean));
+      renderedBossFeedbackEventIds = new Set([...renderedBossFeedbackEventIds].filter((id) => liveIds.has(id)));
+    }
     newFeedback.forEach((feedback, index) => {
       if (feedback.type === 'bossAbility' && feedback.abilityId === 'forced_swap' && feedback.actionId !== lastAnimatedBossSwapId && feedback.receivedCards?.length === 2) {
         void animateBossForcedSwap(feedback);
@@ -4478,9 +4579,20 @@ function renderBossHud() {
       const isHeal = feedback.type === 'bossHeal' && feedback.amount;
       const isBloom = feedback.type === 'bloomChange' && feedback.amount;
       const isRebirth = feedback.type === 'rebirth';
+      const isCocoonAbsorb = feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
       const isCocoonBreak = feedback.type === 'bossDamage' && feedback.cocoonBroken;
       const isNatureCreated = feedback.type === 'bossAbility' && Array.isArray(feedback.threatIds) && feedback.threatIds.length > 0;
-      if (!isChain && !isDebt && !isHeal && !isBloom && !isRebirth && !isCocoonBreak && !isNatureCreated) return;
+      if (isCocoonAbsorb) {
+        const portrait = document.querySelector('#bossHud .boss-portrait');
+        if (portrait) {
+          const pulseClass = isCocoonBreak ? 'boss-cocoon-breaking' : 'boss-cocoon-impact';
+          portrait.classList.remove('boss-cocoon-impact', 'boss-cocoon-breaking');
+          void portrait.offsetWidth;
+          portrait.classList.add(pulseClass);
+          setTimeout(() => portrait.classList.remove(pulseClass), isCocoonBreak ? 820 : 620);
+        }
+      }
+      if (!isChain && !isDebt && !isHeal && !isBloom && !isRebirth && !isCocoonAbsorb && !isCocoonBreak && !isNatureCreated) return;
       const floating = document.createElement('div');
       const visualClass = isChain
         ? feedback.amount > 0
@@ -4496,6 +4608,8 @@ function renderBossHud() {
               ? 'nature-rebirth'
               : isCocoonBreak
                 ? 'nature-cocoon-break'
+                : isCocoonAbsorb
+                  ? 'nature-cocoon-absorb'
                 : isNatureCreated
                   ? 'nature-threat-created'
                   : feedback.dangerDelta > 0
@@ -4511,7 +4625,9 @@ function renderBossHud() {
             : isRebirth
               ? 'RENASCIMENTO +300 HP'
               : isCocoonBreak
-                ? 'CASULO ROMPIDO'
+                ? `CASULO ROMPIDO · ${feedback.absorbedDamage || 0} ABSORVIDO`
+                : isCocoonAbsorb
+                  ? `CASULO ABSORVEU ${feedback.absorbedDamage}`
                 : isNatureCreated
                   ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA'
                   : feedback.dangerChangeLabel;
@@ -4520,7 +4636,7 @@ function renderBossHud() {
         ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
         : isHeal || isRebirth
           ? document.getElementById('bossHpBar')?.parentElement?.getBoundingClientRect()
-          : isCocoonBreak
+          : isCocoonBreak || isCocoonAbsorb
             ? document.querySelector('.boss-portrait')?.getBoundingClientRect()
             : isNatureCreated
               ? document.getElementById('bossIntentName')?.parentElement?.getBoundingClientRect()
@@ -4549,7 +4665,7 @@ function renderBossResult() {
   if (!boss.result.victory && bossVictoryKey !== lastBossVictorySoundKey && bossVictoryKey !== persistedVictoryKey) {
     lastBossVictorySoundKey = bossVictoryKey;
     sessionStorage.setItem('buraco_boss_victory_sound', bossVictoryKey);
-    playSfxClone(BOSS_SFX[boss.id]?.victory);
+    playSfxClone(BOSS_SFX[boss.id]?.victory, { audioContext: audioCtx });
   }
   if (!boss.result.victory && specialDefeatReasons.has(boss.result.reason)) {
     section.dataset.specialDefeat = boss.id;
@@ -4787,8 +4903,10 @@ function renderAll() {
   const discardLayers = updatePile3D(discardEl, 'pile-card', discardCount, 'discard', false);
 
   const discardTop = state.discard[discardCount - 1];
-  const pollenThreat = state.boss?.id === 'matriarca_esmeralda' ? (state.boss.natureThreats || []).find((threat) => threat.status === 'active' && threat.targetPlayerId == null && threat.discardCardId === discardTop?.id) : null;
+  const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
+  const pollenThreat = state.boss?.id === 'matriarca_esmeralda' ? (state.boss.natureThreats || []).find((threat) => threat.status === 'active' && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId)) : null;
   document.getElementById('drawDiscardBtn')?.classList.toggle('boss-pollen-discard', !!pollenThreat);
+  document.getElementById('drawDiscardBtn')?.classList.toggle('boss-surcharge-discard', state.boss?.id === 'banker' && state.boss.discardSurcharge?.status === 'active');
   if (!discardTop) {
     discardFace.style.display = 'none';
   } else {
@@ -4805,7 +4923,8 @@ function renderAll() {
     discardFace.style.zIndex = 20;
 
     discardFace.innerHTML = cardFrontHTML(discardTop);
-    discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}`;
+    discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}`;
+    if (pollenThreat) discardFace.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>');
     discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
   }
 
@@ -4989,6 +5108,17 @@ function renderAll() {
   }
 }
 
+function activeMatriarchTargetPlayerIds() {
+  if (state?.boss?.id !== 'matriarca_esmeralda') return new Set();
+  const playerIds = new Set();
+  const intentTarget = state.boss.currentIntent?.payload?.targetPlayerId;
+  if (state.boss.bossFlow?.stage === 'ability' && intentTarget != null) playerIds.add(intentTarget);
+  (state.boss.natureThreats || []).forEach((threat) => {
+    if (threat.status === 'active' && threat.targetPlayerId != null) playerIds.add(threat.targetPlayerId);
+  });
+  return playerIds;
+}
+
 function renderHand() {
   const container = document.querySelector('#handContainer .cards-row');
   container.innerHTML = '';
@@ -4996,7 +5126,10 @@ function renderHand() {
 
   // --- MODO ESPECTADOR ---
   if (myPlayerIndex === -1) {
-    if (localLabelEl) localLabelEl.style.display = 'none';
+    if (localLabelEl) {
+      localLabelEl.style.display = 'none';
+      localLabelEl.classList.remove('boss-player-targeted');
+    }
     const p0 = state.players[0];
     if (!p0) return;
 
@@ -5013,7 +5146,10 @@ function renderHand() {
   // --- JOGADOR NORMAL ---
   const me = state.players[myPlayerIndex];
   if (!me) {
-    if (localLabelEl) localLabelEl.style.display = 'none';
+    if (localLabelEl) {
+      localLabelEl.style.display = 'none';
+      localLabelEl.classList.remove('boss-player-targeted');
+    }
     return;
   }
 
@@ -5021,6 +5157,7 @@ function renderHand() {
   if (localLabelEl) {
     localLabelEl.textContent = `${me.name} (${me.hand.length})`;
     localLabelEl.style.display = 'block';
+    localLabelEl.classList.toggle('boss-player-targeted', activeMatriarchTargetPlayerIds().has(me.id));
 
     // Verifica se é a sua vez para aplicar o mesmo verde dinâmico dos oponentes ativos
     const isMyTurn = !state.finished && state.currentPlayer === myPlayerIndex;
@@ -5187,6 +5324,7 @@ function renderOpponentSeat(rootEl, playerIdx) {
   if (playerIdx === null || playerIdx === undefined) {
     rootEl.innerHTML = '';
     rootEl.classList.remove('active-turn-glow');
+    rootEl.classList.remove('boss-player-targeted');
     return;
   }
 
@@ -5194,10 +5332,12 @@ function renderOpponentSeat(rootEl, playerIdx) {
   if (!p) {
     rootEl.innerHTML = '';
     rootEl.classList.remove('active-turn-glow');
+    rootEl.classList.remove('boss-player-targeted');
     return;
   }
 
   rootEl.classList.toggle('active-turn-glow', state.currentPlayer === playerIdx);
+  rootEl.classList.toggle('boss-player-targeted', activeMatriarchTargetPlayerIds().has(p.id));
 
   let label = rootEl.querySelector('.opponent-label');
   if (!label) {
@@ -5275,6 +5415,7 @@ function renderOpponentHands() {
     if (playerIdx === null || playerIdx === undefined) {
       rootEl.innerHTML = '';
       rootEl.classList.remove('active-turn-glow');
+      rootEl.classList.remove('boss-player-targeted');
       return;
     }
 
@@ -5282,10 +5423,12 @@ function renderOpponentHands() {
     if (!p) {
       rootEl.innerHTML = '';
       rootEl.classList.remove('active-turn-glow');
+      rootEl.classList.remove('boss-player-targeted');
       return;
     }
 
     rootEl.classList.toggle('active-turn-glow', state.currentPlayer === playerIdx);
+    rootEl.classList.toggle('boss-player-targeted', activeMatriarchTargetPlayerIds().has(p.id));
 
     let label = rootEl.querySelector('.opponent-label');
     if (!label) {
@@ -5551,16 +5694,12 @@ function renderMelds() {
       div.classList.toggle('locked-by-boss', isBossMeldLocked(state, t.id, midx));
       const possessed = isBossMeldPossessed(state, t.id, midx);
       div.classList.toggle('possessed-by-boss', possessed);
-      const activeInterdict = isCurrentBossMode() && state.boss?.id === 'dominadora'
-        ? (state.boss.interdicts || []).find((entry) => (
-            entry.status === 'active'
-            && Number(entry.teamId ?? 0) === Number(t.id)
-            && (
-              Number(entry.meldIndex) === midx
-              || (entry.meldId && entry.meldId === state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`])
+      const activeInterdict =
+        isCurrentBossMode() && state.boss?.id === 'dominadora'
+          ? (state.boss.interdicts || []).find(
+              (entry) => entry.status === 'active' && Number(entry.teamId ?? 0) === Number(t.id) && (Number(entry.meldIndex) === midx || (entry.meldId && entry.meldId === state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`])),
             )
-          ))
-        : null;
+          : null;
       div.classList.toggle('interdicted-by-boss', !!activeInterdict);
       const natureThreats = isCurrentBossMode() ? getBossMeldNatureThreats(state, t.id, midx) : [];
       const rootThreat = natureThreats.find((threat) => ['root', 'twin_root', 'royal_root'].includes(threat.type));
@@ -7061,8 +7200,9 @@ const botEngine = {
   },
 };
 
-function createBotEngineForSession(sessionId, signal) {
+function createBotEngineForSession(sessionId, signal, { delayScale = 1, bossLabOutcome = null } = {}) {
   const engine = Object.create(botEngine);
+  engine.botDelayScale = delayScale;
   engine.isActive = () => isGameSessionActive(sessionId, signal);
   engine.getState = () => (engine.isActive() ? state : null);
   engine.commitState = async () => {
@@ -7073,6 +7213,18 @@ function createBotEngineForSession(sessionId, signal) {
     }
     await commitState();
   };
+  if (bossLabOutcome === 'failure') {
+    engine.shouldForceStockDraw = () => true;
+    engine.shouldSkipMelds = () => true;
+    engine.selectBossLabDiscardIndex = (playerId, hand) => {
+      const payload = state?.boss?.currentIntent?.payload || {};
+      const protectedIds = new Set([payload.cardId, ...(payload.cardIds || []), ...(payload.lockedCards || []).filter((entry) => entry?.playerId === playerId).map((entry) => entry.cardId)].filter(Boolean));
+      const requiredSuit = payload.suit || null;
+      const legalCards = (hand || []).map((card, index) => ({ card, index })).filter(({ card }) => card?.id && card.id !== state?.pickedDiscardCardId && !engine.isCardBlocked?.(playerId, card.id, 'discard'));
+      const harmless = legalCards.find(({ card }) => !protectedIds.has(card.id) && (!requiredSuit || card.suit !== requiredSuit));
+      return (harmless || legalCards.find(({ card }) => !protectedIds.has(card.id)) || legalCards[0])?.index ?? -1;
+    };
+  }
   return engine;
 }
 
@@ -7240,6 +7392,7 @@ onSnapshot(gameRef, async (snap) => {
     lastRenderedBossEventId = null;
     lastAnimatedBossSwapId = null;
     renderedBossFeedbackCount = null;
+    renderedBossFeedbackEventIds = null;
     lastRenderedBossBloom = null;
     lastRenderedBossBloomEventId = null;
     lastSeenBossLogKey = null;
@@ -8361,6 +8514,8 @@ if (isDebugMode) {
     movingWild = null;
     state = prepared.state;
     state.debugScenario.pauseAutomation = true;
+    renderedBossFeedbackCount = null;
+    renderedBossFeedbackEventIds = null;
     if (rememberBase) bossDebugLabBaseSnapshot = module.createBossDebugSnapshot(state);
     beginBossTurn(state, { first: true, now: Date.now(), debug: true });
     const fallbackExpected = config.variant === 'no_target';
@@ -8422,28 +8577,108 @@ if (isDebugMode) {
     showMessage(result.executed ? `Laboratorio: ${result.action}.` : result.reason);
   }
 
-  async function executeBossLabBotAction() {
-    const pendingBotChoice = state?.boss?.pendingChoices?.some((choice) => {
-      const player = state.players?.find((entry) => entry.id === choice.playerId);
-      return player?.name?.toUpperCase().includes('BOT');
-    });
-    if (!state?.debugScenario?.active || (!pendingBotChoice && state.debugScenario.variant !== 'bot')) {
-      if (!(await prepareBossLab({ variant: 'bot', target: 'bot' }))) return;
+  function advanceBossLabPresentationToPlayers() {
+    let steps = 0;
+    while (isBossTurnActive(state) && !hasPendingBossChoices(state) && steps < 12) {
+      const flow = state.boss?.bossFlow;
+      const now = Math.max(Date.now(), Number(flow?.endsAt || 0) + 1);
+      const step = advanceBossTurn(state, now);
+      if (!step) break;
+      steps += 1;
     }
-    const botIndex = state.players.findIndex((player) => player.name?.toUpperCase().includes('BOT'));
-    if (botIndex < 0) throw new Error('O cenario nao possui bot responsavel.');
-    state.currentPlayer = botIndex;
-    state.debugScenario.pauseAutomation = true;
-    const sessionId = window.gameSessionId;
-    const signal = botTurnController.signal;
-    const sessionEngine = createBotEngineForSession(sessionId, signal);
-    await BuracoBot.playTurn(state, botIndex, sessionEngine, { signal, sessionId });
-    if (state?.debugScenario) {
+    return !isBossTurnActive(state);
+  }
+
+  async function executeBossLabBotAction(outcome) {
+    const buttonId = outcome === 'success' ? 'debugBossLabBotSuccess' : 'debugBossLabBotFailure';
+    const button = bossLabElement(buttonId);
+    const otherButton = bossLabElement(outcome === 'success' ? 'debugBossLabBotFailure' : 'debugBossLabBotSuccess');
+    const originalLabel = button?.textContent || `BOT: executar ${outcome === 'success' ? 'sucesso' : 'falha'}`;
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Bot jogando...';
+    }
+    if (otherButton) otherButton.disabled = true;
+    setBossLabError('');
+
+    try {
+      const ability = selectedBossLabAbility();
+      if (!ability) throw new Error('Selecione uma habilidade antes de executar o bot.');
+      const scenarioVariant = ability.variants.some((variant) => variant.id === outcome) ? outcome : 'interactive';
+      const supportsBotTarget = ability.targets.some((target) => target.id === 'bot');
+      const overrides = {
+        variant: scenarioVariant,
+        ...(supportsBotTarget ? { target: 'bot' } : {}),
+      };
+      const activeConfig = currentBossLabConfig();
+      const module = await loadBossDebugLabModule();
+      if (!module.canContinueBossDebugScenario(state, activeConfig) && !(await prepareBossLab(overrides))) return;
+
+      showMessage(`Laboratorio: o bot esta executando o cenario de ${outcome === 'success' ? 'sucesso' : 'falha'}...`);
+      advanceBossLabPresentationToPlayers();
+
+      const botIndex = state.players.findIndex((player) => player.name?.toUpperCase().includes('BOT'));
+      if (botIndex < 0) throw new Error('O cenario nao possui bot responsavel.');
+      const botPlayer = state.players[botIndex];
+      const preparedResult = module.applyBossDebugBotOutcome(state, outcome, botPlayer.id);
+      const sessionId = window.gameSessionId;
+      const signal = botTurnController.signal;
+      const sessionEngine = createBotEngineForSession(sessionId, signal, { delayScale: 0.12, bossLabOutcome: outcome });
+
+      let resolvedChoice = false;
+      while (state.boss?.pendingChoices?.some((choice) => choice.playerId === botPlayer.id)) {
+        const event = await sessionEngine.resolvePendingBossChoice(botPlayer.id);
+        if (!event) break;
+        resolvedChoice = true;
+      }
+
+      if (hasPendingBossChoices(state)) {
+        const waitingChoice = state.boss.pendingChoices[0];
+        const waitingPlayer = state.players.find((player) => player.id === waitingChoice.playerId);
+        renderAll();
+        await commitState();
+        await refreshBossLabObserved();
+        showMessage(`Laboratorio: escolha do bot resolvida. Aguardando ${waitingPlayer?.name || 'o outro jogador'} decidir.`);
+        return;
+      }
+
+      advanceBossLabPresentationToPlayers();
+      if (isBossTurnActive(state)) throw new Error('A apresentacao do chefe nao chegou ao turno dos jogadores.');
+
+      const previousPlayer = state.currentPlayer;
+      if (previousPlayer !== botIndex) {
+        state.currentPlayer = botIndex;
+      }
+      state.hasDrawnThisTurn = false;
+      state.partialDraw = false;
+      state.pickedDiscardCardId = null;
+      state.boss.playersActedThisRound = (state.boss.playersActedThisRound || []).filter((playerId) => playerId !== botPlayer.id);
       state.debugScenario.pauseAutomation = true;
-      state.debugScenario.executionCount = (state.debugScenario.executionCount || 0) + 1;
-      state.debugScenario.lastExecution = { action: 'bot_action', at: Date.now() };
+
+      const turnBefore = state.turnNumber || 0;
+      const completedBotTurnsBefore = (state.boss?.eventLog || []).filter((event) => event.type === 'playerTurn' && event.playerId === botPlayer.id).length;
+      await BuracoBot.playTurn(state, botIndex, sessionEngine, { signal, sessionId });
+      const completedBotTurnsAfter = (state.boss?.eventLog || []).filter((event) => event.type === 'playerTurn' && event.playerId === botPlayer.id).length;
+      const turnFinished = state.finished || (state.turnNumber || 0) > turnBefore || state.currentPlayer !== botIndex || completedBotTurnsAfter > completedBotTurnsBefore;
+      if (!turnFinished && !resolvedChoice) {
+        throw new Error('O bot nao conseguiu concluir uma jogada legal neste cenario.');
+      }
+
+      const result = module.completeBossDebugBotOutcome(state, outcome, botPlayer.id, preparedResult);
+      state.debugScenario.pauseAutomation = true;
+      renderAll();
+      await commitState();
+      await refreshBossLabObserved();
+      if (!result.executed) throw new Error(result.reason || 'O Laboratorio nao encontrou o resultado da habilidade selecionada.');
+      const outcomeNote = result.matchedRequestedOutcome ? '' : ` O bot produziu ${result.actualOutcome || 'outro resultado'}; o painel foi mantido nesse resultado real.`;
+      showMessage(`Laboratorio: ${botPlayer.name} concluiu o cenario de ${outcome === 'success' ? 'sucesso' : 'falha'} (${result.action}).${outcomeNote}`);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+      if (otherButton) otherButton.disabled = false;
     }
-    await refreshBossLabObserved();
   }
 
   async function resetBossLabScenario() {
@@ -8459,18 +8694,6 @@ if (isDebugMode) {
     } catch (error) {
       setBossLabError(error.message || String(error));
     }
-  }
-
-  async function simulateBossLabReload() {
-    if (!state?.debugScenario?.active) {
-      setBossLabError('Prepare um cenario antes de simular reload.');
-      return;
-    }
-    const module = await loadBossDebugLabModule();
-    state = module.simulateBossDebugReload(state);
-    renderAll();
-    await commitState();
-    await refreshBossLabObserved();
   }
 
   async function sweepBossLab() {
@@ -8497,8 +8720,8 @@ if (isDebugMode) {
     bossLabElement('debugBossLabPhase')?.addEventListener('change', validateBossLabSelection);
     bossLabElement('debugBossLabPrepare')?.addEventListener('click', () => prepareBossLab());
     document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => button.addEventListener('click', () => executeBossLabVariant(button.dataset.bossLabVariant)));
-    bossLabElement('debugBossLabBotRun')?.addEventListener('click', () => executeBossLabBotAction().catch((error) => setBossLabError(error.message || String(error))));
-    bossLabElement('debugBossLabReload')?.addEventListener('click', simulateBossLabReload);
+    bossLabElement('debugBossLabBotSuccess')?.addEventListener('click', () => executeBossLabBotAction('success').catch((error) => setBossLabError(error.message || String(error))));
+    bossLabElement('debugBossLabBotFailure')?.addEventListener('click', () => executeBossLabBotAction('failure').catch((error) => setBossLabError(error.message || String(error))));
     bossLabElement('debugBossLabUndo')?.addEventListener('click', async () => {
       await window.executeUndo();
       await refreshBossLabObserved();

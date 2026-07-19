@@ -39,7 +39,7 @@ const MATRIARCH_SPEECHES = Object.freeze({
   harvest: 'Quero ver quanto peso suas maos conseguem sustentar.',
   royal_bloom: 'Todo o jardim exige obediencia ao mesmo tempo.',
   emerald_cocoon: 'Antes de me ferirem, terao de romper o casulo.',
-  spring_crown: 'Cada falha de voces fortalece a minha coroa.',
+  spring_crown: 'Uma unica ameaca carregara o peso da minha coroa.',
 });
 
 const RESULT_CATEGORY_BY_ABILITY = Object.freeze({
@@ -81,13 +81,17 @@ const PREPARED_CHOICE_ABILITIES = new Set(['break_will', 'final_order']);
 const ACTIVE_RESTRICTIONS = new Set(['credit_block', 'pledge', 'collar', 'exposure', 'hands_tied', 'double_collar', 'separation', 'absolute_control', 'interdict']);
 const ROUND_OBJECTIVES = new Set(['suit_audit', 'possession', 'iron_etiquette', 'credit_limit', 'discard_surcharge']);
 const NATURE_OBJECTIVES = new Set(['living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft', 'discard_pollen', 'harvest', 'royal_bloom']);
+const ACTIVE_NATURE_EFFECTS = new Set(['emerald_cocoon', 'spring_crown']);
 
 function actionCategory(intent) {
   if (intent.abilityId === 'forced_choice') return 'Escolha imediata';
   if (PREPARED_CHOICE_ABILITIES.has(intent.abilityId)) return 'Escolha preparada';
   if (ACTIVE_RESTRICTIONS.has(intent.abilityId)) return 'Restricao ativa agora';
+  if (intent.abilityId === 'credit_limit') return 'Cobranca variavel ativa';
+  if (intent.abilityId === 'discard_surcharge') return 'Cobranca preparada';
   if (ROUND_OBJECTIVES.has(intent.abilityId)) return 'Objetivo da rodada';
   if (NATURE_OBJECTIVES.has(intent.abilityId)) return 'Ameaca natural ativa';
+  if (ACTIVE_NATURE_EFFECTS.has(intent.abilityId)) return 'Efeito natural ativo';
   return 'Efeito no fim da rodada';
 }
 
@@ -101,55 +105,254 @@ const cardLabel = (gameState, playerId, cardId) => {
 const cardLabels = (gameState, playerId, cardIds = []) => cardIds.map((cardId) => cardLabel(gameState, playerId, cardId)).filter(Boolean);
 const chains = (gameState, playerId) => gameState.boss?.chainsByPlayer?.[playerId] || 0;
 
+function cardLabelAnywhere(gameState, cardId) {
+  if (!cardId) return 'carta marcada';
+  const zones = [
+    ...(gameState.players || []).map((player) => player.hand || []),
+    ...(gameState.teams || []).flatMap((team) => team.melds || []),
+    gameState.discard || [],
+    gameState.stock || [],
+    ...(gameState.deadPiles || []),
+  ];
+  const card = zones.flat().find((entry) => entry?.id === cardId);
+  return card ? `${card.rank}${card.suit}` : 'carta marcada';
+}
+
 function natureThreatsForIntent(gameState, intent) {
   if (!intent?.id) return [];
   return (gameState.boss?.natureThreats || []).filter((threat) => threat.sourceIntentId === intent.id);
 }
 
-function objectiveStatus(threat) {
-  if (!threat) return 'Pendente';
-  if (threat.status === 'success') return 'Concluido';
-  if (threat.status === 'failed') return 'Nao concluido';
-  if (threat.status === 'cancelled') return 'Cancelado';
-  return 'Pendente';
+function objectiveProgress(currentValue, requiredValue, status = 'active', labels = {}) {
+  const required = Math.max(1, Number(requiredValue) || 1);
+  const current = Math.max(0, Math.min(required, Number(currentValue) || 0));
+  const completed = status === 'success' || (status === 'active' && current >= required);
+  if (completed) return `✅ ${required}/${required} — ${labels.success || 'Concluído'}`;
+  if (status === 'failed') return `❌ ${current}/${required} — ${labels.failed || 'Falhou'}`;
+  if (status === 'cancelled') return `— ${current}/${required} — ${labels.cancelled || 'Cancelado'}`;
+  return `⬜ ${current}/${required} — ${labels.pending || 'Pendente'}`;
+}
+
+function stateProgress(status = 'active', labels = {}) {
+  if (status === 'success') return `✅ ${labels.success || 'Concluído'}`;
+  if (status === 'failed') return `❌ ${labels.failed || 'Falhou'}`;
+  if (status === 'cancelled' || status === 'expired') return `— ${labels.cancelled || 'Cancelado'}`;
+  return labels.active || 'Ativo';
+}
+
+function groupedObjectiveProgress(threats = []) {
+  const required = threats.length;
+  if (!required) return 'Aguardando objetivos';
+  const completed = threats.filter((threat) => threat.status === 'success').length;
+  const active = threats.some((threat) => threat.status === 'active');
+  const failed = threats.filter((threat) => threat.status === 'failed').length;
+  const cancelled = threats.filter((threat) => threat.status === 'cancelled').length;
+  if (active) return objectiveProgress(completed, required, 'active');
+  if (completed === required) return objectiveProgress(completed, required, 'success');
+  if (failed) return `❌ ${completed}/${required} — ${failed} não concluído${failed === 1 ? '' : 's'}`;
+  if (cancelled) return `— ${completed}/${required} — ${cancelled} cancelado${cancelled === 1 ? '' : 's'}`;
+  return objectiveProgress(completed, required, 'active');
+}
+
+function royalBloomObjectiveLabel(gameState, threat) {
+  if (threat.type === 'royal_seed') {
+    return `Semente: ${playerName(gameState, threat.targetPlayerId)} deve usar ${cardLabelAnywhere(gameState, threat.cardId)}`;
+  }
+  if (threat.type === 'royal_root') return `Raiz: adicionar 1 carta legal ao Jogo ${Number(threat.meldIndex) + 1}`;
+  if (threat.type === 'royal_pollen') return `Pólen: não recolher ${cardLabelAnywhere(gameState, threat.discardCardId)} do lixo`;
+  return 'Objetivo natural';
+}
+
+function royalBloomProgress(gameState, intent) {
+  const threats = natureThreatsForIntent(gameState, intent);
+  if (!threats.length) return 'Objetivos sendo preparados';
+  const completed = threats.filter((threat) => threat.status === 'success').length;
+  const lines = threats.map((threat) => {
+    const marker = threat.status === 'success' ? '☑' : threat.status === 'failed' ? '✕' : threat.status === 'cancelled' ? '—' : '☐';
+    const result = threat.status === 'success'
+      ? ' · concluído'
+      : threat.status === 'failed'
+        ? ` · falhou${threat.bloomApplied ? ` (+${threat.bloomApplied} Flor)` : ''}`
+        : threat.status === 'cancelled'
+          ? ' · cancelado sem efeito'
+          : '';
+    return `${marker} ${royalBloomObjectiveLabel(gameState, threat)}${result}`;
+  });
+  return [`${completed}/${threats.length} concluídos`, ...lines].join('\n');
 }
 
 function compactNatureProgress(gameState, intent) {
   const threats = natureThreatsForIntent(gameState, intent);
-  const active = threats.filter((threat) => threat.status === 'active');
-  const finished = threats.filter((threat) => threat.status !== 'active');
-  const statusCounts = threats.length ? `${finished.length}/${threats.length} objetivo${threats.length === 1 ? '' : 's'} encerrado${threats.length === 1 ? '' : 's'}` : '';
-
-  if (intent.abilityId === 'living_seed') return objectiveStatus(threats[0]);
+  if (intent.abilityId === 'living_seed') {
+    const threat = threats[0];
+    return objectiveProgress(threat?.status === 'success' ? 1 : 0, 1, threat?.status || 'active');
+  }
   if (intent.abilityId === 'hungry_root') {
     const threat = threats[0];
-    if (!threat) return 'Pendente';
+    if (!threat) return objectiveProgress(0, 1);
     if (threat.strengthened) {
       const current = new Set(threat.contributorPlayerIds || []).size;
-      return threat.status === 'active' ? `Contribuicoes ${current}/${threat.requiredContributorCount || 2}` : objectiveStatus(threat);
+      return objectiveProgress(current, threat.requiredContributorCount || 2, threat.status);
     }
-    return threat.status === 'active' ? `Cartas adicionadas ${new Set(threat.progressCardIds || []).size}/1` : objectiveStatus(threat);
+    const current = new Set(threat.progressCardIds || []).size;
+    return objectiveProgress(threat.status === 'success' ? 1 : current, 1, threat.status);
   }
-  if (intent.abilityId === 'twin_vines' || intent.abilityId === 'royal_bloom') {
-    if (!threats.length) return 'Aguardando objetivos';
-    const completed = threats.filter((threat) => threat.status === 'success').length;
-    return active.length ? `Concluidos ${completed}/${threats.length}` : `${statusCounts} · ${completed} com sucesso`;
+  if (intent.abilityId === 'twin_vines') {
+    return groupedObjectiveProgress(threats);
   }
+  if (intent.abilityId === 'royal_bloom') return royalBloomProgress(gameState, intent);
   if (intent.abilityId === 'graft') {
     const threat = threats[0];
-    return threat?.status === 'active' ? `Jogos alimentados ${new Set(threat.fedMeldIds || []).size}/2` : objectiveStatus(threat);
+    const current = new Set(threat?.fedMeldIds || []).size;
+    return objectiveProgress(threat?.status === 'success' ? 2 : current, 2, threat?.status || 'active');
   }
   if (intent.abilityId === 'discard_pollen') {
     const threat = threats[0];
-    if (!threat) return 'Aguardando o lixo';
-    return threat.status === 'active' ? (threat.targetPlayerId == null ? 'Aguardando retirada do lixo' : 'Carta na mao: use neste turno') : objectiveStatus(threat);
+    if (!threat) return 'Lixo ainda não contaminado';
+    const contaminatedCard = cardLabelAnywhere(gameState, threat.discardCardId);
+    if (threat.status === 'cancelled') return '✅ CARTA EVITADA · sem efeito';
+    if (threat.status === 'failed') {
+      const effects = [threat.bloomApplied ? `+${threat.bloomApplied} Flor` : '', threat.healApplied ? `cura ${threat.healApplied} HP` : ''].filter(Boolean).join(' · ');
+      return `❌ CARTA CONTAMINADA RECOLHIDA${effects ? ` · ${effects}` : ''}`;
+    }
+    return `☣️ CARTA CONTAMINADA: ${contaminatedCard} · não recolha a pilha`;
   }
   if (intent.abilityId === 'harvest') {
     const player = playerById(gameState, intent.payload?.targetPlayerId);
     const threat = threats[0];
-    return threat?.status === 'active' ? `${player?.hand?.length || 0} cartas na mao` : objectiveStatus(threat);
+    const cards = Number.isFinite(Number(threat?.observedHandSize)) ? Number(threat.observedHandSize) : (player?.hand?.length || 0);
+    const reductionNeeded = Math.max(0, cards - 7);
+    if (threat?.status === 'success') return `✅ COLHEITA EVITADA · terminou com ${cards} carta${cards === 1 ? '' : 's'}`;
+    if (threat?.status === 'failed') {
+      const result = [threat.bloomApplied ? `+${threat.bloomApplied} Flor` : '', threat.healApplied ? `cura ${threat.healApplied} HP` : ''].filter(Boolean).join(' · ');
+      return `❌ ${cards >= 11 ? 'COLHEITA CRÍTICA' : 'COLHEITA ALIMENTADA'} · terminou com ${cards} cartas${result ? ` · ${result}` : ''}`;
+    }
+    if (threat?.status === 'cancelled') return `— COLHEITA CANCELADA · ${cards} carta${cards === 1 ? '' : 's'}`;
+    if (cards <= 7) return `✅ META ATINGIDA AGORA · ${cards} carta${cards === 1 ? '' : 's'} na mão`;
+    return `${cards >= 11 ? '🔴' : '🟡'} ${cards} CARTAS NA MÃO · reduza ${reductionNeeded} para ficar seguro`;
   }
-  return statusCounts;
+  if (intent.abilityId === 'restorative_dew') {
+    const threat = threats[0];
+    const current = new Set(threat?.countedCardIds || intent.payload?.countedCardIds || []).size;
+    return objectiveProgress(current, 6, threat?.status || 'active', { pending: 'Cura sendo reduzida', failed: 'Cura aplicada' });
+  }
+  return threats.length ? groupedObjectiveProgress(threats) : '';
+}
+
+const CROWN_THREAT_NAMES = Object.freeze({
+  seed: 'Semente Viva',
+  royal_seed: 'Semente Real',
+  root: 'Raiz Faminta',
+  twin_root: 'Trepadeira',
+  royal_root: 'Raiz Real',
+  pollen: 'Polen do Lixo',
+  royal_pollen: 'Polen Real',
+  graft: 'Enxerto',
+  dew: 'Orvalho Restaurador',
+  harvest: 'Colheita',
+});
+
+function springCrownMarkedThreat(gameState) {
+  const boss = gameState.boss;
+  const crown = boss?.springCrown;
+  const announcedIntent = boss?.currentIntent?.abilityId === 'spring_crown'
+    ? boss.currentIntent
+    : null;
+  const markedThreatId = crown?.markedThreatId || announcedIntent?.payload?.markedThreatId || null;
+  return markedThreatId
+    ? (boss?.natureThreats || []).find((threat) => threat.id === markedThreatId) || null
+    : null;
+}
+
+function crownThreatName(gameState) {
+  const boss = gameState.boss;
+  const crown = boss?.springCrown;
+  const announcedIntent = boss?.currentIntent?.abilityId === 'spring_crown'
+    ? boss.currentIntent
+    : null;
+  const threat = springCrownMarkedThreat(gameState);
+  return crown?.markedThreatName
+    || announcedIntent?.payload?.markedThreatName
+    || CROWN_THREAT_NAMES[threat?.type]
+    || threat?.name
+    || 'Ameaca natural';
+}
+
+function crownThreatObjective(gameState, threat) {
+  if (!threat) return 'A ameaca marcada nao possui mais um alvo valido.';
+  if (['seed', 'royal_seed'].includes(threat.type)) {
+    return `${playerName(gameState, threat.targetPlayerId)} deve usar ${cardLabelAnywhere(gameState, threat.cardId)} antes do fim do turno.`;
+  }
+  if (['pollen', 'royal_pollen'].includes(threat.type)) return `Nao recolher ${cardLabelAnywhere(gameState, threat.discardCardId)} do lixo.`;
+  if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
+    return threat.strengthened
+      ? `Cada cooperador deve adicionar uma carta legal ao Jogo ${Number(threat.meldIndex) + 1}.`
+      : `Adicionar uma carta legal ao Jogo ${Number(threat.meldIndex) + 1}.`;
+  }
+  if (threat.type === 'graft') return 'Adicionar uma carta legal em cada um dos dois jogos ligados.';
+  if (threat.type === 'dew') return 'Colocar 6 cartas novas na mesa para zerar a cura preparada.';
+  if (threat.type === 'harvest') return `${playerName(gameState, threat.targetPlayerId)} deve terminar o turno com 7 cartas ou menos.`;
+  return 'Cumprir a ameaca natural marcada.';
+}
+
+function crownThreatProgress(threat) {
+  if (!threat) return 'Cancelada sem punicao';
+  if (threat.status === 'success') return 'Concluida · Coroa encerrada sem efeito extra';
+  if (threat.status === 'failed') return 'Falhou · Raiz Fortalecida preparada';
+  if (threat.status === 'cancelled') return 'Cancelada · sem punicao';
+  if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
+    const required = threat.strengthened ? threat.requiredContributorCount || 2 : 1;
+    const current = threat.strengthened
+      ? new Set(threat.contributorPlayerIds || []).size
+      : Math.min(1, new Set(threat.progressCardIds || []).size);
+    return `${current}/${required} · Pendente`;
+  }
+  if (threat.type === 'graft') return `${new Set(threat.fedMeldIds || []).size}/2 · Pendente`;
+  if (threat.type === 'dew') return `${new Set(threat.countedCardIds || []).size}/6 · Pendente`;
+  return 'Pendente';
+}
+
+function compactBankerProgress(gameState, intent) {
+  const boss = gameState.boss || {};
+  const payload = intent.payload || {};
+  switch (intent.abilityId) {
+    case 'fixed_interest':
+      return 'Cobrança no fim da rodada';
+    case 'maintenance_fee': {
+      const total = Math.max(1, gameState.players?.length || 0);
+      const effect = (boss.effects || []).find((entry) => entry.id === 'maintenance_fee' && entry.sourceActionId === intent.id);
+      if (effect) {
+        const pending = new Set(effect.pendingPlayerIds || []).size;
+        return pending ? `Tarifa ativa · ${total - pending}/${total} compras aplicadas` : '✅ Tarifa aplicada aos cooperadores';
+      }
+      if (boss.lastMaintenanceRound === boss.roundNumber) return '✅ Tarifa aplicada aos cooperadores';
+      return `Tarifa preparada · 0/${total} compras aplicadas`;
+    }
+    case 'credit_block':
+      return '🔒 Lixo bloqueado nesta rodada';
+    case 'suit_audit':
+      return objectiveProgress(payload.progress || 0, payload.required || 1, 'active');
+    case 'pledge':
+      return `🔒 Jogo ${Number.isInteger(payload.meldIndex) ? Number(payload.meldIndex) + 1 : ''} penhorado`.trim();
+    case 'compound_interest':
+      return 'Cobrança variável no fim da rodada';
+    case 'credit_limit': {
+      const limit = boss.creditLimit || payload;
+      const counted = new Set(limit.countedCardIds || []).size;
+      const allowance = Math.max(1, limit.allowance || payload.allowance || 1);
+      const exceeded = Math.max(0, counted - allowance);
+      if (limit.status === 'expired') return `Limite encerrado · ${counted} carta${counted === 1 ? '' : 's'} contabilizada${counted === 1 ? '' : 's'}`;
+      return exceeded ? `⚠ Uso ${counted}/${allowance} · ${exceeded} excedente${exceeded === 1 ? '' : 's'}` : `Uso ${counted}/${allowance} · dentro do limite`;
+    }
+    case 'discard_surcharge': {
+      const surcharge = boss.discardSurcharge || payload;
+      if (surcharge.status === 'consumed') return '✅ Cobrança aplicada na retirada do lixo';
+      if (surcharge.status === 'expired') return '— Encerrado sem retirada do lixo';
+      return '🪙 Ágio ativo · aguardando retirada do lixo';
+    }
+    default:
+      return '';
+  }
 }
 
 const detailFields = (entries) => entries.filter(([, value]) => value !== '' && value != null).map(([label, value]) => `${label}: ${value}`);
@@ -290,8 +493,9 @@ function matriarchDetails(gameState, intent) {
         ['Falha', '+1 Flor, sem cura, e pode propagar uma Raiz'],
       ]);
     case 'restorative_dew': {
-      const counted = new Set(payload.countedCardIds || []).size;
-      const phase = payload.announcedPhase || intent.announcedPhase || gameState.boss?.phase || 1;
+      const threat = natureThreatsForIntent(gameState, intent)[0];
+      const counted = new Set(threat?.countedCardIds || payload.countedCardIds || []).size;
+      const phase = threat?.announcedPhase || payload.announcedPhase || intent.announcedPhase || gameState.boss?.phase || 1;
       return detailFields([
         ['Cartas contabilizadas', `${Math.min(counted, 6)}/6`],
         ['Cura prevista', `${getRestorativeDewHealing(phase, counted)} HP`],
@@ -321,38 +525,45 @@ function matriarchDetails(gameState, intent) {
             ? `${gameState.discard.find((entry) => entry.id === payload.discardCardId).rank}${gameState.discard.find((entry) => entry.id === payload.discardCardId).suit}`
             : 'topo do lixo',
         ],
-        ['Objetivo', 'usar a carta no turno em que o lixo for pego'],
-        ['Falha', '+1 Flor e +40 HP'],
+        ['Gatilho', 'pegar a carta contaminada do lixo'],
+        ['Consequência imediata', '+1 Flor e cura de até 40 HP'],
       ]);
     case 'harvest':
       return detailFields([
         ['Alvo', target],
-        ['Avaliacao', 'quantidade de cartas no fim do turno'],
-        ['0-7 cartas', 'sem efeito'],
-        ['8-10 cartas', '+60 HP'],
-        ['11+ cartas', '+100 HP e +1 Flor'],
+        ['Meta', 'terminar o turno com 7 cartas ou menos'],
+        ['8–10 cartas ao final', 'Matriarca cura 60 HP'],
+        ['11+ cartas ao final', 'Matriarca ganha +1 Flor e cura 100 HP'],
       ]);
-    case 'royal_bloom':
+    case 'royal_bloom': {
+      const threats = natureThreatsForIntent(gameState, intent);
+      const objectives = threats.length ? threats : (payload.objectives || []).map((objective) => ({
+        ...objective,
+        type: objective.type === 'seed' ? 'royal_seed' : objective.type === 'root' ? 'royal_root' : 'royal_pollen',
+      }));
       return detailFields([
-        ['Objetivos', `${payload.targetCount || payload.objectives?.length || 0}`],
-        ['Tipos', (payload.objectives || []).map((entry) => ({ seed: 'carta', root: 'jogo', pollen: 'lixo' })[entry.type] || entry.type).join(', ')],
+        ...objectives.map((objective, index) => [`Objetivo ${index + 1}`, royalBloomObjectiveLabel(gameState, objective)]),
         ['Falha por objetivo', '+1 Flor, sem cura'],
         ['Raiz falha', 'pode solicitar uma propagacao'],
       ]);
+    }
     case 'emerald_cocoon':
       return detailFields([
         ['Casulo', `${payload.amount || 180} de absorcao`],
         ['Ruptura', 'canastra limpa ou superior'],
         ['Fim da rodada', 'cura metade do valor restante'],
       ]);
-    case 'spring_crown':
+    case 'spring_crown': {
+      const threat = springCrownMarkedThreat(gameState);
       return detailFields([
-        ['Duracao', 'esta rodada'],
-        ['Primeira falha', 'pode solicitar a propagacao normal'],
-        ['Segunda falha', 'fortalece a Raiz propagada valida'],
-        ['Raiz Fortalecida', 'exige uma contribuicao de cada jogador'],
-        ['Cura adicional', 'nenhuma'],
+        ['A Coroa marcou', crownThreatName(gameState)],
+        ['Objetivo', crownThreatObjective(gameState, threat)],
+        ['Progresso', crownThreatProgress(threat)],
+        ['Se cumprir', 'a Coroa termina sem efeito extra'],
+        ['Se falhar', 'Raiz Fortalecida na proxima rodada'],
+        ['Se for cancelada', 'a Coroa termina sem punicao'],
       ]);
+    }
     default:
       return detailFields([['Efeito', intent.description || 'ameaca natural ativa']]);
   }
@@ -367,20 +578,20 @@ function compactAction(gameState, intent) {
     case 'fixed_interest':
       return {
         instruction: `Contrato ${payload.contractTier || 'Padrao'}: ao fim da rodada, pague tudo ou deixe uma garantia.`,
-        progress: '',
+        progress: compactBankerProgress(gameState, intent),
         consequence: `Integral: +${payload.fullDebt ?? payload.amount} · Garantia: +${payload.guaranteedDebt ?? payload.collateralAmount}`,
       };
     case 'maintenance_fee':
-      return { instruction: `Cada jogador comprara +${payload.extraDraw} carta(s).`, progress: '', consequence: 'Compra extra inevitavel' };
+      return { instruction: `Cada jogador comprara +${payload.extraDraw} carta(s).`, progress: compactBankerProgress(gameState, intent), consequence: 'Compra extra inevitavel' };
     case 'credit_block':
-      return { instruction: 'O lixo esta bloqueado nesta rodada.', progress: '', consequence: 'Encerra na virada da rodada' };
+      return { instruction: 'O lixo esta bloqueado nesta rodada.', progress: compactBankerProgress(gameState, intent), consequence: 'Encerra na virada da rodada' };
     case 'suit_audit':
-      return { instruction: `Joguem ${payload.required} cartas de ${payload.suitLabel}.`, progress: `${payload.progress || 0}/${payload.required}`, consequence: `Sucesso: ${payload.successDelta} | Falha: +${payload.failureDelta}` };
+      return { instruction: `Joguem ${payload.required} cartas de ${payload.suitLabel}.`, progress: compactBankerProgress(gameState, intent), consequence: `Sucesso: ${payload.successDelta} | Falha: +${payload.failureDelta}` };
     case 'pledge':
-      return { instruction: `Jogo ${Number(payload.meldIndex) + 1} nao pode receber cartas.`, progress: '', consequence: 'Libera ao fim da cobranca' };
+      return { instruction: `Jogo ${Number(payload.meldIndex) + 1} nao pode receber cartas.`, progress: compactBankerProgress(gameState, intent), consequence: 'Libera ao fim da cobranca' };
     case 'compound_interest': {
       const total = gameState.players?.reduce((sum, player) => sum + (player.hand?.length || 0), 0) || 0;
-      return { instruction: `${total} cartas nas maos.`, progress: '', consequence: `Estimativa: +${Math.min(12, 4 + Math.floor(total / 4))} de Divida` };
+      return { instruction: `${total} cartas nas maos.`, progress: compactBankerProgress(gameState, intent), consequence: `Estimativa: +${Math.min(12, 4 + Math.floor(total / 4))} de Divida` };
     }
     case 'credit_limit': {
       const limit = gameState.boss?.creditLimit || payload;
@@ -388,12 +599,12 @@ function compactAction(gameState, intent) {
       const allowance = limit.allowance || payload.allowance || 0;
       return {
         instruction: `A equipe possui franquia de ${allowance} cartas novas na mesa.`,
-        progress: `Credito ${counted}/${allowance}`,
+        progress: compactBankerProgress(gameState, intent),
         consequence: `Cobranca acumulada: ${limit.chargedDebt || 0}/${limit.maxCharge || payload.maxCharge || 0} · excedente: +${limit.debtPerCard || 1}`,
       };
     }
     case 'discard_surcharge':
-      return { instruction: `A primeira retirada valida do lixo custa Divida +${payload.amount}.`, progress: '', consequence: 'O jogador pode desistir e comprar do monte' };
+      return { instruction: `A primeira retirada valida do lixo custa Divida +${payload.amount}.`, progress: compactBankerProgress(gameState, intent), consequence: 'O jogador pode desistir e comprar do monte' };
     case 'collar':
       return { instruction: `${target} nao pode jogar nem descartar ${collarCards.join(' e ')} ate o fim do turno.`, progress: '', consequence: '' };
     case 'exposure': {
@@ -467,25 +678,102 @@ function compactAction(gameState, intent) {
     case 'hungry_root':
       return { instruction: `Adicione uma carta legal ao jogo ${Number(payload.meldIndex) + 1}.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor e pode propagar uma Raiz' };
     case 'restorative_dew': {
-      const counted = new Set(payload.countedCardIds || []).size;
-      const phase = payload.announcedPhase || intent.announcedPhase || gameState.boss?.phase || 1;
+      const threat = natureThreatsForIntent(gameState, intent)[0];
+      const counted = new Set(threat?.countedCardIds || payload.countedCardIds || []).size;
+      const phase = threat?.announcedPhase || payload.announcedPhase || intent.announcedPhase || gameState.boss?.phase || 1;
       const healing = getRestorativeDewHealing(phase, counted);
-      return { instruction: 'Cada carta nova na mesa atravessa uma faixa e reduz a cura preparada.', progress: `${Math.min(counted, 6)}/6 cartas para dissipar`, consequence: `Cura prevista: ${healing} HP` };
+      return { instruction: 'Cada carta nova na mesa atravessa uma faixa e reduz a cura preparada.', progress: compactNatureProgress(gameState, intent), consequence: `Cura prevista: ${healing} HP` };
     }
     case 'twin_vines':
       return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogo(s), cada um separadamente.`, progress: compactNatureProgress(gameState, intent), consequence: 'Cada raiz falha: +1 Flor, sem cura' };
     case 'graft':
       return { instruction: 'Adicione uma carta legal em cada um dos dois jogos ligados.', progress: compactNatureProgress(gameState, intent), consequence: '0 lados: +2 Flores e pode propagar · 1 lado: +1 Flor' };
-    case 'discard_pollen':
-      return { instruction: 'Se o lixo for pego, use a carta contaminada no mesmo turno.', progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor e +40 HP' };
+    case 'discard_pollen': {
+      const threat = natureThreatsForIntent(gameState, intent)[0];
+      const contaminatedCard = cardLabelAnywhere(gameState, threat?.discardCardId || payload.discardCardId);
+      return {
+        instruction: `A carta ${contaminatedCard} foi contaminada. Não recolha a pilha enquanto ela estiver no lixo.`,
+        progress: compactNatureProgress(gameState, intent),
+        consequence: 'Se essa carta vier junto na retirada: +1 Flor e cura de até 40 HP',
+      };
+    }
     case 'harvest':
-      return { instruction: `${target} deve reduzir a mao antes de encerrar o turno.`, progress: compactNatureProgress(gameState, intent), consequence: '8-10: +60 HP · 11+: +100 HP e +1 Flor' };
+      return {
+        instruction: `${target}: termine o turno com no máximo 7 cartas na mão.`,
+        progress: compactNatureProgress(gameState, intent),
+        consequence: '8–10 ao final: cura 60 HP · 11+ ao final: +1 Flor e cura 100 HP',
+      };
     case 'royal_bloom':
       return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos independentes.`, progress: compactNatureProgress(gameState, intent), consequence: 'Cada falha: +1 Flor, sem cura' };
-    case 'emerald_cocoon':
-      return { instruction: 'O dano atinge primeiro o Casulo.', progress: `0/${payload.amount || 180}`, consequence: 'Canastra limpa ou superior rompe a protecao' };
-    case 'spring_crown':
-      return { instruction: 'A primeira falha pode propagar; a segunda fortalece a Raiz propagada valida.', progress: '', consequence: 'Raiz Fortalecida: uma contribuicao de cada jogador' };
+    case 'emerald_cocoon': {
+      const boss = gameState.boss;
+      const cocoon = boss?.emeraldCocoon;
+      const amount = payload.amount || 180;
+      const events = boss?.eventLog || [];
+      const activationActionId = intent.immediateEventActionId;
+      let activationIndex = activationActionId
+        ? events.findIndex((entry) => entry.actionId === activationActionId)
+        : -1;
+
+      if (activationIndex < 0) {
+        activationIndex = events.findLastIndex?.((entry) => (
+          entry.type === 'bossAbility' && entry.abilityId === 'emerald_cocoon'
+        )) ?? -1;
+      }
+
+      const eventsAfterActivation = activationIndex >= 0
+        ? events.slice(activationIndex + 1)
+        : events.slice(-1);
+      const breakEvent = [...eventsAfterActivation].reverse().find((entry) => (
+        entry.type === 'bossDamage' && entry.cocoonBroken
+      ));
+      const wasBroken = cocoon?.status === 'broken' || Boolean(breakEvent);
+      const absorbed = Math.max(0, amount - (cocoon?.remaining ?? (wasBroken ? 0 : amount)));
+
+      const progress = wasBroken
+        ? '💥 Casulo rompido · proteção encerrada'
+        : cocoon?.status === 'expired'
+          ? `— Casulo encerrado · ${absorbed} de dano absorvido`
+          : cocoon?.status === 'active'
+            ? `Proteção ativa · ${cocoon.remaining}/${amount}`
+            : '— Casulo encerrado';
+
+      return {
+        instruction: 'Dano comum é absorvido pelo Casulo.',
+        progress,
+        consequence: wasBroken
+          ? 'A proteção não absorve mais dano'
+          : 'Canastra limpa ou superior rompe e causa dano total',
+      };
+    }
+    case 'spring_crown': {
+      const crown = gameState.boss?.springCrown;
+      const threat = springCrownMarkedThreat(gameState);
+      const name = crownThreatName(gameState);
+      const progress = crown?.status === 'root_prepared'
+        ? `${name} falhou · Raiz Fortalecida preparada`
+        : crown?.status === 'root_active'
+          ? 'Raiz Fortalecida ativa · a Coroa permanece fortalecida'
+          : crown?.status === 'completed'
+            ? `${name} concluida · Coroa encerrada sem efeito extra`
+            : crown?.status === 'cancelled'
+              ? `${name} cancelada · sem punicao`
+              : crownThreatProgress(threat);
+      const consequence = crown?.status === 'root_active'
+        ? 'Raiz Fortalecida ativa'
+        : crown?.status === 'root_prepared'
+          ? 'Raiz Fortalecida preparada para a próxima rodada'
+          : crown?.status === 'completed'
+            ? 'Sem efeito extra'
+            : crown?.status === 'cancelled'
+              ? 'Sem punição'
+              : 'Não cumprir: Raiz Fortalecida na próxima rodada';
+      return {
+        instruction: `A Coroa marcou: ${name}. ${crownThreatObjective(gameState, threat)}`,
+        progress,
+        consequence,
+      };
+    }
     default:
       return { instruction: intent.description || 'Habilidade ativa.', progress: '', consequence: '' };
   }
@@ -616,9 +904,15 @@ function ironEtiquetteOrderPresentation(gameState) {
 
   const activeOrder = orders.find((order) => order.type === 'discard_suit' && order.status === 'active');
 
-  const latestResolvedEvent = [...(boss.eventLog || [])]
-    .reverse()
-    .find((event) => event.type === 'dominatrixOrder' && event.orderType === 'discard_suit');
+  // Um resultado resolvido só pode continuar visível enquanto ele ainda for
+  // o último evento da partida e nenhuma nova habilidade estiver ativa.
+  // Consultar o eventLog inteiro fazia uma Etiqueta antiga reaparecer sobre
+  // os resultados das habilidades seguintes.
+  const latestResolvedEvent = !boss.currentIntent
+    && boss.lastEvent?.type === 'dominatrixOrder'
+    && boss.lastEvent?.orderType === 'discard_suit'
+    ? boss.lastEvent
+    : null;
 
   const resolvedOrder = latestResolvedEvent
     ? orders.find((entry) => entry.id === latestResolvedEvent.orderId && entry.type === 'discard_suit' && entry.status !== 'active')
@@ -760,6 +1054,208 @@ function interdictPresentation(gameState) {
   };
 }
 
+function flowResultEvent(gameState) {
+  const boss = gameState?.boss;
+  if (boss?.bossFlow?.stage !== 'result') return null;
+  const actionId = boss.bossFlow.eventActionId;
+  if (!actionId) return null;
+  return (boss.eventLog || []).find((event) => event.actionId === actionId) || null;
+}
+
+function bankerStatusPresentation(gameState) {
+  const boss = gameState?.boss;
+  if (boss?.id !== 'banker') return null;
+  const event = flowResultEvent(gameState);
+  if (event?.type !== 'bossAbility') return null;
+
+  const details = [...(event.presentation?.details || [])];
+  const progressDetail = details.find((entry) => /^Progresso:/i.test(entry)) || '';
+  const progressMatch = progressDetail.match(/(\d+)\s*\/\s*(\d+)/);
+  let progress = event.outcome || 'Efeito resolvido';
+  let category = 'Efeito resolvido';
+
+  if (event.abilityId === 'suit_audit') {
+    const current = Number(progressMatch?.[1]) || 0;
+    const required = Number(progressMatch?.[2]) || 1;
+    const success = Number(event.dangerDelta) < 0;
+    progress = objectiveProgress(success ? required : current, required, success ? 'success' : 'failed');
+    category = success ? 'Objetivo concluído' : 'Objetivo não concluído';
+  } else if (event.abilityId === 'maintenance_fee') {
+    const effect = (boss.effects || []).find((entry) => entry.id === 'maintenance_fee');
+    const total = Math.max(1, gameState.players?.length || 0);
+    const pending = new Set(effect?.pendingPlayerIds || []).size;
+    progress = pending ? `Tarifa ativa · ${total - pending}/${total} compras aplicadas` : '✅ Tarifa aplicada aos cooperadores';
+    category = 'Efeito ativado';
+  } else if (event.abilityId === 'credit_limit') {
+    progress = compactBankerProgress(gameState, { abilityId: 'credit_limit', payload: boss.creditLimit || {} });
+    category = 'Cobrança variável ativa';
+  } else if (event.abilityId === 'discard_surcharge') {
+    progress = compactBankerProgress(gameState, { abilityId: 'discard_surcharge', payload: boss.discardSurcharge || {} });
+    category = 'Cobrança preparada';
+  } else if (['credit_block', 'pledge'].includes(event.abilityId)) {
+    progress = 'Restrição encerrada';
+    category = 'Restrição encerrada';
+  } else if (Number(event.dangerDelta)) {
+    progress = 'Cobrança aplicada';
+    category = 'Cobrança concluída';
+  } else if (event.abilityId === 'fixed_interest') {
+    progress = boss.pendingChoices?.some((choice) => choice.type === 'fixed_interest_payment') ? 'Pagamento obrigatório pendente' : 'Cobrança resolvida';
+    category = 'Cobrança automática';
+  }
+
+  return {
+    category,
+    name: event.name,
+    speech: '',
+    description: '',
+    details,
+    instruction: event.outcome || `${event.name} foi resolvida.`,
+    progress,
+    consequence: event.dangerChangeLabel || '',
+  };
+}
+
+const MATRIARCH_ABILITY_NAMES = Object.freeze({
+  living_seed: 'Semente Viva',
+  hungry_root: 'Raiz Faminta',
+  restorative_dew: 'Orvalho Restaurador',
+  twin_vines: 'Trepadeiras Gêmeas',
+  graft: 'Enxerto',
+  discard_pollen: 'Pólen do Lixo',
+  harvest: 'Colheita',
+  royal_bloom: 'Florescimento Real',
+  emerald_cocoon: 'Casulo Esmeralda',
+  spring_crown: 'Coroa da Primavera',
+});
+
+function matriarchStatusPresentation(gameState) {
+  const boss = gameState?.boss;
+  if (boss?.id !== 'matriarca_esmeralda') return null;
+  const event = flowResultEvent(gameState);
+  const crown = boss.springCrown;
+  const relatedCrownEvent = event?.type === 'springCrown'
+    ? event
+    : event?.type === 'natureThreat'
+      && crown?.markedThreatId === event.threatId
+      && crown?.resolvedEventId
+      ? (boss.eventLog || []).find((entry) => entry.actionId === crown.resolvedEventId) || null
+      : null;
+  if (relatedCrownEvent) {
+    const markedName = relatedCrownEvent.markedThreatName || crownThreatName(gameState);
+    const threatEvent = event?.type === 'natureThreat'
+      ? event
+      : (boss.eventLog || []).find((entry) => (
+          entry.type === 'natureThreat'
+          && entry.threatId === relatedCrownEvent.threatId
+          && entry.status === relatedCrownEvent.status
+        )) || null;
+    const failed = relatedCrownEvent.status === 'failed';
+    const succeeded = relatedCrownEvent.status === 'success';
+    const rootState = crown?.status === 'root_active'
+      ? 'Raiz Fortalecida ativa'
+      : 'Raiz Fortalecida preparada para a próxima rodada';
+    const originalEffects = [
+      threatEvent?.bloomApplied ? `+${threatEvent.bloomApplied} Flor${threatEvent.bloomApplied === 1 ? '' : 'es'}` : '',
+      threatEvent?.healApplied ? `+${threatEvent.healApplied} HP` : '',
+    ].filter(Boolean);
+    return {
+      category: failed
+        ? 'Objetivo não concluído'
+        : succeeded
+          ? 'Objetivo concluído'
+          : 'Objetivo cancelado',
+      name: 'Coroa da Primavera',
+      speech: '',
+      description: '',
+      details: detailFields([
+        ['Ameaça marcada', markedName],
+        ['Efeito da ameaça', originalEffects.join(' · ')],
+      ]),
+      instruction: relatedCrownEvent.outcome || 'A Coroa da Primavera foi resolvida.',
+      progress: failed
+        ? `❌ ${markedName} não cumprida`
+        : succeeded
+          ? `✅ ${markedName} cumprida`
+          : `— ${markedName} cancelada`,
+      consequence: failed
+        ? [...originalEffects, rootState].join(' · ')
+        : succeeded
+          ? 'Sem efeito extra'
+          : 'Sem punição',
+    };
+  }
+  if (event?.type === 'bossAbility' && MATRIARCH_ABILITY_NAMES[event.abilityId]) {
+    const currentIntent = boss.currentIntent;
+    const sameAbility = currentIntent?.abilityId === event.abilityId;
+    const sameResolution = !currentIntent?.immediateEventActionId || currentIntent.immediateEventActionId === event.actionId;
+    const intent = sameAbility && sameResolution ? currentIntent : null;
+    if (!intent) {
+      return {
+        category: 'Efeito registrado',
+        name: MATRIARCH_ABILITY_NAMES[event.abilityId],
+        speech: '',
+        description: '',
+        details: [...(event.presentation?.details || [])],
+        instruction: event.outcome || 'A habilidade foi registrada.',
+        progress: '',
+        consequence: '',
+      };
+    }
+    const compact = compactAction(gameState, intent);
+    return {
+      category: NATURE_OBJECTIVES.has(intent.abilityId) ? 'Ameaça natural ativa' : 'Efeito ativo',
+      name: intent.name || MATRIARCH_ABILITY_NAMES[event.abilityId],
+      speech: '',
+      description: '',
+      details: matriarchDetails(gameState, intent),
+      instruction: compact.instruction,
+      progress: compact.progress,
+      consequence: compact.consequence,
+    };
+  }
+  if (event?.type !== 'natureThreat') return null;
+  const threat = (boss.natureThreats || []).find((entry) => entry.id === event.threatId);
+  if (!threat) return null;
+  const abilityId = threat.sourceAbilityId;
+  const sourceIntentId = threat.sourceIntentId;
+  const related = (boss.natureThreats || []).filter((entry) => entry.sourceIntentId === sourceIntentId);
+  const intent = {
+    id: sourceIntentId,
+    abilityId,
+    payload: {
+      targetPlayerId: threat.targetPlayerId,
+      countedCardIds: threat.countedCardIds || [],
+    },
+  };
+  const completed = related.filter((entry) => entry.status === 'success').length;
+  const failed = related.filter((entry) => entry.status === 'failed').length;
+  const active = related.some((entry) => entry.status === 'active');
+  const category = active
+    ? 'Ameaça natural ativa'
+    : failed
+      ? 'Objetivo não concluído'
+      : completed === related.length
+        ? 'Objetivo concluído'
+        : 'Objetivo resolvido';
+
+  return {
+    category,
+    name: MATRIARCH_ABILITY_NAMES[abilityId] || threat.name || 'Ameaça natural',
+    speech: '',
+    description: '',
+    details: detailFields([
+      ['Objetivos concluídos', related.length > 1 ? `${completed}/${related.length}` : ''],
+      ['Flores aplicadas', event.bloomApplied || ''],
+      ['Cura aplicada', event.healApplied ? `${event.healApplied} HP` : ''],
+    ]),
+    instruction: event.outcome || 'A ameaça natural foi resolvida.',
+    progress: compactNatureProgress(gameState, intent),
+    consequence: event.bloomApplied || event.healApplied
+      ? [event.bloomApplied ? `+${event.bloomApplied} Flor${event.bloomApplied === 1 ? '' : 'es'}` : '', event.healApplied ? `+${event.healApplied} HP` : ''].filter(Boolean).join(' · ')
+      : 'Sem consequência adicional',
+  };
+}
+
 function pendingChoicePresentation(gameState, choice) {
   const target = playerName(gameState, choice.playerId);
   const names = {
@@ -825,6 +1321,18 @@ export function buildBossActionPresentation(gameState) {
     };
   }
   if (flow?.stage === 'result') {
+    const bankerStatus = bankerStatusPresentation(gameState);
+
+    if (bankerStatus) {
+      return bankerStatus;
+    }
+
+    const matriarchStatus = matriarchStatusPresentation(gameState);
+
+    if (matriarchStatus) {
+      return matriarchStatus;
+    }
+
     const possessionStatus = possessionPresentation(gameState);
 
     if (possessionStatus) {

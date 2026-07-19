@@ -207,10 +207,10 @@ test('bot compara Garantia, Limite, Agio e Polen por valor e risco', () => {
   const pollen = game('dominadora');
   assert.equal(shouldBossBotTakeDiscard(pollen, 0, {
     intent: { wants: true, action: 'new' },
-    naturePlan: { pollenOnDiscard: true, bloom: 4 },
+    naturePlan: { pollenOnDiscard: true, bloom: 3 },
   }), true);
   assert.equal(shouldBossBotTakeDiscard(pollen, 0, {
-    intent: { wants: true, action: 'new', usesTopImmediately: false },
-    naturePlan: { pollenOnDiscard: true, bloom: 5 },
+    intent: { wants: true, action: 'new' },
+    naturePlan: { pollenOnDiscard: true, bloom: 4 },
   }), false);
 });

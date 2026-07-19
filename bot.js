@@ -98,7 +98,7 @@ export class BuracoBot {
         this.assertActive(engine, signal);
         let boughtFromDiscard = false;
         const naturePlan = engine.getNaturePriorities?.(me.id);
-        if (state.discard.length > 0 && !engine.isDiscardBlocked?.()) {
+        if (state.discard.length > 0 && !engine.isDiscardBlocked?.() && !engine.shouldForceStockDraw?.(me.id)) {
           const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
           const bossAllowsDiscard = !intent || typeof engine.shouldTakeBossDiscard !== 'function'
             || engine.shouldTakeBossDiscard(me.id, intent, naturePlan);
@@ -136,7 +136,9 @@ export class BuracoBot {
         me = state.players[botIndex];
         engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
 
-        await this.processMelds(botIndex, ctx, engine, signal);
+        if (!engine.shouldSkipMelds?.(me.id)) {
+          await this.processMelds(botIndex, ctx, engine, signal);
+        }
         await this.sleep(this.randomDelay(900, 1300), engine, signal);
       } catch (error) {
         if (this.isCancellationError(error)) throw error;
@@ -847,6 +849,13 @@ export class BuracoBot {
 
     if (me.hand.length === 0) return true;
 
+    const labDiscardIndex = engine.selectBossLabDiscardIndex?.(me.id, me.hand);
+    if (Number.isInteger(labDiscardIndex) && labDiscardIndex >= 0 && labDiscardIndex < me.hand.length) {
+      this.assertActive(engine, signal);
+      const discarded = await engine.executeDiscard(botIndex, labDiscardIndex);
+      if (discarded !== false) return true;
+    }
+
     let discardIndex = -1;
     let minDanger = 9999;
     const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
@@ -939,6 +948,10 @@ export class BuracoBot {
   static async sleep(ms, engine, signal) {
     this.assertActive(engine, signal);
 
+    const configuredScale = Number(engine?.botDelayScale);
+    const delayScale = Number.isFinite(configuredScale) && configuredScale > 0 ? configuredScale : 1;
+    const delay = Math.max(20, Math.round(ms * delayScale));
+
     await new Promise((resolve, reject) => {
       let timer = null;
       const abort = () => {
@@ -951,7 +964,7 @@ export class BuracoBot {
       timer = setTimeout(() => {
         signal?.removeEventListener('abort', abort);
         resolve();
-      }, ms);
+      }, delay);
       signal?.addEventListener('abort', abort, { once: true });
     });
 

@@ -33,10 +33,10 @@ export const matriarchDefinition = Object.freeze({
     ability('restorative_dew', 'Orvalho Restaurador', 3, [1, 2, 3], () => 'A cura prevista cai por faixas conforme cartas novas entram legalmente na mesa e zera com 6 cartas.'),
     ability('twin_vines', 'Trepadeiras Gemeas', 4, [2, 3], ({ targetCount = 2 }) => `${targetCount} jogo(s) precisam receber uma carta legal nesta rodada.`),
     ability('graft', 'Enxerto', 3, [2, 3], () => 'Os dois jogos ligados precisam receber uma carta legal nesta rodada.'),
-    ability('discard_pollen', 'Polen do Lixo', 3, [2, 3], () => 'Se o lixo for pego, a carta contaminada precisa ser usada no mesmo turno.'),
+    ability('discard_pollen', 'Polen do Lixo', 3, [2, 3], () => 'Se o topo contaminado for pego, ganho +1 Flor e curo ate 40 HP.'),
     ability('harvest', 'Colheita', 2, [2, 3], () => 'A quantidade de cartas na mao do alvo sera avaliada no fim do turno.'),
     ability('royal_bloom', 'Florescimento Real', 4, [3], ({ targetCount = 0 }) => `${targetCount} objetivo(s) naturais precisam ser cumpridos separadamente.`),
     ability('emerald_cocoon', 'Casulo Esmeralda', 3, [3], () => 'Um casulo de 180 pontos absorvera o dano ate ser rompido.'),
-    ability('spring_crown', 'Coroa da Primavera', 3, [3], () => 'Falhas sucessivas propagam e fortalecem uma Raiz Faminta nesta rodada.'),
+    ability('spring_crown', 'Coroa da Primavera', 3, [3], ({ markedThreatName = 'uma ameaca natural' }) => `A Coroa marca ${markedThreatName}; somente a falha dela prepara uma Raiz Fortalecida.`),
   ]),
 });

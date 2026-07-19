@@ -1,5 +1,5 @@
 import { createDeck } from '../deck.js';
-import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, queueDebugBossAbility, selectNextBossIntent } from './boss-engine.js';
+import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, queueDebugBossAbility, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
 import { getBossDefinition, listBossDefinitions } from './boss-registry.js';
 
 const SUITS = Object.freeze(['\u2660', '\u2666', '\u2663', '\u2665']);
@@ -214,6 +214,12 @@ function configureAbilityState(state, abilityId) {
     replaceHandCardFromAvailableZone(state, 1, '10', '♣', '♠');
   }
   const boss = state.boss;
+  if (abilityId === 'discard_pollen') {
+    // O Laboratorio precisa expor a cura real do Polen, nao apenas a Flor.
+    boss.hp = Math.max(0, boss.maxHp - 100);
+    boss.natureHealingRound = boss.roundNumber;
+    boss.natureHealingThisRound = 0;
+  }
   if (abilityId === 'break_will') boss.chainsByPlayer = { 0: 2, 1: 2 };
   if (abilityId === 'spring_crown') {
     boss.meldIdsByPosition = { '0:0': 'debug_meld_1', '0:1': 'debug_meld_2' };
@@ -346,9 +352,9 @@ function scenarioInstructions(ability, variant, eligibility, state) {
       'ALVO: os dois cooperadores',
       '',
       'COMO TESTAR:',
-      '1. Clique em Executar sucesso para encerrar a rodada preparada e criar as duas escolhas.',
+      '1. Use BOT: executar sucesso para encerrar a rodada preparada e criar as duas escolhas.',
       '2. Biel escolhe entre Comprar 2 cartas presas ou Receber 1 Chicote.',
-      '3. Depois, use Executar acao do bot para a Luana resolver a escolha dela.',
+      '3. Depois, use novamente BOT: executar sucesso para a Luana resolver a escolha dela.',
       '',
       'ESPERADO:',
       'A partida permanece bloqueada ate as duas escolhas terminarem. Se a opcao Prender 1 carta for escolhida, o HUD, a mao e o historico devem identificar exatamente qual carta ficou presa.',
@@ -361,7 +367,7 @@ function scenarioInstructions(ability, variant, eligibility, state) {
       success: 'Cumpra a exigencia usando a menor jogada legal indicada pelo HUD.',
       failure: 'Encerre o prazo da habilidade sem cumprir a exigencia.',
       external_cancel: 'Altere legalmente o alvo antes do prazo e deixe a normalizacao cancelar apenas o efeito impossivel.',
-      reload: 'Mantenha o efeito pendente e use Simular reload antes de agir.',
+      reload: 'Mantenha o efeito pendente e recarregue a pagina antes de agir.',
       undo: 'Execute uma acao legal e use Voltar para restaurar o snapshot transacional.',
       bot: 'O bot e o responsavel pelo alvo ou pela proxima acao automatizavel.',
       no_target: 'A habilidade solicitada nao possui alvo; execute para confirmar a rejeicao e o fallback legal.',
@@ -442,6 +448,14 @@ export function getBossDebugCatalog() {
       targets: targetsForAbility(ability.id),
     })),
   }));
+}
+
+export function canContinueBossDebugScenario(state, config = {}) {
+  return state?.debugScenario?.active === true
+    && state.debugScenario.bossId === config.bossId
+    && state.debugScenario.abilityId === config.abilityId
+    && Number(state.debugScenario.executionCount || 0) === 0
+    && !state.finished;
 }
 
 export function listBossDebugScenarios({ bossId, abilityId }) {
@@ -568,7 +582,7 @@ function addCardToLegalMeld(state, playerId, preferredCardId = null, preferredMe
   return null;
 }
 
-function executeMinimalSuccess(state) {
+function executeMinimalSuccess(state, preferredPlayerId = null) {
   const intent = state.boss?.currentIntent;
   if (!intent) return { executed: false, reason: 'A habilidade nao gerou uma intencao ativa.' };
   if (intent.abilityId === 'final_order') {
@@ -587,8 +601,13 @@ function executeMinimalSuccess(state) {
   }
   const targets = payload.targets || [];
   const targetIndexes = [payload.meldIndex, ...targets.map((entry) => entry?.meldIndex)].filter(Number.isInteger);
+  const orderedPlayers = [...state.players].sort((left, right) => {
+    if (left.id === preferredPlayerId) return -1;
+    if (right.id === preferredPlayerId) return 1;
+    return 0;
+  });
   for (const meldIndex of targetIndexes) {
-    for (const player of state.players) {
+    for (const player of orderedPlayers) {
       const moved = addCardToLegalMeld(state, player.id, null, meldIndex);
       if (moved) return { executed: true, action: 'target_meld_fed', ...moved };
     }
@@ -596,7 +615,7 @@ function executeMinimalSuccess(state) {
   if (intent.abilityId === 'restorative_dew') {
     const moves = [];
     for (let count = 0; count < 6; count += 1) {
-      const moved = state.players.map((player) => addCardToLegalMeld(state, player.id)).find(Boolean);
+      const moved = orderedPlayers.map((player) => addCardToLegalMeld(state, player.id)).find(Boolean);
       if (!moved) break;
       moves.push(moved);
     }
@@ -607,6 +626,10 @@ function executeMinimalSuccess(state) {
 
 function invalidateCurrentTarget(state) {
   const payload = state.boss?.currentIntent?.payload || {};
+  if (state.boss?.currentIntent?.abilityId === 'spring_crown') {
+    const event = resolveBossDebugSpringCrownThreat(state, 'cancelled');
+    return { executed: !!event, action: 'spring_crown_mark_cancelled', resultActionId: event?.actionId || null };
+  }
   if (payload.discardCardId && state.discard.at(-1)?.id === payload.discardCardId) {
     const replacement = state.stock.pop();
     if (replacement) state.discard.push(replacement);
@@ -631,9 +654,125 @@ function invalidateCurrentTarget(state) {
 }
 
 function finishCurrentDebugRound(state) {
+  const startingRound = state.boss?.roundNumber;
+  const playerIds = (state.players || []).map((player) => player.id);
   for (const player of state.players || []) {
     if (!state.boss?.playersActedThisRound?.includes(player.id)) completeBossPlayerTurn(state, player.id);
   }
+
+  // A jogada real do bot pode sincronizar os dois marcadores antes de a
+  // resolucao da rodada chegar ao cliente do Laboratorio. Nesse estado
+  // intermediario nao existe jogador "faltando" para acionar o fechamento.
+  // Reabre somente o ultimo marcador de debug e conclui a mesma rodada.
+  const roundStillOpen = state.boss?.roundNumber === startingRound
+    && !state.boss?.result
+    && !state.boss?.pendingChoices?.length
+    && (!state.boss?.bossFlow || state.boss.bossFlow.stage === 'players')
+    && playerIds.length > 0
+    && playerIds.every((playerId) => state.boss.playersActedThisRound.includes(playerId));
+  if (roundStillOpen) {
+    const closingPlayerId = playerIds.at(-1);
+    state.boss.playersActedThisRound = state.boss.playersActedThisRound.filter((playerId) => playerId !== closingPlayerId);
+    const currentTurnId = `turn_${state.turnNumber}_${closingPlayerId}`;
+    state.boss.resolvedTurnIds = (state.boss.resolvedTurnIds || []).filter((turnId) => turnId !== currentTurnId);
+    completeBossPlayerTurn(state, closingPlayerId);
+  }
+}
+
+function debugEventAbilityId(state, event) {
+  if (!event) return null;
+  if (event.type === 'bossAbility') return event.abilityId || null;
+  if (event.type === 'springCrown') return 'spring_crown';
+  if (event.type !== 'natureThreat') return null;
+  const threat = (state.boss?.natureThreats || []).find((entry) => entry.id === event.threatId);
+  if (event.threatId && event.threatId === state.boss?.springCrown?.markedThreatId) return 'spring_crown';
+  return threat?.sourceAbilityId || null;
+}
+
+function findBossDebugOutcomeEvent(state, abilityId, outcome) {
+  const events = state.boss?.eventLog || [];
+  const desiredStatus = outcome === 'success' ? 'success' : 'failed';
+  const matching = events.filter((event) => debugEventAbilityId(state, event) === abilityId);
+  if (abilityId === 'spring_crown') {
+    return matching.filter((event) => event.type === 'springCrown' && event.status === desiredStatus).at(-1)
+      || matching.filter((event) => event.type === 'springCrown').at(-1)
+      || null;
+  }
+  const exactNature = matching.filter((event) => event.type === 'natureThreat' && event.status === desiredStatus).at(-1);
+  if (exactNature) return exactNature;
+  return matching.filter((event) => event.type === 'natureThreat').at(-1)
+    || matching.filter((event) => event.type === 'bossAbility').at(-1)
+    || null;
+}
+
+function holdBossDebugResult(state, event, outcome) {
+  const boss = state.boss;
+  if (!boss || !event?.actionId) return false;
+  const now = Date.now();
+  boss.currentIntent = null;
+  boss.awaitingBossTurn = false;
+  boss.bossFlow = {
+    id: `boss_debug_result_${boss.roundNumber}_${boss.actionSequence}`,
+    stage: 'result',
+    queue: [],
+    startedAt: now,
+    endsAt: Number.MAX_SAFE_INTEGER,
+    eventActionId: event.actionId,
+    phase: boss.phase,
+    phaseTransitionId: null,
+    debugSelection: false,
+  };
+  boss.presentationUntil = Number.MAX_SAFE_INTEGER;
+  state.debugScenario.pauseAutomation = true;
+  state.debugScenario.heldResultActionId = event.actionId;
+  state.debugScenario.heldOutcome = outcome;
+  return true;
+}
+
+export function applyBossDebugBotOutcome(state, outcome, playerId) {
+  if (!state?.debugScenario?.active) throw new Error('Nenhum cenario do Laboratorio esta ativo.');
+  if (!['success', 'failure'].includes(outcome)) throw new Error(`Resultado do bot desconhecido: ${outcome}.`);
+  delete state.debugScenario.heldResultActionId;
+  delete state.debugScenario.heldOutcome;
+  driveBossPresentationToPlayers(state);
+  if (state.debugScenario.abilityId === 'spring_crown') {
+    const event = resolveBossDebugSpringCrownThreat(state, outcome === 'success' ? 'success' : 'failed');
+    return {
+      executed: !!event,
+      action: outcome === 'success' ? 'spring_crown_mark_succeeded' : 'spring_crown_mark_failed',
+      playerId,
+      resultActionId: event?.actionId || null,
+    };
+  }
+  return {
+    executed: true,
+    action: outcome === 'success' ? 'bot_success_policy_active' : 'bot_failure_policy_active',
+    playerId,
+  };
+}
+
+export function completeBossDebugBotOutcome(state, outcome, playerId, preparedResult = null) {
+  if (!state?.debugScenario?.active) throw new Error('Nenhum cenario do Laboratorio esta ativo.');
+  finishCurrentDebugRound(state);
+  const abilityId = state.debugScenario.abilityId;
+  const resultEvent = findBossDebugOutcomeEvent(state, abilityId, outcome);
+  const held = holdBossDebugResult(state, resultEvent, outcome);
+  const actualOutcome = resultEvent?.type === 'natureThreat' ? resultEvent.status : null;
+  const requestedStatus = outcome === 'success' ? 'success' : 'failed';
+  const result = {
+    executed: held,
+    action: outcome === 'success' ? 'bot_success_completed' : 'bot_failure_completed',
+    playerId,
+    preparedAction: preparedResult?.action || null,
+    resultActionId: resultEvent?.actionId || null,
+    requestedOutcome: outcome,
+    actualOutcome,
+    matchedRequestedOutcome: actualOutcome == null || actualOutcome === requestedStatus,
+    reason: held ? null : `Nenhum resultado de ${abilityId} foi encontrado para manter no painel.`,
+  };
+  state.debugScenario.executionCount = (state.debugScenario.executionCount || 0) + 1;
+  state.debugScenario.lastExecution = { ...result, at: Date.now() };
+  return result;
 }
 
 export function executeBossDebugScenarioVariant(state) {
