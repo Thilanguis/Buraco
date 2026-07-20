@@ -49,16 +49,29 @@ const BANKER_CONTRACTS = Object.freeze({
   ]),
 });
 
+function fixedInterestHolder(gameState) {
+  const players = (gameState.players || []).filter((player) => player?.id != null);
+  if (!players.length) return null;
+  const boss = gameState.boss || {};
+  const eligible = players.filter((player) => !boss.vaultsByPlayer?.[player.id] && player.hand?.some((card) => card?.id));
+
+  // Com dois titulares elegíveis, a escolha é uniforme: 50% para cada um.
+  // O sorteio usa a seed da partida para permanecer estável em reload/sincronização.
+  return chooseSeeded(eligible.length ? eligible : players, gameState, 31);
+}
+
 function weightedContract(gameState) {
   const roll = seededUnit(bossSeed(gameState, 13));
   const index = roll < 0.25 ? 0 : roll < 0.75 ? 1 : 2;
   const contract = (gameState.boss.phase === 3 ? BANKER_CONTRACTS.late : BANKER_CONTRACTS.early)[index];
+  const holder = fixedInterestHolder(gameState);
   return {
     contractTier: contract.tier,
     fullDebt: contract.fullDebt,
     guaranteedDebt: contract.guaranteedDebt,
     amount: contract.fullDebt,
     collateralAmount: contract.guaranteedDebt,
+    holderPlayerId: holder?.id ?? null,
     rollEventId: `contract_${gameState.boss.roundNumber}_${gameState.boss.actionSequence + 1}`,
   };
 }
@@ -828,6 +841,7 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     damagedCardIds: [],
     suppressedDamageCardIds: [],
     vaultsByPlayer: {},
+    lastFixedInterestHolderPlayerId: null,
     possessions: [],
     activeOrders: [],
     interdicts: [],
@@ -886,6 +900,7 @@ export function normalizeBossState(gameState) {
   // cards are always accounted immediately, including migrated snapshots.
   boss.suppressedDamageCardIds = [];
   boss.vaultsByPlayer ||= {};
+  boss.lastFixedInterestHolderPlayerId ??= null;
   boss.possessions ||= [];
   boss.activeOrders ||= [];
   boss.interdicts ||= [];
@@ -953,9 +968,33 @@ export function normalizeBossState(gameState) {
   }
   boss.stats ||= { totalDamage: 0, canastrasFormed: 0, largestAttack: 0, finalStrike: 0, finalDebt: 0 };
 
+  if (boss.currentIntent?.abilityId === 'fixed_interest' && boss.currentIntent.payload?.holderPlayerId == null) {
+    const holder = fixedInterestHolder(gameState);
+    boss.currentIntent.payload.holderPlayerId = holder?.id ?? null;
+  }
+
   Object.entries(boss.vaultsByPlayer).forEach(([playerId, vault]) => {
     const ownerExists = (gameState.players || []).some((player) => String(player.id) === String(playerId));
-    if (!ownerExists || !vault?.card?.id) delete boss.vaultsByPlayer[playerId];
+    if (!ownerExists || !vault?.card?.id) {
+      delete boss.vaultsByPlayer[playerId];
+      return;
+    }
+    const fallbackBase = boss.phase === 3 ? 5 : 3;
+    vault.baseDebt = Math.max(0, Number(vault.baseDebt ?? vault.collateralAmount ?? fallbackBase) || 0);
+    vault.maxDebt = Math.max(vault.baseDebt, Number(vault.maxDebt ?? vault.fullDebt ?? (vault.baseDebt + 3)) || vault.baseDebt);
+    vault.currentDebt = clamp(
+      Number(vault.currentDebt ?? (vault.baseDebt + Number(vault.interestDebt ?? vault.accruedInterest ?? 0))) || vault.baseDebt,
+      vault.baseDebt,
+      vault.maxDebt,
+    );
+    vault.interestDebt = vault.currentDebt - vault.baseDebt;
+    vault.deferredTurns = Math.max(0, Number(vault.deferredTurns ?? vault.interestDebt) || 0);
+    vault.interestStep = Math.max(1, Number(vault.interestStep) || 1);
+    vault.state = vault.state === 'locked' || vault.state === 'open'
+      ? vault.state
+      : (vault.deferredTurns > 0 || vault.requiredDraw ? 'open' : 'locked');
+    vault.ownerTurnsStarted = Math.max(0, Number(vault.ownerTurnsStarted) || (vault.state === 'open' ? 2 : 0));
+    vault.requiredDraw = vault.state === 'open' && vault.currentDebt >= vault.maxDebt;
   });
 
   const teamMelds = gameState.teams?.[0]?.melds || [];
@@ -1270,6 +1309,9 @@ export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId
     intentAnnouncedAt: null,
     intentAppliedAt: null,
   };
+  if (entry.id === 'fixed_interest' && payload.holderPlayerId != null) {
+    boss.lastFixedInterestHolderPlayerId = payload.holderPlayerId;
+  }
   return boss.currentIntent;
 }
 
@@ -2398,17 +2440,17 @@ export function chooseBossFixedInterestBotOption(gameState, choice) {
   if (choice.type !== 'fixed_interest_payment') return choice.options[0];
   const amount = Math.max(0, Number(choice.amount) || 0);
   const collateralAmount = Math.max(0, Number(choice.collateralAmount) || 0);
-  const candidates = choice.options.filter((option) => option.startsWith('guarantee:')).map((option) => {
-    const playerId = Number(option.split(':')[1]);
-    const player = (gameState.players || []).find((entry) => entry.id === playerId);
-    const card = (player?.hand || []).filter((entry) => entry?.id)
-      .sort((a, b) => botCardUtility(gameState, player, a) - botCardUtility(gameState, player, b))[0];
-    return { option, utility: card ? botCardUtility(gameState, player, card) : Number.POSITIVE_INFINITY };
-  }).filter((entry) => Number.isFinite(entry.utility)).sort((a, b) => a.utility - b.utility);
-  if (!candidates.length) return 'full';
+  const guaranteeOption = choice.options.find((option) => option === 'guarantee' || option.startsWith('guarantee:'));
+  const holderId = guaranteeOption?.startsWith('guarantee:')
+    ? Number(guaranteeOption.split(':')[1])
+    : choice.playerId;
+  const holder = (gameState.players || []).find((entry) => entry.id === holderId);
+  const eligibleCards = (holder?.hand || []).filter((entry) => entry?.id);
+  if (!guaranteeOption || !eligibleCards.length || boss.vaultsByPlayer?.[holderId]) return 'full';
   const fullRisk = (boss.danger + amount) / Math.max(1, boss.maxDanger);
-  const savings = Math.max(0, amount - collateralAmount);
-  if (fullRisk >= 1 || fullRisk >= 0.72 || candidates[0].utility <= savings * 12) return candidates[0].option;
+  const averageUtility = eligibleCards.reduce((sum, card) => sum + botCardUtility(gameState, holder, card), 0) / eligibleCards.length;
+  // Como a carta é aleatória, o bot avalia o valor médio da mão, não a pior carta disponível.
+  if (fullRisk >= 1 || fullRisk >= 0.72 || averageUtility <= 42) return guaranteeOption;
   return 'full';
 }
 
@@ -2523,33 +2565,69 @@ export function resolveBossChoice(gameState, playerId, option) {
       boss.pendingChoices = boss.pendingChoices.filter((entry) => entry.id !== choice.id);
       dangerDelta = choice.amount;
       outcome = `Juros Fixos: Divida +${dangerDelta}.`;
-    } else if (choice.type === 'fixed_interest_payment' && option.startsWith('guarantee:')) {
-      collateralPlayerId = Number(option.split(':')[1]);
+    } else if (choice.type === 'fixed_interest_payment' && (option === 'guarantee' || option.startsWith('guarantee:'))) {
+      // Saves antigos podem trazer guarantee:<id>. No fluxo atual o titular é sorteado antes
+      // e o Banqueiro apreende uma carta aleatória da própria mão desse titular.
+      collateralPlayerId = option.startsWith('guarantee:') ? Number(option.split(':')[1]) : choice.playerId;
       const guarantor = gameState.players?.find((player) => player.id === collateralPlayerId);
-      const cardOptions = (guarantor?.hand || []).filter((card) => card?.id).map((card) => `card:${card.id}`);
-      if (!guarantor || boss.vaultsByPlayer[collateralPlayerId] || !cardOptions.length) return null;
+      const eligibleCards = (guarantor?.hand || []).filter((card) => card?.id);
+      if (!guarantor || boss.vaultsByPlayer[collateralPlayerId] || !eligibleCards.length) return null;
+      const card = chooseSeeded(eligibleCards, gameState, 47 + Number(collateralPlayerId || 0));
+      const cardIndex = guarantor.hand.findIndex((entry) => entry?.id === card?.id);
+      if (!card || cardIndex < 0) return null;
       boss.pendingChoices = boss.pendingChoices.filter((entry) => entry.id !== choice.id);
-      enqueueChoice(boss, collateralPlayerId, 'banker_collateral_card', cardOptions, {
-        amount: choice.amount,
-        collateralAmount: choice.collateralAmount,
-      });
-      outcome = `${guarantor.name} foi escolhido como garantidor e deve enviar uma carta ao Cofre.`;
+      const [storedCard] = guarantor.hand.splice(cardIndex, 1);
+      collateralCardId = storedCard.id;
+      const baseDebt = Math.max(0, Number(choice.collateralAmount) || 0);
+      const maxDebt = Math.max(baseDebt, Number(choice.amount) || baseDebt);
+      boss.vaultsByPlayer[collateralPlayerId] = {
+        playerId: collateralPlayerId,
+        card: storedCard,
+        sourceAbilityId: 'fixed_interest',
+        storedAtRound: boss.roundNumber,
+        baseDebt,
+        currentDebt: baseDebt,
+        maxDebt,
+        interestDebt: 0,
+        interestStep: 1,
+        deferredTurns: 0,
+        state: 'locked',
+        ownerTurnsStarted: gameState.currentPlayer === collateralPlayerId ? 1 : 0,
+        lastPreparedTurnKey: gameState.currentPlayer === collateralPlayerId
+          ? `${gameState.turnNumber ?? 0}:${collateralPlayerId}`
+          : null,
+        requiredDraw: false,
+      };
+      outcome = `${guarantor.name} aceitou a Garantia. O Banqueiro apreendeu ${compactCardLabel(storedCard)}; o resgate começa em Dívida +${baseDebt}.`;
     } else if (choice.type === 'banker_collateral_card' && option.startsWith('card:')) {
+      // Compatibilidade com saves antigos que já estavam na etapa de escolher a carta.
       const guarantor = gameState.players?.find((player) => player.id === playerId);
       collateralCardId = option.slice(5);
       const cardIndex = guarantor?.hand?.findIndex((card) => card?.id === collateralCardId) ?? -1;
       if (!guarantor || cardIndex < 0 || boss.vaultsByPlayer[playerId]) return null;
       boss.pendingChoices = boss.pendingChoices.filter((entry) => entry.id !== choice.id);
       const [card] = guarantor.hand.splice(cardIndex, 1);
+      const baseDebt = Math.max(0, Number(choice.collateralAmount) || 0);
+      const maxDebt = Math.max(baseDebt, Number(choice.amount) || baseDebt);
       boss.vaultsByPlayer[playerId] = {
         playerId,
         card,
         sourceAbilityId: 'fixed_interest',
         storedAtRound: boss.roundNumber,
-        requiredDraw: true,
+        baseDebt,
+        currentDebt: baseDebt,
+        maxDebt,
+        interestDebt: 0,
+        interestStep: 1,
+        deferredTurns: 0,
+        state: 'locked',
+        ownerTurnsStarted: gameState.currentPlayer === playerId ? 1 : 0,
+        lastPreparedTurnKey: gameState.currentPlayer === playerId
+          ? `${gameState.turnNumber ?? 0}:${playerId}`
+          : null,
+        requiredDraw: false,
       };
-      dangerDelta = choice.collateralAmount;
-      outcome = `${guarantor.name} enviou ${compactCardLabel(card)} ao Cofre. Juros Fixos: Divida +${dangerDelta}.`;
+      outcome = `${guarantor.name} enviou ${compactCardLabel(card)} ao Cofre; o resgate começa em Dívida +${baseDebt}.`;
     } else {
       return null;
     }
@@ -2568,6 +2646,7 @@ export function resolveBossChoice(gameState, playerId, option) {
       dangerChangeLabel: dangerDelta ? `Juros Fixos: Divida +${dangerDelta}` : '',
       collateralPlayerId,
       collateralCardId,
+      vaultSound: collateralCardId ? 'close' : null,
     });
     confirmBankerDebtDefeat(gameState, event.actionId);
     if (!boss.pendingChoices.length && !boss.currentIntent && !boss.result) {
@@ -3098,28 +3177,131 @@ export function getBossVault(gameState, playerId) {
   return boss?.id === 'banker' ? boss.vaultsByPlayer?.[playerId] || null : null;
 }
 
+export function getBossVaultQuote(gameState, playerId) {
+  const vault = getBossVault(gameState, playerId);
+  if (!vault) return null;
+  const baseDebt = Math.max(0, Number(vault.baseDebt) || 0);
+  const maxDebt = Math.max(baseDebt, Number(vault.maxDebt) || baseDebt);
+  const currentDebt = clamp(Number(vault.currentDebt ?? (baseDebt + Number(vault.interestDebt || 0))) || baseDebt, baseDebt, maxDebt);
+  const interestDebt = currentDebt - baseDebt;
+  const state = vault.state === 'open' ? 'open' : 'locked';
+  return {
+    state,
+    baseDebt,
+    interestDebt,
+    currentDebt,
+    totalDebt: currentDebt,
+    maxDebt,
+    deferredTurns: Math.max(0, Number(vault.deferredTurns) || 0),
+    ownerTurnsStarted: Math.max(0, Number(vault.ownerTurnsStarted) || 0),
+    forced: state === 'open' && currentDebt >= maxDebt,
+    canDefer: state === 'open' && currentDebt < maxDebt,
+  };
+}
+
 export function isBossVaultDrawRequired(gameState, playerId = gameState?.currentPlayer) {
-  return !!getBossVault(gameState, playerId) && !gameState?.hasDrawnThisTurn;
+  const quote = getBossVaultQuote(gameState, playerId);
+  return !!quote?.forced && !gameState?.hasDrawnThisTurn;
+}
+
+export function prepareBossVaultTurn(gameState, playerId = gameState?.currentPlayer) {
+  const boss = normalizeBossState(gameState);
+  const vault = getBossVault(gameState, playerId);
+  const player = gameState.players?.find((entry) => entry.id === playerId);
+  if (!boss || !vault || !player || vault.state !== 'locked' || gameState.currentPlayer !== playerId) return null;
+  const turnKey = `${gameState.turnNumber ?? 0}:${playerId}`;
+  if (vault.lastPreparedTurnKey === turnKey) return null;
+  vault.lastPreparedTurnKey = turnKey;
+  vault.ownerTurnsStarted = Math.max(0, Number(vault.ownerTurnsStarted) || 0) + 1;
+  if (vault.ownerTurnsStarted < 2) return null;
+
+  vault.state = 'open';
+  vault.openedAtTurnKey = turnKey;
+  vault.currentDebt = Math.max(vault.baseDebt, Number(vault.currentDebt) || vault.baseDebt);
+  vault.interestDebt = vault.currentDebt - vault.baseDebt;
+  vault.requiredDraw = vault.currentDebt >= vault.maxDebt;
+  boss.actionSequence += 1;
+  return recordEvent(boss, {
+    type: 'vaultOpened',
+    actionId: `vault_open_${playerId}_${boss.actionSequence}`,
+    playerId,
+    cardId: vault.card.id,
+    cardLabel: compactCardLabel(vault.card),
+    vaultSound: 'open',
+    baseDebt: vault.baseDebt,
+    currentDebt: vault.currentDebt,
+    outcome: `O Cofre de ${player.name} foi aberto. O resgate custa Dívida +${vault.currentDebt}.`,
+  });
+}
+
+export function deferBossVault(gameState, playerId) {
+  const boss = normalizeBossState(gameState);
+  const vault = getBossVault(gameState, playerId);
+  const quote = getBossVaultQuote(gameState, playerId);
+  const player = gameState.players?.find((entry) => entry.id === playerId);
+  if (!boss || !vault || !quote || !quote.canDefer || !player || gameState.currentPlayer !== playerId || !gameState.hasDrawnThisTurn || boss.pendingChoices.length || isBossTurnActive(gameState)) return null;
+  const turnKey = `${gameState.turnNumber ?? 0}:${playerId}`;
+  if (vault.lastInterestTurnKey === turnKey) return null;
+  vault.lastInterestTurnKey = turnKey;
+  vault.deferredTurns = quote.deferredTurns + 1;
+  vault.currentDebt = Math.min(quote.maxDebt, quote.currentDebt + Math.max(1, Number(vault.interestStep) || 1));
+  vault.interestDebt = vault.currentDebt - quote.baseDebt;
+  vault.requiredDraw = vault.currentDebt >= quote.maxDebt;
+  boss.actionSequence += 1;
+  const updated = getBossVaultQuote(gameState, playerId);
+  return recordEvent(boss, {
+    type: 'vaultInterest',
+    actionId: `vault_interest_${playerId}_${boss.actionSequence}`,
+    playerId,
+    cardId: vault.card.id,
+    cardLabel: compactCardLabel(vault.card),
+    interestDebt: updated.interestDebt,
+    totalDebt: updated.totalDebt,
+    maxDebt: updated.maxDebt,
+    outcome: updated.forced
+      ? `${player.name} deixou a garantia no Cofre. O resgate chegou a Dívida +${updated.totalDebt} e será obrigatório no próximo turno.`
+      : `${player.name} deixou a garantia no Cofre. O resgate agora custa Dívida +${updated.totalDebt}.`,
+  });
 }
 
 export function reclaimBossVault(gameState, playerId) {
   const boss = normalizeBossState(gameState);
   const vault = getBossVault(gameState, playerId);
+  const quote = getBossVaultQuote(gameState, playerId);
   const player = gameState.players?.find((entry) => entry.id === playerId);
-  if (!boss || !vault || !player || gameState.currentPlayer !== playerId || gameState.hasDrawnThisTurn || boss.pendingChoices.length || isBossTurnActive(gameState)) return null;
+  if (!boss || !vault || !quote || quote.state !== 'open' || !player || gameState.currentPlayer !== playerId || gameState.hasDrawnThisTurn || boss.pendingChoices.length || isBossTurnActive(gameState)) return null;
   player.hand.push(vault.card);
   delete boss.vaultsByPlayer[playerId];
   gameState.hasDrawnThisTurn = true;
   gameState.partialDraw = false;
+  boss.danger = clamp(boss.danger + quote.totalDebt, 0, boss.maxDanger);
   boss.actionSequence += 1;
-  return recordEvent(boss, {
+  const event = recordEvent(boss, {
     type: 'vaultReclaim',
     actionId: `vault_reclaim_${playerId}_${boss.actionSequence}`,
     playerId,
     cardId: vault.card.id,
     cardLabel: compactCardLabel(vault.card),
-    outcome: `${player.name} recuperou a garantia do Cofre; a compra do turno foi concluida.`,
+    dangerDelta: quote.totalDebt,
+    danger: boss.danger,
+    dangerChangeLabel: `Resgate do Cofre: Dívida +${quote.totalDebt}`,
+    baseDebt: quote.baseDebt,
+    interestDebt: quote.interestDebt,
+    outcome: `${player.name} resgatou ${compactCardLabel(vault.card)} no lugar da compra e recebeu Dívida +${quote.totalDebt}.`,
   });
+  event.defeatEvent = confirmBankerDebtDefeat(gameState, event.actionId);
+  return event;
+}
+
+export function shouldBossBotReclaimVault(gameState, playerId) {
+  const vault = getBossVault(gameState, playerId);
+  const quote = getBossVaultQuote(gameState, playerId);
+  const player = gameState.players?.find((entry) => entry.id === playerId);
+  if (!vault || !quote || !player) return false;
+  if (quote.forced) return true;
+  const utility = botCardUtility(gameState, player, vault.card);
+  // Carta útil volta cedo; carta ruim tende a acumular juros até a cobrança obrigatória.
+  return utility >= 58 || (quote.interestDebt >= 2 && utility >= 38);
 }
 
 export function consumeBossExtraDraw(gameState, playerId) {
@@ -3429,17 +3611,21 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
   } else if (intent.abilityId === 'fixed_interest') {
     const amount = intent.payload.fullDebt ?? intent.payload.amount ?? (intent.announcedPhase === 3 ? 8 : 6);
     const collateralAmount = intent.payload.guaranteedDebt ?? intent.payload.collateralAmount ?? (intent.announcedPhase === 3 ? 5 : 3);
-    const eligibleGuarantors = (gameState.players || []).filter((player) => !boss.vaultsByPlayer[player.id] && player.hand?.some((card) => card?.id));
-    if (eligibleGuarantors.length) {
-      const decisionPlayer = gameState.players.find((player) => !String(player.name || '').toUpperCase().includes('BOT')) || gameState.players[0];
-      enqueueChoice(boss, decisionPlayer?.id, 'fixed_interest_payment', [
-        'full',
-        ...eligibleGuarantors.map((player) => `guarantee:${player.id}`),
-      ], { amount, collateralAmount });
-      outcome = `Juros Fixos exige pagamento integral de ${amount} ou uma garantia no Cofre.`;
+    const holder = (gameState.players || []).find((player) => player.id === intent.payload.holderPlayerId)
+      || fixedInterestHolder(gameState)
+      || gameState.players?.[0];
+    const guaranteeAvailable = !!holder && !boss.vaultsByPlayer[holder.id] && holder.hand?.some((card) => card?.id);
+    if (holder && guaranteeAvailable) {
+      enqueueChoice(boss, holder.id, 'fixed_interest_payment', ['full', 'guarantee'], {
+        amount,
+        collateralAmount,
+        holderPlayerId: holder.id,
+        contractTier: intent.payload.contractTier,
+      });
+      outcome = `${holder.name} deve escolher entre Dívida +${amount} agora ou aceitar o Cofre. No Cofre, uma carta aleatória é apreendida e o resgate começa em Dívida +${collateralAmount}.`;
     } else {
       dangerDelta = amount;
-      outcome = `Juros Fixos: Dívida +${dangerDelta}. Sem vaga de garantia disponível.`;
+      outcome = `Juros Fixos: Dívida +${dangerDelta}. A garantia do titular estava indisponível.`;
     }
   } else if (intent.abilityId === 'maintenance_fee') {
     const extraDraw = intent.payload.extraDraw ?? (intent.announcedPhase === 3 ? 2 : 1);
@@ -3565,6 +3751,7 @@ export function completeBossPlayerTurn(gameState, playerId) {
           : 'Todas as Cartas Financiadas foram usadas ou descartadas; nenhuma Dívida foi aplicada.',
       });
     }
+    deferBossVault(gameState, playerId);
   }
 
   if (boss.id === 'dominadora') {

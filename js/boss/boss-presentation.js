@@ -1,6 +1,16 @@
 import { getBossDefinition } from './boss-registry.js';
 import { getRestorativeDewHealing } from './boss-balance.js';
 
+const BANKER_CONTRACT_TIER_LABELS = Object.freeze({
+  mild: 'Leve',
+  standard: 'Padrão',
+  severe: 'Severo',
+});
+
+function bankerContractTierLabel(tier) {
+  return BANKER_CONTRACT_TIER_LABELS[tier] || 'Padrão';
+}
+
 const BANKER_SPEECHES = Object.freeze({
   fixed_interest: 'O prazo acabou. Agora paguem os juros.',
   maintenance_fee: 'Nada e gratis na minha mesa.',
@@ -107,13 +117,7 @@ const chains = (gameState, playerId) => gameState.boss?.chainsByPlayer?.[playerI
 
 function cardLabelAnywhere(gameState, cardId) {
   if (!cardId) return 'carta marcada';
-  const zones = [
-    ...(gameState.players || []).map((player) => player.hand || []),
-    ...(gameState.teams || []).flatMap((team) => team.melds || []),
-    gameState.discard || [],
-    gameState.stock || [],
-    ...(gameState.deadPiles || []),
-  ];
+  const zones = [...(gameState.players || []).map((player) => player.hand || []), ...(gameState.teams || []).flatMap((team) => team.melds || []), gameState.discard || [], gameState.stock || [], ...(gameState.deadPiles || [])];
   const card = zones.flat().find((entry) => entry?.id === cardId);
   return card ? `${card.rank}${card.suit}` : 'carta marcada';
 }
@@ -169,13 +173,7 @@ function royalBloomProgress(gameState, intent) {
   const completed = threats.filter((threat) => threat.status === 'success').length;
   const lines = threats.map((threat) => {
     const marker = threat.status === 'success' ? '☑' : threat.status === 'failed' ? '✕' : threat.status === 'cancelled' ? '—' : '☐';
-    const result = threat.status === 'success'
-      ? ' · concluído'
-      : threat.status === 'failed'
-        ? ` · falhou${threat.bloomApplied ? ` (+${threat.bloomApplied} Flor)` : ''}`
-        : threat.status === 'cancelled'
-          ? ' · cancelado sem efeito'
-          : '';
+    const result = threat.status === 'success' ? ' · concluído' : threat.status === 'failed' ? ` · falhou${threat.bloomApplied ? ` (+${threat.bloomApplied} Flor)` : ''}` : threat.status === 'cancelled' ? ' · cancelado sem efeito' : '';
     return `${marker} ${royalBloomObjectiveLabel(gameState, threat)}${result}`;
   });
   return [`${completed}/${threats.length} concluídos`, ...lines].join('\n');
@@ -220,7 +218,7 @@ function compactNatureProgress(gameState, intent) {
   if (intent.abilityId === 'harvest') {
     const player = playerById(gameState, intent.payload?.targetPlayerId);
     const threat = threats[0];
-    const cards = Number.isFinite(Number(threat?.observedHandSize)) ? Number(threat.observedHandSize) : (player?.hand?.length || 0);
+    const cards = Number.isFinite(Number(threat?.observedHandSize)) ? Number(threat.observedHandSize) : player?.hand?.length || 0;
     const reductionNeeded = Math.max(0, cards - 7);
     if (threat?.status === 'success') return `✅ COLHEITA EVITADA · terminou com ${cards} carta${cards === 1 ? '' : 's'}`;
     if (threat?.status === 'failed') {
@@ -255,27 +253,17 @@ const CROWN_THREAT_NAMES = Object.freeze({
 function springCrownMarkedThreat(gameState) {
   const boss = gameState.boss;
   const crown = boss?.springCrown;
-  const announcedIntent = boss?.currentIntent?.abilityId === 'spring_crown'
-    ? boss.currentIntent
-    : null;
+  const announcedIntent = boss?.currentIntent?.abilityId === 'spring_crown' ? boss.currentIntent : null;
   const markedThreatId = crown?.markedThreatId || announcedIntent?.payload?.markedThreatId || null;
-  return markedThreatId
-    ? (boss?.natureThreats || []).find((threat) => threat.id === markedThreatId) || null
-    : null;
+  return markedThreatId ? (boss?.natureThreats || []).find((threat) => threat.id === markedThreatId) || null : null;
 }
 
 function crownThreatName(gameState) {
   const boss = gameState.boss;
   const crown = boss?.springCrown;
-  const announcedIntent = boss?.currentIntent?.abilityId === 'spring_crown'
-    ? boss.currentIntent
-    : null;
+  const announcedIntent = boss?.currentIntent?.abilityId === 'spring_crown' ? boss.currentIntent : null;
   const threat = springCrownMarkedThreat(gameState);
-  return crown?.markedThreatName
-    || announcedIntent?.payload?.markedThreatName
-    || CROWN_THREAT_NAMES[threat?.type]
-    || threat?.name
-    || 'Ameaca natural';
+  return crown?.markedThreatName || announcedIntent?.payload?.markedThreatName || CROWN_THREAT_NAMES[threat?.type] || threat?.name || 'Ameaca natural';
 }
 
 function crownThreatObjective(gameState, threat) {
@@ -285,9 +273,7 @@ function crownThreatObjective(gameState, threat) {
   }
   if (['pollen', 'royal_pollen'].includes(threat.type)) return `Nao recolher ${cardLabelAnywhere(gameState, threat.discardCardId)} do lixo.`;
   if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
-    return threat.strengthened
-      ? `Cada cooperador deve adicionar uma carta legal ao Jogo ${Number(threat.meldIndex) + 1}.`
-      : `Adicionar uma carta legal ao Jogo ${Number(threat.meldIndex) + 1}.`;
+    return threat.strengthened ? `Cada cooperador deve adicionar uma carta legal ao Jogo ${Number(threat.meldIndex) + 1}.` : `Adicionar uma carta legal ao Jogo ${Number(threat.meldIndex) + 1}.`;
   }
   if (threat.type === 'graft') return 'Adicionar uma carta legal em cada um dos dois jogos ligados.';
   if (threat.type === 'dew') return 'Colocar 6 cartas novas na mesa para zerar a cura preparada.';
@@ -302,9 +288,7 @@ function crownThreatProgress(threat) {
   if (threat.status === 'cancelled') return 'Cancelada · sem punicao';
   if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
     const required = threat.strengthened ? threat.requiredContributorCount || 2 : 1;
-    const current = threat.strengthened
-      ? new Set(threat.contributorPlayerIds || []).size
-      : Math.min(1, new Set(threat.progressCardIds || []).size);
+    const current = threat.strengthened ? new Set(threat.contributorPlayerIds || []).size : Math.min(1, new Set(threat.progressCardIds || []).size);
     return `${current}/${required} · Pendente`;
   }
   if (threat.type === 'graft') return `${new Set(threat.fedMeldIds || []).size}/2 · Pendente`;
@@ -537,15 +521,13 @@ function matriarchDetails(gameState, intent) {
       ]);
     case 'royal_bloom': {
       const threats = natureThreatsForIntent(gameState, intent);
-      const objectives = threats.length ? threats : (payload.objectives || []).map((objective) => ({
-        ...objective,
-        type: objective.type === 'seed' ? 'royal_seed' : objective.type === 'root' ? 'royal_root' : 'royal_pollen',
-      }));
-      return detailFields([
-        ...objectives.map((objective, index) => [`Objetivo ${index + 1}`, royalBloomObjectiveLabel(gameState, objective)]),
-        ['Falha por objetivo', '+1 Flor, sem cura'],
-        ['Raiz falha', 'pode solicitar uma propagacao'],
-      ]);
+      const objectives = threats.length
+        ? threats
+        : (payload.objectives || []).map((objective) => ({
+            ...objective,
+            type: objective.type === 'seed' ? 'royal_seed' : objective.type === 'root' ? 'royal_root' : 'royal_pollen',
+          }));
+      return detailFields([...objectives.map((objective, index) => [`Objetivo ${index + 1}`, royalBloomObjectiveLabel(gameState, objective)]), ['Falha por objetivo', '+1 Flor, sem cura'], ['Raiz falha', 'pode solicitar uma propagacao']]);
     }
     case 'emerald_cocoon':
       return detailFields([
@@ -575,12 +557,14 @@ function compactAction(gameState, intent) {
   const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
   const collarCards = cardLabels(gameState, payload.targetPlayerId, payload.cardIds || (payload.cardId ? [payload.cardId] : []));
   switch (intent.abilityId) {
-    case 'fixed_interest':
+    case 'fixed_interest': {
+      const holder = playerName(gameState, payload.holderPlayerId);
       return {
-        instruction: `Contrato ${payload.contractTier || 'Padrao'}: ao fim da rodada, pague tudo ou deixe uma garantia.`,
-        progress: compactBankerProgress(gameState, intent),
-        consequence: `Integral: +${payload.fullDebt ?? payload.amount} · Garantia: +${payload.guaranteedDebt ?? payload.collateralAmount}`,
+        instruction: `${holder} decide o pagamento no fim da rodada.`,
+        progress: `Contrato ${bankerContractTierLabel(payload.contractTier)} · Titular sorteado: ${holder}`,
+        consequence: `Integral: +${payload.fullDebt ?? payload.amount} Dívida · Cofre: carta aleatória; resgate começa em +${payload.guaranteedDebt ?? payload.collateralAmount}`,
       };
+    }
     case 'maintenance_fee':
       return { instruction: `Cada jogador comprara +${payload.extraDraw} carta(s).`, progress: compactBankerProgress(gameState, intent), consequence: 'Compra extra inevitavel' };
     case 'credit_block':
@@ -711,22 +695,14 @@ function compactAction(gameState, intent) {
       const amount = payload.amount || 180;
       const events = boss?.eventLog || [];
       const activationActionId = intent.immediateEventActionId;
-      let activationIndex = activationActionId
-        ? events.findIndex((entry) => entry.actionId === activationActionId)
-        : -1;
+      let activationIndex = activationActionId ? events.findIndex((entry) => entry.actionId === activationActionId) : -1;
 
       if (activationIndex < 0) {
-        activationIndex = events.findLastIndex?.((entry) => (
-          entry.type === 'bossAbility' && entry.abilityId === 'emerald_cocoon'
-        )) ?? -1;
+        activationIndex = events.findLastIndex?.((entry) => entry.type === 'bossAbility' && entry.abilityId === 'emerald_cocoon') ?? -1;
       }
 
-      const eventsAfterActivation = activationIndex >= 0
-        ? events.slice(activationIndex + 1)
-        : events.slice(-1);
-      const breakEvent = [...eventsAfterActivation].reverse().find((entry) => (
-        entry.type === 'bossDamage' && entry.cocoonBroken
-      ));
+      const eventsAfterActivation = activationIndex >= 0 ? events.slice(activationIndex + 1) : events.slice(-1);
+      const breakEvent = [...eventsAfterActivation].reverse().find((entry) => entry.type === 'bossDamage' && entry.cocoonBroken);
       const wasBroken = cocoon?.status === 'broken' || Boolean(breakEvent);
       const absorbed = Math.max(0, amount - (cocoon?.remaining ?? (wasBroken ? 0 : amount)));
 
@@ -741,33 +717,33 @@ function compactAction(gameState, intent) {
       return {
         instruction: 'Dano comum é absorvido pelo Casulo.',
         progress,
-        consequence: wasBroken
-          ? 'A proteção não absorve mais dano'
-          : 'Canastra limpa ou superior rompe e causa dano total',
+        consequence: wasBroken ? 'A proteção não absorve mais dano' : 'Canastra limpa ou superior rompe e causa dano total',
       };
     }
     case 'spring_crown': {
       const crown = gameState.boss?.springCrown;
       const threat = springCrownMarkedThreat(gameState);
       const name = crownThreatName(gameState);
-      const progress = crown?.status === 'root_prepared'
-        ? `${name} falhou · Raiz Fortalecida preparada`
-        : crown?.status === 'root_active'
-          ? 'Raiz Fortalecida ativa · a Coroa permanece fortalecida'
-          : crown?.status === 'completed'
-            ? `${name} concluida · Coroa encerrada sem efeito extra`
-            : crown?.status === 'cancelled'
-              ? `${name} cancelada · sem punicao`
-              : crownThreatProgress(threat);
-      const consequence = crown?.status === 'root_active'
-        ? 'Raiz Fortalecida ativa'
-        : crown?.status === 'root_prepared'
-          ? 'Raiz Fortalecida preparada para a próxima rodada'
-          : crown?.status === 'completed'
-            ? 'Sem efeito extra'
-            : crown?.status === 'cancelled'
-              ? 'Sem punição'
-              : 'Não cumprir: Raiz Fortalecida na próxima rodada';
+      const progress =
+        crown?.status === 'root_prepared'
+          ? `${name} falhou · Raiz Fortalecida preparada`
+          : crown?.status === 'root_active'
+            ? 'Raiz Fortalecida ativa · a Coroa permanece fortalecida'
+            : crown?.status === 'completed'
+              ? `${name} concluida · Coroa encerrada sem efeito extra`
+              : crown?.status === 'cancelled'
+                ? `${name} cancelada · sem punicao`
+                : crownThreatProgress(threat);
+      const consequence =
+        crown?.status === 'root_active'
+          ? 'Raiz Fortalecida ativa'
+          : crown?.status === 'root_prepared'
+            ? 'Raiz Fortalecida preparada para a próxima rodada'
+            : crown?.status === 'completed'
+              ? 'Sem efeito extra'
+              : crown?.status === 'cancelled'
+                ? 'Sem punição'
+                : 'Não cumprir: Raiz Fortalecida na próxima rodada';
       return {
         instruction: `A Coroa marcou: ${name}. ${crownThreatObjective(gameState, threat)}`,
         progress,
@@ -891,16 +867,12 @@ function ironEtiquetteOrderPresentation(gameState) {
   if (boss?.id !== 'dominadora') return null;
 
   const orders = [...(boss.activeOrders || [])].reverse();
-  const currentIntentOrderId = boss.currentIntent?.abilityId === 'iron_etiquette'
-    ? `etiquette_${boss.currentIntent.id}`
-    : null;
+  const currentIntentOrderId = boss.currentIntent?.abilityId === 'iron_etiquette' ? `etiquette_${boss.currentIntent.id}` : null;
 
   // Durante a rodada, o currentIntent da Etiqueta continua ativo mesmo depois
   // de o descarte resolver a ordem. Por isso, priorizamos a ordem ligada ao
   // intent atual, independentemente de ela estar ativa, obedecida ou falhada.
-  const currentIntentOrder = currentIntentOrderId
-    ? orders.find((order) => order.id === currentIntentOrderId && order.type === 'discard_suit')
-    : null;
+  const currentIntentOrder = currentIntentOrderId ? orders.find((order) => order.id === currentIntentOrderId && order.type === 'discard_suit') : null;
 
   const activeOrder = orders.find((order) => order.type === 'discard_suit' && order.status === 'active');
 
@@ -908,15 +880,9 @@ function ironEtiquetteOrderPresentation(gameState) {
   // o último evento da partida e nenhuma nova habilidade estiver ativa.
   // Consultar o eventLog inteiro fazia uma Etiqueta antiga reaparecer sobre
   // os resultados das habilidades seguintes.
-  const latestResolvedEvent = !boss.currentIntent
-    && boss.lastEvent?.type === 'dominatrixOrder'
-    && boss.lastEvent?.orderType === 'discard_suit'
-    ? boss.lastEvent
-    : null;
+  const latestResolvedEvent = !boss.currentIntent && boss.lastEvent?.type === 'dominatrixOrder' && boss.lastEvent?.orderType === 'discard_suit' ? boss.lastEvent : null;
 
-  const resolvedOrder = latestResolvedEvent
-    ? orders.find((entry) => entry.id === latestResolvedEvent.orderId && entry.type === 'discard_suit' && entry.status !== 'active')
-    : null;
+  const resolvedOrder = latestResolvedEvent ? orders.find((entry) => entry.id === latestResolvedEvent.orderId && entry.type === 'discard_suit' && entry.status !== 'active') : null;
 
   const order = currentIntentOrder || activeOrder || resolvedOrder;
 
@@ -977,21 +943,13 @@ function interdictPresentation(gameState) {
   if (boss?.id !== 'dominadora') return null;
 
   const interdicts = [...(boss.interdicts || [])].reverse();
-  const currentIntent = boss.currentIntent?.abilityId === 'interdict'
-    ? boss.currentIntent
-    : null;
+  const currentIntent = boss.currentIntent?.abilityId === 'interdict' ? boss.currentIntent : null;
   const currentInterdictId = currentIntent ? `interdict_${currentIntent.id}` : null;
-  const currentInterdict = currentInterdictId
-    ? interdicts.find((entry) => entry.id === currentInterdictId)
-    : null;
+  const currentInterdict = currentInterdictId ? interdicts.find((entry) => entry.id === currentInterdictId) : null;
   const activeInterdict = interdicts.find((entry) => entry.status === 'active');
 
-  const latestEvent = [...(boss.eventLog || [])]
-    .reverse()
-    .find((event) => ['interdictDecision', 'interdictExpired'].includes(event.type));
-  const resolvedInterdict = latestEvent
-    ? interdicts.find((entry) => entry.id === latestEvent.interdictId)
-    : null;
+  const latestEvent = [...(boss.eventLog || [])].reverse().find((event) => ['interdictDecision', 'interdictExpired'].includes(event.type));
+  const resolvedInterdict = latestEvent ? interdicts.find((entry) => entry.id === latestEvent.interdictId) : null;
 
   const interdict = currentInterdict || activeInterdict || resolvedInterdict;
   if (!interdict) return null;
@@ -1133,37 +1091,17 @@ function matriarchStatusPresentation(gameState) {
   if (boss?.id !== 'matriarca_esmeralda') return null;
   const event = flowResultEvent(gameState);
   const crown = boss.springCrown;
-  const relatedCrownEvent = event?.type === 'springCrown'
-    ? event
-    : event?.type === 'natureThreat'
-      && crown?.markedThreatId === event.threatId
-      && crown?.resolvedEventId
-      ? (boss.eventLog || []).find((entry) => entry.actionId === crown.resolvedEventId) || null
-      : null;
+  const relatedCrownEvent =
+    event?.type === 'springCrown' ? event : event?.type === 'natureThreat' && crown?.markedThreatId === event.threatId && crown?.resolvedEventId ? (boss.eventLog || []).find((entry) => entry.actionId === crown.resolvedEventId) || null : null;
   if (relatedCrownEvent) {
     const markedName = relatedCrownEvent.markedThreatName || crownThreatName(gameState);
-    const threatEvent = event?.type === 'natureThreat'
-      ? event
-      : (boss.eventLog || []).find((entry) => (
-          entry.type === 'natureThreat'
-          && entry.threatId === relatedCrownEvent.threatId
-          && entry.status === relatedCrownEvent.status
-        )) || null;
+    const threatEvent = event?.type === 'natureThreat' ? event : (boss.eventLog || []).find((entry) => entry.type === 'natureThreat' && entry.threatId === relatedCrownEvent.threatId && entry.status === relatedCrownEvent.status) || null;
     const failed = relatedCrownEvent.status === 'failed';
     const succeeded = relatedCrownEvent.status === 'success';
-    const rootState = crown?.status === 'root_active'
-      ? 'Raiz Fortalecida ativa'
-      : 'Raiz Fortalecida preparada para a próxima rodada';
-    const originalEffects = [
-      threatEvent?.bloomApplied ? `+${threatEvent.bloomApplied} Flor${threatEvent.bloomApplied === 1 ? '' : 'es'}` : '',
-      threatEvent?.healApplied ? `+${threatEvent.healApplied} HP` : '',
-    ].filter(Boolean);
+    const rootState = crown?.status === 'root_active' ? 'Raiz Fortalecida ativa' : 'Raiz Fortalecida preparada para a próxima rodada';
+    const originalEffects = [threatEvent?.bloomApplied ? `+${threatEvent.bloomApplied} Flor${threatEvent.bloomApplied === 1 ? '' : 'es'}` : '', threatEvent?.healApplied ? `+${threatEvent.healApplied} HP` : ''].filter(Boolean);
     return {
-      category: failed
-        ? 'Objetivo não concluído'
-        : succeeded
-          ? 'Objetivo concluído'
-          : 'Objetivo cancelado',
+      category: failed ? 'Objetivo não concluído' : succeeded ? 'Objetivo concluído' : 'Objetivo cancelado',
       name: 'Coroa da Primavera',
       speech: '',
       description: '',
@@ -1172,16 +1110,8 @@ function matriarchStatusPresentation(gameState) {
         ['Efeito da ameaça', originalEffects.join(' · ')],
       ]),
       instruction: relatedCrownEvent.outcome || 'A Coroa da Primavera foi resolvida.',
-      progress: failed
-        ? `❌ ${markedName} não cumprida`
-        : succeeded
-          ? `✅ ${markedName} cumprida`
-          : `— ${markedName} cancelada`,
-      consequence: failed
-        ? [...originalEffects, rootState].join(' · ')
-        : succeeded
-          ? 'Sem efeito extra'
-          : 'Sem punição',
+      progress: failed ? `❌ ${markedName} não cumprida` : succeeded ? `✅ ${markedName} cumprida` : `— ${markedName} cancelada`,
+      consequence: failed ? [...originalEffects, rootState].join(' · ') : succeeded ? 'Sem efeito extra' : 'Sem punição',
     };
   }
   if (event?.type === 'bossAbility' && MATRIARCH_ABILITY_NAMES[event.abilityId]) {
@@ -1230,13 +1160,7 @@ function matriarchStatusPresentation(gameState) {
   const completed = related.filter((entry) => entry.status === 'success').length;
   const failed = related.filter((entry) => entry.status === 'failed').length;
   const active = related.some((entry) => entry.status === 'active');
-  const category = active
-    ? 'Ameaça natural ativa'
-    : failed
-      ? 'Objetivo não concluído'
-      : completed === related.length
-        ? 'Objetivo concluído'
-        : 'Objetivo resolvido';
+  const category = active ? 'Ameaça natural ativa' : failed ? 'Objetivo não concluído' : completed === related.length ? 'Objetivo concluído' : 'Objetivo resolvido';
 
   return {
     category,
@@ -1250,9 +1174,10 @@ function matriarchStatusPresentation(gameState) {
     ]),
     instruction: event.outcome || 'A ameaça natural foi resolvida.',
     progress: compactNatureProgress(gameState, intent),
-    consequence: event.bloomApplied || event.healApplied
-      ? [event.bloomApplied ? `+${event.bloomApplied} Flor${event.bloomApplied === 1 ? '' : 'es'}` : '', event.healApplied ? `+${event.healApplied} HP` : ''].filter(Boolean).join(' · ')
-      : 'Sem consequência adicional',
+    consequence:
+      event.bloomApplied || event.healApplied
+        ? [event.bloomApplied ? `+${event.bloomApplied} Flor${event.bloomApplied === 1 ? '' : 'es'}` : '', event.healApplied ? `+${event.healApplied} HP` : ''].filter(Boolean).join(' · ')
+        : 'Sem consequência adicional',
   };
 }
 
@@ -1266,24 +1191,51 @@ function pendingChoicePresentation(gameState, choice) {
     fixed_interest_payment: 'Pagamento dos Juros Fixos',
     banker_collateral_card: 'Garantia do Cofre',
   };
-  const finalOrderInstruction = choice.type === 'final_order_draw'
-    ? `${target} escolhe entre comprar 2 cartas presas no proximo turno ou receber 1 Chicote.`
-    : choice.type === 'final_order_lock'
-      ? `${target} escolhe entre prender 1 carta aleatoria da propria mao no proximo turno ou receber 1 Chicote.`
-      : `${target} precisa decidir antes de a partida continuar.`;
+  let instruction = `${target} precisa decidir antes de a partida continuar.`;
+  let progress = '';
+  let consequence = 'Acoes comuns bloqueadas';
+  let details = detailFields([
+    ['Alvo', target],
+    ['Ordem oferecida', choice.order?.label],
+    ['Estado', 'a partida permanece pausada ate a decisao'],
+  ]);
+
+  if (choice.type === 'final_order_draw') {
+    instruction = `${target} escolhe entre comprar 2 cartas presas no proximo turno ou receber 1 Chicote.`;
+  } else if (choice.type === 'final_order_lock') {
+    instruction = `${target} escolhe entre prender 1 carta aleatoria da propria mao no proximo turno ou receber 1 Chicote.`;
+  } else if (choice.type === 'fixed_interest_payment') {
+    instruction = `${target} escolhe como pagar o contrato.`;
+    progress = `Integral agora: +${choice.amount} Dívida`;
+    consequence = `Cofre: carta aleatória; resgate começa em +${choice.collateralAmount} e sobe +1 por compra adiada`;
+    details = detailFields([
+      ['Titular sorteado', target],
+      ['Pagamento integral', `+${choice.amount} Dívida agora`],
+      ['Com garantia', `o Banqueiro apreende 1 carta aleatória`],
+      ['Preço inicial do resgate', `+${choice.collateralAmount} Dívida`],
+      ['Juros', '+1 a cada turno em que comprar normalmente'],
+      ['Limite', `ao chegar a +${choice.amount}, o próximo resgate é obrigatório`],
+    ]);
+  } else if (choice.type === 'banker_collateral_card') {
+    instruction = `${target}: concluindo uma garantia salva na versão anterior.`;
+    progress = 'A carta escolhida ficará no Cofre';
+    consequence = `O resgate começa em +${choice.collateralAmount} Dívida`;
+    details = detailFields([
+      ['Titular', target],
+      ['Compatibilidade', 'etapa antiga de escolha manual da carta'],
+      ['Resgate', 'substitui uma compra e cobra a Dívida acumulada'],
+    ]);
+  }
+
   return {
     category: 'Escolha obrigatoria agora',
     name: names[choice.type] || 'Decisao obrigatoria',
     speech: '',
     description: '',
-    details: detailFields([
-      ['Alvo', target],
-      ['Ordem oferecida', choice.order?.label],
-      ['Estado', 'a partida permanece pausada ate a decisao'],
-    ]),
-    instruction: finalOrderInstruction,
-    progress: '',
-    consequence: 'Acoes comuns bloqueadas',
+    details,
+    instruction,
+    progress,
+    consequence,
   };
 }
 
@@ -1428,11 +1380,13 @@ export function buildBossActionPresentation(gameState) {
   if (gameState.boss.id === 'banker') {
     if (intent.abilityId === 'fixed_interest')
       details = [
-        `Contrato: ${payload.contractTier || 'Padrao'}`,
-        `Pagamento integral: +${payload.fullDebt ?? payload.amount ?? (phase === 3 ? 8 : 6)} de Divida`,
-        `Com garantia no Cofre: +${payload.guaranteedDebt ?? payload.collateralAmount ?? (phase === 3 ? 5 : 3)} de Divida`,
-        'A carta dada em garantia substitui a compra normal do proximo turno do dono',
-        'Duracao: resolve ao fim da rodada',
+        `Contrato: ${bankerContractTierLabel(payload.contractTier)}`,
+        `Titular sorteado: ${playerName(gameState, payload.holderPlayerId)}`,
+        `Pagamento integral: +${payload.fullDebt ?? payload.amount ?? (phase === 3 ? 8 : 6)} de Dívida agora`,
+        'Com garantia: o Banqueiro apreende 1 carta aleatória do titular',
+        `Resgate inicial: +${payload.guaranteedDebt ?? payload.collateralAmount ?? (phase === 3 ? 5 : 3)} de Dívida`,
+        'Cada compra normal adiada acrescenta +1 ao resgate',
+        `Ao alcançar +${payload.fullDebt ?? payload.amount ?? (phase === 3 ? 8 : 6)}, o resgate seguinte é obrigatório`,
       ];
     else if (intent.abilityId === 'maintenance_fee') details = ['Compra extra inevitavel', `Cada jogador comprara +${payload.extraDraw ?? (phase === 3 ? 2 : 1)} carta(s)`, 'Aplicada no proximo turno de cada jogador'];
     else if (intent.abilityId === 'credit_block') details = ['Lixo bloqueado agora', `Duracao: ate o fim da rodada ${gameState.boss.roundNumber}`, 'Encerra depois da acao do ultimo cooperador'];

@@ -13,6 +13,7 @@ import {
   consumeBossExtraDraw,
   registerBossFinancedCards,
   createBossState,
+  deferBossVault,
   getBossChains,
   getBossCardEffect,
   getBossMeldContribution,
@@ -21,6 +22,7 @@ import {
   getBossNatureThreats,
   getBossPendingChoice,
   getBossVault,
+  getBossVaultQuote,
   hasPendingBossChoices,
   healMatriarch,
   canBossPerformCommonAction,
@@ -1164,7 +1166,7 @@ function prepareFixedInterestChoice({ phase = 1, occupiedVaults = false } = {}) 
     name: 'Juros Fixos',
     duration: 'full_round',
     announcedPhase: phase,
-    payload: { amount: phase === 3 ? 8 : 6, collateralAmount: phase === 3 ? 5 : 3 },
+    payload: { amount: phase === 3 ? 8 : 6, collateralAmount: phase === 3 ? 5 : 3, holderPlayerId: 0 },
   };
   if (occupiedVaults) {
     state.boss.vaultsByPlayer = {
@@ -1177,38 +1179,45 @@ function prepareFixedInterestChoice({ phase = 1, occupiedVaults = false } = {}) 
   return state;
 }
 
-test('Juros Fixos permite pagamento integral ou Garantia com valores congelados', () => {
+test('Juros Fixos permite pagamento integral ou Cofre com valores congelados', () => {
   const full = prepareFixedInterestChoice();
   const fullChoice = getBossPendingChoice(full, 0);
-  assert.deepEqual(fullChoice.options, ['full', 'guarantee:0', 'guarantee:1']);
+  assert.deepEqual(fullChoice.options, ['full', 'guarantee']);
   const fullEvent = resolveBossChoice(full, 0, 'full');
   assert.equal(fullEvent.dangerDelta, 6);
   assert.equal(full.boss.danger, 6);
 
   const collateral = prepareFixedInterestChoice({ phase: 3 });
-  const guarantorEvent = resolveBossChoice(collateral, 0, 'guarantee:1');
-  assert.equal(guarantorEvent.dangerDelta, 0);
-  assert.equal(getBossPendingChoice(collateral, 1).type, 'banker_collateral_card');
-  const collateralEvent = resolveBossChoice(collateral, 1, 'card:guarantee-bot');
-  assert.equal(collateralEvent.dangerDelta, 5);
-  assert.equal(collateral.boss.danger, 5);
-  assert.equal(getBossVault(collateral, 1).card.id, 'guarantee-bot');
-  assert.equal(collateral.players[1].hand.some((card) => card.id === 'guarantee-bot'), false);
+  const collateralEvent = resolveBossChoice(collateral, 0, 'guarantee');
+  assert.equal(collateralEvent.dangerDelta, 0);
+  assert.equal(collateral.boss.danger, 0);
+  assert.equal(collateral.boss.pendingChoices.length, 0);
+  assert.equal(getBossVault(collateral, 0).card.id, 'guarantee-human');
+  assert.equal(collateral.players[0].hand.some((card) => card.id === 'guarantee-human'), false);
+  assert.equal(getBossVaultQuote(collateral, 0).baseDebt, 5);
+  assert.equal(getBossVaultQuote(collateral, 0).maxDebt, 8);
 });
 
-test('Cofre bloqueia as compras e o resgate substitui a compra normal no turno do dono', () => {
+test('Cofre permite adiar com juros e força o resgate ao atingir o valor integral', () => {
   const state = prepareFixedInterestChoice();
-  resolveBossChoice(state, 0, 'guarantee:0');
-  resolveBossChoice(state, 0, 'card:guarantee-human');
+  resolveBossChoice(state, 0, 'guarantee');
   const restored = JSON.parse(JSON.stringify(state));
   restored.boss.bossFlow = { id: 'players', stage: 'players', queue: [] };
   restored.currentPlayer = 0;
   restored.hasDrawnThisTurn = false;
 
+  assert.equal(isBossVaultDrawRequired(restored, 0), false);
+  assert.equal(isBossDiscardBlocked(restored), false);
+  for (let turn = 1; turn <= 3; turn += 1) {
+    restored.turnNumber = turn;
+    assert.ok(deferBossVault(restored, 0));
+  }
+  assert.equal(getBossVaultQuote(restored, 0).totalDebt, 6);
   assert.equal(isBossVaultDrawRequired(restored, 0), true);
   assert.equal(isBossDiscardBlocked(restored), true);
   const event = reclaimBossVault(restored, 0);
   assert.equal(event.cardId, 'guarantee-human');
+  assert.equal(event.dangerDelta, 6);
   assert.equal(restored.hasDrawnThisTurn, true);
   assert.equal(getBossVault(restored, 0), null);
   assert.equal(isBossVaultDrawRequired(restored, 0), false);

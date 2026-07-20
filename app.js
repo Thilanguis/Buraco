@@ -33,6 +33,7 @@ import {
   getBossDiscardSurcharge,
   getBossInterdictAttempt,
   getBossVault,
+  getBossVaultQuote,
   hasPendingBossChoices,
   canBossPerformCommonAction,
   getBossPhaseName,
@@ -44,10 +45,13 @@ import {
   isBossPlayerDominated,
   isBossTurnActive,
   isBossVaultDrawRequired,
+  deferBossVault,
+  prepareBossVaultTurn,
   normalizeBossState,
   notifyBossDiscardTaken,
   notifyBossCardDiscarded,
   reclaimBossVault,
+  shouldBossBotReclaimVault,
   resolveBossChoice,
   resolveBossInterdictAttempt,
   validateBossClosedDiscardSelection,
@@ -335,6 +339,8 @@ window.gameSessionId = window.gameSessionId || 0;
 let localExitPending = false;
 let botTurnController = new AbortController();
 let selectedHandIndexes = new Set();
+let selectedBossCollateralCardId = null;
+let selectedBossCollateralChoiceId = null;
 let turnTimerId = null;
 let turnTimerRemaining = 0;
 let selectedMeldTarget = null;
@@ -355,6 +361,8 @@ let bossResourceSoundScope = null;
 let bossPresentationTimer = null;
 let bossPresentationKey = '';
 let bossDamageReactionTimer = null;
+const locallyAnimatedBossVaultSoundEventIds = new Set();
+const locallyAnimatingBossVaultStates = new Map();
 const renderedBossMeldContributions = new Map();
 const bossSwapReceivedHighlights = new Map();
 
@@ -410,6 +418,9 @@ function syncBossResourceSounds(boss) {
 
   const newEvents = events.filter((event) => event.actionId && !seenBossResourceSoundEventIds.has(event.actionId));
   newEvents.forEach((event) => seenBossResourceSoundEventIds.add(event.actionId));
+  newEvents
+    .filter((event) => boss.id === 'banker' && event.vaultSound === 'open')
+    .forEach((event) => void animateBossVaultOpen(event, { playSound: audioUnlocked }));
   if (!audioUnlocked) return;
 
   const pairedHealByKey = new Map(
@@ -427,6 +438,11 @@ function syncBossResourceSounds(boss) {
   const sequencedHealIds = new Set([...pairedHealByKey].filter(([key]) => pairedResourceKeys.has(key)).map(([, event]) => event.actionId));
 
   for (const event of newEvents) {
+    if (boss.id === 'banker' && event.vaultSound === 'close') {
+      if (!locallyAnimatedBossVaultSoundEventIds.has(event.actionId)) {
+        playSfxClone(BOSS_SFX.banker.vaultClose, { audioContext: audioCtx });
+      }
+    }
     if (bossEventAddsResource(boss, event)) {
       const pairedHeal = pairedHealByKey.get(matriarchNatureSoundPairKey(event, 'bloom'));
       if (pairedHeal) {
@@ -1684,6 +1700,7 @@ function passTurn({ preserveUndo = false } = {}) {
   state.boughtCardIds = []; // Limpa os brilhos
   state.requiredDiscardCard = null;
   state.pickedDiscardCardId = null;
+  if (isCurrentBossMode()) prepareBossVaultTurn(state, state.currentPlayer);
   return true;
 }
 
@@ -1700,6 +1717,16 @@ async function autoPlayTimeout() {
   if (!ensureMyTurn()) return;
 
   let actionDraw = null;
+
+  if (!state.hasDrawnThisTurn && isBossVaultDrawRequired(state, state.currentPlayer)) {
+    const reclaimedVault = await reclaimLocalBossVault();
+    if (!reclaimedVault) {
+      window.isAutoPlaying = false;
+      renderAll();
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 600));
+  }
 
   if (!state.hasDrawnThisTurn) {
     // 🛑 AWAIT INJETADO: Agora o relógio espera o morto virar monte antes de forçar a compra
@@ -2330,7 +2357,7 @@ async function drawFromStock() {
     return;
   }
   if (isBossVaultDrawRequired(state, state.currentPlayer)) {
-    showMessage('Cofre: recupere sua garantia. Ela substitui a compra normal deste turno.');
+    showMessage('Cofre: o resgate chegou ao valor integral e é obrigatório neste turno.');
     return;
   }
 
@@ -2366,6 +2393,7 @@ async function drawFromStock() {
 
   const bossExtraCards = bossExtraDraw > 0 ? drawnCards.slice(-bossExtraDraw) : [];
   const financedEvent = registerBossFinancedCards(state, state.currentPlayer, bossExtraCards);
+  const vaultInterestEvent = deferBossVault(state, state.currentPlayer);
 
   sortHand(currentPlayer().hand);
   state.hasDrawnThisTurn = true;
@@ -2389,7 +2417,10 @@ async function drawFromStock() {
     }
   }
 
-  showMessage(financedEvent ? `${financedEvent.outcome} Use ou descarte neste turno. Cada carta restante gera Dívida.` : '');
+  const drawMessages = [];
+  if (financedEvent) drawMessages.push(`${financedEvent.outcome} Use ou descarte neste turno. Cada carta restante gera Dívida.`);
+  if (vaultInterestEvent) drawMessages.push(vaultInterestEvent.outcome);
+  showMessage(drawMessages.join(' '));
 
   state.lastAction = {
     id: newActionId(),
@@ -2399,6 +2430,7 @@ async function drawFromStock() {
     count: drawnCards.length,
     bossExtraCards: bossExtraCards.map(packCard),
     bossEvent: financedEvent,
+    bossVaultEvent: vaultInterestEvent,
     recycledDeadIndex: recycledIndex,
     ts: Date.now(),
   };
@@ -2406,7 +2438,7 @@ async function drawFromStock() {
 
   resetTurnTimer();
   await commitState();
-  if (!state.partialDraw && !financedEvent) showMessage('✅ Compra realizada.');
+  if (!state.partialDraw && !financedEvent && !vaultInterestEvent) showMessage('✅ Compra realizada.');
 }
 
 function canUseDiscardInClosed(discardTop, hand, team) {
@@ -2439,7 +2471,7 @@ function canUseDiscardInClosed(discardTop, hand, team) {
 async function drawFromDiscard() {
   if (!ensureMyTurn()) return;
   if (!state.hasDrawnThisTurn && isBossVaultDrawRequired(state, state.currentPlayer)) {
-    showMessage('Cofre: recupere sua garantia antes de continuar. Monte e lixo estão bloqueados.');
+    showMessage('Cofre: resgate obrigatório. Monte e lixo estão bloqueados neste turno.');
     return;
   }
   if (!state.hasDrawnThisTurn && isBossDiscardBlocked(state)) {
@@ -2650,6 +2682,7 @@ async function drawFromDiscard() {
     }
     const bossExtraCards = await drawBossTurnExtras(me);
     if (state.finished) return;
+    const vaultInterestEvent = deferBossVault(state, me.id);
 
     if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1 && !state.partialDraw) {
       state.partialDraw = true;
@@ -2718,6 +2751,7 @@ async function drawFromDiscard() {
       bossExtraCards: bossExtraCards.map(packCard),
       bossFinanceEvent: surchargeEvent,
       bossEvent,
+      bossVaultEvent: vaultInterestEvent,
       ts: Date.now(),
     };
     ignoreOwnActionId = state.lastAction.id;
@@ -2725,6 +2759,7 @@ async function drawFromDiscard() {
     renderAll();
     resetTurnTimer();
     await commitState();
+    if (vaultInterestEvent) showMessage(vaultInterestEvent.outcome);
     return;
   }
 
@@ -2743,6 +2778,7 @@ async function drawFromDiscard() {
   sortHand(me.hand);
   const bossExtraCards = await drawBossTurnExtras(me);
   if (state.finished) return;
+  const vaultInterestEvent = deferBossVault(state, me.id);
 
   if (!state.boughtCardIds) state.boughtCardIds = [];
   pile.forEach((c) => state.boughtCardIds.push(c.id));
@@ -2770,13 +2806,14 @@ async function drawFromDiscard() {
     count: pile.length + 1,
     bossExtraCards: bossExtraCards.map(packCard),
     bossFinanceEvent: surchargeEvent,
+    bossVaultEvent: vaultInterestEvent,
     ts: Date.now(),
   };
   ignoreOwnActionId = state.lastAction.id;
 
   resetTurnTimer();
   await commitState();
-  if (!state.partialDraw) showMessage('✅ Lixo recolhido.');
+  if (!state.partialDraw) showMessage(vaultInterestEvent?.outcome || '✅ Lixo recolhido.');
 }
 
 function isValidSequenceMeld(cards) {
@@ -3912,12 +3949,12 @@ function scheduleBossTurnAdvance() {
 }
 
 async function reclaimLocalBossVault() {
-  if (!ensureMyTurn() || !isBossVaultDrawRequired(state, myPlayerIndex)) return;
+  if (!ensureMyTurn() || state.hasDrawnThisTurn || !getBossVault(state, myPlayerIndex)) return null;
   const slot = document.getElementById('bossLocalVaultSlot');
   const fromRect = slot ? getRect(slot) : null;
   const vault = getBossVault(state, myPlayerIndex);
   const event = reclaimBossVault(state, myPlayerIndex);
-  if (!event || !vault?.card) return;
+  if (!event || !vault?.card) return null;
   state.boughtCardIds = [vault.card.id];
   state.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: myPlayerIndex, bossEvent: event, ts: Date.now() };
   renderAll();
@@ -3929,7 +3966,8 @@ async function reclaimLocalBossVault() {
     toEl.style.visibility = '';
   }
   await commitPromise;
-  showMessage('Garantia recuperada. Esta foi a compra obrigatoria do seu turno.');
+  showMessage(event.outcome);
+  return event;
 }
 
 function renderBossVaultSlot(root, player, isLocal = false) {
@@ -3937,22 +3975,131 @@ function renderBossVaultSlot(root, player, isLocal = false) {
   if (!player) {
     root.style.display = 'none';
     root.innerHTML = '';
+    delete root.dataset.playerId;
+    delete root.dataset.vaultState;
     root.onclick = null;
     return;
   }
+  root.dataset.playerId = String(player.id);
   const vault = getBossVault(state, player.id);
   if (!vault) {
     root.style.display = 'none';
     root.innerHTML = '';
+    delete root.dataset.vaultState;
     root.onclick = null;
     return;
   }
   const cardFace = isLocal ? cardFrontHTML(vault.card) : '<span class="boss-vault-hidden">?</span>';
-  const reclaimRequired = isBossVaultDrawRequired(state, player.id) && state.currentPlayer === player.id;
+  const quote = getBossVaultQuote(state, player.id);
+  const localAnimationState = locallyAnimatingBossVaultStates.get(player.id) || '';
+  const vaultReceiving = localAnimationState === 'receiving';
+  const vaultClosing = localAnimationState === 'closing';
+  const vaultOpening = localAnimationState === 'opening';
+  const reclaimAvailable = quote?.state === 'open' && state.currentPlayer === player.id && !state.hasDrawnThisTurn && !hasPendingBossChoices(state) && !isBossTurnActive(state);
+  const reclaimRequired = reclaimAvailable && !!quote?.forced;
   root.style.display = 'grid';
   root.classList.toggle('boss-vault-required', reclaimRequired);
-  root.innerHTML = `<div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : 'boss-vault-card-back'}">${cardFace}</div><div class="boss-vault-copy"><span class="boss-vault-kicker">GARANTIA NO COFRE</span><small>${player.name}</small><strong>${reclaimRequired ? 'RESGATAR PARA COMPRAR' : 'Substitui a próxima compra'}</strong></div><i class="boss-vault-seal" aria-hidden="true"></i>`;
-  root.onclick = isLocal ? reclaimLocalBossVault : null;
+  root.classList.toggle('boss-vault-available', reclaimAvailable);
+  root.classList.toggle('boss-vault-appearing', vaultReceiving);
+  root.classList.toggle('boss-vault-locking', vaultReceiving);
+  root.classList.toggle('boss-vault-closing', vaultClosing);
+  root.classList.toggle('boss-vault-opening', vaultOpening);
+  root.dataset.vaultState = vaultReceiving ? 'receiving' : vaultClosing ? 'closing' : vaultOpening ? 'opening' : quote?.state === 'open' ? 'open' : 'closed';
+  const frameSrc = vaultReceiving || quote?.state === 'open' ? 'assets/images/boss-vault-open.png' : 'assets/images/boss-vault-frame.png';
+  const status = vaultReceiving
+    ? 'RECEBENDO GARANTIA...'
+    : vaultClosing
+      ? 'GARANTIA PROTEGIDA'
+      : vaultOpening
+        ? 'ABRINDO COFRE...'
+      : reclaimRequired
+        ? `RESGATE OBRIGATÓRIO · +${quote?.totalDebt || 0} DÍVIDA`
+        : reclaimAvailable
+          ? `RESGATAR +${quote?.currentDebt || 0} · OU FAZER A COMPRA NORMAL`
+          : quote?.state === 'open'
+            ? `COFRE ABERTO · CUSTO ATUAL +${quote?.currentDebt || 0}`
+            : `CARÊNCIA · ${Math.min(1, quote?.ownerTurnsStarted || 0)}/1 TURNO`;
+  root.innerHTML = `<div class="boss-vault-visual"><div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : 'boss-vault-card-back'}">${cardFace}</div><img class="boss-vault-frame" src="${frameSrc}" alt="" aria-hidden="true"></div><div class="boss-vault-copy"><span class="boss-vault-kicker">GARANTIA NO COFRE</span><small>${player.name} · base +${quote?.baseDebt || 0} · juros +${quote?.interestDebt || 0} · atual +${quote?.currentDebt || 0}</small><strong>${status}</strong></div>`;
+  root.onclick = isLocal && reclaimAvailable ? reclaimLocalBossVault : null;
+}
+
+function snapshotVisibleCardRects() {
+  const rects = new Map();
+  document.querySelectorAll('[data-card-id]').forEach((element) => {
+    const cardId = element.dataset.cardId;
+    if (!cardId || rects.has(cardId)) return;
+    const rect = getRect(element);
+    if (rect.width > 0 && rect.height > 0) rects.set(cardId, rect);
+  });
+  return rects;
+}
+
+function bossVaultSlotForPlayer(playerId) {
+  return [...document.querySelectorAll('.boss-vault-slot')].find((slot) => String(slot.dataset.playerId) === String(playerId)) || null;
+}
+
+function waitForVisualDuration(duration) {
+  return new Promise((resolve) => setTimeout(resolve, duration));
+}
+
+async function animateBossVaultOpen(event, { playSound = true } = {}) {
+  const playerId = event?.playerId;
+  const player = state.players?.find((entry) => entry.id === playerId);
+  let slot = bossVaultSlotForPlayer(playerId);
+  if (!event?.actionId || !player || !slot) {
+    if (playSound) playSfxClone(BOSS_SFX.banker.vaultOpen, { audioContext: audioCtx });
+    return;
+  }
+
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  const isLocal = playerId === myPlayerIndex;
+  locallyAnimatingBossVaultStates.set(playerId, 'opening');
+  renderBossVaultSlot(slot, player, isLocal);
+  if (playSound) playSfxClone(BOSS_SFX.banker.vaultOpen, { audioContext: audioCtx });
+
+  try {
+    if (!reducedMotion) await waitForVisualDuration(1300);
+  } finally {
+    locallyAnimatingBossVaultStates.delete(playerId);
+    slot = bossVaultSlotForPlayer(playerId);
+    if (slot) renderBossVaultSlot(slot, player, isLocal);
+  }
+}
+
+async function animateBossVaultLock(event, card, fromRect) {
+  const eventId = event?.actionId;
+  const playerId = event?.collateralPlayerId;
+  const player = state.players?.find((entry) => entry.id === playerId);
+  let slot = bossVaultSlotForPlayer(playerId);
+  if (!eventId || !card || !slot) {
+    locallyAnimatingBossVaultStates.delete(playerId);
+    playSfxClone(BOSS_SFX.banker.vaultClose, { audioContext: audioCtx });
+    return;
+  }
+
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  const isLocal = playerId === myPlayerIndex;
+  locallyAnimatingBossVaultStates.set(playerId, 'receiving');
+  renderBossVaultSlot(slot, player, isLocal);
+  slot = bossVaultSlotForPlayer(playerId);
+  const storedCard = slot?.querySelector('.boss-vault-card');
+  const targetRect = storedCard ? getRect(storedCard) : getRect(slot);
+  if (storedCard) storedCard.style.visibility = 'hidden';
+
+  try {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (fromRect && !reducedMotion) await flyRectToRect(card, fromRect, targetRect, 'front');
+
+    locallyAnimatingBossVaultStates.set(playerId, 'closing');
+    slot = bossVaultSlotForPlayer(playerId);
+    renderBossVaultSlot(slot, player, isLocal);
+    playSfxClone(BOSS_SFX.banker.vaultClose, { audioContext: audioCtx });
+    if (!reducedMotion) await waitForVisualDuration(900);
+  } finally {
+    locallyAnimatingBossVaultStates.delete(playerId);
+    slot = bossVaultSlotForPlayer(playerId);
+    if (slot) renderBossVaultSlot(slot, player, isLocal);
+  }
 }
 
 async function animateBossForcedSwap(feedback) {
@@ -4334,6 +4481,7 @@ function renderBossHud() {
     lock_card: 'Prender 1 carta',
     break_meld: 'Retirar carta da canastra',
     full: 'Pagar valor integral',
+    guarantee: 'Dar garantia',
   };
   const animateForcedChoiceDraw = async (event, playerId, fromRect) => {
     if (playerId !== myPlayerIndex || !fromRect) return;
@@ -4355,13 +4503,26 @@ function renderBossHud() {
   };
   if (myChoice && !state.finished) {
     choicePanel.style.display = 'flex';
+    const choiceOwner = state.players.find((player) => player.id === myChoice.playerId);
+    const collateralChoice = myChoice.type === 'banker_collateral_card';
+    if (collateralChoice) {
+      const selectedStillExists = state.players[myPlayerIndex]?.hand?.some((card) => card.id === selectedBossCollateralCardId);
+      if (selectedBossCollateralChoiceId !== myChoice.id || !selectedStillExists) {
+        selectedBossCollateralChoiceId = myChoice.id;
+        selectedBossCollateralCardId = null;
+      }
+    } else {
+      selectedBossCollateralChoiceId = null;
+      selectedBossCollateralCardId = null;
+    }
+
     document.getElementById('bossChoicePrompt').textContent =
       myChoice.type === 'break_will'
         ? 'Quebra de Vontade: escolha sua punição.'
         : myChoice.type === 'fixed_interest_payment'
-          ? 'Juros Fixos: pague o valor integral ou escolha um garantidor.'
-          : myChoice.type === 'banker_collateral_card'
-            ? 'Escolha uma carta sua para enviar ao Cofre.'
+          ? `${choiceOwner?.name || 'Titular'}: pague agora ou aceite uma carta aleatória no Cofre.`
+          : collateralChoice
+            ? 'Clique em uma carta da sua mão e confirme a garantia.'
             : myChoice.type === 'final_order_draw'
               ? 'Ordem Final: escolha entre comprar 2 cartas que ficarao presas no proximo turno ou receber 1 Chicote.'
               : myChoice.type === 'final_order_lock'
@@ -4370,30 +4531,53 @@ function renderBossHud() {
                   ? `Escolha Forçada: receba 1 Chicote agora ou aceite a ordem: ${myChoice.order.description}`
                   : 'A Dominadora exige uma escolha.';
     const actions = document.getElementById('bossChoiceActions');
-    actions.innerHTML = myChoice.options
-      .map((option) => {
-        let label = choiceLabels[option] || option;
-        if (option.startsWith('guarantee:')) {
-          const player = state.players.find((entry) => entry.id === Number(option.split(':')[1]));
-          label = `Garantia: ${player?.name || 'Jogador'}`;
-        } else if (option.startsWith('card:')) {
-          const card = state.players[myPlayerIndex]?.hand?.find((entry) => entry.id === option.slice(5));
-          label = card ? `${card.rank}${card.suit}` : 'Carta';
-        }
-        return `<button type="button" data-boss-choice="${option}">${label}</button>`;
-      })
-      .join('');
+
+    if (collateralChoice) {
+      const selectedCard = state.players[myPlayerIndex]?.hand?.find((card) => card.id === selectedBossCollateralCardId);
+      actions.innerHTML = `
+        <span class="boss-collateral-selection-summary">${selectedCard ? `Selecionada: <strong>${selectedCard.rank}${selectedCard.suit}</strong>` : 'Nenhuma carta selecionada'}</span>
+        <button type="button" class="boss-confirm-collateral" ${selectedCard ? `data-boss-choice="card:${selectedCard.id}"` : 'disabled'}>Confirmar garantia</button>
+      `;
+    } else {
+      actions.innerHTML = myChoice.options
+        .map((option) => {
+          let label = choiceLabels[option] || option;
+          if (option === 'full' && myChoice.type === 'fixed_interest_payment') {
+            label = `Assumir +${myChoice.amount} Dívida`;
+          } else if ((option === 'guarantee' || option.startsWith('guarantee:')) && myChoice.type === 'fixed_interest_payment') {
+            label = `Aceitar Cofre · resgate +${myChoice.collateralAmount}`;
+          } else if (option.startsWith('guarantee:')) {
+            const player = state.players.find((entry) => entry.id === Number(option.split(':')[1]));
+            label = `Garantia: ${player?.name || 'Jogador'}`;
+          } else if (option.startsWith('card:')) {
+            const card = state.players[myPlayerIndex]?.hand?.find((entry) => entry.id === option.slice(5));
+            label = card ? `${card.rank}${card.suit}` : 'Carta';
+          }
+          return `<button type="button" data-boss-choice="${option}">${label}</button>`;
+        })
+        .join('');
+    }
+
     actions.querySelectorAll('[data-boss-choice]').forEach((button) => {
       button.onclick = async () => {
         if (!state || state.finished || !getBossPendingChoice(state, myPlayerIndex)) return;
         const stockEl = document.querySelector('#drawStockBtn .pile-card');
         const stockRect = stockEl ? getRect(stockEl) : null;
+        const visibleCardRects = snapshotVisibleCardRects();
         const selectedCollateralId = button.dataset.bossChoice.startsWith('card:') ? button.dataset.bossChoice.slice(5) : '';
         const selectedCollateralEl = selectedCollateralId ? cardElById(selectedCollateralId) : null;
         const selectedCollateralRect = selectedCollateralEl ? getRect(selectedCollateralEl) : null;
         localUndoStack = [];
         const event = resolveBossChoice(state, myPlayerIndex, button.dataset.bossChoice);
         if (!event) return;
+        if (event.collateralCardId && event.actionId) {
+          locallyAnimatedBossVaultSoundEventIds.add(event.actionId);
+          locallyAnimatingBossVaultStates.set(event.collateralPlayerId, 'receiving');
+        }
+        if (selectedCollateralId) {
+          selectedBossCollateralCardId = null;
+          selectedBossCollateralChoiceId = null;
+        }
         if (state.boss?.result) {
           state.finished = true;
           state.winnerTeamId = state.boss.result.victory ? 0 : 1;
@@ -4411,21 +4595,29 @@ function renderBossHud() {
         renderAll();
         const commitPromise = commitState();
         if (event.drawnCardIds?.length) await animateForcedChoiceDraw(event, myPlayerIndex, stockRect);
-        if (event.collateralCardId && selectedCollateralRect) {
-          const vaultSlot = document.getElementById('bossLocalVaultSlot');
-          const vaultCard = getBossVault(state, myPlayerIndex)?.card;
-          if (vaultSlot && vaultCard) await flyRectToRect(vaultCard, selectedCollateralRect, getRect(vaultSlot), 'front');
+        if (event.collateralCardId) {
+          const vaultCard = getBossVault(state, event.collateralPlayerId)?.card;
+          const collateralFromRect = selectedCollateralRect || visibleCardRects.get(event.collateralCardId) || null;
+          try {
+            await animateBossVaultLock(event, vaultCard, collateralFromRect);
+          } finally {
+            locallyAnimatedBossVaultSoundEventIds.delete(event.actionId);
+          }
         }
         await commitPromise;
         if (!hasPendingBossChoices(state)) startTurnTimerIfNeeded();
       };
     });
   } else if (pendingChoice && !state.finished) {
+    selectedBossCollateralCardId = null;
+    selectedBossCollateralChoiceId = null;
     const target = state.players.find((player) => player.id === pendingChoice.playerId);
     choicePanel.style.display = 'flex';
     document.getElementById('bossChoicePrompt').textContent = `Aguardando ${target?.name || 'o jogador alvo'} decidir.`;
     document.getElementById('bossChoiceActions').innerHTML = '';
   } else {
+    selectedBossCollateralCardId = null;
+    selectedBossCollateralChoiceId = null;
     choicePanel.style.display = 'none';
     document.getElementById('bossChoiceActions').innerHTML = '';
   }
@@ -4978,10 +5170,10 @@ function renderAll() {
   document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && !vaultDrawRequired ? '1' : '0.5';
 
   // NOVO: Libera o clique no lixo tanto para comprar quanto para descartar
-  const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && (vaultDrawRequired || (state.discard.length && !isBossDiscardBlocked(state)));
+  const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && !vaultDrawRequired && state.discard.length && !isBossDiscardBlocked(state);
   const canDiscardToPile = myTurn && state.hasDrawnThisTurn && !bossControlsLocked;
   document.getElementById('drawDiscardBtn').style.pointerEvents = canDrawDiscard || canDiscardToPile ? 'auto' : 'none';
-  document.getElementById('drawDiscardBtn').style.opacity = vaultDrawRequired ? '0.5' : canDrawDiscard || canDiscardToPile ? '1' : '0.5';
+  document.getElementById('drawDiscardBtn').style.opacity = canDrawDiscard || canDiscardToPile ? '1' : '0.5';
 
   const me = state.players[myPlayerIndex];
   const myTeamId = me ? me.teamId : null; // Protege o Team ID
@@ -5170,12 +5362,20 @@ function renderHand() {
     }
   }
 
+  const collateralChoice = getBossPendingChoice(state, me.id);
+  const selectingBankerCollateral = collateralChoice?.type === 'banker_collateral_card';
+
   me.hand.forEach((card, idx) => {
     if (!card) return; // 🛡️ BLINDAGEM ANTI-FANTASMA: Impede o crash de UI
     ensureCardId(card);
     const div = document.createElement('div');
     div.dataset.cardId = card.id;
     div.className = `carta ${suitClass(card)} ${deckFaceClass(card)}`;
+    if (selectingBankerCollateral) {
+      div.classList.add('boss-collateral-selectable');
+      if (selectedBossCollateralCardId === card.id) div.classList.add('boss-collateral-selected');
+      div.title = 'Clique para escolher esta carta como garantia';
+    }
 
     const bossCardEffect = getBossCardEffect(state, me.id, card.id);
     const bossDiscardFeedback = getBossCardBlockFeedback(state, me.id, card.id, 'discard');
@@ -5231,6 +5431,13 @@ function renderHand() {
     if (selectedHandIndexes.has(idx)) div.classList.add('selected');
 
     div.onclick = () => {
+      if (selectingBankerCollateral) {
+        selectedBossCollateralChoiceId = collateralChoice.id;
+        selectedBossCollateralCardId = card.id;
+        renderHand();
+        renderBossHud();
+        return;
+      }
       if (!canPerformCommonGameAction(state)) {
         showPendingBossChoiceMessage();
         return;
@@ -5414,6 +5621,7 @@ function renderOpponentHands() {
 
     if (playerIdx === null || playerIdx === undefined) {
       rootEl.innerHTML = '';
+      delete rootEl.dataset.playerId;
       rootEl.classList.remove('active-turn-glow');
       rootEl.classList.remove('boss-player-targeted');
       return;
@@ -5422,10 +5630,13 @@ function renderOpponentHands() {
     const p = state.players[playerIdx];
     if (!p) {
       rootEl.innerHTML = '';
+      delete rootEl.dataset.playerId;
       rootEl.classList.remove('active-turn-glow');
       rootEl.classList.remove('boss-player-targeted');
       return;
     }
+
+    rootEl.dataset.playerId = String(p.id);
 
     rootEl.classList.toggle('active-turn-glow', state.currentPlayer === playerIdx);
     rootEl.classList.toggle('boss-player-targeted', activeMatriarchTargetPlayerIds().has(p.id));
@@ -5500,6 +5711,8 @@ function renderOpponentHands() {
         cardEl.innerHTML = '';
         cardEl.onclick = null;
         cardEl.className = 'opponent-card-back';
+        if (cdata?.id) cardEl.dataset.cardId = cdata.id;
+        else delete cardEl.dataset.cardId;
 
         const wantedClass = cdata?.back === 'blue' ? 'back-blue' : 'back-red';
         const keepArcadeRun = cardEl.classList.contains('arcade-car-run');
@@ -6909,7 +7122,8 @@ const botEngine = {
     const s = this.getState();
     if (!s) return;
     const me = s.players[botIndex];
-    if (isBossVaultDrawRequired(s, botIndex)) {
+    const botVault = getBossVault(s, botIndex);
+    if (botVault && (isBossVaultDrawRequired(s, botIndex) || shouldBossBotReclaimVault(s, botIndex))) {
       const vaultEvent = reclaimBossVault(s, botIndex);
       if (!vaultEvent) return;
       s.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: botIndex, bossEvent: vaultEvent, ts: Date.now() };
@@ -6941,6 +7155,7 @@ const botEngine = {
 
     const bossExtraCards = bossExtraCount > 0 ? drawnCards.slice(-bossExtraCount) : [];
     const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
+    const vaultInterestEvent = deferBossVault(s, botIndex);
 
     sortHand(me.hand);
     s.hasDrawnThisTurn = true;
@@ -6956,6 +7171,7 @@ const botEngine = {
         count: drawnCards.length,
         bossExtraCards: bossExtraCards.map(packCard),
         bossEvent: financedEvent,
+        bossVaultEvent: vaultInterestEvent,
         recycledDeadIndex: recycledIndex,
         ts: Date.now(),
       };
@@ -6972,6 +7188,13 @@ const botEngine = {
       return false;
     }
     const me = s.players[botIndex];
+    if (getBossVault(s, botIndex) && shouldBossBotReclaimVault(s, botIndex)) {
+      const vaultEvent = reclaimBossVault(s, botIndex);
+      if (!vaultEvent) return false;
+      s.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: botIndex, bossEvent: vaultEvent, ts: Date.now() };
+      await this.commitState();
+      return true;
+    }
     const surchargeDecision = this.acceptBossDiscardSurcharge(me.id);
     if (!surchargeDecision.allowed) return false;
     const pile = s.discard.splice(0, s.discard.length);
@@ -6996,6 +7219,7 @@ const botEngine = {
       bossExtraCards.push(extraCard);
     }
     const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
+    const vaultInterestEvent = deferBossVault(s, botIndex);
 
     // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
     if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
@@ -7027,6 +7251,7 @@ const botEngine = {
         bossExtraCards: bossExtraCards.map(packCard),
         bossFinanceEvent: surchargeDecision.event,
         bossEvent: financedEvent,
+        bossVaultEvent: vaultInterestEvent,
         ts: Date.now(),
       };
       await this.commitState();
@@ -7043,6 +7268,13 @@ const botEngine = {
       return false;
     }
     const me = s.players[botIndex];
+    if (getBossVault(s, botIndex) && shouldBossBotReclaimVault(s, botIndex)) {
+      const vaultEvent = reclaimBossVault(s, botIndex);
+      if (!vaultEvent) return false;
+      s.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: botIndex, bossEvent: vaultEvent, ts: Date.now() };
+      await this.commitState();
+      return true;
+    }
     const team = s.teams[me.teamId];
     const selectedHandCards = intent.action === 'new' ? (intent.handIndexes || []).map((index) => me.hand[index]).filter(Boolean) : [];
     if (intent.action === 'extend' && !canBossUseMeld(s, me.id, intent.meldIndex)) return false;
@@ -7107,6 +7339,7 @@ const botEngine = {
       bossExtraCards.push(extraCard);
     }
     const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
+    const vaultInterestEvent = deferBossVault(s, botIndex);
 
     if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
       // 🛑 SALVA-VIDAS: Prepara o morto caso o monte tenha acabado bem na carta extra dele!
@@ -7146,6 +7379,7 @@ const botEngine = {
         bossFinanceEvent: financedEvent || surchargeDecision.event,
         bossSurchargeEvent: surchargeDecision.event,
         bossEvent,
+        bossVaultEvent: vaultInterestEvent,
         ts: Date.now(),
       };
       await this.commitState();

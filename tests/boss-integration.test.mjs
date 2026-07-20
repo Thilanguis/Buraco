@@ -212,7 +212,7 @@ test('HUD explica Dominado e anima Correntes e Divida a partir dos eventos reais
   assert.match(app, /duration: 1800, easing: 'ease-in'/);
 });
 
-test('Cofre fica junto ao jogador, bloqueia compras e anima o resgate sem entrar nos detalhes', () => {
+test('Cofre fica junto ao jogador, permite juros e anima o resgate sem entrar nos detalhes', () => {
   const vaultIndex = html.indexOf('id="bossLocalVaultSlot"');
   const handIndex = html.indexOf('id="handContainer"');
   assert.ok(vaultIndex >= 0 && vaultIndex < handIndex);
@@ -220,15 +220,39 @@ test('Cofre fica junto ao jogador, bloqueia compras e anima o resgate sem entrar
   assert.doesNotMatch(detailsBlock, /bossLocalVaultSlot/);
   assert.match(app, /function renderBossVaultSlot\(root, player, isLocal = false\)/);
   assert.match(app, /GARANTIA NO COFRE/);
-  assert.match(app, /Substitui a próxima compra/);
+  assert.match(app, /CARÊNCIA/);
+  assert.match(app, /COFRE ABERTO · CUSTO ATUAL/);
+  assert.match(app, /quote\?\.state === 'open'[\s\S]*?COFRE ABERTO[\s\S]*?: `CARÊNCIA/);
+  assert.match(app, /base \+\$\{quote\?\.baseDebt/);
+  assert.match(app, /juros \+\$\{quote\?\.interestDebt/);
+  assert.match(app, /atual \+\$\{quote\?\.currentDebt/);
+  assert.match(app, /quote\?\.state === 'open'/);
+  assert.match(app, /event\.vaultSound === 'close'/);
+  assert.match(app, /event\.vaultSound === 'open'/);
+  assert.match(app, /locallyAnimatingBossVaultStates\.set\(event\.collateralPlayerId, 'receiving'\)/);
+  assert.match(app, /vaultReceiving \|\| quote\?\.state === 'open' \? 'assets\/images\/boss-vault-open\.png'/);
+  assert.match(app, /await flyRectToRect\(card, fromRect, targetRect, 'front'\);[\s\S]*?locallyAnimatingBossVaultStates\.set\(playerId, 'closing'\);[\s\S]*?playSfxClone\(BOSS_SFX\.banker\.vaultClose/);
   assert.match(app, /isBossVaultDrawRequired\(state, myPlayerIndex\)/);
-  assert.match(app, /recupere sua garantia antes de continuar\. Monte e lixo estão bloqueados/);
-  assert.match(app, /flyRectToRect\(vaultCard, selectedCollateralRect, getRect\(vaultSlot\), 'front'\)/);
+  assert.match(app, /async function autoPlayTimeout\(\)[\s\S]*?isBossVaultDrawRequired\(state, state\.currentPlayer\)[\s\S]*?await reclaimLocalBossVault\(\)/);
+  assert.match(app, /resgate obrigatório\. Monte e lixo estão bloqueados/);
+  assert.match(app, /function snapshotVisibleCardRects\(\)/);
+  assert.match(app, /async function animateBossVaultLock\(event, card, fromRect\)/);
+  assert.match(app, /await flyRectToRect\(card, fromRect, targetRect, 'front'\)/);
+  assert.match(app, /locallyAnimatedBossVaultSoundEventIds\.add\(event\.actionId\)/);
+  assert.match(app, /!locallyAnimatedBossVaultSoundEventIds\.has\(event\.actionId\)/);
   assert.match(app, /flyRectToRect\(vault\.card, fromRect, getRect\(toEl\), 'front'\)/);
-  assert.match(app, /if \(isBossVaultDrawRequired\(s, botIndex\)\)/);
+  assert.match(app, /shouldBossBotReclaimVault\(s, botIndex\)/);
   assert.match(bossCss, /\.boss-vault-slot \{/);
-  assert.match(bossCss, /\.boss-vault-seal \{/);
+  assert.match(app, /boss-vault-(?:open|frame)\.png/);
+  assert.match(bossCss, /\.boss-vault-frame \{/);
+  assert.match(bossCss, /\.boss-vault-locking \.boss-vault-card \{[\s\S]*?visibility: hidden;/);
   assert.match(bossCss, /\.boss-vault-required \{/);
+  assert.match(bossCss, /\.boss-vault-appearing \{/);
+  assert.match(bossCss, /\.boss-vault-closing \.boss-vault-frame \{/);
+  assert.match(bossCss, /\.boss-vault-opening \.boss-vault-frame \{/);
+  assert.match(app, /async function animateBossVaultOpen/);
+  assert.match(app, /vaultSound === 'open'[\s\S]*?animateBossVaultOpen/);
+  assert.match(bossCss, /@keyframes bossVaultClose/);
 });
 
 test('HUD mostra quatro Correntes, estado Sob Controle e Posses independentes', () => {

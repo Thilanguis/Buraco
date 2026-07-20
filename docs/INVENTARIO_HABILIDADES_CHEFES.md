@@ -4,7 +4,7 @@ Este documento registra os nomes publicos atuais. Nenhuma habilidade foi renomea
 
 | Chefe | ID interno | Nome atual | Efeito resumido | Fases |
 |---|---|---|---|---|
-| O Banqueiro | `fixed_interest` | Juros Fixos | Define uma cobranca de Divida ao final da rodada. | 1, 2 e 3 |
+| O Banqueiro | `fixed_interest` | Juros Fixos | Permite pagar integralmente ou prender uma carta aleatória no Cofre com resgate sujeito a juros. | 1, 2 e 3 |
 | O Banqueiro | `maintenance_fee` | Tarifa de Manutencao | Concede cartas extras financiadas na proxima compra. | 1, 2 e 3 |
 | O Banqueiro | `credit_block` | Bloqueio de Credito | Bloqueia a retirada do lixo durante a rodada. | 1, 2 e 3 |
 | O Banqueiro | `suit_audit` | Auditoria de Naipe | Exige uma quantidade de cartas do naipe anunciado. | 2 e 3 |

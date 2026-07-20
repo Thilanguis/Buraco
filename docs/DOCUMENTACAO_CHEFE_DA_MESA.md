@@ -106,11 +106,11 @@ Feedback de bloqueio deve sempre identificar o efeito correto. Uma Semente da Ma
 
 A fase avança ao cumprir **qualquer** condição.
 
-| Fase | Condições |
-|---|---|
-| Fase 1 | início |
+| Fase   | Condições                                                    |
+| ------ | ------------------------------------------------------------ |
+| Fase 1 | início                                                       |
 | Fase 2 | primeiro morto, monte com 40 ou menos, ou HP em 70% ou menos |
-| Fase 3 | segundo morto, monte com 18 ou menos, ou HP em 35% ou menos |
+| Fase 3 | segundo morto, monte com 18 ou menos, ou HP em 35% ou menos  |
 
 Regras:
 
@@ -137,12 +137,12 @@ Regras:
 
 Cada carta causa dano somente na primeira vez em que entra legalmente na mesa.
 
-| Carta | Dano |
-|---|---:|
-| 3 a 7 | 5 |
-| 8 a K | 10 |
-| Ás e 2 | 15 |
-| Coringa | 20 |
+| Carta   | Dano |
+| ------- | ---: |
+| 3 a 7   |    5 |
+| 8 a K   |   10 |
+| Ás e 2  |   15 |
+| Coringa |   20 |
 
 IDs contabilizados ficam persistidos.
 
@@ -164,13 +164,13 @@ Dano individual não remove:
 
 ## 2.2 Bônus de canastra
 
-| Tipo | Dano total reconhecido |
-|---|---:|
-| Jogo simples | 0 |
-| Canastra suja | 100 |
-| Canastra limpa | 180 |
-| Canastra real | 300 |
-| Ás-a-Ás | 450 |
+| Tipo           | Dano total reconhecido |
+| -------------- | ---------------------: |
+| Jogo simples   |                      0 |
+| Canastra suja  |                    100 |
+| Canastra limpa |                    180 |
+| Canastra real  |                    300 |
+| Ás-a-Ás        |                    450 |
 
 O dano é incremental.
 
@@ -256,8 +256,8 @@ boss.meldContributions[meldId] = {
   damageDone,
   bankerDebtRelief,
   dominatrixChainsBroken,
-  matriarchBloomRemoved
-}
+  matriarchBloomRemoved,
+};
 ```
 
 Regras:
@@ -302,12 +302,12 @@ A alteração é limitada a 100 e a derrota é confirmada uma única vez no mesm
 
 ## 4.3 Redução de Dívida
 
-| Conquista | Redução |
-|---|---:|
-| Canastra limpa | 4 |
-| Canastra real | 8 |
-| Ás-a-Ás | 12 |
-| Morto retirado | 5 |
+| Conquista      | Redução |
+| -------------- | ------: |
+| Canastra limpa |       4 |
+| Canastra real  |       8 |
+| Ás-a-Ás        |      12 |
+| Morto retirado |       5 |
 
 Cada tier contribui somente uma vez.
 
@@ -324,18 +324,18 @@ Ao selecionar a habilidade, o motor sorteia um contrato fechado.
 ### Fases 1 e 2
 
 | Contrato | Sem Garantia | Com Garantia | Chance |
-|---|---:|---:|---:|
-| Brando | +5 | +2 | 25% |
-| Padrão | +6 | +3 | 50% |
-| Severo | +7 | +4 | 25% |
+| -------- | -----------: | -----------: | -----: |
+| Leve     |           +5 |           +2 |    25% |
+| Padrão   |           +6 |           +3 |    50% |
+| Severo   |           +7 |           +4 |    25% |
 
 ### Fase 3
 
 | Contrato | Sem Garantia | Com Garantia | Chance |
-|---|---:|---:|---:|
-| Brando | +7 | +4 | 25% |
-| Padrão | +8 | +5 | 50% |
-| Severo | +9 | +6 | 25% |
+| -------- | -----------: | -----------: | -----: |
+| Leve     |           +7 |           +4 |    25% |
+| Padrão   |           +8 |           +5 |    50% |
+| Severo   |           +9 |           +6 |    25% |
 
 Regras:
 
@@ -349,27 +349,30 @@ Regras:
 Persistência:
 
 ```js
-currentIntent.payload.contractTier
-currentIntent.payload.fullDebt
-currentIntent.payload.guaranteedDebt
-currentIntent.payload.rollEventId
+currentIntent.payload.contractTier;
+currentIntent.payload.fullDebt;
+currentIntent.payload.guaranteedDebt;
+currentIntent.payload.rollEventId;
 ```
 
 ### Garantia e Cofre
 
-- escolhe um fiador elegível;
-- envia uma carta válida ao Cofre;
+- o titular é sorteado entre os jogadores elegíveis, com chance uniforme;
+- ao aceitar a Garantia, o Banqueiro apreende uma carta aleatória da mão do titular;
+- a Dívida menor do contrato vira o preço-base do resgate;
+- a Dívida maior do contrato vira o limite máximo do resgate;
 - cada jogador possui no máximo uma carta no Cofre;
 - com os dois Cofres ocupados, Garantia fica indisponível;
 - a carta não vai ao monte nem ao lixo.
 
-No próximo turno do dono:
+No turno do dono:
 
-- compra do monte e lixo ficam bloqueadas;
-- a compra obrigatória é resgatar o Cofre;
-- o resgate substitui a compra normal;
-- depois do resgate, o turno continua;
-- o bot resgata automaticamente.
+- pode resgatar a carta no lugar da compra e receber a Dívida acumulada;
+- pode comprar normalmente e deixar a carta no Cofre;
+- cada compra adiada acrescenta +1 ao preço do resgate;
+- ao alcançar o valor integral do contrato, o resgate do próximo turno é obrigatório;
+- depois do resgate, o turno continua normalmente após a compra substituída;
+- o bot decide entre resgatar e adiar conforme o valor da carta e o custo acumulado.
 
 O bot avalia:
 
@@ -425,10 +428,10 @@ fases: 1, 2 e 3
 A equipe possui uma franquia compartilhada de cartas colocadas na mesa.
 
 | Fase | Franquia | Dívida por excedente | Cobrança máxima |
-|---|---:|---:|---:|
-| 1 | 7 | +1 | +4 |
-| 2 | 6 | +1 | +5 |
-| 3 | 5 | +1 | +6 |
+| ---- | -------: | -------------------: | --------------: |
+| 1    |        7 |                   +1 |              +4 |
+| 2    |        6 |                   +1 |              +5 |
+| 3    |        5 |                   +1 |              +6 |
 
 ### Cartas que contam
 
@@ -454,8 +457,8 @@ Não conta:
 A origem precisa ser transportada explicitamente pela transação, por exemplo:
 
 ```js
-creditEligibleCardIds
-cardOriginsById
+creditEligibleCardIds;
+cardOriginsById;
 ```
 
 Não inferir apenas comparando jogo anterior e final.
@@ -543,10 +546,10 @@ peso: 4
 fases: 2 e 3
 ```
 
-| Fase | Exigência | Sucesso | Falha |
-|---|---:|---:|---:|
-| 2 | 3 cartas | Dívida -5 | Dívida +10 |
-| 3 | 4 cartas | Dívida -5 | Dívida +12 |
+| Fase | Exigência |   Sucesso |      Falha |
+| ---- | --------: | --------: | ---------: |
+| 2    |  3 cartas | Dívida -5 | Dívida +10 |
+| 3    |  4 cartas | Dívida -5 | Dívida +12 |
 
 - somente cartas reais do naipe;
 - Coringas não contam;
@@ -585,16 +588,16 @@ A habilidade já varia naturalmente pelo tamanho das mãos e não recebe randomi
 
 ## 4.12 Habilidades e pesos
 
-| Habilidade | Peso | Fases |
-|---|---:|---|
-| Juros Fixos | 5 | 1, 2 e 3 |
-| Tarifa de Manutenção | 3 | 1, 2 e 3 |
-| Bloqueio de Crédito | 3 | 1, 2 e 3 |
-| Limite de Crédito | 4 | 1, 2 e 3 |
-| Auditoria de Naipe | 4 | 2 e 3 |
-| Penhora | 2 | 2 e 3 |
-| Juros Compostos | 4 | 2 e 3 |
-| Ágio do Lixo | 3 | 2 e 3 |
+| Habilidade           | Peso | Fases    |
+| -------------------- | ---: | -------- |
+| Juros Fixos          |    5 | 1, 2 e 3 |
+| Tarifa de Manutenção |    3 | 1, 2 e 3 |
+| Bloqueio de Crédito  |    3 | 1, 2 e 3 |
+| Limite de Crédito    |    4 | 1, 2 e 3 |
+| Auditoria de Naipe   |    4 | 2 e 3    |
+| Penhora              |    2 | 2 e 3    |
+| Juros Compostos      |    4 | 2 e 3    |
+| Ágio do Lixo         |    3 | 2 e 3    |
 
 ---
 
@@ -613,11 +616,11 @@ HP: 2100
 Chicotes por jogador: 0..4
 ```
 
-| Chicotes | Estado |
-|---:|---|
-| 0–2 | Normal |
-| 3 | Sob Controle |
-| 4 | Dominado |
+| Chicotes | Estado       |
+| -------: | ------------ |
+|      0–2 | Normal       |
+|        3 | Sob Controle |
+|        4 | Dominado     |
 
 Os dois jogadores com 4 causam derrota imediata.
 
@@ -645,11 +648,11 @@ Com 4 Chicotes:
 
 Somente produção de qualidade remove Chicote.
 
-| Evolução | Efeito |
-|---|---|
-| Canastra suja | não remove |
-| Canastra limpa | qualifica remoção |
-| Evolução para real | qualifica nova remoção histórica |
+| Evolução              | Efeito                           |
+| --------------------- | -------------------------------- |
+| Canastra suja         | não remove                       |
+| Canastra limpa        | qualifica remoção                |
+| Evolução para real    | qualifica nova remoção histórica |
 | Evolução para Ás-a-Ás | qualifica nova remoção histórica |
 
 Regras:
@@ -863,9 +866,9 @@ Ao libertar:
 Persistência:
 
 ```js
-boss.possessions[meldId].contributorPlayerIds
-boss.possessions[meldId].createdTier
-boss.possessions[meldId].releasedEventId
+boss.possessions[meldId].contributorPlayerIds;
+boss.possessions[meldId].createdTier;
+boss.possessions[meldId].releasedEventId;
 ```
 
 ## 5.13 Interdito — DESATIVADO
@@ -970,22 +973,22 @@ A carta presa deve ser identificada no HUD, na mão e no histórico. Depois das 
 
 ## 5.17 Habilidades e pesos
 
-| Habilidade | Peso | Fases |
-|---|---:|---|
-| Coleira | 5 | 1 e 2 |
-| Escolha Forçada | 4 | 1 e 2 |
-| Exposição | 3 | 1 e 2 |
-| Etiqueta de Ferro | 4 | 1 e 2 |
-| Troca Forçada | 4 | 2 e 3 |
-| Mãos Atadas | 4 | 2 e 3 |
-| Posse | 3 | 2 e 3 |
-| Interdito (desativado) | — | — |
-| Favorita | 3 | 2 e 3 |
-| Dupla Coleira | 5 | 3 |
-| Separação | 4 | 3 |
-| Controle Absoluto | 3 | 3 |
-| Quebra de Vontade | 3 | 3 |
-| Ordem Final | 2 | 3 |
+| Habilidade             | Peso | Fases |
+| ---------------------- | ---: | ----- |
+| Coleira                |    5 | 1 e 2 |
+| Escolha Forçada        |    4 | 1 e 2 |
+| Exposição              |    3 | 1 e 2 |
+| Etiqueta de Ferro      |    4 | 1 e 2 |
+| Troca Forçada          |    4 | 2 e 3 |
+| Mãos Atadas            |    4 | 2 e 3 |
+| Posse                  |    3 | 2 e 3 |
+| Interdito (desativado) |    — | —     |
+| Favorita               |    3 | 2 e 3 |
+| Dupla Coleira          |    5 | 3     |
+| Separação              |    4 | 3     |
+| Controle Absoluto      |    3 | 3     |
+| Quebra de Vontade      |    3 | 3     |
+| Ordem Final            |    2 | 3     |
 
 ---
 
@@ -1015,11 +1018,11 @@ Florescimento: 0..5
 
 ## 6.3 Remoção de Florescimento
 
-| Evolução | Remoção |
-|---|---:|
-| Canastra limpa | 1 |
-| Evolução para real | +1 |
-| Evolução para Ás-a-Ás | +1 |
+| Evolução              | Remoção |
+| --------------------- | ------: |
+| Canastra limpa        |       1 |
+| Evolução para real    |      +1 |
+| Evolução para Ás-a-Ás |      +1 |
 
 - cada tier remove uma vez por `meldId`;
 - dano individual não remove;
@@ -1029,10 +1032,10 @@ Florescimento: 0..5
 ## 6.4 Limites de cura
 
 | Fase | Máximo por rodada |
-|---|---:|
-| 1 | 150 |
-| 2 | 220 |
-| 3 | 300 |
+| ---- | ----------------: |
+| 1    |               150 |
+| 2    |               220 |
+| 3    |               300 |
 
 O contador zera na virada efetiva da rodada.
 
@@ -1043,29 +1046,16 @@ Florescimento não é limitado pela cura.
 Limites:
 
 | Fase | Ameaças |
-|---|---:|
-| 1 | 1 |
-| 2 | 2 |
-| 3 | 3 |
+| ---- | ------: |
+| 1    |       1 |
+| 2    |       2 |
+| 3    |       3 |
 
 Estado mínimo:
 
 ```js
 {
-  id,
-  type,
-  targetPlayerId,
-  cardId,
-  meldId,
-  secondMeldId,
-  discardCardId,
-  createdRound,
-  deadlineRound,
-  deadlinePlayerId,
-  healAmount,
-  bloomAmount,
-  status,
-  resolvedEventId
+  (id, type, targetPlayerId, cardId, meldId, secondMeldId, discardCardId, createdRound, deadlineRound, deadlinePlayerId, healAmount, bloomAmount, status, resolvedEventId);
 }
 ```
 
@@ -1157,10 +1147,10 @@ fases: 1, 2 e 3
 ```
 
 | Fase | Cura base |
-|---|---:|
-| 1 | 150 |
-| 2 | 180 |
-| 3 | 220 |
+| ---- | --------: |
+| 1    |       150 |
+| 2    |       180 |
+| 3    |       220 |
 
 Cada carta nova da mão colocada legalmente reduz 15.
 
@@ -1252,11 +1242,11 @@ peso: 2
 fases: 2 e 3
 ```
 
-| Cartas ao fim do turno | Efeito |
-|---:|---|
-| 0–7 | nada |
-| 8–10 | cura 60 |
-| 11+ | cura 100 e +1 Flor |
+| Cartas ao fim do turno | Efeito             |
+| ---------------------: | ------------------ |
+|                    0–7 | nada               |
+|                   8–10 | cura 60            |
+|                    11+ | cura 100 e +1 Flor |
 
 Não bloqueia ações.
 
@@ -1360,18 +1350,18 @@ Funciona no ataque final.
 
 ## 6.18 Habilidades e pesos
 
-| Habilidade | Peso | Fases |
-|---|---:|---|
-| Semente Viva | 5 | 1, 2 e 3 |
-| Raiz Faminta | 5 | 1, 2 e 3 |
-| Orvalho Restaurador | 3 | 1, 2 e 3 |
-| Trepadeiras Gêmeas | 4 | 2 e 3 |
-| Enxerto | 3 | 2 e 3 |
-| Pólen do Lixo | 3 | 2 e 3 |
-| Colheita | 2 | 2 e 3 |
-| Florescimento Real | 4 | 3 |
-| Casulo Esmeralda | 3 | 3 |
-| Coroa da Primavera | 3 | 3 |
+| Habilidade          | Peso | Fases    |
+| ------------------- | ---: | -------- |
+| Semente Viva        |    5 | 1, 2 e 3 |
+| Raiz Faminta        |    5 | 1, 2 e 3 |
+| Orvalho Restaurador |    3 | 1, 2 e 3 |
+| Trepadeiras Gêmeas  |    4 | 2 e 3    |
+| Enxerto             |    3 | 2 e 3    |
+| Pólen do Lixo       |    3 | 2 e 3    |
+| Colheita            |    2 | 2 e 3    |
+| Florescimento Real  |    4 | 3        |
+| Casulo Esmeralda    |    3 | 3        |
+| Coroa da Primavera  |    3 | 3        |
 
 ## 6.19 Falas
 
@@ -1650,15 +1640,15 @@ Em touch, tablet e `prefers-reduced-motion`:
 
 # 12. Comparação dos chefes
 
-| Característica | Banqueiro | Dominadora | Matriarca |
-|---|---|---|---|
-| HP | 2500 | 2100 | 2000 |
-| Perigo | Dívida coletiva | Chicotes individuais | Florescimento |
-| Derrota | Dívida 100 | ambos com 4 | 5 Flores |
-| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação |
-| Recuperação da equipe | redução de Dívida | Resistência | poda por evolução |
-| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle | Pólen |
-| Jogos | Penhora e Limite | Posse, Mãos Atadas, Interdito | Raiz, Enxerto, Casulo |
+| Característica        | Banqueiro                     | Dominadora                    | Matriarca             |
+| --------------------- | ----------------------------- | ----------------------------- | --------------------- |
+| HP                    | 2500                          | 2100                          | 2000                  |
+| Perigo                | Dívida coletiva               | Chicotes individuais          | Florescimento         |
+| Derrota               | Dívida 100                    | ambos com 4                   | 5 Flores              |
+| Pressão               | preços e recursos             | ordens e eficiência           | ameaças e propagação  |
+| Recuperação da equipe | redução de Dívida             | Resistência                   | poda por evolução     |
+| Compra/lixo           | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle           | Pólen                 |
+| Jogos                 | Penhora e Limite              | Posse, Mãos Atadas, Interdito | Raiz, Enxerto, Casulo |
 
 ---
 
