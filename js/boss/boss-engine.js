@@ -906,6 +906,12 @@ export function normalizeBossState(gameState) {
   boss.interdicts ||= [];
   boss.creditLimit ||= null;
   boss.discardSurcharge ||= null;
+  if (boss.creditLimit?.status === 'active' && boss.creditLimit.round !== boss.roundNumber) {
+    boss.creditLimit.status = 'expired';
+  }
+  if (boss.discardSurcharge?.status === 'active' && boss.discardSurcharge.createdRound !== boss.roundNumber) {
+    boss.discardSurcharge.status = 'expired';
+  }
   boss.pendingChoices ||= [];
   (gameState.players || []).forEach((player) => {
     boss.chainsByPlayer[player.id] = clamp(Number(boss.chainsByPlayer[player.id]) || 0, 0, 4);
@@ -1352,6 +1358,42 @@ export function beginBossTurn(gameState, { first = false, phaseChanged = false, 
   return advanceBossTurn(gameState, now);
 }
 
+function activateAnnouncedBankerRoundEffect(gameState, intent) {
+  const boss = gameState?.boss;
+  if (!boss || boss.id !== 'banker' || !intent) return null;
+
+  if (intent.abilityId === 'credit_limit') {
+    if (intent.id && boss.creditLimit?.sourceIntentId === intent.id) return boss.creditLimit;
+    boss.creditLimit = {
+      round: boss.roundNumber,
+      allowance: intent.payload.allowance,
+      debtPerCard: intent.payload.debtPerCard || 1,
+      countedCardIds: [],
+      chargedDebt: 0,
+      maxCharge: intent.payload.maxCharge,
+      eventIds: [],
+      status: 'active',
+      sourceIntentId: intent.id,
+    };
+    return boss.creditLimit;
+  }
+
+  if (intent.abilityId === 'discard_surcharge') {
+    if (intent.id && boss.discardSurcharge?.sourceIntentId === intent.id) return boss.discardSurcharge;
+    boss.discardSurcharge = {
+      amount: intent.payload.amount,
+      createdRound: boss.roundNumber,
+      status: 'active',
+      consumedByPlayerId: null,
+      resolvedEventId: null,
+      sourceIntentId: intent.id,
+    };
+    return boss.discardSurcharge;
+  }
+
+  return null;
+}
+
 export function advanceBossTurn(gameState, now = Date.now()) {
   const boss = normalizeBossState(gameState);
   const flow = boss?.bossFlow;
@@ -1359,6 +1401,7 @@ export function advanceBossTurn(gameState, now = Date.now()) {
   if (flow.stage !== 'pending' && flow.stage !== 'players' && now < flow.endsAt) return null;
   if (flow.stage === 'ability') {
     const announcedIntent = boss.currentIntent;
+    activateAnnouncedBankerRoundEffect(gameState, announcedIntent);
     const matriarchActivation = boss.id === 'matriarca_esmeralda' && MATRIARCH_ABILITIES.has(announcedIntent?.abilityId);
     const dominatrixPersistentActivation = boss.id === 'dominadora'
       && ['iron_etiquette', 'interdict'].includes(announcedIntent?.abilityId);
@@ -1406,6 +1449,7 @@ export function advanceBossTurn(gameState, now = Date.now()) {
     }
     intent.intentStatus = intent.immediateApplied ? 'applied' : 'announced';
     intent.intentAnnouncedAt ||= now;
+    activateAnnouncedBankerRoundEffect(gameState, intent);
   }
 
   flow.stage = next.kind;
@@ -3647,26 +3691,8 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     dangerDelta = Math.min(12, 4 + Math.floor(totalCards / 4));
     outcome = `Juros Compostos: Dívida +${dangerDelta}.`;
   } else if (intent.abilityId === 'credit_limit') {
-    boss.creditLimit = {
-      round: boss.roundNumber,
-      allowance: intent.payload.allowance,
-      debtPerCard: intent.payload.debtPerCard || 1,
-      countedCardIds: [],
-      chargedDebt: 0,
-      maxCharge: intent.payload.maxCharge,
-      eventIds: [],
-      status: 'active',
-      sourceIntentId: intent.id,
-    };
     outcome = `Limite de Crédito: franquia compartilhada de ${intent.payload.allowance} cartas; cobrança máxima de ${intent.payload.maxCharge}.`;
   } else if (intent.abilityId === 'discard_surcharge') {
-    boss.discardSurcharge = {
-      amount: intent.payload.amount,
-      createdRound: boss.roundNumber,
-      status: 'active',
-      consumedByPlayerId: null,
-      resolvedEventId: null,
-    };
     outcome = `Ágio do Lixo: a primeira retirada confirmada custará Dívida +${intent.payload.amount}.`;
   }
 

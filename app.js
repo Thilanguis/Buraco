@@ -583,30 +583,13 @@ async function processBossMeldChange(player, oldKind, newKind, meldIndex, cardsA
   return event;
 }
 
-function confirmBossDiscardPickup(playerId) {
+function confirmBossDiscardPickup() {
   const surcharge = getBossDiscardSurcharge(state);
   if (!surcharge) return { allowed: true, surcharge: null };
-  const confirmed = window.confirm(`Agio do Lixo: esta retirada gera Divida +${surcharge.amount}.\n\nConfirmar a retirada?`);
-  if (!confirmed) {
-    showMessage('Retirada cancelada. Voce ainda pode comprar do monte.');
-    return { allowed: false, surcharge: null };
-  }
   return { allowed: true, surcharge };
 }
 
 async function prepareBossMeldMutation(player, meldIndex, oldKind, newKind, cardsAdded, undoType, selectedCardIds = [], options = {}) {
-  const quote = getBossCreditLimitQuote(state, cardsAdded, {
-    creditEligibleCardIds: options.creditEligibleCardIds ?? null,
-    cardOriginsById: options.cardOriginsById ?? null,
-  });
-  if (quote?.debt > 0) {
-    const confirmed = window.confirm(`Limite de Credito: esta jogada coloca ${quote.newCardIds.length} carta(s) nova(s) na mesa e gera Divida +${quote.debt}.\n\nConfirmar a jogada?`);
-    if (!confirmed) {
-      showMessage('Jogada cancelada sem alterar cartas ou Divida.');
-      return { allowed: false, undoSaved: false, event: null };
-    }
-  }
-
   const interdict = Number.isInteger(meldIndex) ? getBossInterdictAttempt(state, player.teamId, meldIndex, oldKind, newKind) : null;
   if (!interdict) return { allowed: true, undoSaved: false, event: null };
 

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   applyBossMeldTransition,
   advanceBossTurn,
+  beginBossTurn,
   canBossCreateMeld,
   completeBossPlayerTurn,
   consumeBossDiscardSurcharge,
@@ -15,6 +16,7 @@ import {
   getBossNatureThreats,
   normalizeBossState,
   notifyBossCardDiscarded,
+  queueDebugBossAbility,
   resolveBossChoice,
   resolveBossDebugSpringCrownThreat,
   resolveBossInterdictAttempt,
@@ -86,6 +88,16 @@ function applyAbility(state, abilityId, payload, phase = state.boss.phase) {
   advanceBossTurn(state, Date.now());
   assert.equal(state.boss.bossFlow.stage, state.boss.pendingChoices.length ? 'choice' : 'players');
   return state.boss.lastEvent;
+}
+
+function announceBankerAbility(state, abilityId, phase) {
+  state.boss.phase = phase;
+  state.boss.phaseTransitions = Array.from({ length: phase }, (_, index) => index + 1);
+  queueDebugBossAbility(state, abilityId);
+  const announcement = beginBossTurn(state, { now: 1000, debug: true });
+  assert.equal(announcement.stage, 'ability');
+  assert.equal(state.boss.currentIntent.abilityId, abilityId);
+  return state.boss.currentIntent;
 }
 
 function establishMeldId(state, meldIndex = 0) {
@@ -432,6 +444,39 @@ test('Limite de Credito conta IDs unicos, antecipa jogada multipla e respeita te
   assert.equal(getBossCreditLimitQuote(state, [{ id: 'credit-over', rank: '10', suit: '♣' }]).debt, 0);
 });
 
+test('Limite de Credito fica ativo desde o anuncio no fluxo real e expira sem ser recriado', () => {
+  const state = bossGame('banker');
+  const intent = announceBankerAbility(state, 'credit_limit', 2);
+
+  assert.equal(state.boss.creditLimit.round, state.boss.roundNumber);
+  assert.equal(state.boss.creditLimit.sourceIntentId, intent.id);
+  assert.equal(state.boss.creditLimit.allowance, 6);
+  assert.equal(getBossCreditLimitQuote(state, []).maxCharge, 5);
+
+  const reloaded = structuredClone(state);
+  normalizeBossState(reloaded);
+  advanceBossTurn(reloaded, reloaded.boss.bossFlow.endsAt + 1);
+  assert.equal(reloaded.boss.bossFlow.stage, 'players');
+
+  const played = cards('announced-credit', ['3', '4', '5', '6', '7', '8', '9', '10'], '♣');
+  const event = applyBossMeldTransition(reloaded, {
+    teamId: 0,
+    playerId: 0,
+    meldIndex: 0,
+    cardsAdded: played,
+  });
+  assert.equal(event.creditLimitDebt, 2);
+  assert.equal(reloaded.boss.creditLimit.chargedDebt, 2);
+  assert.equal(reloaded.boss.danger, 2);
+
+  completeBossPlayerTurn(reloaded, 0);
+  completeBossPlayerTurn(reloaded, 1);
+  assert.equal(reloaded.boss.roundNumber, 2);
+  assert.equal(reloaded.boss.creditLimit.status, 'expired');
+  assert.equal(reloaded.boss.creditLimit.chargedDebt, 2);
+  assert.equal(getBossCreditLimitQuote(reloaded, played), null);
+});
+
 test('Voltar restaura contagem e Divida do Limite de Credito', () => {
   const state = bossGame('banker');
   state.boss.creditLimit = { round: 1, allowance: 0, debtPerCard: 1, countedCardIds: [], chargedDebt: 0, maxCharge: 4, eventIds: [], status: 'active' };
@@ -463,6 +508,36 @@ test('Agio do Lixo cobra somente uma retirada confirmada e reload nao duplica', 
   assert.equal(getBossDiscardSurcharge(reloaded), null);
   assert.equal(consumeBossDiscardSurcharge(reloaded, 0), null);
   assert.equal(reloaded.boss.danger, 4);
+});
+
+test('Agio do Lixo fica ativo desde o anuncio no fluxo real e nao renasce no fechamento', () => {
+  const state = bossGame('banker');
+  const intent = announceBankerAbility(state, 'discard_surcharge', 2);
+
+  assert.equal(state.boss.discardSurcharge.createdRound, state.boss.roundNumber);
+  assert.equal(state.boss.discardSurcharge.sourceIntentId, intent.id);
+  assert.equal(getBossDiscardSurcharge(state).amount, 4);
+
+  const unconsumed = structuredClone(state);
+  advanceBossTurn(unconsumed, unconsumed.boss.bossFlow.endsAt + 1);
+  completeBossPlayerTurn(unconsumed, 0);
+  completeBossPlayerTurn(unconsumed, 1);
+  assert.equal(unconsumed.boss.roundNumber, 2);
+  assert.equal(unconsumed.boss.discardSurcharge.status, 'expired');
+  assert.equal(getBossDiscardSurcharge(unconsumed), null);
+
+  const reloaded = structuredClone(state);
+  normalizeBossState(reloaded);
+  advanceBossTurn(reloaded, reloaded.boss.bossFlow.endsAt + 1);
+  const event = consumeBossDiscardSurcharge(reloaded, 0);
+  assert.equal(event.amount, 4);
+  assert.equal(reloaded.boss.danger, 4);
+  assert.equal(consumeBossDiscardSurcharge(reloaded, 1), null);
+
+  const chargedReload = structuredClone(reloaded);
+  normalizeBossState(chargedReload);
+  assert.equal(consumeBossDiscardSurcharge(chargedReload, 0), null);
+  assert.equal(chargedReload.boss.danger, 4);
 });
 
 test('Semente e Raiz falham sem cura, e a Raiz propaga somente na rodada seguinte', () => {
