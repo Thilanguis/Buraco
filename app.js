@@ -1,5 +1,5 @@
 import { BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSteal, stopAllGameSfx } from './js/audio.js';
-import { db, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from './js/firebase.js';
+import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
 import {
@@ -62,6 +62,9 @@ import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } 
 import { buildBossActionPresentation, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
 import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
 import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
+import { canCallDominationFriend, createFriendInvitation, callDominationFriend, isDominationFriendTurn, isDominationFriendBusy, queueDominationFriendTurn, executeDominationFriendTurn, grantDominationFriendExtraTurn } from './js/game/domination-friend.js';
+import { renderDominationFriend, presentDominationFriend, dealDominationFriendCards, playDominationFriendTimeline, createFriendNoticeTracker, showDominationFriendNotice } from './js/game/domination-friend-ui.js';
+import { FRIEND_MP3, createFriendSoundQueue, waitForPlayingCanastras } from './js/game/domination-friend-sound.js';
 
 // Importa a IA do Bot
 import { BuracoBot } from './bot.js';
@@ -332,6 +335,17 @@ const RANKS_SEQ_LOW = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', '
 const DEAD_CHUNK_SIZE = 11;
 
 let state = null;
+let friendOperationPending = false;
+let friendAutomationRunning = false;
+let friendAutomationTimer = null;
+let friendPlayback = null;
+const friendActionPresentations = new Map();
+const friendNoticeTracker = createFriendNoticeTracker();
+const friendSoundQueue = createFriendSoundQueue({
+  enabled: () => audioUnlocked && !window.isClosingGame && document.visibilityState !== 'hidden',
+  waitForCanastras: () => waitForPlayingCanastras(Object.values(CANASTRA_SFX)),
+  onBusy: () => { if (state && !window.isClosingGame) syncTableAmbientMusic(); },
+});
 let currentLobby = null;
 window.botPlayTimeoutId = null;
 window.isClosingGame = false;
@@ -499,7 +513,18 @@ function cancelGameAnimations() {
 }
 
 function invalidateGameSession({ stopMedia = true } = {}) {
+  clearTimeout(friendAutomationTimer);
+  friendAutomationTimer = null;
+  friendPlayback = null;
+  friendActionPresentations.clear();
+  document.getElementById('dominationFriendPresentation')?.remove();
   window.isClosingGame = true;
+  friendSoundQueue.cancel();
+  friendNoticeTracker.reset();
+  document.querySelectorAll('.friend-notice').forEach((notice) => {
+    notice.getAnimations().forEach((animation) => animation.cancel());
+    notice.remove();
+  });
   window.gameSessionId += 1;
   botTurnController.abort();
   botTurnController = new AbortController();
@@ -653,6 +678,11 @@ function restoreUndoUiState(ui = {}) {
 
 window.executeUndo = async () => {
   const transaction = localUndoStack[localUndoStack.length - 1];
+  if (state?.mode === '1x1_dominacao') {
+    if (isDominationFriendBusy(state) || friendOperationPending
+      || transaction?.state?.friendUsed !== state.friendUsed
+      || transaction?.state?.dominationFriend?.lastExecutedTurnId !== state.dominationFriend?.lastExecutedTurnId) return;
+  }
   if (!canRestoreUndoTransaction(transaction, state, myPlayerIndex)) {
     showMessage('Esta acao nao pode mais ser desfeita.');
     return;
@@ -661,6 +691,7 @@ window.executeUndo = async () => {
   localUndoStack.pop();
   const restored = restoreUndoTransaction(transaction);
   const previousState = restored.state;
+  if (state.mode === '1x1_dominacao') previousState.friendRevision = state.friendRevision || 0;
   const actionToUndo = state.lastAction; // Pega a ação que estamos revertendo
 
   // 1. Descobrir de onde as cartas vão sair (da mesa) ANTES de reverter o DOM
@@ -945,7 +976,8 @@ function getSafeAmbientVolume(theme) {
   const cfg = TABLE_AMBIENT_MUSIC[normalizeTableTheme(theme)] || TABLE_AMBIENT_MUSIC.feltro;
   const requested = Number(cfg.volume) || 0.1;
   // Mantém a música sempre bem abaixo dos efeitos mais baixos da mesa.
-  return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.7);
+  const friendDucking = state?.mode === '1x1_dominacao' && friendSoundQueue.busy ? 0.3 : 1;
+  return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.7) * friendDucking;
 }
 
 function fadeTableAmbientTo(targetVolume, duration = 850, onDone = null) {
@@ -1273,6 +1305,8 @@ async function movePickedWildToSelectedMeld() {
   }
 
   saveStateForUndo('meldMoveWild');
+  const friendKindsBefore = state.mode === '1x1_dominacao' && state.dominationFriend?.active
+    ? [classifyMeldForUi(fromMeld).kind, classifyMeldForUi(toMeld).kind] : null;
 
   const fromEl = miniCardElByMeld(myTeamId, fromMeldIdx, fromIdx);
   const fromRect = fromEl ? getRect(fromEl) : meldCardsRect(myTeamId, fromMeldIdx);
@@ -1311,6 +1345,13 @@ async function movePickedWildToSelectedMeld() {
     normalizeMeldOrder(toMeld);
   }
 
+  // Moving a wild can clean a canastra too. Only the friend's duration changes;
+  // the existing card-reward rules for this action remain untouched.
+  if (friendKindsBefore) {
+    grantDominationFriendExtraTurn(state, myPlayerIndex, friendKindsBefore[0], classifyMeldForUi(fromMeld).kind, fromMeldIdx);
+    if (!sameMeld) grantDominationFriendExtraTurn(state, myPlayerIndex, friendKindsBefore[1], classifyMeldForUi(toMeld).kind, toMeldIdx);
+  }
+
   const actionCard = packCard(card);
   const actionId = newActionId();
 
@@ -1336,6 +1377,13 @@ async function movePickedWildToSelectedMeld() {
 function playCanastraSfx(kind) {
   if (!audioUnlocked) return;
   const a = CANASTRA_SFX[kind] || CANASTRA_SFX.suja;
+  if (state?.mode === '1x1_dominacao') {
+    if (kind === 'fim') friendSoundQueue.cancel();
+    else if (state.dominationFriend?.active || friendSoundQueue.busy) {
+      friendSoundQueue.enqueue(a);
+      return;
+    }
+  }
   try {
     a.pause();
     a.currentTime = 0;
@@ -1363,6 +1411,7 @@ const canastraKindMem = new Map();
 function resetCanastraSfxMemory() {
   canastraKindMem.clear();
   canastraMemPrimed = false;
+  friendNoticeTracker.reset();
 }
 
 function computeMeldKindMap() {
@@ -1583,6 +1632,10 @@ function updateTimerLabel() {
 
   if (!canPerformCommonGameAction(state)) {
     el.classList.remove('timer-critical');
+    if (isDominationFriendBusy(state) || friendOperationPending) {
+      el.textContent = isDominationFriendTurn(state) ? `TURNO DE ${state.dominationFriend.name.toUpperCase()}` : 'CHAMANDO AMIGA';
+      return;
+    }
     el.textContent = hasPendingBossChoices(state) ? 'PAUSADO · ESCOLHA' : 'TURNO DO CHEFE';
     return;
   }
@@ -1619,6 +1672,188 @@ function resetTurnTimer() {
 let committing = false;
 let pendingCommit = false;
 
+const friendMeldRules = {
+  prepare: (cards) => {
+    const copy = cards.map((card) => ({ ...card }));
+    optimizeMeld(copy);
+    normalizeMeldOrder(copy);
+    return copy;
+  },
+  valid: (cards) => isValidSequenceMeld(cards),
+  classify: (cards) => classifyMeldForUi(cards).kind,
+  isWild: (card, meld) => isWildcard(card, meld),
+};
+
+function friendHostIndex(gameState) {
+  if (!gameState?.players?.[1]?.name?.toUpperCase().includes('BOT')) return 1;
+  const human = gameState.players.findIndex((player) => !player.name.toUpperCase().includes('BOT'));
+  return human >= 0 ? human : -1;
+}
+
+async function saveFriendOperation(operation) {
+  const gameIdentity = state?.friendGameId;
+  const sessionId = window.gameSessionId;
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef);
+    if (sessionId !== window.gameSessionId || window.isClosingGame) return null;
+    if (!snapshot.exists() || !snapshot.data().stateJson) return null;
+    const latest = JSON.parse(snapshot.data().stateJson);
+    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity
+      || latest.finished || latest.surrender?.active || latest.debugPaused) return null;
+    const result = operation(latest);
+    if (!result) return null;
+    latest.friendRevision = (latest.friendRevision || 0) + 1;
+    transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
+    return { state: latest, result };
+  });
+}
+
+window.callDominationFriend = async () => {
+  if (!canCallDominationFriend(state, myPlayerIndex) || friendOperationPending || committing
+    || window.isAutoPlaying || window.isStealModeActive || window.isMelding || document.querySelector('.fly-card')) return;
+  friendOperationPending = true;
+  stopTurnTimer();
+  renderAll();
+  const sessionId = window.gameSessionId;
+  const invitation = createFriendInvitation(crypto.randomUUID());
+  try {
+    const saved = await saveFriendOperation((latest) => {
+      if (!callDominationFriend(latest, myPlayerIndex, invitation, Date.now(), friendMeldRules)) return null;
+      latest.lastAction = { id: `friend_call_${invitation.id}`, type: 'friendCall', playerId: 1, ts: Date.now() };
+      return true;
+    });
+    if (!saved || sessionId !== window.gameSessionId || window.isClosingGame) return;
+    if ((state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
+    localUndoStack = [];
+    renderAll();
+    scheduleDominationFriend();
+    // Only the successful caller animates. Snapshots/reloads show the saved guest.
+    await presentDominationFriend(invitation, () => sessionId === window.gameSessionId && !window.isClosingGame, {
+      fly: flyRectToRect, impact: impactAtRect, rect: getRect,
+      startRouletteSound: () => {
+        const controller = new AbortController();
+        friendSoundQueue.enqueue(FRIEND_MP3.arrival, undefined, { signal: controller.signal, loop: true });
+        return () => controller.abort();
+      },
+    });
+  } catch (error) {
+    console.error('Falha ao chamar amiga:', error);
+    showMessage('Não foi possível salvar a chamada. Tente novamente.');
+  } finally {
+    friendOperationPending = false;
+    if (sessionId === window.gameSessionId && state && !window.isClosingGame) {
+      renderAll();
+      startTurnTimerIfNeeded();
+      scheduleDominationFriend();
+    }
+  }
+};
+
+async function playFriendTurnPresentation(action) {
+  const result = action?.friendResult;
+  if (!result?.steps?.length || state?.mode !== '1x1_dominacao') return;
+  if (friendActionPresentations.has(action.id)) return friendActionPresentations.get(action.id);
+  // A reload renders the saved result without replaying an already ended turn.
+  if (!state.dominationFriend?.active || state.dominationFriend.id !== result.friendId
+    || state.dominationFriend.lastExecutedTurnId === result.turnId) return;
+  const sessionId = window.gameSessionId;
+  const playback = { actionId: action.id, gameId: state.friendGameId, view: structuredClone(state), promise: null };
+  playback.view.dominationFriend.pendingTurnId = result.turnId;
+  playback.view.dominationFriend.farewell = result.farewell;
+  const isActive = () => friendPlayback === playback && sessionId === window.gameSessionId
+    && !window.isClosingGame && state?.mode === '1x1_dominacao'
+    && state.friendGameId === playback.gameId && !state.finished;
+  friendPlayback = playback;
+  playback.promise = Promise.resolve().then(async () => {
+    try {
+      if (!isActive()) return;
+      stopTurnTimer();
+      renderAll();
+      await playDominationFriendTimeline(playback.view, result, {
+        animate: playRemoteAction, render: renderAll, isActive,
+      });
+    } catch (error) {
+      // The gameplay was already committed. A cancelled/failed visual must not
+      // retry the turn, charge bonuses again or strand the next player.
+      if (isActive()) console.error('Falha na animação da amiga:', error);
+    } finally {
+      if (friendPlayback === playback) friendPlayback = null;
+    }
+  });
+  friendActionPresentations.set(action.id, playback.promise);
+  return playback.promise;
+}
+
+function syncDominationFriendNotices() {
+  if (state?.mode !== '1x1_dominacao' || state.finished || window.isClosingGame) return;
+  const sessionId = window.gameSessionId;
+  const gameIdentity = state.friendGameId;
+  for (const event of friendNoticeTracker.collect(state, friendOperationPending)) {
+    // Entry music belongs only to the visible roulette, not the arrival notice.
+    friendSoundQueue.enqueue(event.type === 'arrival' ? null : FRIEND_MP3[event.type], () => {
+      if (sessionId !== window.gameSessionId || window.isClosingGame || state?.finished
+        || state?.friendGameId !== gameIdentity) return;
+      return showDominationFriendNotice(event);
+    });
+  }
+}
+
+function scheduleDominationFriend() {
+  clearTimeout(friendAutomationTimer);
+  friendAutomationTimer = null;
+  if (state?.mode !== '1x1_dominacao' || state.finished || state.debugPaused
+    || !state.dominationFriend?.active || window.isClosingGame) return;
+  const friend = state.dominationFriend;
+  if (!friend.pendingTurnId && !friend.presentationUntil) return;
+  const sessionId = window.gameSessionId;
+  const wait = Math.max(1200, (friend.presentationUntil || 0) - Date.now() + 50);
+  friendAutomationTimer = setTimeout(async () => {
+    friendAutomationTimer = null;
+    if (sessionId !== window.gameSessionId || window.isClosingGame || !state || state.debugPaused) return;
+    if (myPlayerIndex !== friendHostIndex(state)) {
+      renderAll();
+      startTurnTimerIfNeeded();
+      return;
+    }
+    if (committing || friendOperationPending || friendAutomationRunning || friendPlayback) { scheduleDominationFriend(); return; }
+    friendAutomationRunning = true;
+    try {
+      const saved = await saveFriendOperation((latest) => {
+        const guest = latest.dominationFriend;
+        if (myPlayerIndex !== friendHostIndex(latest) || !guest?.active || guest.presentationUntil > Date.now()) return null;
+        let result;
+        if (guest.pendingTurnId) result = executeDominationFriendTurn(latest, guest.pendingTurnId, friendMeldRules);
+        else if (guest.presentationUntil) result = { arrived: true, name: guest.name };
+        if (!result) return null;
+        guest.presentationUntil = 0;
+        latest.lastAction = {
+          id: `friend_${result.turnId || guest.id + '_arrival'}`,
+          type: 'friendTurn', playerId: 'friend', friendResult: result, ts: Date.now(),
+        };
+        return result;
+      });
+      if (saved && sessionId === window.gameSessionId && !window.isClosingGame) {
+        // The host and its own snapshot share the same presentation promise.
+        await playFriendTurnPresentation(saved.state.lastAction);
+        if (sessionId !== window.gameSessionId || window.isClosingGame) return;
+        localUndoStack = [];
+        if ((state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
+        if (saved.result.departed) showMessage(`💋 ${saved.result.name} foi embora.`);
+      }
+    } catch (error) {
+      console.error('Falha no turno da amiga:', error);
+      showMessage('Aguardando conexão para concluir o turno da amiga.');
+    } finally {
+      friendAutomationRunning = false;
+      if (sessionId === window.gameSessionId && state && !window.isClosingGame) {
+        renderAll();
+        startTurnTimerIfNeeded();
+        scheduleDominationFriend();
+      }
+    }
+  }, wait);
+}
+
 async function commitState() {
   if (!state || window.isClosingGame) return;
 
@@ -1647,7 +1882,38 @@ async function commitState() {
         break;
       }
       pendingCommit = false;
-      await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+      if (state.mode === '1x1_dominacao') {
+        const localState = state;
+        const proposal = structuredClone(state);
+        const expectedRevision = proposal.friendRevision || 0;
+        const sessionId = window.gameSessionId;
+        const saved = await runTransaction(db, async (transaction) => {
+          const snapshot = await transaction.get(gameRef);
+          if (!snapshot.exists() || !snapshot.data().stateJson) return null;
+          const latest = JSON.parse(snapshot.data().stateJson);
+          if (latest.mode !== proposal.mode || latest.friendGameId !== proposal.friendGameId) return null;
+          if ((latest.friendRevision || 0) !== expectedRevision || latest.surrender?.active) return { accepted: false, state: latest };
+          proposal.friendRevision = (latest.friendRevision || 0) + 1;
+          transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
+          return { accepted: true, state: proposal };
+        });
+        if (!saved?.accepted) {
+          pendingCommit = false;
+          localUndoStack = [];
+          if (saved && sessionId === window.gameSessionId && !window.isClosingGame
+            && state?.friendGameId === proposal.friendGameId
+            && (state.friendRevision || 0) <= saved.state.friendRevision) {
+            state = saved.state;
+            renderAll();
+            startTurnTimerIfNeeded();
+            scheduleDominationFriend();
+          }
+          return;
+        }
+        if (state === localState) state.friendRevision = saved.state.friendRevision;
+      } else {
+        await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+      }
     }
   } catch (err) {
     console.error('commitState failed:', err);
@@ -1664,6 +1930,7 @@ function passTurn({ preserveUndo = false } = {}) {
   if (!preserveUndo) localUndoStack = [];
   state.powerActiveThisTurn = false; // Desativa o poder do Dominador ao fim do turno
   window.isStealModeActive = false; // Força fechar a visão
+  queueDominationFriendTurn(state, state.currentPlayer);
   if (isCurrentBossMode()) {
     state._pendingBossEvent = completeBossPlayerTurn(state, state.currentPlayer);
     state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
@@ -2217,6 +2484,12 @@ async function startGame(mode, names, variant, pixKeys = []) {
     dominatorUsedPower: false,
     powerActiveThisTurn: false,
   };
+  if (mode === '1x1_dominacao') {
+    newState.friendUsed = false;
+    newState.dominationFriend = null;
+    newState.friendRevision = 0;
+    newState.friendGameId = crypto.randomUUID();
+  }
   if (isBossMode(mode)) {
     newState.boss = createBossStateForMode(mode, Date.now());
     beginBossTurn(newState, { first: true, now: Date.now() });
@@ -2244,7 +2517,9 @@ function showPendingBossChoiceMessage(playerId = myPlayerIndex) {
   else showMessage(`Aguardando ${target?.name || 'o jogador alvo'} decidir.`);
 }
 function canPerformCommonGameAction(gameState = state) {
-  return canBossPerformCommonAction(gameState);
+  return !isDominationFriendBusy(gameState)
+    && !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback))
+    && canBossPerformCommonAction(gameState);
 }
 function ensureMyTurn() {
   if (!state || state.finished) {
@@ -2257,6 +2532,7 @@ function ensureMyTurn() {
   }
   if (!canPerformCommonGameAction(state)) {
     if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
+    else if (isDominationFriendBusy(state) || friendOperationPending) showMessage('👠 Aguarde a amiga concluir a participação.');
     else showMessage(`${getBossDefinition(state.boss?.id)?.name || 'O chefe'} esta executando a acao da rodada.`);
     return false;
   }
@@ -2919,6 +3195,7 @@ function legacyIsValidSequenceMeld(cards) {
 
 async function processDominationReward(p, oldKind, newKind, meldIndex) {
   if (!state || state.mode !== '1x1_dominacao') return null;
+  grantDominationFriendExtraTurn(state, p.id, oldKind, newKind, meldIndex);
   if (oldKind === newKind) return null;
   if (meldIndex === undefined || meldIndex === null || meldIndex < 0) return null;
 
@@ -4870,6 +5147,14 @@ function renderBossResult() {
 
 function renderAll() {
   if (!state) return;
+  // Only rendering sees the intermediate friend frame. Restore the persisted
+  // state synchronously, before any event, timer or network callback can run.
+  if (state.mode === '1x1_dominacao' && friendPlayback && state !== friendPlayback.view && state.friendGameId === friendPlayback.gameId) {
+    const persisted = state;
+    state = friendPlayback.view;
+    try { renderAll(); } finally { state = persisted; }
+    return;
+  }
 
   // Garante que a UI sempre destrave ao receber novo estado
   window.isAutoPlaying = false;
@@ -4963,7 +5248,7 @@ function renderAll() {
   const commonActionsAllowed = canPerformCommonGameAction(state);
   const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex && commonActionsAllowed;
 
-  const currP = currentPlayer();
+  const currP = isDominationFriendTurn(state) ? state.dominationFriend : currentPlayer();
   const pName = currP ? currP.name : 'Aguardando...';
   const cardCount = currP && currP.hand ? currP.hand.length : 0; // 🔥 CORREÇÃO: Variável declarada corretamente no escopo de renderAll
 
@@ -5123,6 +5408,9 @@ function renderAll() {
   renderOpponentHands();
   renderHand();
   renderMelds();
+  renderDominationFriend(state, myPlayerIndex);
+  const callFriendButton = document.getElementById('callFriendBtn');
+  if (callFriendButton) callFriendButton.disabled = friendOperationPending || !commonActionsAllowed;
 
   const myTurn = !state.finished && state.currentPlayer === myPlayerIndex && commonActionsAllowed;
 
@@ -5166,7 +5454,8 @@ function renderAll() {
   // Controle de exibição do botão Voltar
   const undoBtn = document.getElementById('undoBtn');
   if (undoBtn) {
-    const canUndo = canRestoreUndoTransaction(localUndoStack[localUndoStack.length - 1], state, myPlayerIndex);
+    const canUndo = !isDominationFriendBusy(state) && !friendOperationPending
+      && canRestoreUndoTransaction(localUndoStack[localUndoStack.length - 1], state, myPlayerIndex);
     undoBtn.style.display = canUndo ? 'block' : 'none';
     undoBtn.disabled = !canUndo;
     undoBtn.title = canUndo ? 'Desfazer a ultima acao completa' : 'Esta acao nao pode ser desfeita';
@@ -5234,6 +5523,8 @@ function renderAll() {
   }
 
   syncCanastraSfxFromState();
+  // Canastra first, then its extra-turn announcement/MP3, on every client.
+  syncDominationFriendNotices();
 
   // reativa os carrinhos do tema arcade sem loop bugado
   refreshArcadeCars(false);
@@ -5481,6 +5772,9 @@ function fallbackSeatRect(seat) {
 }
 
 function opponentAnchorRect(pid) {
+  if (pid === 'friend' && state?.mode === '1x1_dominacao') {
+    return getOpponentAnchorRectById('dominationFriendPanel', myPlayerIndex === 1 ? 'right' : 'left');
+  }
   const seat = seatForPlayer(pid);
   if (seat === 'self') {
     const hc = document.getElementById('handContainer');
@@ -5775,8 +6069,8 @@ function renderMelds() {
     s2 = 0;
 
   const meLocal = state.players[myPlayerIndex];
-  const myTurnLocal = !state.finished && state.currentPlayer === myPlayerIndex;
-  const activeTeamId = state.players?.[state.currentPlayer]?.teamId;
+  const myTurnLocal = !state.finished && state.currentPlayer === myPlayerIndex && !isDominationFriendBusy(state);
+  const activeTeamId = isDominationFriendTurn(state) ? state.players[1].teamId : state.players?.[state.currentPlayer]?.teamId;
 
   state.teams.forEach((t, i) => {
     const info = computeTeamMeldScore(t);
@@ -6616,8 +6910,12 @@ function showMessage(msg) {
 
 async function playRemoteAction(a) {
   if (!state || !a) return;
+  if (a.type === 'friendTurn') return playFriendTurnPresentation(a);
 
-  const stockEl = document.querySelector('#drawStockBtn .pile-card');
+  const isFriend = a.playerId === 'friend' && state.mode === '1x1_dominacao';
+  const friendSessionId = window.gameSessionId;
+  const flightStillActive = () => !isFriend || (friendSessionId === window.gameSessionId && !window.isClosingGame);
+  const stockEl = document.querySelector(isFriend ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card');
   const discardEl = document.querySelector('#drawDiscardBtn .pile-card');
   const dead0El = document.getElementById('mortoSlot0');
   const dead1El = document.getElementById('mortoSlot1');
@@ -6756,9 +7054,11 @@ async function playRemoteAction(a) {
       }
     }
 
-    const drawCount = Math.max(0, (a.count || 1) - (a.bossExtraCards?.length || 0));
+    const drawCount = isFriend ? a.cards.length : Math.max(0, (a.count || 1) - (a.bossExtraCards?.length || 0));
     for (let i = 0; i < drawCount; i++) {
-      if (stockRect) await flyRectToRect(fallbackCard, stockRect, handRect, 'back');
+      if (!flightStillActive()) return;
+      if (stockRect) await flyRectToRect(isFriend ? a.cards[i] : fallbackCard, stockRect, handRect, 'back');
+      if (!flightStillActive()) return;
       impactAtRect(handRect);
       if (i < drawCount - 1) await new Promise((r) => setTimeout(r, 180)); // Pequeno delay pra ver as cartas separadas
     }
@@ -6851,7 +7151,7 @@ async function playRemoteAction(a) {
       cards.map((c, i) => {
         c.id ||= `rm_${Date.now()}_${i}`;
         const toRect = targets[i];
-        return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
+        return flyRectToRect(c, handRect, toRect, 'front').then(() => { if (flightStillActive()) impactAtRect(toRect); });
       }),
     );
 
@@ -6873,7 +7173,7 @@ async function playRemoteAction(a) {
       cards.map((c, i) => {
         c.id ||= `re_${Date.now()}_${i}`;
         const toRect = targets[i];
-        return flyRectToRect(c, handRect, toRect, 'front').then(() => impactAtRect(toRect));
+        return flyRectToRect(c, handRect, toRect, 'front').then(() => { if (flightStillActive()) impactAtRect(toRect); });
       }),
     );
 
@@ -7830,6 +8130,8 @@ onSnapshot(gameRef, async (snap) => {
   if (!data.stateJson) return;
 
   const newState = JSON.parse(data.stateJson);
+  if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId
+    && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.
   delete newState.pendingWildcardChoice;
   newState.variant = normalizeVariantForMode(newState.mode, newState.variant);
@@ -7842,7 +8144,17 @@ onSnapshot(gameRef, async (snap) => {
 
   if (!state || window.isClosingGame) activateGameSession();
   const snapshotSessionId = window.gameSessionId;
+  // Do not let a repeated or newer snapshot cut across a guest's card flight.
+  if (friendPlayback && newState.friendGameId === friendPlayback.gameId) {
+    await friendPlayback.promise;
+    if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
+    if ((newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
+  }
   if (state && !state.finished && newState.finished) playCanastraSfx('fim');
+  const showFriendArrival = !!state && state.friendGameId === newState.friendGameId
+    && newState.mode === '1x1_dominacao' && !state.dominationFriend
+    && newState.dominationFriend?.active && newState.dominationFriend.presentationUntil > Date.now()
+    && !friendOperationPending;
 
   // 🚀 INTERCEPTOR GRAFICO: Captura a nova ação remota ANTES de aplicar as mutações de dados no state
   const a = newState.lastAction;
@@ -7869,6 +8181,10 @@ onSnapshot(gameRef, async (snap) => {
 
   // 2. Após o término do voo, atualiza a memória com o novo estado e renderiza limpando o DOM de forma síncrona
   if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
+  if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId
+    && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
+  const previousFriendTurn = state?.dominationFriend?.lastExecutedTurnId;
+  const hadFriend = state?.dominationFriend?.active;
   state = newState;
   movingWild = null;
   selectedHandIndexes.clear();
@@ -7881,7 +8197,21 @@ onSnapshot(gameRef, async (snap) => {
   syncTableAmbientMusic();
 
   renderAll();
+  if (showFriendArrival) {
+    try {
+      await dealDominationFriendCards(state.dominationFriend,
+        () => snapshotSessionId === window.gameSessionId && !window.isClosingGame,
+        { fly: flyRectToRect, impact: impactAtRect, rect: getRect });
+    } catch (error) {
+      if (snapshotSessionId === window.gameSessionId && !window.isClosingGame) console.error('Falha na entrada da amiga:', error);
+    }
+    if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
+  }
   startTurnTimerIfNeeded();
+  if (hadFriend && previousFriendTurn !== state.dominationFriend?.lastExecutedTurnId && !state.dominationFriend?.active) {
+    showMessage(`💋 ${state.dominationFriend.name} foi embora.`);
+  }
+  scheduleDominationFriend();
 
   // 🎲 Anuncia quem venceu no dado assim que a mesa carrega (Isolado no fluxo estável)
   if (!isNewRemoteAction) {
@@ -7961,7 +8291,7 @@ onSnapshot(gameRef, async (snap) => {
         await sessionEngine.resolvePendingBossChoice(pendingBotChoice.playerId);
       }, 700);
     }
-  } else if (!state.finished && !isBossLabAutomationPaused() && !hasPendingBossChoices(state) && !isBossTurnActive(state)) {
+  } else if (!state.finished && !isBossLabAutomationPaused() && canPerformCommonGameAction(state) && !hasPendingBossChoices(state) && !isBossTurnActive(state)) {
     const currentPlayerObj = state.players[state.currentPlayer];
 
     if (currentPlayerObj && currentPlayerObj.name.toUpperCase().includes('BOT')) {
@@ -7988,7 +8318,7 @@ onSnapshot(gameRef, async (snap) => {
 
             if (!isGameSessionActive(scheduledSessionId, scheduledSignal)) return;
             if (!state || state.finished) return;
-            if (isBossTurnActive(state) || hasPendingBossChoices(state)) return;
+            if (!canPerformCommonGameAction(state) || isBossTurnActive(state) || hasPendingBossChoices(state)) return;
             if (document.getElementById('gameSection').style.display !== 'flex') return;
             if (state.debugPaused) return; // 🛑 CORTA A IA IMEDIATAMENTE
             if (isBossLabAutomationPaused()) return;
@@ -9435,6 +9765,25 @@ document.getElementById('drawStockBtn').onclick = drawFromStock;
 document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
 
 // --- LÓGICA DE VOTAÇÃO PARA SAIR ---
+async function saveSurrenderState() {
+  if (state.mode !== '1x1_dominacao') {
+    await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+    return;
+  }
+  const gameIdentity = state.friendGameId;
+  const surrender = structuredClone(state.surrender);
+  // Closing/reopening the dialog must not overwrite a concurrently saved guest.
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef);
+    if (!snapshot.exists() || !snapshot.data().stateJson) return;
+    const latest = JSON.parse(snapshot.data().stateJson);
+    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity) return;
+    latest.surrender = surrender;
+    latest.friendRevision = (latest.friendRevision || 0) + 1;
+    transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
+  });
+}
+
 document.getElementById('endGameBtn').onclick = async () => {
   if (!state) return;
 
@@ -9464,7 +9813,7 @@ document.getElementById('endGameBtn').onclick = async () => {
   }
 
   try {
-    await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+    await saveSurrenderState();
   } catch (err) {
     console.error('[ERRO] Falha ao atualizar status de rendição:', err);
   }
@@ -9486,7 +9835,7 @@ document.getElementById('voteYesBtn').onclick = async () => {
     return;
   }
 
-  await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+  await saveSurrenderState();
 };
 
 document.getElementById('voteNoBtn').onclick = async () => {
@@ -9494,7 +9843,7 @@ document.getElementById('voteNoBtn').onclick = async () => {
   activateGameSession();
   state.surrender.active = false;
   state.surrender.votes = {};
-  await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+  await saveSurrenderState();
 };
 
 function renderSurrender() {

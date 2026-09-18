@@ -562,3 +562,115 @@
           0 0 7px var(--brasao-glow),
           0 2px 0 rgba(0, 0, 0, 0.9);
       }
+#callFriendBtn[hidden] { display: none !important; }
+#callFriendBtn {
+  background: linear-gradient(135deg, #831843, #581c87);
+  border: 1px solid #f9a8d4;
+  color: #fff1f2;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 900;
+}
+.domination-friend-seat { z-index: 26; padding: 8px; gap: 7px; }
+.domination-friend-seat .opponent-label {
+  writing-mode: horizontal-tb;
+  transform: none;
+  margin-bottom: 0;
+  max-width: 110px;
+  text-align: center;
+}
+.friend-seat-status { font-size: 9px; color: #e2e8f0; text-align: center; }
+.domination-friend-seat .opponent-cards { padding-bottom: 30px; }
+.friend-stock { display: grid; justify-items: center; gap: 5px; margin-top: 4px; }
+.domination-friend-seat .friend-stock .opponent-card-back { transform: none; margin: 0; }
+.friend-stock small { font-size: 8px; color: #94a3b8; }
+.friend-farewell { color: #f9a8d4; letter-spacing: 1px; font-size: 9px; }
+.friend-notice {
+  position: fixed;
+  z-index: 10003;
+  left: 50%;
+  top: 24%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 9px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 22px 30px;
+  box-sizing: border-box;
+  border: 1px solid #e6c879;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #29203af5, #10131ef5);
+  color: #fff3d5;
+  box-shadow: 0 10px 50px #0009, 0 0 24px #e6c87933;
+  text-align: center;
+  pointer-events: none;
+}
+.friend-notice strong { font-size: clamp(16px, 2.5vw, 24px); }
+.friend-notice span { font-size: 12px; line-height: 1.5; color: #e9d9b7; }
+.friend-notice-extraTurn strong { color: #fde68a; }
+.domination-friend-seat.friend-entering .opponent-label { animation: friend-seat-entry 750ms ease-out; }
+.friend-presentation {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: grid;
+  place-items: center;
+  background: #080714d9;
+  padding: 20px;
+}
+.friend-invitation {
+  width: min(400px, 100%);
+  box-sizing: border-box;
+  border: 1px solid #b99755;
+  border-radius: 16px;
+  padding: 24px 18px 14px;
+  background: radial-gradient(ellipse at top, #31313e, #10121b 75%);
+  color: #fff3d5;
+  text-align: center;
+  box-shadow: 0 20px 70px #0008;
+}
+.friend-invitation > strong { font-size: 16px; }
+.friend-invitation > p { min-height: 38px; margin-bottom: 0; font-size: 12px; line-height: 1.6; color: #e9d9b7; }
+.friend-wheel-stage { margin: 26px auto 16px; width: min(290px, 62vw, 48dvh); }
+.friend-wheel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: repeating-conic-gradient(#f4dda0 0deg 2deg, #8c652c 2deg 12deg);
+  box-shadow: 0 0 0 3px #412b14, 0 0 0 5px #be9550, 0 12px 28px #0009;
+}
+.friend-wheel::after {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: calc(50% - 12px);
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 27px solid #ffe5a4;
+  filter: drop-shadow(0 3px 2px #0009);
+  z-index: 2;
+}
+.friend-wheel-rotor { position: absolute; inset: 10px; border: 2px solid #e7c582; border-radius: 50%; }
+.friend-wheel-label {
+  position: absolute;
+  color: #fff9e8;
+  font-size: clamp(10px, 2.3vw, 14px);
+  font-weight: 800;
+  white-space: nowrap;
+  text-shadow: 0 2px 3px #000b;
+}
+.friend-wheel-hub {
+  position: absolute;
+  inset: 40%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid #ffe5a4;
+  background: radial-gradient(circle at 35% 25%, #ffe6ac, #a67630);
+  color: #493018;
+  font-size: 24px;
+  box-shadow: 0 3px 8px #0008;
+}
+@keyframes friend-seat-entry { from { opacity: 0; scale: 0.8; } to { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .domination-friend-seat.friend-entering .opponent-label { animation: none; } }

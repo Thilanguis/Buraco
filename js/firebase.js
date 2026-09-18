@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { deleteDoc, doc, getFirestore, onSnapshot, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { deleteDoc, doc, getFirestore, onSnapshot, runTransaction, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBHvYOK7pWkikA9x5AjrVjuuSmopHisGik',
@@ -14,4 +14,4 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
-export { db, deleteDoc, doc, onSnapshot, setDoc, updateDoc };
+export { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc };
