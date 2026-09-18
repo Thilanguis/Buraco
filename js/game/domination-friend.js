@@ -104,8 +104,16 @@ export function previewFriendExtension(base, added, rules) {
   const before = rules.prepare(base);
   const after = rules.prepare([...base, ...added]);
   if (!rules.valid(after)) return null;
-  if (!before.some((card) => rules.isWild(card, before))
-    && after.some((card) => rules.isWild(card, after))) return null;
+  // Existing games only receive natural cards, even when still small or
+  // already dirty. Never replace an existing natural 2's role with a wild.
+  // A same-suit 2 is allowed if preparation actually makes it natural.
+  const addedIds = new Set(added.map((card) => card.id));
+  const naturalIds = new Set([
+    ...base.filter((card) => !rules.isWild(card, base)),
+    ...before.filter((card) => !rules.isWild(card, before)),
+  ].map((card) => card.id));
+  if (after.some((card) => rules.isWild(card, after)
+    && (addedIds.has(card.id) || naturalIds.has(card.id)))) return null;
   if (WEIGHT[rules.classify(after)] < WEIGHT[rules.classify(before)]) return null;
   return after;
 }
@@ -251,7 +259,7 @@ export function executeDominationFriendTurn(state, turnId, rules) {
     }
     if (cards.length) steps.push({ type: 'drawStock', playerId: 'friend', cards });
   };
-  draw(1);
+  draw(2);
   const bonuses = new Map();
   const plays = [];
   // Each iteration places cards; the finite auxiliary deck bounds bonus chains.

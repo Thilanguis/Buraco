@@ -202,7 +202,7 @@ test('amiga ocupa assento lateral com os mesmos versos da partida e sai ao mudar
 test('turno grava e anima compra, baixada, bonus e extensao na ordem sem alterar o estado salvo', async () => {
   const state = invite();
   state.dominationFriend.hand = cards(['3', '4', '5', '6', '7', '8'], '♣', 'guest');
-  state.dominationFriend.stock = cards(['10', '9'], '♣', 'aux');
+  state.dominationFriend.stock = [...cards(['10'], '♣', 'bonus'), ...cards(['K'], '♥', 'spare'), ...cards(['9'], '♣', 'aux')];
   const before = structuredClone(state);
   const result = friendTurn(state);
   const saved = JSON.stringify(state);
@@ -222,7 +222,7 @@ test('turno grava e anima compra, baixada, bonus e extensao na ordem sem alterar
     isActive: () => true,
   });
   assert.deepEqual(flown, result.steps.map((step) => step.type));
-  assert.deepEqual(rendered, [7, 0, 1, 0]);
+  assert.deepEqual(rendered, [8, 1, 2, 1]);
   assert.deepEqual(view.teams, state.teams);
   assert.deepEqual(view.dominationFriend.hand, state.dominationFriend.hand);
   assert.deepEqual(view.dominationFriend.stock, state.dominationFriend.stock);
@@ -411,6 +411,56 @@ test('IA nunca suja jogo limpo, prefere alimentar e evolui Real para As-a-As', (
   assert.equal(state.dominationFriend.hand.length, 1);
 });
 
+test('amiga nao acrescenta coringa a jogo existente em formacao, nem na despedida', () => {
+  for (const turns of [3, 1]) {
+    for (const rank of ['2', 'JOKER']) {
+      const state = invite();
+      // O 2 de paus ocupa o 3 neste jogo. Antes, a IA aceitava outro coringa
+      // aqui, convertendo o 2 antigo em natural e mantendo o jogo sujo.
+      const existing = rules.prepare(cards(['2', '4', '5', '6']));
+      state.teams[1].melds = [existing];
+      state.dominationFriend.turnsRemaining = turns;
+      state.dominationFriend.hand = [...cards(['9', '10'], '♦', 'pair'), ...cards([rank], '♥', 'wild')];
+      state.dominationFriend.stock = [];
+      assert.equal(previewFriendExtension(existing, cards([rank], '♥', 'candidate'), rules), null);
+      const before = structuredClone(existing);
+      const result = friendTurn(state);
+      assert.deepEqual(state.teams[1].melds[0], before);
+      assert.equal(result.plays[0].meldIndex, 1, 'coringa somente no novo jogo separado');
+      assert.equal(state.teams[1].melds[1].length, 3);
+      assert.ok(state.teams[1].melds[1].some((card) => rules.isWild(card, state.teams[1].melds[1])));
+    }
+  }
+});
+
+test('extensao permite 2 natural do mesmo naipe mas nao transforma natural existente em coringa', () => {
+  const base = cards(['3', '4', '5']);
+  const natural = previewFriendExtension(base, cards(['2'], '♣', 'natural'), rules);
+  assert.ok(natural);
+  assert.ok(natural.every((card) => !rules.isWild(card, natural)));
+  const low = rules.prepare(cards(['2', '3', '4']));
+  assert.equal(previewFriendExtension(low, cards(['6'], '♣', 'gap'), rules), null);
+});
+
+test('compra duas cartas auxiliares uma vez por turno, respeitando monte vazio ou incompleto', () => {
+  for (const size of [0, 1, 2, 3]) {
+    const state = invite();
+    state.dominationFriend.hand = [];
+    state.dominationFriend.stock = cards(Array(size).fill('K'), '♥', 'aux');
+    const before = structuredClone(state);
+    const result = friendTurn(state);
+    const expected = Math.min(2, size);
+    assert.equal(state.dominationFriend.hand.length, expected);
+    assert.equal(state.dominationFriend.stock.length, size - expected);
+    assert.equal(result.steps.filter((step) => step.type === 'drawStock').flatMap((step) => step.cards).length, expected);
+    for (const key of ['stock', 'discard', 'deadPiles', 'players']) assert.deepEqual(state[key], before[key]);
+    const restored = JSON.parse(JSON.stringify(state));
+    const saved = JSON.stringify(restored);
+    assert.equal(executeDominationFriendTurn(restored, result.turnId, rules), null);
+    assert.equal(JSON.stringify(restored), saved);
+  }
+});
+
 test('despedida final remove amiga da rotacao e preserva todos os jogos baixados', () => {
   const state = invite();
   state.dominationFriend.hand = cards(['3', '4', '5', '6'], '♣', 'guest');
@@ -502,11 +552,11 @@ test('bonus de Limpa, Real e As-a-As continuam saindo somente do baralho auxilia
     const mainStock = structuredClone(state.stock);
     state.teams[1].melds = [rules.prepare(cards(ranks))];
     state.dominationFriend.hand = [];
-    state.dominationFriend.stock = [...cards(['K', 'K', 'K'], '♥', 'aux'), ...cards([next], '♣', 'next')];
+    state.dominationFriend.stock = [...cards(['K', 'K', 'K', 'K', 'K'], '♥', 'aux'), ...cards([next], '♣', 'next')];
     const result = friendTurn(state);
     assert.equal(result.plays[0].newKind, kind);
-    assert.equal(result.steps.filter((step) => step.type === 'drawStock').flatMap((step) => step.cards).length, 1 + bonus);
-    assert.equal(state.dominationFriend.stock.length, 3 - bonus);
+    assert.equal(result.steps.filter((step) => step.type === 'drawStock').flatMap((step) => step.cards).length, 2 + bonus);
+    assert.equal(state.dominationFriend.stock.length, 4 - bonus);
     assert.deepEqual(state.stock, mainStock);
   }
 });
@@ -611,14 +661,14 @@ test('conquista da amiga na despedida prolonga presenca e persiste uma unica vez
     assert.equal(state.dominationFriend.extraTurns, 0, 'canastras anteriores a entrada nao contam');
     state.dominationFriend.turnsRemaining = 1;
     state.dominationFriend.hand = [];
-    state.dominationFriend.stock = [...cards(['K', 'K', 'K'], '♥', 'bonus'), ...cards([next], '♣', 'natural')];
+    state.dominationFriend.stock = [...cards(['K', 'K', 'K', 'K', 'K'], '♥', 'bonus'), ...cards([next], '♣', 'natural')];
     const result = friendTurn(state);
     assert.equal(result.farewell, true);
     assert.equal(result.departed, false);
     assert.equal(state.dominationFriend.turnsRemaining, 1);
     assert.equal(state.dominationFriend.active, true);
     assert.equal(state.dominationFriend.extraTurns, 1);
-    assert.equal(state.dominationFriend.stock.length, 3 - bonus);
+    assert.equal(state.dominationFriend.stock.length, 4 - bonus);
     const event = result.steps.find((step) => step.friendEvent)?.friendEvent;
     assert.equal(event.kind, kind);
     assert.equal(event.playerId, 'friend');
