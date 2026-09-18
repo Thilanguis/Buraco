@@ -4,7 +4,7 @@ export const FRIEND_NAMES = Object.freeze(['Bruna', 'Nathalia', 'Thayanne']);
 export const FRIEND_PRESENTATION_TIMING = Object.freeze({ spinMs: 3600, resultMs: 1400, dealMs: 1600 });
 const MODE = '1x1_dominacao';
 const WEIGHT = { simple: 0, suja: 1, limpa: 2, real: 3, asas: 4 };
-const BONUS = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 };
+const BONUS = { simple: 0, suja: 0, limpa: 1, real: 1, asas: 1 };
 
 export function normalizeDominationOptions(options) {
   return { friend: options?.friend !== false, plus: options?.plus !== false, vision: options?.vision !== false };
@@ -119,11 +119,12 @@ export function grantDominationFriendSharedBonus(state, playerId, kind, count, m
     || playerId !== 1 || !BONUS[kind] || !Number.isInteger(count) || count <= 0
     || !Number.isInteger(meldIndex) || meldIndex < 0) return null;
   if (!dominationFeatureEnabled(state, 'plus')) return null;
-  const id = `${friend.id}:bonus:${state.turnNumber || 0}:${meldIndex}:${kind}`;
+  const prefix = `${friend.id}:bonus:${state.turnNumber || 0}:${meldIndex}:`;
+  const id = `${prefix}${kind}`;
   const events = friend.events ||= [];
-  if (events.some((event) => event.id === id)) return null;
+  if (events.some((event) => event.id.startsWith(prefix))) return null;
   const cards = [];
-  for (let i = 0; i < count && friend.stock.length; i++) {
+  for (let i = 0; i < Math.min(count, BONUS[kind]) && friend.stock.length; i++) {
     const card = friend.stock.pop();
     friend.hand.push(card);
     cards.push({ ...card });
@@ -397,16 +398,11 @@ export function executeDominationFriendTurn(state, turnId, rules) {
     if (cards.length) steps.push({ type: 'drawStock', playerId: 'friend', cards, reason: kind ? 'canastra' : 'turn', kind });
   };
   let pickupPlan = chooseFriendDiscardPickup(state, team, rules, farewell);
-  let complementaryDraw = false;
   if (pickupPlan) {
     const pile = friend.discard.splice(0);
     friend.hand.push(...pile);
     steps.push({ type: 'drawDiscard', playerId: 'friend', cards: pile.map((card) => ({ ...card })), variant: state.variant });
-    complementaryDraw = state.variant === 'fechado';
-    if (!complementaryDraw) {
-      draw(1);
-      pickupPlan = null;
-    }
+    if (state.variant !== 'fechado') pickupPlan = null;
   } else draw(2);
   const bonuses = new Map();
   const plays = [];
@@ -450,10 +446,6 @@ export function executeDominationFriendTurn(state, turnId, rules) {
       draw(count, newKind);
       drawDominadorSharedBonus(state, count, newKind, steps, rules);
       bonuses.set(chosen.meldIndex, Math.max(previous, BONUS[newKind]));
-    }
-    if (complementaryDraw) {
-      draw(1);
-      complementaryDraw = false;
     }
   }
   // Discard only to her private pile; retain wilds and connected naturals.

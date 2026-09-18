@@ -1776,6 +1776,13 @@ async function playFriendTurnPresentation(action) {
       renderAll();
       await playDominationFriendTimeline(playback.view, result, {
         animate: playRemoteAction, render: renderAll, isActive,
+        pace: async (stage) => {
+          const ranges = { think: [1500, 5500], organize: [900, 1300], play: [1700, 2300], discard: [800, 1400], card: [180, 350] };
+          const [min, max] = ranges[stage];
+          await BuracoBot.sleep(BuracoBot.randomDelay(min, max), {
+            isActive, getState: () => state,
+          }, botTurnController.signal);
+        },
       });
     } catch (error) {
       // The gameplay was already committed. A cancelled/failed visual must not
@@ -2650,6 +2657,15 @@ async function drawBossTurnExtras(player) {
   return cards;
 }
 
+function normalizeLegacyDiscardPurchase(gameState) {
+  if (['1x1_duploMorto', '1x1_dominacao'].includes(gameState?.mode) && gameState.partialDraw
+    && gameState.lastAction?.playerId === gameState.currentPlayer
+    && ['drawDiscard', 'drawDiscardFechado'].includes(gameState.lastAction?.type)) {
+    gameState.hasDrawnThisTurn = true;
+    gameState.partialDraw = false;
+  }
+}
+
 async function drawFromStock() {
   if (!ensureMyTurn()) return;
   if (state.hasDrawnThisTurn) {
@@ -2666,7 +2682,7 @@ async function drawFromStock() {
 
   saveStateForUndo('drawStock');
 
-  // Se for J2 na Humilhação ou Dominação, puxa 2 (se já puxou do lixo, puxa só mais 1)
+  // J2 compra 2; uma compra parcial da Visao ainda permite apenas 1.
   const isDominador = (state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1;
   const bossExtraDraw = consumeBossExtraDraw(state, state.currentPlayer);
   const drawCount = (isDominador ? (state.partialDraw ? 1 : 2) : 1) + bossExtraDraw;
@@ -2984,13 +3000,8 @@ async function drawFromDiscard() {
     if (state.finished) return;
     const vaultInterestEvent = deferBossVault(state, me.id);
 
-    if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1 && !state.partialDraw) {
-      state.partialDraw = true;
-      showMessage('Lixo baixado direto! Compre 1 carta do monte!');
-    } else {
-      state.hasDrawnThisTurn = true;
-      state.partialDraw = false;
-    }
+    state.hasDrawnThisTurn = true;
+    state.partialDraw = false;
 
     state.pickedDiscardCardId = null;
     state.requiredDiscardCard = null;
@@ -3086,13 +3097,8 @@ async function drawFromDiscard() {
   if (!state.boughtCardIds) state.boughtCardIds = [];
   pile.forEach((c) => state.boughtCardIds.push(c.id));
 
-  if ((state.mode === '1x1_duploMorto' || state.mode === '1x1_dominacao') && state.currentPlayer === 1 && !state.partialDraw) {
-    state.partialDraw = true;
-    showMessage('Lixo recolhido. Compre 1 carta do monte!');
-  } else {
-    state.hasDrawnThisTurn = true;
-    state.partialDraw = false;
-  }
+  state.hasDrawnThisTurn = true;
+  state.partialDraw = false;
 
   state.pickedDiscardCardId = top.id;
   state.requiredDiscardCard = null;
@@ -3245,7 +3251,7 @@ async function processDominationReward(p, oldKind, newKind, meldIndex) {
   if (meldIndex === undefined || meldIndex === null || meldIndex < 0) return null;
 
   // Tabela de valores exatos das compras
-  const rewards = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 };
+  const rewards = { simple: 0, suja: 0, limpa: 1, real: 1, asas: 1 };
 
   state.dominationTurnTracking = state.dominationTurnTracking || {};
   const trackingKey = `${p.teamId}:${meldIndex}`;
@@ -6181,9 +6187,9 @@ function renderMelds() {
 
     // Texto encurtado para "+X" economizando espaço precioso na barra
     let extraCardsHtml = '';
-    if (state.mode === '1x1_dominacao') {
+    if (dominationFeatureEnabled(state, 'plus')) {
       let extraCardsDrawn = 0;
-      const rewardsMap = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 };
+      const rewardsMap = { simple: 0, suja: 0, limpa: 1, real: 1, asas: 1 };
       t.melds.forEach((m) => {
         const kind = classifyMeldForUi(m).kind;
         extraCardsDrawn += rewardsMap[kind] || 0;
@@ -7590,6 +7596,7 @@ const botEngine = {
   async executeDrawStock(botIndex) {
     const s = this.getState();
     if (!s) return;
+    if (['1x1_duploMorto', '1x1_dominacao'].includes(s.mode) && s.hasDrawnThisTurn) return false;
     const me = s.players[botIndex];
     const botVault = getBossVault(s, botIndex);
     if (botVault && (isBossVaultDrawRequired(s, botIndex) || shouldBossBotReclaimVault(s, botIndex))) {
@@ -7651,6 +7658,7 @@ const botEngine = {
   async executeDrawDiscard(botIndex) {
     const s = this.getState();
     if (!s) return false;
+    if (['1x1_duploMorto', '1x1_dominacao'].includes(s.mode) && s.hasDrawnThisTurn) return false;
     if (isBossDiscardBlocked(s)) return false;
     if (!Array.isArray(s.discard) || s.discard.length === 0) {
       console.warn('[BOT] executeDrawDiscard chamado com lixo vazio. Possível jogada duplicada.');
@@ -7690,20 +7698,6 @@ const botEngine = {
     const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
     const vaultInterestEvent = deferBossVault(s, botIndex);
 
-    // INJEÇÃO DIRETA: Bot Dominador pega a 2ª carta do monte instantaneamente
-    if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
-      // 🛑 SALVA-VIDAS: Prepara o morto caso o monte tenha acabado bem na carta extra dele!
-      if (s.stock.length === 0) {
-        await recycleDeadToStockIfPossible();
-      }
-
-      if (s.stock.length > 0) {
-        const extraCard = s.stock.pop();
-        ensureCardId(extraCard);
-        me.hand.push(extraCard);
-      }
-    }
-
     sortHand(me.hand);
     s.hasDrawnThisTurn = true;
     s.partialDraw = false;
@@ -7731,6 +7725,7 @@ const botEngine = {
   async executeDrawDiscardFechado(botIndex, intent) {
     const s = this.getState();
     if (!s) return false;
+    if (['1x1_duploMorto', '1x1_dominacao'].includes(s.mode) && s.hasDrawnThisTurn) return false;
     if (isBossDiscardBlocked(s)) return false;
     if (!Array.isArray(s.discard) || s.discard.length === 0) {
       console.warn('[BOT] executeDrawDiscardFechado chamado com lixo vazio. Possível jogada duplicada.');
@@ -7809,19 +7804,6 @@ const botEngine = {
     }
     const financedEvent = registerBossFinancedCards(s, botIndex, bossExtraCards);
     const vaultInterestEvent = deferBossVault(s, botIndex);
-
-    if ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1) {
-      // 🛑 SALVA-VIDAS: Prepara o morto caso o monte tenha acabado bem na carta extra dele!
-      if (s.stock.length === 0) {
-        await recycleDeadToStockIfPossible();
-      }
-
-      if (s.stock.length > 0) {
-        const extraCard = s.stock.pop();
-        ensureCardId(extraCard);
-        me.hand.push(extraCard);
-      }
-    }
 
     const targetIdx = intent.action === 'extend' ? intent.meldIndex : team.melds.length - 1;
     let domReward = await processDominationReward(me, kindBeforeFechado, classifyMeldForUi(meldToCheck).kind, targetIdx);
@@ -8318,6 +8300,7 @@ onSnapshot(gameRef, async (snap) => {
   if (!data.stateJson) return;
 
   const newState = JSON.parse(data.stateJson);
+  normalizeLegacyDiscardPurchase(newState);
   if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId
     && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.

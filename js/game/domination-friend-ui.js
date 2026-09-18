@@ -274,12 +274,18 @@ export async function dealDominationFriendCards(friend, isActive, { fly, impact,
 
 // Replay committed actions on a visual copy only. Each flight uses the normal
 // player animator; each frame uses the normal renderer (scores, canastras, SFX).
-export async function playDominationFriendTimeline(view, result, { animate, render, isActive }) {
+export async function playDominationFriendTimeline(view, result, { animate, render, isActive, pace }) {
   const friend = view.dominationFriend;
   const steps = result.steps || [];
   for (let index = 0; index < steps.length; index++) {
     const step = steps[index];
     if (!isActive()) return;
+    if (pace && step.type !== 'dominatorBonus' && !(step.type === 'drawStock' && step.reason === 'canastra')) {
+      const stage = index === 0 ? 'think' : step.type === 'discard' ? 'discard'
+        : steps[index - 1].type.startsWith('draw') ? 'organize' : 'play';
+      await pace(stage);
+      if (!isActive()) return;
+    }
     if (step.type === 'drawStock' && step.reason === 'canastra' && steps[index + 1]?.type === 'dominatorBonus') {
       const ownerSteps = [];
       while (steps[index + 1]?.type === 'dominatorBonus') ownerSteps.push(steps[++index]);
@@ -307,7 +313,8 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
     }
     if (step.type === 'drawDiscard') {
       // Private pile only. Counters move after each real card has arrived.
-      for (const card of [...step.cards].reverse()) {
+      for (const [cardIndex, card] of [...step.cards].reverse().entries()) {
+        if (pace && cardIndex > 0) await pace('card');
         if (!isActive()) return;
         await animate({ ...step, cards: [card], card });
         if (!isActive()) return;
@@ -321,6 +328,7 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
       // Show the exact auxiliary purchase one card at a time, including each
       // canastra bonus; the hand/stock counters advance with the actual flights.
       for (const [drawIndex, card] of step.cards.entries()) {
+        if (pace && drawIndex > 0) await pace('card');
         if (!isActive()) return;
         await animate({ ...step, cards: [card], drawIndex, drawTotal: step.cards.length });
         if (!isActive()) return;

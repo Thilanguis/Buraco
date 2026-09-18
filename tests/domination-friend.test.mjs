@@ -156,10 +156,10 @@ test('canastra da amiga respeita reposicao do morto e roubo final do bonus do Do
   const view = structuredClone(state);
   const result = friendTurn(state);
   const purchases = result.steps.filter((step) => step.type === 'dominatorBonus');
-  assert.equal(purchases.length, 2, 'uma do morto, uma do adversario; nao inventa a terceira');
+  assert.equal(purchases.length, 1, 'As-a-As concede somente uma carta, do morto disponivel');
   assert.equal(purchases[0].recycledIndex, 0);
   assert.equal(purchases[0].cards[0]._isEndgameSteal, false);
-  assert.equal(purchases[1].cards[0]._isEndgameSteal, true);
+  assert.equal(state.players[0].hand.length, 1, 'nao rouba carta extra do adversario');
   const saved = JSON.stringify(state);
   await playDominationFriendTimeline(view, result, { animate: async () => {}, render() {}, isActive: () => true });
   assert.deepEqual(view.players, state.players);
@@ -558,6 +558,31 @@ test('turno grava e anima compra, baixada, bonus e extensao na ordem sem alterar
   assert.equal(JSON.stringify(state), saved);
 });
 
+test('amiga pensa entre acoes, mantem bonus juntos e cancela durante a pausa', async () => {
+  const state = invite();
+  state.dominationFriend.hand = cards(['3', '4', '5', '6', '7', '8'], '♣', 'guest');
+  state.dominationFriend.stock = [...cards(['10'], '♣', 'bonus'), ...cards(['K'], '♥', 'spare'), ...cards(['9'], '♣', 'aux')];
+  const before = structuredClone(state);
+  const result = friendTurn(state);
+  const stages = [];
+  const events = [];
+  await playDominationFriendTimeline(structuredClone(before), result, {
+    isActive: () => true, render() {}, animate: async step => events.push(step.type),
+    pace: async stage => { stages.push(stage); events.push(`pause:${stage}`); },
+  });
+  assert.deepEqual(stages, ['think', 'card', 'organize', 'play', 'discard']);
+  assert.equal(events[0], 'pause:think');
+  const sharedBonus = events.indexOf('dominatorBonus');
+  assert.equal(events[sharedBonus - 1], 'drawStock', 'compras do bonus permanecem juntas, sem pausa entre parceiros');
+  const cancelled = structuredClone(before);
+  let active = true;
+  await playDominationFriendTimeline(cancelled, result, {
+    isActive: () => active, render() {}, animate: async () => assert.fail('nao deve voar apos cancelamento'),
+    pace: async () => { active = false; },
+  });
+  assert.deepEqual(cancelled, before);
+});
+
 test('despedida mantem amiga visivel ate acabar o voo e cancelamento interrompe etapas', async () => {
   const state = invite();
   state.dominationFriend.turnsRemaining = 1;
@@ -597,6 +622,7 @@ test('host e snapshot compartilham animacao, bloqueiam acoes e reload nao repete
     friendPlayback: null, friendActionPresentations: new Map(), friendOperationPending: false,
     stopTurnTimer() {}, renderAll() {}, isDominationFriendBusy, canBossPerformCommonAction: () => true,
     playDominationFriendTimeline,
+    BuracoBot: { randomDelay: (min) => min, sleep: async () => {} }, botTurnController: { signal: undefined },
     playRemoteAction: async () => { flights++; await pendingFlight; },
   });
   vm.runInContext(`async ${appFunction('playFriendTurnPresentation')}\n${appFunction('canPerformCommonGameAction')}`, playbackContext);
@@ -671,7 +697,7 @@ test('entrada distribui 11 cartas exclusivas sem tocar monte, lixo, mortos ou jo
   assert.ok(deck.every((card) => card.id.startsWith('friend_test-invitation_')));
 });
 
-test('lixo proprio: aberto recolhe pilha e compra uma; fechado baixa topo antes da complementar', async () => {
+test('lixo proprio encerra compra no aberto e fechado sem retirar carta do auxiliar', async () => {
   for (const variant of ['aberto', 'fechado']) {
     const state = invite();
     state.variant = variant;
@@ -685,8 +711,9 @@ test('lixo proprio: aberto recolhe pilha e compra uma; fechado baixa topo antes 
     const result = friendTurn(state);
     assert.equal(result.steps[0].type, 'drawDiscard');
     assert.equal(result.steps[0].cards.length, 2);
-    assert.equal(result.steps[1].type, variant === 'fechado' ? 'meldExtend' : 'drawStock');
-    assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'turn').flatMap(s => s.cards).length, 1);
+    assert.equal(result.steps[1].type, 'meldExtend');
+    assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'turn').flatMap(s => s.cards).length, 0);
+    assert.deepEqual(friend.stock, before.dominationFriend.stock);
     assert.ok(state.teams[1].melds[0].some(card => card.id === 'private_1'));
     for (const key of ['stock', 'discard', 'deadPiles', 'players']) assert.deepEqual(state[key], before[key]);
     const view = structuredClone(before);
@@ -730,7 +757,7 @@ test('fechado nao usa cartas enterradas nem compra futura para justificar o topo
   assert.equal(friendTurn(open).steps[0].type, 'drawDiscard');
 });
 
-test('canastra feita com lixo mantem bonus dos dois e complementar nao se duplica', () => {
+test('canastra feita com lixo mantem bonus dos dois mas nao concede compra complementar', () => {
   for (const size of [0, 1, 3]) {
     const state = invite();
     state.variant = 'fechado';
@@ -741,7 +768,7 @@ test('canastra feita com lixo mantem bonus dos dois e complementar nao se duplic
     const result = friendTurn(state);
     assert.deepEqual(result.steps.slice(0, 2).map(s => s.type), ['drawDiscard', 'meldExtend']);
     assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'canastra').flatMap(s => s.cards).length, Math.min(1, size));
-    assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'turn').flatMap(s => s.cards).length, size > 1 ? 1 : 0);
+    assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'turn').flatMap(s => s.cards).length, 0);
     assert.equal(result.steps.filter(s => s.type === 'dominatorBonus').flatMap(s => s.cards).length, 1);
     assert.equal(state.dominationFriend.extraTurns, 1);
     assert.equal(rules.classify(state.teams[1].melds[0]), 'limpa');
@@ -982,8 +1009,8 @@ test('IA na despedida prefere baixar toda a mao em jogo separado a deixar coring
 test('canastra da amiga concede bonus a ambos, cada um usando seu proprio monte', () => {
   const cases = [
     [['3', '4', '5', '6', '7', '8'], '9', 'limpa', 1],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real', 2],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas', 3],
+    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real', 1],
+    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas', 1],
   ];
   for (const [ranks, next, kind, bonus] of cases) {
     const state = invite();
@@ -1072,7 +1099,8 @@ test('fluxo real do Dominador concede +1 por categoria nova, sem mudar compras o
   for (const [kind, expected] of [['limpa', 4], ['real', 5], ['asas', 6]]) {
     const reward = await rewardContext.processDominationReward(state.players[1], previous, kind, 0);
     assert.equal(state.dominationFriend.turnsRemaining, expected);
-    assert.equal(reward.drawnCards.length, 1, 'bonus de cartas continua sendo a diferenca no mesmo turno');
+    if (kind === 'limpa') assert.equal(reward.drawnCards.length, 1);
+    else assert.equal(reward, null, 'evolucao do mesmo jogo no mesmo turno nao repete +1');
     assert.equal(await rewardContext.processDominationReward(state.players[1], kind, kind, 0), null);
     previous = kind;
   }
@@ -1095,7 +1123,7 @@ test('fluxo real do Dominador concede +1 por categoria nova, sem mudar compras o
 });
 
 test('DevTools concede o mesmo bonus ao Dominador e a amiga fora do turno dela', async () => {
-  for (const [kind, count] of [['limpa', 1], ['real', 2], ['asas', 3]]) {
+  for (const [kind, count] of [['limpa', 1], ['real', 1], ['asas', 1]]) {
     const state = invite();
     const before = structuredClone(state);
     const live = vm.createContext({
@@ -1140,7 +1168,7 @@ test('bonus compartilhado respeita diferenca por turno, adversario, saida e limi
   state.stock = cards(Array(20).fill('K'), '♥', 'rewards');
   let previous = 'simple';
   const initial = state.dominationFriend.hand.length;
-  for (const [kind, delta] of [['limpa', 1], ['real', 2], ['asas', 3]]) {
+  for (const [kind, delta] of [['limpa', 1], ['real', 1], ['asas', 1]]) {
     await live.processDominationReward(state.players[1], previous, kind, 0);
     assert.equal(state.dominationFriend.hand.length, initial + delta);
     previous = kind;
@@ -1192,7 +1220,7 @@ test('compra compartilhada anima nas duas telas uma vez, sem vinheta extra ou re
       assert.equal(flights[0].type, 'drawStock');
       assert.equal(flights[0].playerId, 'friend');
       assert.equal(flights[0].kind, kind);
-      assert.equal(flights[0].cards.length, count);
+      assert.equal(flights[0].cards.length, 1, 'valores legados 2/3 tambem ficam limitados a uma carta');
       live.friendNoticeTracker = createFriendNoticeTracker();
       live.state = JSON.parse(JSON.stringify(state));
       live.syncDominationFriendNotices();
@@ -1266,8 +1294,8 @@ test('canastra da amiga compra para os dois em paralelo e cancelamento nao alter
 test('conquista da amiga na despedida prolonga presenca e persiste uma unica vez', () => {
   for (const [ranks, next, kind, bonus] of [
     [['3', '4', '5', '6', '7', '8'], '9', 'limpa', 1],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real', 2],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas', 3],
+    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real', 1],
+    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas', 1],
   ]) {
     const state = game();
     state.teams[1].melds = [rules.prepare(cards(ranks))];
@@ -1377,11 +1405,11 @@ test('com varios turnos espera em vez de abrir fragmento duplicado do mesmo naip
   }
 });
 
-test('bonus animado mostra exatamente uma, duas ou tres cartas e atualiza contadores por voo', async () => {
+test('bonus animado mostra uma carta em qualquer categoria e atualiza contadores por voo', async () => {
   for (const [ranks, next, kind, count] of [
     [['3', '4', '5', '6', '7', '8'], '9', 'limpa', 1],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real', 2],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas', 3],
+    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real', 1],
+    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas', 1],
   ]) {
     const state = invite();
     state.teams[1].melds = [rules.prepare(cards(ranks))];
