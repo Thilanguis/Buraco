@@ -62,7 +62,7 @@ import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } 
 import { buildBossActionPresentation, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
 import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
 import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
-import { canCallDominationFriend, createFriendInvitation, callDominationFriend, isDominationFriendTurn, isDominationFriendBusy, queueDominationFriendTurn, executeDominationFriendTurn, grantDominationFriendExtraTurn } from './js/game/domination-friend.js';
+import { canCallDominationFriend, shouldBotCallDominationFriend, createFriendInvitation, callDominationFriend, isDominationFriendTurn, isDominationFriendBusy, queueDominationFriendTurn, executeDominationFriendTurn, grantDominationFriendExtraTurn, grantDominationFriendSharedBonus, normalizeDominationOptions, dominationFeatureEnabled } from './js/game/domination-friend.js';
 import { renderDominationFriend, presentDominationFriend, dealDominationFriendCards, playDominationFriendTimeline, createFriendNoticeTracker, showDominationFriendNotice } from './js/game/domination-friend-ui.js';
 import { FRIEND_MP3, createFriendSoundQueue, waitForPlayingCanastras } from './js/game/domination-friend-sound.js';
 
@@ -1682,6 +1682,7 @@ const friendMeldRules = {
   valid: (cards) => isValidSequenceMeld(cards),
   classify: (cards) => classifyMeldForUi(cards).kind,
   isWild: (card, meld) => isWildcard(card, meld),
+  sortHand,
 };
 
 function friendHostIndex(gameState) {
@@ -1708,8 +1709,12 @@ async function saveFriendOperation(operation) {
   });
 }
 
-window.callDominationFriend = async () => {
-  if (!canCallDominationFriend(state, myPlayerIndex) || friendOperationPending || committing
+window.callDominationFriend = () => performDominationFriendCall(myPlayerIndex);
+
+async function performDominationFriendCall(actorId, botCall = false) {
+  if (botCall && (actorId !== 1 || myPlayerIndex !== friendHostIndex(state)
+    || !state?.players?.[1]?.name?.toUpperCase().includes('BOT'))) return;
+  if (!canCallDominationFriend(state, actorId) || friendOperationPending || committing
     || window.isAutoPlaying || window.isStealModeActive || window.isMelding || document.querySelector('.fly-card')) return;
   friendOperationPending = true;
   stopTurnTimer();
@@ -1718,7 +1723,7 @@ window.callDominationFriend = async () => {
   const invitation = createFriendInvitation(crypto.randomUUID());
   try {
     const saved = await saveFriendOperation((latest) => {
-      if (!callDominationFriend(latest, myPlayerIndex, invitation, Date.now(), friendMeldRules)) return null;
+      if (!callDominationFriend(latest, actorId, invitation, Date.now(), friendMeldRules)) return null;
       latest.lastAction = { id: `friend_call_${invitation.id}`, type: 'friendCall', playerId: 1, ts: Date.now() };
       return true;
     });
@@ -1747,7 +1752,7 @@ window.callDominationFriend = async () => {
       scheduleDominationFriend();
     }
   }
-};
+}
 
 async function playFriendTurnPresentation(action) {
   const result = action?.friendResult;
@@ -1784,11 +1789,34 @@ async function playFriendTurnPresentation(action) {
   return playback.promise;
 }
 
+function playDominationFriendSharedDraw(event) {
+  if (!event?.cards?.length || state?.mode !== '1x1_dominacao' || state.finished || window.isClosingGame
+    || !state.dominationFriend?.active || state.dominationFriend.id !== event.friendId) return Promise.resolve();
+  const key = `shared-draw:${event.id}`;
+  if (friendActionPresentations.has(key)) return friendActionPresentations.get(key);
+  const sessionId = window.gameSessionId;
+  const gameIdentity = state.friendGameId;
+  const promise = Promise.resolve().then(() => {
+    if (sessionId !== window.gameSessionId || state?.friendGameId !== gameIdentity || window.isClosingGame
+      || state?.finished || !state.dominationFriend?.active) return;
+    renderDominationFriend(state, myPlayerIndex);
+    return playRemoteAction({ type: 'drawStock', playerId: 'friend', friendId: event.friendId,
+      reason: 'canastra', kind: event.kind, cards: event.cards });
+  }).catch((error) => console.warn('Falha visual na compra da amiga:', error));
+  friendActionPresentations.set(key, promise);
+  return promise;
+}
+
 function syncDominationFriendNotices() {
   if (state?.mode !== '1x1_dominacao' || state.finished || window.isClosingGame) return;
   const sessionId = window.gameSessionId;
   const gameIdentity = state.friendGameId;
   for (const event of friendNoticeTracker.collect(state, friendOperationPending)) {
+    // Card flights are independent of the canastra/extra-turn sound queue.
+    if (event.type === 'cardBonus') {
+      playDominationFriendSharedDraw(event);
+      continue;
+    }
     // Entry music belongs only to the visible roulette, not the arrival notice.
     friendSoundQueue.enqueue(event.type === 'arrival' ? null : FRIEND_MP3[event.type], () => {
       if (sessionId !== window.gameSessionId || window.isClosingGame || state?.finished
@@ -2373,7 +2401,19 @@ function sortHand(hand) {
   });
 }
 
-async function startGame(mode, names, variant, pixKeys = []) {
+function readDominationMenuOptions() {
+  return normalizeDominationOptions(Object.fromEntries(['friend', 'plus', 'vision'].map((key) =>
+    [key, document.getElementById(`dominationOption_${key}`)?.checked !== false])));
+}
+
+function syncDominationMenuOptions(options) {
+  for (const [key, enabled] of Object.entries(normalizeDominationOptions(options))) {
+    const checkbox = document.getElementById(`dominationOption_${key}`);
+    if (checkbox) checkbox.checked = enabled;
+  }
+}
+
+async function startGame(mode, names, variant, pixKeys = [], dominationOptions = readDominationMenuOptions()) {
   activateGameSession();
   const effectiveVariant = normalizeVariantForMode(mode, variant);
   const players = [];
@@ -2485,6 +2525,7 @@ async function startGame(mode, names, variant, pixKeys = []) {
     powerActiveThisTurn: false,
   };
   if (mode === '1x1_dominacao') {
+    newState.dominationOptions = normalizeDominationOptions(dominationOptions);
     newState.friendUsed = false;
     newState.dominationFriend = null;
     newState.friendRevision = 0;
@@ -2972,6 +3013,7 @@ async function drawFromDiscard() {
     });
     if (state.finished) return;
 
+    const friendDraw = domReward?.friendBonus ? playDominationFriendSharedDraw(domReward.friendBonus) : Promise.resolve();
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
       renderHand();
       const anims = domReward.drawnCards.map((c) => {
@@ -2997,6 +3039,7 @@ async function drawFromDiscard() {
       });
       await Promise.all(anims);
     }
+    await friendDraw;
 
     const tookDead = domReward?.tookDead || (await checkPostMeldStatus(me));
     if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
@@ -3007,6 +3050,7 @@ async function drawFromDiscard() {
       playerId: state.currentPlayer,
       tookDead: tookDead,
       drawnCards: domReward?.drawnCards,
+      friendBonus: domReward?.friendBonus || null,
       bossExtraCards: bossExtraCards.map(packCard),
       bossFinanceEvent: surchargeEvent,
       bossEvent,
@@ -3196,6 +3240,7 @@ function legacyIsValidSequenceMeld(cards) {
 async function processDominationReward(p, oldKind, newKind, meldIndex) {
   if (!state || state.mode !== '1x1_dominacao') return null;
   grantDominationFriendExtraTurn(state, p.id, oldKind, newKind, meldIndex);
+  if (!dominationFeatureEnabled(state, 'plus')) return null;
   if (oldKind === newKind) return null;
   if (meldIndex === undefined || meldIndex === null || meldIndex < 0) return null;
 
@@ -3280,7 +3325,8 @@ async function processDominationReward(p, oldKind, newKind, meldIndex) {
     showMessage(`👑 DOMINAÇÃO: Canastra ${newKind.toUpperCase()}! +${drawnCards.length} carta(s) ${temRoubo ? 'ROUBADA DA MÃO' : 'DO MONTE'}.`);
   }
 
-  return { tookDead, drawnCards: drawnCards.length > 0 ? drawnCards : null };
+  const friendBonus = grantDominationFriendSharedBonus(state, p.id, newKind, cardsToDraw, meldIndex);
+  return { tookDead, drawnCards: drawnCards.length > 0 ? drawnCards : null, friendBonus };
 }
 
 async function checkPostMeldStatus(player) {
@@ -3420,6 +3466,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
     });
     if (state.finished) return true;
 
+    const friendDraw = domReward?.friendBonus ? playDominationFriendSharedDraw(domReward.friendBonus) : Promise.resolve();
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
       renderHand();
       const anims = domReward.drawnCards.map((c) => {
@@ -3445,6 +3492,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
       });
       await Promise.all(anims);
     }
+    await friendDraw;
 
     const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
     if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
@@ -3458,6 +3506,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
       cards: cards.map(packCard),
       tookDead: tookDead,
       drawnCards: domReward?.drawnCards,
+      friendBonus: domReward?.friendBonus || null,
       bossEvent,
       ts: Date.now(),
     };
@@ -3542,6 +3591,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
   });
   if (state.finished) return true;
 
+  const friendDraw = domReward?.friendBonus ? playDominationFriendSharedDraw(domReward.friendBonus) : Promise.resolve();
   if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
     renderHand();
     const anims = domReward.drawnCards.map((c) => {
@@ -3567,6 +3617,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
     });
     await Promise.all(anims);
   }
+  await friendDraw;
 
   const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
   if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
@@ -3580,6 +3631,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
     cards: cards.map(packCard),
     tookDead: tookDead,
     drawnCards: domReward?.drawnCards,
+    friendBonus: domReward?.friendBonus || null,
     bossEvent,
     ts: Date.now(),
   };
@@ -3726,6 +3778,7 @@ async function makeMeldFromSelection(forceNew = false) {
     });
     if (state.finished) return;
 
+    const friendDraw = domReward?.friendBonus ? playDominationFriendSharedDraw(domReward.friendBonus) : Promise.resolve();
     if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
       renderHand(); // Força as cartas a existirem no DOM para voarem até elas
       const anims = domReward.drawnCards.map((c) => {
@@ -3751,6 +3804,7 @@ async function makeMeldFromSelection(forceNew = false) {
       });
       await Promise.all(anims);
     }
+    await friendDraw;
 
     const tookDead = domReward?.tookDead || (await checkPostMeldStatus(currentPlayer()));
     if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
@@ -3764,6 +3818,7 @@ async function makeMeldFromSelection(forceNew = false) {
       cards: cards.map(packCard),
       tookDead: tookDead,
       drawnCards: domReward?.drawnCards, // <- Envia para o oponente animar
+      friendBonus: domReward?.friendBonus || null,
       bossEvent,
       ts: Date.now(),
     };
@@ -5168,7 +5223,7 @@ function renderAll() {
     document.body.appendChild(stealOverlay);
   }
 
-  if (state.powerActiveThisTurn && !state.finished) {
+  if (dominationFeatureEnabled(state, 'vision') && state.powerActiveThisTurn && !state.finished) {
     stealOverlay.style.display = 'block';
     stealOverlay.classList.add('pulsing'); // Liga a animação de pulsação do CSS
 
@@ -5463,8 +5518,10 @@ function renderAll() {
 
   const powerBtn = document.getElementById('powerBtn');
   if (powerBtn) {
-    const canUsePower = state.mode === '1x1_dominacao' && state.currentPlayer === 1 && myPlayerIndex === 1 && !state.hasDrawnThisTurn && (!state.dominatorUsedPower || state.powerActiveThisTurn);
-    powerBtn.style.display = canUsePower ? 'block' : 'none';
+    const canUsePower = dominationFeatureEnabled(state, 'vision') && state.currentPlayer === 1 && myPlayerIndex === 1 && !state.hasDrawnThisTurn && (!state.dominatorUsedPower || state.powerActiveThisTurn);
+    const showPower = dominationFeatureEnabled(state, 'vision') && myPlayerIndex === 1 && !state.finished;
+    powerBtn.style.display = showPower ? 'block' : 'none';
+    powerBtn.disabled = !canUsePower;
 
     if (window.isStealModeActive) {
       powerBtn.innerHTML = '❌ FECHAR VISÃO';
@@ -5472,7 +5529,7 @@ function renderAll() {
       powerBtn.style.borderColor = '#fca5a5';
       powerBtn.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
     } else {
-      powerBtn.innerHTML = '👁️ ROUBAR MÃO';
+      powerBtn.innerHTML = state.dominatorUsedPower ? '✓ VISÃO USADA' : '👁️ ROUBAR MÃO';
       powerBtn.style.background = 'linear-gradient(90deg, var(--hud-accent-soft), rgba(15, 23, 42, 0.82))';
       powerBtn.style.borderColor = 'var(--hud-accent)';
       powerBtn.style.boxShadow = '0 0 10px var(--hud-accent-glow)';
@@ -5942,7 +5999,7 @@ function renderOpponentHands() {
     }
 
     // 👁️ VISÃO DO DOMINADOR: Liga o CSS grid e exibe a face das cartas com clique liberado
-    const isStealTarget = window.isStealModeActive && playerIdx === 0 && myPlayerIndex === 1 && state.powerActiveThisTurn && !state.hasDrawnThisTurn;
+    const isStealTarget = dominationFeatureEnabled(state, 'vision') && window.isStealModeActive && playerIdx === 0 && myPlayerIndex === 1 && state.powerActiveThisTurn && !state.hasDrawnThisTurn;
 
     if (isStealTarget) {
       rootEl.classList.add('reveal-mode');
@@ -6138,7 +6195,7 @@ function renderMelds() {
 
     // Mantido o texto sutil e enxuto sem ocupar espaço duplicado
     let powerStealHtml = '';
-    if (state.mode === '1x1_dominacao' && t.id === 1) {
+    if (dominationFeatureEnabled(state, 'vision') && t.id === 1) {
       if (state.dominatorUsedPower) {
         powerStealHtml = `<span class="power-steal-badge used">👁️ Roubo</span>`;
       } else {
@@ -6665,18 +6722,27 @@ function renderMelds() {
     const hud = document.getElementById('goalsHud');
 
     if (hud) {
-      // --- MOTOR CORRIGIDO: Vincula o painel fixo ao time do cliente local para o rastreio individual funcionar ---
-      const myTeamId = state.players[myPlayerIndex] ? state.players[myPlayerIndex].teamId : 0;
-      let refFin = myTeamId === 1 ? fin2 : fin1;
-      let refName = state.teams[myTeamId].name;
-
-      // Determina se o seu time está na liderança de pontos para acender o bônus de vitória
-      const isMyTeamLeading = myTeamId === 1 ? s2 > s1 : s1 > s2;
-      const isMyTeamWinner = state.finished && state.winnerTeamId === myTeamId;
-      const myTeamWinsGoal = state.finished ? isMyTeamWinner : isMyTeamLeading;
+      // MetaPix is shared: follow the scoreboard leader, never the local seat.
+      // At game end, use the final scores (including hand/dead/finish penalties
+      // and bonuses), just like the existing financial result screen.
+      const leaderScores = state.finished ? [proj1, proj2] : [s1, s2];
+      const leaderId = leaderScores[0] === leaderScores[1] ? null : leaderScores[0] > leaderScores[1] ? 0 : 1;
+      const leaderWinsGoal = leaderId !== null;
+      const refName = leaderWinsGoal ? state.teams[leaderId].name : 'Empate — sem líder';
+      let refFin = leaderId === 1 ? fin2 : fin1;
+      if (!leaderWinsGoal) {
+        // Neutral display only; do not change either team's calculated values.
+        refFin = { total: 0, b: Object.fromEntries(Object.keys(fin1.b).map((key) => [key, 0])) };
+      } else if (state.finished) {
+        const rivalId = 1 - leaderId;
+        refFin = window.calculatePixFin(leaderScores[leaderId], leaderScores[rivalId],
+          state.teams[leaderId].melds, state.teams[rivalId].melds,
+          state.deadChunksTaken?.[leaderId] ?? 0, (state.deadChunksTaken?.[rivalId] ?? 0) > 0,
+          leaderScores[leaderId], leaderScores[rivalId]);
+      }
 
       let achievedCount = 0;
-      if (myTeamWinsGoal) achievedCount++;
+      if (leaderWinsGoal) achievedCount++;
       if (refFin.b.diff > 0) achievedCount++;
       if (refFin.b.negative > 0) achievedCount++;
       if (refFin.b.countAsas > 0) achievedCount++;
@@ -6689,13 +6755,13 @@ function renderMelds() {
       hud.style.display = myPlayerIndex !== -1 ? 'block' : 'none';
       hud.classList.toggle('collapsed', window.isGoalsHudCollapsed);
 
-      // Indica o nome do seu time no topo do menu de metas
+      // Both clients identify the same leader at the top of the goals table.
       const nameEl = document.getElementById('winnerNameHud');
       if (nameEl) {
         nameEl.textContent = `(${refName})`;
       }
 
-      // Exibe o balanço financeiro em tempo real do seu time
+      // Display the leader's financial goals on both clients.
       document.getElementById('goalsTotalHud').textContent = 'R$ ' + refFin.total.toFixed(2).replace('.', ',');
 
       const counterEl = document.getElementById('goalsCounterHud');
@@ -6707,9 +6773,9 @@ function renderMelds() {
       // Renderiza a lista de itens baseada na referência calculada incluindo a Soberania dos Mortos
       const list = document.getElementById('goalsListHud');
       list.innerHTML = `
-                        <div class="goal-item ${myTeamWinsGoal ? 'achieved' : ''}">
+                        <div class="goal-item ${leaderWinsGoal ? 'achieved' : ''}">
                             <span>✅ Vitória (R$ 5)</span>
-                            <strong>+R$ ${myTeamWinsGoal ? '5,00' : '0,00'}</strong>
+                            <strong>+R$ ${leaderWinsGoal ? '5,00' : '0,00'}</strong>
                         </div>
                         <div class="goal-item ${refFin.b.virgemDeMorto ? 'achieved' : ''}">
                             <span>🛑 Adv. Sem Morto (R$ 8)</span>
@@ -6914,8 +6980,11 @@ async function playRemoteAction(a) {
 
   const isFriend = a.playerId === 'friend' && state.mode === '1x1_dominacao';
   const friendSessionId = window.gameSessionId;
-  const flightStillActive = () => !isFriend || (friendSessionId === window.gameSessionId && !window.isClosingGame);
-  const stockEl = document.querySelector(isFriend ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card');
+  const flightStillActive = () => !isFriend || (friendSessionId === window.gameSessionId && !window.isClosingGame
+    && (!a.friendId || (state.dominationFriend?.active && state.dominationFriend.id === a.friendId)));
+  const stockEl = document.querySelector(isFriend ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card')
+    || (isFriend ? document.getElementById('dominationFriendStock')
+      : a.type === 'dominatorBonus' ? document.getElementById('drawStockBtn') : null);
   const discardEl = document.querySelector('#drawDiscardBtn .pile-card');
   const dead0El = document.getElementById('mortoSlot0');
   const dead1El = document.getElementById('mortoSlot1');
@@ -6959,7 +7028,7 @@ async function playRemoteAction(a) {
     }
   };
 
-  const animateRemoteDrawsIfAny = async () => {
+  const animateRemotePlayerDraws = async () => {
     if (a.drawnCards && a.drawnCards.length > 0) {
       for (let i = 0; i < a.drawnCards.length; i++) {
         const cardData = a.drawnCards[i];
@@ -6999,6 +7068,11 @@ async function playRemoteAction(a) {
     }
   };
 
+  const animateRemoteDrawsIfAny = () => Promise.all([
+    animateRemotePlayerDraws(),
+    a.friendBonus ? playDominationFriendSharedDraw(a.friendBonus) : Promise.resolve(),
+  ]);
+
   const animateRemoteFinancedCards = async () => {
     const financedCards = a.bossExtraCards || [];
     if (!financedCards.length || !stockRect) return;
@@ -7010,6 +7084,12 @@ async function playRemoteAction(a) {
     const playerName = state.players?.find((player) => player.id === a.playerId)?.name || 'Jogador';
     showMessage(`Tarifa de Manutenção: ${playerName} recebeu +${financedCards.length} carta${financedCards.length === 1 ? '' : 's'} financiada${financedCards.length === 1 ? '' : 's'}. Cada carta restante gera Dívida.`);
   };
+
+  if (a.type === 'dominatorBonus' && state.mode === '1x1_dominacao') {
+    await animateRemoteRecycleIfAny();
+    await animateRemoteDrawsIfAny();
+    return;
+  }
 
   if (a.type === 'stealCard') {
     if (sfxSteal) {
@@ -7046,6 +7126,10 @@ async function playRemoteAction(a) {
   }
 
   if (a.type === 'drawStock') {
+    if (isFriend && a.reason === 'canastra' && !a.drawIndex) {
+      const label = { limpa: 'Limpa', real: 'Real', asas: 'Ás-a-Ás' }[a.kind] || a.kind;
+      showMessage(`👠 ${state.dominationFriend.name}: ${label}! +${a.drawTotal || a.cards.length} carta(s) do monte auxiliar.`);
+    }
     if (a.recycledDeadIndex !== null && a.recycledDeadIndex !== undefined) {
       const deadEl = a.recycledDeadIndex === 1 ? dead1El : dead0El;
       if (deadEl && stockRect) {
@@ -7067,6 +7151,13 @@ async function playRemoteAction(a) {
   }
 
   if (a.type === 'drawDiscard') {
+    if (isFriend) {
+      const source = document.querySelector('#dominationFriendDiscard .friend-discard-face');
+      if (!source || !flightStillActive()) return;
+      await flyRectToRect(a.card, getRect(source), handRect, 'front');
+      if (flightStillActive()) impactAtRect(handRect);
+      return;
+    }
     if (discardRect) {
       await flyRectToRect(fallbackCard, discardRect, handRect, 'front');
       impactAtRect(handRect);
@@ -7080,6 +7171,26 @@ async function playRemoteAction(a) {
   }
 
   if (a.type === 'discard') {
+    if (isFriend) {
+      const target = document.querySelector('#dominationFriendDiscard .friend-discard-face');
+      if (!target) return;
+      const destination = getRect(target);
+      await flyRectToRect(a.card, handRect, destination, 'front');
+      if (!flightStillActive()) return;
+      target.innerHTML = cardFrontHTML(a.card);
+      target.classList.add('has-card');
+      target.style.color = ['♥', '♦'].includes(a.card.suit) ? '#b91c1c' : '#111';
+      impactAtRect(destination);
+      if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        const landing = target.animate([
+          { transform: 'rotate(-8deg) scale(1.12)' },
+          { transform: 'rotate(3deg) scale(.97)', offset: .6 },
+          { transform: 'rotate(0) scale(1)' },
+        ], { duration: 320, easing: 'ease-out' });
+        await landing.finished.catch(() => {});
+      }
+      return;
+    }
     const df = document.getElementById('discardFace');
     let prevHtml = null;
     let prevColor = null;
@@ -7197,6 +7308,78 @@ async function playRemoteAction(a) {
 // ==========================================
 // MOTOR DE EXECUÇÃO DA IA (BOT ENGINE)
 // ==========================================
+function chooseBotDominationSteal(gameState) {
+  const hand = gameState.players[1].hand;
+  const melds = gameState.teams[gameState.players[1].teamId].melds;
+  const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  let best = null;
+  let bestValue = -Infinity;
+  for (const card of gameState.players[0].hand) {
+    let value = card.joker ? 25 : card.rank === '2' ? 20 : 0;
+    for (const base of melds) {
+      const after = friendMeldRules.prepare([...base, card]);
+      if (!friendMeldRules.valid(after) || after.some(c => friendMeldRules.isWild(c, after))) continue;
+      const kind = friendMeldRules.classify(after);
+      value = Math.max(value, 100 + after.length * 10 + ({ limpa: 500, real: 1500, asas: 3000 }[kind] || 0));
+    }
+    value += hand.filter(c => !c.joker && c.suit === card.suit && Math.abs(ranks.indexOf(c.rank) - ranks.indexOf(card.rank)) <= 2).length * 15;
+    for (let i = 0; i < hand.length; i++) for (let j = i + 1; j < hand.length; j++) {
+      const meld = friendMeldRules.prepare([hand[i], hand[j], card]);
+      if (friendMeldRules.valid(meld)) value = Math.max(value, meld.some(c => friendMeldRules.isWild(c, meld)) ? 40 : 90);
+    }
+    if (value > bestValue) { best = card; bestValue = value; }
+  }
+  return best;
+}
+
+async function executeBotDominationPowers(engine, botIndex) {
+  const eligible = () => engine.isActive() && state?.mode === '1x1_dominacao' && botIndex === 1
+    && state.currentPlayer === 1 && !state.finished && !state.debugPaused && !state.surrender?.active
+    && state.players[1].name.toUpperCase().includes('BOT');
+  if (!eligible()) return;
+  if (shouldBotCallDominationFriend(state, friendMeldRules)) await performDominationFriendCall(1, true);
+  if (!eligible() || state.hasDrawnThisTurn || !dominationFeatureEnabled(state, 'vision')
+    || (state.dominatorUsedPower && !state.powerActiveThisTurn) || !state.players[0].hand.length) return;
+  // Persist activation before stealing: a resumed turn can finish the remaining
+  // purchase, but can never activate the once-per-match power a second time.
+  state.dominatorUsedPower = true;
+  state.powerActiveThisTurn = true;
+  await engine.commitState();
+  for (let i = 0; i < 2 && eligible() && !state.hasDrawnThisTurn; i++) {
+    if (!dominationFeatureEnabled(state, 'vision')) break;
+    const card = chooseBotDominationSteal(state);
+    if (!card) break;
+    const victim = state.players[0];
+    victim.hand.splice(victim.hand.findIndex(c => c.id === card.id), 1);
+    state.players[1].hand.push(card);
+    sortHand(state.players[1].hand);
+    (state.boughtCardIds ||= []).push(card.id);
+    let escravoAutoDraw = null;
+    if (!victim.hand.length) {
+      if (!state.stock.length) await recycleDeadToStockIfPossible();
+      if (!eligible()) return;
+      if (state.stock.length) {
+        const replacement = state.stock.pop();
+        ensureCardId(replacement);
+        victim.hand.push(replacement);
+        escravoAutoDraw = packCard(replacement);
+      } else {
+        await finishGame(teamHasGoodCanastra(victim.teamId) ? victim.teamId : 1);
+        return;
+      }
+    }
+    if (state.partialDraw) {
+      state.hasDrawnThisTurn = true;
+      state.partialDraw = false;
+      state.powerActiveThisTurn = false;
+    } else state.partialDraw = true;
+    state.lastAction = { id: newActionId(), type: 'stealCard', playerId: 1, card: packCard(card), escravoAutoDraw, ts: Date.now() };
+    engine.showMessage(`👁️ ${state.players[1].name} usou a Visão do Dominador!`);
+    await engine.commitState();
+    await BuracoBot.sleep(900, engine);
+  }
+}
+
 const botEngine = {
   getState: () => state,
   isActive: () => !window.isClosingGame && !localExitPending && !!state,
@@ -7214,6 +7397,7 @@ const botEngine = {
   getNaturePriorities: (playerId) => getBossNaturePriorities(state, playerId),
   getDominatrixPriorities: (playerId) => getBossDominatrixPriorities(state, playerId),
   shouldTakeBossDiscard: (playerId, intent, naturePlan) => shouldBossBotTakeDiscard(state, playerId, { intent, naturePlan }),
+  async executeDominationPowers(botIndex) { await executeBotDominationPowers(this, botIndex); },
 
   async resolvePendingBossChoice(playerId) {
     const choice = getBossPendingChoice(state, playerId);
@@ -7348,6 +7532,7 @@ const botEngine = {
         cards: cards.map(packCard),
         tookDead,
         drawnCards: domReward?.drawnCards,
+        friendBonus: domReward?.friendBonus || null,
         bossEvent,
         ts: Date.now(),
       };
@@ -7394,6 +7579,7 @@ const botEngine = {
         cards: cards.map(packCard),
         tookDead,
         drawnCards: domReward?.drawnCards,
+        friendBonus: domReward?.friendBonus || null,
         bossEvent,
         ts: Date.now(),
       };
@@ -7658,6 +7844,7 @@ const botEngine = {
         playerId: botIndex,
         tookDead,
         drawnCards: domReward?.drawnCards,
+        friendBonus: domReward?.friendBonus || null,
         bossExtraCards: bossExtraCards.map(packCard),
         bossFinanceEvent: financedEvent || surchargeDecision.event,
         bossSurchargeEvent: surchargeDecision.event,
@@ -7986,6 +8173,7 @@ onSnapshot(gameRef, async (snap) => {
     const lobbyBoss = getBossDefinitionForMode(l.mode);
     l.variant = normalizeVariantForMode(l.mode, l.variant || '');
     currentLobby = l;
+    syncDominationMenuOptions(l.dominationOptions);
     setIfUnfocused('modeSelect', lobbyBoss ? COOPERATIVE_MENU_MODE : l.mode || '');
     if (lobbyBoss) setIfUnfocused('bossSelect', lobbyBoss.id);
     setIfUnfocused('variantSelect', l.variant || '');
@@ -8086,7 +8274,7 @@ onSnapshot(gameRef, async (snap) => {
           let hostIdx = currentLobby.names.findIndex((n) => n && !n.toUpperCase().includes('BOT'));
           if (hostIdx === -1) hostIdx = myPlayerIndex;
           if (myPlayerIndex === hostIdx || myPlayerIndex === -1) {
-            startGame(currentLobby.mode, currentLobby.names, currentLobby.variant, currentLobby.pixKeys);
+            startGame(currentLobby.mode, currentLobby.names, currentLobby.variant, currentLobby.pixKeys, currentLobby.dominationOptions);
           }
           return;
         }
@@ -8111,7 +8299,7 @@ onSnapshot(gameRef, async (snap) => {
             if (hostIdx === -1) hostIdx = myPlayerIndex;
 
             if (myPlayerIndex === hostIdx) {
-              startGame(currentLobby.mode, currentLobby.names, currentLobby.variant, currentLobby.pixKeys);
+              startGame(currentLobby.mode, currentLobby.names, currentLobby.variant, currentLobby.pixKeys, currentLobby.dominationOptions);
             }
           }
         }, 1000);
@@ -8342,7 +8530,9 @@ onSnapshot(gameRef, async (snap) => {
 window.pushLobby = function () {
   applyCooperativeBossPreset();
   const mode = getEffectiveMenuMode();
-  const resetReady = currentLobby && currentLobby.mode !== mode;
+  const dominationOptions = readDominationMenuOptions();
+  const resetReady = currentLobby && (currentLobby.mode !== mode
+    || (mode === '1x1_dominacao' && JSON.stringify(normalizeDominationOptions(currentLobby.dominationOptions)) !== JSON.stringify(dominationOptions)));
 
   const pt1 = document.getElementById('pixTeam1');
   const pt2 = document.getElementById('pixTeam2');
@@ -8353,6 +8543,7 @@ window.pushLobby = function () {
 
   const lobby = {
     mode: mode,
+    dominationOptions,
     bossId: getBossDefinitionForMode(mode)?.id || null,
     variant: normalizeVariantForMode(mode, document.getElementById('variantSelect').value),
     deckTheme: document.getElementById('deckThemeSelect').value,
@@ -9377,7 +9568,7 @@ window.debugRestartGame = async () => {
   if (state.debugPaused) state.debugPaused = false;
 
   // Inicia a nova partida no Firebase
-  await startGame(state.mode, currentNames, state.variant, currentPix);
+  await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions));
 
   // Esconde o painel do DevTools para o jogador ver os dados rolarem
   window.toggleDebugPanel(keepDevToolsOpen);
@@ -9438,6 +9629,7 @@ window.debugMeld = async (type) => {
   showDebugBossDamageReaction();
   if (state.finished) return;
 
+  const friendDraw = domReward?.friendBonus ? playDominationFriendSharedDraw(domReward.friendBonus) : Promise.resolve();
   if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {
     renderHand(); // Força as cartas a existirem no DOM para voarem até a mão
     const anims = domReward.drawnCards.map((c) => {
@@ -9463,6 +9655,7 @@ window.debugMeld = async (type) => {
     });
     await Promise.all(anims);
   }
+  await friendDraw;
 
   if (domReward?.tookDead) {
     await animateDeadToHandLocal(domReward.tookDead.deadIndex);
@@ -9689,6 +9882,7 @@ document.getElementById('startBtn').onclick = () => {
 
   const fullLobby = {
     mode: mode,
+    dominationOptions: readDominationMenuOptions(),
     variant: variant,
     betToggle: betToggle,
     betBase: document.getElementById('betBase').value,
@@ -9730,6 +9924,7 @@ document.getElementById('cancelReadyBtn').onclick = () => {
   // 4. Salva a fuga no Firebase
   const fullLobby = {
     mode: getEffectiveMenuMode(),
+    dominationOptions: readDominationMenuOptions(),
     bossId: getBossDefinitionForMode(getEffectiveMenuMode())?.id || null,
     variant: normalizeVariantForMode(getEffectiveMenuMode(), document.getElementById('variantSelect').value),
     betToggle: document.getElementById('betToggle').value,
@@ -9922,6 +10117,7 @@ document.getElementById('inviteBtn').onclick = async () => {
 // SISTEMA DE ROUBO DE MÃO (DOMINAÇÃO COMPLETA)
 // ==========================================
 window.toggleStealMode = async () => {
+  if (!dominationFeatureEnabled(state, 'vision')) return;
   if (!ensureMyTurn() || state.hasDrawnThisTurn) return;
 
   window.isStealModeActive = !window.isStealModeActive;
@@ -9936,6 +10132,7 @@ window.toggleStealMode = async () => {
 };
 
 window.stealCard = async (cardId) => {
+  if (!dominationFeatureEnabled(state, 'vision')) return;
   if (!ensureMyTurn()) return;
 
   // Trava de anti-spam deletada: reseta o ponteiro e força a risada a tocar em todo clique

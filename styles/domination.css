@@ -563,7 +563,13 @@
           0 2px 0 rgba(0, 0, 0, 0.9);
       }
 #callFriendBtn[hidden] { display: none !important; }
+#gameSection #powerBtn { box-sizing: border-box; width: 148px; flex: 0 0 148px; }
+#gameSection .friend-present #drawStockBtn .pile-card { transition: opacity 450ms, filter 450ms; }
+#gameSection .friend-present.friend-playing #drawStockBtn .pile-card { opacity: .55; filter: saturate(.45) brightness(.8); }
 #callFriendBtn {
+  box-sizing: border-box;
+  width: 148px;
+  flex: 0 0 148px;
   background: linear-gradient(135deg, #831843, #581c87);
   border: 1px solid #f9a8d4;
   color: #fff1f2;
@@ -571,7 +577,47 @@
   font-size: 10px;
   font-weight: 900;
 }
-.domination-friend-seat { z-index: 26; padding: 8px; gap: 7px; }
+/* Reserve only the melds' side lane from the start. The shared piles and
+   player interface stay centered whether the guest is present or not. */
+#gameSection .board.friend-layout { --friend-seat-gutter: 148px; }
+#gameSection .board.friend-layout-right .board-melds {
+  padding-right: var(--friend-seat-gutter);
+  padding-left: 8px;
+}
+#gameSection .board.friend-layout-left .board-melds {
+  padding-left: var(--friend-seat-gutter);
+  padding-right: 8px;
+}
+#gameSection .board.friend-layout .board-melds {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 768px), (max-height: 600px) {
+  #gameSection .board.friend-layout { --friend-seat-gutter: 94px; }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  #gameSection .board.friend-layout { --friend-seat-gutter: 76px; }
+  #gameSection .friend-layout .player-actions {
+    position: relative !important;
+    bottom: auto !important;
+    height: auto !important;
+    display: flex !important;
+    justify-content: center;
+    gap: 6px;
+    margin: 2px 0 !important;
+  }
+  #gameSection .friend-layout .player-actions button {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    flex: 0 0 auto;
+    height: 26px !important;
+  }
+}
+.domination-friend-seat { z-index: 26; width: 128px; box-sizing: border-box; padding: 8px; gap: 7px; }
+#gameSection .domination-friend-seat.opponent-hand-right { right: 8px; }
+#gameSection .domination-friend-seat.opponent-hand-left { left: 8px; }
 .domination-friend-seat .opponent-label {
   writing-mode: horizontal-tb;
   transform: none;
@@ -580,10 +626,40 @@
   text-align: center;
 }
 .friend-seat-status { font-size: 9px; color: #e2e8f0; text-align: center; }
+.friend-discard { display: grid; justify-items: center; gap: 5px; }
+.friend-discard small { font-size: 8px; white-space: nowrap; color: #cbd5e1; }
+.friend-discard-face { position: relative; box-sizing: border-box; width: 40px; height: 58px; border: 1px dashed #94a3b866; border-radius: 5px; display: flex; align-items: center; justify-content: center; }
+.friend-discard-face.has-card { background: #fff; color: #111; border: 1px solid #f9a8d4; font-size: 17px; font-weight: 900; box-shadow: 0 3px 8px #0008; }
+.friend-discard-face.red-card { color: #b91c1c; }
 .domination-friend-seat .opponent-cards { padding-bottom: 30px; }
-.friend-stock { display: grid; justify-items: center; gap: 5px; margin-top: 4px; }
-.domination-friend-seat .friend-stock .opponent-card-back { transform: none; margin: 0; }
-.friend-stock small { font-size: 8px; color: #94a3b8; }
+#gameSection .friend-layout .board-middle { display: grid; grid-template-columns: repeat(2, max-content); justify-content: center; column-gap: 30px; row-gap: 30px; }
+#gameSection .friend-layout .board-middle > .pile-area { grid-row: 2; }
+#gameSection .friend-layout .board-middle:not(:has(> #dominationFriendStock))::after { content: ''; grid-column: 1 / -1; grid-row: 1; width: 118px; height: 130px; visibility: hidden; pointer-events: none; }
+#dominationFriendStock { grid-column: 1 / -1; grid-row: 1; position: relative; isolation: isolate; display: grid; justify-items: center; align-content: start; gap: 10px; padding-top: 20px; width: 118px; height: 130px; box-sizing: border-box; justify-self: center; cursor: default; }
+#dominationFriendStock .friend-stock-stack { position: relative; width: 55px; height: 80px; opacity: .55; filter: saturate(.45) brightness(.8); transition: opacity 450ms, filter 450ms; }
+#dominationFriendStock .opponent-card-back { position: absolute; width: 100%; height: 100%; transform: none; margin: 0; }
+#dominationFriendStock.is-playing .friend-stock-stack { opacity: 1; filter: none; }
+#gameSection > #dominationFriendSpotlight { position: fixed; inset: 0; z-index: 24; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity 650ms ease; }
+#gameSection > #dominationFriendSpotlight.is-playing { opacity: 1; }
+#dominationFriendSpotlight svg { display: block; overflow: visible; }
+#dominationFriendSpotlight .friend-spotlight-beam { animation: friend-stock-spotlight 10s ease-in-out infinite alternate; animation-play-state: paused; }
+#dominationFriendSpotlight.is-playing .friend-spotlight-beam { animation-play-state: running; }
+@keyframes friend-stock-spotlight { from { transform: rotate(-.8deg); } to { transform: rotate(.8deg); } }
+#dominationFriendStock small { position: relative; z-index: 1; margin: 0; font-size: 8px; line-height: 1.4; color: #cbd5e1; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  #dominationFriendSpotlight .friend-spotlight-beam { animation: none; }
+  #gameSection > #dominationFriendSpotlight, #dominationFriendStock .friend-stock-stack { transition: none; }
+}
+@media (max-width: 768px), (max-height: 600px) {
+  #gameSection .friend-layout .board-middle { column-gap: 15px; row-gap: 28px; }
+  #gameSection .friend-layout .board-middle:not(:has(> #dominationFriendStock))::after, #dominationFriendStock { height: 108px; }
+  #dominationFriendStock .friend-stock-stack { width: 40px; height: 58px; }
+}
+@media (max-height: 480px) {
+  #gameSection .friend-layout .board-middle { grid-template-columns: repeat(3, max-content); }
+  #gameSection .friend-layout .board-middle > .pile-area { grid-row: 1; }
+  #gameSection .friend-layout .board-middle:not(:has(> #dominationFriendStock))::after, #dominationFriendStock { grid-column: 1; grid-row: 1; }
+}
 .friend-farewell { color: #f9a8d4; letter-spacing: 1px; font-size: 9px; }
 .friend-notice {
   position: fixed;
@@ -674,3 +750,19 @@
 }
 @keyframes friend-seat-entry { from { opacity: 0; scale: 0.8; } to { opacity: 1; scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .domination-friend-seat.friend-entering .opponent-label { animation: none; } }
+/* Scoped lobby controls: no impact on table or other modes. */
+.domination-menu-options { display: grid; gap: 10px; }
+.domination-menu-option { --option-title: #facc15; --option-clean: #4ade80; --option-real: #22d3ee; --option-aces: #c084fc; color: #facc15; transition: color 150ms; }
+.domination-option-vision { --option-title: #c084fc; }
+.domination-menu-options label { display: flex; align-items: center; gap: 8px; min-height: 36px; margin: 0; color: var(--option-title); font-weight: 900; letter-spacing: 0; cursor: pointer; }
+.domination-menu-options label::before { content: none; }
+.domination-menu-options input[type="checkbox"] { flex: 0 0 18px; width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 0; box-shadow: none; accent-color: #a855f7; }
+.domination-menu-options input:focus-visible { outline: 2px solid #facc15; outline-offset: 3px; }
+.domination-option-help { padding-left: 26px; font-weight: 600; line-height: 1.5; }
+.domination-option-help > span, .domination-menu-options small { display: block; }
+.domination-menu-options small { margin-top: 4px; font-size: 10px; font-weight: normal; color: #cbd5e1; }
+.domination-option-help .option-clean { color: var(--option-clean); }
+.domination-option-help .option-real { color: var(--option-real); }
+.domination-option-help .option-aces { color: var(--option-aces); }
+.domination-menu-option:has(input:not(:checked)) { --option-title: #9ca3af; --option-clean: #9ca3af; --option-real: #9ca3af; --option-aces: #9ca3af; color: #9ca3af; filter: grayscale(1); }
+.domination-menu-option:has(input:not(:checked)) small { color: #9ca3af; }

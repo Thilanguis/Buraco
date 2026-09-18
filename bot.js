@@ -57,6 +57,16 @@ export class BuracoBot {
       }
       if (typeof engine.hasPendingBossChoice === 'function' && engine.hasPendingBossChoice()) return;
 
+      if (state.mode === '1x1_dominacao' && botIndex === 1 && engine.executeDominationPowers) {
+        await engine.executeDominationPowers(botIndex);
+        this.assertActive(engine, signal);
+        state = engine.getState();
+        if (!state || state.finished || state.currentPlayer !== botIndex) return;
+        me = state.players[botIndex];
+        team = state.teams[me.teamId];
+        oppTeam = state.teams[me.teamId === 0 ? 1 : 0];
+      }
+
       const myScore = engine.computeTeamMeldScore(team).total;
       const oppScore = engine.computeTeamMeldScore(oppTeam).total;
       const stockCount = state.stock.length;
@@ -98,7 +108,8 @@ export class BuracoBot {
         this.assertActive(engine, signal);
         let boughtFromDiscard = false;
         const naturePlan = engine.getNaturePriorities?.(me.id);
-        if (state.discard.length > 0 && !engine.isDiscardBlocked?.() && !engine.shouldForceStockDraw?.(me.id)) {
+        const dominationBought = state.mode === '1x1_dominacao' && botIndex === 1 && state.hasDrawnThisTurn;
+        if (!dominationBought && state.discard.length > 0 && !engine.isDiscardBlocked?.() && !engine.shouldForceStockDraw?.(me.id)) {
           const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
           const bossAllowsDiscard = !intent || typeof engine.shouldTakeBossDiscard !== 'function'
             || engine.shouldTakeBossDiscard(me.id, intent, naturePlan);
@@ -119,7 +130,7 @@ export class BuracoBot {
           return;
         }
 
-        if (!boughtFromDiscard || state.partialDraw) {
+        if (!(state.mode === '1x1_dominacao' && botIndex === 1 && state.hasDrawnThisTurn) && (!boughtFromDiscard || state.partialDraw)) {
           this.assertActive(engine, signal);
           await engine.executeDrawStock(botIndex);
         }
@@ -134,6 +145,14 @@ export class BuracoBot {
         }
 
         me = state.players[botIndex];
+        if (state.mode === '1x1_dominacao' && botIndex === 1 && engine.executeDominationPowers) {
+          // The purchase may have made a canastra possible: invite before melding.
+          await engine.executeDominationPowers(botIndex);
+          this.assertActive(engine, signal);
+          state = engine.getState();
+          if (!state || state.finished || state.currentPlayer !== botIndex) return;
+          me = state.players[botIndex];
+        }
         engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
 
         if (!engine.shouldSkipMelds?.(me.id)) {

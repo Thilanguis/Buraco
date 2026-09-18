@@ -6,10 +6,44 @@ const MODE = '1x1_dominacao';
 const WEIGHT = { simple: 0, suja: 1, limpa: 2, real: 3, asas: 4 };
 const BONUS = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 };
 
+export function normalizeDominationOptions(options) {
+  return { friend: options?.friend !== false, plus: options?.plus !== false, vision: options?.vision !== false };
+}
+
+export function dominationFeatureEnabled(state, feature) {
+  return state?.mode === MODE && normalizeDominationOptions(state.dominationOptions)[feature] === true;
+}
+
 export function canCallDominationFriend(state, playerId) {
-  return state?.mode === MODE && !state.finished && !state.surrender?.active
+  return dominationFeatureEnabled(state, 'friend') && !state.finished && !state.surrender?.active
     && !state.debugPaused && playerId === 1 && state.currentPlayer === 1
     && !state.friendUsed && !state.dominationFriend;
+}
+
+export function shouldBotCallDominationFriend(state, rules) {
+  if (!canCallDominationFriend(state, 1)) return false;
+  const owner = state.players[1];
+  const team = state.teams.find(entry => entry.id === owner.teamId);
+  if (!team) return false;
+  // Public endgame pressure: do not save the invitation until it is too late.
+  const noDead = !state.deadPiles?.some(pile => pile?.length);
+  const rival = state.players[0];
+  const rivalTeam = state.teams.find(entry => entry.id === rival.teamId);
+  if ((noDead && state.stock.length <= 12)
+    || (state.deadChunksTaken?.[rival.teamId] > 0 && rival.hand.length <= 3
+      && rivalTeam?.melds.some(meld => BONUS[rules.classify(rules.prepare(meld))]))) return true;
+  const melds = team.melds.map(meld => rules.prepare(meld));
+  const cleanGrowing = melds.filter(meld => isClean(meld, rules) && meld.length < 14);
+  if (cleanGrowing.some(meld => (meld.length >= 5 && meld.length < 7) || meld.length >= 11)) return true;
+  if (cleanGrowing.filter(meld => meld.length >= 4).length >= 2) return true;
+  // Call before cashing in a tier already reachable with the bot's own hand.
+  // Never inspect the opponent's cards, future stock or the unsorted guest deck.
+  if (melds.some(base => extensionOptions(base, owner.hand, rules, false).some(plan => {
+    const kind = rules.classify(plan.meld);
+    return BONUS[kind] && WEIGHT[kind] > WEIGHT[rules.classify(base)];
+  }))) return true;
+  const opening = bestNewMeld(owner.hand, melds, rules, false, 3);
+  return !!opening && !!BONUS[rules.classify(opening.meld)];
 }
 
 export function rollFriendDuration(random = Math.random) {
@@ -27,7 +61,7 @@ export function createFriendInvitation(id, random = Math.random) {
     [stock[index], stock[other]] = [stock[other], stock[index]];
   }
   return {
-    id, name, active: true, hand: stock.splice(-11), stock,
+    id, name, active: true, hand: stock.splice(-11), stock, discard: [],
     initialTurns, turnsRemaining: initialTurns, farewell: false,
     pendingTurnId: null, lastExecutedTurnId: null, presentationUntil: 0,
   };
@@ -67,13 +101,35 @@ export function grantDominationFriendExtraTurn(state, playerId, oldKind, newKind
   if (!BONUS[newKind] || next <= previous) return null;
   friend.turnsRemaining++;
   friend.extraTurns = (friend.extraTurns || 0) + 1;
-  friend.farewell = false;
+  friend.farewell = isDominationFriendEndgame(state);
   const event = {
     id: `${friend.id}:extra:${key}:${newKind}`, type: 'extraTurn', name: friend.name,
     playerId, actorName: playerId === 'friend' ? friend.name : (state.players[1].name || 'Dominador'),
     kind: newKind, turnsRemaining: friend.turnsRemaining, extraTurns: friend.extraTurns,
   };
   (friend.events ||= []).push(event);
+  return event;
+}
+
+// The Dominador's reward calculation supplies the same-turn tier difference.
+// This is an auxiliary draw only: it neither starts nor consumes a friend turn.
+export function grantDominationFriendSharedBonus(state, playerId, kind, count, meldIndex) {
+  const friend = state?.dominationFriend;
+  if (state?.mode !== MODE || state.finished || state.surrender?.active || !friend?.active
+    || playerId !== 1 || !BONUS[kind] || !Number.isInteger(count) || count <= 0
+    || !Number.isInteger(meldIndex) || meldIndex < 0) return null;
+  if (!dominationFeatureEnabled(state, 'plus')) return null;
+  const id = `${friend.id}:bonus:${state.turnNumber || 0}:${meldIndex}:${kind}`;
+  const events = friend.events ||= [];
+  if (events.some((event) => event.id === id)) return null;
+  const cards = [];
+  for (let i = 0; i < count && friend.stock.length; i++) {
+    const card = friend.stock.pop();
+    friend.hand.push(card);
+    cards.push({ ...card });
+  }
+  const event = { id, type: 'cardBonus', friendId: friend.id, kind, cards };
+  events.push(event);
   return event;
 }
 
@@ -87,6 +143,11 @@ export function isDominationFriendBusy(state, now = Date.now()) {
     || (state.dominationFriend?.presentationUntil || 0) > now);
 }
 
+export function isDominationFriendEndgame(state) {
+  return state?.mode === MODE && Array.isArray(state.stock) && state.stock.length < 6
+    && Array.isArray(state.deadPiles) && !state.deadPiles.some((pile) => pile?.length);
+}
+
 export function queueDominationFriendTurn(state, outgoingPlayerId) {
   const friend = state?.dominationFriend;
   if (state?.mode !== MODE || state.finished || outgoingPlayerId !== 1
@@ -94,7 +155,7 @@ export function queueDominationFriendTurn(state, outgoingPlayerId) {
   const id = `${friend.id}:after:${state.turnNumber || 0}`;
   if (friend.lastExecutedTurnId === id || friend.pendingTurnId) return false;
   friend.pendingTurnId = id;
-  friend.farewell = friend.turnsRemaining === 1;
+  friend.farewell = friend.turnsRemaining === 1 || isDominationFriendEndgame(state);
   return true;
 }
 
@@ -154,7 +215,7 @@ function extensionOptions(base, hand, rules, farewell) {
   return options.sort((a, b) => b.value - a.value);
 }
 
-function growPlan(base, hand, rules, farewell) {
+function growPlan(base, hand, rules, farewell, requiredId = null) {
   let frontier = [{ meld: base, added: [] }];
   let best = null;
   const visited = new Set();
@@ -172,7 +233,8 @@ function growPlan(base, hand, rules, farewell) {
         visited.add(key);
         const candidate = { meld: extension.meld, added, value: playValue(base, extension.meld, added, rules, farewell) };
         next.push(candidate);
-        if (!best || candidate.value > best.value) best = candidate;
+        if ((!requiredId || added.some((card) => card.id === requiredId))
+          && (!best || candidate.value > best.value)) best = candidate;
       }
     }
     frontier = next.sort((a, b) => b.value - a.value).slice(0, 6);
@@ -198,13 +260,15 @@ function spendsReservedNaturals(candidate, hand, melds, rules, targetIndex = -1)
   });
 }
 
-function bestNewMeld(hand, melds, rules, farewell) {
+function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = null) {
   let best = null;
   const seen = new Set();
   for (let i = 0; i < hand.length - 2; i++) {
     for (let j = i + 1; j < hand.length - 1; j++) {
       for (let k = j + 1; k < hand.length; k++) {
         let added = [hand[i], hand[j], hand[k]];
+        // A closed pickup must justify its top with cards already in hand.
+        if (requiredId && !added.some((card) => card.id === requiredId)) continue;
         let meld = rules.prepare(added);
         if (!rules.valid(meld)) continue;
         const extension = growPlan(meld, hand.filter((card) => !added.includes(card)), rules, farewell);
@@ -223,6 +287,13 @@ function bestNewMeld(hand, melds, rules, farewell) {
           // emptying the hand. Existing clean melds are never dirtied for this.
           if (clean ? meld.length < 4 : meld.length < 7 && !clearsHand) continue;
           if (spendsReservedNaturals({ added }, hand, melds, rules)) continue;
+          // With time to wait, do not fragment a growing clean suit into small
+          // parallel games just because duplicate ranks make that legal.
+          if (turnsRemaining >= 3 && meld.length < 7 && melds.some((base) => {
+            const existing = rules.prepare(base);
+            return existing.length < 14 && isClean(existing, rules)
+              && meldSuit(existing, rules) === meldSuit(meld, rules);
+          })) continue;
           // Even a scoring opening must not spend a 2 that can seed its own
           // natural sequence, unless the hand contains another copy of that 2.
           const spendsUsefulTwo = meld.some((card) => card.rank === '2' && rules.isWild(card, meld)
@@ -242,39 +313,119 @@ function bestNewMeld(hand, melds, rules, farewell) {
   return best;
 }
 
+function chooseFriendDiscardPickup(state, team, rules, farewell) {
+  const friend = state.dominationFriend;
+  const pile = friend.discard || [];
+  if (!pile.length || !['aberto', 'fechado'].includes(state.variant)) return null;
+  const closed = state.variant === 'fechado';
+  const top = pile[pile.length - 1];
+  const pool = [...friend.hand, ...(closed ? [top] : pile)];
+  const requiredId = closed ? top.id : null;
+  const discardedIds = new Set(pile.map((card) => card.id));
+  let best = null;
+  let baseline = 0;
+  team.melds.forEach((base, meldIndex) => {
+    const existing = growPlan(base, friend.hand, rules, farewell);
+    baseline = Math.max(baseline, existing?.value || 0);
+    const candidate = growPlan(base, pool, rules, farewell, requiredId);
+    if (!candidate || !candidate.added.some((card) => discardedIds.has(card.id))) return;
+    if (!farewell && !isClean(rules.prepare(base), rules)
+      && spendsReservedNaturals(candidate, pool, team.melds, rules, meldIndex)) return;
+    if (!best || candidate.value > best.value) best = { ...candidate, meldIndex };
+  });
+  const existingNew = bestNewMeld(friend.hand, team.melds, rules, farewell, friend.turnsRemaining);
+  baseline = Math.max(baseline, existingNew?.value || 0);
+  const opening = bestNewMeld(pool, team.melds, rules, farewell, friend.turnsRemaining, requiredId);
+  if (opening?.added.some((card) => discardedIds.has(card.id)) && (!best || opening.value > best.value)) {
+    best = { ...opening, meldIndex: team.melds.length };
+  }
+  if (!best) return null;
+  // Do not recycle an unhelpful pile forever or peek at the auxiliary stock.
+  // Extra dead weight is especially costly with little time left to unload it.
+  const usable = best.added.filter((card) => discardedIds.has(card.id)).length;
+  const burden = (pile.length - usable) * (farewell ? 900 : 250);
+  return best.value > baseline + burden ? best : null;
+}
+
+function drawDominadorSharedBonus(state, count, kind, steps, rules) {
+  const owner = state.players[1];
+  for (let i = 0; i < count; i++) {
+    let recycledIndex = null;
+    let recycledStock = null;
+    if (!state.stock.length) {
+      const index = state.deadPiles?.findIndex((pile) => pile?.length) ?? -1;
+      if (index >= 0) {
+        state.stock = state.deadPiles[index];
+        state.deadPiles[index] = [];
+        for (let j = state.stock.length - 1; j > 0; j--) {
+          const other = Math.floor(Math.random() * (j + 1));
+          [state.stock[j], state.stock[other]] = [state.stock[other], state.stock[j]];
+        }
+        recycledIndex = index;
+        recycledStock = state.stock.map((card) => ({ ...card }));
+      }
+    }
+    const victim = state.players[0];
+    const stolen = !state.stock.length;
+    const card = stolen
+      ? victim.hand.splice(Math.floor(Math.random() * victim.hand.length), 1)[0]
+      : state.stock.pop();
+    if (!card) break;
+    card._isEndgameSteal = stolen;
+    owner.hand.push(card);
+    (state.boughtCardIds ||= []).push(card.id);
+    steps.push({ type: 'dominatorBonus', playerId: 1, kind, cards: [{ ...card }], recycledIndex, recycledStock });
+  }
+  rules.sortHand?.(owner.hand);
+}
+
 export function executeDominationFriendTurn(state, turnId, rules) {
   const friend = state?.dominationFriend;
   if (!isDominationFriendTurn(state) || state.finished || state.surrender?.active
     || friend.pendingTurnId !== turnId || friend.lastExecutedTurnId === turnId) return null;
   const team = state.teams.find((entry) => entry.id === state.players[1].teamId);
   if (!team) return null;
-  const farewell = friend.turnsRemaining === 1;
+  const farewell = friend.turnsRemaining === 1 || isDominationFriendEndgame(state);
   const steps = [];
-  const draw = (count) => {
+  const draw = (count, kind = null) => {
     const cards = [];
     for (let i = 0; i < count && friend.stock.length; i++) {
       const card = friend.stock.pop();
       friend.hand.push(card);
       cards.push({ ...card });
     }
-    if (cards.length) steps.push({ type: 'drawStock', playerId: 'friend', cards });
+    if (cards.length) steps.push({ type: 'drawStock', playerId: 'friend', cards, reason: kind ? 'canastra' : 'turn', kind });
   };
-  draw(2);
+  let pickupPlan = chooseFriendDiscardPickup(state, team, rules, farewell);
+  let complementaryDraw = false;
+  if (pickupPlan) {
+    const pile = friend.discard.splice(0);
+    friend.hand.push(...pile);
+    steps.push({ type: 'drawDiscard', playerId: 'friend', cards: pile.map((card) => ({ ...card })), variant: state.variant });
+    complementaryDraw = state.variant === 'fechado';
+    if (!complementaryDraw) {
+      draw(1);
+      pickupPlan = null;
+    }
+  } else draw(2);
   const bonuses = new Map();
   const plays = [];
   // Each iteration places cards; the finite auxiliary deck bounds bonus chains.
   for (let step = 0; step < 108 && friend.hand.length; step++) {
-    let chosen = null;
-    team.melds.forEach((base, meldIndex) => {
+    // A canastra may have earned more time since the previous play.
+    const unload = friend.turnsRemaining === 1 || isDominationFriendEndgame(state);
+    let chosen = pickupPlan;
+    pickupPlan = null;
+    if (!chosen) team.melds.forEach((base, meldIndex) => {
       let available = friend.hand;
-      if (!farewell && !isClean(rules.prepare(base), rules)) {
+      if (!unload && !isClean(rules.prepare(base), rules)) {
         available = available.filter((card) => !spendsReservedNaturals({ added: [card] }, friend.hand, team.melds, rules, meldIndex));
       }
-      const candidate = growPlan(base, available, rules, farewell);
+      const candidate = growPlan(base, available, rules, unload);
       if (candidate && (!chosen || candidate.value > chosen.value)) chosen = { ...candidate, meldIndex };
     });
     if (!chosen) {
-      const candidate = bestNewMeld(friend.hand, team.melds, rules, farewell);
+      const candidate = bestNewMeld(friend.hand, team.melds, rules, unload, friend.turnsRemaining);
       if (candidate) chosen = { ...candidate, meldIndex: team.melds.length };
     }
     if (!chosen) break;
@@ -292,17 +443,38 @@ export function executeDominationFriendTurn(state, turnId, rules) {
       meld: chosen.meld.map((card) => ({ ...card })),
       friendEvent,
     });
-    // Same per-turn tier/difference rule; the guest only uses her own resources.
-    if (oldKind !== newKind && BONUS[newKind]) {
+    // Both partners get the same tier difference, each from their own stock.
+    if (dominationFeatureEnabled(state, 'plus') && oldKind !== newKind && BONUS[newKind]) {
       const previous = bonuses.get(chosen.meldIndex) || 0;
-      draw(Math.max(0, BONUS[newKind] - previous));
+      const count = Math.max(0, BONUS[newKind] - previous);
+      draw(count, newKind);
+      drawDominadorSharedBonus(state, count, newKind, steps, rules);
       bonuses.set(chosen.meldIndex, Math.max(previous, BONUS[newKind]));
     }
+    if (complementaryDraw) {
+      draw(1);
+      complementaryDraw = false;
+    }
+  }
+  // Discard only to her private pile; retain wilds and connected naturals.
+  if (friend.hand.length) {
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const usefulness = (card) => {
+      if (card.joker || card.rank === '2') return 100;
+      const rank = ranks.indexOf(card.rank);
+      const neighbors = (cards) => cards.filter((other) => other.id !== card.id && other.suit === card.suit
+        && Math.abs(ranks.indexOf(other.rank) - rank) <= 2).length;
+      return neighbors(friend.hand) * 3 + team.melds.reduce((sum, meld) => sum + neighbors(meld) * 5, 0);
+    };
+    const card = [...friend.hand].sort((a, b) => usefulness(a) - usefulness(b))[0];
+    friend.hand = friend.hand.filter((entry) => entry.id !== card.id);
+    (friend.discard ||= []).push(card);
+    steps.push({ type: 'discard', playerId: 'friend', card: { ...card }, cards: [{ ...card }] });
   }
   friend.lastExecutedTurnId = turnId;
   friend.pendingTurnId = null;
   friend.turnsRemaining -= 1;
-  friend.farewell = friend.turnsRemaining === 1;
+  friend.farewell = friend.turnsRemaining === 1 || isDominationFriendEndgame(state);
   const departed = friend.turnsRemaining === 0;
   if (departed) {
     friend.active = false;
@@ -311,6 +483,6 @@ export function executeDominationFriendTurn(state, turnId, rules) {
     friend.stock = [];
     (friend.events ||= []).push({ id: `${friend.id}:departure`, type: 'departure', name: friend.name, turnsRemaining: 0 });
   }
-  // No shared discard, dead-pile acquisition, hand penalty or finishing hook.
+  // Private discards never enter the shared pile or trigger normal finishing.
   return { friendId: friend.id, name: friend.name, turnId, plays, steps, farewell, departed };
 }

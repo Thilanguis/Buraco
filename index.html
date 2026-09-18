@@ -112,26 +112,33 @@
                   <br />
                   - Se o Dominador pegar o lixo, ele ainda será obrigado a puxar 1 carta extra do monte.
                   <br />
-                  <span id="dominacaoExtra" style="display: none; color: #facc15; font-weight: bold; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px; display: block">
-                    🔥 PLUS DOMINAÇÃO: Toda vez que formar ou evoluir um jogo:
-                    <br />
-                    <span style="color: #4ade80">◆ Limpa:</span>
-                    Compra +1 carta do monte
-                    <br />
-                    <span style="color: #22d3ee">◆ Real:</span>
-                    Compra +2 cartas do monte
-                    <br />
-                    <span style="color: #c084fc">◆ Ás-a-Ás:</span>
-                    Compra +3 cartas do monte
-                    <br />
-                    <br />
-                    <span style="color: #a855f7; font-weight: 900">👁️ VISÃO DO DOMINADOR:</span>
-                    1x por partida, no seu turno, veja a mão do Escravo e roube até 2 cartas no lugar de comprar da mesa!
-                    <br /><br />
-                    <span>📞 AMIGA DO DOMINADOR</span>
-                    <br />
-                    1x por partida, o Dominador pode chamar Bruna, Nathalia ou Thayanne para ajudar temporariamente. Uma roleta determina por quantos turnos ela permanecerá. A amiga entra com sua própria mão e ajuda a construir e evoluir os jogos do Dominador.
-                  </span>
+                  <div id="dominacaoExtra" style="display: none; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px">
+                    <div class="domination-menu-options" role="group" aria-label="Mecânicas da Dominação Completa">
+                      <div class="domination-menu-option">
+                        <label><input id="dominationOption_plus" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationPlusHelp" /> 🔥 Plus Dominação</label>
+                        <div class="domination-option-help" id="dominationPlusHelp">
+                          <span><strong class="option-clean">◆ Limpa:</strong> compra +1 carta.</span>
+                          <span><strong class="option-real">◆ Real:</strong> compra +2 cartas.</span>
+                          <span><strong class="option-aces">◆ Ás-a-Ás:</strong> compra +3 cartas.</span>
+                        </div>
+                      </div>
+                      <div class="domination-menu-option domination-option-vision">
+                        <label><input id="dominationOption_vision" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationVisionHelp" /> 👁️ Visão do Dominador</label>
+                        <div class="domination-option-help" id="dominationVisionHelp">
+                          <span>1x por partida, no seu turno: veja a mão do Escravo e roube até 2 cartas no lugar da compra.</span>
+                        </div>
+                      </div>
+                      <div class="domination-menu-option">
+                        <label><input id="dominationOption_friend" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationFriendHelp" /> 📞 Amiga do Dominador</label>
+                        <div class="domination-option-help" id="dominationFriendHelp">
+                          <span>◆ 1 chamada: roleta de 3, 4 ou 5 turnos.</span>
+                          <span>◆ Entra com 11 cartas. Compra 2 do auxiliar ou lixo próprio +1 do auxiliar.</span>
+                          <span>◆ Limpa, Real ou Ás-a-Ás de qualquer um dos dois: +1 turno para ela, sem limite.</span>
+                        </div>
+                      </div>
+                      <small>Desmarque para desativar nesta partida.</small>
+                    </div>
+                  </div>
                 </div>
 
                 <div id="bossModeRules" class="boss-menu-rules" style="display: none">
