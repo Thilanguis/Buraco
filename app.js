@@ -367,6 +367,7 @@ let turnTimerRemaining = 0;
 let selectedMeldTarget = null;
 let pendingDiscardChoice = null;
 let discardPickupAnimating = false;
+const pendingStockCardIds = new Set();
 let lastMyTurn = false;
 let lastSeenActionId = null;
 let ignoreOwnActionId = null;
@@ -2800,17 +2801,24 @@ async function drawFromStock() {
   if (!state.boughtCardIds) state.boughtCardIds = [];
   drawnCards.forEach((c) => state.boughtCardIds.push(c.id)); // Salva todas para brilhar
 
-  // Atualiza a mesa IMEDIATAMENTE (o número do monte cai na hora do clique)
-  renderAll();
-
-  if (fromRect) {
-    for (const c of drawnCards) {
-      const toEl = cardElById(c.id);
-      if (toEl) {
-        toEl.style.visibility = 'hidden';
-        await flyRectToRect(c, fromRect, getRect(toEl), 'back');
-        toEl.style.visibility = '';
+  // Reserve os lugares na mão, mas revele cada carta só ao terminar seu voo.
+  if (fromRect) drawnCards.forEach(c => pendingStockCardIds.add(c.id));
+  try {
+    renderAll(); // A contagem do monte continua caindo imediatamente.
+    if (fromRect) {
+      for (const c of drawnCards) {
+        const toEl = cardElById(c.id);
+        if (toEl) await flyRectToRect(c, fromRect, getRect(toEl), 'back');
+        pendingStockCardIds.delete(c.id);
+        const arrivedEl = cardElById(c.id);
+        if (arrivedEl) arrivedEl.style.visibility = '';
       }
+    }
+  } finally {
+    for (const c of drawnCards) {
+      pendingStockCardIds.delete(c.id);
+      const el = cardElById(c.id);
+      if (el) el.style.visibility = '';
     }
   }
 
@@ -5895,6 +5903,7 @@ function renderHand() {
     const div = document.createElement('div');
     div.dataset.cardId = card.id;
     div.className = `carta ${suitClass(card)} ${deckFaceClass(card)}`;
+    if (pendingStockCardIds.has(card.id)) div.style.visibility = 'hidden';
     if (selectingBankerCollateral) {
       div.classList.add('boss-collateral-selectable');
       if (selectedBossCollateralCardId === card.id) div.classList.add('boss-collateral-selected');
