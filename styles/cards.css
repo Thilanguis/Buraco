@@ -209,6 +209,7 @@
       #moveWildBtn:disabled {
         opacity: 0.5;
       }
+      #undoBtn:disabled { opacity: 0.4; cursor: default; }
 
       /* Mão */
       .hand-container {
@@ -433,16 +434,16 @@
       #handContainer .carta {
         transition:
           transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
-          margin-right 0.2s,
           box-shadow 0.25s;
         transform-style: preserve-3d;
       }
-      #handContainer .carta:hover {
-        margin-right: 0;
-        z-index: 100;
-        /* Efeito 3D puxando a carta pra câmera e rotacionando levemente */
-        transform: translateY(-15px) scale(1.08) rotateX(12deg) rotateY(-4deg) !important;
-        box-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7);
+      @media (hover: hover) and (pointer: fine) {
+        #handContainer:where(:not(.hand-hover-reset)) .carta:hover {
+          z-index: 100;
+          /* Efeito 3D puxando a carta pra câmera e rotacionando levemente */
+          transform: translateY(-15px) scale(1.08) rotateX(12deg) rotateY(-4deg) !important;
+          box-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7);
+        }
       }
 
       /* CARTA SELECIONADA (Fica travada no alto, sem pular e com altura reduzida) */
@@ -1604,3 +1605,10 @@
         margin-left: 15px !important;
       }
 
+/* Closed-discard pickup waits for an explicit destination when ambiguous. */
+.meld-line.discard-target-choice {
+  outline: 2px solid #facc15;
+  outline-offset: 3px;
+  border-radius: 6px;
+  cursor: pointer;
+}

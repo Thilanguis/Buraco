@@ -7,17 +7,90 @@ const WEIGHT = { simple: 0, suja: 1, limpa: 2, real: 3, asas: 4 };
 const BONUS = { simple: 0, suja: 0, limpa: 1, real: 1, asas: 1 };
 
 export function normalizeDominationOptions(options) {
-  return { friend: options?.friend !== false, plus: options?.plus !== false, vision: options?.vision !== false };
+  return { friend: options?.friend !== false, plus: options?.plus !== false, vision: options?.vision !== false,
+    friendCapacity: options?.friendCapacity === 0 || options?.friendCapacity === '0' ? 0
+      : Number(options?.friendCapacity) === 2 ? 2 : 1 };
+}
+
+export function hasDominationFriendSelection(mode, options) {
+  return mode !== MODE || options?.friend === false || [1, 2].includes(Number(options?.friendCapacity));
 }
 
 export function dominationFeatureEnabled(state, feature) {
   return state?.mode === MODE && normalizeDominationOptions(state.dominationOptions)[feature] === true;
 }
 
+// Canonical persisted state. Legacy piles move once, never get copied per guest.
+export function normalizeDominationFriends(state) {
+  if (!state || state.mode !== MODE) return state;
+  if (!Array.isArray(state.dominationFriends)) {
+    const old = state.dominationFriend;
+    state.dominationFriends = old ? [old] : [];
+    state.dominationFriendShared ||= {
+      stock: old?.stock || [], discard: old?.discard || [],
+      rewardedMeldTiers: { ...old?.rewardedMeldTiers }, bonusIds: [],
+    };
+  }
+  state.dominationFriendShared ||= { stock: [], discard: [], rewardedMeldTiers: {}, bonusIds: [] };
+  const shared = state.dominationFriendShared;
+  shared.rewardedMeldTiers ||= {};
+  shared.bonusIds ||= [];
+  state.dominationFriends.forEach((friend, index) => {
+    friend.seat ||= index === 0 ? 'left' : 'right';
+    for (const [key, tier] of Object.entries(friend.rewardedMeldTiers || {})) {
+      shared.rewardedMeldTiers[key] = Math.max(shared.rewardedMeldTiers[key] || 0, tier);
+    }
+    for (const event of friend.events || []) {
+      if (event.type === 'cardBonus') {
+        const key = event.id.replace(friend.id + ':bonus:', 'bonus:').replace(/:[^:]+$/, '');
+        if (!shared.bonusIds.includes(key)) shared.bonusIds.push(key);
+      }
+    }
+    delete friend.stock;
+    delete friend.discard;
+    delete friend.rewardedMeldTiers;
+  });
+  delete state.dominationFriend;
+  return state;
+}
+
+export function dominationFriends(state) {
+  normalizeDominationFriends(state);
+  return state?.mode === MODE ? state.dominationFriends : [];
+}
+
+export function activeDominationFriends(state) {
+  return dominationFriends(state).filter(friend => friend.active);
+}
+
+// One deterministic actor, including while the committed result is animating.
+export function getDominationFriend(state, id = null) {
+  const friends = dominationFriends(state);
+  if (id) return friends.find(friend => friend.id === id);
+  const presenting = friends.find(friend => friend.id === state?.dominationFriendShared?.presentation?.friendId);
+  if (presenting) return presenting;
+  const active = friends.filter(friend => friend.active);
+  return active.find(friend => friend.pendingTurnId)
+    || active.find(friend => friend.presentationUntil) || active[0];
+}
+
+export function remainingFriendCalls(state) {
+  const used = dominationFriends(state).length || (state?.friendUsed ? 1 : 0);
+  return used ? 0 : normalizeDominationOptions(state?.dominationOptions).friendCapacity;
+}
+
+export function completeDominationFriendPresentation(state, turnId, owner) {
+  normalizeDominationFriends(state);
+  const shared = state?.dominationFriendShared;
+  if (!shared?.presentation || shared.presentation.id !== turnId || shared.presentation.owner !== owner) return false;
+  shared.presentation = null;
+  return true;
+}
+
 export function canCallDominationFriend(state, playerId) {
   return dominationFeatureEnabled(state, 'friend') && !state.finished && !state.surrender?.active
     && !state.debugPaused && playerId === 1 && state.currentPlayer === 1
-    && !state.friendUsed && !state.dominationFriend;
+    && remainingFriendCalls(state) > 0 && !isDominationFriendBusy(state);
 }
 
 export function shouldBotCallDominationFriend(state, rules) {
@@ -62,6 +135,7 @@ export function createFriendInvitation(id, random = Math.random) {
   }
   return {
     id, name, active: true, hand: stock.splice(-11), stock, discard: [],
+    companionName: FRIEND_NAMES.filter(entry => entry !== name)[Math.min(1, Math.floor(random() * 2))],
     initialTurns, turnsRemaining: initialTurns, farewell: false,
     pendingTurnId: null, lastExecutedTurnId: null, presentationUntil: 0,
   };
@@ -69,34 +143,53 @@ export function createFriendInvitation(id, random = Math.random) {
 
 export function callDominationFriend(state, playerId, invitation, now = Date.now(), rules = null) {
   if (!canCallDominationFriend(state, playerId)) return false;
+  const friends = dominationFriends(state);
+  if (friends.some(friend => friend.id === invitation.id)) return false;
+  const shared = state.dominationFriendShared;
+  const capacity = normalizeDominationOptions(state.dominationOptions).friendCapacity;
+  const { spinMs, resultMs, dealMs } = FRIEND_PRESENTATION_TIMING;
+  shared.stock = structuredClone([...invitation.stock, ...invitation.hand]);
+  // One atomic call, one duration roll, distinct hands dealt from one deck.
+  for (let index = 0; index < capacity; index++) {
+    const friend = structuredClone(invitation);
+    friend.id = index === 0 ? invitation.id : `${invitation.id}:2`;
+    friend.callId = invitation.id;
+    friend.name = index === 0 ? invitation.name
+      : invitation.companionName || FRIEND_NAMES.find(name => name !== invitation.name);
+    friend.hand = shared.stock.splice(-11);
+    friend.turnsRemaining = invitation.initialTurns;
+    friend.extraTurns = 0;
+    friend.seat = index === 0 ? 'left' : 'right';
+    friend.presentationUntil = now + 2 * (spinMs + resultMs) + dealMs;
+    friend.events = [{ id: `${friend.id}:arrival`, type: 'arrival', name: friend.name, turnsRemaining: friend.turnsRemaining }];
+    delete friend.stock;
+    delete friend.discard;
+    delete friend.companionName;
+    friends.push(friend);
+  }
   state.friendUsed = true;
-  state.dominationFriend = structuredClone(invitation);
-  const friend = state.dominationFriend;
-  friend.extraTurns = 0;
-  friend.rewardedMeldTiers = {};
+  shared.rewardedMeldTiers ||= {};
   if (rules) {
     const team = state.teams.find((entry) => entry.id === state.players[1].teamId);
     team?.melds.forEach((meld, index) => {
-      friend.rewardedMeldTiers[`${team.id}:${index}`] = WEIGHT[rules.classify(rules.prepare(meld))] || 0;
+      const key = `${team.id}:${index}`;
+      shared.rewardedMeldTiers[key] = Math.max(shared.rewardedMeldTiers[key] || 0, WEIGHT[rules.classify(rules.prepare(meld))] || 0);
     });
   }
-  friend.events = [{ id: `${friend.id}:arrival`, type: 'arrival', name: friend.name, turnsRemaining: friend.turnsRemaining }];
-  // Both rolls and the entire auxiliary deck are committed before presentation.
-  const { spinMs, resultMs, dealMs } = FRIEND_PRESENTATION_TIMING;
-  state.dominationFriend.presentationUntil = now + 2 * (spinMs + resultMs) + dealMs;
   return true;
 }
 
-export function grantDominationFriendExtraTurn(state, playerId, oldKind, newKind, meldIndex) {
-  const friend = state?.dominationFriend;
+export function grantDominationFriendExtraTurn(state, playerId, oldKind, newKind, meldIndex, friendId = null) {
+  const friend = playerId === 'friend' ? getDominationFriend(state, friendId) : activeDominationFriends(state)[0];
   if (state?.mode !== MODE || state.finished || state.surrender?.active || !friend?.active
     || (playerId !== 1 && playerId !== 'friend') || !Number.isInteger(meldIndex) || meldIndex < 0) return null;
+  const shared = state.dominationFriendShared;
   const teamId = state.players[1].teamId;
   const key = `${teamId}:${meldIndex}`;
-  friend.rewardedMeldTiers ||= {};
-  const previous = Math.max(friend.rewardedMeldTiers[key] || 0, WEIGHT[oldKind] || 0);
+  shared.rewardedMeldTiers ||= {};
+  const previous = Math.max(shared.rewardedMeldTiers[key] || 0, WEIGHT[oldKind] || 0);
   const next = WEIGHT[newKind] || 0;
-  friend.rewardedMeldTiers[key] = Math.max(previous, next);
+  shared.rewardedMeldTiers[key] = Math.max(previous, next);
   // One extra turn per newly reached clean tier, not per added card or reload.
   if (!BONUS[newKind] || next <= previous) return null;
   friend.turnsRemaining++;
@@ -114,18 +207,21 @@ export function grantDominationFriendExtraTurn(state, playerId, oldKind, newKind
 // The Dominador's reward calculation supplies the same-turn tier difference.
 // This is an auxiliary draw only: it neither starts nor consumes a friend turn.
 export function grantDominationFriendSharedBonus(state, playerId, kind, count, meldIndex) {
-  const friend = state?.dominationFriend;
+  const friend = activeDominationFriends(state)[0];
   if (state?.mode !== MODE || state.finished || state.surrender?.active || !friend?.active
     || playerId !== 1 || !BONUS[kind] || !Number.isInteger(count) || count <= 0
     || !Number.isInteger(meldIndex) || meldIndex < 0) return null;
   if (!dominationFeatureEnabled(state, 'plus')) return null;
-  const prefix = `${friend.id}:bonus:${state.turnNumber || 0}:${meldIndex}:`;
+  const shared = state.dominationFriendShared;
+  const bonusKey = `bonus:${state.turnNumber || 0}:${meldIndex}`;
+  const prefix = `${friend.id}:${bonusKey}:`;
   const id = `${prefix}${kind}`;
   const events = friend.events ||= [];
-  if (events.some((event) => event.id.startsWith(prefix))) return null;
+  if (shared.bonusIds.includes(bonusKey)) return null;
+  shared.bonusIds.push(bonusKey);
   const cards = [];
-  for (let i = 0; i < Math.min(count, BONUS[kind]) && friend.stock.length; i++) {
-    const card = friend.stock.pop();
+  for (let i = 0; i < Math.min(count, BONUS[kind]) && shared.stock.length; i++) {
+    const card = shared.stock.pop();
     friend.hand.push(card);
     cards.push({ ...card });
   }
@@ -135,13 +231,13 @@ export function grantDominationFriendSharedBonus(state, playerId, kind, count, m
 }
 
 export function isDominationFriendTurn(state) {
-  return state?.mode === MODE && state.dominationFriend?.active
-    && !!state.dominationFriend.pendingTurnId;
+  return state?.mode === MODE && (activeDominationFriends(state).some(friend => !!friend.pendingTurnId)
+    || !!state.dominationFriendShared?.presentation);
 }
 
 export function isDominationFriendBusy(state, now = Date.now()) {
   return state?.mode === MODE && (isDominationFriendTurn(state)
-    || (state.dominationFriend?.presentationUntil || 0) > now);
+    || activeDominationFriends(state).some(friend => (friend.presentationUntil || 0) > now));
 }
 
 export function isDominationFriendEndgame(state) {
@@ -150,14 +246,16 @@ export function isDominationFriendEndgame(state) {
 }
 
 export function queueDominationFriendTurn(state, outgoingPlayerId) {
-  const friend = state?.dominationFriend;
-  if (state?.mode !== MODE || state.finished || outgoingPlayerId !== 1
-    || !friend?.active || friend.turnsRemaining <= 0) return false;
-  const id = `${friend.id}:after:${state.turnNumber || 0}`;
-  if (friend.lastExecutedTurnId === id || friend.pendingTurnId) return false;
-  friend.pendingTurnId = id;
-  friend.farewell = friend.turnsRemaining === 1 || isDominationFriendEndgame(state);
-  return true;
+  if (state?.mode !== MODE || state.finished || outgoingPlayerId !== 1) return false;
+  let queued = false;
+  for (const friend of activeDominationFriends(state)) {
+    const id = `${friend.id}:after:${state.turnNumber || 0}`;
+    if (friend.turnsRemaining <= 0 || friend.lastExecutedTurnId === id || friend.pendingTurnId) continue;
+    friend.pendingTurnId = id;
+    friend.farewell = friend.turnsRemaining === 1 || isDominationFriendEndgame(state);
+    queued = true;
+  }
+  return queued;
 }
 
 // Preparation and classification come from the game's existing meld rules.
@@ -314,9 +412,9 @@ function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = 
   return best;
 }
 
-function chooseFriendDiscardPickup(state, team, rules, farewell) {
-  const friend = state.dominationFriend;
-  const pile = friend.discard || [];
+function chooseFriendDiscardPickup(state, friend, team, rules, farewell) {
+  const shared = state.dominationFriendShared;
+  const pile = shared.discard || [];
   if (!pile.length || !['aberto', 'fechado'].includes(state.variant)) return null;
   const closed = state.variant === 'fechado';
   const top = pile[pile.length - 1];
@@ -380,9 +478,12 @@ function drawDominadorSharedBonus(state, count, kind, steps, rules) {
   rules.sortHand?.(owner.hand);
 }
 
-export function executeDominationFriendTurn(state, turnId, rules) {
-  const friend = state?.dominationFriend;
-  if (!isDominationFriendTurn(state) || state.finished || state.surrender?.active
+export function executeDominationFriendTurn(state, turnId, rules, { owner = 'local', now = Date.now() } = {}) {
+  const friends = activeDominationFriends(state);
+  const friend = friends.find(entry => entry.pendingTurnId);
+  const shared = state?.dominationFriendShared;
+  if (shared?.presentation && shared.presentation.expiresAt > now) return null;
+  if (!friend || friends.some(entry => entry.presentationUntil > now) || !isDominationFriendTurn(state) || state.finished || state.surrender?.active
     || friend.pendingTurnId !== turnId || friend.lastExecutedTurnId === turnId) return null;
   const team = state.teams.find((entry) => entry.id === state.players[1].teamId);
   if (!team) return null;
@@ -390,16 +491,16 @@ export function executeDominationFriendTurn(state, turnId, rules) {
   const steps = [];
   const draw = (count, kind = null) => {
     const cards = [];
-    for (let i = 0; i < count && friend.stock.length; i++) {
-      const card = friend.stock.pop();
+    for (let i = 0; i < count && shared.stock.length; i++) {
+      const card = shared.stock.pop();
       friend.hand.push(card);
       cards.push({ ...card });
     }
     if (cards.length) steps.push({ type: 'drawStock', playerId: 'friend', cards, reason: kind ? 'canastra' : 'turn', kind });
   };
-  let pickupPlan = chooseFriendDiscardPickup(state, team, rules, farewell);
+  let pickupPlan = chooseFriendDiscardPickup(state, friend, team, rules, farewell);
   if (pickupPlan) {
-    const pile = friend.discard.splice(0);
+    const pile = shared.discard.splice(0);
     friend.hand.push(...pile);
     steps.push({ type: 'drawDiscard', playerId: 'friend', cards: pile.map((card) => ({ ...card })), variant: state.variant });
     if (state.variant !== 'fechado') pickupPlan = null;
@@ -431,7 +532,7 @@ export function executeDominationFriendTurn(state, turnId, rules) {
     const ids = new Set(chosen.added.map((card) => card.id));
     friend.hand = friend.hand.filter((card) => !ids.has(card.id));
     team.melds[chosen.meldIndex] = chosen.meld;
-    const friendEvent = grantDominationFriendExtraTurn(state, 'friend', oldKind, newKind, chosen.meldIndex);
+    const friendEvent = grantDominationFriendExtraTurn(state, 'friend', oldKind, newKind, chosen.meldIndex, friend.id);
     plays.push({ meldIndex: chosen.meldIndex, cardIds: [...ids], oldKind, newKind });
     steps.push({
       type: isNew ? 'meldNew' : 'meldExtend', playerId: 'friend', teamId: team.id,
@@ -460,7 +561,7 @@ export function executeDominationFriendTurn(state, turnId, rules) {
     };
     const card = [...friend.hand].sort((a, b) => usefulness(a) - usefulness(b))[0];
     friend.hand = friend.hand.filter((entry) => entry.id !== card.id);
-    (friend.discard ||= []).push(card);
+    (shared.discard ||= []).push(card);
     steps.push({ type: 'discard', playerId: 'friend', card: { ...card }, cards: [{ ...card }] });
   }
   friend.lastExecutedTurnId = turnId;
@@ -472,9 +573,12 @@ export function executeDominationFriendTurn(state, turnId, rules) {
     friend.active = false;
     friend.farewell = false;
     friend.hand = [];
-    friend.stock = [];
     (friend.events ||= []).push({ id: `${friend.id}:departure`, type: 'departure', name: friend.name, turnsRemaining: 0 });
   }
+  for (const step of steps) if (step.playerId === 'friend') step.friendId = friend.id;
+  // Persist the animation barrier with the gameplay transaction. Reloads only
+  // release an expired barrier; they never execute an already committed turn.
+  shared.presentation = { id: turnId, friendId: friend.id, owner, expiresAt: now + 120000 };
   // Private discards never enter the shared pile or trigger normal finishing.
   return { friendId: friend.id, name: friend.name, turnId, plays, steps, farewell, departed };
 }

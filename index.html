@@ -115,25 +115,52 @@
                   <div id="dominacaoExtra" style="display: none; margin-top: 5px; border-top: 1px dashed #ef4444; padding-top: 5px">
                     <div class="domination-menu-options" role="group" aria-label="Mecânicas da Dominação Completa">
                       <div class="domination-menu-option">
-                        <label><input id="dominationOption_plus" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationPlusHelp" /> 🔥 Plus Dominação</label>
+                        <label>
+                          <input id="dominationOption_plus" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationPlusHelp" />
+                          🔥 Plus Dominação
+                        </label>
                         <div class="domination-option-help" id="dominationPlusHelp">
-                          <span><strong class="option-clean">◆ Limpa:</strong> compra +1 carta.</span>
-                          <span><strong class="option-real">◆ Real:</strong> compra +1 carta.</span>
-                          <span><strong class="option-aces">◆ Ás-a-Ás:</strong> compra +1 carta.</span>
+                          <span>
+                            <strong class="option-clean">◆ Limpa:</strong>
+                            compra +1 carta.
+                          </span>
+                          <span>
+                            <strong class="option-real">◆ Real:</strong>
+                            compra +1 carta.
+                          </span>
+                          <span>
+                            <strong class="option-aces">◆ Ás-a-Ás:</strong>
+                            compra +1 carta.
+                          </span>
                         </div>
                       </div>
                       <div class="domination-menu-option domination-option-vision">
-                        <label><input id="dominationOption_vision" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationVisionHelp" /> 👁️ Visão do Dominador</label>
+                        <label>
+                          <input id="dominationOption_vision" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationVisionHelp" />
+                          👁️ Visão do Dominador
+                        </label>
                         <div class="domination-option-help" id="dominationVisionHelp">
                           <span>1x por partida, no seu turno: veja a mão do Escravo e roube até 2 cartas no lugar da compra.</span>
                         </div>
                       </div>
                       <div class="domination-menu-option">
-                        <label><input id="dominationOption_friend" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationFriendHelp" /> 📞 Amiga do Dominador</label>
+                        <label>
+                          <input id="dominationOption_friend" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationFriendHelp" />
+                          📞 Amiga do Dominador
+                        </label>
                         <div class="domination-option-help" id="dominationFriendHelp">
-                          <span>◆ 1 chamada: roleta de 3, 4 ou 5 turnos.</span>
-                          <span>◆ Entra com 11 cartas. Compra 2 do auxiliar ou pega o lixo próprio, sem compra extra.</span>
-                          <span>◆ Limpa, Real ou Ás-a-Ás de qualquer um dos dois: +1 turno para ela, sem limite.</span>
+                          <div class="friend-capacity-picker">
+                            <div class="friend-capacity-heading">
+                              <output id="dominationFriendCapacityValue" for="dominationFriendCapacity" aria-live="polite">Escolha a quantidade</output>
+                            </div>
+                            <div class="friend-capacity-rail">
+                              <input id="dominationFriendCapacity" type="range" min="0" max="2" step="1" value="0" aria-label="Quantidade de amigas por partida" aria-valuetext="Escolha a quantidade" oninput="updateDominationFriendCapacity()" onchange="pushLobby()" />
+                              <div class="friend-capacity-stops" aria-hidden="true"><span>0</span><span>1</span><span>2</span></div>
+                            </div>
+                          </div>
+                          <span>◆ Uma chamada: entram juntas com os mesmos 3, 4 ou 5 turnos sorteados na roleta.</span>
+                          <span>◆ Cada uma entra com 11 cartas. Compram 2 ou pegam o lixo auxiliar; monte e lixo são compartilhados.</span>
+                          <span>◆ Limpa, Real ou Ás-a-Ás: +1 turno para quem fez; se foi o Dominador, para a primeira amiga ainda ativa.</span>
                         </div>
                       </div>
                       <small>Desmarque para desativar nesta partida.</small>
@@ -447,6 +474,14 @@
           <button onclick="debugMeld('asas')" style="font-size: 10px; padding: 6px; background: #8b5cf6">Canastra Ás-a-Ás</button>
           <button onclick="debugSetupDead()" style="font-size: 10px; padding: 6px; background: #0f766e">Prep: Pegar Morto</button>
           <button onclick="debugSetupWin()" style="font-size: 10px; padding: 6px; background: #1d4ed8">Prep: Bater</button>
+          <details id="debugVisionLab" hidden>
+            <summary style="font-size: 10px; color: #e9d5ff; cursor: pointer">👁️ Testar aviso da Visão</summary>
+            <div style="display: flex; gap: 4px; margin-top: 6px">
+              <button onclick="debugSetupVision(1)" style="flex: 1; font-size: 10px; padding: 6px; background: #7e22ce">1 carta útil</button>
+              <button onclick="debugSetupVision(2)" style="flex: 1; font-size: 10px; padding: 6px; background: #7e22ce">2 cartas juntas</button>
+            </div>
+            <small style="display: block; max-width: 230px; color: #cbd5e1; font-size: 9px; margin-top: 4px">No turno do Dominador. Substitui seus jogos da mesa e a mão adversária; libera a Visão novamente. Use em partida de teste.</small>
+          </details>
 
           <label style="display: flex; flex-direction: column; gap: 4px; color: #facc15; font-size: 9px; font-weight: 900; text-transform: uppercase">
             Fundo da Mesa
@@ -552,7 +587,7 @@
             </div>
 
             <div class="board-top-actions">
-              <button id="ambientMusicToggle" class="ambient-toggle" type="button" onclick="toggleTableAmbientMusic()" title="Desligar música da mesa" aria-label="Desligar música da mesa">
+              <button id="ambientMusicToggle" class="ambient-toggle" type="button" onclick="toggleTableAmbientMusic()" title="Desligar música da mesa" aria-label="Desligar música da mesa" style="margin-right: 5px">
                 <span id="ambientMusicIcon">&#128266;</span>
               </button>
               <div class="morto-area">
@@ -596,7 +631,10 @@
                 <div class="boss-meter-label">
                   <span>HP DO CHEFE</span>
                   <span class="boss-hp-values">
-                    <span id="bossCocoonMeter" class="boss-cocoon-meter" hidden>CASULO <strong id="bossCocoonText">180 / 180</strong></span>
+                    <span id="bossCocoonMeter" class="boss-cocoon-meter" hidden>
+                      CASULO
+                      <strong id="bossCocoonText">180 / 180</strong>
+                    </span>
                     <strong id="bossHpText">2200 / 2200</strong>
                   </span>
                 </div>
@@ -756,6 +794,8 @@
               <!-- 🔥 NOVO: Botão de revanche ao lado do botão de fechar sala -->
               <button id="rematchBtn" onclick="voteRematch()" style="display: none; background: #22c55e; font-size: 10px; padding: 8px; font-weight: 900">🔄 JOGAR NOVAMENTE</button>
             </div>
+
+            <div id="dominationVisionHint" class="domination-vision-hint" role="status" aria-live="polite" hidden></div>
 
             <!-- 🔥 Badge local com a cor corrigida explicitamente para ficar idêntico ao dos bots -->
             <div id="localPlayerLabel" class="opponent-label" style="position: relative; margin: 12px auto 4px auto; display: none; pointer-events: none; text-shadow: none !important; width: fit-content; color: #e5e7eb !important"></div>

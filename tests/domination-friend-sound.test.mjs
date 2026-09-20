@@ -95,7 +95,7 @@ test('apresentacao inicia musica nos giros e corta antes da distribuicao, inclus
   const originalDocument = globalThis.document;
   const originalTimeout = globalThis.setTimeout;
   try {
-    for (const cancelled of [false, true]) {
+    for (const quantity of [1, 2]) for (const cancelled of [false, true]) {
       const events = [];
       const element = () => ({
         style: {}, setAttribute() {}, append() {}, replaceChildren() {},
@@ -108,7 +108,8 @@ test('apresentacao inicia musica nos giros e corta antes da distribuicao, inclus
         getElementById() { events.push('deal'); return null; },
       };
       globalThis.setTimeout = (callback) => { callback(); return 0; };
-      await presentDominationFriend({ name: 'Bruna', initialTurns: 3 }, () => !cancelled, {
+      const friends = [{ name: 'Bruna', initialTurns: 3, seat: 'left' }, { name: 'Nathalia', initialTurns: 3, seat: 'right' }].slice(0, quantity);
+      await presentDominationFriend(quantity === 1 ? friends[0] : friends, () => !cancelled, {
         startRouletteSound() {
           events.push('music');
           return () => { if (!events.includes('stop')) events.push('stop'); };
@@ -116,7 +117,7 @@ test('apresentacao inicia musica nos giros e corta antes da distribuicao, inclus
       });
       assert.deepEqual(events, cancelled
         ? ['open', 'music', 'spin', 'stop', 'close']
-        : ['open', 'music', 'spin', 'spin', 'stop', 'close', 'deal', 'close']);
+        : ['open', 'music', 'spin', 'spin', 'stop', 'close', ...Array(quantity).fill('deal'), 'close']);
     }
   } finally {
     globalThis.document = originalDocument;

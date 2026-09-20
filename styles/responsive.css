@@ -434,6 +434,7 @@
         }
 
         /* Caso o placar seja acionado no fim de jogo, fica do lado do X */
+        #undoBtn { left: 68px !important; }
         #showScoreBtn {
           left: 68px !important;
         }

@@ -1,4 +1,6 @@
-import { canCallDominationFriend, isDominationFriendTurn, isDominationFriendEndgame, FRIEND_NAMES, FRIEND_PRESENTATION_TIMING } from './domination-friend.js';
+import { dominationFriends, activeDominationFriends, getDominationFriend, remainingFriendCalls, canCallDominationFriend, isDominationFriendTurn, isDominationFriendEndgame, FRIEND_NAMES, FRIEND_PRESENTATION_TIMING } from './domination-friend.js';
+import { OPPONENT_SEAT_IDS, renderOpponentBacks } from './opponent-seats.js';
+import { cardFrontHTML, suitClass, deckFaceClass } from './card-face.js';
 
 // The wheel only presents the already persisted result; it never rolls again.
 export function friendWheelSegments(values, weights = values.map(() => 1)) {
@@ -19,7 +21,7 @@ export function createFriendNoticeTracker() {
     collect(state, deferArrival = false) {
       if (state?.mode !== '1x1_dominacao') return [];
       const key = state.friendGameId || 'legacy-domination';
-      const events = state.dominationFriend?.events || [];
+      const events = dominationFriends(state).flatMap(friend => friend.events || []);
       if (key !== gameKey) {
         gameKey = key;
         seen = new Set(events.map((event) => event.id));
@@ -41,7 +43,95 @@ function cardBack(card) {
   return back;
 }
 
+function seatChild(parent, className, tag = 'div') {
+  let child = parent.querySelector(`.${className}`);
+  if (!child) {
+    child = document.createElement(tag);
+    child.className = className;
+    parent.append(child);
+  }
+  return child;
+}
+
 let spotlightBinding = null;
+const seatClearanceBindings = new Map();
+
+// Let only meld rows intersecting the actual guest flow around her. This is
+// not a board gutter: there is no exclusion before arrival or after departure,
+// and rows above/below the seat retain the entire available width.
+function syncFriendSeatClearance(panel, side = 'left') {
+  let seatClearanceBinding = seatClearanceBindings.get(side);
+  const clearanceClass = `friend-clearance-${side}`;
+  const titleProperty = `--friend-title-clearance-${side}`;
+  if (!panel) {
+    seatClearanceBinding?.dispose();
+    seatClearanceBindings.delete(side);
+    return;
+  }
+  if (!panel.getBoundingClientRect) return;
+  if (seatClearanceBinding?.panel !== panel) {
+    seatClearanceBinding?.dispose();
+    const board = document.querySelector('#gameSection > .board');
+    const containers = [...board.querySelectorAll('.meld-container')];
+    const titles = [...board.querySelectorAll('.meld-title')];
+    let frame = null;
+    let disposed = false;
+    const update = () => {
+      frame = null;
+      if (disposed) return;
+      const seat = panel.getBoundingClientRect();
+      for (const container of containers) {
+        const rect = container.getBoundingClientRect();
+        const css = getComputedStyle(container);
+        const contentHeight = rect.height - parseFloat(css.paddingTop) - parseFloat(css.paddingBottom);
+        const width = Math.max(0, Math.ceil(Math.min(rect.width,
+          side === 'left' ? seat.right + 6 - rect.left : rect.right - seat.left + 6)));
+        const top = Math.max(0, Math.floor(seat.top - rect.top - 6));
+        const bottom = Math.min(contentHeight, Math.ceil(seat.bottom - rect.top + 6));
+        let exclusion = container.querySelector(`.${clearanceClass}`);
+        if (!width || bottom <= top) { exclusion?.remove(); continue; }
+        if (!exclusion) {
+          exclusion = document.createElement('span');
+          exclusion.className = `friend-seat-clearance ${clearanceClass}`;
+          exclusion.setAttribute('aria-hidden', 'true');
+          container.prepend(exclusion);
+        }
+        const key = `${width}:${top}:${bottom}`;
+        if (exclusion.dataset.geometry !== key) {
+          exclusion.dataset.geometry = key;
+          exclusion.style.width = `${width}px`;
+          exclusion.style.height = `${bottom}px`;
+          exclusion.style.shapeOutside = `inset(${top}px 0 0 0)`;
+        }
+      }
+      for (const title of titles) {
+        const rect = title.getBoundingClientRect();
+        const overlap = rect.bottom > seat.top && rect.top < seat.bottom
+          ? Math.max(0, Math.ceil(side === 'left' ? seat.right + 6 - rect.left : rect.right - seat.left + 6)) : 0;
+        const value = `${overlap}px`;
+        if (title.style.getPropertyValue(titleProperty) !== value) {
+          title.style.setProperty(titleProperty, value);
+        }
+      }
+    };
+    const schedule = () => { if (!disposed && frame === null) frame = window.requestAnimationFrame(update); };
+    const observer = globalThis.ResizeObserver ? new ResizeObserver(schedule) : null;
+    for (const element of [board, panel, ...containers]) observer?.observe(element);
+    window.addEventListener('resize', schedule);
+    window.addEventListener('scroll', schedule, true);
+    seatClearanceBinding = { panel, update: schedule, dispose() {
+      disposed = true;
+      observer?.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', schedule, true);
+      for (const container of containers) container.querySelector(`.${clearanceClass}`)?.remove();
+      for (const title of titles) title.style.removeProperty(titleProperty);
+    } };
+    seatClearanceBindings.set(side, seatClearanceBinding);
+  }
+  seatClearanceBinding.update();
+}
 
 export function friendSpotlightGeometry(rect, width) {
   const x = rect.left + rect.width / 2;
@@ -52,172 +142,212 @@ export function friendSpotlightGeometry(rect, width) {
     path: `M ${origin - 9} -30 L ${origin + 9} -30 L ${x + spread} ${y} Q ${x} ${y + 35} ${x - spread} ${y} Z` };
 }
 
-function syncFriendSpotlight(stock) {
-  if (!stock) {
+function syncFriendSpotlight(stock, playing) {
+  if (!stock || !playing) {
     spotlightBinding?.dispose();
     spotlightBinding = null;
     return;
   }
-  if (!stock.getBoundingClientRect || !globalThis.ResizeObserver) return;
+  if (!stock.getBoundingClientRect) return;
   if (spotlightBinding?.stock !== stock) {
     spotlightBinding?.dispose();
     const overlay = document.createElement('div');
     overlay.id = 'dominationFriendSpotlight';
+    overlay.dataset.source = stock.id;
     overlay.setAttribute('aria-hidden', 'true');
     overlay.innerHTML = `<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="friendBeamFade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#fff6df" stop-opacity=".20"/>
-          <stop offset=".65" stop-color="#fff6df" stop-opacity=".07"/>
-          <stop offset="1" stop-color="#fff6df" stop-opacity=".16"/>
+        <linearGradient id="friendBeamFade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#fff6df" stop-opacity="0"/>
+          <stop offset=".5" stop-color="#fff6df" stop-opacity=".14"/>
+          <stop offset="1" stop-color="#fff6df" stop-opacity="0"/>
         </linearGradient>
         <radialGradient id="friendBeamPool"><stop stop-color="#fff1c2" stop-opacity=".20"/><stop offset="1" stop-color="#fff1c2" stop-opacity="0"/></radialGradient>
-        <filter id="friendBeamSoft" x="-50%" y="-30%" width="200%" height="160%"><feGaussianBlur stdDeviation="14"/></filter>
       </defs>
-      <path class="friend-spotlight-beam" fill="url(#friendBeamFade)" filter="url(#friendBeamSoft)"/>
+      <path class="friend-spotlight-beam" fill="url(#friendBeamFade)"/>
       <ellipse fill="url(#friendBeamPool)"/>
     </svg>`;
     document.getElementById('gameSection').append(overlay);
     const beam = overlay.querySelector('path');
     const pool = overlay.querySelector('ellipse');
+    let frame = null;
+    let lastGeometry = '';
     const update = () => {
-      const present = stock.isConnected;
-      overlay.classList.toggle('is-playing', present);
-      if (!present) return;
-      const anchor = stock.classList.contains('is-playing')
-        ? stock.querySelector('.friend-stock-stack')
-        : document.querySelector('#drawStockBtn .pile-card');
+      frame = null;
+      // Connectivity is only a safety check, never the signal for whose turn it is.
+      if (!stock.isConnected) { syncFriendSpotlight(null, false); return; }
+      const anchor = stock.querySelector('.friend-stock-stack, .pile-card');
       if (!anchor) return;
-      const geometry = friendSpotlightGeometry(anchor.getBoundingClientRect(), window.innerWidth);
+      const rect = anchor.getBoundingClientRect();
+      const key = [rect.left, rect.top, rect.width, rect.height, window.innerWidth].join(':');
+      if (key === lastGeometry) return;
+      lastGeometry = key;
+      const screen = friendSpotlightGeometry(rect, window.innerWidth);
+      const left = Math.max(0, Math.min(screen.origin - 30, screen.x - screen.spread * 1.4));
+      const right = Math.min(window.innerWidth, Math.max(screen.origin + 30, screen.x + screen.spread * 1.4));
+      // Bound the layer to the beam instead of rasterizing a blurred fullscreen SVG.
+      overlay.style.left = `${left}px`;
+      overlay.style.width = `${right - left}px`;
+      overlay.style.height = `${Math.max(1, screen.y + 90)}px`;
+      const geometry = { ...screen, x: screen.x - left, origin: screen.origin - left };
+      geometry.path = `M ${geometry.origin - 9} -30 L ${geometry.origin + 9} -30 L ${geometry.x + geometry.spread} ${geometry.y} Q ${geometry.x} ${geometry.y + 35} ${geometry.x - geometry.spread} ${geometry.y} Z`;
       beam.setAttribute('d', geometry.path);
       beam.style.transformOrigin = `${geometry.origin}px 0px`;
       pool.setAttribute('cx', geometry.x);
       pool.setAttribute('cy', geometry.y);
       pool.setAttribute('rx', geometry.spread * 1.3);
       pool.setAttribute('ry', '65');
+      overlay.classList.add('is-playing');
     };
-    const observer = new ResizeObserver(update);
-    observer.observe(stock);
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    spotlightBinding = { stock, update, dispose() {
-      observer.disconnect();
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
+    const schedule = () => { if (frame === null) frame = window.requestAnimationFrame(update); };
+    const observer = globalThis.ResizeObserver ? new ResizeObserver(schedule) : null;
+    observer?.observe(stock);
+    const board = document.querySelector('#gameSection > .board');
+    if (board) observer?.observe(board);
+    window.addEventListener('resize', schedule);
+    window.addEventListener('scroll', schedule, true);
+    spotlightBinding = { stock, update: schedule, dispose() {
+      observer?.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', schedule, true);
       overlay.remove();
     } };
   }
   spotlightBinding.update();
 }
 
-export function renderDominationFriend(state, playerId) {
-  const enabled = state?.mode === '1x1_dominacao' && !state.finished && state.dominationOptions?.friend !== false;
-  const board = document.querySelector('#gameSection > .board');
-  board?.classList.toggle('friend-layout', enabled);
-  board?.classList.toggle('friend-layout-right', enabled && playerId === 1);
-  board?.classList.toggle('friend-layout-left', enabled && playerId !== 1);
-  const button = document.getElementById('callFriendBtn');
-  if (button) {
-    button.hidden = !(enabled && playerId === 1);
-    button.disabled = !canCallDominationFriend(state, playerId);
-    button.textContent = state?.friendUsed ? '✓ AMIGA CHAMADA' : '📞 CHAMAR AMIGA';
+function renderFriendSeat(state, friend, panel, shared) {
+  if (!panel) return;
+  const playing = friend.id === getDominationFriend(state)?.id && !!friend.pendingTurnId;
+  if (!panel.classList.contains('domination-friend-seat')) {
+    panel.replaceChildren();
+    delete panel.dataset.viewKey;
+    delete panel.dataset.playerId;
+    panel.classList.remove('reveal-mode', 'boss-player-targeted');
   }
-  let panel = document.getElementById('dominationFriendPanel');
-  let stock = document.getElementById('dominationFriendStock');
-  const friend = state?.mode === '1x1_dominacao' && !state.finished ? state.dominationFriend : null;
-  board?.classList.toggle('friend-present', !!friend?.active);
-  board?.classList.toggle('friend-playing', !!friend?.active && isDominationFriendTurn(state));
-  if (!friend?.active) { panel?.remove(); stock?.remove(); syncFriendSpotlight(null); return; }
-  if (!panel) {
-    panel = document.createElement('aside');
-    panel.id = 'dominationFriendPanel';
-    panel.setAttribute('aria-live', 'polite');
-    // Match the existing opponents' parent: direct children of gameSection
-    // receive position:relative and would reserve a blank row below the table.
-    document.querySelector('#gameSection > .board')?.append(panel);
-  }
-  const playing = isDominationFriendTurn(state);
   panel.classList.add('opponent-hand', 'domination-friend-seat');
-  panel.classList.toggle('opponent-hand-right', playerId === 1);
-  panel.classList.toggle('opponent-hand-left', playerId !== 1);
   panel.classList.toggle('active-turn-glow', playing);
   if (playing) {
     for (const id of ['opponentTop', 'opponentLeft', 'opponentRight']) {
-      document.getElementById(id)?.classList.remove('active-turn-glow');
+      if (id !== panel.id) document.getElementById(id)?.classList.remove('active-turn-glow');
     }
   }
   const endgame = isDominationFriendEndgame(state);
-  const key = `${friend.id}:${friend.hand.map((card) => `${card.id}/${card.back}`).join(',')}:${friend.stock.length}:${friend.turnsRemaining}:${friend.extraTurns}:${friend.pendingTurnId}:${friend.farewell}:${endgame}`;
-  const viewKey = `${key}:${friend.discard?.length || 0}`;
-  if (panel.dataset.viewKey === viewKey && stock) { syncFriendSpotlight(stock); return; }
+  const key = `${friend.id}:${friend.hand.map((card) => `${card.id}/${card.back}`).join(',')}:${shared.stock.length}:${friend.turnsRemaining}:${friend.extraTurns}:${friend.pendingTurnId}:${friend.farewell}:${endgame}`;
+  const viewKey = `${key}:${shared.discard?.length || 0}:${playing}`;
+  syncFriendSeatClearance(panel, friend.seat);
+  if (panel.dataset.viewKey === viewKey) return;
   panel.dataset.viewKey = viewKey;
-  panel.replaceChildren();
-  const heading = document.createElement('strong');
-  heading.className = 'opponent-label';
+  panel.dataset.friendId = friend.id;
+  // Keep the seat, fan and stock connected across actions: rebuilding them
+  // restarts animated decks and can flash on mobile compositors.
+  const heading = seatChild(panel, 'opponent-label', 'strong');
   heading.textContent = `👠 ${friend.name} (${friend.hand.length})`;
-  const detail = document.createElement('span');
-  detail.className = 'friend-seat-status';
+  const detail = seatChild(panel, 'friend-seat-status', 'span');
   detail.textContent = `${playing ? 'JOGANDO · ' : ''}${friend.turnsRemaining} ${friend.turnsRemaining === 1 ? 'turno restante' : 'turnos restantes'}`;
   if (friend.extraTurns) detail.textContent += ` · +${friend.extraTurns} ganhos`;
-  const hand = document.createElement('div');
-  hand.className = 'opponent-cards';
+  const hand = seatChild(panel, 'opponent-cards');
   hand.setAttribute('aria-label', `Mão de ${friend.name}: ${friend.hand.length} cartas`);
   // Like normal side seats, cap the visible fan, not the real hand or counter.
-  for (const card of friend.hand.slice(0, 12)) hand.append(cardBack(card));
-  panel.append(heading, detail, hand);
-  const trash = document.createElement('div');
+  renderOpponentBacks(hand, friend.hand);
+  if (friend.farewell || endgame) {
+    const farewell = seatChild(panel, 'friend-farewell', 'b');
+    farewell.textContent = endgame ? 'RETA FINAL DO MONTE' : '💋 DESPEDIDA';
+  } else panel.querySelector('.friend-farewell')?.remove();
+}
+
+
+export function renderDominationFriend(state, playerId) {
+  const enabled = state?.mode === '1x1_dominacao' && !state.finished && state.dominationOptions?.friend !== false;
+  const friends = enabled ? activeDominationFriends(state) : [];
+  const board = document.querySelector('#gameSection > .board');
+  const button = document.getElementById('callFriendBtn');
+  if (button) {
+    const remaining = remainingFriendCalls(state);
+    button.hidden = !(enabled && playerId === 1);
+    button.disabled = !canCallDominationFriend(state, playerId);
+    button.textContent = !remaining ? (dominationFriends(state).length > 1 ? '✓ TODAS CHAMADAS' : '✓ AMIGA CHAMADA')
+      : remaining === 2 ? '📞 CHAMAR AMIGAS' : '📞 CHAMAR AMIGA';
+  }
+  const shared = state?.dominationFriendShared;
+  const playing = friends.some(friend => !!friend.pendingTurnId);
+  board?.classList.toggle('friend-present', friends.length > 0);
+  board?.classList.toggle('friend-playing', playing);
+  for (const side of ['left', 'right']) {
+    const panel = document.getElementById(OPPONENT_SEAT_IDS[side]);
+    const friend = friends.find(entry => entry.seat === side);
+    if (friend) renderFriendSeat(state, friend, panel, shared);
+    else {
+      syncFriendSeatClearance(null, side);
+      if (panel?.classList.contains('domination-friend-seat')) {
+        panel.replaceChildren();
+        panel.classList.remove('domination-friend-seat', 'active-turn-glow');
+        delete panel.dataset.viewKey;
+        delete panel.dataset.friendId;
+      }
+    }
+  }
+  let stock = document.getElementById('dominationFriendStock');
+  if (!friends.length) {
+    stock?.remove();
+    document.getElementById('dominationFriendDiscard')?.remove();
+    syncFriendSpotlight(null, false);
+    return;
+  }
+  const middle = document.querySelector('#gameSection .board-middle');
+  const trash = seatChild(middle, 'friend-discard');
   trash.id = 'dominationFriendDiscard';
-  trash.className = 'friend-discard';
-  const face = document.createElement('div');
-  face.className = 'friend-discard-face';
-  const topDiscard = friend.discard?.at(-1);
-  face.textContent = topDiscard ? `${topDiscard.rank} ${topDiscard.suit}` : '';
-  face.classList.toggle('has-card', !!topDiscard);
-  face.classList.toggle('red-card', ['♥', '♦'].includes(topDiscard?.suit));
-  const trashLabel = document.createElement('small');
-  trashLabel.textContent = `LIXO DA AMIGA (${friend.discard?.length || 0})`;
-  trash.append(face, trashLabel);
-  panel.append(trash);
+  const face = seatChild(trash, 'friend-discard-face');
+  const topDiscard = shared.discard?.at(-1);
+  const faceKey = `${topDiscard?.id}:${topDiscard?.rank}:${topDiscard?.suit}:${topDiscard?.joker}:${topDiscard?.back}`;
+  if (face.dataset.viewKey !== faceKey) {
+    face.dataset.viewKey = faceKey;
+    face.innerHTML = cardFrontHTML(topDiscard);
+    face.className = topDiscard
+      ? `friend-discard-face discard-face has-card ${suitClass(topDiscard)} ${deckFaceClass(topDiscard)}`
+      : 'friend-discard-face';
+    face.style.color = topDiscard && !topDiscard.joker && ['♥', '♦'].includes(topDiscard.suit) ? '#b91c1c' : '#000';
+  }
+  const trashLabel = seatChild(trash, 'friend-discard-label', 'small');
+  trashLabel.classList.add('pile-info');
+  trashLabel.textContent = `LIXO AMIGAS (${shared.discard?.length || 0})`;
   if (!stock) {
     stock = document.createElement('div');
     stock.id = 'dominationFriendStock';
     stock.className = 'friend-stock';
     stock.setAttribute('aria-live', 'polite');
-    document.querySelector('#gameSection .board-middle')?.append(stock);
+    // The guest's two piles form a real row above the normal piles. It exists
+    // only during her stay, so dense melds cannot paint underneath that row.
+    middle.append(stock);
   }
-  stock.replaceChildren();
   stock.classList.toggle('is-playing', playing);
-  const stack = document.createElement('div');
-  stack.className = 'friend-stock-stack';
+  const stack = seatChild(stock, 'friend-stock-stack');
   stack.setAttribute('aria-hidden', 'true');
   // Same density and offsets as the main stock. Keep the top card first in
   // the DOM so existing deal/draw animations measure the visible top layer.
-  const layers = Math.min(16, Math.ceil(friend.stock.length / 3));
-  const topCard = friend.stock[friend.stock.length - 1];
-  for (let i = layers - 1; i >= 0; i--) {
-    const top = i === layers - 1;
-    const back = (layers - 1 - i) % 2 === 0 ? topCard.back : topCard.back === 'blue' ? 'red' : 'blue';
-    const layer = cardBack({ ...topCard, back });
-    layer.classList.add('visual-layer');
-    if (!top) layer.classList.add('sub-layer');
-    layer.style.bottom = `${i * 1.2}px`;
-    layer.style.right = `${i * 0.3}px`;
-    layer.style.zIndex = i;
-    if (!top) layer.style.filter = `brightness(${0.4 + (i / layers) * 0.5})`;
-    stack.append(layer);
+  const layers = Math.min(16, Math.ceil(shared.stock.length / 3));
+  const topCard = shared.stock[shared.stock.length - 1];
+  const stockKey = `${shared.stock.length}:${topCard?.id}:${topCard?.back}`;
+  if (stack.dataset.viewKey !== stockKey) {
+    stack.dataset.viewKey = stockKey;
+    stack.replaceChildren();
+    for (let i = layers - 1; i >= 0; i--) {
+      const top = i === layers - 1;
+      const back = (layers - 1 - i) % 2 === 0 ? topCard.back : topCard.back === 'blue' ? 'red' : 'blue';
+      const layer = cardBack({ ...topCard, back });
+      layer.classList.add('visual-layer');
+      if (!top) layer.classList.add('sub-layer');
+      layer.style.bottom = `${i * 1.2}px`;
+      layer.style.right = `${i * 0.3}px`;
+      layer.style.zIndex = i;
+      if (!top) layer.style.filter = `brightness(${0.4 + (i / layers) * 0.5})`;
+      stack.append(layer);
+    }
   }
-  stock.append(stack);
-  const stockLabel = document.createElement('small');
-  stockLabel.className = 'pile-info';
-  stockLabel.textContent = `MONTE AUXILIAR (${friend.stock.length})`;
-  stock.append(stockLabel);
-  syncFriendSpotlight(stock);
-  if (friend.farewell || endgame) {
-    const farewell = document.createElement('b');
-    farewell.className = 'friend-farewell';
-    farewell.textContent = endgame ? 'RETA FINAL DO MONTE' : '💋 DESPEDIDA';
-    panel.append(farewell);
-  }
+  const stockLabel = seatChild(stock, 'pile-info', 'small');
+  stockLabel.textContent = `MONTE AMIGAS (${shared.stock.length})`;
+  syncFriendSpotlight(playing ? stock : document.getElementById('drawStockBtn'), true);
 }
 
 function createWheel(segments) {
@@ -246,7 +376,7 @@ function createWheel(segments) {
 }
 
 export async function dealDominationFriendCards(friend, isActive, { fly, impact, rect }) {
-  const panel = document.getElementById('dominationFriendPanel');
+  const panel = document.getElementById(OPPONENT_SEAT_IDS[friend.seat || 'left']);
   if (!panel || !isActive()) return;
   panel.classList.add('friend-entering');
   const backs = [...panel.querySelectorAll('.opponent-cards .opponent-card-back')];
@@ -275,10 +405,12 @@ export async function dealDominationFriendCards(friend, isActive, { fly, impact,
 // Replay committed actions on a visual copy only. Each flight uses the normal
 // player animator; each frame uses the normal renderer (scores, canastras, SFX).
 export async function playDominationFriendTimeline(view, result, { animate, render, isActive, pace }) {
-  const friend = view.dominationFriend;
+  const friend = getDominationFriend(view, result.friendId);
+  const shared = view.dominationFriendShared;
+  if (!friend) return;
   const steps = result.steps || [];
   for (let index = 0; index < steps.length; index++) {
-    const step = steps[index];
+    const step = { ...steps[index], friendId: result.friendId || friend.id };
     if (!isActive()) return;
     if (pace && step.type !== 'dominatorBonus' && !(step.type === 'drawStock' && step.reason === 'canastra')) {
       const stage = index === 0 ? 'think' : step.type === 'discard' ? 'discard'
@@ -291,8 +423,8 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
       while (steps[index + 1]?.type === 'dominatorBonus') ownerSteps.push(steps[++index]);
       // The two hands buy together, independently of the sound queue.
       await Promise.all([
-        playDominationFriendTimeline(view, { steps: [step] }, { animate, render, isActive }),
-        playDominationFriendTimeline(view, { steps: ownerSteps }, { animate, render, isActive }),
+        playDominationFriendTimeline(view, { friendId: friend.id, steps: [step] }, { animate, render, isActive }),
+        playDominationFriendTimeline(view, { friendId: friend.id, steps: ownerSteps }, { animate, render, isActive }),
       ]);
       continue;
     }
@@ -318,7 +450,7 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
         if (!isActive()) return;
         await animate({ ...step, cards: [card], card });
         if (!isActive()) return;
-        friend.discard = (friend.discard || []).filter((entry) => entry.id !== card.id);
+        shared.discard = (shared.discard || []).filter((entry) => entry.id !== card.id);
         friend.hand.push({ ...card });
         render();
       }
@@ -332,7 +464,7 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
         if (!isActive()) return;
         await animate({ ...step, cards: [card], drawIndex, drawTotal: step.cards.length });
         if (!isActive()) return;
-        friend.stock = friend.stock.filter((entry) => entry.id !== card.id);
+        shared.stock = shared.stock.filter((entry) => entry.id !== card.id);
         friend.hand.push({ ...card });
         render();
       }
@@ -343,7 +475,7 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
     const ids = new Set(step.cards.map((card) => card.id));
     friend.hand = friend.hand.filter((card) => !ids.has(card.id));
     if (step.type === 'discard') {
-      (friend.discard ||= []).push({ ...step.card });
+      (shared.discard ||= []).push({ ...step.card });
       render();
       continue;
     }
@@ -386,7 +518,13 @@ export async function showDominationFriendNotice(event) {
   } finally { notice.remove(); }
 }
 
-export async function presentDominationFriend(friend, isActive, animations) {
+export async function presentDominationFriend(invited, isActive, animations) {
+  const friends = Array.isArray(invited) ? invited : [invited];
+  const friend = friends[0];
+  if (!friend) return;
+  const plural = friends.length > 1;
+  const names = [...friends].sort((a, b) => FRIEND_NAMES.indexOf(a.name) - FRIEND_NAMES.indexOf(b.name)).map(entry => entry.name).join(' e ');
+  const choices = plural ? FRIEND_NAMES.flatMap((name, index) => FRIEND_NAMES.slice(index + 1).map(other => `${name} e ${other}`)) : FRIEND_NAMES;
   const overlay = document.createElement('div');
   overlay.id = 'dominationFriendPresentation';
   overlay.className = 'friend-presentation';
@@ -420,21 +558,21 @@ export async function presentDominationFriend(friend, isActive, animations) {
   let stopRouletteSound;
   try {
     stopRouletteSound = animations.startRouletteSound?.();
-    title.textContent = '📞 Chamando uma amiga...';
+    title.textContent = plural ? '📞 Chamando as amigas...' : '📞 Chamando uma amiga...';
     detail.textContent = 'Quem vai entrar na mesa?';
-    await spin(friendWheelSegments(FRIEND_NAMES), friend.name);
+    await spin(friendWheelSegments(choices), names);
     if (!isActive()) return;
-    detail.textContent = `👠 ${friend.name} atendeu!`;
+    detail.textContent = `👠 ${names} ${plural ? 'atenderam' : 'atendeu'}!`;
     await pause(FRIEND_PRESENTATION_TIMING.resultMs);
-    title.textContent = 'Quanto tempo ela vai ficar?';
+    title.textContent = plural ? 'Quantos turnos para as duas?' : 'Quanto tempo ela vai ficar?';
     detail.textContent = '3 turnos · 20% | 4 turnos · 35% | 5 turnos · 45%';
     await spin(friendWheelSegments(['3 TURNOS', '4 TURNOS', '5 TURNOS'], [20, 35, 45]), `${friend.initialTurns} TURNOS`);
     if (!isActive()) return;
-    detail.textContent = `👠 ${friend.name} chegou para ajudar por ${friend.initialTurns} turnos!`;
+    detail.textContent = `👠 ${names}: ${friend.initialTurns} turnos${plural ? ' para cada uma' : ''}!`;
     await pause(FRIEND_PRESENTATION_TIMING.resultMs);
     stopRouletteSound?.();
     overlay.remove();
-    await dealDominationFriendCards(friend, isActive, animations);
+    await Promise.all(friends.map(entry => dealDominationFriendCards(entry, isActive, animations)));
   } finally {
     stopRouletteSound?.();
     overlay.remove();

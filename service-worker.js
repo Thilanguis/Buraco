@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v131';
+const CACHE_NAME = 'buraco-v153';
 
 const ASSETS = [
   './',
@@ -13,6 +13,12 @@ const ASSETS = [
   './js/game/wildcard-choice.js',
   './js/game/domination-friend.js',
   './js/game/domination-friend-ui.js',
+  './js/game/card-face.js',
+  './js/game/domination-vision-hint.js',
+  './js/game/domination-vision-alert.js',
+  './js/game/domination-vision-focus.js',
+  './js/game/discard-presentation.js',
+  './js/game/opponent-seats.js',
   './js/game/domination-friend-sound.js',
   './js/boss/boss-engine.js',
   './js/boss/boss-presentation.js',

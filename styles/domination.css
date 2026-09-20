@@ -577,28 +577,19 @@
   font-size: 10px;
   font-weight: 900;
 }
-/* Reserve only the melds' side lane from the start. The shared piles and
-   player interface stay centered whether the guest is present or not. */
-#gameSection .board.friend-layout { --friend-seat-gutter: 148px; }
-#gameSection .board.friend-layout-right .board-melds {
-  padding-right: var(--friend-seat-gutter);
-  padding-left: 8px;
-}
-#gameSection .board.friend-layout-left .board-melds {
-  padding-left: var(--friend-seat-gutter);
-  padding-right: 8px;
-}
-#gameSection .board.friend-layout .board-melds {
-  width: 100%;
-  max-width: none;
-  box-sizing: border-box;
-}
-@media (max-width: 768px), (max-height: 600px) {
-  #gameSection .board.friend-layout { --friend-seat-gutter: 94px; }
-}
+/* The normal Domination 1x1 fills the usable table, with no 1200px cap.
+   Width/padding still follow the regular responsive table, never the guest. */
+#gameSection .board[data-mode='1x1_dominacao'] .board-melds { max-width: none; }
+/* Inline melds can flow around a small, measured float ONLY while the guest
+   occupies that region. No whole-column padding or pre-arrival placeholder. */
+#gameSection .board[data-mode='1x1_dominacao'] .meld-container { display: flow-root; }
+#gameSection .board[data-mode='1x1_dominacao'] .meld-container > .meld-line { display: inline-flex; vertical-align: top; margin: 0 10px 10px 0; }
+#gameSection .board[data-mode='1x1_dominacao'] .meld-container > .meld-line:last-child { margin-right: 0; }
+.friend-seat-clearance { float: left; pointer-events: none; }
+.friend-seat-clearance.friend-clearance-right { float: right; }
+#gameSection .friend-present .meld-title { padding-left: var(--friend-title-clearance-left, 0px); padding-right: var(--friend-title-clearance-right, 0px); }
 @media (max-height: 600px) and (orientation: landscape) {
-  #gameSection .board.friend-layout { --friend-seat-gutter: 76px; }
-  #gameSection .friend-layout .player-actions {
+  #gameSection .board[data-mode='1x1_dominacao'] .player-actions {
     position: relative !important;
     bottom: auto !important;
     height: auto !important;
@@ -607,7 +598,7 @@
     gap: 6px;
     margin: 2px 0 !important;
   }
-  #gameSection .friend-layout .player-actions button {
+  #gameSection .board[data-mode='1x1_dominacao'] .player-actions button {
     position: relative !important;
     left: auto !important;
     right: auto !important;
@@ -616,50 +607,112 @@
     height: 26px !important;
   }
 }
-.domination-friend-seat { z-index: 26; width: 128px; box-sizing: border-box; padding: 8px; gap: 7px; }
-#gameSection .domination-friend-seat.opponent-hand-right { right: 8px; }
-#gameSection .domination-friend-seat.opponent-hand-left { left: 8px; }
-.domination-friend-seat .opponent-label {
-  writing-mode: horizontal-tb;
-  transform: none;
-  margin-bottom: 0;
-  max-width: 110px;
-  text-align: center;
+/* Centre the main controls on the table axis, not the combined width with Undo. */
+#gameSection .board[data-mode='1x1_dominacao'] .player-actions {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: minmax(60px, 1fr) minmax(0, 140px) 32px minmax(0, 140px) minmax(60px, 1fr);
+  align-items: center;
+  gap: 6px;
+  width: 100% !important;
+  max-width: 520px;
+  height: auto !important;
+  margin: 2px auto !important;
+  bottom: auto !important;
 }
-.friend-seat-status { font-size: 9px; color: #e2e8f0; text-align: center; }
-.friend-discard { display: grid; justify-items: center; gap: 5px; }
-.friend-discard small { font-size: 8px; white-space: nowrap; color: #cbd5e1; }
-.friend-discard-face { position: relative; box-sizing: border-box; width: 40px; height: 58px; border: 1px dashed #94a3b866; border-radius: 5px; display: flex; align-items: center; justify-content: center; }
-.friend-discard-face.has-card { background: #fff; color: #111; border: 1px solid #f9a8d4; font-size: 17px; font-weight: 900; box-shadow: 0 3px 8px #0008; }
-.friend-discard-face.red-card { color: #b91c1c; }
-.domination-friend-seat .opponent-cards { padding-bottom: 30px; }
-#gameSection .friend-layout .board-middle { display: grid; grid-template-columns: repeat(2, max-content); justify-content: center; column-gap: 30px; row-gap: 30px; }
-#gameSection .friend-layout .board-middle > .pile-area { grid-row: 2; }
-#gameSection .friend-layout .board-middle:not(:has(> #dominationFriendStock))::after { content: ''; grid-column: 1 / -1; grid-row: 1; width: 118px; height: 130px; visibility: hidden; pointer-events: none; }
-#dominationFriendStock { grid-column: 1 / -1; grid-row: 1; position: relative; isolation: isolate; display: grid; justify-items: center; align-content: start; gap: 10px; padding-top: 20px; width: 118px; height: 130px; box-sizing: border-box; justify-self: center; cursor: default; }
-#dominationFriendStock .friend-stock-stack { position: relative; width: 55px; height: 80px; opacity: .55; filter: saturate(.45) brightness(.8); transition: opacity 450ms, filter 450ms; }
-#dominationFriendStock .opponent-card-back { position: absolute; width: 100%; height: 100%; transform: none; margin: 0; }
-#dominationFriendStock.is-playing .friend-stock-stack { opacity: 1; filter: none; }
-#gameSection > #dominationFriendSpotlight { position: fixed; inset: 0; z-index: 24; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity 650ms ease; }
-#gameSection > #dominationFriendSpotlight.is-playing { opacity: 1; }
-#dominationFriendSpotlight svg { display: block; overflow: visible; }
-#dominationFriendSpotlight .friend-spotlight-beam { animation: friend-stock-spotlight 10s ease-in-out infinite alternate; animation-play-state: paused; }
-#dominationFriendSpotlight.is-playing .friend-spotlight-beam { animation-play-state: running; }
-@keyframes friend-stock-spotlight { from { transform: rotate(-.8deg); } to { transform: rotate(.8deg); } }
-#dominationFriendStock small { position: relative; z-index: 1; margin: 0; font-size: 8px; line-height: 1.4; color: #cbd5e1; white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) {
-  #dominationFriendSpotlight .friend-spotlight-beam { animation: none; }
-  #gameSection > #dominationFriendSpotlight, #dominationFriendStock .friend-stock-stack { transition: none; }
+#gameSection .board[data-mode='1x1_dominacao'] .player-actions button {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  min-width: 0;
+  box-sizing: border-box;
+  grid-row: 1;
+}
+#gameSection .board[data-mode='1x1_dominacao'] #undoBtn { grid-column: 1; justify-self: end; }
+#gameSection .board[data-mode='1x1_dominacao'] #powerBtn,
+#gameSection .board[data-mode='1x1_dominacao'] #showScoreBtn { grid-column: 2; width: 100%; }
+#gameSection .board[data-mode='1x1_dominacao'] #endGameBtn {
+  grid-column: 3;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+#gameSection .board[data-mode='1x1_dominacao'] #callFriendBtn,
+#gameSection .board[data-mode='1x1_dominacao'] #rematchBtn { grid-column: 4; width: 100%; }
+@media (max-width: 600px) {
+  #gameSection .board[data-mode='1x1_dominacao'] .player-actions {
+    grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
+    grid-template-rows: auto 28px;
+    max-width: 360px;
+  }
+  #gameSection .board[data-mode='1x1_dominacao'] #powerBtn,
+  #gameSection .board[data-mode='1x1_dominacao'] #showScoreBtn { grid-column: 1; }
+  #gameSection .board[data-mode='1x1_dominacao'] #endGameBtn { grid-column: 2; }
+  #gameSection .board[data-mode='1x1_dominacao'] #callFriendBtn,
+  #gameSection .board[data-mode='1x1_dominacao'] #rematchBtn { grid-column: 3; }
+  #gameSection .board[data-mode='1x1_dominacao'] #undoBtn { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
+}
+.domination-friend-seat { z-index: 26; }
+.friend-seat-status { max-width: 48px; font-size: 9px; color: #e2e8f0; text-align: center; }
+.friend-discard { display: grid; justify-items: center; }
+.friend-discard small { font-size: 8px; text-align: center; color: #cbd5e1; }
+.friend-discard-face { position: relative; box-sizing: border-box; width: 55px; height: 80px; border: 1px dashed #94a3b866; border-radius: 5px; display: flex; align-items: center; justify-content: center; }
+.friend-discard-face.has-card { justify-content: space-between; border: 1px solid #f9a8d4; box-shadow: 0 3px 8px #0008; }
+.domination-friend-seat .opponent-cards { padding-bottom: 20px; }
+#gameSection .board[data-mode="1x1_dominacao"] .board-middle { column-gap: 36px; }
+#gameSection .friend-present .board-middle {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  row-gap: 64px;
+  padding-top: 30px;
+  align-items: start;
+}
+#gameSection .friend-present #drawStockBtn { grid-column: 1; grid-row: 2; }
+#gameSection .friend-present #drawDiscardBtn { grid-column: 2; grid-row: 2; }
+#dominationFriendStock, #dominationFriendDiscard { position: relative; justify-self: center; grid-row: 1; width: 55px; height: 80px; }
+#dominationFriendStock { grid-column: 1; display: grid; justify-items: center; cursor: default; }
+#dominationFriendDiscard { grid-column: 2; }
+#dominationFriendStock small, #dominationFriendDiscard small {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  margin: 0;
+  font-size: 7px !important;
+  letter-spacing: 0;
+  padding: 2px 4px;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
 }
 @media (max-width: 768px), (max-height: 600px) {
-  #gameSection .friend-layout .board-middle { column-gap: 15px; row-gap: 28px; }
-  #gameSection .friend-layout .board-middle:not(:has(> #dominationFriendStock))::after, #dominationFriendStock { height: 108px; }
-  #dominationFriendStock .friend-stock-stack { width: 40px; height: 58px; }
+  #dominationFriendStock, #dominationFriendDiscard, #dominationFriendStock .friend-stock-stack, .friend-discard-face { width: 40px; height: 58px; }
+  #dominationFriendStock small, #dominationFriendDiscard small { width: max-content; }
 }
-@media (max-height: 480px) {
-  #gameSection .friend-layout .board-middle { grid-template-columns: repeat(3, max-content); }
-  #gameSection .friend-layout .board-middle > .pile-area { grid-row: 1; }
-  #gameSection .friend-layout .board-middle:not(:has(> #dominationFriendStock))::after, #dominationFriendStock { grid-column: 1; grid-row: 1; }
+.domination-friend-seat .friend-farewell { order: 5; max-width: 48px; text-align: center; }
+#dominationFriendStock .friend-stock-stack { position: relative; width: 100%; height: 100%; opacity: .55; transition: opacity 450ms; }
+#dominationFriendStock .opponent-card-back { position: absolute; width: 100%; height: 100%; transform: none; margin: 0; }
+#dominationFriendStock.is-playing .friend-stock-stack { opacity: 1; filter: none; }
+#dominationFriendDiscard .friend-discard-face { opacity: .55; transition: opacity 450ms; }
+#gameSection .friend-playing #dominationFriendDiscard .friend-discard-face { opacity: 1; }
+#gameSection > #dominationFriendSpotlight { position: fixed; top: 0; z-index: 24; pointer-events: none; overflow: hidden; opacity: 0; }
+#gameSection > #dominationFriendSpotlight.is-playing { opacity: 1; }
+#dominationFriendSpotlight svg { display: block; overflow: visible; }
+#dominationFriendSpotlight .friend-spotlight-beam { animation: none; }
+@media (hover: hover) and (pointer: fine) {
+  #dominationFriendSpotlight.is-playing .friend-spotlight-beam { animation: friend-stock-spotlight 10s ease-in-out infinite alternate; }
+}
+@keyframes friend-stock-spotlight { from { transform: rotate(-.8deg); } to { transform: rotate(.8deg); } }
+#dominationFriendStock small { z-index: 1; color: #cbd5e1; }
+@media (prefers-reduced-motion: reduce) {
+  #dominationFriendSpotlight.is-playing .friend-spotlight-beam { animation: none; }
+  #gameSection > #dominationFriendSpotlight, #dominationFriendStock .friend-stock-stack, #dominationFriendDiscard .friend-discard-face { transition: none; }
 }
 .friend-farewell { color: #f9a8d4; letter-spacing: 1px; font-size: 9px; }
 .friend-notice {
@@ -765,5 +818,63 @@
 .domination-option-help .option-clean { color: var(--option-clean); }
 .domination-option-help .option-real { color: var(--option-real); }
 .domination-option-help .option-aces { color: var(--option-aces); }
-.domination-menu-option:has(input:not(:checked)) { --option-title: #9ca3af; --option-clean: #9ca3af; --option-real: #9ca3af; --option-aces: #9ca3af; color: #9ca3af; filter: grayscale(1); }
-.domination-menu-option:has(input:not(:checked)) small { color: #9ca3af; }
+.domination-menu-option:has(input[type="checkbox"]:not(:checked)) { --option-title: #9ca3af; --option-clean: #9ca3af; --option-real: #9ca3af; --option-aces: #9ca3af; color: #9ca3af; filter: grayscale(1); }
+.domination-menu-option:has(input[type="checkbox"]:not(:checked)) small { color: #9ca3af; }
+.friend-capacity-picker { margin: 4px 0 10px; max-width: 240px; }
+.friend-capacity-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin-bottom: 5px; font-size: 10px; }
+.friend-capacity-heading > span { color: #c4b5ca; letter-spacing: .08em; }
+.friend-capacity-heading output { color: #f9a8d4; font-weight: 800; }
+.friend-capacity-rail { position: relative; padding: 0 8px; border: 1px solid #d8b47755; border-radius: 14px; background: linear-gradient(135deg, #201527, #130f1b); box-shadow: inset 0 1px 0 #ffffff09, 0 3px 8px #0003; }
+#dominationFriendCapacity { --friend-capacity-progress: 0%; appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 999px; background: transparent; box-shadow: none; cursor: grab; }
+#dominationFriendCapacity:active { cursor: grabbing; }
+#dominationFriendCapacity:disabled { cursor: not-allowed; opacity: .5; }
+#dominationFriendCapacity::-webkit-slider-runnable-track { height: 2px; border-radius: 999px; background: #584358; }
+#dominationFriendCapacity::-moz-range-track { height: 2px; border-radius: 999px; background: #584358; }
+#dominationFriendCapacity::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 32px; height: 32px; margin-top: -15px; border: 1px solid #f2d39b; border-radius: 50%; background: linear-gradient(145deg, #9c488d, #572554); box-shadow: 0 2px 5px #0008, inset 0 1px 0 #ffffff30; }
+#dominationFriendCapacity::-moz-range-thumb { width: 30px; height: 30px; border: 1px solid #f2d39b; border-radius: 50%; background: linear-gradient(145deg, #9c488d, #572554); box-shadow: 0 2px 5px #0008, inset 0 1px 0 #ffffff30; }
+.friend-capacity-stops { position: absolute; inset: 0 8px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; color: #f9eedc; font-size: 12px; font-weight: 800; }
+.friend-capacity-stops span { width: 32px; text-align: center; text-shadow: 0 1px 3px #000; }
+.domination-vision-hint {
+  margin: 5px auto 0;
+  max-width: 320px;
+  padding: 0 8px;
+  color: #e9d5ff;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+}
+.domination-vision-hint[hidden] { display: none; }
+/* Animate the existing gold, without an extra outline or moving the controls. */
+@keyframes visionGoldButton {
+  0%, 100% { border-color: #b98d31; box-shadow: 0 0 5px #eab30830; }
+  50% { border-color: #ffe3a0; box-shadow: 0 0 14px #facc1560, inset 0 0 9px #facc151c; }
+}
+@keyframes visionGoldMessage {
+  0%, 100% { color: #d8b45c; text-shadow: 0 0 2px #facc1520; }
+  50% { color: #ffedb0; text-shadow: 0 0 9px #facc1566; }
+}
+#powerBtn.vision-alert-pulse { animation: visionGoldButton 2200ms ease-in-out infinite; }
+#dominationVisionHint.vision-alert-pulse { animation: visionGoldMessage 2200ms ease-in-out infinite; }
+.vision-focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  overflow: hidden;
+  pointer-events: none;
+}
+.vision-focus-frame {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+  background: transparent;
+  color: #fffdf4;
+}
+@media (prefers-reduced-motion: reduce) {
+  #powerBtn.vision-alert-pulse { animation: none; border-color: #f4d479 !important; }
+  #dominationVisionHint.vision-alert-pulse { animation: none; color: #f4d479; }
+  .vision-focus-overlay { display: none; }
+}

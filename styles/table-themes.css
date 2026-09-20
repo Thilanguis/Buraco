@@ -808,8 +808,10 @@
         box-shadow: var(--table-card-shadow, var(--card-face-shadow));
       }
 
-      #gameSection #handContainer .carta:hover {
-        box-shadow: var(--table-card-hover-shadow, -8px 20px 30px rgba(0, 0, 0, 0.7));
+      @media (hover: hover) and (pointer: fine) {
+        #gameSection #handContainer:where(:not(.hand-hover-reset)) .carta:hover {
+          box-shadow: var(--table-card-hover-shadow, -8px 20px 30px rgba(0, 0, 0, 0.7));
+        }
       }
 
       #gameSection .opponent-card-back,

@@ -349,10 +349,12 @@
         text-shadow: none !important;
         margin-right: 0 !important; /* Anula o agrupamento padrão do sistema para liberar espaço */
       }
-      .reveal-mode .carta:hover {
-        z-index: 100 !important;
-        transform: translateY(-15px) scale(1.08) !important;
-        box-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7) !important;
+      @media (hover: hover) and (pointer: fine) {
+        .reveal-mode .carta:hover {
+          z-index: 100 !important;
+          transform: translateY(-15px) scale(1.08) !important;
+          box-shadow: -8px 20px 30px rgba(0, 0, 0, 0.7) !important;
+        }
       }
       .reveal-mode .carta:last-child {
         margin-right: 0 !important;
