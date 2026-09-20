@@ -192,16 +192,21 @@ export function grantDominationFriendExtraTurn(state, playerId, oldKind, newKind
   shared.rewardedMeldTiers[key] = Math.max(previous, next);
   // One extra turn per newly reached clean tier, not per added card or reload.
   if (!BONUS[newKind] || next <= previous) return null;
-  friend.turnsRemaining++;
-  friend.extraTurns = (friend.extraTurns || 0) + 1;
-  friend.farewell = isDominationFriendEndgame(state);
-  const event = {
-    id: `${friend.id}:extra:${key}:${newKind}`, type: 'extraTurn', name: friend.name,
-    playerId, actorName: playerId === 'friend' ? friend.name : (state.players[1].name || 'Dominador'),
-    kind: newKind, turnsRemaining: friend.turnsRemaining, extraTurns: friend.extraTurns,
-  };
-  (friend.events ||= []).push(event);
-  return event;
+  const events = activeDominationFriends(state).map(recipient => {
+    recipient.turnsRemaining++;
+    recipient.extraTurns = (recipient.extraTurns || 0) + 1;
+    recipient.farewell = isDominationFriendEndgame(state);
+    const event = {
+      id: `${recipient.id}:extra:${key}:${newKind}`, type: 'extraTurn', name: recipient.name,
+      friendId: recipient.id,
+      playerId, actorName: playerId === 'friend' ? friend.name : (state.players[1].name || 'Dominador'),
+      kind: newKind, turnsRemaining: recipient.turnsRemaining, extraTurns: recipient.extraTurns,
+    };
+    (recipient.events ||= []).push(event);
+    return event;
+  });
+  // Preserve the singular result for old callers; playback also needs all recipients.
+  return events.length === 1 ? events[0] : { ...events.find(event => event.friendId === friend.id), recipients: events };
 }
 
 // The Dominador's reward calculation supplies the same-turn tier difference.

@@ -340,7 +340,7 @@ test('controlador unico aguarda fim da animacao antes de transacionar a segunda 
   assert.ok(persisted.dominationFriends.every(friend => friend.lastExecutedTurnId && !friend.pendingTurnId));
 });
 
-test('canastra da segunda amiga anima sua mao e bonus do Dominador sem premiar a primeira', async () => {
+test('canastra da segunda amiga concede turno a ambas e playback atualiza as duas', async () => {
   const state = twoFriends();
   const [one, two] = state.dominationFriends;
   one.hand = []; two.hand = cards(['3', '4', '5', '6', '7', '8'], '♣', 'second-natural');
@@ -351,7 +351,8 @@ test('canastra da segunda amiga anima sua mao e bonus do Dominador sem premiar a
   const before = structuredClone(state);
   const result = executeDominationFriendTurn(state, two.pendingTurnId, rules);
   assert.ok(result.plays.some(play => play.newKind === 'limpa'));
-  assert.deepEqual(one, before.dominationFriends[0]);
+  assert.equal(one.turnsRemaining, before.dominationFriends[0].turnsRemaining + 1);
+  assert.equal(one.extraTurns, 1);
   assert.equal(two.extraTurns, 1);
   assert.equal(state.players[1].hand.length, before.players[1].hand.length + 1);
   const view = structuredClone(before);
@@ -360,6 +361,9 @@ test('canastra da segunda amiga anima sua mao e bonus do Dominador sem premiar a
   assert.ok(animated.filter(step => step.playerId === 'friend').every(step => step.friendId === two.id));
   assert.deepEqual(view.dominationFriends[0].hand, one.hand);
   assert.deepEqual(view.dominationFriends[1].hand, two.hand);
+  assert.equal(view.dominationFriends[0].turnsRemaining, one.turnsRemaining);
+  assert.equal(view.dominationFriends[0].extraTurns, one.extraTurns);
+  assert.equal(view.dominationFriends[1].extraTurns, two.extraTurns);
   assert.deepEqual(view.dominationFriendShared.stock, state.dominationFriendShared.stock);
   assert.deepEqual(view.dominationFriendShared.discard, state.dominationFriendShared.discard);
 });
@@ -388,25 +392,40 @@ test('saida individual preserva recursos mas nao permite nova chamada', () => {
   assert.equal(later.dominationFriends.length, 1);
 });
 
-test('bonus beneficia a autora ou primeira ativa, com deduplicacao global e apos reload', () => {
+test('turno extra beneficia todas as ativas, com deduplicacao global e apos reload', () => {
   const state = twoFriends();
   const [one, two] = state.dominationFriends;
   assert.ok(grantDominationFriendExtraTurn(state, 'friend', 'simple', 'limpa', 0, two.id));
-  assert.equal(one.extraTurns, 0); assert.equal(two.extraTurns, 1);
-  assert.ok(grantDominationFriendExtraTurn(state, 1, 'simple', 'real', 1));
   assert.equal(one.extraTurns, 1); assert.equal(two.extraTurns, 1);
+  assert.ok(grantDominationFriendExtraTurn(state, 1, 'simple', 'real', 1));
+  assert.equal(one.extraTurns, 2); assert.equal(two.extraTurns, 2);
   const bonus = grantDominationFriendSharedBonus(state, 1, 'real', 1, 1);
   assert.equal(bonus.friendId, one.id);
   one.active = false;
   const saved = JSON.parse(JSON.stringify(state));
   assert.equal(grantDominationFriendExtraTurn(saved, 1, 'simple', 'real', 1), null);
   assert.equal(grantDominationFriendSharedBonus(saved, 1, 'real', 1, 1), null);
-  assert.equal(saved.dominationFriends[1].extraTurns, 1);
-  assert.ok(grantDominationFriendExtraTurn(saved, 1, 'simple', 'asas', 2));
   assert.equal(saved.dominationFriends[1].extraTurns, 2);
+  assert.ok(grantDominationFriendExtraTurn(saved, 1, 'simple', 'asas', 2));
+  assert.equal(saved.dominationFriends[1].extraTurns, 3);
   const notices = createFriendNoticeTracker(); notices.collect(state);
   assert.equal(notices.collect(saved).filter(event => event.type === 'extraTurn').length, 1);
   assert.deepEqual(notices.collect(saved), []);
+});
+
+test('Dominador e qualquer amiga concedem +1 a ambas por Limpa, Real e As-a-As', () => {
+  for (const actor of [1, 'first', 'second']) {
+    const state = twoFriends();
+    state.dominationOptions.plus = false;
+    const before = state.dominationFriends.map(friend => friend.turnsRemaining);
+    const friendId = actor === 'first' ? state.dominationFriends[0].id : state.dominationFriends[1].id;
+    for (const [i, kind] of ['limpa', 'real', 'asas'].entries()) {
+      const event = grantDominationFriendExtraTurn(state, actor === 1 ? 1 : 'friend', 'simple', kind, i, friendId);
+      assert.equal(event.recipients.length, 2);
+      state.dominationFriends.forEach((friend, index) => assert.equal(friend.turnsRemaining, before[index] + i + 1));
+      assert.equal(grantDominationFriendExtraTurn(state, 1, 'simple', kind, i), null);
+    }
+  }
 });
 
 test('migracao de save singular preserva mao, recursos, eventos e turno pendente sem replay', () => {

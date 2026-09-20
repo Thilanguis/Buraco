@@ -258,6 +258,12 @@ export class BuracoBot {
     return true;
   }
 
+  static preservesDominationMeld(state, botIndex, base, after, engine) {
+    if (state.mode !== '1x1_dominacao' || botIndex !== 1) return true;
+    const before = this.simulateMeld(base, [], engine);
+    return this.isMeldDirty(before) || !this.isMeldDirty(after);
+  }
+
   static evaluateDiscard(state, hand, team, engine, ctx) {
     const pileSize = state.discard.length;
     if (pileSize === 0) return false;
@@ -317,10 +323,10 @@ export class BuracoBot {
         const testMeld = this.simulateMeld(meld, [topCard], engine);
         if (engine.isValidSequenceMeld(testMeld)) {
           const realSuit = this.getRealSuit(meld);
-          const testSuit = this.getRealSuit(testMeld);
+          if (!this.preservesDominationMeld(state, state.currentPlayer, meld, testMeld, engine)) continue;
           const hasTwo = meld.some((c) => c.rank === '2');
-          const needsWild = testMeld.some((c) => c.joker || c.forceWild || (c.rank === '2' && c.suit !== testSuit));
-          const isPerfectTwo = topCard.rank === '2' && topCard.suit === realSuit && !hasTwo;
+          const needsWild = this.isMeldDirty(testMeld);
+          const isPerfectTwo = topCard.rank === '2' && topCard.suit === realSuit && !hasTwo && !needsWild;
 
           // 🛡️ CORREÇÃO DA CEGUEIRA: Se o jogo já era sujo e a carta do topo é natural, a compra é aprovada!
           const wasDirty = this.isMeldDirty(meld);
@@ -406,7 +412,8 @@ export class BuracoBot {
           const meld = team.melds[mIdx];
           if (topIsWildOrTwo && this.isMeldDirty(meld)) continue;
 
-          const testMeld = [...meld, topCard];
+          const testMeld = this.simulateMeld(meld, [topCard], engine);
+          if (!this.preservesDominationMeld(state, state.currentPlayer, meld, testMeld, engine)) continue;
           if (engine.isValidSequenceMeld(testMeld)) {
             const realSuit = this.getRealSuit(meld);
             // 🛑 TRAVA DE PRESERVAÇÃO DO 2 NO LIXO (Anti-Cross-Suit)
@@ -568,6 +575,7 @@ export class BuracoBot {
           for (const { card, index: handIndex } of cardIndexes) {
             if (!card || (!markedCards.has(card.id) && !markedMelds.has(meldIndex))) continue;
             const testMeld = this.simulateMeld(meld, [card], engine);
+            if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
             if (!engine.isValidSequenceMeld(testMeld) || !this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
             this.assertActive(engine, signal);
             const moved = await engine.executeMeldExtend(botIndex, meldIndex, [handIndex]);
@@ -614,6 +622,7 @@ export class BuracoBot {
 
             // CORREÇÃO 1: Usa o simulador para ignorar a armadura do 2
             const testMeld = this.simulateMeld(team.melds[mIdx], [c], engine);
+            if (!this.preservesDominationMeld(s, botIndex, team.melds[mIdx], testMeld, engine)) continue;
 
             if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
 
@@ -647,6 +656,7 @@ export class BuracoBot {
             if (c.rank === '2' && c.suit === realSuit) {
               // CORREÇÃO 2: Usa o simulador para o Coringa Perfeito
               const testMeld = this.simulateMeld(meld, [c], engine);
+              if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
 
               if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
 
@@ -782,6 +792,7 @@ export class BuracoBot {
 
               // CORREÇÃO 3: Usa o simulador para sujeira no endgame
               const testMeld = this.simulateMeld(meld, [c], engine);
+              if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
 
               if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
 

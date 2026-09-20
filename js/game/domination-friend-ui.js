@@ -481,10 +481,14 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
     }
     view.teams.find((team) => team.id === step.teamId).melds[step.meldIndex] = step.meld.map((card) => ({ ...card }));
     if (step.friendEvent) {
-      friend.turnsRemaining = step.friendEvent.turnsRemaining;
-      friend.extraTurns = step.friendEvent.extraTurns;
-      friend.farewell = isDominationFriendEndgame(view);
-      (friend.events ||= []).push({ ...step.friendEvent });
+      for (const event of step.friendEvent.recipients || [step.friendEvent]) {
+        const recipient = getDominationFriend(view, event.friendId || friend.id);
+        if (!recipient) continue;
+        recipient.turnsRemaining = event.turnsRemaining;
+        recipient.extraTurns = event.extraTurns;
+        recipient.farewell = isDominationFriendEndgame(view);
+        (recipient.events ||= []).push({ ...event });
+      }
     }
     render();
   }

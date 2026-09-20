@@ -6262,9 +6262,12 @@ document.addEventListener('scroll', scheduleMatriarchGraftLinks, true);
 function renderMelds() {
   if (!discardChoiceIsCurrent()) pendingDiscardChoice = null;
   const m1 = document.getElementById('meldsP1');
-  m1.innerHTML = '';
   const m2 = document.getElementById('meldsP2');
-  m2.innerHTML = '';
+  // Keep unchanged Domination melds (and seat clearances) mounted. Rebuilding
+  // them on every hand/guest update restarts effects and invalidates geometry.
+  const stableMelds = state.mode === '1x1_dominacao';
+  if (!stableMelds) { m1.innerHTML = ''; m2.innerHTML = ''; }
+  const retainedMeldKeys = new Set();
   let s1 = 0,
     s2 = 0;
 
@@ -6539,9 +6542,23 @@ function renderMelds() {
         }
         // O 'else' que acendia a borda amarela foi aniquilado
       };
-      target.appendChild(div);
+      retainedMeldKeys.add(key);
+      const existing = stableMelds ? target.querySelector(`[data-meld-key="${key}"]`) : null;
+      if (existing?.isEqualNode(div)) {
+        existing.onclick = div.onclick; // Refresh closures without resetting animations.
+      } else if (existing) {
+        existing.replaceWith(div);
+      } else {
+        target.appendChild(div);
+      }
     });
   });
+
+  if (stableMelds) for (const container of [m1, m2]) {
+    for (const node of container.querySelectorAll('[data-meld-key]')) {
+      if (!retainedMeldKeys.has(node.dataset.meldKey)) node.remove();
+    }
+  }
 
   scheduleMatriarchGraftLinks();
 
@@ -6638,23 +6655,17 @@ function renderMelds() {
     const grow2 = panel2.closest('.grow');
     const boardMelds = panel1.closest('.board-melds');
 
-    for (let i = 0; i <= 6; i++) {
-      grow1.classList.remove('dom-nivel-' + i);
-      grow2.classList.remove('dom-nivel-' + i);
+    for (const [index, grow] of [grow1, grow2].entries()) {
+      const winner = level > 0 && (index === 0 ? s1 > s2 : s2 > s1);
+      for (let i = 0; i <= 6; i++) {
+        grow.classList.toggle('dom-nivel-' + i, level === 0 ? i === 0 : winner && i === level);
+      }
+      grow.classList.toggle('has-brasao', winner);
+      grow.classList.toggle('dom-dominador', winner);
+      grow.classList.toggle('dom-escravo', level > 0 && !winner);
+      if (!winner) document.getElementById(`statusDom${index + 1}`)?.remove();
     }
-    grow1.classList.remove('has-brasao', 'dom-dominador', 'dom-escravo');
-    grow2.classList.remove('has-brasao', 'dom-dominador', 'dom-escravo');
-    if (boardMelds) boardMelds.classList.remove('has-domination-status');
-
-    const oldStatus1 = document.getElementById('statusDom1');
-    if (oldStatus1) oldStatus1.remove();
-    const oldStatus2 = document.getElementById('statusDom2');
-    if (oldStatus2) oldStatus2.remove();
-
-    if (level === 0) {
-      grow1.classList.add('dom-nivel-0');
-      grow2.classList.add('dom-nivel-0');
-    }
+    if (boardMelds) boardMelds.classList.toggle('has-domination-status', level > 0);
 
     // Calcula quantas coroas acender (nível 1 a 6)
     const coroaSlots = Array.from({ length: 6 }, (_, i) => `<span class="coroa-slot ${i < level ? 'active' : ''}">👑</span>`).join('');
@@ -6676,12 +6687,21 @@ function renderMelds() {
             `;
 
     const applyDominationVisual = (winnerGrow, loserGrow, statusId) => {
-      winnerGrow.classList.add('dom-nivel-' + level, 'dom-dominador');
-      loserGrow.classList.add('dom-escravo');
       if (level > 0) {
-        winnerGrow.classList.add('has-brasao');
-        if (boardMelds) boardMelds.classList.add('has-domination-status');
-        winnerGrow.insertAdjacentHTML('afterbegin', brasaoHtml.replace('statusDom_ID_AQUI', statusId));
+        let status = document.getElementById(statusId);
+        if (!status) {
+          winnerGrow.insertAdjacentHTML('afterbegin', brasaoHtml.replace('statusDom_ID_AQUI', statusId));
+          status = document.getElementById(statusId);
+        }
+        if (status.dataset.level !== String(level)) {
+          status.className = `brasao-dominacao ${levelClass}`;
+          status.dataset.level = String(level);
+          status.style.setProperty('--brasao-runtime-accent', glowColor);
+          status.querySelectorAll('.coroa-slot').forEach((crown, i) => crown.classList.toggle('active', i < level));
+          status.querySelector('.brasao-titulo').textContent = statusText;
+        }
+        const points = status.querySelector('.brasao-pontos');
+        if (points.textContent !== `+${diff}`) points.textContent = `+${diff}`;
       }
     };
 
