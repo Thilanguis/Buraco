@@ -56,6 +56,8 @@ export const TABLE_AMBIENT_MUSIC = Object.freeze({
   ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.23 },
   submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.32 },
   findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.34 },
+  // Whole-track RMS at this gain matches Feltro within 0.4 dB.
+  lunar: { src: 'assets/music/mesa-lunar.mp3', volume: 0.35 },
 });
 
 export const TABLE_AMBIENT_MAX_VOLUME = 0.35;

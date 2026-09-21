@@ -1,5 +1,5 @@
-export const TABLE_THEME_IDS = Object.freeze(['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom']);
-export const DECK_THEME_IDS = Object.freeze(['classico', 'cassino', 'minimal', 'dominacao', 'arcade', 'mythic', 'holografico']);
+export const TABLE_THEME_IDS = Object.freeze(['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom', 'lunar']);
+export const DECK_THEME_IDS = Object.freeze(['classico', 'cassino', 'minimal', 'dominacao', 'arcade', 'mythic', 'holografico', 'lunar']);
 
 export function normalizeTableTheme(theme) {
   return TABLE_THEME_IDS.includes(theme) ? theme : 'feltro';

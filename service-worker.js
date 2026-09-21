@@ -1,6 +1,10 @@
-const CACHE_NAME = 'buraco-v155';
+const CACHE_NAME = 'buraco-v158';
 
 const ASSETS = [
+  './styles/lunar.css',
+  ...['spades', 'hearts', 'clubs', 'diamonds'].flatMap(suit =>
+    ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map(rank => `./assets/lunar/${suit}-${rank}.webp`)),
+  ...['joker-red', 'joker-blue', 'back-red', 'back-blue', 'table'].map(name => `./assets/lunar/${name}.webp`),
   './',
   './index.html',
   './app.js',

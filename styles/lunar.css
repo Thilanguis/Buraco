@@ -1,0 +1,74 @@
+/* Image skins only: card sizes, selection, stacking and flights stay unchanged. */
+.lunar-card-art { display: none; }
+body[data-deck-theme='lunar'] .lunar-card-art {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--lunar-face) center / 100% 100% no-repeat;
+  pointer-events: none;
+  z-index: 2;
+}
+body[data-deck-theme='lunar'] .back .lunar-card-art { display: none; }
+body[data-deck-theme='lunar'] :has(> .lunar-card-art) > :is(.carta-canto, .carta-meio) {
+  /* Keep the textual rank/suit for assistive technology. */
+  opacity: 0;
+}
+body[data-deck-theme='lunar'] :is(.carta:not(.back), .discard-face) {
+  --card-face-surface: #fff8e5;
+  --card-face-border: #d5aa59;
+  --card-face-mark: none;
+}
+body[data-deck-theme='lunar'] :is(.back-red, .back-blue, .fly-card.back, .opponent-card-back, .morto-card-back, .carta.back, #drawStockBtn .pile-card) {
+  background: url('../assets/lunar/back-red.webp') center / 100% 100% no-repeat !important;
+  border-color: #d5aa59 !important;
+}
+body[data-deck-theme='lunar'] :is(.back-blue, #mortoSlot1 .morto-card-back) {
+  background-image: url('../assets/lunar/back-blue.webp') !important;
+}
+body[data-deck-theme='lunar'] :is(.back-red, .back-blue, .fly-card.back, .opponent-card-back, .morto-card-back, .carta.back)::before,
+body[data-deck-theme='lunar'] :is(.back-red, .back-blue, .fly-card.back, .opponent-card-back, .morto-card-back, .carta.back)::after {
+  content: none !important;
+}
+body[data-table-theme='lunar'] #gameSection {
+  background: #080f3e url('../assets/lunar/table.webp') center / cover no-repeat;
+  --table-light-layer: none;
+  --table-flash-layer: none;
+  --table-light-animation: none;
+  --table-flash-animation: none;
+  --table-light-opacity: 0;
+  --table-flash-opacity: 0;
+  --hud-accent: #f5ce83;
+  --hud-accent-soft: rgba(227, 164, 237, .16);
+  --hud-accent-glow: rgba(245, 206, 131, .25);
+  --hud-chip-border: rgba(245, 206, 131, .4);
+  --hud-chip-bg: rgba(8, 15, 46, .88);
+  --hud-muted: #b9bfd9;
+  --table-panel-bg: rgba(4, 9, 35, .32);
+  --table-panel-border: rgba(245, 206, 131, .3);
+  /* Keep the shared green/red player identities and danger color unchanged. */
+  --table-panel-active-glow: rgba(245, 206, 131, .2);
+  --table-panel-title-line: rgba(245, 206, 131, .18);
+  --table-card-shadow: -1px 2px 5px rgba(2, 5, 24, .48), 0 0 0 1px rgba(245, 206, 131, .07);
+  --table-card-hover-shadow: -8px 20px 30px rgba(2, 5, 24, .68), 0 0 14px rgba(245, 206, 131, .16);
+  --table-card-back-filter: drop-shadow(0 4px 7px rgba(2, 5, 24, .5)) drop-shadow(0 0 5px rgba(227, 164, 237, .08));
+  --table-pile-spot: radial-gradient(ellipse at center, rgba(245, 206, 131, .1), rgba(8, 15, 62, .2) 42%, transparent 70%);
+  --table-pile-border: rgba(245, 206, 131, .28);
+  --table-pile-glow: rgba(227, 164, 237, .14);
+  --table-dom-panel-sheen: linear-gradient(110deg, rgba(227, 164, 237, .055), transparent 42%, rgba(245, 206, 131, .06) 72%, transparent);
+  --table-brasao-sheen: rgba(245, 206, 131, .08);
+  --dom-border-underlay: rgba(4, 9, 35, .82);
+  --dom-contrast-shadow: rgba(2, 5, 24, .58);
+  --dom-panel-scrim: linear-gradient(180deg, rgba(4, 9, 35, .18), rgba(4, 9, 35, .06) 46%, transparent 72%);
+  --dom-panel-scrim-strong: linear-gradient(180deg, rgba(4, 9, 35, .24), rgba(4, 9, 35, .08) 50%, transparent 74%);
+  --dom-border-glow-boost: .9;
+  --dom-runner-core: rgba(255, 248, 229, .96);
+  --dom-runner-soft: rgba(245, 206, 131, .48);
+  --dom-spark-core: rgba(255, 248, 229, .54);
+  --dom-spark-warm: rgba(227, 164, 237, .28);
+  --brasao-contrast-ring: rgba(4, 9, 35, .86);
+}
+body[data-table-theme='lunar'] .table-preview-icon {
+  background: #080f3e url('../assets/lunar/table.webp') center / cover no-repeat;
+  border-color: #d5aa59;
+}
