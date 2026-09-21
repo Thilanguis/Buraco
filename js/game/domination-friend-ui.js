@@ -27,11 +27,27 @@ export function createFriendNoticeTracker() {
         seen = new Set(events.map((event) => event.id));
         return []; // Reload: prime saved events, do not replay old announcements.
       }
-      return events.filter((event) => {
+      const fresh = events.filter((event) => {
         if (seen.has(event.id) || (deferArrival && event.type === 'arrival')) return false;
         seen.add(event.id);
         return true;
       });
+      const groups = new Map();
+      const notices = [];
+      for (const event of fresh) {
+        if (event.type !== 'extraTurn') { notices.push(event); continue; }
+        const key = event.groupId || `${event.id.split(':extra:')[1]}:${event.actorName}`;
+        const existing = groups.get(key);
+        if (existing) {
+          existing.recipients ||= [{ ...existing }];
+          existing.recipients.push(event);
+        } else {
+          const notice = { ...event };
+          groups.set(key, notice);
+          notices.push(notice);
+        }
+      }
+      return notices;
     },
   };
 }
@@ -331,18 +347,21 @@ export function renderDominationFriend(state, playerId) {
   const stockKey = `${shared.stock.length}:${topCard?.id}:${topCard?.back}`;
   if (stack.dataset.viewKey !== stockKey) {
     stack.dataset.viewKey = stockKey;
-    stack.replaceChildren();
+    while (stack.children.length > layers) stack.lastChild.remove();
     for (let i = layers - 1; i >= 0; i--) {
       const top = i === layers - 1;
       const back = (layers - 1 - i) % 2 === 0 ? topCard.back : topCard.back === 'blue' ? 'red' : 'blue';
-      const layer = cardBack({ ...topCard, back });
+      let layer = stack.children[layers - 1 - i];
+      if (!layer) { layer = cardBack({ ...topCard, back }); stack.append(layer); }
+      layer.classList.toggle('back-blue', back === 'blue');
+      layer.classList.toggle('back-red', back !== 'blue');
+      layer.dataset.cardId = topCard.id;
       layer.classList.add('visual-layer');
-      if (!top) layer.classList.add('sub-layer');
+      layer.classList.toggle('sub-layer', !top);
       layer.style.bottom = `${i * 1.2}px`;
       layer.style.right = `${i * 0.3}px`;
       layer.style.zIndex = i;
-      if (!top) layer.style.filter = `brightness(${0.4 + (i / layers) * 0.5})`;
-      stack.append(layer);
+      layer.style.filter = top ? '' : `brightness(${0.4 + (i / layers) * 0.5})`;
     }
   }
   const stockLabel = seatChild(stock, 'pile-info', 'small');
@@ -410,7 +429,7 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
   if (!friend) return;
   const steps = result.steps || [];
   for (let index = 0; index < steps.length; index++) {
-    const step = { ...steps[index], friendId: result.friendId || friend.id };
+    const step = { ...steps[index], friendId: steps[index].friendId || result.friendId || friend.id };
     if (!isActive()) return;
     if (pace && step.type !== 'dominatorBonus' && !(step.type === 'drawStock' && step.reason === 'canastra')) {
       const stage = index === 0 ? 'think' : step.type === 'discard' ? 'discard'
@@ -418,14 +437,13 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
       await pace(stage);
       if (!isActive()) return;
     }
-    if (step.type === 'drawStock' && step.reason === 'canastra' && steps[index + 1]?.type === 'dominatorBonus') {
+    const isBonusDraw = entry => entry?.type === 'dominatorBonus' || (entry?.type === 'drawStock' && entry.reason === 'canastra');
+    if (isBonusDraw(step) && isBonusDraw(steps[index + 1])) {
       const ownerSteps = [];
-      while (steps[index + 1]?.type === 'dominatorBonus') ownerSteps.push(steps[++index]);
-      // The two hands buy together, independently of the sound queue.
-      await Promise.all([
-        playDominationFriendTimeline(view, { friendId: friend.id, steps: [step] }, { animate, render, isActive }),
-        playDominationFriendTimeline(view, { friendId: friend.id, steps: ownerSteps }, { animate, render, isActive }),
-      ]);
+      while (isBonusDraw(steps[index + 1])) ownerSteps.push(steps[++index]);
+      // All recipients buy together, independently of the sound queue.
+      await Promise.all([step, ...ownerSteps].map(entry =>
+        playDominationFriendTimeline(view, { friendId: entry.friendId || friend.id, steps: [entry] }, { animate, render, isActive })));
       continue;
     }
     if (step.type === 'dominatorBonus') {
@@ -444,16 +462,15 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
       continue;
     }
     if (step.type === 'drawDiscard') {
-      // Private pile only. Counters move after each real card has arrived.
-      for (const [cardIndex, card] of [...step.cards].reverse().entries()) {
-        if (pace && cardIndex > 0) await pace('card');
-        if (!isActive()) return;
-        await animate({ ...step, cards: [card], card });
-        if (!isActive()) return;
-        shared.discard = (shared.discard || []).filter((entry) => entry.id !== card.id);
-        friend.hand.push({ ...card });
-        render();
-      }
+      // Carry the entire private pile in one flight, like a normal pickup.
+      // Commit the visual hand and counters only after the batch lands.
+      if (!step.cards.length) continue;
+      await animate({ ...step, card: step.cards.at(-1) });
+      if (!isActive()) return;
+      const pickedIds = new Set(step.cards.map(card => card.id));
+      shared.discard = (shared.discard || []).filter(card => !pickedIds.has(card.id));
+      getDominationFriend(view, step.friendId).hand.push(...step.cards.map(card => ({ ...card })));
+      render();
       continue;
     }
     if (step.type === 'drawStock') {
@@ -465,7 +482,7 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
         await animate({ ...step, cards: [card], drawIndex, drawTotal: step.cards.length });
         if (!isActive()) return;
         shared.stock = shared.stock.filter((entry) => entry.id !== card.id);
-        friend.hand.push({ ...card });
+        getDominationFriend(view, step.friendId).hand.push({ ...card });
         render();
       }
       continue;
@@ -503,8 +520,11 @@ export async function showDominationFriendNotice(event) {
   const detail = document.createElement('span');
   if (event.type === 'extraTurn') {
     const kind = { limpa: 'Limpa', real: 'Real', asas: 'Ás-a-Ás' }[event.kind];
-    title.textContent = `+1 TURNO PARA ${event.name.toUpperCase()}!`;
-    detail.textContent = `${event.actorName} fez ${kind} · ${event.turnsRemaining} turnos disponíveis`;
+    const recipients = event.recipients || [event];
+    title.textContent = `+1 TURNO PARA ${recipients.map(entry => entry.name.toUpperCase()).join(' E ')}!`;
+    const remaining = recipients.length === 1 ? `${event.turnsRemaining} turnos disponíveis`
+      : recipients.map(entry => `${entry.name}: ${entry.turnsRemaining} turnos`).join(' · ');
+    detail.textContent = `${event.actorName} fez ${kind} · ${remaining}`;
   } else {
     title.textContent = event.type === 'arrival' ? `👠 ${event.name} entrou na mesa!` : `💋 ${event.name} se despediu!`;
     detail.textContent = event.type === 'arrival' ? `${event.turnsRemaining} turnos para ajudar o Dominador` : 'Os jogos construídos continuam na mesa.';

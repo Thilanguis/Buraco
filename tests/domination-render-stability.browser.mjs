@@ -6,7 +6,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const start = app.indexOf('function renderMelds()');
 const source = app.slice(start, app.indexOf('\n}', start) + 2);
-const styles = await Promise.all(['base-menu', 'game', 'table-themes', 'domination', 'cards', 'hud', 'responsive', 'effects'].map(name => readFile(new URL(`../styles/${name}.css`, import.meta.url), 'utf8')));
+const styles = await Promise.all(['base-menu', 'game', 'table-themes', 'domination', 'cards', 'hud', 'responsive', 'effects', 'card-readability'].map(name => readFile(new URL(`../styles/${name}.css`, import.meta.url), 'utf8')));
 const browser = await chromium.launch({ headless: true, channel: 'msedge' });
 try {
   for (const [width, height, touch] of [[1440, 900, false], [768, 1024, true]]) {

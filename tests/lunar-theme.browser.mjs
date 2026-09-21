@@ -15,7 +15,7 @@ assert.equal(normalizeDeckTheme('lunar'), 'lunar');
 assert.equal(normalizeTableTheme('lunar'), 'lunar');
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 assert.equal((index.match(/<option value="lunar">/g) || []).length, 4);
-const styles = ['base-menu', 'game', 'table-themes', 'domination', 'cards', 'hud', 'responsive', 'effects', 'boss-mode', 'lunar'];
+const styles = ['base-menu', 'game', 'table-themes', 'domination', 'cards', 'hud', 'responsive', 'effects', 'boss-mode', 'lunar', 'card-readability'];
 const fixture = `<!doctype html><html><head>${styles.map(n => `<link rel="stylesheet" href="/styles/${n}.css">`).join('')}</head>
 <body data-deck-theme="classico"><main id="gameSection" style="display:block;min-height:100vh;padding:30px">
 <div style="display:flex;gap:20px;flex-wrap:wrap">${cards.map((c, i) => `<div id="card${i}" class="carta ${i % 2 ? 'mini' : ''}">${cardFrontHTML(c)}</div>`).join('')}</div>

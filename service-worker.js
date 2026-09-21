@@ -1,6 +1,7 @@
-const CACHE_NAME = 'buraco-v158';
+const CACHE_NAME = 'buraco-v160';
 
 const ASSETS = [
+  './styles/card-readability.css',
   './styles/lunar.css',
   ...['spades', 'hearts', 'clubs', 'diamonds'].flatMap(suit =>
     ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map(rank => `./assets/lunar/${suit}-${rank}.webp`)),

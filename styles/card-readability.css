@@ -1,0 +1,47 @@
+/* 20% larger faces, preserving each existing aspect ratio and flow layout. */
+:root {
+  --readable-hand-width: 72px;
+  --readable-hand-height: 108px;
+  --readable-pile-width: 66px;
+  --readable-pile-height: 96px;
+  --readable-meld-width: 66px;
+  --readable-meld-height: 96px;
+}
+.hand-container .carta { width: var(--readable-hand-width); height: var(--readable-hand-height); font-size: 16.8px; }
+.hand-container { min-height: 108px; }
+.hand-container .carta .carta-meio { font-size: 28.8px; }
+.discard-face { font-size: 16.8px; }
+.discard-face .carta-canto { font-size: 13.2px; }
+.discard-face .carta-meio { font-size: 28.8px; }
+.pile-card, #dominationFriendStock, #dominationFriendDiscard, .friend-discard-face {
+  width: var(--readable-pile-width);
+  height: var(--readable-pile-height);
+}
+.meld-line-cards { height: 102px; }
+.carta.mini { width: var(--readable-meld-width); height: var(--readable-meld-height); margin-right: -45.6px; font-size: 15.6px; }
+.carta.mini .carta-canto { font-size: 12px; }
+.carta.mini .carta-meio { font-size: 26.4px; }
+.carta.mini:last-child { margin-right: 0; }
+.meld-container { column-gap: 8px; }
+#gameSection .board[data-mode='1x1_dominacao'] .meld-container > .meld-line { margin-right: 8px; }
+#gameSection .board[data-mode='1x1_dominacao'] .meld-container > .meld-line:last-child { margin-right: 0; }
+@media (max-width: 768px), (max-height: 600px) {
+  :root {
+    --readable-hand-width: 50.4px;
+    --readable-hand-height: 74.4px;
+    --readable-pile-width: 48px;
+    --readable-pile-height: 69.6px;
+    --readable-meld-width: 40.8px;
+    --readable-meld-height: 60px;
+  }
+  .hand-container { min-height: 78px; }
+  .hand-container .carta { font-size: 12px; }
+  .hand-container .carta .carta-meio { font-size: 19.2px; }
+  .meld-line-cards { height: 62.4px; }
+  .carta.mini { margin-right: -21.6px; font-size: 10.8px; }
+  .carta.mini .carta-canto { font-size: 9.6px; }
+  .carta.mini .carta-meio { font-size: 16.8px; }
+  .discard-face { font-size: 12px; }
+  .discard-face .carta-canto { font-size: 9.6px; }
+  .discard-face .carta-meio { font-size: 19.2px; }
+}

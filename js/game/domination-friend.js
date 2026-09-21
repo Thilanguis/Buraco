@@ -199,6 +199,7 @@ export function grantDominationFriendExtraTurn(state, playerId, oldKind, newKind
     const event = {
       id: `${recipient.id}:extra:${key}:${newKind}`, type: 'extraTurn', name: recipient.name,
       friendId: recipient.id,
+      groupId: `extra:${key}:${newKind}`,
       playerId, actorName: playerId === 'friend' ? friend.name : (state.players[1].name || 'Dominador'),
       kind: newKind, turnsRemaining: recipient.turnsRemaining, extraTurns: recipient.extraTurns,
     };
@@ -219,20 +220,20 @@ export function grantDominationFriendSharedBonus(state, playerId, kind, count, m
   if (!dominationFeatureEnabled(state, 'plus')) return null;
   const shared = state.dominationFriendShared;
   const bonusKey = `bonus:${state.turnNumber || 0}:${meldIndex}`;
-  const prefix = `${friend.id}:${bonusKey}:`;
-  const id = `${prefix}${kind}`;
-  const events = friend.events ||= [];
   if (shared.bonusIds.includes(bonusKey)) return null;
   shared.bonusIds.push(bonusKey);
-  const cards = [];
-  for (let i = 0; i < Math.min(count, BONUS[kind]) && shared.stock.length; i++) {
-    const card = shared.stock.pop();
-    friend.hand.push(card);
-    cards.push({ ...card });
-  }
-  const event = { id, type: 'cardBonus', friendId: friend.id, kind, cards };
-  events.push(event);
-  return event;
+  const events = activeDominationFriends(state).map(recipient => {
+    const cards = [];
+    for (let i = 0; i < Math.min(count, BONUS[kind]) && shared.stock.length; i++) {
+      const card = shared.stock.pop();
+      recipient.hand.push(card);
+      cards.push({ ...card });
+    }
+    const event = { id: `${recipient.id}:${bonusKey}:${kind}`, type: 'cardBonus', friendId: recipient.id, kind, cards };
+    (recipient.events ||= []).push(event);
+    return event;
+  });
+  return events.length === 1 ? events[0] : { ...events[0], recipients: events };
 }
 
 export function isDominationFriendTurn(state) {
@@ -494,14 +495,14 @@ export function executeDominationFriendTurn(state, turnId, rules, { owner = 'loc
   if (!team) return null;
   const farewell = friend.turnsRemaining === 1 || isDominationFriendEndgame(state);
   const steps = [];
-  const draw = (count, kind = null) => {
+  const draw = (count, kind = null, recipient = friend) => {
     const cards = [];
     for (let i = 0; i < count && shared.stock.length; i++) {
       const card = shared.stock.pop();
-      friend.hand.push(card);
+      recipient.hand.push(card);
       cards.push({ ...card });
     }
-    if (cards.length) steps.push({ type: 'drawStock', playerId: 'friend', cards, reason: kind ? 'canastra' : 'turn', kind });
+    if (cards.length) steps.push({ type: 'drawStock', playerId: 'friend', friendId: recipient.id, cards, reason: kind ? 'canastra' : 'turn', kind });
   };
   let pickupPlan = chooseFriendDiscardPickup(state, friend, team, rules, farewell);
   if (pickupPlan) {
@@ -545,11 +546,14 @@ export function executeDominationFriendTurn(state, turnId, rules, { owner = 'loc
       meld: chosen.meld.map((card) => ({ ...card })),
       friendEvent,
     });
-    // Both partners get the same tier difference, each from their own stock.
+    // Every active ally receives the reward, using the appropriate stock.
     if (dominationFeatureEnabled(state, 'plus') && oldKind !== newKind && BONUS[newKind]) {
       const previous = bonuses.get(chosen.meldIndex) || 0;
       const count = Math.max(0, BONUS[newKind] - previous);
       draw(count, newKind);
+      for (const recipient of activeDominationFriends(state)) {
+        if (recipient.id !== friend.id) draw(count, newKind, recipient);
+      }
       drawDominadorSharedBonus(state, count, newKind, steps, rules);
       bonuses.set(chosen.meldIndex, Math.max(previous, BONUS[newKind]));
     }
@@ -580,7 +584,7 @@ export function executeDominationFriendTurn(state, turnId, rules, { owner = 'loc
     friend.hand = [];
     (friend.events ||= []).push({ id: `${friend.id}:departure`, type: 'departure', name: friend.name, turnsRemaining: 0 });
   }
-  for (const step of steps) if (step.playerId === 'friend') step.friendId = friend.id;
+  for (const step of steps) if (step.playerId === 'friend') step.friendId ||= friend.id;
   // Persist the animation barrier with the gameplay transaction. Reloads only
   // release an expired barrier; they never execute an already committed turn.
   shared.presentation = { id: turnId, friendId: friend.id, owner, expiresAt: now + 120000 };

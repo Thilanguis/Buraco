@@ -1831,6 +1831,7 @@ async function playFriendTurnPresentation(action) {
 }
 
 function playDominationFriendSharedDraw(event) {
+  if (event?.recipients) return Promise.all(event.recipients.map(playDominationFriendSharedDraw));
   if (!event?.cards?.length || state?.mode !== '1x1_dominacao' || state.finished || window.isClosingGame
     || !getDominationFriend(state, event.friendId)?.active) return Promise.resolve();
   const key = `shared-draw:${event.id}`;
@@ -5946,6 +5947,9 @@ function renderHand() {
     }
 
     div.innerHTML = cardFrontHTML(card);
+    if (div.classList.contains('just-bought')) {
+      div.insertAdjacentHTML('beforeend', '<span class="bought-card-marker" role="img" aria-label="Carta recém-comprada"><span aria-hidden="true">NOVA</span></span>');
+    }
     if (bossCardLocked) {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-locked" aria-hidden="true"><i></i><b>PRESA</b></span>');
     } else if (bossCardEffect === 'exposed') {
@@ -7327,7 +7331,7 @@ async function playRemoteAction(a) {
     if (isFriend) {
       const source = document.querySelector('#dominationFriendDiscard .friend-discard-face');
       if (!source || !flightStillActive()) return;
-      await flyRectToRect(a.card, getRect(source), handRect, 'front');
+      await flyRectToRect(a.card || a.cards?.at(-1) || fallbackCard, getRect(source), handRect, 'front');
       if (flightStillActive()) impactAtRect(handRect);
       return;
     }
