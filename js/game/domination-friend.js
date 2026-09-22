@@ -8,7 +8,7 @@ const WEIGHT = { simple: 0, suja: 1, limpa: 2, real: 3, asas: 4 };
 const BONUS = { simple: 0, suja: 0, limpa: 1, real: 1, asas: 1 };
 
 export function normalizeDominationOptions(options) {
-  return { friend: options?.friend !== false, plus: options?.plus !== false, vision: options?.vision !== false,
+  return { friend: options?.friend !== false, plus: options?.plus !== false, vision: options?.vision !== false, search: options?.search !== false,
     friendCapacity: options?.friendCapacity === 0 || options?.friendCapacity === '0' ? 0
       : Number(options?.friendCapacity) === 2 ? 2 : 1 };
 }

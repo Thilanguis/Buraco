@@ -1,11 +1,15 @@
-const CACHE_NAME = 'buraco-v164';
+const CACHE_NAME = 'buraco-v165';
 
 const ASSETS = [
   './styles/card-readability.css',
+  './styles/card-inspector.css',
+  './js/game/card-inspector.js',
   './styles/lunar.css',
-  ...['spades', 'hearts', 'clubs', 'diamonds'].flatMap(suit =>
-    ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map(rank => `./assets/lunar/${suit}-${rank}.webp`)),
-  ...['joker-red', 'joker-blue', 'back-red', 'back-blue', 'table'].map(name => `./assets/lunar/${name}.webp`),
+  './styles/wwe.css',
+  ...['spades', 'hearts', 'clubs', 'diamonds'].flatMap((suit) => ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map((rank) => `./assets/wwe/${suit}-${rank}.webp`)),
+  ...['joker-red', 'joker-blue', 'back-red', 'back-blue', 'table'].map((name) => `./assets/wwe/${name}.webp`),
+  ...['spades', 'hearts', 'clubs', 'diamonds'].flatMap((suit) => ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map((rank) => `./assets/lunar/${suit}-${rank}.webp`)),
+  ...['joker-red', 'joker-blue', 'back-red', 'back-blue', 'table'].map((name) => `./assets/lunar/${name}.webp`),
   './',
   './index.html',
   './app.js',
@@ -18,6 +22,7 @@ const ASSETS = [
   './js/game/wildcard-choice.js',
   './js/game/domination-friend.js',
   './js/game/domination-strategy.js',
+  './js/game/domination-search.js',
   './js/game/domination-dev-tools.js',
   './js/game/domination-friend-ui.js',
   './js/game/card-face.js',

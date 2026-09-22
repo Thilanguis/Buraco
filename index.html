@@ -22,7 +22,9 @@
     <link rel="stylesheet" href="styles/effects.css" />
     <link rel="stylesheet" href="styles/boss-mode.css" />
     <link rel="stylesheet" href="styles/lunar.css" />
+    <link rel="stylesheet" href="styles/wwe.css" />
     <link rel="stylesheet" href="styles/card-readability.css" />
+    <link rel="stylesheet" href="styles/card-inspector.css" />
   </head>
   <body data-deck-theme="classico">
     <div id="loadingScreen">
@@ -138,6 +140,15 @@
                       </div>
                       <div class="domination-menu-option domination-option-vision">
                         <label>
+                          <input id="dominationOption_search" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationSearchHelp" />
+                          🔎 Procurar carta
+                        </label>
+                        <div class="domination-option-help" id="dominationSearchHelp">
+                          <span>1x por partida, no turno do Dominador: escolha uma carta disponível no monte principal ou no auxiliar das amigas e leve para sua mão, sem gastar a compra normal. Não revela a ordem do monte. Desmarque para jogar sem essa habilidade.</span>
+                        </div>
+                      </div>
+                      <div class="domination-menu-option domination-option-vision">
+                        <label>
                           <input id="dominationOption_vision" type="checkbox" checked onchange="pushLobby()" aria-describedby="dominationVisionHelp" />
                           👁️ Visão do Dominador
                         </label>
@@ -221,6 +232,7 @@
                       <option value="mythic">✨ Mítico (Findom Animado)</option>
                       <option value="holografico">💎 Holográfico (Prisma Animado)</option>
                       <option value="lunar">🌙 Reino Lunar (Ilustrado)</option>
+                      <option value="wwe">👑 WWE — Rainhas da Dominação</option>
                     </select>
                   </div>
                 </div>
@@ -243,6 +255,7 @@
                       <option value="submissao">Submissão Total (Latex & Pink Glow)</option>
                       <option value="findom">Dominação Financeira (Grafite & Ouro Verde)</option>
                       <option value="lunar">🌙 Reino Lunar</option>
+                      <option value="wwe">👑 WWE — Arena</option>
                     </select>
                   </div>
                 </div>
@@ -509,6 +522,7 @@
               <option value="submissao">Submissão</option>
               <option value="findom">Findom</option>
               <option value="lunar">Reino Lunar</option>
+              <option value="wwe">WWE — Arena</option>
             </select>
           </label>
 
@@ -526,6 +540,7 @@
               <option value="mythic">Mítico</option>
               <option value="holografico">Holográfico</option>
               <option value="lunar">Reino Lunar</option>
+              <option value="wwe">WWE — Rainhas da Dominação</option>
             </select>
           </label>
 
@@ -811,6 +826,7 @@
               <!-- 🔥 NOVO: Botão de revanche ao lado do botão de fechar sala -->
               <button id="rematchBtn" onclick="voteRematch()" style="display: none; background: #22c55e; font-size: 10px; padding: 8px; font-weight: 900">🔄 JOGAR NOVAMENTE</button>
             </div>
+            <p id="inspectCardHelp" class="card-inspect-help" role="status" hidden>Toque numa carta aberta para ampliar. Toque no botão novamente ou pressione Esc para cancelar.</p>
 
             <dialog id="cardSearchDialog" class="card-search-dialog">
               <h3>Buscar uma carta</h3>
@@ -829,6 +845,9 @@
 
             <div id="handContainer" class="hand-container">
               <div class="cards-row"></div>
+            </div>
+            <div class="card-art-toolbar">
+              <button id="inspectCardBtn" type="button" hidden aria-pressed="false" aria-describedby="inspectCardHelp" title="Ampliar a arte de uma carta aberta"><span aria-hidden="true">⛶</span> VER ARTE</button>
             </div>
           </div>
         </div>
@@ -889,6 +908,13 @@
       </div>
     </div>
 
+    <dialog id="cardArtDialog" aria-labelledby="cardArtTitle" aria-describedby="cardArtNotice">
+      <button id="closeCardArtBtn" type="button" aria-label="Fechar ampliação" autofocus>✕</button>
+      <h2 id="cardArtTitle">Arte da carta</h2>
+      <img id="cardArtImage" alt="" />
+      <p id="cardArtNotice">O turno continua enquanto você vê a arte.</p>
+    </dialog>
+    <script type="module" src="js/game/card-inspector.js"></script>
     <script type="module" src="app.js"></script>
   </body>
 </html>

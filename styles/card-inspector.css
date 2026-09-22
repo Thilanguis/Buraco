@@ -1,0 +1,15 @@
+/* Overlay only: no flex row, reserved height or extra gap below the hand. */
+.card-art-toolbar { position: absolute; right: max(8px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); z-index: 40; width: max-content; padding: 0; pointer-events: none; }
+.card-art-toolbar:has(> [hidden]) { display: none; }
+#inspectCardBtn { width: auto; min-height: 36px; margin: 0; background: #242837; color: #fff5db; border: 1px solid #bca572; border-radius: 8px; font-size: 10px; padding: 4px 10px; pointer-events: auto; }
+#inspectCardBtn[hidden], .card-inspect-help[hidden] { display: none !important; }
+#inspectCardBtn span { font-size: 18px; vertical-align: middle; }
+#inspectCardBtn[aria-pressed='true'] { background: #755423; outline: 2px solid #ffe2a0; }
+.card-inspect-help { position: absolute; right: max(8px, env(safe-area-inset-right)); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 44px); z-index: 41; margin: 0; padding: 6px 10px; width: fit-content; max-width: min(320px, 90%); background: #191d29; color: #fff3cd; border-radius: 8px; font-size: 12px; text-align: center; pointer-events: none; }
+.inspecting-card-art :is(.carta:not(.back), .discard-face) { cursor: zoom-in !important; }
+#cardArtDialog { box-sizing: border-box; width: min(94vw, 680px); max-width: 94vw; max-height: 96dvh; padding: 12px; border: 1px solid #bca572; border-radius: 14px; background: #11131b; color: #fff3db; overflow: auto; text-align: center; }
+#cardArtDialog::backdrop { background: rgba(0, 0, 0, .86); }
+#cardArtTitle { margin: 0 40px 8px; font-size: 15px; }
+#closeCardArtBtn { position: absolute; right: 5px; top: 5px; width: 38px; height: 38px; padding: 0; background: #303442; color: white; border-radius: 50%; }
+#cardArtImage { display: block; width: 100%; height: min(78dvh, 960px); object-fit: contain; }
+#cardArtNotice { margin: 8px 0 0; font-size: 12px; color: #d8d8e0; }

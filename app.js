@@ -1,4 +1,5 @@
-import { BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSteal, stopAllGameSfx } from './js/audio.js';
+import { ALL_CANASTRA_SFX, DECK_MOVE_SFX, TABLE_ASAS_SFX, BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSearch, sfxSteal, stopAllGameSfx } from './js/audio.js';
+import { chooseDominationSearchCard } from './js/game/domination-search.js';
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
@@ -82,7 +83,7 @@ import {
   normalizeDominationOptions,
   dominationFeatureEnabled,
 } from './js/game/domination-friend.js';
-import { renderDominationFriend, presentDominationFriend, dealDominationFriendCards, playDominationFriendTimeline, createFriendNoticeTracker, showDominationFriendNotice } from './js/game/domination-friend-ui.js';
+import { renderDominationFriend, presentDominationFriend, playDominationFriendTimeline, createFriendNoticeTracker, showDominationFriendNotice } from './js/game/domination-friend-ui.js';
 import { opponentSeats, OPPONENT_SEAT_IDS, renderOpponentBacks } from './js/game/opponent-seats.js';
 import { cardFrontHTML, suitClass, deckFaceClass } from './js/game/card-face.js';
 import { createVisionHintEvaluator } from './js/game/domination-vision-hint.js';
@@ -370,7 +371,7 @@ const friendActionPresentations = new Map();
 const friendNoticeTracker = createFriendNoticeTracker();
 const friendSoundQueue = createFriendSoundQueue({
   enabled: () => audioUnlocked && !window.isClosingGame && document.visibilityState !== 'hidden',
-  waitForCanastras: () => waitForPlayingCanastras(Object.values(CANASTRA_SFX)),
+  waitForCanastras: () => waitForPlayingCanastras(ALL_CANASTRA_SFX),
   onBusy: () => {
     if (state && !window.isClosingGame) syncTableAmbientMusic();
   },
@@ -963,6 +964,8 @@ let audioCtx = null;
 let tableAmbientAudio = null;
 let tableAmbientTheme = null;
 let tableAmbientFadeId = 0;
+let ambientIntroSession = null;
+const playedTableIntros = new Set();
 let tableAmbientEnabled = (() => {
   try {
     return localStorage.getItem(TABLE_AMBIENT_STORAGE_KEY) !== 'false';
@@ -1003,14 +1006,43 @@ function toggleTableAmbientMusic() {
 
 function getSafeAmbientVolume(theme) {
   const cfg = TABLE_AMBIENT_MUSIC[normalizeTableTheme(theme)] || TABLE_AMBIENT_MUSIC.feltro;
-  const requested = Number(cfg.volume) || 0.1;
+  const requested = tableAmbientAudio?.dataset.intro === 'true' ? 0.35 : Number(cfg.volume) || 0.1;
   // Mantém a música sempre bem abaixo dos efeitos mais baixos da mesa.
-  const friendDucking = state?.mode === '1x1_dominacao' && friendSoundQueue.busy ? 0.3 : 1;
-  return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.7) * friendDucking;
+  return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.7);
 }
+
+function dominationAudioHasPriority() {
+  // Lunar's power effect needs a clear background in every game mode.
+  // Queued canastra sounds are already covered by friendSoundQueue.busy.
+  if (!TABLE_ASAS_SFX.lunar.paused && !TABLE_ASAS_SFX.lunar.ended) return true;
+  return state?.mode === '1x1_dominacao' && (
+    friendSoundQueue.busy || (state.powerActiveThisTurn && !state.hasDrawnThisTurn) ||
+    document.getElementById('cardSearchDialog')?.open ||
+    (!sfxSteal.paused && !sfxSteal.ended) || (!sfxSearch.paused && !sfxSearch.ended)
+  );
+}
+
+function pauseAmbientForDomination() {
+  tableAmbientFadeId++;
+  // Keep this element and currentTime: resume the same intro/music afterward.
+  tableAmbientAudio?.pause();
+}
+
+function playDominationSearchSound() {
+  if (!audioUnlocked || window.isClosingGame || !sfxSearch.paused) return;
+  pauseAmbientForDomination();
+  sfxSearch.currentTime = 0;
+  sfxSearch.play().catch(() => syncTableAmbientMusic());
+}
+
+for (const sound of [sfxSearch, sfxSteal, TABLE_ASAS_SFX.lunar]) {
+  for (const event of ['play', 'ended', 'pause', 'error']) sound.addEventListener(event, () => syncTableAmbientMusic());
+}
+document.getElementById('cardSearchDialog')?.addEventListener('close', () => syncTableAmbientMusic());
 
 function fadeTableAmbientTo(targetVolume, duration = 850, onDone = null) {
   if (!tableAmbientAudio) return;
+  if (targetVolume > 0 && dominationAudioHasPriority()) { pauseAmbientForDomination(); return; }
   const audio = tableAmbientAudio;
   const fadeId = ++tableAmbientFadeId;
   const startVolume = clampMediaVolume(audio.volume);
@@ -1070,30 +1102,55 @@ function syncTableAmbientMusic() {
     return;
   }
 
+  if (dominationAudioHasPriority()) {
+    pauseAmbientForDomination();
+    return;
+  }
+
   const theme = normalizeTableTheme(state.tableTheme || document.body.dataset.tableTheme || 'feltro');
   const cfg = TABLE_AMBIENT_MUSIC[theme];
+  // Illustrated tables may not have a supplied soundtrack yet.
+  if (!cfg) {
+    stopTableAmbientMusic(true);
+    return;
+  }
   const targetVolume = getSafeAmbientVolume(theme);
 
-  if (!tableAmbientAudio || tableAmbientTheme !== theme) {
+  if (!tableAmbientAudio || tableAmbientTheme !== theme || ambientIntroSession !== window.gameSessionId) {
     stopTableAmbientMusic(true);
+    if (ambientIntroSession !== window.gameSessionId) {
+      ambientIntroSession = window.gameSessionId;
+      playedTableIntros.clear();
+    }
+    const intro = Boolean(cfg.intro) && !playedTableIntros.has(theme);
+    if (intro) playedTableIntros.add(theme);
     tableAmbientTheme = theme;
-    tableAmbientAudio = new Audio(cfg.src);
-    tableAmbientAudio.addEventListener('error', () => {
-      console.warn('[ambient] Música ambiente não encontrada ou não carregou:', cfg.src);
+    const audio = new Audio(intro ? cfg.intro : cfg.src);
+    tableAmbientAudio = audio;
+    audio.dataset.intro = String(intro);
+    const finishIntro = () => {
+      if (tableAmbientAudio !== audio) return;
+      stopTableAmbientMusic(true);
+      syncTableAmbientMusic();
+    };
+    if (intro) audio.addEventListener('ended', finishIntro, { once: true });
+    audio.addEventListener('error', () => {
+      console.warn('[ambient] Áudio da mesa não carregou:', audio.src);
+      if (intro) finishIntro();
     });
     tableAmbientAudio.preload = 'auto';
-    tableAmbientAudio.loop = true;
+    tableAmbientAudio.loop = !intro;
     tableAmbientAudio.volume = clampMediaVolume(0);
     tableAmbientAudio
       .play()
       .then(() => {
-        fadeTableAmbientTo(targetVolume, 1000);
+        if (tableAmbientAudio === audio) fadeTableAmbientTo(getSafeAmbientVolume(theme), intro ? 200 : 1000);
       })
       .catch(() => {});
     return;
   }
 
-  tableAmbientAudio.loop = true;
+  tableAmbientAudio.loop = tableAmbientAudio.dataset.intro !== 'true';
   if (tableAmbientAudio.paused) tableAmbientAudio.play().catch(() => {});
   if (Math.abs(tableAmbientAudio.volume - targetVolume) > 0.01) {
     fadeTableAmbientTo(targetVolume, 500);
@@ -1108,6 +1165,15 @@ document.addEventListener('visibilitychange', () => {
 function playCardMove() {
   if (!audioUnlocked) return;
   try {
+    const themed = DECK_MOVE_SFX[normalizeDeckTheme(state?.deckTheme || document.body.dataset.deckTheme)];
+    if (themed) {
+      // Simultaneous card movements share one clip instead of overlapping voices.
+      if (themed.paused || themed.ended) {
+        themed.currentTime = 0;
+        themed.play().catch(() => {});
+      }
+      return;
+    }
     playSfxClone(sfxCardMove);
   } catch (e) {}
 }
@@ -1128,9 +1194,9 @@ function syncHeartbeatAudio(active) {
   if (state && !window.isClosingGame) syncTableAmbientMusic();
 }
 
-Object.values(CANASTRA_SFX).forEach((a) => {
+ALL_CANASTRA_SFX.forEach((a) => {
   a.preload = 'auto';
-  a.volume = 0.9;
+  a.volume = Object.values(TABLE_ASAS_SFX).includes(a) ? 1 : 0.9;
 });
 
 function unlockAudio() {
@@ -1143,7 +1209,7 @@ function unlockAudio() {
 
   // Injeta o novo som de coração na lista global para garantir que o navegador libere o autoplay
   const bossAudios = Object.values(BOSS_SFX).flatMap((sounds) => Object.values(sounds));
-  const allAudios = [...Object.values(CANASTRA_SFX), ...bossAudios, sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
+  const allAudios = [...ALL_CANASTRA_SFX, ...Object.values(DECK_MOVE_SFX), ...bossAudios, sfxCardMove, sfxMyTurn, sfxSearch, sfxSteal, sfxHeartbeat];
   for (const a of allAudios) {
     try {
       a.pause();
@@ -1404,7 +1470,15 @@ async function movePickedWildToSelectedMeld() {
 
 function playCanastraSfx(kind) {
   if (!audioUnlocked) return;
-  const a = CANASTRA_SFX[kind] || CANASTRA_SFX.suja;
+  if (kind === 'asas') {
+    // Do not let the preceding card-movement jingle cover the celebration.
+    for (const sound of Object.values(DECK_MOVE_SFX)) {
+      sound.pause();
+      sound.currentTime = 0;
+    }
+  }
+  const tableTheme = normalizeTableTheme(state?.tableTheme || document.body.dataset.tableTheme);
+  const a = (kind === 'asas' && TABLE_ASAS_SFX[tableTheme]) || CANASTRA_SFX[kind] || CANASTRA_SFX.suja;
   if (state?.mode === '1x1_dominacao') {
     if (kind === 'fim') friendSoundQueue.cancel();
     else if (activeDominationFriends(state).length > 0 || friendSoundQueue.busy) {
@@ -1416,7 +1490,10 @@ function playCanastraSfx(kind) {
     a.pause();
     a.currentTime = 0;
   } catch (e) {}
-  a.play().catch(() => {});
+  if (a === TABLE_ASAS_SFX.lunar) pauseAmbientForDomination();
+  a.play().catch(() => {
+    if (a === TABLE_ASAS_SFX.lunar) syncTableAmbientMusic();
+  });
 }
 
 function playTone(freq, t0, dur, vol = 0.12, type = 'sine') {
@@ -1525,8 +1602,8 @@ function setBox(el, rect) {
   el.style.height = rect.height + 'px';
 }
 
-async function flyRectToRect(card, fromRect, toRect, face = 'front') {
-  playCardMove();
+async function flyRectToRect(card, fromRect, toRect, face = 'front', silent = false) {
+  if (!silent && !card?._silentAsAsBonus) playCardMove();
   const fly = makeFlyEl(card, face);
 
   // Desativa a transição do CSS que faz a carta pular
@@ -1700,7 +1777,7 @@ const friendMeldRules = {
 const evaluateDominationVisionHint = createVisionHintEvaluator(friendMeldRules);
 const presentVisionFocus = createVisionFocus();
 const updateVisionAlert = createVisionAlert({
-  busy: () => [sfxMyTurn, ...Object.values(CANASTRA_SFX)].some((audio) => !audio.paused && !audio.ended),
+  busy: () => [sfxMyTurn, ...ALL_CANASTRA_SFX].some((audio) => !audio.paused && !audio.ended),
   valid: () => !window.isClosingGame && Boolean(evaluateDominationVisionHint(state, myPlayerIndex, canPerformCommonGameAction(state))),
   intro: presentVisionFocus,
   pulse: (active) => ['powerBtn', 'dominationVisionHint'].forEach((id) => document.getElementById(id)?.classList.toggle('vision-alert-pulse', active)),
@@ -1755,9 +1832,9 @@ function renderMatchDuration() {
   } else if (!matchDurationTimer) matchDurationTimer = setInterval(renderMatchDuration, 1000);
 }
 
-function canSearchDominationCard(gameState = state) {
+function canSearchDominationCard(gameState = state, actorId = myPlayerIndex) {
   return (
-    gameState?.mode === '1x1_dominacao' && myPlayerIndex === 1 && gameState.currentPlayer === 1 && !gameState.finished && !gameState.surrender?.active && !gameState.debugPaused && !gameState.dominatorSearchUsed && !isDominationFriendBusy(gameState)
+    dominationFeatureEnabled(gameState, 'search') && actorId === 1 && gameState.currentPlayer === 1 && !gameState.finished && !gameState.surrender?.active && !gameState.debugPaused && !gameState.dominatorSearchUsed && !isDominationFriendBusy(gameState)
   );
 }
 
@@ -1782,7 +1859,7 @@ function renderDominationTools() {
   }
   const button = document.getElementById('seekCardBtn');
   if (button) {
-    button.hidden = state.mode !== '1x1_dominacao' || myPlayerIndex !== 1;
+    button.hidden = !dominationFeatureEnabled(state, 'search') || myPlayerIndex !== 1;
     button.disabled = !canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying;
     button.textContent = state.dominatorSearchUsed ? '✓ BUSCA UTILIZADA' : '🔎 CARTA';
   }
@@ -1794,6 +1871,8 @@ window.openDominationCardSearch = () => {
   if (!canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying || document.querySelector('.fly-card')) return;
   window.refreshDominationCardSearch();
   document.getElementById('cardSearchDialog').showModal();
+  playDominationSearchSound();
+  syncTableAmbientMusic();
 };
 window.refreshDominationCardSearch = () => {
   const auxiliary = document.getElementById('seekCardSource').value === 'auxiliary';
@@ -1815,6 +1894,13 @@ window.takeDominationSearchCard = async () => {
   if (!canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying || document.querySelector('.fly-card')) return;
   const source = document.getElementById('seekCardSource').value;
   const cardId = document.getElementById('seekCardChoice').value;
+  await performDominationSearch(source, cardId);
+};
+
+async function performDominationSearch(source, cardId, botCall = false) {
+  const actorId = botCall ? 1 : myPlayerIndex;
+  if (botCall && (myPlayerIndex !== friendHostIndex(state) || !state?.players?.[1]?.name?.toUpperCase().includes('BOT'))) return;
+  if (!canSearchDominationCard(state, actorId) || !canPerformCommonGameAction() || committing || friendOperationPending) return;
   if (!['main', 'auxiliary'].includes(source) || !cardId) return;
   const session = window.gameSessionId;
   const id = newActionId();
@@ -1824,16 +1910,18 @@ window.takeDominationSearchCard = async () => {
   document.getElementById('cardSearchDialog').close();
   try {
     const saved = await saveFriendOperation((latest) => {
-      if (!canSearchDominationCard(latest)) return null;
-      const stock = source === 'auxiliary' ? latest.dominationFriendShared.stock : latest.stock;
-      const index = stock.findIndex((card) => card.id === cardId);
+      if (!canSearchDominationCard(latest, actorId)) return null;
+      const choice = botCall ? chooseDominationSearchCard(latest, friendMeldRules) : { source, cardId };
+      if (!choice) return null;
+      const stock = choice.source === 'auxiliary' ? latest.dominationFriendShared?.stock || [] : latest.stock;
+      const index = stock.findIndex((card) => card.id === choice.cardId);
       if (index < 0) return null;
       const [card] = stock.splice(index, 1);
       latest.players[1].hand.push(card);
       sortHand(latest.players[1].hand);
       latest.boughtCardIds = [...new Set([...(latest.boughtCardIds || []), card.id])];
       latest.dominatorSearchUsed = true;
-      latest.lastAction = { id, type: 'dominationSearch', playerId: 1, source, card: packCard(card), ts: Date.now() };
+      latest.lastAction = { id, type: 'dominationSearch', playerId: 1, source: choice.source, card: packCard(card), ts: Date.now() };
       return true;
     });
     if (session !== window.gameSessionId || window.isClosingGame) return;
@@ -1849,7 +1937,7 @@ window.takeDominationSearchCard = async () => {
     } finally {
       if (session === window.gameSessionId && !window.isClosingGame && (state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
     }
-    showMessage('🔎 Carta recebida! Sua compra normal do turno foi preservada.');
+    showMessage(botCall ? '🔎 O Dominador procurou uma carta útil. A compra normal dele foi preservada.' : '🔎 Carta recebida! Sua compra normal do turno foi preservada.');
   } catch (error) {
     console.error('Busca de carta:', error);
     showMessage('Não foi possível concluir a apresentação da busca. Confira sua mão antes de tentar novamente.');
@@ -1860,7 +1948,7 @@ window.takeDominationSearchCard = async () => {
       startTurnTimerIfNeeded();
     }
   }
-};
+}
 
 async function performDominationDevOperation(operation) {
   if (!isDebugMode || state?.mode !== '1x1_dominacao' || state.finished || friendOperationPending || committing || isDominationFriendBusy(state) || document.querySelector('.fly-card')) return;
@@ -1950,18 +2038,9 @@ async function performDominationFriendCall(actorId, botCall = false) {
     localUndoStack = [];
     renderAll();
     scheduleDominationFriend();
-    // Only the successful caller animates. Snapshots/reloads show the saved guest.
+    // Both clients present the same persisted invitation; neither rolls again.
     const invited = dominationFriends(saved.state).filter((friend) => friend.callId === invitation.id);
-    await presentDominationFriend(invited, () => sessionId === window.gameSessionId && !window.isClosingGame, {
-      fly: flyRectToRect,
-      impact: impactAtRect,
-      rect: getRect,
-      startRouletteSound: () => {
-        const controller = new AbortController();
-        friendSoundQueue.enqueue(FRIEND_MP3.arrival, undefined, { signal: controller.signal, loop: true });
-        return () => controller.abort();
-      },
-    });
+    await playFriendInvitationPresentation(invited);
   } catch (error) {
     console.error('Falha ao chamar amiga:', error);
     showMessage('Não foi possível salvar a chamada. Tente novamente.');
@@ -1973,6 +2052,37 @@ async function performDominationFriendCall(actorId, botCall = false) {
       scheduleDominationFriend();
     }
   }
+}
+
+function playFriendInvitationPresentation(invited) {
+  if (!invited.length || state?.mode !== '1x1_dominacao') return Promise.resolve();
+  const key = `invitation:${state.friendGameId}:${invited[0].callId || invited[0].id}`;
+  if (friendActionPresentations.has(key)) return friendActionPresentations.get(key);
+  const sessionId = window.gameSessionId;
+  const playback = { gameId: state.friendGameId, view: structuredClone(state), promise: null };
+  const isActive = () => friendPlayback === playback && sessionId === window.gameSessionId && !window.isClosingGame && state?.friendGameId === playback.gameId && !state.finished;
+  friendPlayback = playback;
+  playback.promise = Promise.resolve().then(async () => {
+    try {
+      if (!isActive()) return;
+      stopTurnTimer();
+      await presentDominationFriend(invited, isActive, {
+        fly: flyRectToRect,
+        impact: impactAtRect,
+        rect: getRect,
+        startRouletteSound: () => {
+          const controller = new AbortController();
+          friendSoundQueue.enqueue(FRIEND_MP3.arrival, undefined, { signal: controller.signal, loop: true });
+          return () => controller.abort();
+        },
+      });
+    } finally {
+      if (friendPlayback === playback) friendPlayback = null;
+      if (sessionId === window.gameSessionId && state && !window.isClosingGame) renderAll();
+    }
+  });
+  friendActionPresentations.set(key, playback.promise);
+  return playback.promise;
 }
 
 async function playFriendTurnPresentation(action) {
@@ -2682,7 +2792,7 @@ window.updateDominationFriendCapacity = updateDominationFriendCapacity;
 
 function readDominationMenuOptions() {
   return normalizeDominationOptions({
-    ...Object.fromEntries(['friend', 'plus', 'vision'].map((key) => [key, document.getElementById(`dominationOption_${key}`)?.checked !== false])),
+    ...Object.fromEntries(['friend', 'plus', 'vision', 'search'].map((key) => [key, document.getElementById(`dominationOption_${key}`)?.checked !== false])),
     friendCapacity: document.getElementById('dominationFriendCapacity')?.value || 0,
   });
 }
@@ -2691,7 +2801,7 @@ function syncDominationMenuOptions(options) {
   const normalized = normalizeDominationOptions({ ...options, friendCapacity: options?.friendCapacity ?? 0 });
   const capacity = document.getElementById('dominationFriendCapacity');
   if (capacity) capacity.value = String(normalized.friendCapacity);
-  for (const key of ['friend', 'plus', 'vision']) {
+  for (const key of ['friend', 'plus', 'vision', 'search']) {
     const enabled = normalized[key];
     const checkbox = document.getElementById(`dominationOption_${key}`);
     if (checkbox) checkbox.checked = enabled;
@@ -3682,6 +3792,7 @@ async function processDominationReward(p, oldKind, newKind, meldIndex) {
 
       const packed = packCard(c);
       packed._isEndgameSteal = false;
+      packed._silentAsAsBonus = newKind === 'asas';
 
       p.hand.push(c);
       drawnCards.push(packed);
@@ -3699,6 +3810,7 @@ async function processDominationReward(p, oldKind, newKind, meldIndex) {
         c._isEndgameSteal = true;
         const packed = packCard(c);
         packed._isEndgameSteal = true;
+        packed._silentAsAsBonus = newKind === 'asas';
 
         p.hand.push(c);
         drawnCards.push(packed);
@@ -7531,7 +7643,7 @@ async function playRemoteAction(a) {
             fromEl.style.visibility = 'hidden';
           }
 
-          await flyRectToRect(cardVisual, fromRect, handRect, isSteal ? 'front' : 'back');
+          await flyRectToRect(cardVisual, fromRect, handRect, isSteal ? 'front' : 'back', cardData?._silentAsAsBonus === true || (a.type === 'dominatorBonus' && a.kind === 'asas'));
           impactAtRect(handRect);
 
           if (i < a.drawnCards.length - 1) await new Promise((r) => setTimeout(r, 180));
@@ -7561,6 +7673,7 @@ async function playRemoteAction(a) {
   }
 
   if (a.type === 'dominationSearch') {
+    if (myPlayerIndex !== 1 || state.players[1]?.name?.toUpperCase().includes('BOT')) playDominationSearchSound();
     const source = document.querySelector(a.source === 'auxiliary' ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card');
     if (source && a.card) {
       await flyRectToRect(a.card, getRect(source), handRect, 'front');
@@ -7619,7 +7732,7 @@ async function playRemoteAction(a) {
     const drawCount = isFriend ? a.cards.length : Math.max(0, (a.count || 1) - (a.bossExtraCards?.length || 0));
     for (let i = 0; i < drawCount; i++) {
       if (!flightStillActive()) return;
-      if (stockRect) await flyRectToRect(isFriend ? a.cards[i] : fallbackCard, stockRect, handRect, 'back');
+      if (stockRect) await flyRectToRect(isFriend ? a.cards[i] : fallbackCard, stockRect, handRect, 'back', a.reason === 'canastra' && a.kind === 'asas');
       if (!flightStillActive()) return;
       impactAtRect(handRect);
       if (i < drawCount - 1) await new Promise((r) => setTimeout(r, 180)); // Pequeno delay pra ver as cartas separadas
@@ -7828,6 +7941,10 @@ async function executeBotDominationPowers(engine, botIndex) {
   const eligible = () => engine.isActive() && state?.mode === '1x1_dominacao' && botIndex === 1 && state.currentPlayer === 1 && !state.finished && !state.debugPaused && !state.surrender?.active && state.players[1].name.toUpperCase().includes('BOT');
   if (!eligible()) return;
   if (shouldBotCallDominationFriend(state, friendMeldRules)) await performDominationFriendCall(1, true);
+  if (eligible() && canSearchDominationCard(state, 1) && canPerformCommonGameAction()) {
+    const choice = chooseDominationSearchCard(state, friendMeldRules);
+    if (choice) await performDominationSearch(choice.source, choice.cardId, true);
+  }
   if (!eligible() || state.hasDrawnThisTurn || !dominationFeatureEnabled(state, 'vision') || (state.dominatorUsedPower && !state.powerActiveThisTurn) || !state.players[0].hand.length) return;
   // Persist activation before stealing: a resumed turn can finish the remaining
   // purchase, but can never activate the once-per-match power a second time.
@@ -8865,7 +8982,7 @@ onSnapshot(gameRef, async (snap) => {
   renderAll();
   if (arrivingFriends.length) {
     try {
-      await Promise.all(arrivingFriends.map((friend) => dealDominationFriendCards(friend, () => snapshotSessionId === window.gameSessionId && !window.isClosingGame, { fly: flyRectToRect, impact: impactAtRect, rect: getRect })));
+      await playFriendInvitationPresentation(arrivingFriends);
     } catch (error) {
       if (snapshotSessionId === window.gameSessionId && !window.isClosingGame) console.error('Falha na entrada da amiga:', error);
     }

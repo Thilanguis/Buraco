@@ -32,10 +32,23 @@ export const BOSS_SFX = Object.freeze({
 });
 
 export const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');
+// All card movement sounds follow the deck; celebrations and intros follow the table.
+export const DECK_MOVE_SFX = Object.freeze({
+  lunar: createBossSfx('assets/sfx/compra-lunar.mp3', 0.5),
+  wwe: createBossSfx('assets/sfx/compra-wwe.mp3', 0.5),
+});
+export const TABLE_ASAS_SFX = Object.freeze({
+  // Supplied filenames were inverted; route by the actual intended theme.
+  // 0.9 -> 1 is an 11.1% gain increase, within HTMLAudio's volume limit.
+  lunar: createBossSfx('assets/sfx/asas-wwe.mp3', 1),
+  wwe: createBossSfx('assets/sfx/asas-lunar.mp3', 1),
+});
+export const ALL_CANASTRA_SFX = [...Object.values(CANASTRA_SFX), ...Object.values(TABLE_ASAS_SFX)];
 sfxCardMove.preload = 'auto';
 sfxCardMove.volume = 0.5;
 
 export const sfxMyTurn = new Audio('assets/sfx/seu-turno.mp3');
+export const sfxSearch = createBossSfx('assets/sfx/procurar-carta.mp3', 0.9);
 sfxMyTurn.preload = 'auto';
 sfxMyTurn.volume = 0.8;
 
@@ -56,15 +69,17 @@ export const TABLE_AMBIENT_MUSIC = Object.freeze({
   ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.23 },
   submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.32 },
   findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.34 },
-  // Whole-track RMS at this gain matches Feltro within 0.4 dB.
-  lunar: { src: 'assets/music/mesa-lunar.mp3', volume: 0.35 },
+  // Measured whole-track output RMS: about -29.4 dBFS for both,
+  // roughly 2 dB below Feltro/Findom to leave more room for effects.
+  lunar: { src: 'assets/music/mesa-lunar.mp3', volume: 0.28, intro: 'assets/sfx/abertura-lunar-curta.wav' },
+  wwe: { src: 'assets/music/mesa-wwe.mp3', volume: 0.10, intro: 'assets/sfx/abertura-wwe.mp3' },
 });
 
 export const TABLE_AMBIENT_MAX_VOLUME = 0.35;
 export const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
 
 const BOSS_AUDIO_ELEMENTS = Object.values(BOSS_SFX).flatMap((sounds) => Object.values(sounds));
-const GAME_SFX = [...Object.values(CANASTRA_SFX), ...BOSS_AUDIO_ELEMENTS, sfxCardMove, sfxMyTurn, sfxSteal, sfxHeartbeat];
+const GAME_SFX = [...ALL_CANASTRA_SFX, ...Object.values(DECK_MOVE_SFX), ...BOSS_AUDIO_ELEMENTS, sfxCardMove, sfxMyTurn, sfxSearch, sfxSteal, sfxHeartbeat];
 const transientSfx = new Set();
 const transientSfxNodes = new Map();
 

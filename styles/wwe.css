@@ -1,0 +1,106 @@
+/* Image skins only: card sizes, selection, stacking and flights stay unchanged. */
+.wwe-card-art { display: none; }
+body[data-deck-theme='wwe'] .wwe-card-art {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--wwe-face) center / 100% 100% no-repeat;
+  pointer-events: none;
+  z-index: 2;
+}
+body[data-deck-theme='wwe'] .back .wwe-card-art { display: none; }
+body[data-deck-theme='wwe'] :has(> .wwe-card-art) > :is(.carta-canto, .carta-meio) {
+  /* Keep the textual rank/suit for assistive technology. */
+  opacity: 0;
+}
+body[data-deck-theme='wwe'] :is(.carta:not(.back), .discard-face) {
+  --card-face-surface: #fff8e5;
+  --card-face-border: #d5aa59;
+  --card-face-mark: none;
+}
+body[data-deck-theme='wwe'] :is(.back-red, .back-blue, .fly-card.back, .opponent-card-back, .morto-card-back, .carta.back, #drawStockBtn .pile-card) {
+  background: url('../assets/wwe/back-red.webp') center / 100% 100% no-repeat !important;
+  border-color: #d5aa59 !important;
+}
+body[data-deck-theme='wwe'] :is(.back-blue, #mortoSlot1 .morto-card-back) {
+  background-image: url('../assets/wwe/back-blue.webp') !important;
+}
+body[data-deck-theme='wwe'] :is(.back-red, .back-blue, .fly-card.back, .opponent-card-back, .morto-card-back, .carta.back)::before,
+body[data-deck-theme='wwe'] :is(.back-red, .back-blue, .fly-card.back, .opponent-card-back, .morto-card-back, .carta.back)::after {
+  content: none !important;
+}
+body[data-table-theme='wwe'] #gameSection {
+  background: #171313 url('../assets/wwe/table.webp') center / cover no-repeat;
+  --table-light-layer: none;
+  --table-flash-layer: none;
+  --table-light-animation: none;
+  --table-flash-animation: none;
+  --table-light-opacity: 0;
+  --table-flash-opacity: 0;
+  --hud-accent: #f5ce83;
+  --hud-accent-soft: rgba(220, 55, 65, .16);
+  --hud-accent-glow: rgba(245, 206, 131, .25);
+  --hud-chip-border: rgba(245, 206, 131, .4);
+  --hud-chip-bg: rgba(22, 17, 17, .88);
+  --hud-muted: #d0c6c6;
+  --table-panel-bg: rgba(14, 11, 11, .32);
+  --table-panel-border: rgba(245, 206, 131, .3);
+  /* Keep the shared green/red player identities and danger color unchanged. */
+  --table-panel-active-glow: rgba(245, 206, 131, .2);
+  --table-panel-title-line: rgba(245, 206, 131, .18);
+  --table-card-shadow: -1px 2px 5px rgba(5, 3, 3, .48), 0 0 0 1px rgba(245, 206, 131, .07);
+  --table-card-hover-shadow: -8px 20px 30px rgba(5, 3, 3, .68), 0 0 14px rgba(245, 206, 131, .16);
+  --table-card-back-filter: drop-shadow(0 4px 7px rgba(5, 3, 3, .5)) drop-shadow(0 0 5px rgba(220, 55, 65, .08));
+  --table-pile-spot: radial-gradient(ellipse at center, rgba(245, 206, 131, .1), rgba(23, 19, 19, .2) 42%, transparent 70%);
+  --table-pile-border: rgba(245, 206, 131, .28);
+  --table-pile-glow: rgba(220, 55, 65, .14);
+  --table-dom-panel-sheen: linear-gradient(110deg, rgba(220, 55, 65, .055), transparent 42%, rgba(245, 206, 131, .06) 72%, transparent);
+  --table-brasao-sheen: rgba(245, 206, 131, .08);
+  --dom-border-underlay: rgba(14, 11, 11, .82);
+  --dom-contrast-shadow: rgba(5, 3, 3, .58);
+  --dom-panel-scrim: linear-gradient(180deg, rgba(14, 11, 11, .18), rgba(14, 11, 11, .06) 46%, transparent 72%);
+  --dom-panel-scrim-strong: linear-gradient(180deg, rgba(14, 11, 11, .24), rgba(14, 11, 11, .08) 50%, transparent 74%);
+  --dom-border-glow-boost: .9;
+  --dom-runner-core: rgba(255, 248, 229, .96);
+  --dom-runner-soft: rgba(245, 206, 131, .48);
+  --dom-spark-core: rgba(255, 248, 229, .54);
+  --dom-spark-warm: rgba(220, 55, 65, .28);
+  --brasao-contrast-ring: rgba(14, 11, 11, .86);
+}
+body[data-table-theme='wwe'] .table-preview-icon {
+  background: #171313 url('../assets/wwe/table.webp') center / cover no-repeat;
+  border-color: #d5aa59;
+}
+
+/* Shield the HUD from the ornamental arena border without moving the table layout. */
+body[data-table-theme='wwe'] #gameSection .board-status {
+  background: rgba(22, 17, 17, .96);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px rgba(22, 17, 17, .96),
+    0 0 0 4px rgba(245, 206, 131, .45),
+    0 5px 16px rgba(5, 3, 3, .5);
+  color: #fff8e5;
+  text-shadow: 0 1px 2px #090505;
+}
+body[data-table-theme='wwe'] .board-status .current-player-chip {
+  background: #292121;
+  color: #fff8e5;
+}
+body[data-table-theme='wwe'] .board-status .current-player-chip.is-my-turn {
+  background: #482024;
+  border-color: #f5ce83;
+}
+body[data-table-theme='wwe'] #gameModeBadge {
+  color: #ffe3a6 !important;
+  text-shadow: 0 1px 2px #090505;
+}
+body[data-table-theme='wwe'] .board-status .match-duration {
+  color: #f5eeee;
+}
+/* Keep the existing critical timer color and pulse unchanged. */
+body[data-table-theme='wwe'] #turnTimerLabel:not(.timer-critical) {
+  color: #ffe38a !important;
+  font-weight: 700;
+}
