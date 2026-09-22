@@ -62,13 +62,33 @@ import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } 
 import { buildBossActionPresentation, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
 import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
 import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
-import { hasDominationFriendSelection, normalizeDominationFriends, dominationFriends, activeDominationFriends, getDominationFriend, completeDominationFriendPresentation, canCallDominationFriend, shouldBotCallDominationFriend, createFriendInvitation, callDominationFriend, isDominationFriendTurn, isDominationFriendBusy, queueDominationFriendTurn, executeDominationFriendTurn, grantDominationFriendExtraTurn, grantDominationFriendSharedBonus, normalizeDominationOptions, dominationFeatureEnabled } from './js/game/domination-friend.js';
+import {
+  hasDominationFriendSelection,
+  normalizeDominationFriends,
+  dominationFriends,
+  activeDominationFriends,
+  getDominationFriend,
+  completeDominationFriendPresentation,
+  canCallDominationFriend,
+  shouldBotCallDominationFriend,
+  createFriendInvitation,
+  callDominationFriend,
+  isDominationFriendTurn,
+  isDominationFriendBusy,
+  queueDominationFriendTurn,
+  executeDominationFriendTurn,
+  grantDominationFriendExtraTurn,
+  grantDominationFriendSharedBonus,
+  normalizeDominationOptions,
+  dominationFeatureEnabled,
+} from './js/game/domination-friend.js';
 import { renderDominationFriend, presentDominationFriend, dealDominationFriendCards, playDominationFriendTimeline, createFriendNoticeTracker, showDominationFriendNotice } from './js/game/domination-friend-ui.js';
 import { opponentSeats, OPPONENT_SEAT_IDS, renderOpponentBacks } from './js/game/opponent-seats.js';
 import { cardFrontHTML, suitClass, deckFaceClass } from './js/game/card-face.js';
 import { createVisionHintEvaluator } from './js/game/domination-vision-hint.js';
 import { createVisionAlert } from './js/game/domination-vision-alert.js';
 import { createVisionFocus } from './js/game/domination-vision-focus.js';
+import { setDebugFriends, debugFriendMeld } from './js/game/domination-dev-tools.js';
 import { animateDiscardTransfer } from './js/game/discard-presentation.js';
 import { FRIEND_MP3, createFriendSoundQueue, waitForPlayingCanastras } from './js/game/domination-friend-sound.js';
 
@@ -351,7 +371,9 @@ const friendNoticeTracker = createFriendNoticeTracker();
 const friendSoundQueue = createFriendSoundQueue({
   enabled: () => audioUnlocked && !window.isClosingGame && document.visibilityState !== 'hidden',
   waitForCanastras: () => waitForPlayingCanastras(Object.values(CANASTRA_SFX)),
-  onBusy: () => { if (state && !window.isClosingGame) syncTableAmbientMusic(); },
+  onBusy: () => {
+    if (state && !window.isClosingGame) syncTableAmbientMusic();
+  },
 });
 let currentLobby = null;
 window.botPlayTimeoutId = null;
@@ -442,9 +464,7 @@ function syncBossResourceSounds(boss) {
 
   const newEvents = events.filter((event) => event.actionId && !seenBossResourceSoundEventIds.has(event.actionId));
   newEvents.forEach((event) => seenBossResourceSoundEventIds.add(event.actionId));
-  newEvents
-    .filter((event) => boss.id === 'banker' && event.vaultSound === 'open')
-    .forEach((event) => void animateBossVaultOpen(event, { playSound: audioUnlocked }));
+  newEvents.filter((event) => boss.id === 'banker' && event.vaultSound === 'open').forEach((event) => void animateBossVaultOpen(event, { playSound: audioUnlocked }));
   if (!audioUnlocked) return;
 
   const pairedHealByKey = new Map(
@@ -690,9 +710,7 @@ function restoreUndoUiState(ui = {}) {
 window.executeUndo = async () => {
   const transaction = localUndoStack[localUndoStack.length - 1];
   if (state?.mode === '1x1_dominacao') {
-    if (isDominationFriendBusy(state) || friendOperationPending
-      || transaction?.state?.friendUsed !== state.friendUsed
-      || JSON.stringify(dominationFriends(transaction?.state)) !== JSON.stringify(dominationFriends(state))) return;
+    if (isDominationFriendBusy(state) || friendOperationPending || transaction?.state?.friendUsed !== state.friendUsed || JSON.stringify(dominationFriends(transaction?.state)) !== JSON.stringify(dominationFriends(state))) return;
   }
   if (!canRestoreUndoTransaction(transaction, state, myPlayerIndex)) {
     showMessage('Esta acao nao pode mais ser desfeita.');
@@ -1316,8 +1334,7 @@ async function movePickedWildToSelectedMeld() {
   }
 
   saveStateForUndo('meldMoveWild');
-  const friendKindsBefore = state.mode === '1x1_dominacao' && activeDominationFriends(state).length > 0
-    ? [classifyMeldForUi(fromMeld).kind, classifyMeldForUi(toMeld).kind] : null;
+  const friendKindsBefore = state.mode === '1x1_dominacao' && activeDominationFriends(state).length > 0 ? [classifyMeldForUi(fromMeld).kind, classifyMeldForUi(toMeld).kind] : null;
 
   const fromEl = miniCardElByMeld(myTeamId, fromMeldIdx, fromIdx);
   const fromRect = fromEl ? getRect(fromEl) : meldCardsRect(myTeamId, fromMeldIdx);
@@ -1683,12 +1700,22 @@ const friendMeldRules = {
 const evaluateDominationVisionHint = createVisionHintEvaluator(friendMeldRules);
 const presentVisionFocus = createVisionFocus();
 const updateVisionAlert = createVisionAlert({
-  busy: () => [sfxMyTurn, ...Object.values(CANASTRA_SFX)].some(audio => !audio.paused && !audio.ended),
+  busy: () => [sfxMyTurn, ...Object.values(CANASTRA_SFX)].some((audio) => !audio.paused && !audio.ended),
   valid: () => !window.isClosingGame && Boolean(evaluateDominationVisionHint(state, myPlayerIndex, canPerformCommonGameAction(state))),
   intro: presentVisionFocus,
-  pulse: active => ['powerBtn', 'dominationVisionHint'].forEach(id => document.getElementById(id)?.classList.toggle('vision-alert-pulse', active)),
-  recalled: key => { try { return sessionStorage.getItem('buraco-vision-alert') === key; } catch { return false; } },
-  remember: key => { try { sessionStorage.setItem('buraco-vision-alert', key); } catch {} },
+  pulse: (active) => ['powerBtn', 'dominationVisionHint'].forEach((id) => document.getElementById(id)?.classList.toggle('vision-alert-pulse', active)),
+  recalled: (key) => {
+    try {
+      return sessionStorage.getItem('buraco-vision-alert') === key;
+    } catch {
+      return false;
+    }
+  },
+  remember: (key) => {
+    try {
+      sessionStorage.setItem('buraco-vision-alert', key);
+    } catch {}
+  },
 });
 
 function renderDominationVisionHint() {
@@ -1706,13 +1733,186 @@ function renderDominationVisionHint() {
   }
 }
 
+let matchDurationTimer = null;
+function renderMatchDuration() {
+  const el = document.getElementById('matchDuration');
+  if (!el) return;
+  if (!state || window.isClosingGame) {
+    el.textContent = '';
+    clearInterval(matchDurationTimer);
+    matchDurationTimer = null;
+    return;
+  }
+  const start = state.matchStartedAt;
+  const end = state.finished ? (state.matchFinishedAt ||= state.lastAction?.ts || Date.now()) : Date.now();
+  const seconds = start ? Math.max(0, Math.floor((end - start) / 1000)) : 0;
+  const parts = [Math.floor(seconds / 60) % 60, seconds % 60];
+  if (seconds >= 3600) parts.unshift(Math.floor(seconds / 3600));
+  el.textContent = `${state.finished ? '⏱ Final' : '⏱'} ${parts.map((n) => String(n).padStart(2, '0')).join(':')}`;
+  if (state.finished) {
+    clearInterval(matchDurationTimer);
+    matchDurationTimer = null;
+  } else if (!matchDurationTimer) matchDurationTimer = setInterval(renderMatchDuration, 1000);
+}
+
+function canSearchDominationCard(gameState = state) {
+  return (
+    gameState?.mode === '1x1_dominacao' && myPlayerIndex === 1 && gameState.currentPlayer === 1 && !gameState.finished && !gameState.surrender?.active && !gameState.debugPaused && !gameState.dominatorSearchUsed && !isDominationFriendBusy(gameState)
+  );
+}
+
+function renderDominationTools() {
+  const control = document.getElementById('debugFriendControls');
+  if (control) control.hidden = state.mode !== '1x1_dominacao';
+  const select = document.getElementById('debugMeldActor');
+  if (select) {
+    const options = [['current', 'Jogador do turno'], ...state.players.map((p) => [`player:${p.id}`, p.name])];
+    if (state.mode === '1x1_dominacao')
+      for (const [i, seat] of ['left', 'right'].entries()) {
+        const friend = activeDominationFriends(state).find((f) => f.seat === seat);
+        if (friend) options.push([`friend:${friend.id}`, `Amiga ${i + 1} — ${friend.name}`]);
+      }
+    const key = JSON.stringify(options);
+    if (select.dataset.options !== key) {
+      const previous = select.value;
+      select.replaceChildren(...options.map(([value, text]) => new Option(text, value)));
+      if (options.some(([value]) => value === previous)) select.value = previous;
+      select.dataset.options = key;
+    }
+  }
+  const button = document.getElementById('seekCardBtn');
+  if (button) {
+    button.hidden = state.mode !== '1x1_dominacao' || myPlayerIndex !== 1;
+    button.disabled = !canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying;
+    button.textContent = state.dominatorSearchUsed ? '✓ BUSCA UTILIZADA' : '🔎 CARTA';
+  }
+  const dialog = document.getElementById('cardSearchDialog');
+  if (dialog?.open && !canSearchDominationCard()) dialog.close();
+}
+
+window.openDominationCardSearch = () => {
+  if (!canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying || document.querySelector('.fly-card')) return;
+  window.refreshDominationCardSearch();
+  document.getElementById('cardSearchDialog').showModal();
+};
+window.refreshDominationCardSearch = () => {
+  const auxiliary = document.getElementById('seekCardSource').value === 'auxiliary';
+  const stock = auxiliary ? state?.dominationFriendShared?.stock || [] : state?.stock || [];
+  const select = document.getElementById('seekCardChoice');
+  const choices = new Map();
+  // Aggregate duplicates and sort by face: do not disclose draw order.
+  for (const card of stock) {
+    const label = card.joker ? 'Coringa' : `${card.rank} ${card.suit}`;
+    const entry = choices.get(label) || { id: card.id, count: 0 };
+    entry.count++;
+    choices.set(label, entry);
+  }
+  select.replaceChildren(...[...choices].sort(([a], [b]) => a.localeCompare(b, 'pt-BR', { numeric: true })).map(([label, entry]) => new Option(`${label} (${entry.count} ${entry.count > 1 ? 'disponíveis' : 'disponível'})`, entry.id)));
+  document.getElementById('seekCardConfirm').disabled = !stock.length || !canSearchDominationCard();
+  document.getElementById('seekCardStatus').textContent = stock.length ? 'A carta escolhida vai para a mão do Dominador.' : 'Este monte está vazio ou ainda não foi criado. A habilidade não será gasta.';
+};
+window.takeDominationSearchCard = async () => {
+  if (!canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying || document.querySelector('.fly-card')) return;
+  const source = document.getElementById('seekCardSource').value;
+  const cardId = document.getElementById('seekCardChoice').value;
+  if (!['main', 'auxiliary'].includes(source) || !cardId) return;
+  const session = window.gameSessionId;
+  const id = newActionId();
+  friendOperationPending = true;
+  ignoreOwnActionId = id;
+  stopTurnTimer();
+  document.getElementById('cardSearchDialog').close();
+  try {
+    const saved = await saveFriendOperation((latest) => {
+      if (!canSearchDominationCard(latest)) return null;
+      const stock = source === 'auxiliary' ? latest.dominationFriendShared.stock : latest.stock;
+      const index = stock.findIndex((card) => card.id === cardId);
+      if (index < 0) return null;
+      const [card] = stock.splice(index, 1);
+      latest.players[1].hand.push(card);
+      sortHand(latest.players[1].hand);
+      latest.boughtCardIds = [...new Set([...(latest.boughtCardIds || []), card.id])];
+      latest.dominatorSearchUsed = true;
+      latest.lastAction = { id, type: 'dominationSearch', playerId: 1, source, card: packCard(card), ts: Date.now() };
+      return true;
+    });
+    if (session !== window.gameSessionId || window.isClosingGame) return;
+    if (!saved) {
+      showMessage('A carta não está mais disponível ou a vez mudou. A busca não foi gasta.');
+      return;
+    }
+    localUndoStack = [];
+    selectedHandIndexes.clear();
+    selectedMeldTarget = null;
+    try {
+      await playRemoteAction(saved.state.lastAction);
+    } finally {
+      if (session === window.gameSessionId && !window.isClosingGame && (state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
+    }
+    showMessage('🔎 Carta recebida! Sua compra normal do turno foi preservada.');
+  } catch (error) {
+    console.error('Busca de carta:', error);
+    showMessage('Não foi possível concluir a apresentação da busca. Confira sua mão antes de tentar novamente.');
+  } finally {
+    friendOperationPending = false;
+    if (session === window.gameSessionId && !window.isClosingGame) {
+      renderAll();
+      startTurnTimerIfNeeded();
+    }
+  }
+};
+
+async function performDominationDevOperation(operation) {
+  if (!isDebugMode || state?.mode !== '1x1_dominacao' || state.finished || friendOperationPending || committing || isDominationFriendBusy(state) || document.querySelector('.fly-card')) return;
+  const session = window.gameSessionId;
+  const id = newActionId();
+  friendOperationPending = true;
+  ignoreOwnActionId = id;
+  stopTurnTimer();
+  try {
+    const saved = await saveFriendOperation(
+      (latest) => {
+        if (isDominationFriendBusy(latest)) return null;
+        const result = operation(latest);
+        if (!result) return null;
+        latest.lastAction = { ...(result === true ? { type: 'debugFriends', playerId: 1 } : result), id, ts: Date.now() };
+        return true;
+      },
+      { allowDebugPause: true },
+    );
+    if (!saved || session !== window.gameSessionId || window.isClosingGame) return;
+    localUndoStack = [];
+    try {
+      await playRemoteAction(saved.state.lastAction);
+    } finally {
+      if (session === window.gameSessionId && !window.isClosingGame && (state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
+    }
+    showMessage('🔧 Cenário atualizado. Os bônus seguem as opções Plus da partida.');
+  } catch (error) {
+    console.error('Dev amigas:', error);
+    showMessage('Não foi possível aplicar o cenário.');
+  } finally {
+    friendOperationPending = false;
+    if (session === window.gameSessionId && !window.isClosingGame) {
+      renderAll();
+      startTurnTimerIfNeeded();
+      scheduleDominationFriend();
+    }
+  }
+}
+window.debugSetFriends = (count) => {
+  if (!isDebugMode || ![1, 2].includes(count)) return;
+  const invitation = createFriendInvitation(crypto.randomUUID());
+  return performDominationDevOperation((latest) => setDebugFriends(latest, count, invitation, friendMeldRules));
+};
+
 function friendHostIndex(gameState) {
   if (!gameState?.players?.[1]?.name?.toUpperCase().includes('BOT')) return 1;
   const human = gameState.players.findIndex((player) => !player.name.toUpperCase().includes('BOT'));
   return human >= 0 ? human : -1;
 }
 
-async function saveFriendOperation(operation) {
+async function saveFriendOperation(operation, { allowDebugPause = false } = {}) {
   const gameIdentity = state?.friendGameId;
   const sessionId = window.gameSessionId;
   return runTransaction(db, async (transaction) => {
@@ -1720,8 +1920,7 @@ async function saveFriendOperation(operation) {
     if (sessionId !== window.gameSessionId || window.isClosingGame) return null;
     if (!snapshot.exists() || !snapshot.data().stateJson) return null;
     const latest = normalizeDominationFriends(JSON.parse(snapshot.data().stateJson));
-    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity
-      || latest.finished || latest.surrender?.active || latest.debugPaused) return null;
+    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity || latest.finished || latest.surrender?.active || (latest.debugPaused && !(allowDebugPause && isDebugMode))) return null;
     const result = operation(latest);
     if (!result) return null;
     latest.friendRevision = (latest.friendRevision || 0) + 1;
@@ -1733,10 +1932,8 @@ async function saveFriendOperation(operation) {
 window.callDominationFriend = () => performDominationFriendCall(myPlayerIndex);
 
 async function performDominationFriendCall(actorId, botCall = false) {
-  if (botCall && (actorId !== 1 || myPlayerIndex !== friendHostIndex(state)
-    || !state?.players?.[1]?.name?.toUpperCase().includes('BOT'))) return;
-  if (!canCallDominationFriend(state, actorId) || friendOperationPending || committing
-    || window.isAutoPlaying || window.isStealModeActive || window.isMelding || document.querySelector('.fly-card')) return;
+  if (botCall && (actorId !== 1 || myPlayerIndex !== friendHostIndex(state) || !state?.players?.[1]?.name?.toUpperCase().includes('BOT'))) return;
+  if (!canCallDominationFriend(state, actorId) || friendOperationPending || committing || window.isAutoPlaying || window.isStealModeActive || window.isMelding || document.querySelector('.fly-card')) return;
   friendOperationPending = true;
   stopTurnTimer();
   renderAll();
@@ -1754,9 +1951,11 @@ async function performDominationFriendCall(actorId, botCall = false) {
     renderAll();
     scheduleDominationFriend();
     // Only the successful caller animates. Snapshots/reloads show the saved guest.
-    const invited = dominationFriends(saved.state).filter(friend => friend.callId === invitation.id);
+    const invited = dominationFriends(saved.state).filter((friend) => friend.callId === invitation.id);
     await presentDominationFriend(invited, () => sessionId === window.gameSessionId && !window.isClosingGame, {
-      fly: flyRectToRect, impact: impactAtRect, rect: getRect,
+      fly: flyRectToRect,
+      impact: impactAtRect,
+      rect: getRect,
       startRouletteSound: () => {
         const controller = new AbortController();
         friendSoundQueue.enqueue(FRIEND_MP3.arrival, undefined, { signal: controller.signal, loop: true });
@@ -1787,9 +1986,7 @@ async function playFriendTurnPresentation(action) {
   const playback = { actionId: action.id, gameId: state.friendGameId, view: structuredClone(state), promise: null };
   getDominationFriend(playback.view, result.friendId).pendingTurnId = result.turnId;
   getDominationFriend(playback.view, result.friendId).farewell = result.farewell;
-  const isActive = () => friendPlayback === playback && sessionId === window.gameSessionId
-    && !window.isClosingGame && state?.mode === '1x1_dominacao'
-    && state.friendGameId === playback.gameId && !state.finished;
+  const isActive = () => friendPlayback === playback && sessionId === window.gameSessionId && !window.isClosingGame && state?.mode === '1x1_dominacao' && state.friendGameId === playback.gameId && !state.finished;
   friendPlayback = playback;
   playback.promise = Promise.resolve().then(async () => {
     try {
@@ -1797,12 +1994,14 @@ async function playFriendTurnPresentation(action) {
       stopTurnTimer();
       renderAll();
       await playDominationFriendTimeline(playback.view, result, {
-        animate: playRemoteAction, render: renderAll, isActive,
+        animate: playRemoteAction,
+        render: renderAll,
+        isActive,
         pace: async (stage) => {
           // Only the committing host renews the shared animation lease.
           const barrier = state.dominationFriendShared?.presentation;
           if (barrier?.owner === friendControllerId && barrier.expiresAt - Date.now() < 90000) {
-            const renewed = await saveFriendOperation(latest => {
+            const renewed = await saveFriendOperation((latest) => {
               const lock = latest.dominationFriendShared?.presentation;
               if (lock?.id !== result.turnId || lock.owner !== friendControllerId) return null;
               lock.expiresAt = Date.now() + 120000;
@@ -1813,9 +2012,14 @@ async function playFriendTurnPresentation(action) {
           }
           const ranges = { think: [1500, 5500], organize: [900, 1300], play: [1700, 2300], discard: [800, 1400], card: [180, 350] };
           const [min, max] = ranges[stage];
-          await BuracoBot.sleep(BuracoBot.randomDelay(min, max), {
-            isActive, getState: () => state,
-          }, botTurnController.signal);
+          await BuracoBot.sleep(
+            BuracoBot.randomDelay(min, max),
+            {
+              isActive,
+              getState: () => state,
+            },
+            botTurnController.signal,
+          );
         },
       });
     } catch (error) {
@@ -1832,19 +2036,18 @@ async function playFriendTurnPresentation(action) {
 
 function playDominationFriendSharedDraw(event) {
   if (event?.recipients) return Promise.all(event.recipients.map(playDominationFriendSharedDraw));
-  if (!event?.cards?.length || state?.mode !== '1x1_dominacao' || state.finished || window.isClosingGame
-    || !getDominationFriend(state, event.friendId)?.active) return Promise.resolve();
+  if (!event?.cards?.length || state?.mode !== '1x1_dominacao' || state.finished || window.isClosingGame || !getDominationFriend(state, event.friendId)?.active) return Promise.resolve();
   const key = `shared-draw:${event.id}`;
   if (friendActionPresentations.has(key)) return friendActionPresentations.get(key);
   const sessionId = window.gameSessionId;
   const gameIdentity = state.friendGameId;
-  const promise = Promise.resolve().then(() => {
-    if (sessionId !== window.gameSessionId || state?.friendGameId !== gameIdentity || window.isClosingGame
-      || state?.finished || !getDominationFriend(state, event.friendId)?.active) return;
-    renderDominationFriend(state, myPlayerIndex);
-    return playRemoteAction({ type: 'drawStock', playerId: 'friend', friendId: event.friendId,
-      reason: 'canastra', kind: event.kind, cards: event.cards });
-  }).catch((error) => console.warn('Falha visual na compra da amiga:', error));
+  const promise = Promise.resolve()
+    .then(() => {
+      if (sessionId !== window.gameSessionId || state?.friendGameId !== gameIdentity || window.isClosingGame || state?.finished || !getDominationFriend(state, event.friendId)?.active) return;
+      renderDominationFriend(state, myPlayerIndex);
+      return playRemoteAction({ type: 'drawStock', playerId: 'friend', friendId: event.friendId, reason: 'canastra', kind: event.kind, cards: event.cards });
+    })
+    .catch((error) => console.warn('Falha visual na compra da amiga:', error));
   friendActionPresentations.set(key, promise);
   return promise;
 }
@@ -1861,8 +2064,7 @@ function syncDominationFriendNotices() {
     }
     // Entry music belongs only to the visible roulette, not the arrival notice.
     friendSoundQueue.enqueue(event.type === 'arrival' ? null : FRIEND_MP3[event.type], () => {
-      if (sessionId !== window.gameSessionId || window.isClosingGame || state?.finished
-        || state?.friendGameId !== gameIdentity) return;
+      if (sessionId !== window.gameSessionId || window.isClosingGame || state?.finished || state?.friendGameId !== gameIdentity) return;
       return showDominationFriendNotice(event);
     });
   }
@@ -1885,7 +2087,10 @@ function scheduleDominationFriend() {
       startTurnTimerIfNeeded();
       return;
     }
-    if (committing || friendOperationPending || friendAutomationRunning || friendPlayback) { scheduleDominationFriend(); return; }
+    if (committing || friendOperationPending || friendAutomationRunning || friendPlayback) {
+      scheduleDominationFriend();
+      return;
+    }
     friendAutomationRunning = true;
     try {
       const saved = await saveFriendOperation((latest) => {
@@ -1897,7 +2102,7 @@ function scheduleDominationFriend() {
           return { recovered: true };
         }
         const guest = getDominationFriend(latest);
-        if (!guest?.active || activeDominationFriends(latest).some(entry => entry.presentationUntil > Date.now())) return null;
+        if (!guest?.active || activeDominationFriends(latest).some((entry) => entry.presentationUntil > Date.now())) return null;
         let result;
         if (guest.pendingTurnId) result = executeDominationFriendTurn(latest, guest.pendingTurnId, friendMeldRules, { owner: friendControllerId });
         else if (guest.presentationUntil) result = { arrived: true, friendId: guest.id, name: guest.name };
@@ -1905,7 +2110,11 @@ function scheduleDominationFriend() {
         guest.presentationUntil = 0;
         latest.lastAction = {
           id: `friend_${result.turnId || guest.id + '_arrival'}`,
-          type: 'friendTurn', playerId: 'friend', friendId: guest.id, friendResult: result, ts: Date.now(),
+          type: 'friendTurn',
+          playerId: 'friend',
+          friendId: guest.id,
+          friendResult: result,
+          ts: Date.now(),
         };
         return result;
       });
@@ -1916,10 +2125,8 @@ function scheduleDominationFriend() {
         localUndoStack = [];
         if ((state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
         if (saved.result.turnId) {
-          const completed = await saveFriendOperation(latest =>
-            completeDominationFriendPresentation(latest, saved.result.turnId, friendControllerId));
-          if (completed && sessionId === window.gameSessionId && !window.isClosingGame
-            && (state.friendRevision || 0) <= completed.state.friendRevision) state = completed.state;
+          const completed = await saveFriendOperation((latest) => completeDominationFriendPresentation(latest, saved.result.turnId, friendControllerId));
+          if (completed && sessionId === window.gameSessionId && !window.isClosingGame && (state.friendRevision || 0) <= completed.state.friendRevision) state = completed.state;
         }
         if (saved.result.departed) showMessage(`💋 ${saved.result.name} foi embora.`);
       }
@@ -1939,6 +2146,7 @@ function scheduleDominationFriend() {
 
 async function commitState() {
   if (!state || window.isClosingGame) return;
+  if (state.finished && !state.matchFinishedAt) state.matchFinishedAt = Date.now();
 
   // Gatilho Universal de Reciclagem (Travado se o jogo já acabou)
   if (state.stock && state.stock.length === 0 && !state.finished && !window.isClosingGame) {
@@ -1983,9 +2191,7 @@ async function commitState() {
         if (!saved?.accepted) {
           pendingCommit = false;
           localUndoStack = [];
-          if (saved && sessionId === window.gameSessionId && !window.isClosingGame
-            && state?.friendGameId === proposal.friendGameId
-            && (state.friendRevision || 0) <= saved.state.friendRevision) {
+          if (saved && sessionId === window.gameSessionId && !window.isClosingGame && state?.friendGameId === proposal.friendGameId && (state.friendRevision || 0) <= saved.state.friendRevision) {
             state = saved.state;
             renderAll();
             startTurnTimerIfNeeded();
@@ -2475,9 +2681,10 @@ function updateDominationFriendCapacity() {
 window.updateDominationFriendCapacity = updateDominationFriendCapacity;
 
 function readDominationMenuOptions() {
-  return normalizeDominationOptions({ ...Object.fromEntries(['friend', 'plus', 'vision'].map((key) =>
-    [key, document.getElementById(`dominationOption_${key}`)?.checked !== false])),
-    friendCapacity: document.getElementById('dominationFriendCapacity')?.value || 0 });
+  return normalizeDominationOptions({
+    ...Object.fromEntries(['friend', 'plus', 'vision'].map((key) => [key, document.getElementById(`dominationOption_${key}`)?.checked !== false])),
+    friendCapacity: document.getElementById('dominationFriendCapacity')?.value || 0,
+  });
 }
 
 function syncDominationMenuOptions(options) {
@@ -2587,6 +2794,8 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
 
   const newState = {
     mode,
+    matchStartedAt: Date.now(),
+    matchFinishedAt: null,
     variant: effectiveVariant,
     deckTheme,
     tableTheme,
@@ -2611,6 +2820,7 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
     betBase,
     betPerPoint,
     dominatorUsedPower: false,
+    dominatorSearchUsed: false,
     powerActiveThisTurn: false,
   };
   if (mode === '1x1_dominacao') {
@@ -2648,9 +2858,7 @@ function showPendingBossChoiceMessage(playerId = myPlayerIndex) {
   else showMessage(`Aguardando ${target?.name || 'o jogador alvo'} decidir.`);
 }
 function canPerformCommonGameAction(gameState = state) {
-  return !discardPickupAnimating && !isDominationFriendBusy(gameState)
-    && !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback))
-    && canBossPerformCommonAction(gameState);
+  return !discardPickupAnimating && !isDominationFriendBusy(gameState) && !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback)) && canBossPerformCommonAction(gameState);
 }
 function ensureMyTurn() {
   if (!state || state.finished) {
@@ -2741,9 +2949,7 @@ async function drawBossTurnExtras(player) {
 }
 
 function normalizeLegacyDiscardPurchase(gameState) {
-  if (['1x1_duploMorto', '1x1_dominacao'].includes(gameState?.mode) && gameState.partialDraw
-    && gameState.lastAction?.playerId === gameState.currentPlayer
-    && ['drawDiscard', 'drawDiscardFechado'].includes(gameState.lastAction?.type)) {
+  if (['1x1_duploMorto', '1x1_dominacao'].includes(gameState?.mode) && gameState.partialDraw && gameState.lastAction?.playerId === gameState.currentPlayer && ['drawDiscard', 'drawDiscardFechado'].includes(gameState.lastAction?.type)) {
     gameState.hasDrawnThisTurn = true;
     gameState.partialDraw = false;
   }
@@ -2803,7 +3009,7 @@ async function drawFromStock() {
   drawnCards.forEach((c) => state.boughtCardIds.push(c.id)); // Salva todas para brilhar
 
   // Reserve os lugares na mão, mas revele cada carta só ao terminar seu voo.
-  if (fromRect) drawnCards.forEach(c => pendingStockCardIds.add(c.id));
+  if (fromRect) drawnCards.forEach((c) => pendingStockCardIds.add(c.id));
   try {
     renderAll(); // A contagem do monte continua caindo imediatamente.
     if (fromRect) {
@@ -2875,16 +3081,21 @@ function canUseDiscardInClosed(discardTop, hand, team) {
 }
 
 function discardChoiceIsCurrent() {
-  return !!pendingDiscardChoice && !state.finished && !state.hasDrawnThisTurn
-    && state.currentPlayer === myPlayerIndex && pendingDiscardChoice.turn === state.turnNumber
-    && pendingDiscardChoice.topId === state.discard.at(-1)?.id
-    && pendingDiscardChoice.selection === JSON.stringify([...selectedHandIndexes].sort((a, b) => a - b).map(i => currentPlayer().hand[i]?.id));
+  return (
+    !!pendingDiscardChoice &&
+    !state.finished &&
+    !state.hasDrawnThisTurn &&
+    state.currentPlayer === myPlayerIndex &&
+    pendingDiscardChoice.turn === state.turnNumber &&
+    pendingDiscardChoice.topId === state.discard.at(-1)?.id &&
+    pendingDiscardChoice.selection === JSON.stringify([...selectedHandIndexes].sort((a, b) => a - b).map((i) => currentPlayer().hand[i]?.id))
+  );
 }
 
 async function animateLocalDiscardPickup(presentation, origin, handOrigins = {}) {
   const session = window.gameSessionId;
   const hidden = [];
-  const conceal = el => {
+  const conceal = (el) => {
     if (!el) return null;
     const rect = getRect(el);
     hidden.push([el, el.style.visibility]);
@@ -2894,12 +3105,13 @@ async function animateLocalDiscardPickup(presentation, origin, handOrigins = {})
   discardPickupAnimating = true;
   try {
     await animateDiscardTransfer({
-      ...presentation, fromDiscard: origin,
-      fromHand: card => handOrigins[card.id] || opponentAnchorRect(myPlayerIndex),
-      toHand: card => conceal(cardElById(card.id)),
-      toMeld: card => {
-        const meld = state.teams.find(t => t.id === presentation.teamId)?.melds[presentation.meldIndex];
-        const index = meld?.findIndex(c => c.id === card.id);
+      ...presentation,
+      fromDiscard: origin,
+      fromHand: (card) => handOrigins[card.id] || opponentAnchorRect(myPlayerIndex),
+      toHand: (card) => conceal(cardElById(card.id)),
+      toMeld: (card) => {
+        const meld = state.teams.find((t) => t.id === presentation.teamId)?.melds[presentation.meldIndex];
+        const index = meld?.findIndex((c) => c.id === card.id);
         const root = meldElByKey(`${presentation.teamId}:${presentation.meldIndex}`);
         return conceal(root?.querySelector(`[data-card-index="${index}"]`)) || meldDropRect(`${presentation.teamId}:${presentation.meldIndex}`);
       },
@@ -2907,7 +3119,9 @@ async function animateLocalDiscardPickup(presentation, origin, handOrigins = {})
       isActive: () => session === window.gameSessionId && !window.isClosingGame,
     });
   } finally {
-    hidden.forEach(([el, visibility]) => { el.style.visibility = visibility; });
+    hidden.forEach(([el, visibility]) => {
+      el.style.visibility = visibility;
+    });
     discardPickupAnimating = false;
   }
 }
@@ -3021,12 +3235,9 @@ async function drawFromDiscard(options = {}) {
       if (isValidSequenceMeld(testMeld)) validExtensions.push(mIdx);
     }
 
-    const canCreateNew = !selectedMeldTarget && selectedCards.length >= 2
-      && isValidSequenceMeld([...selectedCards, top]) && canBossCreateMeld(state, me.id);
+    const canCreateNew = !selectedMeldTarget && selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top]) && canBossCreateMeld(state, me.id);
     if (!selectedMeldTarget && !options.forceNew && validExtensions.length + Number(canCreateNew) > 1) {
-      pendingDiscardChoice = { topId: top.id, turn: state.turnNumber, teamId: team.id,
-        indexes: validExtensions, canCreateNew,
-        selection: JSON.stringify([...selectedHandIndexes].sort((a, b) => a - b).map(i => hand[i]?.id)) };
+      pendingDiscardChoice = { topId: top.id, turn: state.turnNumber, teamId: team.id, indexes: validExtensions, canCreateNew, selection: JSON.stringify([...selectedHandIndexes].sort((a, b) => a - b).map((i) => hand[i]?.id)) };
       renderMelds();
       showMessage('Escolha o jogo destacado que receberá a carta do lixo.' + (canCreateNew ? ' Ou clique no fundo da sua mesa para criar um novo jogo.' : ''));
       return;
@@ -3105,7 +3316,7 @@ async function drawFromDiscard(options = {}) {
     pendingDiscardChoice = null;
     const discardOriginEl = document.querySelector('#drawDiscardBtn .pile-card');
     const discardOrigin = discardOriginEl ? getRect(discardOriginEl) : null;
-    const handOrigins = Object.fromEntries(selectedCards.map(card => [card.id, cardElById(card.id) ? getRect(cardElById(card.id)) : null]));
+    const handOrigins = Object.fromEntries(selectedCards.map((card) => [card.id, cardElById(card.id) ? getRect(cardElById(card.id)) : null]));
     const pile = state.discard.splice(0, state.discard.length);
     pile.forEach(ensureCardId);
     const topCard = pile.pop();
@@ -3150,8 +3361,7 @@ async function drawFromDiscard(options = {}) {
       hand.push(...pile);
       sortHand(hand);
     }
-    const discardPresentation = { cards: pile.map(packCard), topCard: packCard(topCard),
-      meldCards: finalMeldCards.map(packCard), teamId: team.id, meldIndex: isNewMeld ? team.melds.length - 1 : extendedMeldIndex };
+    const discardPresentation = { cards: pile.map(packCard), topCard: packCard(topCard), meldCards: finalMeldCards.map(packCard), teamId: team.id, meldIndex: isNewMeld ? team.melds.length - 1 : extendedMeldIndex };
     state.hasDrawnThisTurn = true;
     state.partialDraw = false;
     selectedHandIndexes.clear();
@@ -4513,13 +4723,13 @@ function renderBossVaultSlot(root, player, isLocal = false) {
       ? 'GARANTIA PROTEGIDA'
       : vaultOpening
         ? 'ABRINDO COFRE...'
-      : reclaimRequired
-        ? `RESGATE OBRIGATÓRIO · +${quote?.totalDebt || 0} DÍVIDA`
-        : reclaimAvailable
-          ? `RESGATAR +${quote?.currentDebt || 0} · OU FAZER A COMPRA NORMAL`
-          : quote?.state === 'open'
-            ? `COFRE ABERTO · CUSTO ATUAL +${quote?.currentDebt || 0}`
-            : `CARÊNCIA · ${Math.min(1, quote?.ownerTurnsStarted || 0)}/1 TURNO`;
+        : reclaimRequired
+          ? `RESGATE OBRIGATÓRIO · +${quote?.totalDebt || 0} DÍVIDA`
+          : reclaimAvailable
+            ? `RESGATAR +${quote?.currentDebt || 0} · OU FAZER A COMPRA NORMAL`
+            : quote?.state === 'open'
+              ? `COFRE ABERTO · CUSTO ATUAL +${quote?.currentDebt || 0}`
+              : `CARÊNCIA · ${Math.min(1, quote?.ownerTurnsStarted || 0)}/1 TURNO`;
   root.innerHTML = `<div class="boss-vault-visual"><div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : 'boss-vault-card-back'}">${cardFace}</div><img class="boss-vault-frame" src="${frameSrc}" alt="" aria-hidden="true"></div><div class="boss-vault-copy"><span class="boss-vault-kicker">GARANTIA NO COFRE</span><small>${player.name} · base +${quote?.baseDebt || 0} · juros +${quote?.interestDebt || 0} · atual +${quote?.currentDebt || 0}</small><strong>${status}</strong></div>`;
   root.onclick = isLocal && reclaimAvailable ? reclaimLocalBossVault : null;
 }
@@ -5303,11 +5513,11 @@ function renderBossHud() {
                 ? 'nature-cocoon-break'
                 : isCocoonAbsorb
                   ? 'nature-cocoon-absorb'
-                : isNatureCreated
-                  ? 'nature-threat-created'
-                  : feedback.dangerDelta > 0
-                    ? 'debt-up'
-                    : 'debt-down';
+                  : isNatureCreated
+                    ? 'nature-threat-created'
+                    : feedback.dangerDelta > 0
+                      ? 'debt-up'
+                      : 'debt-down';
       floating.className = `boss-floating-number ${visualClass}`;
       floating.textContent = isChain
         ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Chicote`
@@ -5321,9 +5531,9 @@ function renderBossHud() {
                 ? `CASULO ROMPIDO · ${feedback.absorbedDamage || 0} ABSORVIDO`
                 : isCocoonAbsorb
                   ? `CASULO ABSORVEU ${feedback.absorbedDamage}`
-                : isNatureCreated
-                  ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA'
-                  : feedback.dangerChangeLabel;
+                  : isNatureCreated
+                    ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA'
+                    : feedback.dangerChangeLabel;
       const chainPlayer = isChain ? [...document.querySelectorAll('#bossChainStatus .boss-chain-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId)) : null;
       const anchor = isChain
         ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
@@ -5388,12 +5598,18 @@ function renderBossResult() {
 
 function renderAll() {
   if (!state) return;
+  renderMatchDuration();
+  renderDominationTools();
   // Only rendering sees the intermediate friend frame. Restore the persisted
   // state synchronously, before any event, timer or network callback can run.
   if (state.mode === '1x1_dominacao' && friendPlayback && state !== friendPlayback.view && state.friendGameId === friendPlayback.gameId) {
     const persisted = state;
     state = friendPlayback.view;
-    try { renderAll(); } finally { state = persisted; }
+    try {
+      renderAll();
+    } finally {
+      state = persisted;
+    }
     return;
   }
 
@@ -5491,7 +5707,7 @@ function renderAll() {
   const commonActionsAllowed = canPerformCommonGameAction(state);
   const isMyTurnRightNow = !state.finished && state.currentPlayer === myPlayerIndex && commonActionsAllowed;
 
-  const currP = isDominationFriendTurn(state) ? (getDominationFriend(state) || currentPlayer()) : currentPlayer();
+  const currP = isDominationFriendTurn(state) ? getDominationFriend(state) || currentPlayer() : currentPlayer();
   const pName = currP ? currP.name : 'Aguardando...';
   const cardCount = currP && currP.hand ? currP.hand.length : 0; // 🔥 CORREÇÃO: Variável declarada corretamente no escopo de renderAll
 
@@ -5697,8 +5913,7 @@ function renderAll() {
   // Controle de exibição do botão Voltar
   const undoBtn = document.getElementById('undoBtn');
   if (undoBtn) {
-    const canUndo = !isDominationFriendBusy(state) && !friendOperationPending
-      && canRestoreUndoTransaction(localUndoStack[localUndoStack.length - 1], state, myPlayerIndex);
+    const canUndo = !isDominationFriendBusy(state) && !friendOperationPending && canRestoreUndoTransaction(localUndoStack[localUndoStack.length - 1], state, myPlayerIndex);
     // Keep the slot stable instead of recentering the bar after every action.
     undoBtn.style.display = !state.finished && myPlayerIndex >= 0 ? 'block' : 'none';
     undoBtn.disabled = !canUndo;
@@ -6119,8 +6334,7 @@ function renderOpponentHands() {
   function updateSeat(rootEl, playerIdx) {
     if (!rootEl) return;
     // The guest renderer owns this existing empty seat, not a parallel panel.
-    if (state.mode === '1x1_dominacao' && state.dominationOptions?.friend !== false && !state.finished
-      && activeDominationFriends(state).some(friend => OPPONENT_SEAT_IDS[friend.seat] === rootEl.id)) return;
+    if (state.mode === '1x1_dominacao' && state.dominationOptions?.friend !== false && !state.finished && activeDominationFriends(state).some((friend) => OPPONENT_SEAT_IDS[friend.seat] === rootEl.id)) return;
     if (rootEl.classList.contains('domination-friend-seat')) rootEl.replaceChildren();
     rootEl.classList.remove('domination-friend-seat');
     delete rootEl.dataset.viewKey;
@@ -6270,7 +6484,10 @@ function renderMelds() {
   // Keep unchanged Domination melds (and seat clearances) mounted. Rebuilding
   // them on every hand/guest update restarts effects and invalidates geometry.
   const stableMelds = state.mode === '1x1_dominacao';
-  if (!stableMelds) { m1.innerHTML = ''; m2.innerHTML = ''; }
+  if (!stableMelds) {
+    m1.innerHTML = '';
+    m2.innerHTML = '';
+  }
   const retainedMeldKeys = new Set();
   let s1 = 0,
     s2 = 0;
@@ -6422,6 +6639,9 @@ function renderMelds() {
       // Se for uma canastra Ás-a-Ás, injeta o visual BDSM de destaque
       if (mInfo && mInfo.kind === 'asas') {
         div.classList.add('canastra-asas-bdsm');
+        div.classList.add('compact-asas');
+        row.classList.add('asas-stack');
+        row.title = `Canastra Ás-a-Ás · ${meld.length} cartas`;
       }
 
       meld.forEach((card, cardIndex) => {
@@ -6446,7 +6666,12 @@ function renderMelds() {
         miniCard.className = `carta mini ${suitClass(card)} ${deckFaceClass(card)}`;
 
         miniCard.dataset.cardIndex = String(cardIndex);
-        miniCard.innerHTML = cardFrontHTML(card);
+        if (mInfo?.kind === 'asas') {
+          miniCard.className = `carta mini back back-${card.back === 'blue' ? 'blue' : 'red'}`;
+          miniCard.style.setProperty('--stack-step', Math.min(cardIndex, 4));
+          miniCard.style.zIndex = cardIndex;
+          miniCard.setAttribute('aria-hidden', 'true');
+        } else miniCard.innerHTML = cardFrontHTML(card);
 
         row.appendChild(miniCard);
       });
@@ -6458,12 +6683,24 @@ function renderMelds() {
           const closedCard = document.createElement('div');
 
           closedCard.className = `carta mini canastra-fechada ${suitClass(lastCard)} ${deckFaceClass(lastCard)}`;
+          if (mInfo?.kind === 'asas') {
+            closedCard.classList.remove('canastra-fechada');
+            closedCard.classList.add('asas-top');
+            closedCard.style.setProperty('--stack-step', 5);
+            closedCard.style.zIndex = meld.length;
+          }
 
           closedCard.dataset.cardIndex = String(meld.length - 1);
 
           closedCard.innerHTML = cardFrontHTML(lastCard);
 
           row.appendChild(closedCard);
+          if (mInfo?.kind === 'asas') {
+            const count = document.createElement('span');
+            count.className = 'asas-stack-count';
+            count.textContent = `${meld.length} cartas`;
+            row.appendChild(count);
+          }
         } else {
           console.warn('[renderMelds] carta final inválida ignorada:', lastCard, {
             teamId: t.id,
@@ -6509,7 +6746,7 @@ function renderMelds() {
         natureLabels.push(`<span class="boss-meld-nature-seal boss-meld-nature-graft">ENXERTO ${sideLabel} · ${fed.size}/${graftThreat.required || 2}</span>`);
       }
       meta.innerHTML = `
-              <span class="meld-meta-label">${mInfo.base}${mInfo.tag ? ` <span class="meld-tag ${mInfo.tag.cls}">${mInfo.tag.text}</span>` : ''}</span>
+              <span class="meld-meta-label">${mInfo.kind === 'asas' ? 'Ás-a-Ás' : `${mInfo.base}${mInfo.tag ? ` <span class="meld-tag ${mInfo.tag.cls}">${mInfo.tag.text}</span>` : ''}`}</span>
               ${contributionChips.length ? `<span class="boss-meld-contributions" data-meld-id="${contribution.meldId}">${contributionChips.join('')}</span>` : ''}
               ${natureLabels.join('')}
             `;
@@ -6558,11 +6795,12 @@ function renderMelds() {
     });
   });
 
-  if (stableMelds) for (const container of [m1, m2]) {
-    for (const node of container.querySelectorAll('[data-meld-key]')) {
-      if (!retainedMeldKeys.has(node.dataset.meldKey)) node.remove();
+  if (stableMelds)
+    for (const container of [m1, m2]) {
+      for (const node of container.querySelectorAll('[data-meld-key]')) {
+        if (!retainedMeldKeys.has(node.dataset.meldKey)) node.remove();
+      }
     }
-  }
 
   scheduleMatriarchGraftLinks();
 
@@ -6763,8 +7001,8 @@ function renderMelds() {
       }
 
       if (myScore > opScore) {
-        total += 5.0;
-        b.base = 5.0;
+        total += 15.0;
+        b.base = 15.0;
         total += diff * 0.01;
         b.diff = diff * 0.01;
 
@@ -6912,10 +7150,16 @@ function renderMelds() {
         refFin = { total: 0, b: Object.fromEntries(Object.keys(fin1.b).map((key) => [key, 0])) };
       } else if (state.finished) {
         const rivalId = 1 - leaderId;
-        refFin = window.calculatePixFin(leaderScores[leaderId], leaderScores[rivalId],
-          state.teams[leaderId].melds, state.teams[rivalId].melds,
-          state.deadChunksTaken?.[leaderId] ?? 0, (state.deadChunksTaken?.[rivalId] ?? 0) > 0,
-          leaderScores[leaderId], leaderScores[rivalId]);
+        refFin = window.calculatePixFin(
+          leaderScores[leaderId],
+          leaderScores[rivalId],
+          state.teams[leaderId].melds,
+          state.teams[rivalId].melds,
+          state.deadChunksTaken?.[leaderId] ?? 0,
+          (state.deadChunksTaken?.[rivalId] ?? 0) > 0,
+          leaderScores[leaderId],
+          leaderScores[rivalId],
+        );
       }
 
       let achievedCount = 0;
@@ -6951,8 +7195,8 @@ function renderMelds() {
       const list = document.getElementById('goalsListHud');
       list.innerHTML = `
                         <div class="goal-item ${leaderWinsGoal ? 'achieved' : ''}">
-                            <span>✅ Vitória (R$ 5)</span>
-                            <strong>+R$ ${leaderWinsGoal ? '5,00' : '0,00'}</strong>
+                            <span>✅ Vitória (R$ 15)</span>
+                            <strong>+R$ ${leaderWinsGoal ? '15,00' : '0,00'}</strong>
                         </div>
                         <div class="goal-item ${refFin.b.virgemDeMorto ? 'achieved' : ''}">
                             <span>🛑 Adv. Sem Morto (R$ 8)</span>
@@ -7157,11 +7401,10 @@ async function playRemoteAction(a) {
 
   const isFriend = a.playerId === 'friend' && state.mode === '1x1_dominacao';
   const friendSessionId = window.gameSessionId;
-  const flightStillActive = () => !isFriend || (friendSessionId === window.gameSessionId && !window.isClosingGame
-    && (!a.friendId || getDominationFriend(state, a.friendId)?.active));
-  const stockEl = document.querySelector(isFriend ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card')
-    || (isFriend ? document.getElementById('dominationFriendStock')
-      : a.type === 'dominatorBonus' ? document.getElementById('drawStockBtn') : null);
+  const flightStillActive = () => !isFriend || (friendSessionId === window.gameSessionId && !window.isClosingGame && (!a.friendId || getDominationFriend(state, a.friendId)?.active));
+  const stockEl =
+    document.querySelector(isFriend ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card') ||
+    (isFriend ? document.getElementById('dominationFriendStock') : a.type === 'dominatorBonus' ? document.getElementById('drawStockBtn') : null);
   const discardEl = document.querySelector('#drawDiscardBtn .pile-card');
   const dead0El = document.getElementById('mortoSlot0');
   const dead1El = document.getElementById('mortoSlot1');
@@ -7245,10 +7488,7 @@ async function playRemoteAction(a) {
     }
   };
 
-  const animateRemoteDrawsIfAny = () => Promise.all([
-    animateRemotePlayerDraws(),
-    a.friendBonus ? playDominationFriendSharedDraw(a.friendBonus) : Promise.resolve(),
-  ]);
+  const animateRemoteDrawsIfAny = () => Promise.all([animateRemotePlayerDraws(), a.friendBonus ? playDominationFriendSharedDraw(a.friendBonus) : Promise.resolve()]);
 
   const animateRemoteFinancedCards = async () => {
     const financedCards = a.bossExtraCards || [];
@@ -7265,6 +7505,15 @@ async function playRemoteAction(a) {
   if (a.type === 'dominatorBonus' && state.mode === '1x1_dominacao') {
     await animateRemoteRecycleIfAny();
     await animateRemoteDrawsIfAny();
+    return;
+  }
+
+  if (a.type === 'dominationSearch') {
+    const source = document.querySelector(a.source === 'auxiliary' ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card');
+    if (source && a.card) {
+      await flyRectToRect(a.card, getRect(source), handRect, 'front');
+      if (friendSessionId === window.gameSessionId && !window.isClosingGame) impactAtRect(handRect);
+    }
     return;
   }
 
@@ -7336,9 +7585,7 @@ async function playRemoteAction(a) {
       return;
     }
     if (a.discardPresentation) {
-      await animateDiscardTransfer({ ...a.discardPresentation, fromDiscard: discardRect,
-        fromHand: () => handRect, toHand: () => handRect, toMeld: () => null,
-        fly: flyRectToRect, isActive: flightStillActive });
+      await animateDiscardTransfer({ ...a.discardPresentation, fromDiscard: discardRect, fromHand: () => handRect, toHand: () => handRect, toMeld: () => null, fly: flyRectToRect, isActive: flightStillActive });
     } else if (discardRect) {
       await flyRectToRect(fallbackCard, discardRect, handRect, 'front');
       impactAtRect(handRect);
@@ -7363,11 +7610,7 @@ async function playRemoteAction(a) {
       target.style.color = ['♥', '♦'].includes(a.card.suit) ? '#b91c1c' : '#111';
       impactAtRect(destination);
       if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        const landing = target.animate([
-          { transform: 'rotate(-8deg) scale(1.12)' },
-          { transform: 'rotate(3deg) scale(.97)', offset: .6 },
-          { transform: 'rotate(0) scale(1)' },
-        ], { duration: 320, easing: 'ease-out' });
+        const landing = target.animate([{ transform: 'rotate(-8deg) scale(1.12)' }, { transform: 'rotate(3deg) scale(.97)', offset: 0.6 }, { transform: 'rotate(0) scale(1)' }], { duration: 320, easing: 'ease-out' });
         await landing.finished.catch(() => {});
       }
       return;
@@ -7424,9 +7667,7 @@ async function playRemoteAction(a) {
       const panel = document.getElementById(presentation.teamId === 0 ? 'meldsP1' : 'meldsP2');
       const panelRect = panel ? getRect(panel) : null;
       const destination = meldDropRect(key) || (panelRect ? { left: panelRect.left + 20, top: panelRect.top + 15, width: 28, height: 40 } : null);
-      await animateDiscardTransfer({ ...presentation, fromDiscard: discardRect,
-        fromHand: () => handRect, toHand: () => handRect, toMeld: () => destination,
-        fly: flyRectToRect, isActive: flightStillActive });
+      await animateDiscardTransfer({ ...presentation, fromDiscard: discardRect, fromHand: () => handRect, toHand: () => handRect, toMeld: () => destination, fly: flyRectToRect, isActive: flightStillActive });
     }
     await animateRemoteDeadIfAny();
     await animateRemoteDrawsIfAny();
@@ -7453,7 +7694,9 @@ async function playRemoteAction(a) {
       cards.map((c, i) => {
         c.id ||= `rm_${Date.now()}_${i}`;
         const toRect = targets[i];
-        return flyRectToRect(c, handRect, toRect, 'front').then(() => { if (flightStillActive()) impactAtRect(toRect); });
+        return flyRectToRect(c, handRect, toRect, 'front').then(() => {
+          if (flightStillActive()) impactAtRect(toRect);
+        });
       }),
     );
 
@@ -7475,7 +7718,9 @@ async function playRemoteAction(a) {
       cards.map((c, i) => {
         c.id ||= `re_${Date.now()}_${i}`;
         const toRect = targets[i];
-        return flyRectToRect(c, handRect, toRect, 'front').then(() => { if (flightStillActive()) impactAtRect(toRect); });
+        return flyRectToRect(c, handRect, toRect, 'front').then(() => {
+          if (flightStillActive()) impactAtRect(toRect);
+        });
       }),
     );
 
@@ -7509,28 +7754,29 @@ function chooseBotDominationSteal(gameState) {
     let value = card.joker ? 25 : card.rank === '2' ? 20 : 0;
     for (const base of melds) {
       const after = friendMeldRules.prepare([...base, card]);
-      if (!friendMeldRules.valid(after) || after.some(c => friendMeldRules.isWild(c, after))) continue;
+      if (!friendMeldRules.valid(after) || after.some((c) => friendMeldRules.isWild(c, after))) continue;
       const kind = friendMeldRules.classify(after);
       value = Math.max(value, 100 + after.length * 10 + ({ limpa: 500, real: 1500, asas: 3000 }[kind] || 0));
     }
-    value += hand.filter(c => !c.joker && c.suit === card.suit && Math.abs(ranks.indexOf(c.rank) - ranks.indexOf(card.rank)) <= 2).length * 15;
-    for (let i = 0; i < hand.length; i++) for (let j = i + 1; j < hand.length; j++) {
-      const meld = friendMeldRules.prepare([hand[i], hand[j], card]);
-      if (friendMeldRules.valid(meld)) value = Math.max(value, meld.some(c => friendMeldRules.isWild(c, meld)) ? 40 : 90);
+    value += hand.filter((c) => !c.joker && c.suit === card.suit && Math.abs(ranks.indexOf(c.rank) - ranks.indexOf(card.rank)) <= 2).length * 15;
+    for (let i = 0; i < hand.length; i++)
+      for (let j = i + 1; j < hand.length; j++) {
+        const meld = friendMeldRules.prepare([hand[i], hand[j], card]);
+        if (friendMeldRules.valid(meld)) value = Math.max(value, meld.some((c) => friendMeldRules.isWild(c, meld)) ? 40 : 90);
+      }
+    if (value > bestValue) {
+      best = card;
+      bestValue = value;
     }
-    if (value > bestValue) { best = card; bestValue = value; }
   }
   return best;
 }
 
 async function executeBotDominationPowers(engine, botIndex) {
-  const eligible = () => engine.isActive() && state?.mode === '1x1_dominacao' && botIndex === 1
-    && state.currentPlayer === 1 && !state.finished && !state.debugPaused && !state.surrender?.active
-    && state.players[1].name.toUpperCase().includes('BOT');
+  const eligible = () => engine.isActive() && state?.mode === '1x1_dominacao' && botIndex === 1 && state.currentPlayer === 1 && !state.finished && !state.debugPaused && !state.surrender?.active && state.players[1].name.toUpperCase().includes('BOT');
   if (!eligible()) return;
   if (shouldBotCallDominationFriend(state, friendMeldRules)) await performDominationFriendCall(1, true);
-  if (!eligible() || state.hasDrawnThisTurn || !dominationFeatureEnabled(state, 'vision')
-    || (state.dominatorUsedPower && !state.powerActiveThisTurn) || !state.players[0].hand.length) return;
+  if (!eligible() || state.hasDrawnThisTurn || !dominationFeatureEnabled(state, 'vision') || (state.dominatorUsedPower && !state.powerActiveThisTurn) || !state.players[0].hand.length) return;
   // Persist activation before stealing: a resumed turn can finish the remaining
   // purchase, but can never activate the once-per-match power a second time.
   state.dominatorUsedPower = true;
@@ -7541,7 +7787,10 @@ async function executeBotDominationPowers(engine, botIndex) {
     const card = chooseBotDominationSteal(state);
     if (!card) break;
     const victim = state.players[0];
-    victim.hand.splice(victim.hand.findIndex(c => c.id === card.id), 1);
+    victim.hand.splice(
+      victim.hand.findIndex((c) => c.id === card.id),
+      1,
+    );
     state.players[1].hand.push(card);
     sortHand(state.players[1].hand);
     (state.boughtCardIds ||= []).push(card.id);
@@ -7588,7 +7837,9 @@ const botEngine = {
   getNaturePriorities: (playerId) => getBossNaturePriorities(state, playerId),
   getDominatrixPriorities: (playerId) => getBossDominatrixPriorities(state, playerId),
   shouldTakeBossDiscard: (playerId, intent, naturePlan) => shouldBossBotTakeDiscard(state, playerId, { intent, naturePlan }),
-  async executeDominationPowers(botIndex) { await executeBotDominationPowers(this, botIndex); },
+  async executeDominationPowers(botIndex) {
+    await executeBotDominationPowers(this, botIndex);
+  },
 
   async resolvePendingBossChoice(playerId) {
     const choice = getBossPendingChoice(state, playerId);
@@ -8349,7 +8600,7 @@ onSnapshot(gameRef, async (snap) => {
     setIfUnfocused('deckThemeSelect', l.deckTheme || 'classico');
     setIfUnfocused('tableThemeSelect', l.tableTheme || 'feltro'); // Sincroniza inputs entre abas
     setIfUnfocused('betToggle', l.betToggle || '');
-    setIfUnfocused('betBase', l.betBase || 5);
+    setIfUnfocused('betBase', 15);
     setIfUnfocused('betPerPoint', l.betPerPoint || 0.01);
     if (l.names) {
       setIfUnfocused('p1Name', l.names[0] || '');
@@ -8493,9 +8744,10 @@ onSnapshot(gameRef, async (snap) => {
   if (!data.stateJson) return;
 
   const newState = normalizeDominationFriends(JSON.parse(data.stateJson));
+  newState.matchStartedAt ||= data.createdAt?.toMillis?.() || Number(data.createdAt) || null;
+  if (newState.finished) newState.matchFinishedAt ||= newState.lastAction?.ts || Number(data.updatedAt) || Date.now();
   normalizeLegacyDiscardPurchase(newState);
-  if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId
-    && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
+  if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.
   delete newState.pendingWildcardChoice;
   newState.variant = normalizeVariantForMode(newState.mode, newState.variant);
@@ -8515,9 +8767,10 @@ onSnapshot(gameRef, async (snap) => {
     if ((newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   }
   if (state && !state.finished && newState.finished) playCanastraSfx('fim');
-  const arrivingFriends = state && state.friendGameId === newState.friendGameId && !friendOperationPending
-    ? activeDominationFriends(newState).filter(friend => friend.presentationUntil > Date.now()
-      && !dominationFriends(state).some(previous => previous.id === friend.id)) : [];
+  const arrivingFriends =
+    state && state.friendGameId === newState.friendGameId && !friendOperationPending
+      ? activeDominationFriends(newState).filter((friend) => friend.presentationUntil > Date.now() && !dominationFriends(state).some((previous) => previous.id === friend.id))
+      : [];
 
   // 🚀 INTERCEPTOR GRAFICO: Captura a nova ação remota ANTES de aplicar as mutações de dados no state
   const a = newState.lastAction;
@@ -8544,8 +8797,7 @@ onSnapshot(gameRef, async (snap) => {
 
   // 2. Após o término do voo, atualiza a memória com o novo estado e renderiza limpando o DOM de forma síncrona
   if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
-  if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId
-    && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
+  if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   const previousFriends = activeDominationFriends(state);
   state = newState;
   movingWild = null;
@@ -8561,9 +8813,7 @@ onSnapshot(gameRef, async (snap) => {
   renderAll();
   if (arrivingFriends.length) {
     try {
-      await Promise.all(arrivingFriends.map(friend => dealDominationFriendCards(friend,
-        () => snapshotSessionId === window.gameSessionId && !window.isClosingGame,
-        { fly: flyRectToRect, impact: impactAtRect, rect: getRect })));
+      await Promise.all(arrivingFriends.map((friend) => dealDominationFriendCards(friend, () => snapshotSessionId === window.gameSessionId && !window.isClosingGame, { fly: flyRectToRect, impact: impactAtRect, rect: getRect })));
     } catch (error) {
       if (snapshotSessionId === window.gameSessionId && !window.isClosingGame) console.error('Falha na entrada da amiga:', error);
     }
@@ -8706,8 +8956,7 @@ window.pushLobby = function () {
   updateDominationFriendCapacity();
   const mode = getEffectiveMenuMode();
   const dominationOptions = readDominationMenuOptions();
-  const resetReady = currentLobby && (currentLobby.mode !== mode
-    || (mode === '1x1_dominacao' && JSON.stringify(normalizeDominationOptions(currentLobby.dominationOptions)) !== JSON.stringify(dominationOptions)));
+  const resetReady = currentLobby && (currentLobby.mode !== mode || (mode === '1x1_dominacao' && JSON.stringify(normalizeDominationOptions(currentLobby.dominationOptions)) !== JSON.stringify(dominationOptions)));
 
   const pt1 = document.getElementById('pixTeam1');
   const pt2 = document.getElementById('pixTeam2');
@@ -9720,7 +9969,7 @@ window.debugRestartGame = async () => {
   document.getElementById('deckThemeSelect').value = state.deckTheme || 'classico';
   document.getElementById('tableThemeSelect').value = state.tableTheme || document.body.dataset.tableTheme || 'feltro';
   document.getElementById('betToggle').value = state.isBetting ? 'sim' : 'nao';
-  document.getElementById('betBase').value = state.betBase || 5;
+  document.getElementById('betBase').value = 15;
   document.getElementById('betPerPoint').value = state.betPerPoint || 0.01;
 
   // 🧹 FAXINA GLOBAL: Limpa a memória do navegador para não bugar a nova partida
@@ -9778,8 +10027,12 @@ function showDebugBossDamageReaction() {
 }
 
 window.debugMeld = async (type) => {
-  if (!ensureMyTurn()) return;
-  const team = currentTeam();
+  if (!isDebugMode || !state || state.finished || friendOperationPending || committing || isDominationFriendBusy(state) || document.querySelector('.fly-card')) return;
+  const target = document.getElementById('debugMeldActor')?.value || 'current';
+  const friendId = target.startsWith('friend:') ? target.slice(7) : null;
+  const actor = target.startsWith('player:') ? state.players.find((p) => p.id === Number(target.slice(7))) : currentPlayer();
+  if (!actor) return;
+  const team = state.teams.find((t) => t.id === actor.teamId);
   let meld = [];
   const mkCard = (r, s, j) => ({ rank: r, suit: s, joker: j, id: `db_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, back: 'red' });
 
@@ -9795,12 +10048,16 @@ window.debugMeld = async (type) => {
 
   optimizeMeld(meld);
   normalizeMeldOrder(meld);
+  if (friendId || (state.mode === '1x1_dominacao' && actor.id === 1)) {
+    await performDominationDevOperation((latest) => debugFriendMeld(latest, friendId, meld, friendMeldRules));
+    return;
+  }
   team.melds.push(meld);
   const meldIdx = team.melds.length - 1;
 
   // Passando o meldIdx corretamente no lugar do array "meld"
-  let domReward = await processDominationReward(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx);
-  await processBossMeldChange(currentPlayer(), 'simple', classifyMeldForUi(meld).kind, meldIdx, meld, true);
+  let domReward = await processDominationReward(actor, 'simple', classifyMeldForUi(meld).kind, meldIdx);
+  await processBossMeldChange(actor, 'simple', classifyMeldForUi(meld).kind, meldIdx, meld, true);
   showDebugBossDamageReaction();
   if (state.finished) return;
 
@@ -9855,8 +10112,8 @@ async function debugSetupVision(count) {
   const card = (rank, suit = '♥') => ({ id: `${prefix}-${serial++}`, rank, suit, joker: false, back: 'red' });
   // Intentionally replace the test board/target hand: unrelated opportunities
   // must not mask whether the hint really needs one card or the pair together.
-  team.melds = [(count === 1 ? ['3', '4', '5', '6', '7', '8'] : ['3', '4', '5', '6', '7']).map(rank => card(rank))];
-  enemy.hand = [...(count === 1 ? ['9'] : ['8', '9']).map(rank => card(rank)), card('K', '♣'), card('Q', '♦')];
+  team.melds = [(count === 1 ? ['3', '4', '5', '6', '7', '8'] : ['3', '4', '5', '6', '7']).map((rank) => card(rank))];
+  enemy.hand = [...(count === 1 ? ['9'] : ['8', '9']).map((rank) => card(rank)), card('K', '♣'), card('Q', '♦')];
   state.dominatorUsedPower = false;
   state.powerActiveThisTurn = false;
   state.hasDrawnThisTurn = false;
@@ -9870,9 +10127,7 @@ async function debugSetupVision(count) {
   localUndoStack = [];
   renderAll();
   await commitState();
-  showMessage(count === 1
-    ? 'Teste: 3–8 de copas na mesa; 9 de copas no adversário. Veja o aviso abaixo da Visão.'
-    : 'Teste: 3–7 de copas na mesa; 8 e 9 de copas no adversário. O aviso precisa das duas juntas.');
+  showMessage(count === 1 ? 'Teste: 3–8 de copas na mesa; 9 de copas no adversário. Veja o aviso abaixo da Visão.' : 'Teste: 3–7 de copas na mesa; 8 e 9 de copas no adversário. O aviso precisa das duas juntas.');
 }
 
 window.debugSetupDead = async () => {

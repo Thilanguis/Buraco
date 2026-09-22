@@ -272,7 +272,7 @@
                 <div style="text-align: left; margin-top: 8px; font-size: 10px; color: #cbd5e1; background: rgba(0, 0, 0, 0.4); padding: 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05)">
                   ✅
                   <strong>Vitória:</strong>
-                  R$ 5,00
+                  R$ 15,00
                   <br />
                   🛑
                   <strong>Adv. Sem Morto:</strong>
@@ -302,7 +302,7 @@
                   <strong>Chuva de Canastras:</strong>
                   4ª(+R$2) | 5ª(+R$3) | 6ª(+R$4) | 7ª(+R$5) | 8ª em diante(+R$5/cada)
                 </div>
-                <input id="betBase" type="hidden" value="5" />
+                <input id="betBase" type="hidden" value="15" />
                 <input id="betPerPoint" type="hidden" value="0.01" />
 
                 <div id="pixContainer" style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
@@ -472,6 +472,15 @@
             <button onclick="debugDiscard5()" style="flex: 1; font-size: 10px; padding: 6px; background: #64748b">-5 Lixo</button>
           </div>
 
+          <div id="debugFriendControls" hidden>
+            <div style="display:flex;gap:6px">
+              <button onclick="debugSetFriends(1)">Colocar 1 amiga</button>
+              <button onclick="debugSetFriends(2)">Colocar 2 amigas</button>
+            </div>
+            <small>Entrada imediata, sem roleta. Mantém as cartas das amigas presentes.</small>
+          </div>
+          <label for="debugMeldActor">Quem faz a canastra?</label>
+          <select id="debugMeldActor"><option value="current">Jogador do turno</option></select>
           <button onclick="debugMeld('suja')" style="font-size: 10px; padding: 6px; background: #ef4444">Canastra Suja</button>
           <button onclick="debugMeld('limpa')" style="font-size: 10px; padding: 6px; background: #22c55e">Canastra Limpa</button>
           <button onclick="debugMeld('real')" style="font-size: 10px; padding: 6px; background: #eab308; color: #000">Canastra Real</button>
@@ -574,6 +583,7 @@
                 <span id="currentPlayerLabel">...</span>
               </span>
               <span id="turnTimerLabel" style="margin-left: 5px; font-size: 11px; color: #facc15"></span>
+              <span id="matchDuration" class="match-duration" title="Tempo total da partida">⏱ 00:00</span>
               <div id="gameModeBadge" style="margin-top: 5px; font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; padding-left: 4px"></div>
 
               <div id="goalsHud" class="goals-hud-container">
@@ -797,10 +807,19 @@
               </button>
               <button id="endGameBtn" style="background: #333; font-size: 10px; padding: 8px">❌</button>
               <button id="callFriendBtn" hidden onclick="callDominationFriend()">📞 CHAMAR AMIGA</button>
+              <button id="seekCardBtn" hidden onclick="openDominationCardSearch()">🔎 CARTA</button>
               <!-- 🔥 NOVO: Botão de revanche ao lado do botão de fechar sala -->
               <button id="rematchBtn" onclick="voteRematch()" style="display: none; background: #22c55e; font-size: 10px; padding: 8px; font-weight: 900">🔄 JOGAR NOVAMENTE</button>
             </div>
 
+            <dialog id="cardSearchDialog" class="card-search-dialog">
+              <h3>Buscar uma carta</h3>
+              <p>Uma vez por partida. Não gasta a compra normal do turno.</p>
+              <label>Monte<select id="seekCardSource" onchange="refreshDominationCardSearch()"><option value="main">Principal</option><option value="auxiliary">Auxiliar das amigas</option></select></label>
+              <label>Carta disponível<select id="seekCardChoice"></select></label>
+              <p id="seekCardStatus" role="status"></p>
+              <div class="card-search-actions"><button onclick="document.getElementById('cardSearchDialog').close()">Cancelar</button><button id="seekCardConfirm" onclick="takeDominationSearchCard()">Comprar carta</button></div>
+            </dialog>
             <div id="dominationVisionHint" class="domination-vision-hint" role="status" aria-live="polite" hidden></div>
 
             <!-- 🔥 Badge local com a cor corrigida explicitamente para ficar idêntico ao dos bots -->

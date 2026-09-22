@@ -452,7 +452,7 @@ function chooseFriendDiscardPickup(state, friend, team, rules, farewell) {
   return best.value > baseline + burden ? best : null;
 }
 
-function drawDominadorSharedBonus(state, count, kind, steps, rules) {
+export function drawDominadorSharedBonus(state, count, kind, steps, rules) {
   const owner = state.players[1];
   for (let i = 0; i < count; i++) {
     let recycledIndex = null;

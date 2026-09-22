@@ -8,7 +8,7 @@ export function friendWheelSegments(values, weights = values.map(() => 1)) {
   let angle = 0;
   return values.map((value, index) => {
     const start = angle;
-    angle += weights[index] / total * 360;
+    angle += (weights[index] / total) * 360;
     return { value, start, end: angle, center: (start + angle) / 2 };
   });
 }
@@ -17,11 +17,14 @@ export function createFriendNoticeTracker() {
   let gameKey = null;
   let seen = new Set();
   return {
-    reset() { gameKey = null; seen.clear(); },
+    reset() {
+      gameKey = null;
+      seen.clear();
+    },
     collect(state, deferArrival = false) {
       if (state?.mode !== '1x1_dominacao') return [];
       const key = state.friendGameId || 'legacy-domination';
-      const events = dominationFriends(state).flatMap(friend => friend.events || []);
+      const events = dominationFriends(state).flatMap((friend) => friend.events || []);
       if (key !== gameKey) {
         gameKey = key;
         seen = new Set(events.map((event) => event.id));
@@ -35,7 +38,10 @@ export function createFriendNoticeTracker() {
       const groups = new Map();
       const notices = [];
       for (const event of fresh) {
-        if (event.type !== 'extraTurn') { notices.push(event); continue; }
+        if (event.type !== 'extraTurn') {
+          notices.push(event);
+          continue;
+        }
         const key = event.groupId || `${event.id.split(':extra:')[1]}:${event.actorName}`;
         const existing = groups.get(key);
         if (existing) {
@@ -100,12 +106,14 @@ function syncFriendSeatClearance(panel, side = 'left') {
         const rect = container.getBoundingClientRect();
         const css = getComputedStyle(container);
         const contentHeight = rect.height - parseFloat(css.paddingTop) - parseFloat(css.paddingBottom);
-        const width = Math.max(0, Math.ceil(Math.min(rect.width,
-          side === 'left' ? seat.right + 6 - rect.left : rect.right - seat.left + 6)));
+        const width = Math.max(0, Math.ceil(Math.min(rect.width, side === 'left' ? seat.right + 6 - rect.left : rect.right - seat.left + 6)));
         const top = Math.max(0, Math.floor(seat.top - rect.top - 6));
         const bottom = Math.min(contentHeight, Math.ceil(seat.bottom - rect.top + 6));
         let exclusion = container.querySelector(`.${clearanceClass}`);
-        if (!width || bottom <= top) { exclusion?.remove(); continue; }
+        if (!width || bottom <= top) {
+          exclusion?.remove();
+          continue;
+        }
         if (!exclusion) {
           exclusion = document.createElement('span');
           exclusion.className = `friend-seat-clearance ${clearanceClass}`;
@@ -122,28 +130,33 @@ function syncFriendSeatClearance(panel, side = 'left') {
       }
       for (const title of titles) {
         const rect = title.getBoundingClientRect();
-        const overlap = rect.bottom > seat.top && rect.top < seat.bottom
-          ? Math.max(0, Math.ceil(side === 'left' ? seat.right + 6 - rect.left : rect.right - seat.left + 6)) : 0;
+        const overlap = rect.bottom > seat.top && rect.top < seat.bottom ? Math.max(0, Math.ceil(side === 'left' ? seat.right + 6 - rect.left : rect.right - seat.left + 6)) : 0;
         const value = `${overlap}px`;
         if (title.style.getPropertyValue(titleProperty) !== value) {
           title.style.setProperty(titleProperty, value);
         }
       }
     };
-    const schedule = () => { if (!disposed && frame === null) frame = window.requestAnimationFrame(update); };
+    const schedule = () => {
+      if (!disposed && frame === null) frame = window.requestAnimationFrame(update);
+    };
     const observer = globalThis.ResizeObserver ? new ResizeObserver(schedule) : null;
     for (const element of [board, panel, ...containers]) observer?.observe(element);
     window.addEventListener('resize', schedule);
     window.addEventListener('scroll', schedule, true);
-    seatClearanceBinding = { panel, update: schedule, dispose() {
-      disposed = true;
-      observer?.disconnect();
-      if (frame !== null) window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', schedule);
-      window.removeEventListener('scroll', schedule, true);
-      for (const container of containers) container.querySelector(`.${clearanceClass}`)?.remove();
-      for (const title of titles) title.style.removeProperty(titleProperty);
-    } };
+    seatClearanceBinding = {
+      panel,
+      update: schedule,
+      dispose() {
+        disposed = true;
+        observer?.disconnect();
+        if (frame !== null) window.cancelAnimationFrame(frame);
+        window.removeEventListener('resize', schedule);
+        window.removeEventListener('scroll', schedule, true);
+        for (const container of containers) container.querySelector(`.${clearanceClass}`)?.remove();
+        for (const title of titles) title.style.removeProperty(titleProperty);
+      },
+    };
     seatClearanceBindings.set(side, seatClearanceBinding);
   }
   seatClearanceBinding.update();
@@ -151,11 +164,10 @@ function syncFriendSeatClearance(panel, side = 'left') {
 
 export function friendSpotlightGeometry(rect, width) {
   const x = rect.left + rect.width / 2;
-  const y = rect.top + rect.height * .65;
-  const origin = Math.max(24, Math.min(width - 24, x - width * .22));
+  const y = rect.top + rect.height * 0.65;
+  const origin = Math.max(24, Math.min(width - 24, x - width * 0.22));
   const spread = Math.min(125, Math.max(65, rect.width * 1.25));
-  return { x, y, origin, spread,
-    path: `M ${origin - 9} -30 L ${origin + 9} -30 L ${x + spread} ${y} Q ${x} ${y + 35} ${x - spread} ${y} Z` };
+  return { x, y, origin, spread, path: `M ${origin - 9} -30 L ${origin + 9} -30 L ${x + spread} ${y} Q ${x} ${y + 35} ${x - spread} ${y} Z` };
 }
 
 function syncFriendSpotlight(stock, playing) {
@@ -191,7 +203,10 @@ function syncFriendSpotlight(stock, playing) {
     const update = () => {
       frame = null;
       // Connectivity is only a safety check, never the signal for whose turn it is.
-      if (!stock.isConnected) { syncFriendSpotlight(null, false); return; }
+      if (!stock.isConnected) {
+        syncFriendSpotlight(null, false);
+        return;
+      }
       const anchor = stock.querySelector('.friend-stock-stack, .pile-card');
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
@@ -215,20 +230,26 @@ function syncFriendSpotlight(stock, playing) {
       pool.setAttribute('ry', '65');
       overlay.classList.add('is-playing');
     };
-    const schedule = () => { if (frame === null) frame = window.requestAnimationFrame(update); };
+    const schedule = () => {
+      if (frame === null) frame = window.requestAnimationFrame(update);
+    };
     const observer = globalThis.ResizeObserver ? new ResizeObserver(schedule) : null;
     observer?.observe(stock);
     const board = document.querySelector('#gameSection > .board');
     if (board) observer?.observe(board);
     window.addEventListener('resize', schedule);
     window.addEventListener('scroll', schedule, true);
-    spotlightBinding = { stock, update: schedule, dispose() {
-      observer?.disconnect();
-      if (frame !== null) window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', schedule);
-      window.removeEventListener('scroll', schedule, true);
-      overlay.remove();
-    } };
+    spotlightBinding = {
+      stock,
+      update: schedule,
+      dispose() {
+        observer?.disconnect();
+        if (frame !== null) window.cancelAnimationFrame(frame);
+        window.removeEventListener('resize', schedule);
+        window.removeEventListener('scroll', schedule, true);
+        overlay.remove();
+      },
+    };
   }
   spotlightBinding.update();
 }
@@ -273,7 +294,6 @@ function renderFriendSeat(state, friend, panel, shared) {
   } else panel.querySelector('.friend-farewell')?.remove();
 }
 
-
 export function renderDominationFriend(state, playerId) {
   const enabled = state?.mode === '1x1_dominacao' && !state.finished && state.dominationOptions?.friend !== false;
   const friends = enabled ? activeDominationFriends(state) : [];
@@ -283,16 +303,15 @@ export function renderDominationFriend(state, playerId) {
     const remaining = remainingFriendCalls(state);
     button.hidden = !(enabled && playerId === 1);
     button.disabled = !canCallDominationFriend(state, playerId);
-    button.textContent = !remaining ? (dominationFriends(state).length > 1 ? '✓ TODAS CHAMADAS' : '✓ AMIGA CHAMADA')
-      : remaining === 2 ? '📞 CHAMAR AMIGAS' : '📞 CHAMAR AMIGA';
+    button.textContent = !remaining ? (dominationFriends(state).length > 1 ? '✓ CHAMADAS' : '✓ CHAMADA') : remaining === 2 ? '📞 CHAMAR AMIGAS' : '📞 CHAMAR AMIGA';
   }
   const shared = state?.dominationFriendShared;
-  const playing = friends.some(friend => !!friend.pendingTurnId);
+  const playing = friends.some((friend) => !!friend.pendingTurnId);
   board?.classList.toggle('friend-present', friends.length > 0);
   board?.classList.toggle('friend-playing', playing);
   for (const side of ['left', 'right']) {
     const panel = document.getElementById(OPPONENT_SEAT_IDS[side]);
-    const friend = friends.find(entry => entry.seat === side);
+    const friend = friends.find((entry) => entry.seat === side);
     if (friend) renderFriendSeat(state, friend, panel, shared);
     else {
       syncFriendSeatClearance(null, side);
@@ -320,9 +339,7 @@ export function renderDominationFriend(state, playerId) {
   if (face.dataset.viewKey !== faceKey) {
     face.dataset.viewKey = faceKey;
     face.innerHTML = cardFrontHTML(topDiscard);
-    face.className = topDiscard
-      ? `friend-discard-face discard-face has-card ${suitClass(topDiscard)} ${deckFaceClass(topDiscard)}`
-      : 'friend-discard-face';
+    face.className = topDiscard ? `friend-discard-face discard-face has-card ${suitClass(topDiscard)} ${deckFaceClass(topDiscard)}` : 'friend-discard-face';
     face.style.color = topDiscard && !topDiscard.joker && ['♥', '♦'].includes(topDiscard.suit) ? '#b91c1c' : '#000';
   }
   const trashLabel = seatChild(trash, 'friend-discard-label', 'small');
@@ -352,7 +369,10 @@ export function renderDominationFriend(state, playerId) {
       const top = i === layers - 1;
       const back = (layers - 1 - i) % 2 === 0 ? topCard.back : topCard.back === 'blue' ? 'red' : 'blue';
       let layer = stack.children[layers - 1 - i];
-      if (!layer) { layer = cardBack({ ...topCard, back }); stack.append(layer); }
+      if (!layer) {
+        layer = cardBack({ ...topCard, back });
+        stack.append(layer);
+      }
       layer.classList.toggle('back-blue', back === 'blue');
       layer.classList.toggle('back-red', back !== 'blue');
       layer.dataset.cardId = topCard.id;
@@ -380,7 +400,7 @@ function createWheel(segments) {
   for (const segment of segments) {
     const label = document.createElement('span');
     label.className = 'friend-wheel-label';
-    const radians = segment.center * Math.PI / 180;
+    const radians = (segment.center * Math.PI) / 180;
     label.style.left = `${50 + Math.sin(radians) * 31}%`;
     label.style.top = `${50 - Math.cos(radians) * 31}%`;
     label.style.transform = `translate(-50%, -50%) rotate(${segment.center}deg)`;
@@ -400,23 +420,32 @@ export async function dealDominationFriendCards(friend, isActive, { fly, impact,
   panel.classList.add('friend-entering');
   const backs = [...panel.querySelectorAll('.opponent-cards .opponent-card-back')];
   const source = document.querySelector('#dominationFriendStock .opponent-card-back');
-  if (!source) { panel.classList.remove('friend-entering'); return; }
+  if (!source) {
+    panel.classList.remove('friend-entering');
+    return;
+  }
   const origin = rect(source);
-  backs.forEach((back) => { back.style.visibility = 'hidden'; });
+  backs.forEach((back) => {
+    back.style.visibility = 'hidden';
+  });
   try {
-    await Promise.all(backs.map(async (back, index) => {
-      await new Promise((resolve) => setTimeout(resolve, index * 35));
-      if (!isActive()) return;
-      const target = rect(back);
-      try {
-        await fly(friend.hand[index], origin, target, 'back');
-        if (isActive()) impact(target);
-      } finally {
-        back.style.visibility = '';
-      }
-    }));
+    await Promise.all(
+      backs.map(async (back, index) => {
+        await new Promise((resolve) => setTimeout(resolve, index * 35));
+        if (!isActive()) return;
+        const target = rect(back);
+        try {
+          await fly(friend.hand[index], origin, target, 'back');
+          if (isActive()) impact(target);
+        } finally {
+          back.style.visibility = '';
+        }
+      }),
+    );
   } finally {
-    backs.forEach((back) => { back.style.visibility = ''; });
+    backs.forEach((back) => {
+      back.style.visibility = '';
+    });
     panel.classList.remove('friend-entering');
   }
 }
@@ -432,18 +461,16 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
     const step = { ...steps[index], friendId: steps[index].friendId || result.friendId || friend.id };
     if (!isActive()) return;
     if (pace && step.type !== 'dominatorBonus' && !(step.type === 'drawStock' && step.reason === 'canastra')) {
-      const stage = index === 0 ? 'think' : step.type === 'discard' ? 'discard'
-        : steps[index - 1].type.startsWith('draw') ? 'organize' : 'play';
+      const stage = index === 0 ? 'think' : step.type === 'discard' ? 'discard' : steps[index - 1].type.startsWith('draw') ? 'organize' : 'play';
       await pace(stage);
       if (!isActive()) return;
     }
-    const isBonusDraw = entry => entry?.type === 'dominatorBonus' || (entry?.type === 'drawStock' && entry.reason === 'canastra');
+    const isBonusDraw = (entry) => entry?.type === 'dominatorBonus' || (entry?.type === 'drawStock' && entry.reason === 'canastra');
     if (isBonusDraw(step) && isBonusDraw(steps[index + 1])) {
       const ownerSteps = [];
       while (isBonusDraw(steps[index + 1])) ownerSteps.push(steps[++index]);
       // All recipients buy together, independently of the sound queue.
-      await Promise.all([step, ...ownerSteps].map(entry =>
-        playDominationFriendTimeline(view, { friendId: entry.friendId || friend.id, steps: [entry] }, { animate, render, isActive })));
+      await Promise.all([step, ...ownerSteps].map((entry) => playDominationFriendTimeline(view, { friendId: entry.friendId || friend.id, steps: [entry] }, { animate, render, isActive })));
       continue;
     }
     if (step.type === 'dominatorBonus') {
@@ -467,9 +494,9 @@ export async function playDominationFriendTimeline(view, result, { animate, rend
       if (!step.cards.length) continue;
       await animate({ ...step, card: step.cards.at(-1) });
       if (!isActive()) return;
-      const pickedIds = new Set(step.cards.map(card => card.id));
-      shared.discard = (shared.discard || []).filter(card => !pickedIds.has(card.id));
-      getDominationFriend(view, step.friendId).hand.push(...step.cards.map(card => ({ ...card })));
+      const pickedIds = new Set(step.cards.map((card) => card.id));
+      shared.discard = (shared.discard || []).filter((card) => !pickedIds.has(card.id));
+      getDominationFriend(view, step.friendId).hand.push(...step.cards.map((card) => ({ ...card })));
       render();
       continue;
     }
@@ -521,9 +548,8 @@ export async function showDominationFriendNotice(event) {
   if (event.type === 'extraTurn') {
     const kind = { limpa: 'Limpa', real: 'Real', asas: 'Ás-a-Ás' }[event.kind];
     const recipients = event.recipients || [event];
-    title.textContent = `+1 TURNO PARA ${recipients.map(entry => entry.name.toUpperCase()).join(' E ')}!`;
-    const remaining = recipients.length === 1 ? `${event.turnsRemaining} turnos disponíveis`
-      : recipients.map(entry => `${entry.name}: ${entry.turnsRemaining} turnos`).join(' · ');
+    title.textContent = `+1 TURNO PARA ${recipients.map((entry) => entry.name.toUpperCase()).join(' E ')}!`;
+    const remaining = recipients.length === 1 ? `${event.turnsRemaining} turnos disponíveis` : recipients.map((entry) => `${entry.name}: ${entry.turnsRemaining} turnos`).join(' · ');
     detail.textContent = `${event.actorName} fez ${kind} · ${remaining}`;
   } else {
     title.textContent = event.type === 'arrival' ? `👠 ${event.name} entrou na mesa!` : `💋 ${event.name} se despediu!`;
@@ -533,13 +559,18 @@ export async function showDominationFriendNotice(event) {
   document.body.append(notice);
   const reduced = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   try {
-    await notice.animate([
-      { opacity: 0, transform: reduced ? 'translate(-50%, 0)' : 'translate(-50%, 20px) scale(.92)' },
-      { opacity: 1, transform: 'translate(-50%, 0) scale(1)', offset: .12 },
-      { opacity: 1, transform: 'translate(-50%, 0) scale(1)', offset: .86 },
-      { opacity: 0, transform: reduced ? 'translate(-50%, 0)' : 'translate(-50%, -10px) scale(1)' },
-    ], { duration: 3200, easing: 'ease-out', fill: 'both' }).finished;
-  } finally { notice.remove(); }
+    await notice.animate(
+      [
+        { opacity: 0, transform: reduced ? 'translate(-50%, 0)' : 'translate(-50%, 20px) scale(.92)' },
+        { opacity: 1, transform: 'translate(-50%, 0) scale(1)', offset: 0.12 },
+        { opacity: 1, transform: 'translate(-50%, 0) scale(1)', offset: 0.86 },
+        { opacity: 0, transform: reduced ? 'translate(-50%, 0)' : 'translate(-50%, -10px) scale(1)' },
+      ],
+      { duration: 3200, easing: 'ease-out', fill: 'both' },
+    ).finished;
+  } finally {
+    notice.remove();
+  }
 }
 
 export async function presentDominationFriend(invited, isActive, animations) {
@@ -547,8 +578,11 @@ export async function presentDominationFriend(invited, isActive, animations) {
   const friend = friends[0];
   if (!friend) return;
   const plural = friends.length > 1;
-  const names = [...friends].sort((a, b) => FRIEND_NAMES.indexOf(a.name) - FRIEND_NAMES.indexOf(b.name)).map(entry => entry.name).join(' e ');
-  const choices = plural ? FRIEND_NAMES.flatMap((name, index) => FRIEND_NAMES.slice(index + 1).map(other => `${name} e ${other}`)) : FRIEND_NAMES;
+  const names = [...friends]
+    .sort((a, b) => FRIEND_NAMES.indexOf(a.name) - FRIEND_NAMES.indexOf(b.name))
+    .map((entry) => entry.name)
+    .join(' e ');
+  const choices = plural ? FRIEND_NAMES.flatMap((name, index) => FRIEND_NAMES.slice(index + 1).map((other) => `${name} e ${other}`)) : FRIEND_NAMES;
   const overlay = document.createElement('div');
   overlay.id = 'dominationFriendPresentation';
   overlay.className = 'friend-presentation';
@@ -573,7 +607,8 @@ export async function presentDominationFriend(invited, isActive, animations) {
     rotor.style.transform = `rotate(${stop}deg)`;
     if (!reducedMotion && rotor.animate) {
       await rotor.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${stop}deg)` }], {
-        duration: FRIEND_PRESENTATION_TIMING.spinMs, easing: 'cubic-bezier(.12,.72,.12,1)',
+        duration: FRIEND_PRESENTATION_TIMING.spinMs,
+        easing: 'cubic-bezier(.12,.72,.12,1)',
       }).finished;
     } else {
       await pause(150);
@@ -596,7 +631,7 @@ export async function presentDominationFriend(invited, isActive, animations) {
     await pause(FRIEND_PRESENTATION_TIMING.resultMs);
     stopRouletteSound?.();
     overlay.remove();
-    await Promise.all(friends.map(entry => dealDominationFriendCards(entry, isActive, animations)));
+    await Promise.all(friends.map((entry) => dealDominationFriendCards(entry, isActive, animations)));
   } finally {
     stopRouletteSound?.();
     overlay.remove();

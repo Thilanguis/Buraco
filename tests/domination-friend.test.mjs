@@ -4,11 +4,28 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { isValidBossSequence } from '../js/boss/boss-engine.js';
 import {
-  hasDominationFriendSelection, normalizeDominationFriends, dominationFriends, activeDominationFriends, getDominationFriend, completeDominationFriendPresentation, remainingFriendCalls,
-  FRIEND_NAMES, canCallDominationFriend, createFriendInvitation, rollFriendDuration,
-  callDominationFriend, queueDominationFriendTurn, executeDominationFriendTurn,
-  previewFriendExtension, isDominationFriendBusy, grantDominationFriendExtraTurn, isDominationFriendEndgame, grantDominationFriendSharedBonus,
-  normalizeDominationOptions, dominationFeatureEnabled, shouldBotCallDominationFriend,
+  hasDominationFriendSelection,
+  normalizeDominationFriends,
+  dominationFriends,
+  activeDominationFriends,
+  getDominationFriend,
+  completeDominationFriendPresentation,
+  remainingFriendCalls,
+  FRIEND_NAMES,
+  canCallDominationFriend,
+  createFriendInvitation,
+  rollFriendDuration,
+  callDominationFriend,
+  queueDominationFriendTurn,
+  executeDominationFriendTurn,
+  previewFriendExtension,
+  isDominationFriendBusy,
+  grantDominationFriendExtraTurn,
+  isDominationFriendEndgame,
+  grantDominationFriendSharedBonus,
+  normalizeDominationOptions,
+  dominationFeatureEnabled,
+  shouldBotCallDominationFriend,
 } from '../js/game/domination-friend.js';
 import { renderDominationFriend, friendWheelSegments, playDominationFriendTimeline, createFriendNoticeTracker, friendSpotlightGeometry } from '../js/game/domination-friend-ui.js';
 import { opponentSeats } from '../js/game/opponent-seats.js';
@@ -39,7 +56,18 @@ test('visao usada continua visivel e desabilitada sem mudar texto dos outros mod
   const code = app.slice(start, app.indexOf('// Oculta botões', start));
   const button = { style: {} };
   const state = { mode: '1x1_dominacao', currentPlayer: 1, dominatorUsedPower: true };
-  const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host', state, dominationFeatureEnabled, myPlayerIndex: 1, window: {}, document: { getElementById: () => button } });
+  const live = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    dominationFeatureEnabled,
+    myPlayerIndex: 1,
+    window: {},
+    document: { getElementById: () => button },
+  });
   vm.runInContext(code, live);
   assert.equal(button.style.display, 'block');
   assert.equal(button.disabled, true);
@@ -56,11 +84,15 @@ test('descarte privado pousa antes de atualizar mao e persiste sem repetir no re
   assert.equal(result.steps.at(-1).type, 'discard');
   assert.equal(state.dominationFriendShared.discard[0].rank, 'K');
   assert.equal(state.dominationFriends[0].hand[0].rank, '2');
-  await playDominationFriendTimeline(view, result, { isActive: () => true, render() {}, animate: async step => {
-    assert.equal(step.type, 'discard');
-    assert.equal(view.dominationFriendShared.discard.length, 0);
-    assert.ok(view.dominationFriends[0].hand.some(card => card.id === step.card.id));
-  } });
+  await playDominationFriendTimeline(view, result, {
+    isActive: () => true,
+    render() {},
+    animate: async (step) => {
+      assert.equal(step.type, 'discard');
+      assert.equal(view.dominationFriendShared.discard.length, 0);
+      assert.ok(view.dominationFriends[0].hand.some((card) => card.id === step.card.id));
+    },
+  });
   assert.deepEqual(view.dominationFriendShared.discard, state.dominationFriendShared.discard);
   assert.deepEqual(state.discard, shared);
   const restored = JSON.parse(JSON.stringify(state));
@@ -72,7 +104,12 @@ function appFunction(name) {
   return app.slice(start, app.indexOf('\n}', start) + 2);
 }
 const functions = ['isWildcard', 'optimizeMeld', 'normalizeMeldOrder', 'classifyMeldForUi'].map(appFunction).join('\n');
-const context = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
+const context = vm.createContext({
+  getDominationFriend,
+  activeDominationFriends,
+  dominationFriends,
+  normalizeDominationFriends,
+  friendControllerId: 'test-host',
   isValidSequenceMeld: isValidBossSequence,
   RANKS_SEQ: ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'],
   RANKS_SEQ_LOW: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'],
@@ -92,11 +129,23 @@ const rules = {
 const cards = (ranks, suit = '♣', prefix = 'table') => ranks.map((rank, i) => ({ id: `${prefix}_${i}`, rank, suit, joker: rank === 'JOKER' }));
 function game(mode = '1x1_dominacao') {
   return {
-    mode, currentPlayer: 1, turnNumber: 1, friendUsed: false, finished: false,
-    players: [{ id: 0, teamId: 0, hand: cards(['K'], '♥', 'enemy') }, { id: 1, teamId: 1, hand: cards(['Q'], '♦', 'owner') }],
-    teams: [{ id: 0, melds: [] }, { id: 1, melds: [] }],
-    stock: cards(['A', '2', '3'], '♠', 'main'), discard: cards(['5'], '♥', 'discard'),
-    deadPiles: [cards(['7'], '♥', 'dead0'), cards(['8'], '♥', 'dead1')], deadChunksTaken: [0, 0],
+    mode,
+    currentPlayer: 1,
+    turnNumber: 1,
+    friendUsed: false,
+    finished: false,
+    players: [
+      { id: 0, teamId: 0, hand: cards(['K'], '♥', 'enemy') },
+      { id: 1, teamId: 1, hand: cards(['Q'], '♦', 'owner') },
+    ],
+    teams: [
+      { id: 0, melds: [] },
+      { id: 1, melds: [] },
+    ],
+    stock: cards(['A', '2', '3'], '♠', 'main'),
+    discard: cards(['5'], '♥', 'discard'),
+    deadPiles: [cards(['7'], '♥', 'dead0'), cards(['8'], '♥', 'dead1')],
+    deadChunksTaken: [0, 0],
   };
 }
 const invitation = () => createFriendInvitation('test-invitation', () => 0.1);
@@ -105,11 +154,21 @@ test('DevTools Visao prepara uma carta ou par necessario e permite repetir', asy
   const state = game();
   const ownHand = JSON.stringify(state.players[1].hand);
   const stock = JSON.stringify(state.stock);
-  const live = vm.createContext({ state, isDebugMode: true, myPlayerIndex: 1,
-    ensureMyTurn: () => true, dominationFeatureEnabled,
-    currentTeam: () => state.teams[1], newActionId: () => Math.random().toString(36),
-    selectedHandIndexes: new Set([0]), selectedMeldTarget: '1:0', localUndoStack: [{}],
-    window: {}, renderAll() {}, commitState: async () => {}, showMessage() {},
+  const live = vm.createContext({
+    state,
+    isDebugMode: true,
+    myPlayerIndex: 1,
+    ensureMyTurn: () => true,
+    dominationFeatureEnabled,
+    currentTeam: () => state.teams[1],
+    newActionId: () => Math.random().toString(36),
+    selectedHandIndexes: new Set([0]),
+    selectedMeldTarget: '1:0',
+    localUndoStack: [{}],
+    window: {},
+    renderAll() {},
+    commitState: async () => {},
+    showMessage() {},
   });
   vm.runInContext(`async ${appFunction('debugSetupVision')}`, live);
   for (const count of [1, 2, 1]) {
@@ -166,7 +225,13 @@ test('aviso Visao recalcula e some apos compra, uso ou bloqueios', () => {
   state.teams[1].melds = [cards(['3', '4', '5', '6', '7'])];
   state.players[0].hand = cards(['8', '9'], '♣', 'enemy');
   let calls = 0;
-  const evaluate = createVisionHintEvaluator({ ...rules, prepare(cards) { calls++; return rules.prepare(cards); } });
+  const evaluate = createVisionHintEvaluator({
+    ...rules,
+    prepare(cards) {
+      calls++;
+      return rules.prepare(cards);
+    },
+  });
   assert.ok(evaluate(state, 1));
   const firstCalls = calls;
   assert.ok(evaluate(state, 1));
@@ -191,14 +256,16 @@ function twoFriends() {
   const state = game();
   state.dominationOptions = { friendCapacity: 2 };
   assert.equal(callDominationFriend(state, 1, invitation(), 0), true);
-  state.dominationFriends.forEach(friend => { friend.presentationUntil = 0; });
+  state.dominationFriends.forEach((friend) => {
+    friend.presentationUntil = 0;
+  });
   return state;
 }
 
 test('bonus da Dominadora entrega uma carta a CADA amiga ativa e nao repete no reload', () => {
   for (const kind of ['limpa', 'real', 'asas']) {
     const state = twoFriends();
-    const before = state.dominationFriends.map(friend => friend.hand.length);
+    const before = state.dominationFriends.map((friend) => friend.hand.length);
     const stockSize = state.dominationFriendShared.stock.length;
     const result = grantDominationFriendSharedBonus(state, 1, kind, 1, 0);
     assert.equal(result.recipients.length, 2);
@@ -216,49 +283,58 @@ test('bonus da Dominadora entrega uma carta a CADA amiga ativa e nao repete no r
   const state = twoFriends();
   state.dominationFriendShared.stock = cards(['K'], '♥', 'last');
   const result = grantDominationFriendSharedBonus(state, 1, 'limpa', 1, 0);
-  assert.deepEqual(result.recipients.map(event => event.cards.length), [1, 0]);
+  assert.deepEqual(
+    result.recipients.map((event) => event.cards.length),
+    [1, 0],
+  );
   assert.equal(state.dominationFriendShared.stock.length, 0);
 });
 
 test('qualquer amiga fazendo canastra premia as duas e Dominadora com playback fiel', async () => {
-  for (const actor of [0, 1]) for (const [ranks, next, kind] of [
-    [['3', '4', '5', '6', '7', '8'], '9', 'limpa'],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real'],
-    [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas'],
-  ]) {
-    const state = twoFriends();
-    state.teams[1].melds = [rules.prepare(cards(ranks))];
-    state.dominationFriends.forEach(friend => { friend.hand = []; });
-    const friend = state.dominationFriends[actor];
-    friend.pendingTurnId = `${friend.id}:test`;
-    state.dominationFriendShared.stock = [...cards(Array(7).fill('K'), '♥', 'aux'), ...cards([next], '♣', 'next')];
-    const view = structuredClone(state);
-    const result = executeDominationFriendTurn(state, friend.pendingTurnId, rules);
-    assert.equal(result.plays[0].newKind, kind);
-    const bonus = result.steps.filter(step => step.type === 'drawStock' && step.reason === 'canastra');
-    assert.equal(bonus.length, 2);
-    assert.deepEqual(new Set(bonus.map(step => step.friendId)), new Set(state.dominationFriends.map(f => f.id)));
-    assert.ok(bonus.every(step => step.cards.length === 1));
-    assert.equal(state.dominationFriends[1 - actor].hand.length, 1);
-    assert.equal(state.players[1].hand.length, 2);
-    await playDominationFriendTimeline(view, result, { isActive: () => true, render() {}, animate: async () => {} });
-    assert.deepEqual(view.dominationFriends.map(f => f.hand), state.dominationFriends.map(f => f.hand));
-    assert.deepEqual(view.dominationFriendShared.stock, state.dominationFriendShared.stock);
-    assert.deepEqual(view.players[1].hand, state.players[1].hand);
-    assert.equal(executeDominationFriendTurn(structuredClone(state), result.turnId, rules), null);
-  }
+  for (const actor of [0, 1])
+    for (const [ranks, next, kind] of [
+      [['3', '4', '5', '6', '7', '8'], '9', 'limpa'],
+      [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'], 'K', 'real'],
+      [['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], 'A', 'asas'],
+    ]) {
+      const state = twoFriends();
+      state.teams[1].melds = [rules.prepare(cards(ranks))];
+      state.dominationFriends.forEach((friend) => {
+        friend.hand = [];
+      });
+      const friend = state.dominationFriends[actor];
+      friend.pendingTurnId = `${friend.id}:test`;
+      state.dominationFriendShared.stock = [...cards(Array(7).fill('K'), '♥', 'aux'), ...cards([next], '♣', 'next')];
+      const view = structuredClone(state);
+      const result = executeDominationFriendTurn(state, friend.pendingTurnId, rules);
+      assert.equal(result.plays[0].newKind, kind);
+      const bonus = result.steps.filter((step) => step.type === 'drawStock' && step.reason === 'canastra');
+      assert.equal(bonus.length, 2);
+      assert.deepEqual(new Set(bonus.map((step) => step.friendId)), new Set(state.dominationFriends.map((f) => f.id)));
+      assert.ok(bonus.every((step) => step.cards.length === 1));
+      assert.equal(state.dominationFriends[1 - actor].hand.length, 1);
+      assert.equal(state.players[1].hand.length, 2);
+      await playDominationFriendTimeline(view, result, { isActive: () => true, render() {}, animate: async () => {} });
+      assert.deepEqual(
+        view.dominationFriends.map((f) => f.hand),
+        state.dominationFriends.map((f) => f.hand),
+      );
+      assert.deepEqual(view.dominationFriendShared.stock, state.dominationFriendShared.stock);
+      assert.deepEqual(view.players[1].hand, state.players[1].hand);
+      assert.equal(executeDominationFriendTurn(structuredClone(state), result.turnId, rules), null);
+    }
 });
 
 test('um unico aviso de turno extra agrupa as duas amigas em cada cliente', () => {
   const state = twoFriends();
   const trackers = [createFriendNoticeTracker(), createFriendNoticeTracker()];
-  trackers.forEach(tracker => tracker.collect(state));
+  trackers.forEach((tracker) => tracker.collect(state));
   grantDominationFriendExtraTurn(state, 1, 'simple', 'limpa', 0);
   for (const tracker of trackers) {
     const notices = tracker.collect(state);
     assert.equal(notices.length, 1);
     assert.equal(notices[0].recipients.length, 2);
-    assert.equal(new Set(notices[0].recipients.map(e => e.friendId)).size, 2);
+    assert.equal(new Set(notices[0].recipients.map((e) => e.friendId)).size, 2);
     assert.deepEqual(tracker.collect(state), []);
   }
   assert.deepEqual(createFriendNoticeTracker().collect(structuredClone(state)), []);
@@ -284,7 +360,8 @@ test('capacidade 2 chama ambas juntas com a mesma roleta e sem duplicar deck', (
   const expectedHand = first.stock.slice(-11);
   assert.equal(callDominationFriend(state, 1, createFriendInvitation('second'), 0), false);
   const [one, two] = state.dominationFriends;
-  assert.equal(one.seat, 'left'); assert.equal(two.seat, 'right');
+  assert.equal(one.seat, 'left');
+  assert.equal(two.seat, 'right');
   assert.notEqual(one.hand, two.hand);
   assert.notEqual(one.name, two.name);
   assert.equal(one.initialTurns, first.initialTurns);
@@ -293,35 +370,42 @@ test('capacidade 2 chama ambas juntas com a mesma roleta e sem duplicar deck', (
   assert.equal(one.presentationUntil, two.presentationUntil);
   assert.equal(one.callId, two.callId);
   assert.deepEqual(two.hand, expectedHand);
-  assert.equal(new Set([...one.hand, ...two.hand, ...state.dominationFriendShared.stock].map(card => card.id)).size, 108);
+  assert.equal(new Set([...one.hand, ...two.hand, ...state.dominationFriendShared.stock].map((card) => card.id)).size, 108);
   assert.equal(state.dominationFriendShared.stock.length, 86);
   assert.equal(remainingFriendCalls(state), 0);
   assert.equal(callDominationFriend(state, 1, createFriendInvitation('third'), 0), false);
-  assert.equal(state.dominationOptions.plus, false); assert.equal(state.dominationOptions.vision, false);
+  assert.equal(state.dominationOptions.plus, false);
+  assert.equal(state.dominationOptions.vision, false);
   assert.equal('dominationFriend' in state, false);
-  assert.ok(state.dominationFriends.every(friend => !('stock' in friend) && !('discard' in friend)));
+  assert.ok(state.dominationFriends.every((friend) => !('stock' in friend) && !('discard' in friend)));
 });
 
 test('chamada conjunta rejeita concorrencia e nao libera outra chamada depois da roleta', () => {
-  const state = game(); state.dominationOptions = { friendCapacity: 2 };
+  const state = game();
+  state.dominationOptions = { friendCapacity: 2 };
   assert.equal(callDominationFriend(state, 1, invitation()), true);
   assert.equal(callDominationFriend(state, 1, createFriendInvitation('concurrent')), false);
   assert.equal(state.dominationFriends.length, 2);
-  state.dominationFriends.forEach(friend => { friend.presentationUntil = 0; });
+  state.dominationFriends.forEach((friend) => {
+    friend.presentationUntil = 0;
+  });
   assert.equal(canCallDominationFriend(state, 1), false);
 });
 
 test('turnos serializados consomem o mesmo monte, descartam no mesmo lixo e nao repetem no reload', () => {
   const state = twoFriends();
   const [one, two] = state.dominationFriends;
-  one.hand = []; two.hand = [];
+  one.hand = [];
+  two.hand = [];
   state.dominationFriendShared.stock = cards(['K', 'K', 'K', 'K', 'K', 'K'], '♥', 'shared');
   queueDominationFriendTurn(state, 1);
   assert.equal(executeDominationFriendTurn(state, two.pendingTurnId, rules), null, 'fila nao pode ser ultrapassada');
-  const firstId = one.pendingTurnId, secondId = two.pendingTurnId;
+  const firstId = one.pendingTurnId,
+    secondId = two.pendingTurnId;
   const first = executeDominationFriendTurn(state, firstId, rules, { owner: 'host', now: 100 });
   assert.equal(state.dominationFriendShared.stock.length, 4);
-  assert.equal(one.turnsRemaining, 2); assert.equal(two.turnsRemaining, 3);
+  assert.equal(one.turnsRemaining, 2);
+  assert.equal(two.turnsRemaining, 3);
   assert.equal(state.dominationFriendShared.discard.length, 1);
   const persisted = JSON.stringify(state);
   assert.equal(executeDominationFriendTurn(state, secondId, rules, { owner: 'other', now: 101 }), null);
@@ -334,7 +418,7 @@ test('turnos serializados consomem o mesmo monte, descartam no mesmo lixo e nao 
   const second = executeDominationFriendTurn(restored, secondId, rules, { owner: 'host', now: 103 });
   assert.equal(restored.dominationFriendShared.stock.length, 2);
   assert.equal(restored.dominationFriendShared.discard.length, 2);
-  assert.ok(second.steps.filter(step => step.playerId === 'friend').every(step => step.friendId === two.id));
+  assert.ok(second.steps.filter((step) => step.playerId === 'friend').every((step) => step.friendId === two.id));
   assert.notEqual(first.steps[0].cards[0].id, second.steps[0].cards[0].id);
   assert.equal(restored.dominationFriends[0].turnsRemaining, 2);
   assert.equal(restored.dominationFriends[1].turnsRemaining, 2);
@@ -347,7 +431,8 @@ test('turnos serializados consomem o mesmo monte, descartam no mesmo lixo e nao 
 
 test('segunda amiga usa lixo compartilhado com regras de aberto e fechado', () => {
   for (const variant of ['aberto', 'fechado']) {
-    const state = twoFriends(); state.variant = variant;
+    const state = twoFriends();
+    state.variant = variant;
     const [one, two] = state.dominationFriends;
     one.active = false;
     two.hand = cards(['3', '4', '5', '6'], '♣', 'second-hand');
@@ -365,20 +450,43 @@ test('segunda amiga usa lixo compartilhado com regras de aberto e fechado', () =
 
 test('controlador unico aguarda fim da animacao antes de transacionar a segunda amiga', async () => {
   const state = twoFriends();
-  state.dominationFriends.forEach(friend => { friend.hand = []; });
+  state.dominationFriends.forEach((friend) => {
+    friend.hand = [];
+  });
   state.dominationFriendShared.stock = cards(Array(6).fill('K'), '♥', 'controller');
   queueDominationFriendTurn(state, 1);
   let persisted = structuredClone(state);
   let timer, finish;
   const presented = [];
-  const animation = new Promise(resolve => { finish = resolve; });
+  const animation = new Promise((resolve) => {
+    finish = resolve;
+  });
   const live = vm.createContext({
-    state, window: { gameSessionId: 1 }, myPlayerIndex: 1, friendControllerId: 'host', console,
-    friendAutomationTimer: null, friendAutomationRunning: false, friendOperationPending: false,
-    friendPlayback: null, committing: false, localUndoStack: [], friendMeldRules: rules,
-    getDominationFriend, activeDominationFriends, executeDominationFriendTurn, completeDominationFriendPresentation,
-    friendHostIndex: () => 1, clearTimeout() {}, setTimeout(callback) { timer = callback; return 1; },
-    renderAll() {}, showMessage() {}, startTurnTimerIfNeeded() {},
+    state,
+    window: { gameSessionId: 1 },
+    myPlayerIndex: 1,
+    friendControllerId: 'host',
+    console,
+    friendAutomationTimer: null,
+    friendAutomationRunning: false,
+    friendOperationPending: false,
+    friendPlayback: null,
+    committing: false,
+    localUndoStack: [],
+    friendMeldRules: rules,
+    getDominationFriend,
+    activeDominationFriends,
+    executeDominationFriendTurn,
+    completeDominationFriendPresentation,
+    friendHostIndex: () => 1,
+    clearTimeout() {},
+    setTimeout(callback) {
+      timer = callback;
+      return 1;
+    },
+    renderAll() {},
+    showMessage() {},
+    startTurnTimerIfNeeded() {},
     async saveFriendOperation(operation) {
       const latest = structuredClone(persisted);
       const result = operation(latest);
@@ -395,39 +503,50 @@ test('controlador unico aguarda fim da animacao antes de transacionar a segunda 
   vm.runInContext(appFunction('scheduleDominationFriend'), live);
   live.scheduleDominationFriend();
   const firstRun = timer();
-  await new Promise(resolve => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(presented, [state.dominationFriends[0].id]);
   assert.ok(persisted.dominationFriendShared.presentation);
   assert.equal(persisted.dominationFriends[1].lastExecutedTurnId, null);
   assert.equal(live.friendAutomationRunning, true);
-  finish(); await firstRun;
+  finish();
+  await firstRun;
   assert.equal(persisted.dominationFriendShared.presentation, null);
   await timer();
-  assert.deepEqual(presented, state.dominationFriends.map(friend => friend.id));
+  assert.deepEqual(
+    presented,
+    state.dominationFriends.map((friend) => friend.id),
+  );
   assert.equal(persisted.dominationFriendShared.presentation, null);
   assert.equal(persisted.dominationFriendShared.stock.length, 2);
-  assert.ok(persisted.dominationFriends.every(friend => friend.lastExecutedTurnId && !friend.pendingTurnId));
+  assert.ok(persisted.dominationFriends.every((friend) => friend.lastExecutedTurnId && !friend.pendingTurnId));
 });
 
 test('canastra da segunda amiga concede turno a ambas e playback atualiza as duas', async () => {
   const state = twoFriends();
   const [one, two] = state.dominationFriends;
-  one.hand = []; two.hand = cards(['3', '4', '5', '6', '7', '8'], '♣', 'second-natural');
+  one.hand = [];
+  two.hand = cards(['3', '4', '5', '6', '7', '8'], '♣', 'second-natural');
   state.dominationFriendShared.stock = [...cards(['K'], '♥', 'bonus'), ...cards(['9'], '♣', 'draw'), ...cards(['K', 'K', 'K'], '♥', 'other-draws')];
   queueDominationFriendTurn(state, 1);
   const first = executeDominationFriendTurn(state, one.pendingTurnId, rules);
   completeDominationFriendPresentation(state, first.turnId, 'local');
   const before = structuredClone(state);
   const result = executeDominationFriendTurn(state, two.pendingTurnId, rules);
-  assert.ok(result.plays.some(play => play.newKind === 'limpa'));
+  assert.ok(result.plays.some((play) => play.newKind === 'limpa'));
   assert.equal(one.turnsRemaining, before.dominationFriends[0].turnsRemaining + 1);
   assert.equal(one.extraTurns, 1);
   assert.equal(two.extraTurns, 1);
   assert.equal(state.players[1].hand.length, before.players[1].hand.length + 1);
   const view = structuredClone(before);
   const animated = [];
-  await playDominationFriendTimeline(view, result, { isActive: () => true, render() {}, animate: async step => { animated.push(step); } });
-  assert.ok(animated.filter(step => step.playerId === 'friend').every(step => step.friendId === two.id));
+  await playDominationFriendTimeline(view, result, {
+    isActive: () => true,
+    render() {},
+    animate: async (step) => {
+      animated.push(step);
+    },
+  });
+  assert.ok(animated.filter((step) => step.playerId === 'friend').every((step) => step.friendId === two.id));
   assert.deepEqual(view.dominationFriends[0].hand, one.hand);
   assert.deepEqual(view.dominationFriends[1].hand, two.hand);
   assert.equal(view.dominationFriends[0].turnsRemaining, one.turnsRemaining);
@@ -440,12 +559,17 @@ test('canastra da segunda amiga concede turno a ambas e playback atualiza as dua
 test('saida individual preserva recursos mas nao permite nova chamada', () => {
   const state = twoFriends();
   const [one, two] = state.dominationFriends;
-  one.turnsRemaining = 1; one.hand = []; two.hand = [];
+  one.turnsRemaining = 1;
+  one.hand = [];
+  two.hand = [];
   state.dominationFriendShared.stock = cards(['K', 'K', 'K', 'K'], '♥', 'stock');
   queueDominationFriendTurn(state, 1);
   const first = executeDominationFriendTurn(state, one.pendingTurnId, rules);
   assert.equal(first.departed, true);
-  assert.deepEqual(activeDominationFriends(state).map(friend => friend.id), [two.id]);
+  assert.deepEqual(
+    activeDominationFriends(state).map((friend) => friend.id),
+    [two.id],
+  );
   assert.equal(state.dominationFriendShared.stock.length, 2);
   assert.equal(state.dominationFriendShared.discard.length, 1);
   completeDominationFriendPresentation(state, first.turnId, 'local');
@@ -453,7 +577,8 @@ test('saida individual preserva recursos mas nao permite nova chamada', () => {
   assert.equal(executeDominationFriendTurn(state, two.pendingTurnId, rules).departed, true);
   assert.equal(activeDominationFriends(state).length, 0);
   assert.equal(state.dominationFriendShared.discard.length, 2);
-  const later = invite(); later.dominationOptions = { friendCapacity: 2 };
+  const later = invite();
+  later.dominationOptions = { friendCapacity: 2 };
   later.dominationFriends[0].active = false;
   const stock = later.dominationFriendShared.stock;
   assert.equal(callDominationFriend(later, 1, createFriendInvitation('later'), 0), false);
@@ -465,9 +590,11 @@ test('turno extra beneficia todas as ativas, com deduplicacao global e apos relo
   const state = twoFriends();
   const [one, two] = state.dominationFriends;
   assert.ok(grantDominationFriendExtraTurn(state, 'friend', 'simple', 'limpa', 0, two.id));
-  assert.equal(one.extraTurns, 1); assert.equal(two.extraTurns, 1);
+  assert.equal(one.extraTurns, 1);
+  assert.equal(two.extraTurns, 1);
   assert.ok(grantDominationFriendExtraTurn(state, 1, 'simple', 'real', 1));
-  assert.equal(one.extraTurns, 2); assert.equal(two.extraTurns, 2);
+  assert.equal(one.extraTurns, 2);
+  assert.equal(two.extraTurns, 2);
   const bonus = grantDominationFriendSharedBonus(state, 1, 'real', 1, 1);
   assert.equal(bonus.friendId, one.id);
   one.active = false;
@@ -477,8 +604,9 @@ test('turno extra beneficia todas as ativas, com deduplicacao global e apos relo
   assert.equal(saved.dominationFriends[1].extraTurns, 2);
   assert.ok(grantDominationFriendExtraTurn(saved, 1, 'simple', 'asas', 2));
   assert.equal(saved.dominationFriends[1].extraTurns, 3);
-  const notices = createFriendNoticeTracker(); notices.collect(state);
-  assert.equal(notices.collect(saved).filter(event => event.type === 'extraTurn').length, 1);
+  const notices = createFriendNoticeTracker();
+  notices.collect(state);
+  assert.equal(notices.collect(saved).filter((event) => event.type === 'extraTurn').length, 1);
   assert.deepEqual(notices.collect(saved), []);
 });
 
@@ -486,7 +614,7 @@ test('Dominador e qualquer amiga concedem +1 a ambas por Limpa, Real e As-a-As',
   for (const actor of [1, 'first', 'second']) {
     const state = twoFriends();
     state.dominationOptions.plus = false;
-    const before = state.dominationFriends.map(friend => friend.turnsRemaining);
+    const before = state.dominationFriends.map((friend) => friend.turnsRemaining);
     const friendId = actor === 'first' ? state.dominationFriends[0].id : state.dominationFriends[1].id;
     for (const [i, kind] of ['limpa', 'real', 'asas'].entries()) {
       const event = grantDominationFriendExtraTurn(state, actor === 1 ? 1 : 'friend', 'simple', kind, i, friendId);
@@ -503,7 +631,8 @@ test('migracao de save singular preserva mao, recursos, eventos e turno pendente
   legacy.pendingTurnId = 'legacy-turn';
   legacy.events = [{ id: `${legacy.id}:bonus:1:0:limpa`, type: 'cardBonus', cards: [] }];
   legacy.rewardedMeldTiers = { '1:0': 2 };
-  state.dominationFriend = legacy; state.friendUsed = true;
+  state.dominationFriend = legacy;
+  state.friendUsed = true;
   const original = structuredClone(legacy);
   normalizeDominationFriends(state);
   assert.equal('dominationFriend' in state, false);
@@ -514,7 +643,8 @@ test('migracao de save singular preserva mao, recursos, eventos e turno pendente
   assert.equal(remainingFriendCalls(state), 0);
   assert.equal(grantDominationFriendSharedBonus(state, 1, 'limpa', 1, 0), null);
   assert.equal(grantDominationFriendExtraTurn(state, 1, 'simple', 'limpa', 0), null);
-  const saved = JSON.stringify(state); normalizeDominationFriends(state);
+  const saved = JSON.stringify(state);
+  normalizeDominationFriends(state);
   assert.equal(JSON.stringify(state), saved);
   const restored = JSON.parse(saved);
   const result = executeDominationFriendTurn(restored, original.pendingTurnId, rules);
@@ -531,11 +661,17 @@ test('selecao de quantidade comeca em zero e bloqueia inicio sem alert', async (
   };
   let started = false;
   const live = vm.createContext({
-    hasDominationFriendSelection, normalizeDominationOptions,
-    document: { getElementById: id => elements[id] },
-    activateGameSession() { started = true; },
+    hasDominationFriendSelection,
+    normalizeDominationOptions,
+    document: { getElementById: (id) => elements[id] },
+    activateGameSession() {
+      started = true;
+    },
   });
-  vm.runInContext(`${appFunction('updateDominationFriendCapacity')}\n${appFunction('readDominationMenuOptions')}\n${appFunction('syncDominationMenuOptions')}\n${appFunction('validateDominationFriendSelection')}\nasync ${appFunction('startGame')}`, live);
+  vm.runInContext(
+    `${appFunction('updateDominationFriendCapacity')}\n${appFunction('readDominationMenuOptions')}\n${appFunction('syncDominationMenuOptions')}\n${appFunction('validateDominationFriendSelection')}\nasync ${appFunction('startGame')}`,
+    live,
+  );
   live.syncDominationMenuOptions();
   assert.equal(elements.dominationFriendCapacity.value, '0');
   assert.equal(live.readDominationMenuOptions().friendCapacity, 0);
@@ -565,26 +701,49 @@ test('opcoes independentes iniciam ligadas, persistem na partida e nao alteram o
   assert.deepEqual(normalizeDominationOptions(), { friend: true, plus: true, vision: true, friendCapacity: 1 });
   const elements = Object.fromEntries(['friend', 'plus', 'vision'].map((key) => [`dominationOption_${key}`, { checked: true }]));
   elements.dominationFriendCapacity = { value: '1', style: { setProperty() {} }, setAttribute() {} };
-  const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    hasDominationFriendSelection, normalizeDominationOptions, document: { getElementById: (id) => elements[id] || { value: '', open: false } },
-    activateGameSession() {}, normalizeVariantForMode: (_mode, variant) => variant,
-    isBossMode: () => false, shuffle: (deck) => deck, createDeck: () => [], SUITS: [], RANKS: [], DEAD_CHUNK_SIZE: 11,
+  const live = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    hasDominationFriendSelection,
+    normalizeDominationOptions,
+    document: { getElementById: (id) => elements[id] || { value: '', open: false } },
+    activateGameSession() {},
+    normalizeVariantForMode: (_mode, variant) => variant,
+    isBossMode: () => false,
+    shuffle: (deck) => deck,
+    createDeck: () => [],
+    SUITS: [],
+    RANKS: [],
+    DEAD_CHUNK_SIZE: 11,
     dealInitialDeck: (_deck, count) => ({ stock: [], discard: [], deadPiles: [], hands: Array.from({ length: count }, () => []) }),
-    sortHand() {}, crypto: { randomUUID: () => 'test-options' }, gameRef: {}, lastSeenBossLogKey: null,
-    setDoc: async (_ref, data) => { live.saved = JSON.parse(data.stateJson); }, showMessage() {},
+    sortHand() {},
+    crypto: { randomUUID: () => 'test-options' },
+    gameRef: {},
+    lastSeenBossLogKey: null,
+    setDoc: async (_ref, data) => {
+      live.saved = JSON.parse(data.stateJson);
+    },
+    showMessage() {},
   });
-  vm.runInContext(`${appFunction('updateDominationFriendCapacity')}\n${appFunction('readDominationMenuOptions')}\n${appFunction('syncDominationMenuOptions')}\n${appFunction('validateDominationFriendSelection')}\nasync ${appFunction('startGame')}`, live);
-  for (const capacity of [1, 2]) for (const feature of ['friend', 'plus', 'vision']) {
-    const options = normalizeDominationOptions({ [feature]: false, friendCapacity: capacity });
-    live.syncDominationMenuOptions(options);
-    assert.deepEqual(live.readDominationMenuOptions(), options);
-    await live.startGame('1x1_dominacao', ['J1', 'J2'], 'aberto');
-    assert.deepEqual(live.saved.dominationOptions, options);
-    for (const key of ['friend', 'plus', 'vision']) assert.equal(dominationFeatureEnabled(live.saved, key), key !== feature);
-    const restored = JSON.parse(JSON.stringify(live.saved));
-    restored.currentPlayer = 1;
-    assert.equal(canCallDominationFriend(restored, 1), feature !== 'friend');
-  }
+  vm.runInContext(
+    `${appFunction('updateDominationFriendCapacity')}\n${appFunction('readDominationMenuOptions')}\n${appFunction('syncDominationMenuOptions')}\n${appFunction('validateDominationFriendSelection')}\nasync ${appFunction('startGame')}`,
+    live,
+  );
+  for (const capacity of [1, 2])
+    for (const feature of ['friend', 'plus', 'vision']) {
+      const options = normalizeDominationOptions({ [feature]: false, friendCapacity: capacity });
+      live.syncDominationMenuOptions(options);
+      assert.deepEqual(live.readDominationMenuOptions(), options);
+      await live.startGame('1x1_dominacao', ['J1', 'J2'], 'aberto');
+      assert.deepEqual(live.saved.dominationOptions, options);
+      for (const key of ['friend', 'plus', 'vision']) assert.equal(dominationFeatureEnabled(live.saved, key), key !== feature);
+      const restored = JSON.parse(JSON.stringify(live.saved));
+      restored.currentPlayer = 1;
+      assert.equal(canCallDominationFriend(restored, 1), feature !== 'friend');
+    }
   await live.startGame('1x1', ['J1', 'J2'], 'aberto');
   assert.equal(live.saved.dominationOptions, undefined);
   for (const feature of ['friend', 'plus', 'vision']) assert.equal(dominationFeatureEnabled(live.saved, feature), false);
@@ -612,7 +771,10 @@ test('desmarcar Plus desativa compras dos dois, mas preserva turno extra e compr
   assert.equal(result.plays[0].newKind, 'limpa');
   assert.equal(state.dominationFriends[0].extraTurns, extraBefore + 1);
   assert.equal(result.steps.filter((step) => step.type === 'drawStock').flatMap((step) => step.cards).length, 2);
-  assert.equal(result.steps.some((step) => step.type === 'dominatorBonus'), false);
+  assert.equal(
+    result.steps.some((step) => step.type === 'dominatorBonus'),
+    false,
+  );
   assert.deepEqual(state.players, before.players);
   assert.deepEqual(state.stock, before.stock);
 });
@@ -620,7 +782,19 @@ test('desmarcar Plus desativa compras dos dois, mas preserva turno extra e compr
 test('Visao desativada bloqueia ativacao e roubo, inclusive chamada direta', async () => {
   const state = game();
   state.dominationOptions = normalizeDominationOptions({ vision: false });
-  const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host', state, window: {}, dominationFeatureEnabled, ensureMyTurn() { assert.fail('Visao desligada deve sair antes da acao'); } });
+  const live = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    window: {},
+    dominationFeatureEnabled,
+    ensureMyTurn() {
+      assert.fail('Visao desligada deve sair antes da acao');
+    },
+  });
   for (const name of ['toggleStealMode', 'stealCard']) {
     const start = app.indexOf(`window.${name} =`);
     vm.runInContext(app.slice(start, app.indexOf('\n};', start) + 3), live);
@@ -665,41 +839,61 @@ function friendTurn(state) {
 }
 
 test('bot Dominador respeita opcoes, chama amiga e rouba uma vez por partida', async () => {
-  for (const friend of [false, true]) for (const vision of [false, true]) {
-    const state = game();
-    state.players[1].name = 'BOT Dominador';
-    state.teams[1].melds = [rules.prepare(cards(['3', '4', '5', '6', '7']))];
-    state.dominationOptions = { friend, vision, plus: false };
-    state.players[0].hand = cards(['3', '4', '5', '6'], '♣', 'victim');
-    state.hasDrawnThisTurn = false;
-    let calls = 0;
-    const actions = [];
-    const engine = { isActive: () => true, showMessage() {}, commitState: async () => {
-      if (state.lastAction) actions.push(state.lastAction);
-    } };
-    const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host', state, dominationFeatureEnabled, canCallDominationFriend, shouldBotCallDominationFriend, friendMeldRules: rules,
-      performDominationFriendCall: async (id, bot) => {
-        assert.equal(id, 1); assert.equal(bot, true); calls++;
-        callDominationFriend(state, id, invitation(), 0);
-      }, sortHand() {}, packCard: card => ({ ...card }), newActionId: () => `steal-${actions.length}`,
-      BuracoBot: { sleep: async () => {} },
-    });
-    vm.runInContext(`${appFunction('chooseBotDominationSteal')}\nasync ${appFunction('executeBotDominationPowers')}`, live);
-    await live.executeBotDominationPowers(engine, 1);
-    assert.equal(calls, friend ? 1 : 0);
-    assert.equal(actions.length, vision ? 2 : 0);
-    assert.equal(state.players[0].hand.length, vision ? 2 : 4);
-    assert.equal(state.hasDrawnThisTurn, vision);
-    if (vision) {
-      assert.equal(state.partialDraw, false);
-      assert.equal(state.powerActiveThisTurn, false);
-      assert.equal(state.dominatorUsedPower, true);
+  for (const friend of [false, true])
+    for (const vision of [false, true]) {
+      const state = game();
+      state.players[1].name = 'BOT Dominador';
+      state.teams[1].melds = [rules.prepare(cards(['3', '4', '5', '6', '7']))];
+      state.dominationOptions = { friend, vision, plus: false };
+      state.players[0].hand = cards(['3', '4', '5', '6'], '♣', 'victim');
+      state.hasDrawnThisTurn = false;
+      let calls = 0;
+      const actions = [];
+      const engine = {
+        isActive: () => true,
+        showMessage() {},
+        commitState: async () => {
+          if (state.lastAction) actions.push(state.lastAction);
+        },
+      };
+      const live = vm.createContext({
+        getDominationFriend,
+        activeDominationFriends,
+        dominationFriends,
+        normalizeDominationFriends,
+        friendControllerId: 'test-host',
+        state,
+        dominationFeatureEnabled,
+        canCallDominationFriend,
+        shouldBotCallDominationFriend,
+        friendMeldRules: rules,
+        performDominationFriendCall: async (id, bot) => {
+          assert.equal(id, 1);
+          assert.equal(bot, true);
+          calls++;
+          callDominationFriend(state, id, invitation(), 0);
+        },
+        sortHand() {},
+        packCard: (card) => ({ ...card }),
+        newActionId: () => `steal-${actions.length}`,
+        BuracoBot: { sleep: async () => {} },
+      });
+      vm.runInContext(`${appFunction('chooseBotDominationSteal')}\nasync ${appFunction('executeBotDominationPowers')}`, live);
+      await live.executeBotDominationPowers(engine, 1);
+      assert.equal(calls, friend ? 1 : 0);
+      assert.equal(actions.length, vision ? 2 : 0);
+      assert.equal(state.players[0].hand.length, vision ? 2 : 4);
+      assert.equal(state.hasDrawnThisTurn, vision);
+      if (vision) {
+        assert.equal(state.partialDraw, false);
+        assert.equal(state.powerActiveThisTurn, false);
+        assert.equal(state.dominatorUsedPower, true);
+      }
+      state.hasDrawnThisTurn = false;
+      await live.executeBotDominationPowers(engine, 1);
+      assert.equal(calls, friend ? 1 : 0);
+      assert.equal(actions.length, vision ? 2 : 0);
     }
-    state.hasDrawnThisTurn = false;
-    await live.executeBotDominationPowers(engine, 1);
-    assert.equal(calls, friend ? 1 : 0);
-    assert.equal(actions.length, vision ? 2 : 0);
-  }
 });
 
 test('bot guarda amiga ate haver potencial de canastra ou pressao de fim de partida', () => {
@@ -738,8 +932,21 @@ test('Visao do bot retoma compra parcial e repoe mao vazia sem pegar morto', asy
   state.partialDraw = true;
   const dead = structuredClone(state.deadPiles);
   const engine = { isActive: () => true, showMessage() {}, commitState: async () => {} };
-  const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host', state, dominationFeatureEnabled, canCallDominationFriend, shouldBotCallDominationFriend, friendMeldRules: rules,
-    sortHand() {}, ensureCardId() {}, packCard: card => ({ ...card }), newActionId: () => 'resumed',
+  const live = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    dominationFeatureEnabled,
+    canCallDominationFriend,
+    shouldBotCallDominationFriend,
+    friendMeldRules: rules,
+    sortHand() {},
+    ensureCardId() {},
+    packCard: (card) => ({ ...card }),
+    newActionId: () => 'resumed',
     BuracoBot: { sleep: async () => {} },
   });
   vm.runInContext(`${appFunction('chooseBotDominationSteal')}\nasync ${appFunction('executeBotDominationPowers')}`, live);
@@ -778,11 +985,20 @@ test('turno real do bot nao compra monte ou lixo novamente depois da Visao', asy
     let powers = 0;
     let draws = 0;
     const engine = {
-      isActive: () => true, getState: () => state, showMessage() {},
-      computeTeamMeldScore: () => ({ total: 0 }), teamHasGoodCanastra: () => false,
+      isActive: () => true,
+      getState: () => state,
+      showMessage() {},
+      computeTeamMeldScore: () => ({ total: 0 }),
+      teamHasGoodCanastra: () => false,
       isDiscardBlocked: () => true,
-      executeDominationPowers: async () => { powers++; state.hasDrawnThisTurn = true; },
-      executeDrawStock: async () => { draws++; state.hasDrawnThisTurn = true; },
+      executeDominationPowers: async () => {
+        powers++;
+        state.hasDrawnThisTurn = true;
+      },
+      executeDrawStock: async () => {
+        draws++;
+        state.hasDrawnThisTurn = true;
+      },
     };
     await live.TestBot.playTurn(state, 1, engine);
     assert.equal(powers, mode === '1x1_dominacao' ? 2 : 0);
@@ -792,7 +1008,7 @@ test('turno real do bot nao compra monte ou lixo novamente depois da Visao', asy
 
 test('botao da amiga mantem lugar e so habilita a chamada no proprio turno', () => {
   const button = { hidden: true };
-  globalThis.document = { getElementById: (id) => id === 'callFriendBtn' ? button : null, querySelector: () => null };
+  globalThis.document = { getElementById: (id) => (id === 'callFriendBtn' ? button : null), querySelector: () => null };
   try {
     for (const mode of ['1x1_duploMorto', '1x1', 'boss_banker', 'boss_dominadora', '2x2', '1x1_dominacao']) {
       for (const seat of [-1, 0, 1]) {
@@ -810,10 +1026,12 @@ test('botao da amiga mantem lugar e so habilita a chamada no proprio turno', () 
     renderDominationFriend(state, 1);
     assert.equal(button.hidden, false);
     assert.equal(button.disabled, true);
-    assert.equal(button.textContent, '✓ AMIGA CHAMADA');
+    assert.equal(button.textContent, '✓ CHAMADA');
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
     assert.match(html, /id="callFriendBtn" hidden onclick="callDominationFriend\(\)"/);
-  } finally { delete globalThis.document; }
+  } finally {
+    delete globalThis.document;
+  }
 });
 
 test('chamada e unica, inclusive entre clientes e depois da saida, e rejeita outros modos', async () => {
@@ -831,8 +1049,16 @@ test('chamada e unica, inclusive entre clientes e depois da saida, e rejeita out
   // Run the production transaction callback against concurrent snapshot reads.
   let persisted = game();
   let version = 0;
-  const transactionContext = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    state: persisted, window: { gameSessionId: 1, isClosingGame: false }, db: {}, gameRef: {},
+  const transactionContext = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state: persisted,
+    window: { gameSessionId: 1, isClosingGame: false },
+    db: {},
+    gameRef: {},
     runTransaction: async (_db, callback) => {
       for (;;) {
         const readVersion = version;
@@ -840,19 +1066,26 @@ test('chamada e unica, inclusive entre clientes e depois da saida, e rejeita out
         let update;
         const result = await callback({
           get: async () => ({ exists: () => true, data: () => ({ stateJson: json }) }),
-          update: (_ref, value) => { update = value; },
+          update: (_ref, value) => {
+            update = value;
+          },
         });
         if (version !== readVersion) continue;
-        if (update) { persisted = JSON.parse(update.stateJson); version++; }
+        if (update) {
+          persisted = JSON.parse(update.stateJson);
+          version++;
+        }
         return result;
       }
     },
   });
   vm.runInContext(`async ${appFunction('saveFriendOperation')}`, transactionContext);
-  const calls = await Promise.all(['client-a', 'client-b'].map((id) => {
-    const choice = createFriendInvitation(id, () => 0.1);
-    return transactionContext.saveFriendOperation((latest) => callDominationFriend(latest, 1, choice, 0));
-  }));
+  const calls = await Promise.all(
+    ['client-a', 'client-b'].map((id) => {
+      const choice = createFriendInvitation(id, () => 0.1);
+      return transactionContext.saveFriendOperation((latest) => callDominationFriend(latest, 1, choice, 0));
+    }),
+  );
   assert.equal(calls.filter(Boolean).length, 1);
   assert.equal(persisted.friendUsed, true);
   assert.equal(persisted.dominationFriends[0].hand.length, 11);
@@ -866,8 +1099,18 @@ test('nomes tem intervalos iguais e sao somente Bruna, Nathalia e Thayanne', () 
 });
 
 test('duracao retorna 3, 4 ou 5 nos limites exatos dos intervalos', () => {
-  for (const [value, expected] of [[0, 3], [0.199999, 3], [0.2, 4], [0.549999, 4], [0.55, 5], [0.999999, 5]]) {
-    assert.equal(rollFriendDuration(() => value), expected);
+  for (const [value, expected] of [
+    [0, 3],
+    [0.199999, 3],
+    [0.2, 4],
+    [0.549999, 4],
+    [0.55, 5],
+    [0.999999, 5],
+  ]) {
+    assert.equal(
+      rollFriendDuration(() => value),
+      expected,
+    );
   }
 });
 
@@ -879,9 +1122,15 @@ test('amostragem uniforme da roleta produz pesos 20%, 35% e 45%', () => {
 
 test('roletas circulares representam os pesos e param com o resultado salvo no ponteiro', () => {
   const names = friendWheelSegments(FRIEND_NAMES);
-  assert.deepEqual(names.map((segment) => segment.end - segment.start), [120, 120, 120]);
+  assert.deepEqual(
+    names.map((segment) => segment.end - segment.start),
+    [120, 120, 120],
+  );
   const turns = friendWheelSegments([3, 4, 5], [20, 35, 45]);
-  assert.deepEqual(turns.map((segment) => segment.end - segment.start), [72, 126, 162]);
+  assert.deepEqual(
+    turns.map((segment) => segment.end - segment.start),
+    [72, 126, 162],
+  );
   for (const segment of [...names, ...turns]) {
     const rotation = 360 * 5 + 360 - segment.center;
     assert.equal((segment.center + rotation) % 360, 0);
@@ -889,7 +1138,11 @@ test('roletas circulares representam os pesos e param com o resultado salvo no p
 });
 
 test('holofote parte de fora do topo e acompanha a posicao do auxiliar em cada tela', () => {
-  for (const [width, left, top, cardWidth, cardHeight] of [[390, 130, 540, 40, 58], [844, 340, 180, 40, 58], [1440, 680, 600, 55, 80]]) {
+  for (const [width, left, top, cardWidth, cardHeight] of [
+    [390, 130, 540, 40, 58],
+    [844, 340, 180, 40, 58],
+    [1440, 680, 600, 55, 80],
+  ]) {
     const rect = { left, top, width: cardWidth, height: cardHeight };
     const geometry = friendSpotlightGeometry(rect, width);
     assert.equal(geometry.x, left + cardWidth / 2);
@@ -910,16 +1163,34 @@ test('amiga ocupa assento lateral com os mesmos versos da partida e sai ao mudar
       contains: (name) => node.className.split(' ').includes(name),
       toggle(name, enabled) {
         const classes = new Set(node.className.split(' ').filter(Boolean));
-        if (enabled) classes.add(name); else classes.delete(name);
+        if (enabled) classes.add(name);
+        else classes.delete(name);
         node.className = [...classes].join(' ');
       },
-      add(...names) { names.forEach((name) => this.toggle(name, true)); },
-      remove(...names) { names.forEach((name) => this.toggle(name, false)); },
+      add(...names) {
+        names.forEach((name) => this.toggle(name, true));
+      },
+      remove(...names) {
+        names.forEach((name) => this.toggle(name, false));
+      },
     };
-    node.append = (...children) => children.forEach((child) => { child.remove(); node.children.push(child); child.parent = node; });
-    node.replaceChildren = () => { node.children.forEach(child => { child.parent = null; }); node.children = []; };
-    node.remove = () => { if (node.parent) node.parent.children = node.parent.children.filter((child) => child !== node); node.parent = null; };
-    node.querySelector = (selector) => node.children.find(child => child.classList.contains(selector.slice(1)));
+    node.append = (...children) =>
+      children.forEach((child) => {
+        child.remove();
+        node.children.push(child);
+        child.parent = node;
+      });
+    node.replaceChildren = () => {
+      node.children.forEach((child) => {
+        child.parent = null;
+      });
+      node.children = [];
+    };
+    node.remove = () => {
+      if (node.parent) node.parent.children = node.parent.children.filter((child) => child !== node);
+      node.parent = null;
+    };
+    node.querySelector = (selector) => node.children.find((child) => child.classList.contains(selector.slice(1)));
     Object.defineProperty(node, 'lastChild', { get: () => node.children.at(-1) });
     return node;
   }
@@ -935,12 +1206,12 @@ test('amiga ocupa assento lateral com os mesmos versos da partida e sai ao mudar
   left.id = 'opponentLeft';
   left.className = 'opponent-hand opponent-hand-left';
   table.append(left);
-  const findNode = (node, id) => node.id === id ? node : node.children.map((child) => findNode(child, id)).find(Boolean);
+  const findNode = (node, id) => (node.id === id ? node : node.children.map((child) => findNode(child, id)).find(Boolean));
   const button = element();
   globalThis.document = {
     createElement: element,
-    getElementById: (id) => id === 'gameSection' ? section : id === 'callFriendBtn' ? button : findNode(table, id),
-    querySelector: (selector) => selector === '#gameSection > .board' ? table : selector === '#gameSection .board-middle' ? middle : null,
+    getElementById: (id) => (id === 'gameSection' ? section : id === 'callFriendBtn' ? button : findNode(table, id)),
+    querySelector: (selector) => (selector === '#gameSection > .board' ? table : selector === '#gameSection .board-middle' ? middle : null),
   };
   try {
     const state = invite();
@@ -959,7 +1230,11 @@ test('amiga ocupa assento lateral com os mesmos versos da partida e sai ao mudar
     assert.equal(auxiliary.classList.contains('is-playing'), false);
     assert.ok(table.classList.contains('friend-present'));
     assert.equal(table.classList.contains('friend-playing'), false);
-    for (const [count, expected] of [[7, 3], [3, 1], [1, 1]]) {
+    for (const [count, expected] of [
+      [7, 3],
+      [3, 1],
+      [1, 1],
+    ]) {
       const savedStock = state.dominationFriendShared.stock;
       state.dominationFriendShared.stock = savedStock.slice(0, count);
       state.dominationFriends[0].pendingTurnId = 'visual-test';
@@ -1016,7 +1291,9 @@ test('amiga ocupa assento lateral com os mesmos versos da partida e sai ao mudar
     assert.deepEqual(table.children, [middle, left]);
     assert.equal(table.classList.contains('friend-layout'), false);
     assert.deepEqual(middle.children, [mainStock, discard]);
-  } finally { delete globalThis.document; }
+  } finally {
+    delete globalThis.document;
+  }
 });
 
 test('turno grava e anima compra, baixada, bonus e extensao na ordem sem alterar o estado salvo', async () => {
@@ -1026,7 +1303,10 @@ test('turno grava e anima compra, baixada, bonus e extensao na ordem sem alterar
   const before = structuredClone(state);
   const result = friendTurn(state);
   const saved = JSON.stringify(state);
-  assert.deepEqual(result.steps.map((step) => step.type), ['drawStock', 'meldNew', 'drawStock', 'dominatorBonus', 'meldExtend', 'discard']);
+  assert.deepEqual(
+    result.steps.map((step) => step.type),
+    ['drawStock', 'meldNew', 'drawStock', 'dominatorBonus', 'meldExtend', 'discard'],
+  );
   const view = structuredClone(before);
   const flown = [];
   const rendered = [];
@@ -1034,7 +1314,10 @@ test('turno grava e anima compra, baixada, bonus e extensao na ordem sem alterar
     animate: async (step) => {
       assert.equal(JSON.stringify(state), saved);
       if (step.type.startsWith('meld')) {
-        assert.ok(step.cards.every((card) => view.dominationFriends[0].hand.some((entry) => entry.id === card.id)), 'cartas permanecem na mao ate o voo terminar');
+        assert.ok(
+          step.cards.every((card) => view.dominationFriends[0].hand.some((entry) => entry.id === card.id)),
+          'cartas permanecem na mao ate o voo terminar',
+        );
       }
       flown.push(step.type);
     },
@@ -1060,8 +1343,13 @@ test('amiga pensa entre acoes, mantem bonus juntos e cancela durante a pausa', a
   const stages = [];
   const events = [];
   await playDominationFriendTimeline(structuredClone(before), result, {
-    isActive: () => true, render() {}, animate: async step => events.push(step.type),
-    pace: async stage => { stages.push(stage); events.push(`pause:${stage}`); },
+    isActive: () => true,
+    render() {},
+    animate: async (step) => events.push(step.type),
+    pace: async (stage) => {
+      stages.push(stage);
+      events.push(`pause:${stage}`);
+    },
   });
   assert.deepEqual(stages, ['think', 'card', 'organize', 'play', 'discard']);
   assert.equal(events[0], 'pause:think');
@@ -1070,8 +1358,12 @@ test('amiga pensa entre acoes, mantem bonus juntos e cancela durante a pausa', a
   const cancelled = structuredClone(before);
   let active = true;
   await playDominationFriendTimeline(cancelled, result, {
-    isActive: () => active, render() {}, animate: async () => assert.fail('nao deve voar apos cancelamento'),
-    pace: async () => { active = false; },
+    isActive: () => active,
+    render() {},
+    animate: async () => assert.fail('nao deve voar apos cancelamento'),
+    pace: async () => {
+      active = false;
+    },
   });
   assert.deepEqual(cancelled, before);
 });
@@ -1088,14 +1380,18 @@ test('despedida mantem amiga visivel ate acabar o voo e cancelamento interrompe 
   const view = structuredClone(before);
   await playDominationFriendTimeline(view, result, {
     animate: async () => assert.equal(view.dominationFriends[0].active, true),
-    render() {}, isActive: () => true,
+    render() {},
+    isActive: () => true,
   });
   assert.deepEqual(view.teams, state.teams);
   let active = true;
   let calls = 0;
   const cancelled = structuredClone(before);
   await playDominationFriendTimeline(cancelled, result, {
-    animate: async () => { calls++; active = false; },
+    animate: async () => {
+      calls++;
+      active = false;
+    },
     render: () => assert.fail('nao renderizar depois de fechar a partida'),
     isActive: () => active,
   });
@@ -1109,14 +1405,34 @@ test('host e snapshot compartilham animacao, bloqueiam acoes e reload nao repete
   const result = friendTurn(state);
   let finishFlight;
   let flights = 0;
-  const pendingFlight = new Promise((resolve) => { finishFlight = resolve; });
-  const playbackContext = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    state: before, window: { gameSessionId: 1, isClosingGame: false }, structuredClone, console,
-    friendPlayback: null, friendActionPresentations: new Map(), friendOperationPending: false, discardPickupAnimating: false,
-    stopTurnTimer() {}, renderAll() {}, isDominationFriendBusy, canBossPerformCommonAction: () => true,
+  const pendingFlight = new Promise((resolve) => {
+    finishFlight = resolve;
+  });
+  const playbackContext = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state: before,
+    window: { gameSessionId: 1, isClosingGame: false },
+    structuredClone,
+    console,
+    friendPlayback: null,
+    friendActionPresentations: new Map(),
+    friendOperationPending: false,
+    discardPickupAnimating: false,
+    stopTurnTimer() {},
+    renderAll() {},
+    isDominationFriendBusy,
+    canBossPerformCommonAction: () => true,
     playDominationFriendTimeline,
-    BuracoBot: { randomDelay: (min) => min, sleep: async () => {} }, botTurnController: { signal: undefined },
-    playRemoteAction: async () => { flights++; await pendingFlight; },
+    BuracoBot: { randomDelay: (min) => min, sleep: async () => {} },
+    botTurnController: { signal: undefined },
+    playRemoteAction: async () => {
+      flights++;
+      await pendingFlight;
+    },
   });
   vm.runInContext(`async ${appFunction('playFriendTurnPresentation')}\n${appFunction('canPerformCommonGameAction')}`, playbackContext);
   const action = { id: 'friend-animation-test', friendResult: result };
@@ -1148,27 +1464,45 @@ test('motor normal anima cartas reais do monte auxiliar e do assento para o jogo
   const meld = { left: 500, top: 100, width: 22, height: 30 };
   const flights = [];
   const impacts = [];
-  const flightContext = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    cardFrontHTML, suitClass, deckFaceClass,
-    state: friendState, myPlayerIndex: 1, window: { gameSessionId: 1, isClosingGame: false },
+  const flightContext = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    cardFrontHTML,
+    suitClass,
+    deckFaceClass,
+    state: friendState,
+    myPlayerIndex: 1,
+    window: { gameSessionId: 1, isClosingGame: false },
     document: {
-      querySelector: (selector) => selector === '#dominationFriendStock .opponent-card-back' ? auxiliary
-        : selector === '#dominationFriendDiscard .friend-discard-face' ? privateDiscard : null,
+      querySelector: (selector) => (selector === '#dominationFriendStock .opponent-card-back' ? auxiliary : selector === '#dominationFriendDiscard .friend-discard-face' ? privateDiscard : null),
       getElementById: () => null,
     },
     getRect: (element) => element,
     getOpponentAnchorRectById: (id, side) => {
-      assert.equal(id, 'opponentLeft'); assert.equal(side, 'left'); return seat;
+      assert.equal(id, 'opponentLeft');
+      assert.equal(side, 'left');
+      return seat;
     },
-    meldDropRect: (key) => { assert.equal(key, '1:0'); return meld; },
-    flyRectToRect: async (card, from, to, face) => { flights.push({ card, from, to, face }); },
+    meldDropRect: (key) => {
+      assert.equal(key, '1:0');
+      return meld;
+    },
+    flyRectToRect: async (card, from, to, face) => {
+      flights.push({ card, from, to, face });
+    },
     impactAtRect: (target) => impacts.push(target),
     setTimeout: (callback) => callback(),
   });
   vm.runInContext(`${appFunction('seatForPlayer')}\n${appFunction('opponentAnchorRect')}\nasync ${appFunction('playRemoteAction')}`, flightContext);
   const drawn = cards(['7', '8'], '♣', 'aux');
   await flightContext.playRemoteAction({ type: 'drawStock', playerId: 'friend', cards: drawn });
-  assert.deepEqual(flights.map((flight) => flight.card), drawn);
+  assert.deepEqual(
+    flights.map((flight) => flight.card),
+    drawn,
+  );
   assert.ok(flights.every((flight) => flight.from === auxiliary && flight.to === seat && flight.face === 'back'));
   for (const type of ['meldNew', 'meldExtend']) {
     await flightContext.playRemoteAction({ type, playerId: 'friend', teamId: 1, meldIndex: 0, cards: drawn });
@@ -1211,24 +1545,28 @@ test('lixo proprio encerra compra no aberto e fechado sem retirar carta do auxil
     assert.equal(result.steps[0].type, 'drawDiscard');
     assert.equal(result.steps[0].cards.length, 2);
     assert.equal(result.steps[1].type, 'meldExtend');
-    assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'turn').flatMap(s => s.cards).length, 0);
+    assert.equal(result.steps.filter((s) => s.type === 'drawStock' && s.reason === 'turn').flatMap((s) => s.cards).length, 0);
     assert.deepEqual(state.dominationFriendShared.stock, before.dominationFriendShared.stock);
-    assert.ok(state.teams[1].melds[0].some(card => card.id === 'private_1'));
+    assert.ok(state.teams[1].melds[0].some((card) => card.id === 'private_1'));
     for (const key of ['stock', 'discard', 'deadPiles', 'players']) assert.deepEqual(state[key], before[key]);
     const view = structuredClone(before);
     const saved = JSON.stringify(state);
     const flights = [];
-    await playDominationFriendTimeline(view, result, { isActive: () => true, render() {}, animate: async step => {
-      if (step.type === 'drawDiscard') {
-        assert.ok(view.dominationFriendShared.discard.some(card => card.id === step.card.id));
-        flights.push(step.card.id);
-      }
-      assert.equal(JSON.stringify(state), saved);
-    } });
+    await playDominationFriendTimeline(view, result, {
+      isActive: () => true,
+      render() {},
+      animate: async (step) => {
+        if (step.type === 'drawDiscard') {
+          assert.ok(view.dominationFriendShared.discard.some((card) => card.id === step.card.id));
+          flights.push(step.card.id);
+        }
+        assert.equal(JSON.stringify(state), saved);
+      },
+    });
     assert.deepEqual(flights, ['private_1'], 'a pilha inteira usa um unico voo com a carta do topo');
     assert.deepEqual(view.dominationFriendShared.discard, state.dominationFriendShared.discard);
     assert.deepEqual(view.teams, state.teams);
-    assert.deepEqual(view.dominationFriends[0].hand.map(c => c.id).sort(), friend.hand.map(c => c.id).sort());
+    assert.deepEqual(view.dominationFriends[0].hand.map((c) => c.id).sort(), friend.hand.map((c) => c.id).sort());
     const restored = JSON.parse(saved);
     assert.equal(executeDominationFriendTurn(restored, result.turnId, rules), null);
     assert.equal(JSON.stringify(restored), saved);
@@ -1236,41 +1574,50 @@ test('lixo proprio encerra compra no aberto e fechado sem retirar carta do auxil
 });
 
 test('ambas as amigas recolhem pilha grande em um voo e so atualizam ao pousar', async () => {
-  for (const actor of [0, 1]) for (const cancel of [false, true]) {
-    const view = twoFriends();
-    const friend = view.dominationFriends[actor];
-    const pile = cards(Array(20).fill('K'), '♥', 'pile');
-    view.dominationFriendShared.discard = structuredClone(pile);
-    const before = structuredClone(view);
-    let active = true, flights = 0, renders = 0;
-    const pauses = [];
-    await playDominationFriendTimeline(view, {
-      friendId: friend.id,
-      steps: [{ type: 'drawDiscard', playerId: 'friend', friendId: friend.id, cards: pile }],
-    }, {
-      isActive: () => active,
-      pace: async stage => pauses.push(stage),
-      animate: async step => {
-        flights++;
-        assert.equal(step.friendId, friend.id);
-        assert.deepEqual(step.cards, pile);
-        assert.deepEqual(step.card, pile.at(-1));
-        assert.deepEqual(view, before, 'nenhuma carta ou contador muda durante o voo');
-        if (cancel) active = false;
-      },
-      render: () => { renders++; },
-    });
-    assert.equal(flights, 1);
-    assert.deepEqual(pauses, ['think'], 'sem pausas por carta');
-    assert.equal(renders, cancel ? 0 : 1);
-    if (cancel) assert.deepEqual(view, before);
-    else {
-      assert.equal(view.dominationFriendShared.discard.length, 0);
-      assert.deepEqual(friend.hand, [...before.dominationFriends[actor].hand, ...pile]);
-      assert.deepEqual(view.dominationFriends[1-actor], before.dominationFriends[1-actor]);
-      for (const key of ['stock', 'discard', 'deadPiles', 'players']) assert.deepEqual(view[key], before[key]);
+  for (const actor of [0, 1])
+    for (const cancel of [false, true]) {
+      const view = twoFriends();
+      const friend = view.dominationFriends[actor];
+      const pile = cards(Array(20).fill('K'), '♥', 'pile');
+      view.dominationFriendShared.discard = structuredClone(pile);
+      const before = structuredClone(view);
+      let active = true,
+        flights = 0,
+        renders = 0;
+      const pauses = [];
+      await playDominationFriendTimeline(
+        view,
+        {
+          friendId: friend.id,
+          steps: [{ type: 'drawDiscard', playerId: 'friend', friendId: friend.id, cards: pile }],
+        },
+        {
+          isActive: () => active,
+          pace: async (stage) => pauses.push(stage),
+          animate: async (step) => {
+            flights++;
+            assert.equal(step.friendId, friend.id);
+            assert.deepEqual(step.cards, pile);
+            assert.deepEqual(step.card, pile.at(-1));
+            assert.deepEqual(view, before, 'nenhuma carta ou contador muda durante o voo');
+            if (cancel) active = false;
+          },
+          render: () => {
+            renders++;
+          },
+        },
+      );
+      assert.equal(flights, 1);
+      assert.deepEqual(pauses, ['think'], 'sem pausas por carta');
+      assert.equal(renders, cancel ? 0 : 1);
+      if (cancel) assert.deepEqual(view, before);
+      else {
+        assert.equal(view.dominationFriendShared.discard.length, 0);
+        assert.deepEqual(friend.hand, [...before.dominationFriends[actor].hand, ...pile]);
+        assert.deepEqual(view.dominationFriends[1 - actor], before.dominationFriends[1 - actor]);
+        for (const key of ['stock', 'discard', 'deadPiles', 'players']) assert.deepEqual(view[key], before[key]);
+      }
     }
-  }
 });
 
 test('fechado nao usa cartas enterradas nem compra futura para justificar o topo', () => {
@@ -1283,7 +1630,10 @@ test('fechado nao usa cartas enterradas nem compra futura para justificar o topo
     state.dominationFriendShared.stock = cards(['4'], '♣', 'future');
     const result = friendTurn(state);
     assert.equal(result.steps[0].type, 'drawStock');
-    assert.equal(result.steps.some(s => s.type === 'drawDiscard'), false);
+    assert.equal(
+      result.steps.some((s) => s.type === 'drawDiscard'),
+      false,
+    );
   }
   const open = invite();
   open.variant = 'aberto';
@@ -1303,10 +1653,13 @@ test('canastra feita com lixo mantem bonus dos dois mas nao concede compra compl
     state.dominationFriendShared.discard = cards(['9'], '♣', 'private');
     state.dominationFriendShared.stock = cards(Array(size).fill('K'), '♥', 'aux');
     const result = friendTurn(state);
-    assert.deepEqual(result.steps.slice(0, 2).map(s => s.type), ['drawDiscard', 'meldExtend']);
-    assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'canastra').flatMap(s => s.cards).length, Math.min(1, size));
-    assert.equal(result.steps.filter(s => s.type === 'drawStock' && s.reason === 'turn').flatMap(s => s.cards).length, 0);
-    assert.equal(result.steps.filter(s => s.type === 'dominatorBonus').flatMap(s => s.cards).length, 1);
+    assert.deepEqual(
+      result.steps.slice(0, 2).map((s) => s.type),
+      ['drawDiscard', 'meldExtend'],
+    );
+    assert.equal(result.steps.filter((s) => s.type === 'drawStock' && s.reason === 'canastra').flatMap((s) => s.cards).length, Math.min(1, size));
+    assert.equal(result.steps.filter((s) => s.type === 'drawStock' && s.reason === 'turn').flatMap((s) => s.cards).length, 0);
+    assert.equal(result.steps.filter((s) => s.type === 'dominatorBonus').flatMap((s) => s.cards).length, 1);
     assert.equal(state.dominationFriends[0].extraTurns, 1);
     assert.equal(rules.classify(state.teams[1].melds[0]), 'limpa');
   }
@@ -1320,7 +1673,10 @@ test('fechado abre jogo com o topo, preserva limpos e ignora lixo sem vantagem',
   opening.dominationFriendShared.discard = cards(['5'], '♣', 'private');
   opening.dominationFriendShared.stock = [];
   const result = friendTurn(opening);
-  assert.deepEqual(result.steps.slice(0, 2).map(s => s.type), ['drawDiscard', 'meldNew']);
+  assert.deepEqual(
+    result.steps.slice(0, 2).map((s) => s.type),
+    ['drawDiscard', 'meldNew'],
+  );
   for (const rank of ['JOKER', 'K']) {
     const state = invite();
     state.variant = 'fechado';
@@ -1330,7 +1686,10 @@ test('fechado abre jogo com o topo, preserva limpos e ignora lixo sem vantagem',
     state.dominationFriendShared.stock = cards(['Q', 'Q'], '♦', 'aux');
     const before = structuredClone(state.teams);
     const result = friendTurn(state);
-    assert.equal(result.steps.some(s => s.type === 'drawDiscard'), false);
+    assert.equal(
+      result.steps.some((s) => s.type === 'drawDiscard'),
+      false,
+    );
     assert.equal(result.steps[0].cards.length, 2);
     assert.deepEqual(state.teams, before);
   }
@@ -1340,10 +1699,19 @@ test('turno encaixa depois do Dominador, reduz contador uma vez e preserva recur
   const state = invite();
   const before = structuredClone(state);
   assert.equal(queueDominationFriendTurn(state, 0), false);
-  const turnContext = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    state, localUndoStack: [], window: {}, queueDominationFriendTurn,
+  const turnContext = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    localUndoStack: [],
+    window: {},
+    queueDominationFriendTurn,
     canPerformCommonGameAction: (current) => !isDominationFriendBusy(current),
-    hasPendingBossChoices: () => false, isCurrentBossMode: () => false,
+    hasPendingBossChoices: () => false,
+    isCurrentBossMode: () => false,
   });
   vm.runInContext(appFunction('passTurn'), turnContext);
   assert.equal(turnContext.passTurn(), true);
@@ -1561,7 +1929,13 @@ test('canastra da amiga concede bonus a ambos, cada um usando seu proprio monte'
     assert.equal(state.dominationFriendShared.stock.length, 4 - bonus);
     assert.deepEqual(state.stock, mainStock.slice(0, -bonus));
     assert.equal(state.players[1].hand.length, 1 + bonus);
-    assert.deepEqual(state.players[1].hand.slice(1).map((card) => card.id), mainStock.slice(-bonus).reverse().map((card) => card.id));
+    assert.deepEqual(
+      state.players[1].hand.slice(1).map((card) => card.id),
+      mainStock
+        .slice(-bonus)
+        .reverse()
+        .map((card) => card.id),
+    );
     assert.equal(state.dominationFriends[0].extraTurns, 1);
     const restored = JSON.parse(JSON.stringify(state));
     assert.equal(executeDominationFriendTurn(restored, result.turnId, rules), null);
@@ -1627,13 +2001,28 @@ test('sobras da despedida nao entram no lixo comum nem penalizam o adversario', 
 test('fluxo real do Dominador concede +1 por categoria nova, sem mudar compras ou premiar adversario', async () => {
   const state = invite();
   state.stock = cards(Array(20).fill('K'), '♥', 'rewards');
-  const rewardContext = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    state, dominationFeatureEnabled, grantDominationFriendExtraTurn, grantDominationFriendSharedBonus, ensureCardId() {}, packCard: (card) => ({ ...card }),
-    sortHand() {}, showMessage() {},
+  const rewardContext = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    dominationFeatureEnabled,
+    grantDominationFriendExtraTurn,
+    grantDominationFriendSharedBonus,
+    ensureCardId() {},
+    packCard: (card) => ({ ...card }),
+    sortHand() {},
+    showMessage() {},
   });
   vm.runInContext(`async ${appFunction('processDominationReward')}`, rewardContext);
   let previous = 'simple';
-  for (const [kind, expected] of [['limpa', 4], ['real', 5], ['asas', 6]]) {
+  for (const [kind, expected] of [
+    ['limpa', 4],
+    ['real', 5],
+    ['asas', 6],
+  ]) {
     const reward = await rewardContext.processDominationReward(state.players[1], previous, kind, 0);
     assert.equal(state.dominationFriends[0].turnsRemaining, expected);
     if (kind === 'limpa') assert.equal(reward.drawnCards.length, 1);
@@ -1660,17 +2049,40 @@ test('fluxo real do Dominador concede +1 por categoria nova, sem mudar compras o
 });
 
 test('DevTools concede o mesmo bonus ao Dominador e a amiga fora do turno dela', async () => {
-  for (const [kind, count] of [['limpa', 1], ['real', 1], ['asas', 1]]) {
+  for (const [kind, count] of [
+    ['limpa', 1],
+    ['real', 1],
+    ['asas', 1],
+  ]) {
     const state = invite();
     const before = structuredClone(state);
-    const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-      state, window: {}, dominationFeatureEnabled, grantDominationFriendExtraTurn, grantDominationFriendSharedBonus,
-      ensureMyTurn: () => true, currentTeam: () => state.teams[1], currentPlayer: () => state.players[1],
-      optimizeMeld: context.optimizeMeld, normalizeMeldOrder: context.normalizeMeldOrder,
+    const live = vm.createContext({
+      getDominationFriend,
+      activeDominationFriends,
+      dominationFriends,
+      normalizeDominationFriends,
+      friendControllerId: 'test-host',
+      state,
+      window: {},
+      dominationFeatureEnabled,
+      grantDominationFriendExtraTurn,
+      grantDominationFriendSharedBonus,
+      ensureMyTurn: () => true,
+      currentTeam: () => state.teams[1],
+      currentPlayer: () => state.players[1],
+      optimizeMeld: context.optimizeMeld,
+      normalizeMeldOrder: context.normalizeMeldOrder,
       classifyMeldForUi: context.classifyMeldForUi,
-      ensureCardId() {}, packCard: (card) => ({ ...card }), sortHand() {}, showMessage() {},
-      processBossMeldChange: async () => {}, showDebugBossDamageReaction() {},
-      renderHand() {}, cardElById: () => null, renderAll() {}, commitState: async () => {},
+      ensureCardId() {},
+      packCard: (card) => ({ ...card }),
+      sortHand() {},
+      showMessage() {},
+      processBossMeldChange: async () => {},
+      showDebugBossDamageReaction() {},
+      renderHand() {},
+      cardElById: () => null,
+      renderAll() {},
+      commitState: async () => {},
       playDominationFriendSharedDraw: async () => {},
     });
     vm.runInContext(`async ${appFunction('processDominationReward')}`, live);
@@ -1697,15 +2109,30 @@ test('DevTools concede o mesmo bonus ao Dominador e a amiga fora do turno dela',
 
 test('bonus compartilhado respeita diferenca por turno, adversario, saida e limite do auxiliar', async () => {
   const state = invite();
-  const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    state, dominationFeatureEnabled, grantDominationFriendExtraTurn, grantDominationFriendSharedBonus,
-    ensureCardId() {}, packCard: (card) => ({ ...card }), sortHand() {}, showMessage() {},
+  const live = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    dominationFeatureEnabled,
+    grantDominationFriendExtraTurn,
+    grantDominationFriendSharedBonus,
+    ensureCardId() {},
+    packCard: (card) => ({ ...card }),
+    sortHand() {},
+    showMessage() {},
   });
   vm.runInContext(`async ${appFunction('processDominationReward')}`, live);
   state.stock = cards(Array(20).fill('K'), '♥', 'rewards');
   let previous = 'simple';
   const initial = state.dominationFriends[0].hand.length;
-  for (const [kind, delta] of [['limpa', 1], ['real', 1], ['asas', 1]]) {
+  for (const [kind, delta] of [
+    ['limpa', 1],
+    ['real', 1],
+    ['asas', 1],
+  ]) {
     await live.processDominationReward(state.players[1], previous, kind, 0);
     assert.equal(state.dominationFriends[0].hand.length, initial + delta);
     previous = kind;
@@ -1737,12 +2164,29 @@ test('compra compartilhada anima nas duas telas uma vez, sem vinheta extra ou re
       tracker.collect(state);
       const flights = [];
       const presentations = new Map();
-      const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-        state, window: { gameSessionId: 1 }, friendNoticeTracker: tracker, friendOperationPending: false,
-        myPlayerIndex: 1, friendActionPresentations: presentations, renderDominationFriend() {},
-        FRIEND_MP3: {}, friendSoundQueue: { enqueue() { assert.fail('compra nao deve entrar na fila de audio'); } },
+      const live = vm.createContext({
+        getDominationFriend,
+        activeDominationFriends,
+        dominationFriends,
+        normalizeDominationFriends,
+        friendControllerId: 'test-host',
+        state,
+        window: { gameSessionId: 1 },
+        friendNoticeTracker: tracker,
+        friendOperationPending: false,
+        myPlayerIndex: 1,
+        friendActionPresentations: presentations,
+        renderDominationFriend() {},
+        FRIEND_MP3: {},
+        friendSoundQueue: {
+          enqueue() {
+            assert.fail('compra nao deve entrar na fila de audio');
+          },
+        },
         playRemoteAction: async (action) => flights.push(action),
-        showDominationFriendNotice() { assert.fail('bonus de cartas nao e despedida'); },
+        showDominationFriendNotice() {
+          assert.fail('bonus de cartas nao e despedida');
+        },
       });
       vm.runInContext(`${appFunction('playDominationFriendSharedDraw')}\n${appFunction('syncDominationFriendNotices')}`, live);
       return { live, presentations, flights };
@@ -1770,19 +2214,38 @@ test('canastra do Dominador inicia as duas compras juntas sem esperar audio e se
   const state = invite();
   const started = [];
   let release;
-  const gate = new Promise((resolve) => { release = resolve; });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
   const friendBonus = grantDominationFriendSharedBonus(state, 1, 'limpa', 1, 0);
-  const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    state, window: { gameSessionId: 1 }, myPlayerIndex: 1,
-    friendActionPresentations: new Map(), renderDominationFriend() {}, showMessage() {},
-    document: { querySelector: () => ({}), getElementById: () => null }, getRect: (node) => node,
-    opponentAnchorRect: (playerId) => ({ playerId }), impactAtRect() {},
-    flyRectToRect: async (_card, _from, to) => { started.push(to.playerId); await gate; },
-    friendSoundQueue: { enqueue() { assert.fail('voos nao aguardam sons'); } },
+  const live = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    window: { gameSessionId: 1 },
+    myPlayerIndex: 1,
+    friendActionPresentations: new Map(),
+    renderDominationFriend() {},
+    showMessage() {},
+    document: { querySelector: () => ({}), getElementById: () => null },
+    getRect: (node) => node,
+    opponentAnchorRect: (playerId) => ({ playerId }),
+    impactAtRect() {},
+    flyRectToRect: async (_card, _from, to) => {
+      started.push(to.playerId);
+      await gate;
+    },
+    friendSoundQueue: {
+      enqueue() {
+        assert.fail('voos nao aguardam sons');
+      },
+    },
   });
   vm.runInContext(`${appFunction('playDominationFriendSharedDraw')}\nasync ${appFunction('playRemoteAction')}`, live);
-  const playback = live.playRemoteAction({ type: 'drawDiscardFechado', playerId: 1,
-    drawnCards: cards(['7'], '♣', 'bonus-owner'), friendBonus });
+  const playback = live.playRemoteAction({ type: 'drawDiscardFechado', playerId: 1, drawnCards: cards(['7'], '♣', 'bonus-owner'), friendBonus });
   try {
     await new Promise(setImmediate);
     assert.deepEqual(started, [1, 'friend'], 'ambos iniciam antes que qualquer voo termine');
@@ -1791,7 +2254,10 @@ test('canastra do Dominador inicia as duas compras juntas sem esperar audio e se
     assert.equal(started.length, 2);
     release();
     await Promise.all([playback, duplicate]);
-  } finally { release(); await playback; }
+  } finally {
+    release();
+    await playback;
+  }
 });
 
 test('canastra da amiga compra para os dois em paralelo e cancelamento nao altera contadores', async () => {
@@ -1802,15 +2268,27 @@ test('canastra da amiga compra para os dois em paralelo e cancelamento nao alter
     const ownerCard = { ...view.stock.at(-1), _isEndgameSteal: false };
     let active = true;
     let release;
-    const gate = new Promise((resolve) => { release = resolve; });
-    const started = [];
-    const playback = playDominationFriendTimeline(view, { steps: [
-      { type: 'drawStock', playerId: 'friend', reason: 'canastra', kind: 'limpa', cards: [friendCard] },
-      { type: 'dominatorBonus', playerId: 1, kind: 'limpa', cards: [ownerCard] },
-    ] }, {
-      animate: async (step) => { started.push(step.playerId); await gate; },
-      render() {}, isActive: () => active,
+    const gate = new Promise((resolve) => {
+      release = resolve;
     });
+    const started = [];
+    const playback = playDominationFriendTimeline(
+      view,
+      {
+        steps: [
+          { type: 'drawStock', playerId: 'friend', reason: 'canastra', kind: 'limpa', cards: [friendCard] },
+          { type: 'dominatorBonus', playerId: 1, kind: 'limpa', cards: [ownerCard] },
+        ],
+      },
+      {
+        animate: async (step) => {
+          started.push(step.playerId);
+          await gate;
+        },
+        render() {},
+        isActive: () => active,
+      },
+    );
     try {
       await new Promise(setImmediate);
       assert.deepEqual(started, ['friend', 1]);
@@ -1824,7 +2302,10 @@ test('canastra da amiga compra para os dois em paralelo e cancelamento nao alter
         assert.equal(view.players[1].hand.length, initial.players[1].hand.length + 1);
         assert.equal(view.stock.length, initial.stock.length - 1);
       }
-    } finally { release(); await playback; }
+    } finally {
+      release();
+      await playback;
+    }
   }
 });
 
@@ -1884,11 +2365,28 @@ test('avisos chegam uma vez em cada cliente e nao repetem eventos salvos no relo
 
 test('sorteio de cinco turnos cresce alem de cinco com conquistas do Dominador e da amiga', async () => {
   const state = game();
-  callDominationFriend(state, 1, createFriendInvitation('unlimited', () => 0.9), 0, rules);
+  callDominationFriend(
+    state,
+    1,
+    createFriendInvitation('unlimited', () => 0.9),
+    0,
+    rules,
+  );
   assert.equal(state.dominationFriends[0].turnsRemaining, 5);
-  const human = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host',
-    state, dominationFeatureEnabled, grantDominationFriendExtraTurn, grantDominationFriendSharedBonus, ensureCardId() {}, packCard: (card) => ({ ...card }),
-    sortHand() {}, showMessage() {},
+  const human = vm.createContext({
+    getDominationFriend,
+    activeDominationFriends,
+    dominationFriends,
+    normalizeDominationFriends,
+    friendControllerId: 'test-host',
+    state,
+    dominationFeatureEnabled,
+    grantDominationFriendExtraTurn,
+    grantDominationFriendSharedBonus,
+    ensureCardId() {},
+    packCard: (card) => ({ ...card }),
+    sortHand() {},
+    showMessage() {},
   });
   vm.runInContext(`async ${appFunction('processDominationReward')}`, human);
   state.teams[1].melds = [cards(['3', '4', '5', '6', '7', '8', '9'])];
@@ -1906,7 +2404,12 @@ test('sorteio de cinco turnos cresce alem de cinco com conquistas do Dominador e
 });
 
 test('reta final depende do monte principal e de todos os mortos, nao encerra a presenca antecipadamente', () => {
-  for (const [stockCount, hasDead, urgent] of [[5, false, true], [0, false, true], [6, false, false], [5, true, false]]) {
+  for (const [stockCount, hasDead, urgent] of [
+    [5, false, true],
+    [0, false, true],
+    [6, false, false],
+    [5, true, false],
+  ]) {
     const state = invite();
     state.stock = cards(Array(stockCount).fill('K'), '♥', 'main');
     state.deadPiles = [[], hasDead ? cards(['J'], '♥', 'dead') : []];
@@ -1963,12 +2466,16 @@ test('bonus animado mostra uma carta em qualquer categoria e atualiza contadores
         assert.ok(view.dominationFriendShared.stock.some((card) => card.id === step.cards[0].id));
         flights.push(step);
       },
-      render: () => stocks.push(view.dominationFriendShared.stock.length), isActive: () => true,
+      render: () => stocks.push(view.dominationFriendShared.stock.length),
+      isActive: () => true,
     });
     const bonuses = flights.filter((step) => step.reason === 'canastra');
     assert.equal(bonuses.length, count);
     assert.ok(bonuses.every((step) => step.kind === kind && step.drawTotal === count));
-    assert.deepEqual(bonuses.map((step) => step.drawIndex), Array.from({ length: count }, (_, i) => i));
+    assert.deepEqual(
+      bonuses.map((step) => step.drawIndex),
+      Array.from({ length: count }, (_, i) => i),
+    );
     assert.deepEqual(stocks, [5, 4, 4, ...Array.from({ length: count }, (_, i) => [3 - i, 3 - i]).flat(), 4 - count]);
     assert.deepEqual(view.dominationFriends[0].hand, state.dominationFriends[0].hand);
     assert.deepEqual(view.dominationFriendShared.stock, state.dominationFriendShared.stock);
