@@ -1,4 +1,5 @@
 // bot.js
+import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './js/game/domination-strategy.js';
 
 export class BuracoBot {
   static _turnLocks = new Set();
@@ -80,13 +81,15 @@ export class BuracoBot {
       // Verifica se existe QUALQUER morto na mesa (seja para pegar ou para virar monte)
       const hasDeadPiles = state.deadPiles && state.deadPiles.some((p) => p && p.length > 0);
 
-      // 🚨 REGRA DO BURACO: Se não tem mais morto e faltam 8 cartas ou menos no monte, é PÂNICO!
+      // Domination waits for <=4 cards without dead piles; other modes keep <=8.
       // O bot desliga o modo "fresco" do Ás-a-Ás e passa a desovar jogo separado, sujar cruzado, etc.
-      const isMonteSecando = !hasDeadPiles && stockCount <= 8;
+      const isDominationOwner = state.mode === '1x1_dominacao' && botIndex === 1;
+      const isMonteSecando = isDominationOwner ? dominationStockEndgame(state) : !hasDeadPiles && stockCount <= 8;
       const isPanicDump = oppAboutToWin || isMonteSecando;
 
       // isDesperate absorve o Pânico, forçando o bot a quebrar as regras de segurar carta
-      const isDesperate = oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25) || isPanicDump;
+      const isDesperate = isDominationOwner ? isMonteSecando
+        : oppScore > myScore + 1000 || (oppTookMorto && !tookMorto && stockCount < 25) || isPanicDump;
       const isRushingMorto = !tookMorto && me.hand.length <= 5;
       const isDuo = state.mode?.startsWith('boss_') || state.mode === '2x2' || ((state.mode === '1x2' || state.mode === '1x3') && team.playerIndexes && team.playerIndexes.length > 1);
 
@@ -94,7 +97,7 @@ export class BuracoBot {
       const isVip = ((state.mode === '1x1_dominacao' || state.mode === '1x1_duploMorto') && botIndex === 1) || ((state.mode === '1x2' || state.mode === '1x3') && me.teamId === 1);
 
       // VIP Sniper ativado desde o turno 1, desliga se entrar em pânico
-      const isVipSniper = isVip && !isDesperate && stockCount > 10;
+      const isVipSniper = isDominationOwner ? !isMonteSecando : isVip && !isDesperate && stockCount > 10;
 
       // 🛑 MODO HUMILHAÇÃO (FARMING): Desativado se o jogo estiver acabando
       const isFarming = isVip && tookMorto && engine.teamHasGoodCanastra(team.id) && (!oppHasCanastra || myScore > oppScore + 1000) && stockCount > 6 && !isPanicDump;
@@ -261,7 +264,22 @@ export class BuracoBot {
   static preservesDominationMeld(state, botIndex, base, after, engine) {
     if (state.mode !== '1x1_dominacao' || botIndex !== 1) return true;
     const before = this.simulateMeld(base, [], engine);
+    if (!dominationStockEndgame(state) && this.isMeldDirty(after)) return false;
     return this.isMeldDirty(before) || !this.isMeldDirty(after);
+  }
+
+  static dominationOpeningValidator(state, botIndex, hand, melds, engine) {
+    if (state.mode !== '1x1_dominacao' || botIndex !== 1 || dominationStockEndgame(state)) return () => true;
+    const prepare = cards => this.simulateMeld(cards, [], engine);
+    const available = new Set(dominationOpeningCards(hand, melds, {
+      prepare,
+      isWild: card => this.isMeldDirty([card]),
+    }).map(card => card.id));
+    return combo => {
+      if (!combo.every(card => available.has(card.id))) return false;
+      const prepared = prepare(combo);
+      return engine.isValidSequenceMeld(prepared) && !this.isMeldDirty(prepared);
+    };
   }
 
   static evaluateDiscard(state, hand, team, engine, ctx) {
@@ -269,6 +287,7 @@ export class BuracoBot {
     if (pileSize === 0) return false;
 
     const topCard = state.discard[pileSize - 1];
+    const allowsOpening = this.dominationOpeningValidator(state, state.currentPlayer, [...hand, topCard], team.melds, engine);
     const isJuicyPile = pileSize >= 8;
     const isEndgame = ctx.isVipSniper ? state.stock.length <= 10 : state.stock.length <= 22 || (ctx.tookMorto && hand.length <= 6);
 
@@ -344,6 +363,7 @@ export class BuracoBot {
       for (let i = 0; i < hand.length - 1; i++) {
         for (let j = i + 1; j < hand.length; j++) {
           const combo = [hand[i], hand[j], topCard];
+          if (!allowsOpening(combo)) continue;
 
           if (this.isComboPerfectlyClean3(combo, engine)) {
             if (!checkSafe(2, combo)) continue;
@@ -356,7 +376,7 @@ export class BuracoBot {
             const suit = getRealSuit(combo);
             const hasMeldSameSuit = suit && team.melds && team.melds.some((m) => getRealSuit(m) === suit);
 
-            if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
+            if (hasMeldSameSuit && !(state.mode === '1x1_dominacao' && state.currentPlayer === 1) && (ctx.isVip || !ctx.isDesperate)) {
               if (!ctx.isPanicDump) continue;
             }
 
@@ -373,6 +393,7 @@ export class BuracoBot {
       for (let i = 0; i < hand.length - 1; i++) {
         for (let j = i + 1; j < hand.length; j++) {
           const combo = [hand[i], hand[j], topCard];
+          if (!allowsOpening(combo)) continue;
 
           if (engine.isValidSequenceMeld(combo)) {
             const wilds = combo.filter((c) => c.joker || c.rank === '2');
@@ -444,6 +465,7 @@ export class BuracoBot {
         for (let i = 0; i < hand.length - 1; i++) {
           for (let j = i + 1; j < hand.length; j++) {
             const combo = [hand[i], hand[j], topCard];
+            if (!allowsOpening(combo)) continue;
             const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
 
             if (wilds === 1 && engine.isValidSequenceMeld(combo)) {
@@ -551,7 +573,20 @@ export class BuracoBot {
 
       // 🧠 MODO SNIPER (Ganância Segura): VIPs jogam para humilhar, mas só APÓS garantir uma canastra limpa.
       // A trava VIP agora vem do contexto global para operar de forma unificada
+      if (s.mode === '1x1_dominacao' && botIndex === 1) {
+        // Draws and canastra bonuses can cross the threshold within this turn.
+        const endgame = dominationStockEndgame(s);
+        ctx = { ...ctx, isDesperate: endgame, isPanicDump: endgame,
+          isVipSniper: !endgame, isFarming: ctx.isFarming && !endgame };
+      }
       const isVipSniper = ctx.isVipSniper;
+      const allowsOpening = this.dominationOpeningValidator(s, botIndex, me.hand, team.melds, engine);
+      // Longer clean runs get first refusal, regardless of creation order.
+      const meldOrder = team.melds.map((meld, index) => ({ meld, index }));
+      if (s.mode === '1x1_dominacao' && botIndex === 1) {
+        meldOrder.sort((a, b) => Number(this.isMeldDirty(a.meld)) - Number(this.isMeldDirty(b.meld))
+          || b.meld.length - a.meld.length);
+      }
 
       const naturePriorities = engine.getNaturePriorities?.(me.id);
       const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
@@ -598,6 +633,7 @@ export class BuracoBot {
                 if (second === markedIndex) continue;
                 const indexes = [markedIndex, first, second];
                 const combo = indexes.map((index) => me.hand[index]);
+                if (!allowsOpening(combo)) continue;
                 if (!engine.isValidSequenceMeld(combo) || !this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
                 this.assertActive(engine, signal);
                 const moved = await engine.executeMeldNew(botIndex, indexes);
@@ -614,7 +650,7 @@ export class BuracoBot {
       }
 
       if (team.melds && team.melds.length > 0) {
-        for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+        for (const { index: mIdx } of meldOrder) {
           if (engine.isMeldLocked?.(team.id, mIdx)) continue;
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
@@ -645,7 +681,7 @@ export class BuracoBot {
       if (madeMove) continue;
 
       if (team.melds && team.melds.length > 0) {
-        for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
+        for (const { index: mIdx } of meldOrder) {
           if (engine.isMeldLocked?.(team.id, mIdx)) continue;
           const meld = team.melds[mIdx];
           if (this.isMeldDirty(meld)) continue;
@@ -687,12 +723,36 @@ export class BuracoBot {
       }
       if (madeMove) continue;
 
+      // A + natural 2 (or another two-card bridge) may only fit together.
+      // Try that before opening a separate run with the same cards.
+      if (s.mode === '1x1_dominacao' && botIndex === 1) {
+        for (const { meld, index: mIdx } of meldOrder) {
+          if (meld.length >= 14 || engine.isMeldLocked?.(team.id, mIdx)) continue;
+          for (let first = 0; first < me.hand.length - 1 && !madeMove; first++) {
+            for (let second = first + 1; second < me.hand.length; second++) {
+              const after = this.simulateMeld(meld, [me.hand[first], me.hand[second]], engine);
+              if (this.isMeldDirty(after) || !engine.isValidSequenceMeld(after)
+                || !this.canMeldSafely(me, team, 2, engine, after, ctx)) continue;
+              this.assertActive(engine, signal);
+              madeMove = (await engine.executeMeldExtend(botIndex, mIdx, [first, second])) !== false;
+              if (madeMove) {
+                await this.paceBetweenActions(engine, signal);
+                break;
+              }
+            }
+          }
+          if (madeMove) break;
+        }
+      }
+      if (madeMove) continue;
+
       let n = me.hand.length;
       if (n >= 3) {
         for (let i = 0; i < n - 2; i++) {
           for (let j = i + 1; j < n - 1; j++) {
             for (let k = j + 1; k < n; k++) {
               const combo = [me.hand[i], me.hand[j], me.hand[k]];
+              if (!allowsOpening(combo)) continue;
               if (!this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
 
               // Validação blindada: Permite sequência pura OU o "Falso Sujo" (2 do mesmo naipe)
@@ -718,9 +778,9 @@ export class BuracoBot {
               if (suit) {
                 const hasMeldSameSuit = team.melds.some((m) => getRealSuit(m) === suit);
 
-                // VIPs (Dominadores) NUNCA dividem o mesmo naipe.
-                // Bots normais só podem dividir no desespero absoluto (ex: última carta para bater).
-                if (hasMeldSameSuit && (ctx.isVip || !ctx.isDesperate)) {
+                // Domination may seed a second clean run using surplus copies;
+                // The opening validator already protected the first run.
+                if (hasMeldSameSuit && !(s.mode === '1x1_dominacao' && botIndex === 1) && (ctx.isVip || !ctx.isDesperate)) {
                   // Se entrou em pânico (8 cartas finais sem morto), a honra VIP é suspensa e ele joga as cartas para fugir da multa
                   if (!ctx.isPanicDump) continue;
                 }
@@ -751,7 +811,9 @@ export class BuracoBot {
       }
 
       // 🛑 TRAVA DO SNIPER ABSOLUTA: O VIP é blindado de jogar coringas na mesa antes do verdadeiro endgame
-      if (isVipSniper) {
+      if (s.mode === '1x1_dominacao' && botIndex === 1) {
+        allowDirty = dominationStockEndgame(s);
+      } else if (isVipSniper) {
         allowDirty = false;
       }
 
@@ -829,6 +891,7 @@ export class BuracoBot {
             for (let j = i + 1; j < n - 1; j++) {
               for (let k = j + 1; k < n; k++) {
                 const combo = [me.hand[i], me.hand[j], me.hand[k]];
+                if (!allowsOpening(combo)) continue;
                 if (!this.canMeldSafely(me, team, 3, engine, combo)) continue;
 
                 const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
@@ -890,6 +953,11 @@ export class BuracoBot {
     let minDanger = 9999;
     const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
     const orderedSuit = dominatrixPriorities?.discardSuit || null;
+    const growingClean = state.mode === '1x1_dominacao' && botIndex === 1
+      ? cleanDominationMelds(state.teams[me.teamId].melds, {
+        prepare: meld => this.simulateMeld(meld, [], engine),
+        isWild: card => this.isMeldDirty([card]),
+      }).filter(meld => meld.length < 14) : [];
 
     for (let i = 0; i < me.hand.length; i++) {
       const c = me.hand[i];
@@ -897,6 +965,12 @@ export class BuracoBot {
       if (!c || state.pickedDiscardCardId === c.id || engine.isCardBlocked?.(me.id, c.id, 'discard')) continue;
 
       let danger = 0;
+      if (!c.joker) {
+        const needed = growingClean.filter(meld => meld[0].suit === c.suit).reduce((sum, meld) =>
+          sum + Math.max(0, (c.rank === 'A' ? 2 : 1) - meld.filter(card => card.rank === c.rank).length), 0);
+        const copies = me.hand.filter(card => !card.joker && card.suit === c.suit && card.rank === c.rank).length;
+        if (needed >= copies) danger += 1500;
+      }
       // Nunca joga coringa fora a não ser que seja a última opção da vida
       if (c.joker || c.rank === '2') {
         danger += 1000;

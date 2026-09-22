@@ -1,4 +1,5 @@
 import { createDeck } from '../deck.js';
+import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './domination-strategy.js';
 
 export const FRIEND_NAMES = Object.freeze(['Bruna', 'Nathalia', 'Thayanne']);
 export const FRIEND_PRESENTATION_TIMING = Object.freeze({ spinMs: 3600, resultMs: 1400, dealMs: 1600 });
@@ -247,8 +248,7 @@ export function isDominationFriendBusy(state, now = Date.now()) {
 }
 
 export function isDominationFriendEndgame(state) {
-  return state?.mode === MODE && Array.isArray(state.stock) && state.stock.length < 6
-    && Array.isArray(state.deadPiles) && !state.deadPiles.some((pile) => pile?.length);
+  return dominationStockEndgame(state);
 }
 
 export function queueDominationFriendTurn(state, outgoingPlayerId) {
@@ -349,23 +349,20 @@ function growPlan(base, hand, rules, farewell, requiredId = null) {
 
 function spendsReservedNaturals(candidate, hand, melds, rules, targetIndex = -1) {
   const spent = new Set(candidate.added.map((card) => card.id));
-  return melds.some((raw, index) => {
-    if (index === targetIndex) return false;
-    const meld = rules.prepare(raw);
-    if (!isClean(meld, rules) || meld.length >= 14) return false;
-    const suit = meldSuit(meld, rules);
-    // Retain missing natural ranks for each growing clean sequence. Duplicate
-    // copies are free to use elsewhere, as are cards already present there.
-    return candidate.added.some((card) => {
-      if (card.joker || card.suit !== suit) return false;
-      const needed = (card.rank === 'A' ? 2 : 1) - meld.filter((entry) => entry.rank === card.rank).length;
-      if (needed <= 0) return false;
-      return hand.filter((entry) => !entry.joker && entry.suit === suit && entry.rank === card.rank && !spent.has(entry.id)).length < needed;
-    });
+  const growing = cleanDominationMelds(melds.filter((_, index) => index !== targetIndex), rules)
+    .filter(meld => meld.length < 14);
+  return candidate.added.some(card => {
+    if (card.joker) return false;
+    const needed = growing.filter(meld => meldSuit(meld, rules) === card.suit).reduce((sum, meld) =>
+      sum + Math.max(0, (card.rank === 'A' ? 2 : 1) - meld.filter(entry => entry.rank === card.rank).length), 0);
+    return hand.filter(entry => !entry.joker && entry.suit === card.suit && entry.rank === card.rank && !spent.has(entry.id)).length < needed;
   });
 }
 
 function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = null) {
+  // Grow existing sequences first; only surplus copies may seed another one.
+  // Filter before planning so a greedy extension cannot consume a reserved rank.
+  if (!farewell) hand = dominationOpeningCards(hand, melds, rules);
   let best = null;
   const seen = new Set();
   for (let i = 0; i < hand.length - 2; i++) {
@@ -387,24 +384,9 @@ function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = 
         const clearsHand = added.length === hand.length;
         if (!farewell) {
           const clean = isClean(meld, rules);
-          // Before farewell, keep weak triples and small wild games in hand.
-          // A separate wild opening needs a concrete payoff: a canastra or
-          // emptying the hand. Existing clean melds are never dirtied for this.
-          if (clean ? meld.length < 4 : meld.length < 7 && !clearsHand) continue;
-          if (spendsReservedNaturals({ added }, hand, melds, rules)) continue;
-          // With time to wait, do not fragment a growing clean suit into small
-          // parallel games just because duplicate ranks make that legal.
-          if (turnsRemaining >= 3 && meld.length < 7 && melds.some((base) => {
-            const existing = rules.prepare(base);
-            return existing.length < 14 && isClean(existing, rules)
-              && meldSuit(existing, rules) === meldSuit(meld, rules);
-          })) continue;
-          // Even a scoring opening must not spend a 2 that can seed its own
-          // natural sequence, unless the hand contains another copy of that 2.
-          const spendsUsefulTwo = meld.some((card) => card.rank === '2' && rules.isWild(card, meld)
-            && hand.filter((entry) => !entry.joker && entry.suit === card.suit && entry.rank !== '2').length >= 2
-            && !hand.some((entry) => entry.id !== card.id && entry.rank === '2' && entry.suit === card.suit));
-          if (spendsUsefulTwo) continue;
+          // Even a clean triple is a useful seed. Wild openings wait until
+          // departure/endgame; a seven-card dirty meld is not an exception.
+          if (!clean) continue;
         }
         // On departure, favor a complete separate opening over a weak natural
         // fragment that strands its wild. This heuristic stays below the 12000
@@ -525,7 +507,13 @@ export function executeDominationFriendTurn(state, turnId, rules, { owner = 'loc
         available = available.filter((card) => !spendsReservedNaturals({ added: [card] }, friend.hand, team.melds, rules, meldIndex));
       }
       const candidate = growPlan(base, available, rules, unload);
-      if (candidate && (!chosen || candidate.value > chosen.value)) chosen = { ...candidate, meldIndex };
+      if (candidate) {
+        const clean = isClean(candidate.meld, rules);
+        const chosenClean = chosen && isClean(chosen.meld, rules);
+        if (!chosen || (!unload && clean !== chosenClean ? clean : candidate.value > chosen.value)) {
+          chosen = { ...candidate, meldIndex };
+        }
+      }
     });
     if (!chosen) {
       const candidate = bestNewMeld(friend.hand, team.melds, rules, unload, friend.turnsRemaining);
@@ -561,7 +549,14 @@ export function executeDominationFriendTurn(state, turnId, rules, { owner = 'loc
   // Discard only to her private pile; retain wilds and connected naturals.
   if (friend.hand.length) {
     const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const growingClean = cleanDominationMelds(team.melds, rules).filter(meld => meld.length < 14);
     const usefulness = (card) => {
+      if (!card.joker) {
+        const needed = growingClean.filter(meld => meld[0].suit === card.suit).reduce((sum, meld) =>
+          sum + Math.max(0, (card.rank === 'A' ? 2 : 1) - meld.filter(entry => entry.rank === card.rank).length), 0);
+        const copies = friend.hand.filter(entry => !entry.joker && entry.suit === card.suit && entry.rank === card.rank).length;
+        if (needed >= copies) return 1000;
+      }
       if (card.joker || card.rank === '2') return 100;
       const rank = ranks.indexOf(card.rank);
       const neighbors = (cards) => cards.filter((other) => other.id !== card.id && other.suit === card.suit

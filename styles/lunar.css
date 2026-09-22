@@ -72,3 +72,35 @@ body[data-table-theme='lunar'] .table-preview-icon {
   background: #080f3e url('../assets/lunar/table.webp') center / cover no-repeat;
   border-color: #d5aa59;
 }
+
+/* Shield the HUD from the bright moon without moving the table layout. */
+body[data-table-theme='lunar'] #gameSection .board-status {
+  background: rgba(8, 12, 38, .96);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px rgba(8, 12, 38, .96),
+    0 0 0 4px rgba(245, 206, 131, .45),
+    0 5px 16px rgba(2, 5, 24, .5);
+  color: #fff8e5;
+  text-shadow: 0 1px 2px #020518;
+}
+body[data-table-theme='lunar'] .board-status .current-player-chip {
+  background: #171e42;
+  color: #fff8e5;
+}
+body[data-table-theme='lunar'] .board-status .current-player-chip.is-my-turn {
+  background: #302647;
+  border-color: #f5ce83;
+}
+body[data-table-theme='lunar'] #gameModeBadge {
+  color: #ffe3a6 !important;
+  text-shadow: 0 1px 2px #020518;
+}
+body[data-table-theme='lunar'] .board-status .match-duration {
+  color: #f1edff;
+}
+/* Keep the existing critical timer color and pulse unchanged. */
+body[data-table-theme='lunar'] #turnTimerLabel:not(.timer-critical) {
+  color: #ffe38a !important;
+  font-weight: 700;
+}

@@ -5725,9 +5725,10 @@ function renderAll() {
   function updatePile3D(container, baseCardClass, count, backColor, keepArcade) {
     if (!container) return 0;
 
-    container.querySelectorAll('.visual-layer').forEach((e) => e.remove());
+    const existingLayers = [...container.querySelectorAll('.visual-layer')];
 
     if (count === 0) {
+      existingLayers.forEach(layer => layer.remove());
       container.style.background = '';
       container.style.border = '';
       container.style.boxShadow = '';
@@ -5749,11 +5750,13 @@ function renderAll() {
     if (layers > 16) layers = 16;
 
     const topClass = backColor === 'blue' ? 'back-blue' : backColor === 'red' ? 'back-red' : 'visual-discard-layer';
+    const visibleLayers = isDiscard ? layers - 1 : layers;
+    existingLayers.slice(visibleLayers).forEach(layer => layer.remove());
 
     for (let i = 0; i < layers; i++) {
       if (isDiscard && i === layers - 1) continue;
 
-      const layer = document.createElement('div');
+      const layer = existingLayers[i] || document.createElement('div');
       const isTopLayer = i === layers - 1;
 
       // Intercala as cores herdando perfeitamente as classes do Tema
@@ -5763,10 +5766,11 @@ function renderAll() {
         currentClass = (layers - 1 - i) % 2 === 0 ? topClass : isBlueTop ? 'back-red' : 'back-blue';
       }
 
-      layer.className = `${baseCardClass} visual-layer ${currentClass}`;
-      if (!isTopLayer && !isDiscard) {
-        layer.classList.add('sub-layer'); // Aciona o CSS que apaga os ícones de dentro
+      layer.classList.add(...baseCardClass.split(' '), 'visual-layer');
+      for (const colorClass of ['back-blue', 'back-red', 'visual-discard-layer']) {
+        layer.classList.toggle(colorClass, colorClass === currentClass);
       }
+      layer.classList.toggle('sub-layer', !isTopLayer && !isDiscard);
       if (keepArcade && isTopLayer) layer.classList.add('arcade-car-run');
 
       layer.style.position = 'absolute';
@@ -5786,7 +5790,7 @@ function renderAll() {
         } else {
           layer.style.setProperty('box-shadow', '-0.5px 1px 1px rgba(0,0,0,0.7), inset 0 0 2px rgba(0,0,0,0.5)', 'important');
         }
-      }
+      } else layer.style.removeProperty('box-shadow');
 
       if (isDiscard) {
         layer.style.background = '#f3f4f6';
@@ -5795,9 +5799,9 @@ function renderAll() {
       } else if (!isTopLayer) {
         // Escurece gradativamente para dar noção de profundidade na pilha
         layer.style.filter = `brightness(${0.4 + (i / layers) * 0.5})`;
-      }
+      } else layer.style.filter = '';
 
-      container.appendChild(layer);
+      if (!layer.parentNode) container.appendChild(layer);
     }
     return layers;
   }
@@ -5841,9 +5845,10 @@ function renderAll() {
     discardFace.style.right = `${topIndex * 0.3}px`;
     discardFace.style.zIndex = 20;
 
-    discardFace.innerHTML = cardFrontHTML(discardTop);
+    const discardMarkup = cardFrontHTML(discardTop) + (pollenThreat ? '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>' : '');
+    if (discardFace._faceMarkup !== discardMarkup) discardFace.innerHTML = discardMarkup;
+    discardFace._faceMarkup = discardMarkup;
     discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}`;
-    if (pollenThreat) discardFace.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>');
     discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
   }
 
@@ -6051,7 +6056,6 @@ function renderHand() {
   const handRoot = document.getElementById('handContainer');
   // Replacing the DOM under a stationary cursor must not lift a different
   // card after a discard. Re-enable PC hover only after genuine mouse motion.
-  handRoot.classList.add('hand-hover-reset');
   handRoot.onpointerenter = (event) => {
     if (event.pointerType === 'mouse') handRoot.classList.remove('hand-hover-reset');
   };
@@ -6061,7 +6065,39 @@ function renderHand() {
     }
   };
   const container = document.querySelector('#handContainer .cards-row');
-  container.innerHTML = '';
+  const nextCards = document.createDocumentFragment();
+  const commitHand = () => {
+    const oldCards = new Map([...container.children].map(node => [node.dataset.cardId, node]));
+    const desired = [...nextCards.children];
+    const orderChanged = desired.length !== container.children.length
+      || desired.some((node, index) => node.dataset.cardId !== container.children[index]?.dataset.cardId);
+    if (orderChanged) handRoot.classList.add('hand-hover-reset');
+    desired.forEach((fresh, index) => {
+      const existing = oldCards.get(fresh.dataset.cardId);
+      const node = existing || fresh;
+      if (existing) {
+        // Preserve faces and running effects; refresh handlers because indexes
+        // and collateral choices can change without changing the card itself.
+        for (const name of (existing._handClasses || existing.className).split(' ').filter(Boolean)) {
+          if (!fresh.classList.contains(name)) existing.classList.remove(name);
+        }
+        for (const name of fresh.classList) existing.classList.add(name);
+        for (const name of ['title', 'aria-label']) {
+          if (fresh.hasAttribute(name)) existing.setAttribute(name, fresh.getAttribute(name));
+          else existing.removeAttribute(name);
+        }
+        if (existing._faceMarkup !== fresh.innerHTML) existing.innerHTML = fresh.innerHTML;
+        if (existing._handVisibility !== fresh.style.visibility) existing.style.visibility = fresh.style.visibility;
+        existing.onclick = fresh.onclick;
+      }
+      node._faceMarkup = fresh.innerHTML;
+      node._handClasses = fresh.className;
+      node._handVisibility = fresh.style.visibility;
+      if (container.children[index] !== node) container.insertBefore(node, container.children[index] || null);
+      oldCards.delete(fresh.dataset.cardId);
+    });
+    oldCards.forEach(node => node.remove());
+  };
   const localLabelEl = document.getElementById('localPlayerLabel'); // Captura o novo elemento
 
   // --- MODO ESPECTADOR ---
@@ -6071,15 +6107,16 @@ function renderHand() {
       localLabelEl.classList.remove('boss-player-targeted');
     }
     const p0 = state.players[0];
-    if (!p0) return;
+    if (!p0) { commitHand(); return; }
 
     p0.hand.forEach((card) => {
       ensureCardId(card);
       const div = document.createElement('div');
       div.dataset.cardId = card.id;
       div.className = 'carta back ' + (card.back === 'blue' ? 'back-blue' : 'back-red');
-      container.appendChild(div);
+      nextCards.appendChild(div);
     });
+    commitHand();
     return;
   }
 
@@ -6090,6 +6127,7 @@ function renderHand() {
       localLabelEl.style.display = 'none';
       localLabelEl.classList.remove('boss-player-targeted');
     }
+    commitHand();
     return;
   }
 
@@ -6207,8 +6245,9 @@ function renderHand() {
       renderHand();
       renderMelds(); // Atualiza a mesa para acender/apagar a zona de drop
     };
-    container.appendChild(div);
+    nextCards.appendChild(div);
   });
+  commitHand();
 }
 
 function seatForPlayer(pid, friendId = null) {
@@ -6581,7 +6620,7 @@ function renderMelds() {
       const isEscravoRole = normalizedRole.includes('escravo');
       const roleClass = isDominadorRole ? 'role-dominador' : isEscravoRole ? 'role-escravo' : 'role-neutral';
 
-      titleEl.innerHTML = `
+      const identityMarkup = `
               <div class="player-title-main">
                 <div class="player-identity-chip ${roleClass}">
                   <span class="identity-copy">
@@ -6590,12 +6629,16 @@ function renderMelds() {
                   </span>
                 </div>
                 <div class="player-title-badges">${mortoHtml}${extraCardsHtml}${powerStealHtml}</div>
-              </div>
-              <div class="title-score-cluster">
+              </div>`;
+      if (!titleEl.querySelector('.title-score-cluster')) {
+        titleEl.innerHTML = `${identityMarkup}<div class="title-score-cluster">
                 <div id="liveMoney${i + 1}" class="live-money-badge"></div>
                 <strong id="scoreTeam${i + 1}">${i === 0 ? s1 : s2}</strong>
-              </div>
-            `;
+              </div>`;
+      } else if (titleEl._identityMarkup !== identityMarkup) {
+        titleEl.querySelector('.player-title-main').outerHTML = identityMarkup;
+      }
+      titleEl._identityMarkup = identityMarkup;
     }
 
     const target = i === 0 ? m1 : m2;
@@ -6785,13 +6828,17 @@ function renderMelds() {
       };
       retainedMeldKeys.add(key);
       const existing = stableMelds ? target.querySelector(`[data-meld-key="${key}"]`) : null;
-      if (existing?.isEqualNode(div)) {
+      // Compare the requested render, not live DOM mutated by card flights
+      // (visibility/transforms) or theme animations.
+      const renderMarkup = div.outerHTML;
+      if (existing && existing._meldRenderMarkup === renderMarkup) {
         existing.onclick = div.onclick; // Refresh closures without resetting animations.
       } else if (existing) {
         existing.replaceWith(div);
       } else {
         target.appendChild(div);
       }
+      (existing && existing._meldRenderMarkup === renderMarkup ? existing : div)._meldRenderMarkup = renderMarkup;
     });
   });
 
@@ -6808,6 +6855,10 @@ function renderMelds() {
 
   function triggerScoreAnim(teamIndex, oldScore, newScore) {
     const scoreEl = document.getElementById(`scoreTeam${teamIndex + 1}`);
+    if (scoreEl._scoreTarget === newScore) return;
+    scoreEl._scoreTarget = newScore;
+    const animationId = (scoreEl._scoreAnimationId || 0) + 1;
+    scoreEl._scoreAnimationId = animationId;
     if (newScore <= oldScore) {
       scoreEl.textContent = newScore;
       return;
@@ -6841,6 +6892,7 @@ function renderMelds() {
     let startTime = null;
     const duration = 900;
     const step = (timestamp) => {
+      if (!scoreEl.isConnected || scoreEl._scoreAnimationId !== animationId) return;
       if (!startTime) startTime = timestamp;
       const progress = Math.min((timestamp - startTime) / duration, 1);
       scoreEl.textContent = Math.floor(progress * diff + oldScore);
