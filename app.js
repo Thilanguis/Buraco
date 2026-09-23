@@ -1,4 +1,4 @@
-import { ALL_CANASTRA_SFX, DECK_MOVE_SFX, TABLE_ASAS_SFX, BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSearch, sfxSteal, stopAllGameSfx } from './js/audio.js';
+import { ALL_CANASTRA_SFX, DECK_MOVE_SFX, TABLE_ASAS_SFX, TABLE_CANASTRA_SFX, BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSearch, sfxSteal, stopAllGameSfx } from './js/audio.js';
 import { chooseDominationSearchCard } from './js/game/domination-search.js';
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
@@ -91,7 +91,7 @@ import { createVisionAlert } from './js/game/domination-vision-alert.js';
 import { createVisionFocus } from './js/game/domination-vision-focus.js';
 import { setDebugFriends, debugFriendMeld } from './js/game/domination-dev-tools.js';
 import { animateDiscardTransfer } from './js/game/discard-presentation.js';
-import { FRIEND_MP3, createFriendSoundQueue, waitForPlayingCanastras } from './js/game/domination-friend-sound.js';
+import { FRIEND_MP3, friendNoticeSound, createFriendSoundQueue, waitForPlayingCanastras } from './js/game/domination-friend-sound.js';
 
 // Importa a IA do Bot
 import { BuracoBot } from './bot.js';
@@ -1196,7 +1196,7 @@ function syncHeartbeatAudio(active) {
 
 ALL_CANASTRA_SFX.forEach((a) => {
   a.preload = 'auto';
-  a.volume = Object.values(TABLE_ASAS_SFX).includes(a) ? 1 : 0.9;
+  if (Object.values(CANASTRA_SFX).includes(a)) a.volume = 0.9;
 });
 
 function unlockAudio() {
@@ -1478,7 +1478,7 @@ function playCanastraSfx(kind) {
     }
   }
   const tableTheme = normalizeTableTheme(state?.tableTheme || document.body.dataset.tableTheme);
-  const a = (kind === 'asas' && TABLE_ASAS_SFX[tableTheme]) || CANASTRA_SFX[kind] || CANASTRA_SFX.suja;
+  const a = TABLE_CANASTRA_SFX[tableTheme]?.[kind] || CANASTRA_SFX[kind] || CANASTRA_SFX.suja;
   if (state?.mode === '1x1_dominacao') {
     if (kind === 'fim') friendSoundQueue.cancel();
     else if (activeDominationFriends(state).length > 0 || friendSoundQueue.busy) {
@@ -2173,7 +2173,7 @@ function syncDominationFriendNotices() {
       continue;
     }
     // Entry music belongs only to the visible roulette, not the arrival notice.
-    friendSoundQueue.enqueue(event.type === 'arrival' ? null : FRIEND_MP3[event.type], () => {
+    friendSoundQueue.enqueue(friendNoticeSound(event), () => {
       if (sessionId !== window.gameSessionId || window.isClosingGame || state?.finished || state?.friendGameId !== gameIdentity) return;
       return showDominationFriendNotice(event);
     });

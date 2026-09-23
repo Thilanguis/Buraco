@@ -43,7 +43,18 @@ export const TABLE_ASAS_SFX = Object.freeze({
   lunar: createBossSfx('assets/sfx/asas-wwe.mp3', 1),
   wwe: createBossSfx('assets/sfx/asas-lunar.mp3', 1),
 });
-export const ALL_CANASTRA_SFX = [...Object.values(CANASTRA_SFX), ...Object.values(TABLE_ASAS_SFX)];
+export const TABLE_CANASTRA_SFX = Object.freeze({
+  lunar: Object.freeze({ asas: TABLE_ASAS_SFX.lunar }),
+  wwe: Object.freeze({
+    // These masters are louder than the existing effects: keep their output
+    // around the default canastras instead of applying the same raw gain.
+    suja: createBossSfx('assets/sfx/canastra-suja-wwe.mp3', 0.35),
+    limpa: createBossSfx('assets/sfx/canastra-limpa-wwe.mp3', 0.4),
+    real: createBossSfx('assets/sfx/canastra-real-wwe.mp3', 0.7),
+    asas: TABLE_ASAS_SFX.wwe,
+  }),
+});
+export const ALL_CANASTRA_SFX = [...Object.values(CANASTRA_SFX), ...Object.values(TABLE_CANASTRA_SFX).flatMap(Object.values)];
 sfxCardMove.preload = 'auto';
 sfxCardMove.volume = 0.5;
 

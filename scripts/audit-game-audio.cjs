@@ -11,11 +11,15 @@ const root = path.join(__dirname, '..');
   const entries = [];
   const add = (label, audio, volume = audio.volume) => entries.push({ label, src: audio.src, gain: volume * Number(audio.dataset?.systemGain || 1) });
   for (const [kind, audio] of Object.entries(config.CANASTRA_SFX)) add(`canastra/${kind}`, audio, .9);
-  for (const [theme, audio] of Object.entries(config.TABLE_ASAS_SFX)) add(`asas/${theme}`, audio);
+  for (const [theme, sounds] of Object.entries(config.TABLE_CANASTRA_SFX)) {
+    for (const [kind, audio] of Object.entries(sounds)) add(`canastra/${theme}/${kind}`, audio);
+  }
   for (const [theme, audio] of Object.entries(config.DECK_MOVE_SFX)) add(`movimento/${theme}`, audio);
   for (const [boss, sounds] of Object.entries(config.BOSS_SFX)) for (const [kind, audio] of Object.entries(sounds)) add(`${boss}/${kind}`, audio);
   for (const key of ['sfxCardMove', 'sfxMyTurn', 'sfxSearch', 'sfxSteal', 'sfxHeartbeat']) add(key, config[key]);
   for (const name of ['entrada', 'saida', 'turno-extra']) add(`amiga/${name}`, { src: `assets/sfx/amiga-${name}.mp3`, volume: .9 });
+  const { FRIEND_EXTRA_TURN_MP3 } = await import(pathToFileURL(path.join(root, 'js/game/domination-friend-sound.js')));
+  for (const [name, src] of Object.entries(FRIEND_EXTRA_TURN_MP3)) add(`amiga/voz/${name}`, { src, volume: .9 });
   for (const [theme, cfg] of Object.entries(config.TABLE_AMBIENT_MUSIC)) {
     add(`musica/${theme}`, cfg);
     if (cfg.intro) add(`intro/${theme}`, { src: cfg.intro, volume: .35 });
@@ -24,6 +28,7 @@ const root = path.join(__dirname, '..');
   try {
     const page = await browser.newPage();
     for (const entry of entries) {
+      if (process.argv.length > 2 && !process.argv.slice(2).some(filter => entry.label.includes(filter))) continue;
       try {
         const data = fs.readFileSync(path.join(root, entry.src)).toString('base64');
         const result = await page.evaluate(async ({ data, gain }) => {

@@ -5,6 +5,22 @@ export const FRIEND_MP3 = Object.freeze({
   extraTurn: 'assets/sfx/amiga-turno-extra.mp3',
 });
 
+export const FRIEND_EXTRA_TURN_MP3 = Object.freeze({
+  Bruna: 'assets/sfx/amiga-bruna-turno-extra.mp3',
+  Nathalia: 'assets/sfx/amiga-nathalia-turno-extra.mp3',
+  Thayanne: 'assets/sfx/amiga-thayanne-turno-extra.mp3',
+  dominador: 'assets/sfx/dominador-luana-turno-extra.mp3',
+});
+
+export function friendNoticeSound(event) {
+  if (event.type === 'arrival') return null;
+  if (event.type !== 'extraTurn') return FRIEND_MP3[event.type];
+  // A single achievement may reward several friends: use its actor, not
+  // the first recipient's name, and let the existing notice grouping play once.
+  return event.playerId === 1 ? FRIEND_EXTRA_TURN_MP3.dominador
+    : FRIEND_EXTRA_TURN_MP3[event.actorName] || FRIEND_MP3.extraTurn;
+}
+
 export function waitForPlayingCanastras(sounds) {
   return Promise.all(sounds.filter((audio) => !audio.paused && !audio.ended).map((audio) => new Promise((resolve) => {
     const finish = () => {

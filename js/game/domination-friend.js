@@ -1,5 +1,5 @@
 import { createDeck } from '../deck.js';
-import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './domination-strategy.js';
+import { cleanDominationMelds, friendDominationCards, friendDominationPlanAllowed, dominationStockEndgame } from './domination-strategy.js';
 
 export const FRIEND_NAMES = Object.freeze(['Bruna', 'Nathalia', 'Thayanne']);
 export const FRIEND_PRESENTATION_TIMING = Object.freeze({ spinMs: 3600, resultMs: 1400, dealMs: 1600 });
@@ -347,6 +347,12 @@ function growPlan(base, hand, rules, farewell, requiredId = null) {
   return best;
 }
 
+function growFriendPlan(base, hand, melds, rules, farewell, meldIndex, requiredId = null) {
+  const available = friendDominationCards(hand, melds, rules, meldIndex);
+  const candidate = growPlan(base, available, rules, farewell, requiredId);
+  return candidate && friendDominationPlanAllowed(candidate.meld, melds, rules, meldIndex) ? candidate : null;
+}
+
 function spendsReservedNaturals(candidate, hand, melds, rules, targetIndex = -1) {
   const spent = new Set(candidate.added.map((card) => card.id));
   const growing = cleanDominationMelds(melds.filter((_, index) => index !== targetIndex), rules)
@@ -362,7 +368,7 @@ function spendsReservedNaturals(candidate, hand, melds, rules, targetIndex = -1)
 function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = null) {
   // Grow existing sequences first; only surplus copies may seed another one.
   // Filter before planning so a greedy extension cannot consume a reserved rank.
-  if (!farewell) hand = dominationOpeningCards(hand, melds, rules);
+  hand = friendDominationCards(hand, melds, rules);
   let best = null;
   const seen = new Set();
   for (let i = 0; i < hand.length - 2; i++) {
@@ -378,6 +384,7 @@ function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = 
           meld = extension.meld;
           added = [...added, ...extension.added];
         }
+        if (!friendDominationPlanAllowed(meld, melds, rules)) continue;
         const key = added.map((card) => card.id).sort().join('|');
         if (seen.has(key)) continue;
         seen.add(key);
@@ -412,9 +419,9 @@ function chooseFriendDiscardPickup(state, friend, team, rules, farewell) {
   let best = null;
   let baseline = 0;
   team.melds.forEach((base, meldIndex) => {
-    const existing = growPlan(base, friend.hand, rules, farewell);
+    const existing = growFriendPlan(base, friend.hand, team.melds, rules, farewell, meldIndex);
     baseline = Math.max(baseline, existing?.value || 0);
-    const candidate = growPlan(base, pool, rules, farewell, requiredId);
+    const candidate = growFriendPlan(base, pool, team.melds, rules, farewell, meldIndex, requiredId);
     if (!candidate || !candidate.added.some((card) => discardedIds.has(card.id))) return;
     if (!farewell && !isClean(rules.prepare(base), rules)
       && spendsReservedNaturals(candidate, pool, team.melds, rules, meldIndex)) return;
@@ -506,7 +513,7 @@ export function executeDominationFriendTurn(state, turnId, rules, { owner = 'loc
       if (!unload && !isClean(rules.prepare(base), rules)) {
         available = available.filter((card) => !spendsReservedNaturals({ added: [card] }, friend.hand, team.melds, rules, meldIndex));
       }
-      const candidate = growPlan(base, available, rules, unload);
+      const candidate = growFriendPlan(base, available, team.melds, rules, unload, meldIndex);
       if (candidate) {
         const clean = isClean(candidate.meld, rules);
         const chosenClean = chosen && isClean(chosen.meld, rules);
