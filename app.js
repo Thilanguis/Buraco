@@ -6249,11 +6249,11 @@ function renderHand() {
     localLabelEl.style.display = 'block';
     localLabelEl.classList.toggle('boss-player-targeted', activeMatriarchTargetPlayerIds().has(me.id));
 
-    // Verifica se é a sua vez para aplicar o mesmo verde dinâmico dos oponentes ativos
+    // Usa a cor de turno do tema, mantendo o verde padrão nas demais mesas.
     const isMyTurn = !state.finished && state.currentPlayer === myPlayerIndex;
     if (isMyTurn) {
-      localLabelEl.style.setProperty('background', '#16a34a', 'important');
-      localLabelEl.style.setProperty('border-color', 'rgba(255, 255, 255, 0.3)', 'important');
+      localLabelEl.style.setProperty('background', 'var(--table-local-active-bg, #16a34a)', 'important');
+      localLabelEl.style.setProperty('border-color', 'var(--table-local-active-border, rgba(255, 255, 255, 0.3))', 'important');
     } else {
       localLabelEl.style.setProperty('background', 'rgba(15, 23, 42, 0.9)', 'important');
       localLabelEl.style.setProperty('border-color', 'rgba(255, 255, 255, 0.15)', 'important');

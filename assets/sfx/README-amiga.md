@@ -5,11 +5,12 @@ Coloque os MP3s nesta pasta, com estes nomes:
 - `amiga-entrada.mp3`: toca durante a roleta, nos dois giros, e para assim que ela fecha (antes da distribuição das cartas). Repete se o arquivo for curto. Não toca novamente no aviso de entrada da amiga.
 - `amiga-saida.mp3`: despedida da amiga, quando os turnos realmente acabam.
 - `amiga-bruna-turno-extra.mp3`, `amiga-nathalia-turno-extra.mp3` e
-  `amiga-thayanne-turno-extra.mp3`: fala da amiga que fez a canastra e
-  conquistou +1 turno (não da primeira destinatária do bônus).
-- `dominador-luana-turno-extra.mp3`: fala de Luana quando o Dominador
-  concede +1 turno às amigas presentes. Luana não é uma amiga sorteável.
-- `amiga-turno-extra.mp3`: fallback para eventos legados sem uma voz conhecida.
+  `amiga-thayanne-turno-extra.mp3`: gravações personalizadas preservadas,
+  atualmente desativadas.
+- `dominador-luana-turno-extra.mp3`: gravação de Luana preservada e
+  atualmente desativada. Luana não é uma amiga sorteável.
+- `amiga-turno-extra.mp3`: risada original para todo +1 turno, conquistado
+  por uma amiga ou concedido pelo Dominador às amigas presentes.
 
 Os arquivos são opcionais: enquanto não forem fornecidos, os avisos animados
 continuam funcionando. Prefira vinhetas curtas.

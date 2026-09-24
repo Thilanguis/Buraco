@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v176';
+const CACHE_NAME = 'buraco-v178';
 
 const ASSETS = [
   './styles/card-readability.css',

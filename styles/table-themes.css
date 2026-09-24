@@ -917,11 +917,11 @@
       }
       .view-team0 #teamPanel1 .player-identity-chip,
       .view-team1 #teamPanel2 .player-identity-chip {
-        --identity-accent: #22c55e;
+        --identity-accent: var(--table-identity-self, #22c55e);
       }
       .view-team0 #teamPanel2 .player-identity-chip,
       .view-team1 #teamPanel1 .player-identity-chip {
-        --identity-accent: #ef4444;
+        --identity-accent: var(--table-identity-rival, #ef4444);
       }
       .identity-copy {
         display: flex;

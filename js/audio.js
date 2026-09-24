@@ -38,13 +38,17 @@ export const DECK_MOVE_SFX = Object.freeze({
   wwe: createBossSfx('assets/sfx/compra-wwe.mp3', 0.5),
 });
 export const TABLE_ASAS_SFX = Object.freeze({
-  // Supplied filenames were inverted; route by the actual intended theme.
-  // 0.9 -> 1 is an 11.1% gain increase, within HTMLAudio's volume limit.
-  lunar: createBossSfx('assets/sfx/asas-wwe.mp3', 1),
+  lunar: createBossSfx('assets/sfx/canastra-as-a-as-lunar.mp3', 0.9),
+  // Legacy supplied filename was inverted; this is the WWE counting effect.
   wwe: createBossSfx('assets/sfx/asas-lunar.mp3', 1),
 });
 export const TABLE_CANASTRA_SFX = Object.freeze({
-  lunar: Object.freeze({ asas: TABLE_ASAS_SFX.lunar }),
+  lunar: Object.freeze({
+    suja: createBossSfx('assets/sfx/canastra-suja-lunar.mp3'),
+    limpa: createBossSfx('assets/sfx/canastra-limpa-lunar.mp3'),
+    real: createBossSfx('assets/sfx/canastra-real-lunar.mp3'),
+    asas: TABLE_ASAS_SFX.lunar,
+  }),
   wwe: Object.freeze({
     // These masters are louder than the existing effects: keep their output
     // around the default canastras instead of applying the same raw gain.
@@ -80,9 +84,8 @@ export const TABLE_AMBIENT_MUSIC = Object.freeze({
   ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.23 },
   submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.32 },
   findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.34 },
-  // Measured whole-track output RMS: about -29.4 dBFS for both,
-  // roughly 2 dB below Feltro/Findom to leave more room for effects.
-  lunar: { src: 'assets/music/mesa-lunar.mp3', volume: 0.28, intro: 'assets/sfx/abertura-lunar-curta.wav' },
+  // Full opening song replaces both the former Lunar track and short intro.
+  lunar: { src: 'assets/music/mesa-lunar-abertura.mp3', volume: 0.28 },
   wwe: { src: 'assets/music/mesa-wwe.mp3', volume: 0.10, intro: 'assets/sfx/abertura-wwe.mp3' },
 });
 

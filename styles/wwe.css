@@ -38,22 +38,34 @@ body[data-table-theme='wwe'] #gameSection {
   --table-flash-animation: none;
   --table-light-opacity: 0;
   --table-flash-opacity: 0;
-  --hud-accent: #f5ce83;
-  --hud-accent-soft: rgba(220, 55, 65, .16);
-  --hud-accent-glow: rgba(245, 206, 131, .25);
-  --hud-chip-border: rgba(245, 206, 131, .4);
-  --hud-chip-bg: rgba(22, 17, 17, .88);
+  --hud-accent: #75baff;
+  --hud-accent-soft: rgba(35, 132, 242, .18);
+  --hud-accent-glow: rgba(64, 158, 255, .25);
+  --hud-chip-border: rgba(92, 174, 255, .55);
+  --hud-chip-bg: rgba(20, 21, 25, .92);
   --hud-muted: #d0c6c6;
-  --table-panel-bg: rgba(14, 11, 11, .32);
-  --table-panel-border: rgba(245, 206, 131, .3);
-  /* Keep the shared green/red player identities and danger color unchanged. */
-  --table-panel-active-glow: rgba(245, 206, 131, .2);
-  --table-panel-title-line: rgba(245, 206, 131, .18);
+  --table-panel-bg: rgba(16, 17, 21, .48);
+  --table-panel-border: rgba(92, 174, 255, .35);
+  --table-panel-self-border: #409eff;
+  --table-panel-rival-border: #ef6b73;
+  --table-panel-self-glow: rgba(64, 158, 255, .22);
+  --table-panel-rival-glow: rgba(239, 107, 115, .12);
+  --table-panel-self-wash: rgba(35, 132, 242, .09);
+  --table-panel-rival-wash: rgba(239, 107, 115, .055);
+  --table-identity-self: var(--table-panel-self-border);
+  --table-identity-rival: var(--table-panel-rival-border);
+  --table-local-active-bg: #124e91;
+  --table-local-active-border: #75baff;
+  --table-turn-rgb: 64, 158, 255;
+  --table-turn-peak: #91caff;
+  --table-hand-rgb: 16, 17, 21;
+  --table-panel-active-glow: rgba(64, 158, 255, .22);
+  --table-panel-title-line: rgba(117, 186, 255, .22);
   --table-card-shadow: -1px 2px 5px rgba(5, 3, 3, .48), 0 0 0 1px rgba(245, 206, 131, .07);
   --table-card-hover-shadow: -8px 20px 30px rgba(5, 3, 3, .68), 0 0 14px rgba(245, 206, 131, .16);
   --table-card-back-filter: drop-shadow(0 4px 7px rgba(5, 3, 3, .5)) drop-shadow(0 0 5px rgba(220, 55, 65, .08));
-  --table-pile-spot: radial-gradient(ellipse at center, rgba(245, 206, 131, .1), rgba(23, 19, 19, .2) 42%, transparent 70%);
-  --table-pile-border: rgba(245, 206, 131, .28);
+  --table-pile-spot: radial-gradient(ellipse at center, rgba(216, 222, 232, .1), rgba(23, 19, 19, .2) 42%, transparent 70%);
+  --table-pile-border: rgba(216, 222, 232, .28);
   --table-pile-glow: rgba(220, 55, 65, .14);
   --table-dom-panel-sheen: linear-gradient(110deg, rgba(220, 55, 65, .055), transparent 42%, rgba(245, 206, 131, .06) 72%, transparent);
   --table-brasao-sheen: rgba(245, 206, 131, .08);
@@ -79,21 +91,21 @@ body[data-table-theme='wwe'] #gameSection .board-status {
   border-radius: 8px;
   box-shadow:
     0 0 0 3px rgba(22, 17, 17, .96),
-    0 0 0 4px rgba(245, 206, 131, .45),
+    0 0 0 4px rgba(92, 174, 255, .55),
     0 5px 16px rgba(5, 3, 3, .5);
-  color: #fff8e5;
+  color: #f1f5f9;
   text-shadow: 0 1px 2px #090505;
 }
 body[data-table-theme='wwe'] .board-status .current-player-chip {
-  background: #292121;
-  color: #fff8e5;
+  background: #24262c;
+  color: #f1f5f9;
 }
 body[data-table-theme='wwe'] .board-status .current-player-chip.is-my-turn {
-  background: #482024;
-  border-color: #f5ce83;
+  background: #124e91;
+  border-color: #75baff;
 }
 body[data-table-theme='wwe'] #gameModeBadge {
-  color: #ffe3a6 !important;
+  color: #a9d4ff !important;
   text-shadow: 0 1px 2px #090505;
 }
 body[data-table-theme='wwe'] .board-status .match-duration {
@@ -103,4 +115,30 @@ body[data-table-theme='wwe'] .board-status .match-duration {
 body[data-table-theme='wwe'] #turnTimerLabel:not(.timer-critical) {
   color: #ffe38a !important;
   font-weight: 700;
+}
+
+/* Protect feedback from the bright ring ropes without reserving more height. */
+body[data-table-theme='wwe'] #message {
+  align-self: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: #08182b;
+  color: #f4f9ff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 15px;
+  text-shadow: 0 1px 2px #000;
+  box-shadow: 0 0 0 1px #409eff, 0 2px 5px rgba(0, 0, 0, .65);
+}
+body[data-table-theme='wwe'] #message:empty {
+  background: transparent;
+  box-shadow: none;
+}
+@media (max-width: 768px), (max-height: 600px) {
+  body[data-table-theme='wwe'] #message {
+    font-size: 11px;
+    line-height: 12px;
+  }
 }

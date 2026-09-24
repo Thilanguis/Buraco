@@ -14,11 +14,9 @@ export const FRIEND_EXTRA_TURN_MP3 = Object.freeze({
 
 export function friendNoticeSound(event) {
   if (event.type === 'arrival') return null;
-  if (event.type !== 'extraTurn') return FRIEND_MP3[event.type];
-  // A single achievement may reward several friends: use its actor, not
-  // the first recipient's name, and let the existing notice grouping play once.
-  return event.playerId === 1 ? FRIEND_EXTRA_TURN_MP3.dominador
-    : FRIEND_EXTRA_TURN_MP3[event.actorName] || FRIEND_MP3.extraTurn;
+  // Restore the original laugh for both friends and the Dominador.
+  // Personalized recordings remain on disk but are not used by notices.
+  return FRIEND_MP3[event.type];
 }
 
 export function waitForPlayingCanastras(sounds) {
