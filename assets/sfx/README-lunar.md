@@ -3,7 +3,8 @@
 Importados de `sailor_moon_audios_PRONTOS.zip` em 24/09/2026:
 
 - `abertura-lunar.mp3` → `assets/music/mesa-lunar-abertura.mp3`: música de
-  fundo completa em loop, sem a antiga vinheta de três segundos antes dela.
+  fundo completa em loop, precedida pela vinheta mágica de três segundos
+  `abertura-lunar-curta.wav` (restaurada em 25/09/2026).
 - `sailor-moon-suja.mp3` → `canastra-suja-lunar.mp3`.
 - `sailor-moon-limpa.mp3` → `canastra-limpa-lunar.mp3`.
 - `sailor-moon-real.mp3` → `canastra-real-lunar.mp3`.

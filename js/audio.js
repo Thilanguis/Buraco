@@ -34,15 +34,24 @@ export const BOSS_SFX = Object.freeze({
 export const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');
 // All card movement sounds follow the deck; celebrations and intros follow the table.
 export const DECK_MOVE_SFX = Object.freeze({
+  resident: createBossSfx('assets/sfx/compra-resident.mp3', 0.3),
   lunar: createBossSfx('assets/sfx/compra-lunar.mp3', 0.5),
   wwe: createBossSfx('assets/sfx/compra-wwe.mp3', 0.5),
 });
 export const TABLE_ASAS_SFX = Object.freeze({
+  resident: createBossSfx('assets/sfx/canastra-as-a-as-resident.mp3', 0.45),
   lunar: createBossSfx('assets/sfx/canastra-as-a-as-lunar.mp3', 0.9),
   // Legacy supplied filename was inverted; this is the WWE counting effect.
   wwe: createBossSfx('assets/sfx/asas-lunar.mp3', 1),
 });
 export const TABLE_CANASTRA_SFX = Object.freeze({
+  resident: Object.freeze({
+    // Supplied masters have different levels; balance without rewriting audio.
+    suja: createBossSfx('assets/sfx/canastra-suja-resident.mp3', 0.45),
+    limpa: createBossSfx('assets/sfx/canastra-limpa-resident.mp3', 0.28),
+    real: createBossSfx('assets/sfx/canastra-real-resident.mp3', 0.34),
+    asas: TABLE_ASAS_SFX.resident,
+  }),
   lunar: Object.freeze({
     suja: createBossSfx('assets/sfx/canastra-suja-lunar.mp3'),
     limpa: createBossSfx('assets/sfx/canastra-limpa-lunar.mp3'),
@@ -78,14 +87,15 @@ sfxHeartbeat.volume = 1;
 sfxHeartbeat.loop = true;
 
 export const TABLE_AMBIENT_MUSIC = Object.freeze({
+  resident: { src: 'assets/music/mesa-resident.mp3', volume: 0.35, intro: 'assets/sfx/abertura-resident.mp3' },
   feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.35 },
   cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.32 },
   masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.31 },
   ostentacao: { src: 'assets/music/mesa-ostentacao.mp3', volume: 0.23 },
   submissao: { src: 'assets/music/mesa-submissao.mp3', volume: 0.32 },
   findom: { src: 'assets/music/mesa-findom.mp3', volume: 0.34 },
-  // Full opening song replaces both the former Lunar track and short intro.
-  lunar: { src: 'assets/music/mesa-lunar-abertura.mp3', volume: 0.28 },
+  // Play the original magical vignette before the full Lunar soundtrack.
+  lunar: { src: 'assets/music/mesa-lunar-abertura.mp3', volume: 0.28, intro: 'assets/sfx/abertura-lunar-curta.wav' },
   wwe: { src: 'assets/music/mesa-wwe.mp3', volume: 0.10, intro: 'assets/sfx/abertura-wwe.mp3' },
 });
 

@@ -16,7 +16,7 @@ function arm(value) {
 
 function sync() {
   const theme = document.body.dataset.deckTheme;
-  const available = ['lunar', 'wwe'].includes(theme) && game.getClientRects().length > 0;
+  const available = ['lunar', 'wwe', 'resident'].includes(theme) && game.getClientRects().length > 0;
   button.hidden = !available;
   if (!available || theme !== activeTheme) {
     arm(false);
@@ -53,7 +53,7 @@ function intercept(event) {
   if (!/^(?:(?:spades|hearts|clubs|diamonds)-(?:A|[2-9]|10|J|Q|K)|joker-(?:red|blue))$/.test(asset || '')) return;
   const rank = card.querySelector('.card-rank')?.textContent || 'Carta';
   const suit = card.querySelector('.card-suit')?.textContent || '';
-  const label = `${rank} ${suit} — ${activeTheme === 'wwe' ? 'WWE' : 'Reino Lunar'}`;
+  const label = `${rank} ${suit} — ${{ wwe: 'WWE', lunar: 'Reino Lunar', resident: 'Resident Evil' }[activeTheme]}`;
   document.getElementById('cardArtTitle').textContent = label;
   image.alt = label;
   const base = `assets/${activeTheme}/${asset}.webp`;
@@ -62,7 +62,7 @@ function intercept(event) {
     image.src = base;
   };
   // Lunar originals are not available locally; use the existing game artwork.
-  image.src = activeTheme === 'wwe' ? `assets/${activeTheme}/detail/${asset}.webp` : base;
+  image.src = activeTheme !== 'lunar' ? `assets/${activeTheme}/detail/${asset}.webp` : base;
   arm(false);
   dialog.showModal();
 }
