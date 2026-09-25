@@ -605,6 +605,7 @@
               </span>
               <span id="turnTimerLabel" style="margin-left: 5px; font-size: 11px; color: #facc15"></span>
               <span id="matchDuration" class="match-duration" title="Tempo total da partida">⏱ 00:00</span>
+              <span id="localPlayerLabel" class="opponent-label local-player-hud" style="display: none"></span>
               <div id="gameModeBadge" style="margin-top: 5px; font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; padding-left: 4px"></div>
 
               <div id="goalsHud" class="goals-hud-container">
@@ -844,9 +845,6 @@
               <div class="card-search-actions"><button onclick="document.getElementById('cardSearchDialog').close()">Cancelar</button><button id="seekCardConfirm" onclick="takeDominationSearchCard()">Comprar carta</button></div>
             </dialog>
             <div id="dominationVisionHint" class="domination-vision-hint" role="status" aria-live="polite" hidden></div>
-
-            <!-- 🔥 Badge local com a cor corrigida explicitamente para ficar idêntico ao dos bots -->
-            <div id="localPlayerLabel" class="opponent-label" style="position: relative; margin: 12px auto 4px auto; display: none; pointer-events: none; text-shadow: none !important; width: fit-content; color: #e5e7eb !important"></div>
 
             <div id="bossLocalVaultSlot" class="boss-vault-slot" style="display: none"></div>
 

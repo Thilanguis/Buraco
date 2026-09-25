@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v187';
+const CACHE_NAME = 'buraco-v190';
 const ASSETS = [
   './js/game/match-control.js',
   './js/game/table-background.js',
