@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v184';
+const CACHE_NAME = 'buraco-v185';
 
 const ASSETS = [
   './styles/resident.css',
