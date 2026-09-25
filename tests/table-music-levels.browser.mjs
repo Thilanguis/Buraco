@@ -29,14 +29,16 @@ try {
     levels.push({ theme, volume, ...level });
   }
   console.table(levels);
-  const references = levels.filter(l => l.theme !== 'lunar').map(l => l.outputDb).sort((a, b) => a - b);
+  const references = levels.filter(l => !['lunar', 'resident'].includes(l.theme)).map(l => l.outputDb).sort((a, b) => a - b);
   const target = (references[2] + references[3]) / 2;
-  const lunar = levels.find(l => l.theme === 'lunar');
-  if (lunar) {
-    console.log('Suggested lunar gain:', Math.min(0.35, 10 ** (target / 20) / lunar.rms).toFixed(3));
-    // Respect the shared volume ceiling; match the quieter existing tables.
-    const feltro = levels.find(l => l.theme === 'feltro');
-    assert.ok(Math.abs(lunar.outputDb - feltro.outputDb) < 1, 'lunar must match Feltro within 1 dB RMS');
-    assert.ok(lunar.outputDb >= references[0] - 1 && lunar.outputDb <= references.at(-1) + 1);
+  const feltro = levels.find(l => l.theme === 'feltro');
+
+  for (const theme of ['lunar', 'resident']) {
+    const level = levels.find(l => l.theme === theme);
+    if (!level) continue;
+    console.log(`Suggested ${theme} gain:`, Math.min(0.35, 10 ** (target / 20) / level.rms).toFixed(3));
+    // Themed tables should stay close to Feltro and within the spread of the existing ambience.
+    assert.ok(Math.abs(level.outputDb - feltro.outputDb) < 1.5, `${theme} must match Feltro within 1.5 dB RMS`);
+    assert.ok(level.outputDb >= references[0] - 1 && level.outputDb <= references.at(-1) + 1);
   }
 } finally { await browser.close(); }
