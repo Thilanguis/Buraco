@@ -1,5 +1,4 @@
 const CACHE_NAME = 'buraco-v184';
-
 const ASSETS = [
   './js/game/table-background.js',
   './styles/resident.css',

@@ -34,7 +34,7 @@ export const BOSS_SFX = Object.freeze({
 export const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');
 // All card movement sounds follow the deck; celebrations and intros follow the table.
 export const DECK_MOVE_SFX = Object.freeze({
-  resident: createBossSfx('assets/sfx/compra-resident.mp3', 0.3),
+  resident: createBossSfx('assets/sfx/compra-resident.mp3', 0.18),
   lunar: createBossSfx('assets/sfx/compra-lunar.mp3', 0.5),
   wwe: createBossSfx('assets/sfx/compra-wwe.mp3', 0.5),
 });

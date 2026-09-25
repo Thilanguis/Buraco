@@ -1012,9 +1012,9 @@ function getSafeAmbientVolume(theme) {
 }
 
 function dominationAudioHasPriority() {
-  // Lunar's power effect needs a clear background in every game mode.
+  // Any themed Ás-a-Ás celebration needs a clear background in every game mode.
   // Queued canastra sounds are already covered by friendSoundQueue.busy.
-  if (!TABLE_ASAS_SFX.lunar.paused && !TABLE_ASAS_SFX.lunar.ended) return true;
+  if (Object.values(TABLE_ASAS_SFX).some(sound => !sound.paused && !sound.ended)) return true;
   return state?.mode === '1x1_dominacao' && (
     friendSoundQueue.busy || (state.powerActiveThisTurn && !state.hasDrawnThisTurn) ||
     document.getElementById('cardSearchDialog')?.open ||
@@ -1035,7 +1035,7 @@ function playDominationSearchSound() {
   sfxSearch.play().catch(() => syncTableAmbientMusic());
 }
 
-for (const sound of [sfxSearch, sfxSteal, TABLE_ASAS_SFX.lunar]) {
+for (const sound of [sfxSearch, sfxSteal, ...Object.values(TABLE_ASAS_SFX)]) {
   for (const event of ['play', 'ended', 'pause', 'error']) sound.addEventListener(event, () => syncTableAmbientMusic());
 }
 document.getElementById('cardSearchDialog')?.addEventListener('close', () => syncTableAmbientMusic());
@@ -1490,9 +1490,10 @@ function playCanastraSfx(kind) {
     a.pause();
     a.currentTime = 0;
   } catch (e) {}
-  if (a === TABLE_ASAS_SFX.lunar) pauseAmbientForDomination();
+  const isThemedAsas = Object.values(TABLE_ASAS_SFX).includes(a);
+  if (isThemedAsas) pauseAmbientForDomination();
   a.play().catch(() => {
-    if (a === TABLE_ASAS_SFX.lunar) syncTableAmbientMusic();
+    if (isThemedAsas) syncTableAmbientMusic();
   });
 }
 
