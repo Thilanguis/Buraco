@@ -1,4 +1,25 @@
 /* Image skins only: card sizes, selection, stacking and flights stay unchanged. */
+/* Responsive composition: untouched foreground plus a soft fill behind it.
+   Both layers are decorative and never participate in the game layout. */
+body[data-table-theme='resident'] #gameSection > .table-preserved-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.table-preserved-art > div {
+  position: absolute;
+  inset: 0;
+  background: var(--preserved-image) center / cover no-repeat;
+}
+.table-preserved-art .table-art-fill {
+  inset: -24px;
+  filter: blur(18px) brightness(.65);
+}
+.table-preserved-art .table-art-original {
+  background-size: var(--preserved-size);
+}
 .resident-card-art { display: none; }
 body[data-deck-theme='resident'] .resident-card-art {
   display: block;

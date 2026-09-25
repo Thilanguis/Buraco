@@ -1,6 +1,7 @@
-const CACHE_NAME = 'buraco-v183';
+const CACHE_NAME = 'buraco-v184';
 
 const ASSETS = [
+  './js/game/table-background.js',
   './styles/resident.css',
   ...['spades', 'hearts', 'clubs', 'diamonds'].flatMap((suit) => ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map((rank) => `./assets/resident/${suit}-${rank}.webp`)),
   ...['joker-red', 'joker-blue', 'back-red', 'back-blue', 'table'].map((name) => `./assets/resident/${name}.webp`),
