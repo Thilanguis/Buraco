@@ -483,6 +483,7 @@
           box-shadow 0.16s ease;
         z-index: 6;
       }
+      #pauseGameBtn[hidden] { display: none; }
       .ambient-toggle:hover {
         opacity: 1;
         transform: translateY(-1px);

@@ -111,8 +111,8 @@ export class BuracoBot {
         this.assertActive(engine, signal);
         let boughtFromDiscard = false;
         const naturePlan = engine.getNaturePriorities?.(me.id);
-        const dominationBought = state.mode === '1x1_dominacao' && botIndex === 1 && state.hasDrawnThisTurn;
-        if (!dominationBought && state.discard.length > 0 && !engine.isDiscardBlocked?.() && !engine.shouldForceStockDraw?.(me.id)) {
+        const alreadyBought = state.hasDrawnThisTurn;
+        if (!alreadyBought && state.discard.length > 0 && !engine.isDiscardBlocked?.() && !engine.shouldForceStockDraw?.(me.id)) {
           const intent = this.evaluateDiscard(state, me.hand, team, engine, ctx);
           const bossAllowsDiscard = !intent || typeof engine.shouldTakeBossDiscard !== 'function'
             || engine.shouldTakeBossDiscard(me.id, intent, naturePlan);
@@ -133,7 +133,7 @@ export class BuracoBot {
           return;
         }
 
-        if (!(state.mode === '1x1_dominacao' && botIndex === 1 && state.hasDrawnThisTurn) && (!boughtFromDiscard || state.partialDraw)) {
+        if (!state.hasDrawnThisTurn && (!boughtFromDiscard || state.partialDraw)) {
           this.assertActive(engine, signal);
           await engine.executeDrawStock(botIndex);
         }

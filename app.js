@@ -1,5 +1,6 @@
 import { ALL_CANASTRA_SFX, DECK_MOVE_SFX, TABLE_ASAS_SFX, TABLE_CANASTRA_SFX, BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSearch, sfxSteal, stopAllGameSfx } from './js/audio.js';
 import { chooseDominationSearchCard } from './js/game/domination-search.js';
+import { applyPauseVote, pauseBlocksPlay, stockIsExhausted, createActionGate } from './js/game/match-control.js';
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
@@ -362,6 +363,10 @@ const RANKS_SEQ_LOW = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', '
 const DEAD_CHUNK_SIZE = 11;
 
 let state = null;
+const localActionGate = createActionGate();
+let resultPresented = false;
+let rematchVotePending = false;
+let exitVotePending = false;
 let friendOperationPending = false;
 const friendControllerId = crypto.randomUUID();
 let friendAutomationRunning = false;
@@ -587,7 +592,7 @@ function activateGameSession() {
 }
 
 function isGameSessionActive(sessionId, signal) {
-  return !signal?.aborted && !window.isClosingGame && !localExitPending && !!state && window.gameSessionId === sessionId && document.getElementById('gameSection')?.style.display === 'flex';
+  return !signal?.aborted && !window.isClosingGame && !localExitPending && !!state && !pauseBlocksPlay(state) && window.gameSessionId === sessionId && document.getElementById('gameSection')?.style.display === 'flex';
 }
 
 function isCurrentBossMode() {
@@ -1834,6 +1839,7 @@ function renderMatchDuration() {
 }
 
 function canSearchDominationCard(gameState = state, actorId = myPlayerIndex) {
+  if (pauseBlocksPlay(gameState)) return false;
   return (
     dominationFeatureEnabled(gameState, 'search') && actorId === 1 && gameState.currentPlayer === 1 && !gameState.finished && !gameState.surrender?.active && !gameState.debugPaused && !gameState.dominatorSearchUsed && !isDominationFriendBusy(gameState)
   );
@@ -2009,7 +2015,7 @@ async function saveFriendOperation(operation, { allowDebugPause = false } = {}) 
     if (sessionId !== window.gameSessionId || window.isClosingGame) return null;
     if (!snapshot.exists() || !snapshot.data().stateJson) return null;
     const latest = normalizeDominationFriends(JSON.parse(snapshot.data().stateJson));
-    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity || latest.finished || latest.surrender?.active || (latest.debugPaused && !(allowDebugPause && isDebugMode))) return null;
+    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity || latest.finished || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.debugPaused && !(allowDebugPause && isDebugMode))) return null;
     const result = operation(latest);
     if (!result) return null;
     latest.friendRevision = (latest.friendRevision || 0) + 1;
@@ -2184,7 +2190,7 @@ function syncDominationFriendNotices() {
 function scheduleDominationFriend() {
   clearTimeout(friendAutomationTimer);
   friendAutomationTimer = null;
-  if (state?.mode !== '1x1_dominacao' || state.finished || state.debugPaused || window.isClosingGame) return;
+  if (state?.mode !== '1x1_dominacao' || state.finished || state.debugPaused || pauseBlocksPlay(state) || window.isClosingGame) return;
   const friend = getDominationFriend(state);
   const barrier = state.dominationFriendShared?.presentation;
   if (!barrier && !friend?.pendingTurnId && !friend?.presentationUntil) return;
@@ -2294,7 +2300,7 @@ async function commitState() {
           if (!snapshot.exists() || !snapshot.data().stateJson) return null;
           const latest = JSON.parse(snapshot.data().stateJson);
           if (latest.mode !== proposal.mode || latest.friendGameId !== proposal.friendGameId) return null;
-          if ((latest.friendRevision || 0) !== expectedRevision || latest.surrender?.active) return { accepted: false, state: latest };
+          if ((latest.friendRevision || 0) !== expectedRevision || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return { accepted: false, state: latest };
           proposal.friendRevision = (latest.friendRevision || 0) + 1;
           transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
           return { accepted: true, state: proposal };
@@ -2312,7 +2318,21 @@ async function commitState() {
         }
         if (state === localState) state.friendRevision = saved.state.friendRevision;
       } else {
-        await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
+        const proposal = structuredClone(state);
+        const saved = await runTransaction(db, async transaction => {
+          const snapshot = await transaction.get(gameRef);
+          if (!snapshot.exists() || !snapshot.data().stateJson) return null;
+          const latest = JSON.parse(snapshot.data().stateJson);
+          if (latest.matchStartedAt !== proposal.matchStartedAt || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return latest;
+          transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
+          return null;
+        });
+        if (saved) {
+          state = saved;
+          pendingCommit = false;
+          localUndoStack = [];
+          renderAll();
+        }
       }
     }
   } catch (err) {
@@ -2355,6 +2375,10 @@ function passTurn({ preserveUndo = false } = {}) {
 }
 
 async function autoPlayTimeout() {
+  try { return await localActionGate.run(autoPlayTimeoutOnce); }
+  finally { window.isAutoPlaying = false; }
+}
+async function autoPlayTimeoutOnce() {
   if (!canPerformCommonGameAction(state)) {
     window.isAutoPlaying = false;
     if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
@@ -2490,6 +2514,7 @@ async function autoPlayTimeout() {
     return;
   }
 
+  if (stockIsExhausted(state)) { await finishGame(null); return; }
   passTurn();
 
   state.lastAction = {
@@ -2570,6 +2595,7 @@ function classifyMeldPreview(meld) {
 
 let activeTurnNumber = -1;
 function startTurnTimerIfNeeded() {
+  if (pauseBlocksPlay(state)) { updateTimerLabel(); return; }
   if (!state || state.finished) {
     stopTurnTimer();
     updateTimerLabel();
@@ -2599,7 +2625,7 @@ function startTurnTimerIfNeeded() {
   updateTimerLabel();
 
   turnTimerId = setInterval(() => {
-    if (window.isAutoPlaying || (state && state.debugPaused) || isBossLabAutomationPaused()) return; // Congela o relógio se o debug exigir
+    if (window.isAutoPlaying || localActionGate.pending || pauseBlocksPlay(state) || (state && state.debugPaused) || isBossLabAutomationPaused()) return;
 
     if (!canPerformCommonGameAction(state)) return;
     turnTimerRemaining--;
@@ -2969,9 +2995,10 @@ function showPendingBossChoiceMessage(playerId = myPlayerIndex) {
   else showMessage(`Aguardando ${target?.name || 'o jogador alvo'} decidir.`);
 }
 function canPerformCommonGameAction(gameState = state) {
-  return !discardPickupAnimating && !isDominationFriendBusy(gameState) && !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback)) && canBossPerformCommonAction(gameState);
+  return !pauseBlocksPlay(gameState) && !gameState?.surrender?.active && !discardPickupAnimating && !isDominationFriendBusy(gameState) && !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback)) && canBossPerformCommonAction(gameState);
 }
 function ensureMyTurn() {
+  if (pauseBlocksPlay(state)) { showMessage('⏸ Partida pausada ou aguardando votação.'); return false; }
   if (!state || state.finished) {
     showMessage('Fim de jogo.');
     return false;
@@ -3067,6 +3094,9 @@ function normalizeLegacyDiscardPurchase(gameState) {
 }
 
 async function drawFromStock() {
+  return localActionGate.run(drawFromStockOnce);
+}
+async function drawFromStockOnce() {
   if (!ensureMyTurn()) return;
   if (state.hasDrawnThisTurn) {
     showMessage('⚠️ Compra bloqueada: Você já puxou carta neste turno.');
@@ -3249,6 +3279,10 @@ async function chooseDiscardDestination(teamId, meldIndex = null) {
 }
 
 async function drawFromDiscard(options = {}) {
+  if (state?.hasDrawnThisTurn) return discardSelectedCard();
+  return localActionGate.run(() => drawFromDiscardOnce(options));
+}
+async function drawFromDiscardOnce(options = {}) {
   if (!ensureMyTurn()) return;
   if (!state.hasDrawnThisTurn && isBossVaultDrawRequired(state, state.currentPlayer)) {
     showMessage('Cofre: resgate obrigatório. Monte e lixo estão bloqueados neste turno.');
@@ -4373,6 +4407,9 @@ function canTeamTakeDeadNow(teamId) {
 }
 
 async function discardSelectedCard() {
+  return localActionGate.run(discardSelectedCardOnce);
+}
+async function discardSelectedCardOnce() {
   if (!ensureMyTurn()) return;
   if (!state.hasDrawnThisTurn) {
     showMessage('Compre primeiro.');
@@ -4449,6 +4486,7 @@ async function discardSelectedCard() {
   const hand = p.hand;
 
   const actualIndex = hand.findIndex((c) => c.id === card.id);
+  if (actualIndex === -1 || !ensureMyTurn() || !state.hasDrawnThisTurn) return;
   if (actualIndex !== -1) {
     hand.splice(actualIndex, 1);
   }
@@ -4469,6 +4507,7 @@ async function discardSelectedCard() {
 
   if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
+  if (stockIsExhausted(state)) { await finishGame(null); return; }
   passTurn({ preserveUndo: true });
 
   state.lastAction = {
@@ -4738,7 +4777,7 @@ function bossFlowHostIndex() {
 
 function scheduleBossTurnAdvance() {
   const flow = state?.boss?.bossFlow;
-  const active = isCurrentBossMode() && isBossTurnActive(state) && flow && !hasPendingBossChoices(state);
+  const active = !pauseBlocksPlay(state) && isCurrentBossMode() && isBossTurnActive(state) && flow && !hasPendingBossChoices(state);
   const isHost = active && myPlayerIndex === bossFlowHostIndex();
   const key = active ? `${flow.id}:${flow.stage}:${flow.endsAt}` : '';
   if (!isHost) {
@@ -5384,7 +5423,7 @@ function renderBossHud() {
 
     actions.querySelectorAll('[data-boss-choice]').forEach((button) => {
       button.onclick = async () => {
-        if (!state || state.finished || !getBossPendingChoice(state, myPlayerIndex)) return;
+        if (!state || state.finished || pauseBlocksPlay(state) || !getBossPendingChoice(state, myPlayerIndex)) return;
         const stockEl = document.querySelector('#drawStockBtn .pile-card');
         const stockRect = stockEl ? getRect(stockEl) : null;
         const visibleCardRects = snapshotVisibleCardRects();
@@ -6096,9 +6135,14 @@ function renderAll() {
   specBadge.style.display = isSpec && !isFin ? 'block' : 'none';
 
   if (state.finished) {
-    if (isCurrentBossMode()) renderBossResult();
-    else renderScores(computeScores(), state.winnerTeamId);
-  } else if (isCurrentBossMode()) {
+    if (!resultPresented && !state.surrender?.active) {
+      resultPresented = true;
+      if (isCurrentBossMode()) renderBossResult();
+      else renderScores(computeScores(), state.winnerTeamId);
+    }
+  } else {
+    resultPresented = false;
+    document.getElementById('scoreSection').style.display = 'none';
     document.getElementById('bossResultSection').style.display = 'none';
   }
 
@@ -6113,6 +6157,7 @@ function renderAll() {
 
   // CHAMA A TELA DE VOTAÇÃO AQUI
   renderSurrender();
+  renderPauseVote();
 
   // --- SISTEMA DE CONGELAMENTO VISUAL (DEBUG) ---
   const boardEl = document.querySelector('.board');
@@ -7453,7 +7498,7 @@ function renderScores(scores, winner) {
     return p + (crc & 0xffff).toString(16).toUpperCase().padStart(4, '0');
   };
 
-  const scoreCard = document.querySelector('.score-card');
+  const scoreCard = document.querySelector('#scoreSection .score-card');
   scoreCard.innerHTML = `
               <h2 style="margin: 0; color: #fff; font-size: 22px">Fim de Jogo</h2>
               <div style="font-size: 11px; color: #facc15; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">
@@ -8202,7 +8247,7 @@ const botEngine = {
   async executeDrawStock(botIndex) {
     const s = this.getState();
     if (!s) return;
-    if (['1x1_duploMorto', '1x1_dominacao'].includes(s.mode) && s.hasDrawnThisTurn) return false;
+    if (s.hasDrawnThisTurn) return false;
     const me = s.players[botIndex];
     const botVault = getBossVault(s, botIndex);
     if (botVault && (isBossVaultDrawRequired(s, botIndex) || shouldBossBotReclaimVault(s, botIndex))) {
@@ -8264,7 +8309,7 @@ const botEngine = {
   async executeDrawDiscard(botIndex) {
     const s = this.getState();
     if (!s) return false;
-    if (['1x1_duploMorto', '1x1_dominacao'].includes(s.mode) && s.hasDrawnThisTurn) return false;
+    if (s.hasDrawnThisTurn) return false;
     if (isBossDiscardBlocked(s)) return false;
     if (!Array.isArray(s.discard) || s.discard.length === 0) {
       console.warn('[BOT] executeDrawDiscard chamado com lixo vazio. Possível jogada duplicada.');
@@ -8332,7 +8377,7 @@ const botEngine = {
   async executeDrawDiscardFechado(botIndex, intent) {
     const s = this.getState();
     if (!s) return false;
-    if (['1x1_duploMorto', '1x1_dominacao'].includes(s.mode) && s.hasDrawnThisTurn) return false;
+    if (s.hasDrawnThisTurn) return false;
     if (isBossDiscardBlocked(s)) return false;
     if (!Array.isArray(s.discard) || s.discard.length === 0) {
       console.warn('[BOT] executeDrawDiscardFechado chamado com lixo vazio. Possível jogada duplicada.');
@@ -8472,6 +8517,7 @@ const botEngine = {
       return true;
     }
 
+    if (stockIsExhausted(s)) { await finishGame(null); return true; }
     passTurn({ preserveUndo: true });
 
     const freshS = this.getState();
@@ -8631,8 +8677,12 @@ function create3DDiceElement(roll, endX, endY) {
 // Flag de controle para bloquear re-escrita do lobby durante carregamento de cache
 window.isFirstLobbyLoad = true;
 
+let gameSnapshotSequence = 0;
 onSnapshot(gameRef, async (snap) => {
+  const snapshotSequence = ++gameSnapshotSequence;
   if (!snap.exists()) {
+    document.getElementById('pauseVoteOverlay')?.remove();
+    resultPresented = false;
     invalidateGameSession();
     window.stopBossLabReportTimer?.();
     localExitPending = false;
@@ -8913,6 +8963,9 @@ onSnapshot(gameRef, async (snap) => {
 
   if (!data.stateJson) return;
 
+  if (localActionGate.pending) await localActionGate.pending;
+  if (snapshotSequence !== gameSnapshotSequence) return;
+
   const newState = normalizeDominationFriends(JSON.parse(data.stateJson));
   newState.matchStartedAt ||= data.createdAt?.toMillis?.() || Number(data.createdAt) || null;
   if (newState.finished) newState.matchFinishedAt ||= newState.lastAction?.ts || Number(data.updatedAt) || Date.now();
@@ -8921,6 +8974,21 @@ onSnapshot(gameRef, async (snap) => {
   // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.
   delete newState.pendingWildcardChoice;
   newState.variant = normalizeVariantForMode(newState.mode, newState.variant);
+  const wasPaused = pauseBlocksPlay(state);
+  if (pauseBlocksPlay(newState)) {
+    state = newState;
+    if (!wasPaused) {
+      botTurnController.abort();
+      botTurnController = new AbortController();
+      BuracoBot.cancelPendingTurns();
+    }
+    window.lastBotTurnPlayed = null;
+    if (window.botPlayTimeoutId) clearTimeout(window.botPlayTimeoutId);
+    window.botPlayTimeoutId = null;
+    renderAll();
+    return;
+  }
+  if (wasPaused) window.lastBotTurnPlayed = null;
   if (newState.surrender?.active) {
     state = newState;
     if (!window.isClosingGame) invalidateGameSession({ stopMedia: false });
@@ -8966,6 +9034,7 @@ onSnapshot(gameRef, async (snap) => {
   }
 
   // 2. Após o término do voo, atualiza a memória com o novo estado e renderiza limpando o DOM de forma síncrona
+  if (snapshotSequence !== gameSnapshotSequence) return;
   if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
   if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   const previousFriends = activeDominationFriends(state);
@@ -10595,87 +10664,125 @@ document.getElementById('localPlayerSelect').onchange = (e) => {
 document.getElementById('drawStockBtn').onclick = drawFromStock;
 document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
 
-// --- LÓGICA DE VOTAÇÃO PARA SAIR ---
-async function saveSurrenderState() {
-  if (state.mode !== '1x1_dominacao') {
-    await updateDoc(gameRef, { stateJson: JSON.stringify(state), updatedAt: Date.now() });
-    return;
-  }
-  const gameIdentity = state.friendGameId;
-  const surrender = structuredClone(state.surrender);
-  // Closing/reopening the dialog must not overwrite a concurrently saved guest.
-  await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(gameRef);
-    if (!snapshot.exists() || !snapshot.data().stateJson) return;
-    const latest = JSON.parse(snapshot.data().stateJson);
-    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity) return;
-    latest.surrender = surrender;
-    latest.friendRevision = (latest.friendRevision || 0) + 1;
-    transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
-  });
+// Suppress all overlapping table gestures until a purchase/discard is saved.
+for (const type of ['click', 'dblclick', 'pointerdown', 'keydown']) {
+  window.addEventListener(type, event => {
+    if (localActionGate.pending && event.target.closest?.('#gameSection')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
 }
 
-document.getElementById('endGameBtn').onclick = async () => {
-  if (!state) return;
-
-  localExitPending = true;
-  invalidateGameSession();
-
-  state.surrender = { active: true, votes: {} };
-  if (myPlayerIndex !== -1) state.surrender.votes[myPlayerIndex] = true;
-
-  state.players.forEach((p) => {
-    if (p.name.toUpperCase().includes('BOT')) state.surrender.votes[p.id] = true;
-  });
-
-  let yesCount = Object.values(state.surrender.votes).filter((v) => v).length;
-  renderSurrender();
-
-  // Se a sala estiver pronta para ser fechada (Solo ou Humanos + Bots votaram)
-  if (yesCount >= state.players.length && state.players.length > 0) {
-    try {
-      await deleteDoc(gameRef);
-    } catch (err) {
-      console.error('[ERRO] Falha ao deletar sala no Firebase. Forçando saída local:', err);
-      // Fallback imediato: Se o Firestore barrar o delete, retira o jogador da sala bugada na marra
-      window.location.replace(window.location.pathname);
-    }
-    return;
-  }
-
+let pauseVotePending = false;
+async function votePause(action) {
+  if (!state || state.finished || myPlayerIndex < 0 || pauseVotePending || localActionGate.pending) return;
+  pauseVotePending = true;
   try {
-    await saveSurrenderState();
-  } catch (err) {
-    console.error('[ERRO] Falha ao atualizar status de rendição:', err);
+    const startedAt = state.matchStartedAt;
+    await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(gameRef);
+      if (!snapshot.exists() || !snapshot.data().stateJson) return;
+      const latest = JSON.parse(snapshot.data().stateJson);
+      if (latest.matchStartedAt !== startedAt || isDominationFriendBusy(latest)) return;
+      if (!applyPauseVote(latest, myPlayerIndex, action)) return;
+      if (latest.mode === '1x1_dominacao') latest.friendRevision = (latest.friendRevision || 0) + 1;
+      transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
+    });
+  } catch (error) {
+    console.error('Falha na votação de pausa:', error);
+    showMessage('Não foi possível salvar o voto. Tente novamente.');
+  } finally { pauseVotePending = false; }
+}
+document.getElementById('pauseGameBtn').onclick = () => votePause('request');
+
+function renderPauseVote() {
+  const button = document.getElementById('pauseGameBtn');
+  button.hidden = !state || state.finished || myPlayerIndex < 0;
+  button.disabled = isDominationFriendBusy(state);
+  let overlay = document.getElementById('pauseVoteOverlay');
+  if (!pauseBlocksPlay(state) || state.finished || state.surrender?.active) { overlay?.remove(); return; }
+  for (const id of ['cardArtDialog', 'cardSearchDialog']) {
+    const dialog = document.getElementById(id);
+    if (dialog?.open) dialog.close();
   }
-};
-
-document.getElementById('voteYesBtn').onclick = async () => {
-  if (!state || !state.surrender) return;
-  localExitPending = true;
-  invalidateGameSession();
-  state.surrender.votes[myPlayerIndex] = true;
-
-  state.players.forEach((p) => {
-    if (p.name.toUpperCase().includes('BOT')) state.surrender.votes[p.id] = true;
-  });
-
-  let yesCount = Object.values(state.surrender.votes).filter((v) => v).length;
-  if (yesCount >= state.players.length && state.players.length > 0) {
-    await deleteDoc(gameRef); // Quem deu o último sim destrói a sala instantaneamente
-    return;
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'pauseVoteOverlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Pausa da partida');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.9);display:grid;place-items:center';
+    document.body.append(overlay);
   }
+  const pause = state.pause;
+  overlay.replaceChildren();
+  const panel = document.createElement('div');
+  panel.style.cssText = 'padding:24px;max-width:350px;color:white;text-align:center';
+  const title = document.createElement('h2');
+  title.textContent = pause.request ? (pause.request === 'pause' ? '⏸ Votar para pausar' : '▶ Votar para retomar') : '⏸ Partida pausada';
+  panel.append(title);
+  const text = document.createElement('p');
+  text.textContent = 'Relógio e jogadas congelados. Todos precisam concordar; bots votam sim.';
+  panel.append(text);
+  if (pause.request) for (const player of state.players) {
+    const row = document.createElement('p');
+    row.textContent = `${player.name}: ${pause.votes[player.id] ? '✅ Sim' : '⏳ Aguardando'}`;
+    panel.append(row);
+  }
+  const addButton = (label, action) => {
+    const control = document.createElement('button');
+    control.textContent = label;
+    control.style.margin = '6px';
+    control.onclick = () => votePause(action);
+    panel.append(control);
+  };
+  if (myPlayerIndex >= 0) {
+    if (!pause.request) addButton('▶ Retomar (votação)', 'request');
+    else {
+      if (!pause.votes[myPlayerIndex]) addButton('Sim', 'yes');
+      addButton('Não / cancelar votação', 'no');
+    }
+  }
+  overlay.append(panel);
+}
 
-  await saveSurrenderState();
-};
-
-document.getElementById('voteNoBtn').onclick = async () => {
-  if (!state || !state.surrender) return;
-  activateGameSession();
-  state.surrender.active = false;
-  state.surrender.votes = {};
-  await saveSurrenderState();
-};
+// --- LÓGICA DE VOTAÇÃO PARA SAIR ---
+async function voteExit(action) {
+  if (!state || myPlayerIndex < 0 || exitVotePending || localActionGate.pending) return;
+  exitVotePending = true;
+  const startedAt = state.matchStartedAt;
+  try {
+    await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(gameRef);
+      if (!snapshot.exists() || !snapshot.data().stateJson) return;
+      const latest = JSON.parse(snapshot.data().stateJson);
+      if (latest.matchStartedAt !== startedAt || latest.rematch?.starting || !latest.players.some(p => p.id === myPlayerIndex)) return;
+      if (action === 'request') latest.surrender ||= { active: false, votes: {} };
+      if (!latest.surrender || (action !== 'request' && !latest.surrender.active)) return;
+      if (action === 'no') {
+        latest.surrender = { active: false, votes: {} };
+      } else {
+        if (!latest.surrender.active) latest.surrender = { active: true, votes: {} };
+        latest.surrender.votes[myPlayerIndex] = true;
+        for (const p of latest.players) if (p.name?.toUpperCase().includes('BOT')) latest.surrender.votes[p.id] = true;
+        if (latest.players.every(p => latest.surrender.votes[p.id] === true)) {
+          transaction.delete(gameRef);
+          return;
+        }
+      }
+      latest.pauseControlRevision = (latest.pauseControlRevision || 0) + 1;
+      if (latest.mode === '1x1_dominacao') latest.friendRevision = (latest.friendRevision || 0) + 1;
+      transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
+    });
+  } catch (error) {
+    console.error('Falha na votação de saída:', error);
+    showMessage('Não foi possível salvar o voto de saída. Tente novamente.');
+  } finally { exitVotePending = false; }
+}
+document.getElementById('endGameBtn').onclick = () => voteExit('request');
+document.getElementById('voteYesBtn').onclick = () => voteExit('yes');
+document.getElementById('voteNoBtn').onclick = () => voteExit('no');
 
 function renderSurrender() {
   const section = document.getElementById('surrenderSection');
@@ -10686,6 +10793,8 @@ function renderSurrender() {
 
   section.style.display = 'flex';
   const list = document.getElementById('surrenderVotesList');
+  document.getElementById('scoreSection').style.display = 'none';
+  document.getElementById('bossResultSection').style.display = 'none';
   list.innerHTML = '';
 
   state.players.forEach((p) => {
@@ -10701,8 +10810,8 @@ function renderSurrender() {
   });
 
   const alreadyVoted = state.surrender.votes[myPlayerIndex] === true;
-  document.getElementById('voteYesBtn').style.display = alreadyVoted ? 'none' : 'block';
-  document.getElementById('voteNoBtn').style.display = alreadyVoted ? 'none' : 'block';
+  document.getElementById('voteYesBtn').style.display = alreadyVoted || myPlayerIndex < 0 ? 'none' : 'block';
+  document.getElementById('voteNoBtn').style.display = myPlayerIndex < 0 ? 'none' : 'block';
 }
 document.getElementById('closeScoreBtn').onclick = () => (document.getElementById('scoreSection').style.display = 'none');
 document.getElementById('closeBossResultBtn').onclick = () => (document.getElementById('bossResultSection').style.display = 'none');
@@ -10867,31 +10976,36 @@ window.stealCard = async (cardId) => {
 
 // 🔥 NOVO: Motor de verificação e gatilho de nova partida síncrona
 window.voteRematch = async () => {
-  if (!state || !state.finished || myPlayerIndex === -1) return;
-
-  if (!state.rematch) {
-    state.rematch = { votes: {} };
-  }
-
-  // Registra o voto do jogador local
-  state.rematch.votes[myPlayerIndex] = true;
-
-  // Computa automaticamente o voto de confirmação dos bots da sala
-  state.players.forEach((p) => {
-    if (p && p.name && p.name.toUpperCase().includes('BOT')) {
-      state.rematch.votes[p.id] = true;
-    }
-  });
-
-  const yesCount = Object.values(state.rematch.votes).filter((v) => v === true).length;
-
-  // Se todos aceitaram, dispara o motor de faxina e reinicia direto no Firebase
-  if (yesCount >= state.players.length) {
-    await window.debugRestartGame();
-    return;
-  }
-
-  // Senão, joga o estado pro Firebase pro outro jogador ver a contagem subir
-  renderAll();
-  await commitState();
+  if (!state?.finished || myPlayerIndex < 0 || state.surrender?.active || rematchVotePending) return;
+  rematchVotePending = true;
+  const startedAt = state.matchStartedAt;
+  try {
+    const restart = await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(gameRef);
+      if (!snapshot.exists() || !snapshot.data().stateJson) return false;
+      const latest = JSON.parse(snapshot.data().stateJson);
+      if (!latest.finished || latest.matchStartedAt !== startedAt || latest.surrender?.active || latest.rematch?.starting) return false;
+      latest.rematch ||= { votes: {} };
+      latest.rematch.votes[myPlayerIndex] = true;
+      for (const p of latest.players) if (p.name?.toUpperCase().includes('BOT')) latest.rematch.votes[p.id] = true;
+      const ready = latest.players.every(p => latest.rematch.votes[p.id] === true);
+      latest.rematch.starting = ready;
+      if (latest.mode === '1x1_dominacao') latest.friendRevision = (latest.friendRevision || 0) + 1;
+      transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
+      return ready;
+    });
+    if (restart) await window.debugRestartGame();
+  } catch (error) {
+    console.error('Falha na revanche:', error);
+    showMessage('Não foi possível iniciar a revanche. Tente novamente.');
+    await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(gameRef);
+      if (!snapshot.exists() || !snapshot.data().stateJson) return;
+      const latest = JSON.parse(snapshot.data().stateJson);
+      if (latest.finished && latest.matchStartedAt === startedAt && latest.rematch) {
+        latest.rematch.starting = false;
+        transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
+      }
+    }).catch(console.error);
+  } finally { rematchVotePending = false; }
 };
