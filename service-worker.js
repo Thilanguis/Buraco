@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v195';
+const CACHE_NAME = 'buraco-v196';
 const ASSETS = [
   './js/game/devtools-access.js',
   './js/game/devtools-auth.js',
