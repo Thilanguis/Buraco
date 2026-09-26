@@ -1,5 +1,7 @@
-const CACHE_NAME = 'buraco-v190';
+const CACHE_NAME = 'buraco-v195';
 const ASSETS = [
+  './js/game/devtools-access.js',
+  './js/game/devtools-auth.js',
   './js/game/match-control.js',
   './js/game/table-background.js',
   './styles/resident.css',

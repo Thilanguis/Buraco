@@ -61,13 +61,19 @@
   .discard-face .carta-meio { font-size: 19.2px; }
 }
 
-/* Reclaim the separate name row without losing identity, count or boss warnings. */
+/* Vault thumbnails are not playable cards: keep their original frame sizes. */
+#gameSection .boss-vault-slot .boss-vault-card { width: 46px; height: 64px; min-width: 46px; margin: 0; }
+#gameSection .boss-vault-opponent .boss-vault-card { width: 32px; height: 44px; min-width: 32px; }
+/* Tiny inset for CSS ranks only. The purchased-card frame/animation stays intact. */
+body:not([data-deck-theme='lunar']):not([data-deck-theme='wwe']):not([data-deck-theme='resident']) #handContainer .carta:not(.back) .carta-canto { padding: 3px 3px; }
+
+/* Keep the local player's name centered above the action buttons. */
 #localPlayerLabel.local-player-hud {
   position: relative;
   display: inline-block !important;
   width: fit-content;
   max-width: 130px;
-  margin: 0 0 0 6px;
+  margin: 3px auto 0;
   vertical-align: middle;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -90,7 +96,7 @@
   width: fit-content !important;
   max-width: 100%;
   height: auto !important;
-  margin: 0 auto !important;
+  margin: 6px auto 0 !important;
   inset: auto !important;
   pointer-events: auto;
   z-index: 30;
@@ -116,7 +122,7 @@
   justify-content: flex-start !important;
   overflow-x: auto !important;
   /* Clearance for the existing selected/hover lift; not an extra name row. */
-  padding: 20px 10px 5px !important;
+  padding: 14px 10px 5px !important;
   min-height: 0;
 }
 body {

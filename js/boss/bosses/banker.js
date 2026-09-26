@@ -47,7 +47,7 @@ export const bankerDefinition = Object.freeze({
   }),
   abilities: Object.freeze([
     ability('fixed_interest', 'Juros Fixos', 5, [1, 2, 3], () => 'Um contrato fechado define os valores com e sem Garantia.'),
-    ability('maintenance_fee', 'Tarifa de Manutenção', 3, [1, 2, 3], ({ phase }) => `Cada jogador comprará ${phase === 3 ? 'até 2 cartas extras' : '1 carta extra'} no próximo turno.`),
+    ability('maintenance_fee', 'Tarifa de Manutenção', 3, [1, 2, 3], ({ phase }) => `Nesta rodada, cada jogador comprará ${phase === 3 ? '2 cartas extras' : '1 carta extra'} junto da compra normal.`),
     ability('credit_block', 'Bloqueio de Crédito', 3, [1, 2, 3], () => 'O lixo ficará bloqueado durante esta rodada.'),
     ability('suit_audit', 'Auditoria de Naipe', 4, [2, 3], ({ phase, suitLabel }) => `Baixem ${phase === 3 ? 4 : 3} cartas de ${suitLabel} nesta rodada.`),
     ability('pledge', 'Penhora', 2, [2, 3], () => 'Um jogo da equipe ficará bloqueado até a próxima cobrança.'),

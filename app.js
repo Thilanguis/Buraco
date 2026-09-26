@@ -363,6 +363,7 @@ const RANKS_SEQ_LOW = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', '
 const DEAD_CHUNK_SIZE = 11;
 
 let state = null;
+let isDebugMode = false;
 const localActionGate = createActionGate();
 let resultPresented = false;
 let rematchVotePending = false;
@@ -2632,7 +2633,9 @@ function startTurnTimerIfNeeded() {
 
     if (turnTimerRemaining <= 0) {
       stopTurnTimer();
-      if (state.currentPlayer === myPlayerIndex) {
+      if (state.players?.[state.currentPlayer]?.name?.toUpperCase().includes('BOT')) {
+        recoverTimedOutBotTurn().catch(console.error);
+      } else if (state.currentPlayer === myPlayerIndex) {
         // TRAVA DE 2.5s PARA EVITAR RACE CONDITION (DUPLO DESCARTE)
         window.isAutoPlaying = true;
         showMessage('Tempo esgotado. Processando Auto-play...');
@@ -2663,6 +2666,28 @@ function startTurnTimerIfNeeded() {
       }
     }
   }, 1000);
+}
+
+async function recoverTimedOutBotTurn() {
+  const botIndex = state?.currentPlayer;
+  const turnNumber = state?.turnNumber;
+  const sessionId = window.gameSessionId;
+  const hostIndex = state?.players?.findIndex((player) => player && !player.name.toUpperCase().includes('BOT'));
+  if (hostIndex !== myPlayerIndex || !state?.players?.[botIndex]?.name.toUpperCase().includes('BOT')) return;
+  const running = window.activeBotTurn;
+  // Stop the decision loop, then wait for any in-flight move/commit. Never
+  // race a timeout discard against a move that is already being applied.
+  const timedOutController = botTurnController;
+  timedOutController.abort();
+  if (running?.promise) await running.promise.catch(() => {});
+  if (botTurnController !== timedOutController) return;
+  botTurnController = new AbortController();
+  if (sessionId !== window.gameSessionId || state?.turnNumber !== turnNumber || state?.currentPlayer !== botIndex || state?.finished) return;
+  if (!canPerformCommonGameAction(state) || isBossTurnActive(state) || hasPendingBossChoices(state)) return;
+  const engine = createBotEngineForSession(sessionId, botTurnController.signal);
+  showMessage('Tempo do bot esgotado. Concluindo o turno...');
+  if (!state.hasDrawnThisTurn) await engine.executeDrawStock(botIndex);
+  if (state?.currentPlayer === botIndex && !state.finished) await engine.recoverBotTurn(botIndex);
 }
 
 function shuffle(array) {
@@ -4777,7 +4802,8 @@ function bossFlowHostIndex() {
 
 function scheduleBossTurnAdvance() {
   const flow = state?.boss?.bossFlow;
-  const active = !pauseBlocksPlay(state) && isCurrentBossMode() && isBossTurnActive(state) && flow && !hasPendingBossChoices(state);
+  const heldDebugResult = state?.debugScenario?.active && state.debugScenario.heldResultActionId;
+  const active = !heldDebugResult && !pauseBlocksPlay(state) && isCurrentBossMode() && isBossTurnActive(state) && flow && !hasPendingBossChoices(state);
   const isHost = active && myPlayerIndex === bossFlowHostIndex();
   const key = active ? `${flow.id}:${flow.stage}:${flow.endsAt}` : '';
   if (!isHost) {
@@ -4838,6 +4864,7 @@ function renderBossVaultSlot(root, player, isLocal = false) {
   if (!player) {
     root.style.display = 'none';
     root.innerHTML = '';
+    delete root._vaultMarkup;
     delete root.dataset.playerId;
     delete root.dataset.vaultState;
     root.onclick = null;
@@ -4848,6 +4875,7 @@ function renderBossVaultSlot(root, player, isLocal = false) {
   if (!vault) {
     root.style.display = 'none';
     root.innerHTML = '';
+    delete root._vaultMarkup;
     delete root.dataset.vaultState;
     root.onclick = null;
     return;
@@ -4882,7 +4910,11 @@ function renderBossVaultSlot(root, player, isLocal = false) {
             : quote?.state === 'open'
               ? `COFRE ABERTO · CUSTO ATUAL +${quote?.currentDebt || 0}`
               : `CARÊNCIA · ${Math.min(1, quote?.ownerTurnsStarted || 0)}/1 TURNO`;
-  root.innerHTML = `<div class="boss-vault-visual"><div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : 'boss-vault-card-back'}">${cardFace}</div><img class="boss-vault-frame" src="${frameSrc}" alt="" aria-hidden="true"></div><div class="boss-vault-copy"><span class="boss-vault-kicker">GARANTIA NO COFRE</span><small>${player.name} · base +${quote?.baseDebt || 0} · juros +${quote?.interestDebt || 0} · atual +${quote?.currentDebt || 0}</small><strong>${status}</strong></div>`;
+  const vaultMarkup = `<div class="boss-vault-visual"><div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : `back back-${vault.card.back === 'blue' ? 'blue' : 'red'} boss-vault-card-back`}">${cardFace}</div><img class="boss-vault-frame" src="${frameSrc}" alt="" aria-hidden="true"></div><div class="boss-vault-copy"><span class="boss-vault-kicker">GARANTIA NO COFRE</span><small>${player.name} · base +${quote?.baseDebt || 0} · juros +${quote?.interestDebt || 0} · atual +${quote?.currentDebt || 0}</small><strong>${status}</strong></div>`;
+  if (root._vaultMarkup !== vaultMarkup) {
+    root.innerHTML = vaultMarkup;
+    root._vaultMarkup = vaultMarkup;
+  }
   root.onclick = isLocal && reclaimAvailable ? reclaimLocalBossVault : null;
 }
 
@@ -5279,8 +5311,8 @@ function renderBossHud() {
   }
   const tacticalEffects = [];
   if (boss.currentIntent?.abilityId === 'hands_tied') tacticalEffects.push({ id: 'hands_tied_team', ...boss.currentIntent.payload });
-  (boss.activeOrders || []).filter((order) => order.status === 'active').forEach((order) => tacticalEffects.push({ id: 'dominatrix_order', ...order }));
-  (boss.interdicts || []).filter((interdict) => interdict.status === 'active').forEach((interdict) => tacticalEffects.push({ id: 'interdict', ...interdict }));
+  (boss.activeOrders || []).filter((order) => order.status === 'active').forEach((order) => tacticalEffects.push({ ...order, id: 'dominatrix_order' }));
+  (boss.interdicts || []).filter((interdict) => interdict.status === 'active').forEach((interdict) => tacticalEffects.push({ ...interdict, id: 'interdict' }));
   if (boss.creditLimit?.status === 'active') tacticalEffects.push({ id: 'credit_limit', ...boss.creditLimit });
   if (boss.discardSurcharge?.status === 'active') tacticalEffects.push({ id: 'discard_surcharge', ...boss.discardSurcharge });
   document.getElementById('bossEffects').innerHTML =
@@ -8494,8 +8526,9 @@ const botEngine = {
 
   async executeDiscard(botIndex, cardIndex) {
     const s = this.getState();
-    if (!s) return false;
+    if (!s || s.finished || s.currentPlayer !== botIndex || !s.hasDrawnThisTurn || !canPerformCommonGameAction(s)) return false;
     const me = s.players[botIndex];
+    if (!me?.hand?.[cardIndex]) return false;
     if (isBossCardBlocked(s, me.id, me.hand[cardIndex]?.id, 'discard')) {
       cardIndex = me.hand.findIndex((card) => !isBossCardBlocked(s, me.id, card?.id, 'discard') && card?.id !== s.pickedDiscardCardId);
     }
@@ -8532,7 +8565,12 @@ const botEngine = {
   async recoverBotTurn(botIndex) {
     const s = this.getState();
     const me = s?.players?.[botIndex];
-    if (!s || !me || s.finished) return false;
+    if (!s || !me || s.finished || s.currentPlayer !== botIndex) return false;
+    if (!me.hand.length) {
+      await this._checkBotMortoOrWin(botIndex);
+      if (s.finished) return true;
+      if (!me.hand.length) return false;
+    }
     normalizeBossState(s);
     const legalIndex = me.hand.findIndex((card) => card?.id && card.id !== s.pickedDiscardCardId && !isBossCardBlocked(s, me.id, card.id, 'discard'));
     if (legalIndex < 0) return false;
@@ -9178,10 +9216,14 @@ onSnapshot(gameRef, async (snap) => {
 
             window.lastBotTurnPlayed = state.turnNumber;
             const sessionEngine = createBotEngineForSession(scheduledSessionId, scheduledSignal);
-            BuracoBot.playTurn(state, state.currentPlayer, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId }).catch((err) => {
+            const activeBotTurn = { turnNumber: scheduledTurn, sessionId: scheduledSessionId, promise: null };
+            window.activeBotTurn = activeBotTurn;
+            activeBotTurn.promise = BuracoBot.playTurn(state, state.currentPlayer, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId }).catch((err) => {
               if (BuracoBot.isCancellationError(err)) return;
               console.error('Erro na Matrix:', err);
               window.lastBotTurnPlayed = null;
+            }).finally(() => {
+              if (window.activeBotTurn === activeBotTurn) window.activeBotTurn = null;
             });
           }, botDelay);
         }
@@ -9684,7 +9726,17 @@ window.updateMenuDynamic = function () {
 // ==========================================
 // MOTOR DE DEBUG / DEVTOOLS
 // ==========================================
-const isDebugMode = urlParams.get('debug') === '1' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+const isLocalDevelopment = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+let leaveDevTools;
+if (isLocalDevelopment) {
+  // Development keeps its original always-on panel, without production auth/exit.
+  isDebugMode = true;
+} else {
+  const access = await import('./js/game/devtools-auth.js');
+  access.installDevToolsAccessUI();
+  isDebugMode = await access.hasDevToolsAccess();
+  leaveDevTools = access.leaveDevTools;
+}
 window.isDevToolsOpen = true; // Começa aberto por padrão
 
 window.toggleDebugPanel = (show) => {
@@ -9738,13 +9790,22 @@ window.debugSetDeckTheme = async (theme) => {
 };
 
 if (isDebugMode) {
+  if (!isLocalDevelopment) {
+  const exitDevTools = document.createElement('button');
+  exitDevTools.id = 'exitDevToolsBtn';
+  exitDevTools.type = 'button';
+  exitDevTools.textContent = 'Sair do modo DEV';
+  exitDevTools.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:2147483647;padding:8px 12px;background:#7f1d1d;color:white;border:1px solid #fca5a5;border-radius:8px;font-size:11px;';
+  exitDevTools.addEventListener('click', leaveDevTools);
+  document.body.append(exitDevTools);
+  }
   window.toggleDebugPanel(true);
   // 🔥 Exibe o painel de atalhos rápidos do menu principal
   const menuPanel = document.getElementById('menuDebugPanel');
   if (menuPanel) menuPanel.style.display = 'flex';
 
   // 🔥 Preenche as configurações e inverte dinamicamente os BOTs de lugar baseado na sua cadeira de teste
-  window.debugInstantStart = async (selectedMode, preferredSeat = 0) => {
+  window.debugInstantStart = async (selectedMode, preferredSeat = 0, preparedState = null) => {
     const selectedBoss = getBossDefinitionForMode(selectedMode);
     document.getElementById('modeSelect').value = selectedBoss ? COOPERATIVE_MENU_MODE : selectedMode;
     if (selectedBoss) document.getElementById('bossSelect').value = selectedBoss.id;
@@ -9784,7 +9845,25 @@ if (isDebugMode) {
 
     window.updateMenuDynamic();
 
-    return startGame(selectedMode, names, normalizeVariantForMode(selectedMode, 'aberto'), ['biel@financeiro.com', 'bot@rebeca.com']);
+    const debugDominationOptions = selectedMode === '1x1_dominacao'
+      ? { ...readDominationMenuOptions(), friend: true, friendCapacity: 2 }
+      : undefined;
+    if (debugDominationOptions) syncDominationMenuOptions(debugDominationOptions);
+
+    if (preparedState) {
+      // Publish the selected scenario once, never an unrelated random match first.
+      activateGameSession();
+      preparedState.matchStartedAt = Date.now();
+      preparedState.matchFinishedAt = null;
+      preparedState.isBetting = false;
+      preparedState.betBase = 0;
+      preparedState.betPerPoint = 0;
+      beginBossTurn(preparedState, { first: true, now: Date.now(), debug: true });
+      await setDoc(gameRef, { stateJson: JSON.stringify(preparedState), createdAt: preparedState.matchStartedAt });
+      return preparedState;
+    }
+
+    return startGame(selectedMode, names, normalizeVariantForMode(selectedMode, 'aberto'), ['biel@financeiro.com', 'bot@rebeca.com'], debugDominationOptions);
   };
 
   let bossDebugLabModulePromise = null;
@@ -9831,8 +9910,8 @@ if (isDebugMode) {
     const phaseSelect = bossLabElement('debugBossLabPhase');
     const previousPhase = preservePhase ? phaseSelect?.value : 'auto';
     setBossLabOptions(phaseSelect, [{ id: 'auto', label: 'Automatica' }, ...[1, 2, 3].map((phase) => ({ id: phase, label: `Fase ${phase}`, disabled: !ability.phases.includes(phase) }))], previousPhase);
-    setBossLabOptions(bossLabElement('debugBossLabVariant'), ability.variants, bossLabElement('debugBossLabVariant')?.value || 'interactive');
-    setBossLabOptions(bossLabElement('debugBossLabTarget'), ability.targets, bossLabElement('debugBossLabTarget')?.value || 'auto');
+    setBossLabOptions(bossLabElement('debugBossLabVariant'), ability.variants, 'interactive');
+    setBossLabOptions(bossLabElement('debugBossLabTarget'), ability.targets, 'auto');
     const technical = bossLabElement('debugBossLabTechnical');
     if (technical) technical.textContent = `${ability.id} - Fases ${ability.phases.join('/')} - peso ${ability.weight}`;
     document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => {
@@ -9851,13 +9930,13 @@ if (isDebugMode) {
     syncBossLabAbilityControls({ preservePhase: false });
   }
 
-  function validateBossLabSelection() {
+  function validateBossLabSelection({ preserveError = false } = {}) {
     const ability = selectedBossLabAbility();
     const phase = bossLabElement('debugBossLabPhase')?.value || 'auto';
     const button = bossLabElement('debugBossLabPrepare');
     const compatible = !!ability && (phase === 'auto' || ability.phases.includes(Number(phase)));
     if (button) button.disabled = !compatible;
-    setBossLabError(compatible ? '' : `${ability?.name || 'A habilidade'} nao e elegivel na Fase ${phase}.`);
+    if (!compatible || !preserveError) setBossLabError(compatible ? '' : `${ability?.name || 'A habilidade'} nao e elegivel na Fase ${phase}.`);
     return compatible;
   }
 
@@ -9917,14 +9996,14 @@ if (isDebugMode) {
     state.debugScenario.pauseAutomation = true;
     renderedBossFeedbackCount = null;
     renderedBossFeedbackEventIds = null;
+    if (!state.boss?.bossFlow) beginBossTurn(state, { first: true, now: Date.now(), debug: true });
     if (rememberBase) bossDebugLabBaseSnapshot = module.createBossDebugSnapshot(state);
-    beginBossTurn(state, { first: true, now: Date.now(), debug: true });
     const fallbackExpected = config.variant === 'no_target';
     if (!fallbackExpected && state.boss?.currentIntent?.abilityId !== config.abilityId) {
       throw new Error(`O motor selecionou ${state.boss?.currentIntent?.abilityId || 'nenhuma habilidade'} em vez de ${config.abilityId}.`);
     }
     const selectedDebugAbilityId = state.boss?.currentIntent?.abilityId || state.boss?.lastAbilityId || null;
-    if (fallbackExpected && (!selectedDebugAbilityId || selectedDebugAbilityId === config.abilityId)) {
+    if (fallbackExpected && selectedDebugAbilityId === config.abilityId) {
       throw new Error(`${config.abilityId} nao foi rejeitada pelo fallback sem alvo.`);
     }
     bossDebugLabObservedBaseline = module.restoreBossDebugSnapshot(module.createBossDebugSnapshot(state));
@@ -9952,24 +10031,26 @@ if (isDebugMode) {
       const definition = bossDebugLabCatalog.find((entry) => entry.id === config.bossId);
       if (!definition) throw new Error('Chefe invalido no laboratorio.');
       const prepared = module.buildBossDebugScenario(null, config);
-      await window.debugInstantStart(definition.mode, 0);
+      await window.debugInstantStart(definition.mode, 0, prepared.state);
       await activatePreparedBossLabState(prepared, config);
       if (instructions) instructions.textContent = prepared.instructions;
-      showMessage(`${definition.name}: ${state.boss.currentIntent?.name || 'fallback legal'} preparado no laboratorio.`);
+      showMessage(config.variant === 'no_target'
+        ? `Sem alvo: habilidade rejeitada. ${state.boss.currentIntent?.name ? `Fallback: ${state.boss.currentIntent.name}.` : 'Nenhuma alternativa elegivel nesta fase.'}`
+        : `${definition.name}: ${state.boss.currentIntent?.name} preparado no laboratorio.`);
       return true;
     } catch (error) {
       setBossLabError(error.message || String(error));
     } finally {
-      validateBossLabSelection();
+      validateBossLabSelection({ preserveError: true });
     }
     return false;
   }
 
   async function executeBossLabVariant(variant) {
     const config = currentBossLabConfig({ variant });
-    const sameScenario = state?.debugScenario?.active && state.debugScenario.bossId === config.bossId && state.debugScenario.abilityId === config.abilityId && state.debugScenario.variant === variant;
-    if (!sameScenario && !(await prepareBossLab({ variant }))) return;
     const module = await loadBossDebugLabModule();
+    const sameScenario = module.canContinueBossDebugScenario(state, config);
+    if (!sameScenario && !(await prepareBossLab({ variant }))) return;
     const result = module.executeBossDebugScenarioVariant(state);
     state.lastAction = { id: newActionId(), type: 'bossDebugExecute', variant, result, ts: Date.now() };
     renderAll();

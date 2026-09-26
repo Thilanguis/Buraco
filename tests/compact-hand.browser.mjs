@@ -57,11 +57,13 @@ try {
               hand: rect('#handContainer'), actions: rect('.player-actions'),
               stock: rect('#drawStockBtn .pile-card'), discard: rect('#drawDiscardBtn .pile-card'),
               meld: rect('#meldsP1 .carta'), meldRow: rect('#meldsP1 .meld-line-cards'),
-              labelInHud: !!document.querySelector('.board-status #localPlayerLabel'),
+              label: rect('#localPlayerLabel'),
+              labelAboveActions: !!document.querySelector('.player-interface #localPlayerLabel'),
               buttons: buttons.map(b => b.getBoundingClientRect().toJSON()), overflow: document.documentElement.scrollWidth };
           });
           const key = `${touch}/${width}/${theme}/${mode}`;
-          assert.ok(result.labelInHud, key);
+          assert.ok(result.labelAboveActions, key);
+          assert.ok(result.label.bottom <= result.actions.top + 1, `name above buttons: ${key}`);
           assert.ok(result.actions.bottom <= result.hand.top + 1, `actions above hand: ${key}`);
           assert.ok(result.last.right <= width + 1 && result.last.bottom <= height + 1, `last card reachable: ${key}`);
           assert.ok(result.overflow <= width + 1, `no page overflow: ${key}`);

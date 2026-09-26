@@ -602,7 +602,8 @@ export class BuracoBot {
             if (meld?.length) markedMelds.add(index);
           });
         }
-        const cardIndexes = me.hand.map((card, index) => ({ card, index })).sort((a, b) => Number(markedCards.has(b.card?.id)) - Number(markedCards.has(a.card?.id)));
+        const cardIndexes = me.hand.map((card, index) => ({ card, index })).sort((a, b) => Number(markedCards.has(b.card?.id)) - Number(markedCards.has(a.card?.id))
+          || Number(this.isMeldDirty([a.card])) - Number(this.isMeldDirty([b.card])));
         const meldIndexes = (team.melds || []).map((meld, index) => ({ meld, index })).sort((a, b) => Number(markedMelds.has(b.index)) - Number(markedMelds.has(a.index)));
 
         for (const { meld, index: meldIndex } of meldIndexes) {
@@ -611,6 +612,11 @@ export class BuracoBot {
             if (!card || (!markedCards.has(card.id) && !markedMelds.has(meldIndex))) continue;
             const testMeld = this.simulateMeld(meld, [card], engine);
             if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
+            // Feed natural threats with a natural card first. Do not ruin a
+            // clean run for optional progress; allow a wildcard for a deadline.
+            const dirtiesClean = !this.isMeldDirty(meld) && this.isMeldDirty(testMeld);
+            if (naturePriorities && dirtiesClean && !markedCards.has(card.id)
+              && !naturePriorities.meldIndexes?.includes(meldIndex)) continue;
             if (!engine.isValidSequenceMeld(testMeld) || !this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
             this.assertActive(engine, signal);
             const moved = await engine.executeMeldExtend(botIndex, meldIndex, [handIndex]);
@@ -940,7 +946,7 @@ export class BuracoBot {
       return;
     }
 
-    if (me.hand.length === 0) return true;
+    if (me.hand.length === 0) return typeof engine.recoverBotTurn === 'function' ? engine.recoverBotTurn(botIndex) : false;
 
     const labDiscardIndex = engine.selectBossLabDiscardIndex?.(me.id, me.hand);
     if (Number.isInteger(labDiscardIndex) && labDiscardIndex >= 0 && labDiscardIndex < me.hand.length) {

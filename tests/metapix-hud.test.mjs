@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 // Exercise the production HUD without Firebase, using two independent clients.
-const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
 const marker = app.indexOf('// 🎨 PINTANDO A CHECKLIST DE METAS');
 assert.ok(marker > 0);
 const start = app.indexOf("const hud = document.getElementById('goalsHud');", marker);

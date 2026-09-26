@@ -2403,8 +2403,9 @@ body[data-boss-id='banker'] .boss-portrait img {
   object-position: 50% 29%;
   transform: translate3d(0, 0, 0) scale(var(--banker-portrait-scale));
   transform-origin: 50% 32%;
-  will-change: transform;
-  animation: bankerPortraitBreathing 10s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  /* Keep the bitmap on a stable layer during long, card-heavy matches. */
+  will-change: auto;
+  animation: none;
 }
 body[data-boss-id='banker'] .boss-portrait::before,
 body[data-boss-id='banker'] .boss-portrait::after {

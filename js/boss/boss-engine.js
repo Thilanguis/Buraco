@@ -266,12 +266,20 @@ function isCompleteAceToAce(meld) {
     && ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].every((rank) => ranks.includes(rank));
 }
 
+const meldContinuationCache = new Map();
 function meldCanReceiveAnyCard(meld) {
   if (!Array.isArray(meld) || !meld.length || isCompleteAceToAce(meld) || meld.length >= 14) return false;
+  // Normalization is also called by per-card HUD queries. Cache only this
+  // pure rules calculation, keyed by card values (never by mutable array).
+  const key = JSON.stringify(meld.map((card) => [card?.rank, card?.suit, !!card?.joker, !!card?.forceNatural, !!card?.forceWild]));
+  if (meldContinuationCache.has(key)) return meldContinuationCache.get(key);
   const realSuit = meld.find((card) => card && !card.joker && card.rank !== '2' && card.rank !== 2)?.suit || SUITS[0].value;
   const candidates = BOSS_RANKS_LOW.map((rank) => ({ rank, suit: realSuit }));
   candidates.push({ joker: true, rank: 'JOKER', suit: 'JOKER' });
-  return candidates.some((card) => isValidBossSequence([...meld, card]));
+  const result = candidates.some((card) => isValidBossSequence([...meld, card]));
+  if (meldContinuationCache.size >= 256) meldContinuationCache.clear();
+  meldContinuationCache.set(key, result);
+  return result;
 }
 
 function isNaturalBossSequence(meld) {
@@ -479,7 +487,7 @@ function isCardBlockedByBossState(boss, playerId, cardId, action = 'play') {
     if (cardIds.includes(cardId)) return true;
   }
   if (intent?.abilityId === 'double_collar' && intent.payload?.lockedCards?.some((entry) => entry.playerId === playerId && entry.cardId === cardId)) return true;
-  if (action === 'discard' && intent?.abilityId === 'exposure' && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId === cardId) return true;
+  if (action === 'discard' && intent?.abilityId === 'exposure' && !intent.payload?.discardLockReleased && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId === cardId) return true;
   if (boss.effects.some((effect) => effect.playerId === playerId && effect.cardId === cardId && (effect.id === 'choice_lock' || (action === 'discard' && effect.id === 'choice_exposure')))) return true;
   return false;
 }
@@ -587,7 +595,7 @@ function createPayload(gameState, abilityId) {
     return { suit: suit.value, suitLabel: suit.label, required: boss.phase === 3 ? 4 : 3, progress: 0, successDelta: -5, failureDelta: boss.phase === 3 ? 12 : 10 };
   }
   if (abilityId === 'credit_limit') {
-    const config = { 1: { allowance: 7, maxCharge: 4 }, 2: { allowance: 6, maxCharge: 5 }, 3: { allowance: 5, maxCharge: 6 } }[boss.phase];
+    const config = { 1: { allowance: 3, maxCharge: 4 }, 2: { allowance: 2, maxCharge: 5 }, 3: { allowance: 1, maxCharge: 6 } }[boss.phase];
     return { ...config, debtPerCard: 1 };
   }
   if (abilityId === 'discard_surcharge') return { amount: boss.phase === 3 ? 6 : 4 };
@@ -886,7 +894,7 @@ export function createBossStateForMode(mode, seed = Date.now()) {
   return createBossState(definition.id, seed);
 }
 
-export function normalizeBossState(gameState) {
+export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   if (!isBossMode(gameState)) return null;
   if (!gameState.boss) gameState.boss = createBossState(getBossDefinitionForMode(gameState.mode)?.id || 'banker');
   const boss = gameState.boss;
@@ -1119,7 +1127,9 @@ export function normalizeBossState(gameState) {
         }
       } else if (intent?.abilityId === 'exposure' && intent.payload?.targetPlayerId === player.id) {
         cancelledCardId = intent.payload.cardId || null;
-        boss.currentIntent = null;
+        // Release only the deadlocking discard restriction, not the objective.
+        // The player can still use this card; judge success at the turn deadline.
+        intent.payload.discardLockReleased = true;
       }
       if (cancelledCardId) {
         boss.actionSequence += 1;
@@ -1128,7 +1138,9 @@ export function normalizeBossState(gameState) {
           actionId: `intent_lock_cancelled_${boss.actionSequence}`,
           playerId: player.id,
           cardId: cancelledCardId,
-          outcome: 'A trava temporária mais recente foi reduzida para preservar um descarte legal.',
+          outcome: intent?.abilityId === 'exposure'
+            ? 'O descarte foi liberado para evitar uma trava. A carta exposta ainda precisa ser usada na mesa até o fim do turno para evitar o Chicote.'
+            : 'A trava temporária mais recente foi reduzida para preservar um descarte legal.',
         });
       }
     }
@@ -1166,14 +1178,14 @@ export function normalizeBossState(gameState) {
         else if (threat.strengthened && (gameState.players || []).length < Math.max(1, Number(threat.requiredContributorCount) || 2)) {
           cancelNatureThreat(gameState, threat, 'Um dos cooperadores deixou de poder contribuir com a Raiz Fortalecida.');
         }
-        else if (!meldCanReceiveAnyCard(gameState.teams?.[0]?.melds?.[currentIndex])) {
+        else if (!resolvingMeld && !meldCanReceiveAnyCard(gameState.teams?.[0]?.melds?.[currentIndex])) {
           cancelNatureThreat(gameState, threat, 'O jogo marcado nao aceita mais nenhuma continuacao legal.');
         } else threat.meldIndex = currentIndex;
       } else if (threat.type === 'graft') {
         const indexes = (threat.meldIds || []).map(meldIndexById);
         if (indexes.length !== 2 || indexes.some((index) => index < 0)) {
           cancelNatureThreat(gameState, threat, 'O Enxerto perdeu um dos jogos ligados.');
-        } else if (indexes.some((index) => !meldCanReceiveAnyCard(gameState.teams?.[0]?.melds?.[index]))) {
+        } else if (!resolvingMeld && indexes.some((index, side) => !(threat.fedMeldIds || []).includes(threat.meldIds[side]) && !meldCanReceiveAnyCard(gameState.teams?.[0]?.melds?.[index]))) {
           cancelNatureThreat(gameState, threat, 'Um dos lados do Enxerto deixou de aceitar continuacoes legais.');
         } else threat.meldIndexes = indexes;
       } else if (threat.type === 'harvest' && !playerById(threat.targetPlayerId)) {
@@ -1361,6 +1373,17 @@ export function beginBossTurn(gameState, { first = false, phaseChanged = false, 
 function activateAnnouncedBankerRoundEffect(gameState, intent) {
   const boss = gameState?.boss;
   if (!boss || boss.id !== 'banker' || !intent) return null;
+
+  if (intent.abilityId === 'maintenance_fee') {
+    if (boss.lastMaintenanceIntentId === intent.id) return null;
+    const extraDraw = intent.payload.extraDraw ?? (intent.announcedPhase === 3 ? 2 : 1);
+    const financedDebt = intent.payload.financedDebt ?? (intent.announcedPhase === 3 ? 4 : 3);
+    boss.effects = boss.effects.filter((entry) => entry.id !== 'maintenance_fee');
+    boss.effects.push({ id: 'maintenance_fee', extraDraw, financedDebt, sourceActionId: intent.id, pendingPlayerIds: gameState.players.map((player) => player.id) });
+    boss.lastMaintenanceIntentId = intent.id;
+    boss.lastMaintenanceRound = boss.roundNumber;
+    return boss.effects.at(-1);
+  }
 
   if (intent.abilityId === 'credit_limit') {
     if (intent.id && boss.creditLimit?.sourceIntentId === intent.id) return boss.creditLimit;
@@ -2066,7 +2089,8 @@ export function getBossNaturePriorities(gameState, playerId) {
     .filter((cardId) => player.hand?.some((card) => card?.id === cardId));
   const meldIds = new Set();
   threats.forEach((threat) => {
-    if (['root', 'twin_root', 'royal_root'].includes(threat.type) && threat.meldId) meldIds.add(threat.meldId);
+    if (['root', 'twin_root', 'royal_root'].includes(threat.type) && threat.meldId
+      && !(threat.strengthened && threat.contributorPlayerIds?.includes(playerId))) meldIds.add(threat.meldId);
     if (threat.type === 'graft') {
       const fed = new Set(threat.fedMeldIds || []);
       (threat.meldIds || []).filter((meldId) => !fed.has(meldId)).forEach((meldId) => meldIds.add(meldId));
@@ -2875,7 +2899,9 @@ export function applyBossMeldTransition(gameState, {
   cardOriginsById = null,
   suppressDominatrixResistance = false,
 }) {
-  const boss = normalizeBossState(gameState);
+  // Cards have already moved: record their contribution before checking whether
+  // the newly completed meld still accepts another card.
+  const boss = normalizeBossState(gameState, { resolvingMeld: true });
   if (!boss || teamId !== 0 || boss.result) return null;
   const legacyKey = `${teamId}:${meldIndex}`;
   const meldId = resolveBossMeldId(gameState, teamId, meldIndex, true);
@@ -3470,9 +3496,10 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else if (intent.abilityId === 'exposure') {
       const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);
       const remainsInHand = !!target?.hand?.some((card) => card?.id === intent.payload.cardId);
-      exposureSuccess = !remainsInHand;
-      if (remainsInHand) changeChains(gameState, intent.payload.targetPlayerId, 1, 'exposure_failed');
-      outcome = remainsInHand
+      const playedOnTable = (gameState.teams || []).some((team) => (team.melds || []).some((meld) => meld.some((card) => card?.id === intent.payload.cardId)));
+      exposureSuccess = intent.payload.discardLockReleased ? playedOnTable : !remainsInHand;
+      if (!exposureSuccess) changeChains(gameState, intent.payload.targetPlayerId, 1, 'exposure_failed');
+      outcome = !exposureSuccess
         ? `${target?.name || 'O jogador alvo'} não usou a carta exposta e recebeu 1 Chicote.`
         : `${target?.name || 'O jogador alvo'} usou a carta exposta e evitou o Chicote.`;
     } else if (intent.abilityId === 'break_will') {
@@ -3673,10 +3700,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     }
   } else if (intent.abilityId === 'maintenance_fee') {
     const extraDraw = intent.payload.extraDraw ?? (intent.announcedPhase === 3 ? 2 : 1);
-    const financedDebt = intent.payload.financedDebt ?? (intent.announcedPhase === 3 ? 4 : 3);
-    boss.effects = boss.effects.filter((entry) => entry.id !== 'maintenance_fee');
-    boss.effects.push({ id: 'maintenance_fee', extraDraw, financedDebt, sourceActionId: intent.id, pendingPlayerIds: gameState.players.map((player) => player.id) });
-    boss.lastMaintenanceRound = boss.roundNumber;
+    activateAnnouncedBankerRoundEffect(gameState, intent);
     outcome = `Tarifa ativa: +${extraDraw} carta${extraDraw === 1 ? '' : 's'} financiada${extraDraw === 1 ? '' : 's'} para cada jogador.`;
   } else if (intent.abilityId === 'credit_block') {
     outcome = 'Bloqueio de Crédito encerrado.';

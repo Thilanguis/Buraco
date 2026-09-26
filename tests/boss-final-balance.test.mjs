@@ -450,7 +450,7 @@ test('Limite de Credito fica ativo desde o anuncio no fluxo real e expira sem se
 
   assert.equal(state.boss.creditLimit.round, state.boss.roundNumber);
   assert.equal(state.boss.creditLimit.sourceIntentId, intent.id);
-  assert.equal(state.boss.creditLimit.allowance, 6);
+  assert.equal(state.boss.creditLimit.allowance, 2);
   assert.equal(getBossCreditLimitQuote(state, []).maxCharge, 5);
 
   const reloaded = structuredClone(state);
@@ -458,7 +458,7 @@ test('Limite de Credito fica ativo desde o anuncio no fluxo real e expira sem se
   advanceBossTurn(reloaded, reloaded.boss.bossFlow.endsAt + 1);
   assert.equal(reloaded.boss.bossFlow.stage, 'players');
 
-  const played = cards('announced-credit', ['3', '4', '5', '6', '7', '8', '9', '10'], '♣');
+  const played = cards('announced-credit', ['3', '4', '5', '6'], '♣');
   const event = applyBossMeldTransition(reloaded, {
     teamId: 0,
     playerId: 0,

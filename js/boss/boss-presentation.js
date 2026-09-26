@@ -94,6 +94,7 @@ const NATURE_OBJECTIVES = new Set(['living_seed', 'hungry_root', 'restorative_de
 const ACTIVE_NATURE_EFFECTS = new Set(['emerald_cocoon', 'spring_crown']);
 
 function actionCategory(intent) {
+  if (intent.abilityId === 'maintenance_fee') return 'Tarifa ativa nesta rodada';
   if (intent.abilityId === 'forced_choice') return 'Escolha imediata';
   if (PREPARED_CHOICE_ABILITIES.has(intent.abilityId)) return 'Escolha preparada';
   if (ACTIVE_RESTRICTIONS.has(intent.abilityId)) return 'Restricao ativa agora';
@@ -566,7 +567,7 @@ function compactAction(gameState, intent) {
       };
     }
     case 'maintenance_fee':
-      return { instruction: `Cada jogador comprara +${payload.extraDraw} carta(s).`, progress: compactBankerProgress(gameState, intent), consequence: 'Compra extra inevitavel' };
+      return { instruction: `Nesta rodada: +${payload.extraDraw} carta(s) junto da compra normal de cada jogador.`, progress: compactBankerProgress(gameState, intent), consequence: 'Se ficar na mão ao fim do turno, gera Dívida' };
     case 'credit_block':
       return { instruction: 'O lixo esta bloqueado nesta rodada.', progress: compactBankerProgress(gameState, intent), consequence: 'Encerra na virada da rodada' };
     case 'suit_audit':
@@ -582,9 +583,9 @@ function compactAction(gameState, intent) {
       const counted = new Set(limit.countedCardIds || []).size;
       const allowance = limit.allowance || payload.allowance || 0;
       return {
-        instruction: `A equipe possui franquia de ${allowance} cartas novas na mesa.`,
+        instruction: `Nesta rodada, a equipe compartilha ${allowance} carta(s) sem taxa. Não é uma obrigação de baixar cartas.`,
         progress: compactBankerProgress(gameState, intent),
-        consequence: `Cobranca acumulada: ${limit.chargedDebt || 0}/${limit.maxCharge || payload.maxCharge || 0} · excedente: +${limit.debtPerCard || 1}`,
+        consequence: `Cada carta excedente: +${limit.debtPerCard || 1} Dívida. Cobrado: ${limit.chargedDebt || 0}/${limit.maxCharge || payload.maxCharge || 0}. Após o teto, não há taxa extra nesta rodada.`,
       };
     }
     case 'discard_surcharge':
@@ -1020,6 +1021,34 @@ function flowResultEvent(gameState) {
   return (boss.eventLog || []).find((event) => event.actionId === actionId) || null;
 }
 
+function dominadoraResultPresentation(gameState) {
+  if (gameState?.boss?.id !== 'dominadora') return null;
+  const event = flowResultEvent(gameState);
+  if (!event) return null;
+  const abilityId = event.abilityId || event.sourceAbilityId;
+  const ability = getBossDefinition('dominadora')?.abilities.find(entry => entry.id === abilityId);
+  if (!ability) return null;
+  // Persistent objectives must not replace the result identified by the flow.
+  if (abilityId === 'possession') {
+    const presentation = possessionPresentation(gameState);
+    if (presentation) return presentation;
+  }
+  if (abilityId === 'exposure') {
+    const presentation = exposureResultPresentation(gameState);
+    if (presentation) return presentation;
+  }
+  return {
+    category: 'Resultado da habilidade',
+    name: ability.name,
+    speech: '',
+    description: '',
+    details: event.presentation?.details || [],
+    instruction: event.outcome || `${ability.name} foi resolvida.`,
+    progress: 'Resultado registrado',
+    consequence: event.dangerChangeLabel || '',
+  };
+}
+
 function bankerStatusPresentation(gameState) {
   const boss = gameState?.boss;
   if (boss?.id !== 'banker') return null;
@@ -1273,6 +1302,8 @@ export function buildBossActionPresentation(gameState) {
     };
   }
   if (flow?.stage === 'result') {
+    const dominadoraResult = dominadoraResultPresentation(gameState);
+    if (dominadoraResult) return dominadoraResult;
     const bankerStatus = bankerStatusPresentation(gameState);
 
     if (bankerStatus) {
@@ -1337,6 +1368,12 @@ export function buildBossActionPresentation(gameState) {
   }
 
   if (!intent) {
+    const orders = (gameState.boss?.activeOrders || []).filter(order => order.status === 'active' && order.sourceAbilityId === 'forced_choice');
+    if (orders.length) return {
+      category: 'Ordem aceita em vigor', name: 'Escolha Forçada', speech: '', description: '', details: [],
+      instruction: orders.map(order => `${playerName(gameState, order.targetPlayerId)}: ${order.description || order.label || order.type}`).join(' · '),
+      progress: 'Prazo: fim do turno do jogador marcado', consequence: 'Descumprir: +1 Chicote',
+    };
     const possessionStatus = possessionPresentation(gameState);
 
     if (possessionStatus) {
@@ -1388,7 +1425,7 @@ export function buildBossActionPresentation(gameState) {
         'Cada compra normal adiada acrescenta +1 ao resgate',
         `Ao alcançar +${payload.fullDebt ?? payload.amount ?? (phase === 3 ? 8 : 6)}, o resgate seguinte é obrigatório`,
       ];
-    else if (intent.abilityId === 'maintenance_fee') details = ['Compra extra inevitavel', `Cada jogador comprara +${payload.extraDraw ?? (phase === 3 ? 2 : 1)} carta(s)`, 'Aplicada no proximo turno de cada jogador'];
+    else if (intent.abilityId === 'maintenance_fee') details = ['Compra extra inevitavel nesta rodada', `Cada jogador comprara +${payload.extraDraw ?? (phase === 3 ? 2 : 1)} carta(s)`, 'Aplicada junto da compra normal; cobrada ao fim desse turno se ficar na mão'];
     else if (intent.abilityId === 'credit_block') details = ['Lixo bloqueado agora', `Duracao: ate o fim da rodada ${gameState.boss.roundNumber}`, 'Encerra depois da acao do ultimo cooperador'];
     else if (intent.abilityId === 'suit_audit')
       details = [

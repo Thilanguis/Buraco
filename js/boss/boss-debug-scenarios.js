@@ -411,6 +411,7 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
     bossId: definition.id,
     phase,
     abilityId: ability.id,
+    requestedPhase: String(options.phase ?? 'auto'),
     variant,
     target,
     seed: state.boss.seed,
@@ -454,6 +455,9 @@ export function canContinueBossDebugScenario(state, config = {}) {
   return state?.debugScenario?.active === true
     && state.debugScenario.bossId === config.bossId
     && state.debugScenario.abilityId === config.abilityId
+    && (config.phase == null || String(config.phase) === state.debugScenario.requestedPhase)
+    && (config.variant == null || config.variant === state.debugScenario.variant)
+    && (config.target == null || config.target === state.debugScenario.target)
     && Number(state.debugScenario.executionCount || 0) === 0
     && !state.finished;
 }
