@@ -206,8 +206,43 @@ export function installAccountMenu(account) {
   label.className = 'account-name';
   label.textContent = account.name;
   label.title = account.name;
-  identity.append(welcome, label);
+  const nameRow = document.createElement('span');
+  nameRow.className = 'account-name-row';
+  const stats = document.createElement('span');
+  stats.className = 'account-stats';
+  stats.setAttribute('role', 'status');
+  stats.textContent = 'Carregando…';
+  nameRow.append(label, stats);
+  identity.append(welcome, nameRow);
+  let statsBusy = false;
+  function showStats(totals) {
+    stats.textContent = `${totals.played.toLocaleString('pt-BR')} ${totals.played === 1 ? 'partida' : 'partidas'} · ${totals.winRate}% vitórias`;
+    stats.title = 'Mesmo resumo de “Entre jogadores” no perfil. Sem bots, chefes ou testes.';
+  }
+  window.addEventListener('account-history-loaded', event => {
+    if (event.detail?.uid === account.uid) showStats(event.detail.stats);
+  });
+  async function refreshStats() {
+    if (statsBusy) return;
+    statsBusy = true;
+    try {
+      const [{ loadHistoryPage }, { loadHistoryTotals }] = await Promise.all([import('./history-store.js'), import('./history-totals.js')]);
+      const totals = await loadHistoryTotals(account.uid, loadHistoryPage);
+      showStats(totals);
+    } catch {
+      stats.textContent = 'Estatísticas indisponíveis';
+      stats.title = 'Não foi possível consultar o histórico. Tente novamente ao abrir o perfil.';
+    } finally { statsBusy = false; }
+  }
+  void refreshStats();
+  let menuVisible = menu.style.display !== 'none';
+  new MutationObserver(() => {
+    const visible = menu.style.display !== 'none';
+    if (visible && !menuVisible) void refreshStats();
+    menuVisible = visible;
+  }).observe(menu, { attributes: true, attributeFilter: ['style'] });
   identity.onclick = async () => {
+    if (stats.textContent === 'Estatísticas indisponíveis') void refreshStats();
     identity.disabled = true;
     try {
       const [{ openAccountPage }, { loadHistoryPage }] = await Promise.all([import('./account-page.js'), import('./history-store.js')]);

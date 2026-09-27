@@ -20,6 +20,9 @@ body.account-pending > :not(#accountGate):not(script):not(style) { visibility: h
 #configSection .account-identity { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 #configSection .account-welcome { color: #bfae82; font: 600 9px/1.2 system-ui, sans-serif; letter-spacing: .16em; }
 #configSection .account-name { display: block; color: #f3eee2; font: 600 13px/1.4 system-ui, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#configSection .account-name-row { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; row-gap: 3px; width: 100%; min-width: 0; }
+#configSection .account-name-row .account-name { min-width: 0; max-width: 100%; }
+#configSection .account-stats { color: #c9b77e; font: 500 10px/1.5 system-ui, sans-serif; letter-spacing: 0; text-transform: none; }
 #configSection .account-logout { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: 0 0 auto; width: auto; min-height: 44px; margin: 0; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #aeb5c3; box-shadow: none; font: 500 11px/1 system-ui, sans-serif; text-transform: none; letter-spacing: 0; cursor: pointer; transition: background .15s, color .15s; }
 #configSection .account-logout:hover { color: #f2db9d; background: #d4af3710; border-color: #d4af3733; transform: none; }
 #configSection .account-logout:focus-visible { outline: 2px solid #e6c67d; outline-offset: 2px; }
