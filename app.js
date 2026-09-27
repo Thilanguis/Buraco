@@ -3705,7 +3705,8 @@ async function drawFromDiscardOnce(options = {}) {
   state.requiredDiscardCard = null;
   selectedHandIndexes.clear();
 
-  renderHand();
+  // renderAll already refreshes the hand. Avoid rendering the full hand twice
+  // after a discard pickup, which is the exact moment it is usually largest.
   renderAll();
 
   state.lastAction = {
@@ -6412,6 +6413,10 @@ function renderHand() {
 
   const collateralChoice = getBossPendingChoice(state, me.id);
   const selectingBankerCollateral = collateralChoice?.type === 'banker_collateral_card';
+  // Membership is checked once per rendered card. Sets avoid repeatedly
+  // scanning large pickup lists after a big discard purchase.
+  const boughtCardIds = new Set(state.boughtCardIds || []);
+  const bossChoiceBoughtIds = new Set(state.boss?.choiceDrawnCardIdsByPlayer?.[me.id] || []);
 
   me.hand.forEach((card, idx) => {
     if (!card) return; // 🛡️ BLINDAGEM ANTI-FANTASMA: Impede o crash de UI
@@ -6431,8 +6436,7 @@ function renderHand() {
     const bossCardLocked = bossCardEffect === 'locked';
 
     // O brilho de compra nunca compete com um estado visual da Dominadora.
-    const bossChoiceBoughtIds = state.boss?.choiceDrawnCardIdsByPlayer?.[me.id] || [];
-    if (!bossCardEffect && ((state.boughtCardIds && state.boughtCardIds.includes(card.id)) || bossChoiceBoughtIds.includes(card.id))) {
+    if (!bossCardEffect && (boughtCardIds.has(card.id) || bossChoiceBoughtIds.has(card.id))) {
       div.classList.add('just-bought');
     }
 
@@ -6504,8 +6508,19 @@ function renderHand() {
 
       if (selectedHandIndexes.size === 0) selectedMeldTarget = null; // Auto-clear de segurança
 
-      renderHand();
-      renderMelds(); // Atualiza a mesa para acender/apagar a zona de drop
+      // Do not rebuild the entire hand and every meld just to toggle one card.
+      // This is especially important after a large discard pickup, when the
+      // hand can temporarily contain dozens of cards until the turn ends.
+      div.classList.toggle('selected', selectedHandIndexes.has(idx));
+      if (pendingDiscardChoice) {
+        // Changing the hand selection invalidates the previous closed-discard
+        // destination calculation, so refresh only in that exceptional path.
+        renderMelds();
+      } else {
+        const teamIndex = state.teams.findIndex((team) => team.id === me.teamId);
+        const panel = teamIndex >= 0 ? document.getElementById(`teamPanel${teamIndex + 1}`) : null;
+        panel?.classList.toggle('can-drop-new', selectedHandIndexes.size > 0);
+      }
     };
     nextCards.appendChild(div);
   });

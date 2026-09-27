@@ -1,5 +1,6 @@
 import { createDeck } from '../deck.js';
 import { cleanDominationMelds, friendDominationCards, friendDominationPlanAllowed, dominationStockEndgame } from './domination-strategy.js';
+import { planTripleIndexes } from './bot-planner.js';
 
 export const FRIEND_NAMES = Object.freeze(['Bruna', 'Nathalia', 'Thayanne']);
 export const FRIEND_PRESENTATION_TIMING = Object.freeze({ spinMs: 3600, resultMs: 1400, dealMs: 1600 });
@@ -371,38 +372,37 @@ function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = 
   hand = friendDominationCards(hand, melds, rules);
   let best = null;
   const seen = new Set();
-  for (let i = 0; i < hand.length - 2; i++) {
-    for (let j = i + 1; j < hand.length - 1; j++) {
-      for (let k = j + 1; k < hand.length; k++) {
-        let added = [hand[i], hand[j], hand[k]];
-        // A closed pickup must justify its top with cards already in hand.
-        if (requiredId && !added.some((card) => card.id === requiredId)) continue;
-        let meld = rules.prepare(added);
-        if (!rules.valid(meld)) continue;
-        const extension = growPlan(meld, hand.filter((card) => !added.includes(card)), rules, farewell);
-        if (extension) {
-          meld = extension.meld;
-          added = [...added, ...extension.added];
-        }
-        if (!friendDominationPlanAllowed(meld, melds, rules)) continue;
-        const key = added.map((card) => card.id).sort().join('|');
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const clearsHand = added.length === hand.length;
-        if (!farewell) {
-          const clean = isClean(meld, rules);
-          // Even a clean triple is a useful seed. Wild openings wait until
-          // departure/endgame; a seven-card dirty meld is not an exception.
-          if (!clean) continue;
-        }
-        // On departure, favor a complete separate opening over a weak natural
-        // fragment that strands its wild. This heuristic stays below the 12000
-        // tier weight: making a clean canastra still beats merely shedding.
-        // It is a planning score, not a change to card/canastra rewards.
-        const value = playValue([], meld, added, rules, farewell) + (farewell && clearsHand ? 6000 : 0);
-        if (!best || value > best.value) best = { meld, added, value };
-      }
+  // The old code ran the expensive growPlan for every C(n,3) triple. Filter
+  // impossible sequence seeds first; the official rules still validate every
+  // survivor, so this changes cost rather than game legality.
+  for (const [i, j, k] of planTripleIndexes(hand)) {
+    let added = [hand[i], hand[j], hand[k]];
+    // A closed pickup must justify its top with cards already in hand.
+    if (requiredId && !added.some((card) => card.id === requiredId)) continue;
+    let meld = rules.prepare(added);
+    if (!rules.valid(meld)) continue;
+    const extension = growPlan(meld, hand.filter((card) => !added.includes(card)), rules, farewell);
+    if (extension) {
+      meld = extension.meld;
+      added = [...added, ...extension.added];
     }
+    if (!friendDominationPlanAllowed(meld, melds, rules)) continue;
+    const key = added.map((card) => card.id).sort().join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const clearsHand = added.length === hand.length;
+    if (!farewell) {
+      const clean = isClean(meld, rules);
+      // Even a clean triple is a useful seed. Wild openings wait until
+      // departure/endgame; a seven-card dirty meld is not an exception.
+      if (!clean) continue;
+    }
+    // On departure, favor a complete separate opening over a weak natural
+    // fragment that strands its wild. This heuristic stays below the 12000
+    // tier weight: making a clean canastra still beats merely shedding.
+    // It is a planning score, not a change to card/canastra rewards.
+    const value = playValue([], meld, added, rules, farewell) + (farewell && clearsHand ? 6000 : 0);
+    if (!best || value > best.value) best = { meld, added, value };
   }
   return best;
 }

@@ -1,8 +1,117 @@
 // bot.js
 import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './js/game/domination-strategy.js';
+import { planPairIndexesWithTop, planTripleIndexes, plannerFingerprint } from './js/game/bot-planner.js';
 
 export class BuracoBot {
   static _turnLocks = new Set();
+  static _plannerWorker = null;
+  static _plannerRequestId = 0;
+  static _plannerPending = new Map();
+  static _plannerWorkerDisabled = false;
+  static _plannerWorkerThreshold = 14;
+
+  static perfNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+  }
+
+  static createPlannerAbortError(message = 'Planejamento do bot cancelado.') {
+    const error = new Error(message);
+    error.name = 'AbortError';
+    error.code = 'BOT_TURN_CANCELLED';
+    return error;
+  }
+
+  static createStalePlanError() {
+    const error = new Error('A mesa mudou enquanto o bot calculava a jogada.');
+    error.name = 'AbortError';
+    error.code = 'BOT_PLAN_STALE';
+    return error;
+  }
+
+  static destroyPlannerWorker(reason = 'Planner reiniciado.') {
+    const error = this.createPlannerAbortError(reason);
+    for (const pending of this._plannerPending.values()) {
+      pending.cleanup?.();
+      pending.reject(error);
+    }
+    this._plannerPending.clear();
+    if (this._plannerWorker) this._plannerWorker.terminate();
+    this._plannerWorker = null;
+  }
+
+  static getPlannerWorker() {
+    if (this._plannerWorkerDisabled || typeof Worker === 'undefined') return null;
+    if (this._plannerWorker) return this._plannerWorker;
+    try {
+      const worker = new Worker(new URL('./js/game/bot-planner-worker.js', import.meta.url), { type: 'module' });
+      worker.addEventListener('message', (event) => {
+        const message = event.data || {};
+        const pending = this._plannerPending.get(message.requestId);
+        if (!pending) return;
+        this._plannerPending.delete(message.requestId);
+        pending.cleanup?.();
+        if (message.ok) pending.resolve(message.result || []);
+        else pending.reject(new Error(message.error || 'Falha no planner do bot.'));
+      });
+      const disable = () => {
+        this._plannerWorkerDisabled = true;
+        this.destroyPlannerWorker('Worker do bot indisponível; fallback local ativado.');
+      };
+      worker.addEventListener('error', disable);
+      worker.addEventListener('messageerror', disable);
+      this._plannerWorker = worker;
+      return worker;
+    } catch (error) {
+      console.warn('[BOT-PERF] Web Worker indisponível; usando planner local.', error);
+      this._plannerWorkerDisabled = true;
+      return null;
+    }
+  }
+
+  static assertPlanCurrent(token, engine, botIndex) {
+    const current = engine.getState();
+    if (!current || plannerFingerprint(current, botIndex) !== token) throw this.createStalePlanError();
+  }
+
+  static async planTriples(state, botIndex, engine, signal) {
+    const hand = state?.players?.[botIndex]?.hand || [];
+    const token = plannerFingerprint(state, botIndex);
+    const worker = hand.length >= this._plannerWorkerThreshold ? this.getPlannerWorker() : null;
+    if (!worker) return { token, indexes: planTripleIndexes(hand), worker: false };
+
+    const requestId = ++this._plannerRequestId;
+    try {
+      const indexes = await new Promise((resolve, reject) => {
+        const onAbort = () => {
+          const pending = this._plannerPending.get(requestId);
+          if (!pending) return;
+          this._plannerPending.delete(requestId);
+          pending.cleanup?.();
+          reject(this.createPlannerAbortError());
+        };
+        const cleanup = () => signal?.removeEventListener?.('abort', onAbort);
+        this._plannerPending.set(requestId, { resolve, reject, cleanup });
+        signal?.addEventListener?.('abort', onAbort, { once: true });
+        worker.postMessage({ requestId, token, kind: 'triples', payload: { hand } });
+      });
+      this.assertActive(engine, signal);
+      this.assertPlanCurrent(token, engine, botIndex);
+      return { token, indexes, worker: true };
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
+      console.warn('[BOT-PERF] Worker falhou; usando planner local.', error);
+      this._plannerWorkerDisabled = true;
+      this.destroyPlannerWorker('Worker desativado após falha.');
+      this.assertActive(engine, signal);
+      this.assertPlanCurrent(token, engine, botIndex);
+      return { token, indexes: planTripleIndexes(hand), worker: false };
+    }
+  }
+
+  static async cooperativeYield(engine, signal) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    this.assertActive(engine, signal);
+  }
 
   static isCancellationError(error) {
     return error?.name === 'AbortError' || error?.code === 'BOT_TURN_CANCELLED';
@@ -19,6 +128,7 @@ export class BuracoBot {
 
   static cancelPendingTurns() {
     this._turnLocks.clear();
+    this.destroyPlannerWorker('Turnos pendentes do bot cancelados.');
   }
 
   static async playTurn(stateIgnored, botIndex, engine, options = {}) {
@@ -332,6 +442,11 @@ export class BuracoBot {
       return false;
     };
 
+    // O filtro barato elimina pares que nunca poderiam formar sequência com o
+    // topo do lixo. A validação oficial continua abaixo, então a regra do jogo
+    // continua sendo a autoridade final.
+    const pairCandidates = hand.length >= 2 ? planPairIndexesWithTop(hand, topCard) : [];
+
     // FASE 1: Tenta comprar usando jogo LIMPO (Encaixe perfeito)
     if (team.melds && team.melds.length > 0) {
       for (let mIdx = 0; mIdx < team.melds.length; mIdx++) {
@@ -360,8 +475,7 @@ export class BuracoBot {
     }
 
     if (hand.length >= 2) {
-      for (let i = 0; i < hand.length - 1; i++) {
-        for (let j = i + 1; j < hand.length; j++) {
+      for (const [i, j] of pairCandidates) {
           const combo = [hand[i], hand[j], topCard];
           if (!allowsOpening(combo)) continue;
 
@@ -382,7 +496,6 @@ export class BuracoBot {
 
             return { wants: true, action: 'new', handIndexes: [i, j] };
           }
-        }
       }
     }
 
@@ -390,8 +503,7 @@ export class BuracoBot {
     // O bot (especialmente o VIP) usa EXCLUSIVAMENTE o 2 do MESMO naipe para roubar a mesa,
     // garantindo que a sujeira poderá ser limpa depois para fazer as canastras de meta.
     if (hand.length >= 2 && (isJuicyPile || ctx.isVip)) {
-      for (let i = 0; i < hand.length - 1; i++) {
-        for (let j = i + 1; j < hand.length; j++) {
+      for (const [i, j] of pairCandidates) {
           const combo = [hand[i], hand[j], topCard];
           if (!allowsOpening(combo)) continue;
 
@@ -421,7 +533,6 @@ export class BuracoBot {
               }
             }
           }
-        }
       }
     }
 
@@ -462,8 +573,7 @@ export class BuracoBot {
       }
 
       if (hand.length >= 2) {
-        for (let i = 0; i < hand.length - 1; i++) {
-          for (let j = i + 1; j < hand.length; j++) {
+        for (const [i, j] of pairCandidates) {
             const combo = [hand[i], hand[j], topCard];
             if (!allowsOpening(combo)) continue;
             const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
@@ -493,7 +603,6 @@ export class BuracoBot {
 
               return { wants: true, action: 'new', handIndexes: [i, j] };
             }
-          }
         }
       }
     }
@@ -550,6 +659,10 @@ export class BuracoBot {
   }
 
   static async processMelds(botIndex, ctx, engine, signal) {
+    const perfStartedAt = this.perfNow();
+    let plannedCandidates = 0;
+    let workerPlans = 0;
+    let maxHandSize = 0;
     let madeMove = true;
     let loops = 0;
 
@@ -565,6 +678,7 @@ export class BuracoBot {
       }
 
       const me = s.players[botIndex];
+      maxHandSize = Math.max(maxHandSize, me.hand?.length || 0);
       const team = s.teams[me.teamId];
       if (!team) {
         console.error('[BOT] Team inválido em processMelds:', { s, me, botIndex });
@@ -754,54 +868,50 @@ export class BuracoBot {
 
       let n = me.hand.length;
       if (n >= 3) {
-        for (let i = 0; i < n - 2; i++) {
-          for (let j = i + 1; j < n - 1; j++) {
-            for (let k = j + 1; k < n; k++) {
-              const combo = [me.hand[i], me.hand[j], me.hand[k]];
-              if (!allowsOpening(combo)) continue;
-              if (!this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
+        const plan = await this.planTriples(s, botIndex, engine, signal);
+        plannedCandidates += plan.indexes.length;
+        if (plan.worker) workerPlans += 1;
 
-              // Validação blindada: Permite sequência pura OU o "Falso Sujo" (2 do mesmo naipe)
-              let isValidCombo = this.isComboPerfectlyClean3(combo, engine);
-              if (!isValidCombo) {
-                const wilds = combo.filter((c) => c.joker || c.rank === '2');
-                const realCards = combo.filter((c) => !c.joker && c.rank !== '2');
-                if (wilds.length === 1 && !wilds[0].joker && wilds[0].rank === '2' && realCards.length > 0) {
-                  if (wilds[0].suit === realCards[0].suit) isValidCombo = true;
-                }
-              }
-
-              if (!isValidCombo) continue;
-
-              // 🛑 TRAVA UNIVERSAL ANTI-CANIBALISMO (Impede separar jogos do mesmo naipe)
-              // CORREÇÃO: Ignora o '2' na hora de identificar o naipe, pois um 2 coringa mascara a mesa.
-              const getRealSuit = (cards) => {
-                const real = cards.find((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
-                return real ? real.suit : null;
-              };
-
-              const suit = getRealSuit(combo);
-              if (suit) {
-                const hasMeldSameSuit = team.melds.some((m) => getRealSuit(m) === suit);
-
-                // Domination may seed a second clean run using surplus copies;
-                // The opening validator already protected the first run.
-                if (hasMeldSameSuit && !(s.mode === '1x1_dominacao' && botIndex === 1) && (ctx.isVip || !ctx.isDesperate)) {
-                  // Se entrou em pânico (8 cartas finais sem morto), a honra VIP é suspensa e ele joga as cartas para fugir da multa
-                  if (!ctx.isPanicDump) continue;
-                }
-              }
-
-              if (engine.isValidSequenceMeld(combo)) {
-                this.assertActive(engine, signal);
-                const moved = await engine.executeMeldNew(botIndex, [i, j, k]);
-                madeMove = moved !== false;
-                await this.paceBetweenActions(engine, signal);
-                break;
-              }
-            }
-            if (madeMove) break;
+        for (let candidateIndex = 0; candidateIndex < plan.indexes.length; candidateIndex += 1) {
+          if (candidateIndex > 0 && candidateIndex % 48 === 0) {
+            await this.cooperativeYield(engine, signal);
+            this.assertPlanCurrent(plan.token, engine, botIndex);
           }
+          const indexes = plan.indexes[candidateIndex];
+          const combo = indexes.map((index) => me.hand[index]);
+          if (combo.some((card) => !card)) continue;
+          if (!allowsOpening(combo)) continue;
+          if (!this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
+
+          // Validação blindada: Permite sequência pura OU o "Falso Sujo" (2 do mesmo naipe)
+          let isValidCombo = this.isComboPerfectlyClean3(combo, engine);
+          if (!isValidCombo) {
+            const wilds = combo.filter((c) => c.joker || c.rank === '2');
+            const realCards = combo.filter((c) => !c.joker && c.rank !== '2');
+            if (wilds.length === 1 && !wilds[0].joker && wilds[0].rank === '2' && realCards.length > 0) {
+              if (wilds[0].suit === realCards[0].suit) isValidCombo = true;
+            }
+          }
+          if (!isValidCombo || !engine.isValidSequenceMeld(combo)) continue;
+
+          // 🛑 TRAVA UNIVERSAL ANTI-CANIBALISMO (Impede separar jogos do mesmo naipe)
+          const getRealSuit = (cards) => {
+            const real = cards.find((c) => c && !c.joker && c.rank !== '2' && c.rank !== 2);
+            return real ? real.suit : null;
+          };
+          const suit = getRealSuit(combo);
+          if (suit) {
+            const hasMeldSameSuit = team.melds.some((m) => getRealSuit(m) === suit);
+            if (hasMeldSameSuit && !(s.mode === '1x1_dominacao' && botIndex === 1) && (ctx.isVip || !ctx.isDesperate)) {
+              if (!ctx.isPanicDump) continue;
+            }
+          }
+
+          this.assertPlanCurrent(plan.token, engine, botIndex);
+          this.assertActive(engine, signal);
+          const moved = await engine.executeMeldNew(botIndex, indexes);
+          madeMove = moved !== false;
+          await this.paceBetweenActions(engine, signal);
           if (madeMove) break;
         }
       }
@@ -893,40 +1003,54 @@ export class BuracoBot {
         // 🚨 NOVO: Se o bot estiver no Panic Dump, ele ignora o limite de 6 cartas e tenta sujar tudo que der na mesa para fugir da multa!
         if (me.hand.length >= 3 && (me.hand.length <= 6 || ctx.isPanicDump)) {
           n = me.hand.length;
-          for (let i = 0; i < n - 2; i++) {
-            for (let j = i + 1; j < n - 1; j++) {
-              for (let k = j + 1; k < n; k++) {
-                const combo = [me.hand[i], me.hand[j], me.hand[k]];
-                if (!allowsOpening(combo)) continue;
-                if (!this.canMeldSafely(me, team, 3, engine, combo)) continue;
+          const panicPlan = await this.planTriples(s, botIndex, engine, signal);
+          plannedCandidates += panicPlan.indexes.length;
+          if (panicPlan.worker) workerPlans += 1;
 
-                const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
-
-                // Permite 1 coringa normal, ou 2 "wilds" (para o caso de 2, 2, 4 onde um 2 é natural)
-                if (wilds === 0 || wilds > 2) continue;
-
-                // 🛑 TRAVA DE PRESERVAÇÃO DO 2 (Nova Sujeira)
-                const wildCard = combo.find((c) => c.joker || c.rank === '2');
-                const realCard = combo.find((c) => !c.joker && c.rank !== '2');
-                if (wildCard && !wildCard.joker && wildCard.rank === '2' && realCard && wildCard.suit !== realCard.suit) {
-                  if (ctx.isVip && !ctx.isPanicDump) continue;
-                  if (!ctx.isVip && !ctx.isDesperate && !ctx.isRushingMorto && me.hand.length > 2) continue;
-                }
-
-                if (engine.isValidSequenceMeld(combo)) {
-                  this.assertActive(engine, signal);
-                  const moved = await engine.executeMeldNew(botIndex, [i, j, k]);
-                  madeMove = moved !== false;
-                  await this.paceBetweenActions(engine, signal);
-                  break;
-                }
-              }
-              if (madeMove) break;
+          for (let candidateIndex = 0; candidateIndex < panicPlan.indexes.length; candidateIndex += 1) {
+            if (candidateIndex > 0 && candidateIndex % 48 === 0) {
+              await this.cooperativeYield(engine, signal);
+              this.assertPlanCurrent(panicPlan.token, engine, botIndex);
             }
+            const indexes = panicPlan.indexes[candidateIndex];
+            const combo = indexes.map((index) => me.hand[index]);
+            if (combo.some((card) => !card)) continue;
+            if (!allowsOpening(combo)) continue;
+            if (!this.canMeldSafely(me, team, 3, engine, combo)) continue;
+
+            const wilds = combo.filter((c) => c.joker || c.rank === '2').length;
+            if (wilds === 0 || wilds > 2) continue;
+
+            const wildCard = combo.find((c) => c.joker || c.rank === '2');
+            const realCard = combo.find((c) => !c.joker && c.rank !== '2');
+            if (wildCard && !wildCard.joker && wildCard.rank === '2' && realCard && wildCard.suit !== realCard.suit) {
+              if (ctx.isVip && !ctx.isPanicDump) continue;
+              if (!ctx.isVip && !ctx.isDesperate && !ctx.isRushingMorto && me.hand.length > 2) continue;
+            }
+
+            if (!engine.isValidSequenceMeld(combo)) continue;
+            this.assertPlanCurrent(panicPlan.token, engine, botIndex);
+            this.assertActive(engine, signal);
+            const moved = await engine.executeMeldNew(botIndex, indexes);
+            madeMove = moved !== false;
+            await this.paceBetweenActions(engine, signal);
             if (madeMove) break;
           }
         }
       }
+    }
+
+    const elapsed = this.perfNow() - perfStartedAt;
+    if (elapsed >= 120) {
+      console.info('[BOT-PERF] processMelds', {
+        mode: engine.getState()?.mode,
+        botIndex,
+        ms: Math.round(elapsed),
+        loops,
+        maxHandSize,
+        plannedCandidates,
+        workerPlans,
+      });
     }
   }
 
