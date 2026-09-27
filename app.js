@@ -6001,8 +6001,10 @@ function renderAll() {
   const debugPanel = document.getElementById('debugPanel');
   const debugMiniBtn = document.getElementById('debugMiniBtn');
   if (debugPanel && debugMiniBtn) {
-    const isDebug = window.location.search.includes('debug=1') || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-    if (isDebug) {
+    // Em produção, o DevTools é liberado pela sessão autenticada no Firebase.
+    // Não dependa de ?debug=1 aqui: isso fazia o painel sumir assim que renderAll()
+    // rodava dentro da partida, mesmo com o acesso DEV válido.
+    if (isDebugMode) {
       debugPanel.style.display = window.isDevToolsOpen ? 'flex' : 'none';
       debugMiniBtn.style.display = window.isDevToolsOpen ? 'none' : 'block';
     } else {
