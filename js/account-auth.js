@@ -19,9 +19,10 @@ const errors = {
   unavailable: 'O banco está indisponível. Confira sua conexão e tente novamente.',
 };
 
-export async function requireAccount() {
+export async function requireAccount({ deferReveal = false } = {}) {
   const overlay = document.createElement('section');
   overlay.id = 'accountGate';
+  overlay.classList.add('account-restoring');
   overlay.innerHTML = `<form class="account-card" aria-labelledby="accountTitle">
     <p class="account-eyebrow">BURACO • SUA CONTA</p>
     <h1 id="accountTitle">Entre para jogar</h1>
@@ -83,7 +84,7 @@ export async function requireAccount() {
     activeAccount = { uid: user.uid, email: user.email, ...profile };
     field('password').value = '';
     overlay.remove();
-    document.body.classList.remove('account-pending');
+    if (!deferReveal) document.body.classList.remove('account-pending');
     finish(activeAccount);
   }
 
@@ -157,17 +158,17 @@ export async function requireAccount() {
 
   setBusy(true);
   status.textContent = 'Conferindo sua sessão…';
-  const user = await new Promise((resolve, reject) => {
-    const off = onAuthStateChanged(
-      auth,
-      (value) => {
-        off();
-        resolve(value);
-      },
-      reject,
-    );
-  });
   try {
+    const user = await new Promise((resolve, reject) => {
+      const off = onAuthStateChanged(
+        auth,
+        (value) => {
+          off();
+          resolve(value);
+        },
+        reject,
+      );
+    });
     if (user) await loadProfile(user);
     else status.textContent = '';
   } catch (e) {
@@ -175,6 +176,7 @@ export async function requireAccount() {
     status.textContent = errors[e.code] || 'Não foi possível carregar seu perfil. Entre novamente para tentar.';
   } finally {
     setBusy(false);
+    overlay.classList.remove('account-restoring');
   }
   onAuthStateChanged(auth, (user) => {
     if (acceptedUid && user?.uid !== acceptedUid) {
@@ -215,40 +217,43 @@ export function installAccountMenu(account) {
   nameRow.append(label, stats);
   identity.append(welcome, nameRow);
   let statsBusy = false;
+  let statsRevision = 0;
+  let stopHistory = null;
   function showStats(totals) {
     stats.textContent = `${totals.played.toLocaleString('pt-BR')} ${totals.played === 1 ? 'partida' : 'partidas'} · ${totals.winRate}% vitórias`;
     stats.title = 'Mesmo resumo de “Entre jogadores” no perfil. Sem bots, chefes ou testes.';
   }
   window.addEventListener('account-history-loaded', event => {
-    if (event.detail?.uid === account.uid) showStats(event.detail.stats);
+    if (event.detail?.uid === account.uid && event.detail.complete) { statsRevision++; showStats(event.detail.stats); }
   });
   async function refreshStats() {
     if (statsBusy) return;
     statsBusy = true;
     try {
-      const [{ loadHistoryPage }, { loadHistoryTotals }] = await Promise.all([import('./history-store.js'), import('./history-totals.js')]);
-      const totals = await loadHistoryTotals(account.uid, loadHistoryPage);
-      showStats(totals);
+      const [{ subscribeHistory }, { playerHistoryStats }] = await Promise.all([import('./history-store.js'), import('./history-totals.js')]);
+      stopHistory?.();
+      stopHistory = subscribeHistory(account.uid, matches => {
+        statsRevision++;
+        showStats(playerHistoryStats(matches, account.uid));
+      }, () => {
+        stats.textContent = 'Estatísticas indisponíveis';
+        stats.title = 'Não foi possível atualizar o histórico. Abra o perfil para tentar novamente.';
+      });
     } catch {
       stats.textContent = 'Estatísticas indisponíveis';
       stats.title = 'Não foi possível consultar o histórico. Tente novamente ao abrir o perfil.';
     } finally { statsBusy = false; }
   }
   void refreshStats();
-  let menuVisible = menu.style.display !== 'none';
-  new MutationObserver(() => {
-    const visible = menu.style.display !== 'none';
-    if (visible && !menuVisible) void refreshStats();
-    menuVisible = visible;
-  }).observe(menu, { attributes: true, attributeFilter: ['style'] });
   identity.onclick = async () => {
     if (stats.textContent === 'Estatísticas indisponíveis') void refreshStats();
     identity.disabled = true;
     try {
-      const [{ openAccountPage }, { loadHistoryPage }] = await Promise.all([import('./account-page.js'), import('./history-store.js')]);
+      const [{ openAccountPage }, { loadHistoryPage, subscribeHistory }] = await Promise.all([import('./account-page.js'), import('./history-store.js')]);
       openAccountPage({
         account,
         loadMatches: loadHistoryPage,
+        subscribeMatches: subscribeHistory,
         resetPassword: () => sendPasswordResetEmail(auth, account.email),
         saveProfile: async (input) => {
           const profile = normalizeProfile(input);

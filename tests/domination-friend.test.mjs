@@ -220,6 +220,31 @@ test('aviso Visao prioriza Real e reconhece limpeza pelo dois natural', () => {
   assert.match(findVisionOpportunity([dirty, real], cards(['3', 'A'], '♣', 'enemy'), rules), /Real ou Ás-a-Ás/);
 });
 
+test('aviso Visao mapeia defesa e invalida cache quando mesa adversaria muda', () => {
+  const state = game();
+  state.teams[1].melds = [];
+  state.teams[0].melds = [rules.prepare(cards(['3', '4', '5', '6', '7', '8']))];
+  state.players[0].hand = cards(['9'], '♣', 'enemy');
+  const before = JSON.stringify(state);
+  const evaluate = createVisionHintEvaluator(rules);
+  const text = evaluate(state, 1);
+  assert.match(text, /Defesa: roubar da mão pode atrapalhar uma canastra do adversário/);
+  assert.match(text, /Não desfaz jogos já baixados/);
+  assert.match(text, /antes de comprar/);
+  assert.doesNotMatch(text, /enemy|9|♣/);
+  assert.equal(JSON.stringify(state), before);
+  state.teams[0].melds = [];
+  assert.equal(evaluate(state, 1), '');
+});
+
+test('chamada usada permanece desabilitada depois do render geral', () => {
+  const start = app.indexOf("  const callFriendButton = document.getElementById('callFriendBtn');");
+  const code = app.slice(start, app.indexOf('  const myTurn', start));
+  const button = { disabled: true };
+  vm.runInNewContext(code, { document: { getElementById: () => button }, friendOperationPending: false, commonActionsAllowed: true });
+  assert.equal(button.disabled, true);
+});
+
 test('aviso Visao recalcula e some apos compra, uso ou bloqueios', () => {
   const state = game();
   state.teams[1].melds = [cards(['3', '4', '5', '6', '7'])];

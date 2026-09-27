@@ -620,6 +620,28 @@
   margin: 2px auto !important;
   bottom: auto !important;
 }
+/* Pequenos reflexos de item: dois pontos alternados, sem pulsar o botão inteiro. */
+#callFriendBtn, #seekCardBtn { position: relative; isolation: isolate; }
+#callFriendBtn:not(:disabled):not([hidden])::before,
+#callFriendBtn:not(:disabled):not([hidden])::after,
+#seekCardBtn:not(:disabled):not([hidden])::before,
+#seekCardBtn:not(:disabled):not([hidden])::after {
+  content: ''; position: absolute; pointer-events: none; width: 28px; height: 28px;
+  background: radial-gradient(circle, #fff 0 12%, #fff5cdd9 28%, #ffe7a673 52%, transparent 73%);
+  clip-path: polygon(50% 0, 59% 40%, 100% 50%, 59% 60%, 50% 100%, 41% 60%, 0 50%, 41% 40%);
+  opacity: 0; transform: scale(.3); animation: action-item-glint 8s ease-in-out infinite;
+}
+#callFriendBtn::before, #seekCardBtn::before { top: -7px; left: 19%; }
+#callFriendBtn::after, #seekCardBtn::after { bottom: -7px; right: 13%; animation-delay: 3.7s !important; }
+#seekCardBtn::before { animation-delay: 1.9s !important; }
+#seekCardBtn::after { animation-delay: 5.6s !important; }
+@keyframes action-item-glint {
+  0%, 12%, 100% { opacity: 0; transform: scale(.3) rotate(0deg); }
+  4% { opacity: 1; transform: scale(1.25) rotate(12deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #callFriendBtn::before, #callFriendBtn::after, #seekCardBtn::before, #seekCardBtn::after { animation: none !important; content: none !important; }
+}
 #gameSection .board[data-mode='1x1_dominacao'] .player-actions button {
   position: relative !important;
   left: auto !important;

@@ -28,6 +28,10 @@ try {
    return route.fulfill({body:await readFile(new URL(url.pathname.slice(1),root)),contentType:url.pathname.endsWith('.css')?'text/css':'text/javascript'});
   });
   await page.goto('http://profile.test');await page.locator('#open').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#historyPanel .profile-match').length===1);
+  assert.equal(await page.locator('#historyFilter').inputValue(),'players');
+  assert.equal(await page.locator('.profile-stat strong').first().textContent(),'1');
+  await page.locator('#historyFilter').selectOption('all');
   await page.waitForFunction(()=>document.querySelectorAll('#historyPanel .profile-match').length===3);
   assert.equal(await page.locator('.profile-stat strong').first().textContent(),'2');
   assert.equal(await page.evaluate(()=>document.getElementById('accountPage').scrollWidth>innerWidth),false);

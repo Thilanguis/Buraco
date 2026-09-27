@@ -1,8 +1,9 @@
 try {
   const { requireAccount, installAccountMenu } = await import('./account-auth.js');
-  const account = await requireAccount();
+  const account = await requireAccount({ deferReveal: true });
   await import('../app.js');
   installAccountMenu(account);
+  document.body.classList.remove('account-pending');
 } catch (error) {
   // Falha fechada: não carregar a partida se o login estiver indisponível.
   document.body.classList.add('account-pending');

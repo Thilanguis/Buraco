@@ -132,6 +132,7 @@ function onPageLoad(callback) {
 
 // --- LÓGICA DE LOADING E ROTAÇÃO DE VÍDEOS ---
 const loadingScreen = document.getElementById('loadingScreen');
+const accountBootHandled = document.body.classList.contains('account-pending');
 let introFinished = false;
 
 onPageLoad(() => {
@@ -160,7 +161,7 @@ onPageLoad(() => {
 
   // Lógica de sumir a tela de loading
   const isDebug = window.location.search.includes('debug=1') || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-  if (isDebug) {
+  if (isDebug || accountBootHandled) {
     loadingScreen.style.display = 'none';
     introFinished = true;
     if (!state) {
@@ -6128,7 +6129,7 @@ function renderAll() {
   renderMelds();
   renderDominationFriend(state, myPlayerIndex);
   const callFriendButton = document.getElementById('callFriendBtn');
-  if (callFriendButton) callFriendButton.disabled = friendOperationPending || !commonActionsAllowed;
+  if (callFriendButton) callFriendButton.disabled = callFriendButton.disabled || friendOperationPending || !commonActionsAllowed;
 
   const myTurn = !state.finished && state.currentPlayer === myPlayerIndex && commonActionsAllowed;
 
@@ -6181,6 +6182,7 @@ function renderAll() {
 
   const powerBtn = document.getElementById('powerBtn');
   if (powerBtn) {
+    powerBtn.title = 'Antes de comprar, use uma vez por partida para ver a mão adversária e roubar até 2 cartas. Priorize completar seus jogos ou tirar cartas que ajudam o adversário. Não retira cartas dos jogos já baixados.';
     const canUsePower = dominationFeatureEnabled(state, 'vision') && state.currentPlayer === 1 && myPlayerIndex === 1 && !state.hasDrawnThisTurn && (!state.dominatorUsedPower || state.powerActiveThisTurn);
     const showPower = dominationFeatureEnabled(state, 'vision') && myPlayerIndex === 1 && !state.finished;
     powerBtn.style.display = showPower ? 'block' : 'none';
@@ -10915,11 +10917,19 @@ async function voteExit(action) {
   exitVotePending = true;
   const startedAt = state.matchStartedAt;
   try {
+    // Arquivar o resultado antes de encerrar a sala; nunca perder o histórico.
+    await recoverFinishedHistory();
     await runTransaction(db, async transaction => {
       const snapshot = await transaction.get(gameRef);
       if (!snapshot.exists() || !snapshot.data().stateJson) return;
       const latest = JSON.parse(snapshot.data().stateJson);
       if (latest.matchStartedAt !== startedAt || latest.rematch?.starting || !latest.players.some(p => p.id === myPlayerIndex)) return;
+      if (latest.finished) {
+        if (action === 'no') return;
+        if (!snapshot.data().historySummary) throw new Error('Resultado ainda não arquivado');
+        transaction.delete(gameRef);
+        return;
+      }
       if (action === 'request') latest.surrender ||= { active: false, votes: {} };
       if (!latest.surrender || (action !== 'request' && !latest.surrender.active)) return;
       if (action === 'no') {
@@ -10939,7 +10949,7 @@ async function voteExit(action) {
     });
   } catch (error) {
     console.error('Falha na votação de saída:', error);
-    showMessage('Não foi possível salvar o voto de saída. Tente novamente.');
+    showMessage('Não foi possível concluir a saída. Confira a conexão e tente novamente.');
   } finally { exitVotePending = false; }
 }
 document.getElementById('endGameBtn').onclick = () => voteExit('request');

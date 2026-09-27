@@ -48,9 +48,17 @@ export function createVisionHintEvaluator(rules) {
     const teamId = state.players?.[1]?.teamId;
     const melds = state.teams?.find(team => team.id === teamId)?.melds || [];
     const hand = state.players?.[0]?.hand || [];
-    const key = JSON.stringify([melds, hand]);
+    const enemyTeamId = state.players?.[0]?.teamId;
+    const enemyMelds = state.teams?.find(team => team.id === enemyTeamId)?.melds || [];
+    const key = JSON.stringify([melds, enemyMelds, hand]);
     if (key !== previousKey) {
       previousMessage = findVisionOpportunity(melds, hand, rules);
+      const threat = findVisionOpportunity(enemyMelds, hand, rules);
+      if (threat) {
+        const goal = threat === messages.special ? 'uma Real ou Ás-a-Ás' : threat === messages.clean ? 'uma canastra limpa' : 'uma canastra';
+        previousMessage += `${previousMessage ? ' ' : '👁️ ' }Defesa: roubar da mão pode atrapalhar ${goal} do adversário. Não desfaz jogos já baixados.`;
+      }
+      if (previousMessage) previousMessage += ' Use antes de comprar: veja a mão e escolha até 2 cartas. Só uma vez por partida.';
       previousKey = key;
     }
     return previousMessage;

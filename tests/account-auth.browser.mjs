@@ -8,6 +8,7 @@ const root = new URL('../', import.meta.url);
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const authStub = `
 const state = window.fixture = { currentUser: null, profiles: {}, creates: 0, writes: [], failWrite: false, badLogin: false, resets: 0 };
+if (window.restoreFixture) { state.currentUser={uid:'test-user',email:'maria@example.test'}; state.profiles['test-user']={name:'Maria Silva',pixKey:'maria-pix@example.test'}; }
 export const getAuth = () => state;
 export function onAuthStateChanged(auth, fn) { queueMicrotask(()=>fn(auth.currentUser)); return ()=>{}; }
 export async function createUserWithEmailAndPassword(auth,email,password) { state.creates++; auth.currentUser = {uid:'test-user',email}; return {user:auth.currentUser}; }
@@ -18,7 +19,7 @@ export async function sendPasswordResetEmail() { state.resets++; }
 const dbStub = `
 export const firebaseApp = {}, db = {};
 export const doc = (_db, collection, uid) => ({collection,uid});
-export async function getDocFromServer(ref) { const data=window.fixture.profiles[ref.uid]; return {exists:()=>!!data,data:()=>data}; }
+export async function getDocFromServer(ref) { if(window.restoreFixture) await new Promise(resolve=>window.releaseProfile=resolve); const data=window.fixture.profiles[ref.uid]; return {exists:()=>!!data,data:()=>data}; }
 export async function setDoc(ref,data) { if(ref.collection!=='userProfiles') throw Error('unexpected collection'); if(window.fixture.failWrite) {window.fixture.failWrite=false;throw {code:'permission-denied'};} window.fixture.writes.push({ref,data}); window.fixture.profiles[ref.uid]=data; }
 `;
 try {
@@ -76,6 +77,15 @@ try {
     await page.waitForFunction(()=>!!window.accepted);
     assert.equal(await page.evaluate(()=>window.fixture.creates),0);
     assert.equal(await page.evaluate(()=>window.fixture.writes.length),0);
+    await page.addInitScript(()=>window.restoreFixture=true);
+    await page.goto('http://account.test');
+    await page.waitForFunction(()=>!!window.releaseProfile);
+    assert.equal(await page.locator('#accountGate').isVisible(),false);
+    assert.equal(await page.evaluate(()=>document.body.classList.contains('account-pending')),true);
+    await page.evaluate(()=>window.releaseProfile());
+    await page.waitForFunction(()=>!!window.accepted);
+    assert.equal(await page.locator('#accountGate').count(),0);
+    assert.equal(await page.evaluate(()=>document.body.classList.contains('account-pending')),false);
     assert.deepEqual(failures,[]);
     await page.close();
   }

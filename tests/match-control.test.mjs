@@ -120,9 +120,10 @@ let deleted = 0, restarted = 0;
 const votingContext = {
   state: structuredClone(persisted), myPlayerIndex: 0, rematchVotePending: false, exitVotePending: false,
   localActionGate: createActionGate(), db: {}, gameRef: {}, console, showMessage() {},
+  recoverFinishedHistory: async () => {},
   document: { getElementById: () => ({}) }, window: { debugRestartGame: async () => { restarted++; } },
   runTransaction: async (_, operation) => operation({
-    get: async () => ({ exists: () => true, data: () => ({ stateJson: JSON.stringify(persisted) }) }),
+    get: async () => ({ exists: () => true, data: () => ({ stateJson: JSON.stringify(persisted), historySummary: { id: 'saved' } }) }),
     update: (_, data) => { persisted = JSON.parse(data.stateJson); },
     delete: () => { deleted++; },
   }),
@@ -140,8 +141,13 @@ assert.equal(restarted, 1);
 persisted.rematch = null;
 votingContext.myPlayerIndex = 0;
 await votingContext.voteExit('request');
-assert.equal(deleted, 0);
+assert.equal(deleted, 1, 'partida terminada sai sem votação');
+assert.equal(persisted.surrender?.active, undefined);
+persisted.finished = false;
+votingContext.state.finished = false;
+await votingContext.voteExit('request');
+assert.equal(deleted, 1, 'partida em andamento aguarda votos humanos');
 votingContext.myPlayerIndex = 1;
 await votingContext.voteExit('yes');
-assert.equal(deleted, 1);
+assert.equal(deleted, 2);
 console.log('PASS: pause/resume, bots, rejection, spectator, exhaustion, real discard rapid-click regression, result panel and transaction voting handlers.');

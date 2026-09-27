@@ -26,7 +26,7 @@ function duration(seconds) {
   return seconds == null ? 'Duração não registrada' : `${Math.floor(seconds / 60)}min ${seconds % 60}s`;
 }
 
-export function openAccountPage({ account, saveProfile, resetPassword, loadMatches }) {
+export function openAccountPage({ account, saveProfile, resetPassword, loadMatches, subscribeMatches }) {
   if (document.getElementById('accountPage')) return;
   const previousFocus = document.activeElement;
   const menu = document.getElementById('configSection');
@@ -66,9 +66,11 @@ export function openAccountPage({ account, saveProfile, resetPassword, loadMatch
     cursor = null,
     hasMore = false,
     loadError = false;
+  let stopHistory = null;
   const close = () => {
     if (!alive) return;
     alive = false;
+    stopHistory?.();
     dialog.classList.add('is-closing');
     menu?.classList.remove('profile-menu-away');
     const finish = () => {
@@ -137,7 +139,7 @@ export function openAccountPage({ account, saveProfile, resetPassword, loadMatch
       tile.append(node('strong', '', value), node('span', '', label));
       statsNode.append(tile);
     }
-    $('.profile-scope').textContent = `${stats.played} partidas válidas carregadas · ${stats.losses} derrotas · ${stats.draws} empates. Testes não entram nas estatísticas.`;
+    $('.profile-scope').textContent = `${stats.played} partidas ${subscribeMatches ? 'no histórico' : 'válidas carregadas'} · ${stats.losses} derrotas · ${stats.draws} empates. Testes não entram nas estatísticas.`;
     renderMatchList(visible, $('#historyPanel .profile-matches'));
     $('.profile-history-status').textContent = visible.length
       ? `${visible.length} partidas exibidas. Toque numa partida para ver os detalhes.`
@@ -308,6 +310,7 @@ export function openAccountPage({ account, saveProfile, resetPassword, loadMatch
       matches.push(...page.matches.filter((m) => !seen.has(m.matchId)));
       cursor = page.cursor;
       hasMore = page.hasMore;
+      window.dispatchEvent(new CustomEvent('account-history-loaded', { detail: { uid: account.uid, stats: playerHistoryStats(matches, account.uid), complete: !hasMore } }));
       loadError = false;
       render();
       $('.profile-more').textContent = $('.comparison-more').textContent = 'Carregar mais partidas';
@@ -328,11 +331,11 @@ export function openAccountPage({ account, saveProfile, resetPassword, loadMatch
   }
   $('.profile-more').onclick = () => {
     $('.profile-more').textContent = 'Carregar mais partidas';
-    void load();
+    if (subscribeMatches) watch(); else void load();
   };
   $('.comparison-more').onclick = () => {
     $('.comparison-more').textContent = 'Carregar mais partidas';
-    void load();
+    if (subscribeMatches) watch(); else void load();
   };
   form.onsubmit = async (event) => {
     event.preventDefault();
@@ -364,6 +367,22 @@ export function openAccountPage({ account, saveProfile, resetPassword, loadMatch
   };
   menu?.classList.add('profile-menu-away');
   dialog.showModal();
+  function watch() {
+    stopHistory?.();
+    $('.profile-history-status').textContent = 'Atualizando histórico…';
+    stopHistory = subscribeMatches(account.uid, updated => {
+      if (!alive) return;
+      matches = [...new Map(updated.map(match => [match.matchId, match])).values()].sort((a,b) => b.finishedAt - a.finishedAt);
+      hasMore = false; loadError = false; cursor = null;
+      render();
+      window.dispatchEvent(new CustomEvent('account-history-loaded', { detail: { uid: account.uid, stats: playerHistoryStats(matches, account.uid), complete: true } }));
+    }, () => {
+      if (!alive) return;
+      loadError = true;
+      $('.profile-history-status').textContent = $('.comparison-scope').textContent = 'Não foi possível atualizar o histórico. Os dados exibidos podem estar desatualizados.';
+      for (const selector of ['.profile-more', '.comparison-more']) { $(selector).hidden = false; $(selector).textContent = 'Tentar novamente'; }
+    });
+  }
   render();
-  void load();
+  if (subscribeMatches) watch(); else void load();
 }

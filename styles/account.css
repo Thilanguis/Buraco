@@ -1,4 +1,14 @@
-body.account-pending > :not(#accountGate):not(script):not(style) { visibility: hidden !important; }
+body.account-pending > :not(#accountGate):not(#accountBoot):not(script):not(style) { visibility: hidden !important; }
+#accountBoot { position: fixed; inset: 0; z-index: 2147483646; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #20202a, #080b13 65%); color: #ead394; opacity: 1; transition: opacity .25s ease, visibility .25s; }
+body:not(.account-pending) #accountBoot { opacity: 0; visibility: hidden; pointer-events: none; }
+.account-boot-brand { display: grid; justify-items: center; gap: 16px; font-family: system-ui, sans-serif; }
+.account-boot-brand > span { font-size: 20px; letter-spacing: 12px; padding-left: 12px; opacity: .7; }
+.account-boot-brand strong { font-size: clamp(30px, 7vw, 44px); letter-spacing: .16em; padding-left: .16em; }
+.account-boot-brand small { color: #b5b1a9; font-size: 13px; }
+.account-boot-brand i { width: 110px; height: 2px; background: #ddc37d; box-shadow: 0 0 15px #ddc37d66; animation: account-boot-pulse 1.4s ease-in-out infinite alternate; }
+@keyframes account-boot-pulse { to { opacity: .25; transform: scaleX(.55); } }
+#accountGate.account-restoring { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { #accountBoot { transition: none; } .account-boot-brand i { animation: none; } }
 #accountGate { position: fixed; inset: 0; z-index: 2147483647; overflow: auto; display: grid; place-items: center; padding: 24px 16px; box-sizing: border-box; background: radial-gradient(ellipse at top, #253226, #080d15 70%); color: #f8fafc; font: 16px/1.5 system-ui, sans-serif; }
 #accountGate .account-card { width: min(420px, 100%); box-sizing: border-box; padding: 28px; border: 1px solid #776b43; border-radius: 20px; background: #111923; box-shadow: 0 20px 80px #0008; }
 #accountGate h1 { font-size: 28px; margin: 4px 0 12px; }

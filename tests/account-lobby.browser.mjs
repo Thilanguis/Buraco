@@ -36,7 +36,11 @@ try {
     if (url.origin !== 'http://localhost') return route.abort();
     if (url.pathname === '/auth-stub.js') return route.fulfill({ contentType: 'text/javascript', body: authStub });
     if (url.pathname === '/js/firebase.js') return route.fulfill({ contentType: 'text/javascript', body: dbStub });
-    if (url.pathname === '/js/history-store.js') return route.fulfill({ contentType: 'text/javascript', body: 'export async function loadHistoryPage(){return {matches:[],cursor:null,hasMore:false};}' });
+    if (url.pathname === '/js/history-store.js') return route.fulfill({ contentType: 'text/javascript', body: `
+      const listeners=new Set();window.historyFixture={matches:[],emit(){for(const fn of listeners)fn(this.matches);},listeners};
+      export function subscribeHistory(uid,fn){if(uid!=='fixture-user')throw Error('Wrong account');listeners.add(fn);queueMicrotask(()=>fn(window.historyFixture.matches));return()=>listeners.delete(fn);}
+      export async function loadHistoryPage(){return {matches:window.historyFixture.matches,cursor:null,hasMore:false};}
+    ` });
     const path = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
     if (!/^[\w/.-]+$/.test(path) || !/\.(js|css|html)$/.test(path)) return route.abort();
     try {
@@ -69,6 +73,15 @@ try {
   await page.waitForFunction(() => document.getElementById('p1Name').value === '');
   assert.equal(await page.evaluate(() => window.accountFixture.writes.some((w) => w.stateJson)), false);
   await page.locator('button.account-identity').click();
+  await page.evaluate(() => {
+    window.historyFixture.matches=Array.from({length:31},(_,i)=>({matchId:'fixture'+i,finishedAt:1000+i,mode:'1x1',category:'players',winnerTeamId:0,finisherTeamId:0,participants:[{uid:'fixture-user',name:'Maria',teamId:0}],teams:[{id:0,name:'Time',score:100,canastras:{suja:0,limpa:0,real:0,asas:0}}]}));
+    window.historyFixture.emit();
+  });
+  await page.waitForFunction(()=>document.querySelector('.account-stats').textContent==='31 partidas · 100% vitórias');
+  await page.waitForFunction(()=>document.querySelector('#historyPanel .profile-stat strong')?.textContent==='31');
+  await page.evaluate(()=>{window.historyFixture.matches.push({...window.historyFixture.matches[0],matchId:'new-match',finishedAt:9999,winnerTeamId:1});window.historyFixture.emit();});
+  await page.waitForFunction(()=>document.querySelector('.account-stats').textContent==='32 partidas · 97% vitórias');
+  assert.equal(await page.locator('#historyPanel .profile-stat strong').first().textContent(),'32');
   await page.locator('#settingsTab').click();
   await page.locator('#settingsPanel [name=name]').fill('Maria Nova');
   await page.locator('#settingsPanel [name=pixKey]').fill('nova-chave');
@@ -76,6 +89,8 @@ try {
   await page.waitForFunction(() => window.accountFixture.data.lobby.names[1] === 'Maria Nova');
   assert.equal(await page.evaluate(() => window.accountFixture.profile.pixKey), 'nova-chave');
   await page.locator('[data-back]').click();
+  await page.locator('#accountPage').waitFor({state:'detached'});
+  assert.equal(await page.evaluate(()=>window.historyFixture.listeners.size),1);
   assert.equal(await page.locator('.account-name').textContent(), 'Maria Nova');
   await page.locator('#configSection .section').evaluate(async (section) => {
     await Promise.all(section.getAnimations().map((animation) => animation.finished));
