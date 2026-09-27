@@ -7,7 +7,7 @@ import { DECK_THEME_IDS } from '../js/themes.js';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const root = new URL('../', import.meta.url);
-const html = (await readFile(new URL('index.html', root), 'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+const html = (await readFile(new URL('index.html', root), 'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace('class="account-pending"', '');
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   for (const touch of [false, true]) {

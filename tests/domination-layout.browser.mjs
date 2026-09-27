@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const html = (await readFile(resolve(root, 'index.html'), 'utf8'))
+  .replace('class="account-pending"', '')
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
   .replace(/<video\b[^>]*>[\s\S]*?<\/video>/gi, '');
 const app = await readFile(resolve(root, 'app.js'), 'utf8');

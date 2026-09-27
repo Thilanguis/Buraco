@@ -1,0 +1,30 @@
+body.account-pending > :not(#accountGate):not(script):not(style) { visibility: hidden !important; }
+#accountGate { position: fixed; inset: 0; z-index: 2147483647; overflow: auto; display: grid; place-items: center; padding: 24px 16px; box-sizing: border-box; background: radial-gradient(ellipse at top, #253226, #080d15 70%); color: #f8fafc; font: 16px/1.5 system-ui, sans-serif; }
+#accountGate .account-card { width: min(420px, 100%); box-sizing: border-box; padding: 28px; border: 1px solid #776b43; border-radius: 20px; background: #111923; box-shadow: 0 20px 80px #0008; }
+#accountGate h1 { font-size: 28px; margin: 4px 0 12px; }
+#accountGate p { margin: 8px 0 16px; }
+#accountGate .account-eyebrow { font-size: 12px; letter-spacing: .12em; color: #e3cc8a; }
+#accountGate label { display: block; margin: 14px 0; font-weight: 600; }
+#accountGate input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 12px; background: #080f18; border: 1px solid #697484; border-radius: 8px; color: white; font: inherit; }
+#accountGate small { display: block; color: #bcc7d4; font-size: 12px; font-weight: 400; margin-top: 5px; }
+#accountGate button { width: 100%; min-height: 44px; padding: 10px 12px; margin: 5px 0; border: 1px solid #dac385; border-radius: 8px; background: #dac385; color: #131820; cursor: pointer; font: 600 15px system-ui, sans-serif; }
+#accountGate .account-secondary { background: transparent; color: #e3cc8a; }
+#accountGate .account-link { border-color: transparent; background: transparent; color: #cbd5e1; }
+#accountGate [hidden] { display: none !important; }
+#accountGate :disabled { opacity: .6; cursor: wait; }
+#accountGate :focus-visible { outline: 3px solid #5ce4ef; outline-offset: 3px; }
+#accountStatus { min-height: 24px; color: #ffe0a1; font-size: 14px; }
+#configSection .account-bar { display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; padding: 13px 12px; margin: 0 0 20px; border: 1px solid #bba15c38; border-radius: 12px; background: linear-gradient(110deg, #d4af3710, #ffffff03 70%); box-shadow: inset 0 1px 0 #ffe5a609; text-align: left; }
+#configSection .account-avatar { position: relative; display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid #d8b96a70; border-radius: 50%; background: linear-gradient(145deg, #e6c67d25, #a3823420); color: #eed493; font: 600 14px/1 system-ui, sans-serif; letter-spacing: .03em; }
+#configSection .account-avatar::after { content: ''; position: absolute; right: 0; bottom: 0; width: 7px; height: 7px; border-radius: 50%; background: #7ac7a2; border: 2px solid #111827; }
+#configSection .account-identity { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+#configSection .account-welcome { color: #bfae82; font: 600 9px/1.2 system-ui, sans-serif; letter-spacing: .16em; }
+#configSection .account-name { display: block; color: #f3eee2; font: 600 13px/1.4 system-ui, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#configSection .account-logout { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: 0 0 auto; width: auto; min-height: 44px; margin: 0; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #aeb5c3; box-shadow: none; font: 500 11px/1 system-ui, sans-serif; text-transform: none; letter-spacing: 0; cursor: pointer; transition: background .15s, color .15s; }
+#configSection .account-logout:hover { color: #f2db9d; background: #d4af3710; border-color: #d4af3733; transform: none; }
+#configSection .account-logout:focus-visible { outline: 2px solid #e6c67d; outline-offset: 2px; }
+#configSection .account-logout:disabled { opacity: .5; cursor: wait; }
+@media (max-width: 380px) {
+  #configSection .account-bar { gap: 8px; padding: 10px; }
+  #configSection .account-avatar { flex-basis: 34px; width: 34px; height: 34px; font-size: 12px; }
+}

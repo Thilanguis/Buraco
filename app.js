@@ -2,6 +2,8 @@ import { ALL_CANASTRA_SFX, DECK_MOVE_SFX, TABLE_ASAS_SFX, TABLE_CANASTRA_SFX, BO
 import { chooseDominationSearchCard } from './js/game/domination-search.js';
 import { applyPauseVote, pauseBlocksPlay, stockIsExhausted, createActionGate } from './js/game/match-control.js';
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
+import { activeAccount } from './js/account-auth.js';
+import { profileInLobby, teamForSeat } from './js/account-profile.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
 import {
@@ -121,11 +123,17 @@ function applyCooperativeBossPreset() {
   return definition;
 }
 
+// O login pode terminar depois do evento load original da página.
+function onPageLoad(callback) {
+  if (document.readyState === 'complete') queueMicrotask(callback);
+  else window.addEventListener('load', callback, { once: true });
+}
+
 // --- LÓGICA DE LOADING E ROTAÇÃO DE VÍDEOS ---
 const loadingScreen = document.getElementById('loadingScreen');
 let introFinished = false;
 
-window.addEventListener('load', () => {
+onPageLoad(() => {
   // Inicia a rotação dos vídeos
   const videos = [document.getElementById('bgVid1'), document.getElementById('bgVid2'), document.getElementById('bgVid3')];
 
@@ -177,7 +185,7 @@ window.addEventListener('load', () => {
   }
 });
 
-window.addEventListener('load', () => {
+onPageLoad(() => {
   const battleDetails = document.getElementById('bossBattleDetails');
   battleDetails?.addEventListener('toggle', () => {
     if (!battleDetails.open || !state?.boss?.eventLog?.length) return;
@@ -197,7 +205,7 @@ document.addEventListener(
 );
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  onPageLoad(() => {
     // Substitua o bloco do navigator.serviceWorker.register (linhas 3435 a 3470) por este:
 
     navigator.serviceWorker
@@ -383,6 +391,31 @@ const friendSoundQueue = createFriendSoundQueue({
   },
 });
 let currentLobby = null;
+let accountSeatStamp = '';
+
+async function syncAccountSeat(force = false, previousSeat = -1) {
+  if (!activeAccount || state || !currentLobby || (myPlayerIndex < 0 && !force)) return;
+  const seat = myPlayerIndex;
+  const mode = currentLobby.mode || '';
+  if (seat !== -1 && teamForSeat(mode, seat) < 0) return;
+  const stamp = `${seat}:${mode}`;
+  if (!force && accountSeatStamp === stamp) return;
+  accountSeatStamp = stamp;
+  try {
+    await runTransaction(db, async transaction => {
+      const snap = await transaction.get(gameRef);
+      const data = snap.data();
+      if (!data?.lobby || data.stateJson || data.lobby.mode !== mode || myPlayerIndex !== seat) return;
+      const lobby = profileInLobby(data.lobby, seat, activeAccount, previousSeat);
+      if (JSON.stringify(lobby) !== JSON.stringify(data.lobby)) transaction.update(gameRef, { lobby, updatedAt: Date.now() });
+    });
+  } catch {
+    accountSeatStamp = '';
+    const error = document.getElementById('menuError');
+    error.textContent = 'Não foi possível preencher nome/Pix. Confira a conexão e escolha seu jogador novamente.';
+    error.style.display = 'block';
+  }
+}
 window.botPlayTimeoutId = null;
 window.isClosingGame = false;
 window.gameSessionId = window.gameSessionId || 0;
@@ -8793,6 +8826,7 @@ onSnapshot(gameRef, async (snap) => {
 
     state = null;
     currentLobby = null;
+    accountSeatStamp = '';
     for (let i = 0; i < 4; i++) {
       const r = document.getElementById('ready' + i);
       if (r) r.style.display = 'none';
@@ -8869,6 +8903,7 @@ onSnapshot(gameRef, async (snap) => {
 
     // CHAMA A FUNÇÃO NOVA AQUI PARA ATUALIZAR A TELA COM OS DADOS DO BANCO
     window.updateMenuDynamic();
+    void syncAccountSeat();
 
     document.getElementById('betConfig').style.display = l.betToggle === 'sim' ? 'block' : 'none';
 
@@ -9246,7 +9281,8 @@ window.pushLobby = function () {
   if (!pt1.disabled) pt1.dataset.rawPix = pt1.value.trim();
   if (!pt2.disabled) pt2.dataset.rawPix = pt2.value.trim();
 
-  const lobby = {
+  const lobby = profileInLobby({
+    seatAccountIds: currentLobby?.seatAccountIds || ['', '', '', ''],
     mode: mode,
     dominationOptions,
     bossId: getBossDefinitionForMode(mode)?.id || null,
@@ -9258,7 +9294,7 @@ window.pushLobby = function () {
     betPerPoint: document.getElementById('betPerPoint').value,
     names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
     pixKeys: [pt1.dataset.rawPix || '', pt2.dataset.rawPix || ''],
-  };
+  }, myPlayerIndex, activeAccount);
 
   let readyArray = [false, false, false, false];
   if (currentLobby && currentLobby.ready && !resetReady) {
@@ -9648,10 +9684,7 @@ window.updateMenuDynamic = function () {
   // -----------------------------------------------------------------
   // 🛡️ TRAVA DE VISÃO DO PIX: Oculta a chave do time adversário
   // -----------------------------------------------------------------
-  let myTeam = -1;
-  if (myPlayerIndex === 0 || myPlayerIndex === 2) myTeam = 0; // Time 1
-  if (myPlayerIndex === 1 || myPlayerIndex === 3) myTeam = 1; // Time 2
-  if (isBossMode(mode) && (myPlayerIndex === 0 || myPlayerIndex === 1)) myTeam = 0;
+  const myTeam = teamForSeat(mode, myPlayerIndex);
 
   // Sincroniza o Cache Imutável (Dataset) com o Banco de Dados
   if (currentLobby && currentLobby.pixKeys) {
@@ -10667,6 +10700,7 @@ document.getElementById('startBtn').onclick = () => {
   }
 
   const fullLobby = {
+    seatAccountIds: currentLobby?.seatAccountIds || ['', '', '', ''],
     mode: mode,
     dominationOptions: readDominationMenuOptions(),
     variant: variant,
@@ -10709,6 +10743,7 @@ document.getElementById('cancelReadyBtn').onclick = () => {
 
   // 4. Salva a fuga no Firebase
   const fullLobby = {
+    seatAccountIds: currentLobby?.seatAccountIds || ['', '', '', ''],
     mode: getEffectiveMenuMode(),
     dominationOptions: readDominationMenuOptions(),
     bossId: getBossDefinitionForMode(getEffectiveMenuMode())?.id || null,
@@ -10725,6 +10760,7 @@ document.getElementById('cancelReadyBtn').onclick = () => {
 };
 
 document.getElementById('localPlayerSelect').onchange = (e) => {
+  const previousSeat = myPlayerIndex;
   myPlayerIndex = parseInt(e.target.value);
   if (isNaN(myPlayerIndex)) myPlayerIndex = -1;
 
@@ -10740,6 +10776,10 @@ document.getElementById('localPlayerSelect').onchange = (e) => {
   window.history.replaceState({}, '', url);
 
   window.updateMenuDynamic();
+  if (!state) {
+    if (currentLobby) void syncAccountSeat(true, previousSeat);
+    else if (myPlayerIndex >= 0) window.pushLobby();
+  }
   if (state) renderAll();
 };
 document.getElementById('drawStockBtn').onclick = drawFromStock;
