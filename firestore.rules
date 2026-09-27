@@ -12,6 +12,17 @@ service cloud.firestore {
         && request.resource.data.pixKey is string
         && request.resource.data.pixKey.size() > 0
         && request.resource.data.pixKey.size() <= 140;
+      match /matches/{matchId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null
+          && request.resource.data.matchId == matchId
+          && uid in request.resource.data.participantIds
+          && request.auth.uid in request.resource.data.participantIds
+          && getAfter(/databases/$(database)/documents/buracoGames/$(request.resource.data.gameId)).data.historySummary == request.resource.data;
+        allow update: if request.auth != null
+          && request.auth.uid in resource.data.participantIds
+          && request.resource.data == resource.data;
+      }
     }
     // Salas por link: somente contas autenticadas. Não permitir listar todas as salas.
     // A chave do time faz parte da sala e pode ser lida por quem tem acesso a ela.

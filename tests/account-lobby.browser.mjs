@@ -17,11 +17,11 @@ export async function signOut(){}
 const dbStub = `
 export const db={},firebaseApp={};
 export const doc=(_db,collection,id)=>({collection,id});
-export async function getDocFromServer(ref){if(ref.collection!=='userProfiles')throw Error('unexpected read'); return {exists:()=>true,data:()=>({name:'Maria Silva',pixKey:'maria-pix@example.test'})};}
+export async function getDocFromServer(ref){if(ref.collection!=='userProfiles')throw Error('unexpected read'); return {exists:()=>true,data:()=>window.accountFixture.profile||({name:'Maria Silva',pixKey:'maria-pix@example.test'})};}
 const snapshot=()=>({exists:()=>true,data:()=>structuredClone(window.accountFixture.data)});
 const emit=()=>window.accountFixture.listeners.forEach(fn=>setTimeout(()=>fn(snapshot()),0));
 export function onSnapshot(ref,fn){window.accountFixture.listeners.push(fn);setTimeout(()=>fn(snapshot()),0);return ()=>{};}
-export async function setDoc(ref,data){if(data.stateJson)throw Error('fixture must not start a match');window.accountFixture.writes.push(data);Object.assign(window.accountFixture.data,data);emit();}
+export async function setDoc(ref,data){if(data.stateJson)throw Error('fixture must not start a match');if(ref.collection==='userProfiles'){window.accountFixture.profile=data;return;}window.accountFixture.writes.push(data);Object.assign(window.accountFixture.data,data);emit();}
 export const updateDoc=setDoc;
 export async function deleteDoc(){throw Error('unexpected delete');}
 export async function runTransaction(_db,fn){return fn({get:async()=>snapshot(),update:(ref,data)=>setDoc(ref,data),set:(ref,data)=>setDoc(ref,data)});}
@@ -36,6 +36,7 @@ try {
     if(url.origin!=='http://localhost')return route.abort();
     if(url.pathname==='/auth-stub.js')return route.fulfill({contentType:'text/javascript',body:authStub});
     if(url.pathname==='/js/firebase.js')return route.fulfill({contentType:'text/javascript',body:dbStub});
+    if(url.pathname==='/js/history-store.js')return route.fulfill({contentType:'text/javascript',body:'export async function loadHistoryPage(){return {matches:[],cursor:null,hasMore:false};}'});
     const path=url.pathname==='/'?'index.html':url.pathname.slice(1);
     if(!/^[\w/.-]+$/.test(path)||!/\.(js|css|html)$/.test(path))return route.abort();
     try{
@@ -64,6 +65,15 @@ try {
   await page.waitForFunction(()=>window.accountFixture.data.lobby.names[1]==='Maria Silva' && window.accountFixture.data.lobby.names[0]==='');
   await page.waitForFunction(()=>document.getElementById('p1Name').value==='');
   assert.equal(await page.evaluate(()=>window.accountFixture.writes.some(w=>w.stateJson)),false);
+  await page.locator('button.account-identity').click();
+  await page.locator('#settingsTab').click();
+  await page.locator('#settingsPanel [name=name]').fill('Maria Nova');
+  await page.locator('#settingsPanel [name=pixKey]').fill('nova-chave');
+  await page.locator('#settingsPanel [type=submit]').click();
+  await page.waitForFunction(()=>window.accountFixture.data.lobby.names[1]==='Maria Nova');
+  assert.equal(await page.evaluate(()=>window.accountFixture.profile.pixKey),'nova-chave');
+  await page.locator('[data-back]').click();
+  assert.equal(await page.locator('.account-name').textContent(),'Maria Nova');
   await page.locator('#configSection .section').evaluate(async section => {
     await Promise.all(section.getAnimations().map(animation => animation.finished));
   });

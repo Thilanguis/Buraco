@@ -16,7 +16,7 @@ const errors = {
   'auth/operation-not-allowed': 'O login por e-mail ainda precisa ser habilitado no Firebase.',
   'auth/configuration-not-found': 'O Authentication ainda precisa ser habilitado no Firebase.',
   'permission-denied': 'Não foi possível acessar seu perfil. Verifique as regras do Firebase.',
-  'unavailable': 'O banco está indisponível. Confira sua conexão e tente novamente.',
+  unavailable: 'O banco está indisponível. Confira sua conexão e tente novamente.',
 };
 
 export async function requireAccount() {
@@ -38,20 +38,26 @@ export async function requireAccount() {
   </form>`;
   document.body.append(overlay);
   const form = overlay.querySelector('form');
-  const field = name => form.elements.namedItem(name);
+  const field = (name) => form.elements.namedItem(name);
   const status = overlay.querySelector('#accountStatus');
   let mode = 'login';
   let busy = false;
   let acceptedUid = null;
   let finish;
-  const ready = new Promise(resolve => { finish = resolve; });
+  const ready = new Promise((resolve) => {
+    finish = resolve;
+  });
 
   function setMode(next) {
     mode = next;
     const profileMode = mode !== 'login';
     const completing = mode === 'profile';
-    overlay.querySelectorAll('[data-profile]').forEach(el => { el.hidden = !profileMode; });
-    overlay.querySelectorAll('[data-credentials]').forEach(el => { el.hidden = completing; });
+    overlay.querySelectorAll('[data-profile]').forEach((el) => {
+      el.hidden = !profileMode;
+    });
+    overlay.querySelectorAll('[data-credentials]').forEach((el) => {
+      el.hidden = completing;
+    });
     field('name').required = field('pixKey').required = profileMode;
     field('email').required = field('password').required = !completing;
     field('password').autocomplete = mode === 'register' ? 'new-password' : 'current-password';
@@ -66,7 +72,9 @@ export async function requireAccount() {
 
   function setBusy(value) {
     busy = value;
-    form.querySelectorAll('button,input').forEach(el => { el.disabled = value; });
+    form.querySelectorAll('button,input').forEach((el) => {
+      el.disabled = value;
+    });
     form.setAttribute('aria-busy', String(value));
   }
 
@@ -83,17 +91,32 @@ export async function requireAccount() {
     // Sempre do servidor: não reutilizar o perfil de outra sessão ou aceitar cache vencido.
     const snap = await getDocFromServer(doc(db, 'userProfiles', user.uid));
     if (snap.exists()) {
-      try { accept(user, normalizeProfile(snap.data())); return; } catch { /* perfil antigo incompleto */ }
+      try {
+        accept(user, normalizeProfile(snap.data()));
+        return;
+      } catch {
+        /* perfil antigo incompleto */
+      }
     }
     setMode('profile');
     status.textContent = 'Falta salvar seu nome e sua chave Pix para entrar.';
   }
 
-  overlay.querySelector('#accountSwitch').onclick = () => { setMode(mode === 'login' ? 'register' : 'login'); field('password').value = ''; };
+  overlay.querySelector('#accountSwitch').onclick = () => {
+    setMode(mode === 'login' ? 'register' : 'login');
+    field('password').value = '';
+  };
   overlay.querySelector('#accountCancel').onclick = async () => {
     setBusy(true);
-    try { await signOut(auth); form.reset(); setMode('login'); } catch (e) { status.textContent = errors[e.code] || 'Não foi possível sair. Tente novamente.'; }
-    finally { setBusy(false); }
+    try {
+      await signOut(auth);
+      form.reset();
+      setMode('login');
+    } catch (e) {
+      status.textContent = errors[e.code] || 'Não foi possível sair. Tente novamente.';
+    } finally {
+      setBusy(false);
+    }
   };
   overlay.querySelector('#accountReset').onclick = async () => {
     if (!field('email').reportValidity()) return;
@@ -101,10 +124,13 @@ export async function requireAccount() {
     try {
       await sendPasswordResetEmail(auth, field('email').value.trim());
       status.textContent = 'Se houver uma conta para esse e-mail, enviaremos a recuperação. Confira também o spam.';
-    } catch (e) { status.textContent = e.code === 'auth/user-not-found' ? 'Confira seu e-mail e a caixa de spam.' : errors[e.code] || 'Não foi possível enviar o e-mail. Tente novamente.'; }
-    finally { setBusy(false); }
+    } catch (e) {
+      status.textContent = e.code === 'auth/user-not-found' ? 'Confira seu e-mail e a caixa de spam.' : errors[e.code] || 'Não foi possível enviar o e-mail. Tente novamente.';
+    } finally {
+      setBusy(false);
+    }
   };
-  form.onsubmit = async event => {
+  form.onsubmit = async (event) => {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
@@ -122,22 +148,39 @@ export async function requireAccount() {
         await setDoc(doc(db, 'userProfiles', user.uid), profile);
         accept(user, profile);
       }
-    } catch (e) { status.textContent = errors[e.code] || (e.code ? 'Não foi possível entrar. Tente novamente.' : e.message); }
-    finally { setBusy(false); }
+    } catch (e) {
+      status.textContent = errors[e.code] || (e.code ? 'Não foi possível entrar. Tente novamente.' : e.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   setBusy(true);
   status.textContent = 'Conferindo sua sessão…';
   const user = await new Promise((resolve, reject) => {
-    const off = onAuthStateChanged(auth, value => { off(); resolve(value); }, reject);
+    const off = onAuthStateChanged(
+      auth,
+      (value) => {
+        off();
+        resolve(value);
+      },
+      reject,
+    );
   });
-  try { if (user) await loadProfile(user); else status.textContent = ''; }
-  catch (e) {
+  try {
+    if (user) await loadProfile(user);
+    else status.textContent = '';
+  } catch (e) {
     // Nunca liberar o jogo sem perfil. Permitir nova tentativa e troca de conta.
     status.textContent = errors[e.code] || 'Não foi possível carregar seu perfil. Entre novamente para tentar.';
-  } finally { setBusy(false); }
-  onAuthStateChanged(auth, user => {
-    if (acceptedUid && user?.uid !== acceptedUid) { document.body.classList.add('account-pending'); location.reload(); }
+  } finally {
+    setBusy(false);
+  }
+  onAuthStateChanged(auth, (user) => {
+    if (acceptedUid && user?.uid !== acceptedUid) {
+      document.body.classList.add('account-pending');
+      location.reload();
+    }
   });
   return ready;
 }
@@ -152,29 +195,60 @@ export function installAccountMenu(account) {
   avatar.setAttribute('aria-hidden', 'true');
   const words = account.name.trim().split(/\s+/);
   avatar.textContent = (words[0][0] + (words.length > 1 ? words.at(-1)[0] : '')).toLocaleUpperCase('pt-BR');
-  const identity = document.createElement('div');
+  const identity = document.createElement('button');
+  identity.type = 'button';
   identity.className = 'account-identity';
+  identity.setAttribute('aria-label', 'Abrir meu perfil e histórico de partidas');
   const welcome = document.createElement('span');
   welcome.className = 'account-welcome';
-  welcome.textContent = 'BOA PARTIDA';
+  welcome.textContent = 'JOGADOR';
   const label = document.createElement('span');
   label.className = 'account-name';
   label.textContent = account.name;
   label.title = account.name;
   identity.append(welcome, label);
+  identity.onclick = async () => {
+    identity.disabled = true;
+    try {
+      const [{ openAccountPage }, { loadHistoryPage }] = await Promise.all([import('./account-page.js'), import('./history-store.js')]);
+      openAccountPage({
+        account,
+        loadMatches: loadHistoryPage,
+        resetPassword: () => sendPasswordResetEmail(auth, account.email),
+        saveProfile: async (input) => {
+          const profile = normalizeProfile(input);
+          await setDoc(doc(db, 'userProfiles', account.uid), profile);
+          Object.assign(account, profile);
+          label.textContent = profile.name;
+          label.title = profile.name;
+          const parts = profile.name.split(/\s+/);
+          avatar.textContent = (parts[0][0] + (parts.length > 1 ? parts.at(-1)[0] : '')).toLocaleUpperCase('pt-BR');
+          window.dispatchEvent(new Event('account-profile-updated'));
+        },
+      });
+    } catch {
+      welcome.textContent = 'Não foi possível abrir. Tente novamente.';
+    } finally {
+      identity.disabled = false;
+    }
+  };
   const logout = document.createElement('button');
   logout.type = 'button';
   logout.className = 'account-logout';
   logout.setAttribute('aria-label', 'Sair da conta');
   logout.title = 'Sair da conta';
-  logout.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H5v16h4M13 8l4 4-4 4M9 12h11"/></svg><span>Sair</span>';
+  logout.innerHTML =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H5v16h4M13 8l4 4-4 4M9 12h11"/></svg><span>Sair</span>';
   logout.onclick = async () => {
     logout.disabled = true;
     try {
       sessionStorage.removeItem('buraco_devtools_session');
       await signOut(auth);
       location.reload();
-    } catch { logout.disabled = false; label.textContent = 'Não foi possível sair. Tente novamente.'; }
+    } catch {
+      logout.disabled = false;
+      label.textContent = 'Não foi possível sair. Tente novamente.';
+    }
   };
   bar.append(avatar, identity, logout);
   const header = menu.querySelector('.section-header');

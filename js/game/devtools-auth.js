@@ -26,7 +26,7 @@ export function installDevToolsAccessUI() {
   const version = document.createElement('button');
   version.id = 'appVersionButton';
   version.type = 'button';
-  version.textContent = 'v199';
+  version.textContent = 'v202';
   version.setAttribute('aria-label', 'Versão do aplicativo');
   version.style.cssText = 'position:fixed;bottom:4px;left:8px;z-index:100001;background:#0f172acc;color:#cbd5e1;border:0;border-radius:4px;padding:3px 6px;font-size:10px;touch-action:manipulation;';
   document.body.append(version);

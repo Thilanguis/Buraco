@@ -4,6 +4,7 @@ import { applyPauseVote, pauseBlocksPlay, stockIsExhausted, createActionGate } f
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
 import { activeAccount } from './js/account-auth.js';
 import { profileInLobby, teamForSeat } from './js/account-profile.js';
+import { buildMatchSummary, prepareHistoryWrites } from './js/match-history.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
 import {
@@ -392,6 +393,7 @@ const friendSoundQueue = createFriendSoundQueue({
 });
 let currentLobby = null;
 let accountSeatStamp = '';
+window.addEventListener('account-profile-updated', () => { void syncAccountSeat(true); });
 
 async function syncAccountSeat(force = false, previousSeat = -1) {
   if (!activeAccount || state || !currentLobby || (myPlayerIndex < 0 && !force)) return;
@@ -2004,6 +2006,7 @@ async function performDominationDevOperation(operation) {
         if (isDominationFriendBusy(latest)) return null;
         const result = operation(latest);
         if (!result) return null;
+        latest.historyTest = true;
         latest.lastAction = { ...(result === true ? { type: 'debugFriends', playerId: 1 } : result), id, ts: Date.now() };
         return true;
       },
@@ -2053,7 +2056,9 @@ async function saveFriendOperation(operation, { allowDebugPause = false } = {}) 
     const result = operation(latest);
     if (!result) return null;
     latest.friendRevision = (latest.friendRevision || 0) + 1;
+    const saveHistory = latest.finished ? await prepareMatchHistory(transaction, latest) : () => {};
     transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
+    saveHistory();
     return { state: latest, result };
   });
 }
@@ -2336,7 +2341,9 @@ async function commitState() {
           if (latest.mode !== proposal.mode || latest.friendGameId !== proposal.friendGameId) return null;
           if ((latest.friendRevision || 0) !== expectedRevision || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return { accepted: false, state: latest };
           proposal.friendRevision = (latest.friendRevision || 0) + 1;
+          const saveHistory = proposal.finished ? await prepareMatchHistory(transaction, proposal) : () => {};
           transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
+          saveHistory();
           return { accepted: true, state: proposal };
         });
         if (!saved?.accepted) {
@@ -2358,7 +2365,9 @@ async function commitState() {
           if (!snapshot.exists() || !snapshot.data().stateJson) return null;
           const latest = JSON.parse(snapshot.data().stateJson);
           if (latest.matchStartedAt !== proposal.matchStartedAt || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return latest;
+          const saveHistory = proposal.finished ? await prepareMatchHistory(transaction, proposal) : () => {};
           transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
+          saveHistory();
           return null;
         });
         if (saved) {
@@ -2371,6 +2380,7 @@ async function commitState() {
     }
   } catch (err) {
     console.error('commitState failed:', err);
+    if (state?.finished) showMessage('Não foi possível salvar o resultado. Confira a conexão antes de sair ou pedir revanche.');
   } finally {
     committing = false;
   }
@@ -2903,7 +2913,7 @@ function validateDominationFriendSelection(mode, options) {
   return false;
 }
 
-async function startGame(mode, names, variant, pixKeys = [], dominationOptions = readDominationMenuOptions()) {
+async function startGame(mode, names, variant, pixKeys = [], dominationOptions = readDominationMenuOptions(), historyOptions = {}) {
   if (!validateDominationFriendSelection(mode, dominationOptions)) return;
   activateGameSession();
   const effectiveVariant = normalizeVariantForMode(mode, variant);
@@ -2942,7 +2952,9 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
     ];
   }
   playerConfigs.forEach((cfg, idx) => {
-    players.push({ id: idx, name: cfg.name, teamId: cfg.team, hand: [] });
+    const owners = historyOptions.accountIds || currentLobby?.seatAccountIds || [];
+    const accountUid = /bot/i.test(cfg.name) ? null : owners[idx] || (idx === myPlayerIndex ? activeAccount?.uid : null) || null;
+    players.push({ id: idx, name: cfg.name, accountUid, teamId: cfg.team, hand: [] });
   });
   for (let t = 0; t < 2; t++) {
     const playerIndexes = players.filter((p) => p.teamId === t).map((p) => p.id);
@@ -2991,6 +3003,7 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
     mode,
     matchStartedAt: Date.now(),
     matchFinishedAt: null,
+    historyTest: !!historyOptions.test,
     variant: effectiveVariant,
     deckTheme,
     tableTheme,
@@ -4722,22 +4735,46 @@ function normalizeMeldOrder(meld) {
   meld.splice(0, meld.length, ...prefix, ...middle, ...suffix);
 }
 
-function computeScores() {
+function computeScores(gameState = state) {
   const results = [];
-  state.teams.forEach((team) => {
-    const players = state.players.filter((p) => p.teamId === team.id);
+  gameState.teams.forEach((team) => {
+    const players = gameState.players.filter((p) => p.teamId === team.id);
     let handPenalty = 0;
     players.forEach((p) => p.hand.forEach((c) => (handPenalty += cardBasePoints(c))));
     const meldInfo = computeTeamMeldScore(team);
 
-    const mortosPegos = state.deadChunksTaken?.[team.id] ?? 0;
+    const mortosPegos = gameState.deadChunksTaken?.[team.id] ?? 0;
     const penaltyMorto = mortosPegos === 0 ? 100 : 0;
-    const bonusBatida = state.winnerTeamId === team.id ? 100 : 0;
+    const bonusBatida = gameState.winnerTeamId === team.id ? 100 : 0;
 
     const finalScore = meldInfo.total - handPenalty - penaltyMorto + bonusBatida;
     results.push({ team, players, score: finalScore, handPenalty, penaltyMorto, bonusBatida, ...meldInfo });
   });
   return results;
+}
+
+async function prepareMatchHistory(transaction, gameState) {
+  if (gameState.finished) gameState.matchFinishedAt ||= gameState.lastAction?.ts || Date.now();
+  const summary = gameState.finished ? buildMatchSummary(gameId, gameState, computeScores(gameState)) : null;
+  return prepareHistoryWrites(transaction, { db, doc, gameRef, summary, uid: activeAccount?.uid });
+}
+
+let historyRecoveryPromise = null;
+function recoverFinishedHistory() {
+  if (historyRecoveryPromise) return historyRecoveryPromise;
+  historyRecoveryPromise = (async () => {
+    await runTransaction(db, async transaction => {
+      const snap = await transaction.get(gameRef);
+      const data = snap.data();
+      if (!data?.stateJson || data.historySummary) return;
+      const finished = JSON.parse(data.stateJson);
+      if (!finished.finished) return;
+      finished.matchFinishedAt ||= finished.lastAction?.ts || Date.now();
+      const save = await prepareMatchHistory(transaction, finished);
+      save();
+    });
+  })().finally(() => { historyRecoveryPromise = null; });
+  return historyRecoveryPromise;
 }
 
 // Função que encerra a partida
@@ -9042,6 +9079,7 @@ onSnapshot(gameRef, async (snap) => {
   const newState = normalizeDominationFriends(JSON.parse(data.stateJson));
   newState.matchStartedAt ||= data.createdAt?.toMillis?.() || Number(data.createdAt) || null;
   if (newState.finished) newState.matchFinishedAt ||= newState.lastAction?.ts || Number(data.updatedAt) || Date.now();
+  if (newState.finished && !data.historySummary) void recoverFinishedHistory().catch(error => console.warn('Histórico pendente: reconecte para tentar novamente.', error.code));
   normalizeLegacyDiscardPurchase(newState);
   if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.
@@ -9888,6 +9926,8 @@ if (isDebugMode) {
       activateGameSession();
       preparedState.matchStartedAt = Date.now();
       preparedState.matchFinishedAt = null;
+      preparedState.historyTest = true;
+      preparedState.players.forEach(p => { p.accountUid = p.id === targetSeat ? activeAccount?.uid || null : null; });
       preparedState.isBetting = false;
       preparedState.betBase = 0;
       preparedState.betPerPoint = 0;
@@ -9896,7 +9936,7 @@ if (isDebugMode) {
       return preparedState;
     }
 
-    return startGame(selectedMode, names, normalizeVariantForMode(selectedMode, 'aberto'), ['biel@financeiro.com', 'bot@rebeca.com'], debugDominationOptions);
+    return startGame(selectedMode, names, normalizeVariantForMode(selectedMode, 'aberto'), ['biel@financeiro.com', 'bot@rebeca.com'], debugDominationOptions, { test: true });
   };
 
   let bossDebugLabModulePromise = null;
@@ -10309,7 +10349,7 @@ window.debugDiscard5 = async () => {
   await commitState();
 };
 
-window.debugRestartGame = async () => {
+window.debugRestartGame = async (fromRematch = false) => {
   if (!state) return;
   const keepDevToolsOpen = window.isDevToolsOpen;
 
@@ -10345,7 +10385,8 @@ window.debugRestartGame = async () => {
   if (state.debugPaused) state.debugPaused = false;
 
   // Inicia a nova partida no Firebase
-  await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions));
+  if (state.finished) await recoverFinishedHistory();
+  await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions), { test: !!state.historyTest || !fromRematch, accountIds: state.players.map(p => p.accountUid || null) });
 
   // Esconde o painel do DevTools para o jogador ver os dados rolarem
   window.toggleDebugPanel(keepDevToolsOpen);
@@ -11115,7 +11156,7 @@ window.voteRematch = async () => {
       transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
       return ready;
     });
-    if (restart) await window.debugRestartGame();
+    if (restart) await window.debugRestartGame(true);
   } catch (error) {
     console.error('Falha na revanche:', error);
     showMessage('Não foi possível iniciar a revanche. Tente novamente.');
@@ -11130,3 +11171,13 @@ window.voteRematch = async () => {
     }).catch(console.error);
   } finally { rematchVotePending = false; }
 };
+
+// Usar uma ferramenta que altera a partida torna seu resultado um teste, não uma vitória válida.
+for (const name of ['debugDraw5', 'debugDraw30', 'debugDiscard5', 'debugMeld', 'debugSetupDead', 'debugSetupWin', 'debugEndGame', 'debugSetFriends', 'debugSetupVision', 'debugTogglePause']) {
+  const action = window[name];
+  if (typeof action !== 'function') continue;
+  window[name] = function (...args) {
+    if (state && !state.finished) state.historyTest = true;
+    return action.apply(this, args);
+  };
+}
