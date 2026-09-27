@@ -2,10 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { buildMatchSummary, historyIdentity, historyStats, resultFor, prepareHistoryWrites } from '../js/match-history.js';
+import { buildMatchSummary, historyIdentity, historyStats, resultFor, prepareHistoryWrites, recordedDominationOptions } from '../js/match-history.js';
 
 const state = { finished: true, matchStartedAt: 1000, matchFinishedAt: 61000, mode: '1x1', variant: 'aberto', winnerTeamId: 0, players: [{id:0,name:'Maria',accountUid:'u1',teamId:0},{id:1,name:'João',accountUid:'u2',teamId:1}] };
 const scores = [{team:{id:0,name:'Time 1',pix:'secret-pix'},score:200,meldPoints:300,sujaBonus:100,handPenalty:200,bonusBatida:100},{team:{id:1,name:'Time 2'},score:600,limpaBonus:200,realBonus:500,asasBonus:1000}];
+
+test('histórico preserva opções explícitas sem inventar defaults antigos',()=>{
+ const options={plus:false,search:true,vision:false,friend:true,friendCapacity:2};
+ const summary=buildMatchSummary('room',{...state,mode:'1x1_dominacao',dominationOptions:{...options,secret:'não copiar'}},scores);
+ assert.deepEqual(summary.dominationOptions,options);
+ assert.deepEqual(recordedDominationOptions({mode:'1x1_dominacao',dominationOptions:{plus:false}}),{plus:false,search:null,vision:null,friend:null,friendCapacity:null});
+ assert.equal(recordedDominationOptions({mode:'1x1_duploMorto'}),null);
+ assert.equal(buildMatchSummary('room',state,scores).dominationOptions,undefined);
+ assert.equal(recordedDominationOptions({mode:'1x1_dominacao'}).plus,null);
+});
 
 test('resumo usa placar, separa batida, não inclui Pix, cartas ou e-mail', () => {
   const summary = buildMatchSummary('room',state,scores);

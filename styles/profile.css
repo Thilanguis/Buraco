@@ -26,6 +26,30 @@
 #accountPage h1 { margin: 0; font-size: clamp(24px,4vw,36px); line-height: 1.25; overflow-wrap: anywhere; letter-spacing: -.03em; }
 .profile-subtitle { margin: 8px 0 0; color: #929aa9; }
 .profile-tabs { display: flex; gap: 22px; border-bottom: 1px solid #ffffff14; margin-bottom: 28px; }
+.comparison-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 24px 0; }
+.comparison-filters label { min-width: 0; font-size: 11px; color: #a6acb8; }
+.comparison-filters label:first-child { grid-column: 1 / -1; }
+#accountPage .comparison-filters select { display: block; width: 100%; margin-top: 6px; }
+.comparison-arena { display: grid; grid-template-columns: 1fr .65fr 1fr; gap: 12px; padding: 24px 12px; border: 1px solid #cfb78030; border-radius: 16px; background: radial-gradient(ellipse at top left,#d2b46b12,transparent 65%),#0d1523; }
+.comparison-side { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; text-align: center; }
+.comparison-name { color: #dfd9ca; font-size: 13px; overflow-wrap: anywhere; }
+.comparison-side strong { font-size: 44px; line-height: 1.2; font-weight: 600; color: #edcf88; }
+.comparison-side small { font-size: 10px; color: #a4afbf; }
+.comparison-side:nth-child(2) .comparison-name { font-size: 9px; letter-spacing: .12em; color: #8f9aad; }
+.comparison-side:nth-child(2) strong { color: #929dab; }
+.comparison-side:last-child strong { color: #9fbae4; }
+.comparison-bar { display: flex; height: 6px; gap: 3px; margin: 16px 4px; border-radius: 10px; overflow: hidden; background: #ffffff0d; }
+.comparison-bar span { flex-basis: 0; }
+.comparison-bar .wins { background: #e3c275; }
+.comparison-bar .draws { background: #818c9e; }
+.comparison-bar .losses { background: #90acd9; }
+.comparison-streak { color: #d4c299; text-align: center; font-size: 12px; }
+.comparison-table { table-layout: fixed; width: 100%; margin: 24px 0; border-collapse: collapse; font-size: 12px; color: #eeeade; }
+.comparison-table th, .comparison-table td { text-align: right; padding: 12px 8px; border-bottom: 1px solid #ffffff12; overflow-wrap: anywhere; }
+.comparison-table th { color: #aab6c9; font-weight: 500; }
+.comparison-table th:first-child, .comparison-table td:first-child { text-align: left; color: #aab6c9; }
+.comparison-scope { color: #8e9aaf; font-size: 11px; margin: 20px 0; }
+#accountPage .comparison-more { display: block; margin: 24px auto 0; }
 #accountPage .profile-tabs button { border: 0; border-radius: 0; border-bottom: 2px solid transparent; background: none; color: #979fae; padding: 14px 0; }
 #accountPage .profile-tabs button[aria-selected=true] { color: #edce85; border-bottom-color: #edce85; }
 .profile-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
@@ -55,6 +79,14 @@
 .profile-match-detail { padding: 0 20px 18px; border-top: 1px solid #ffffff10; color: #9aa8ba; font-size: 12px; }
 .profile-match-detail h3 { color: #e1dacb; font-size: 13px; margin: 20px 0 6px; }
 .profile-match-note { color: #bea774; }
+.match-options { margin: 18px 0; }
+.match-option-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.match-option { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid #ffffff16; border-radius: 8px; background: #ffffff03; }
+.match-option span { font-size: 11px; color: #bac3d0; }
+.match-option strong { font-size: 11px; font-weight: 500; color: #b1bac9; }
+.match-option.enabled strong { color: #a9dabb; }
+.match-option.disabled strong { color: #e0b4a9; }
+.match-option-note { font-size: 10px; color: #8f9bad; }
 #accountPage .profile-more { display: block; margin: 24px auto 0; }
 .profile-footer { border-top: 1px solid #ffffff12; margin-top: 40px; padding-top: 20px; color: #778499; font-size: 11px; }
 .profile-form { max-width: 520px; padding: 24px; border: 1px solid #cfb78025; border-radius: 14px; background: #111824; }

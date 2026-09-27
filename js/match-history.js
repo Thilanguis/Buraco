@@ -2,6 +2,19 @@ export function historyIdentity(gameId, state) {
   return `${gameId}_${state.matchStartedAt}`;
 }
 
+// Não aplicar defaults atuais a registros antigos: ausente não significa ativado.
+export function recordedDominationOptions(state) {
+  if (state?.mode !== '1x1_dominacao') return null;
+  const source = state.dominationOptions;
+  return {
+    plus: typeof source?.plus === 'boolean' ? source.plus : null,
+    search: typeof source?.search === 'boolean' ? source.search : null,
+    vision: typeof source?.vision === 'boolean' ? source.vision : null,
+    friend: typeof source?.friend === 'boolean' ? source.friend : null,
+    friendCapacity: [0,1,2].includes(source?.friendCapacity) ? source.friendCapacity : null,
+  };
+}
+
 export function buildMatchSummary(gameId, state, scores) {
   if (!state?.finished || !state.matchStartedAt || !state.matchFinishedAt) return null;
   const participants = state.players.map(p => ({ seat: p.id, uid: p.accountUid || null, name: p.name, teamId: p.teamId, bot: /bot/i.test(p.name) }));
@@ -18,6 +31,7 @@ export function buildMatchSummary(gameId, state, scores) {
     startedAt: state.matchStartedAt, finishedAt: state.matchFinishedAt,
     durationSeconds: Math.max(0, Math.round((state.matchFinishedAt - state.matchStartedAt) / 1000)),
     mode: state.mode, variant: state.variant || '',
+    ...(state.mode === '1x1_dominacao' ? { dominationOptions: recordedDominationOptions(state) } : {}),
     category: test ? 'test' : boss ? 'boss' : participants.some(p => p.bot) ? 'bots' : 'players',
     participants, participantIds, winnerTeamId, finisherTeamId: state.winnerTeamId ?? null,
     reason: boss ? state.boss?.result?.reason || 'boss_result' : state.winnerTeamId == null ? 'stock_exhausted' : 'finished',
