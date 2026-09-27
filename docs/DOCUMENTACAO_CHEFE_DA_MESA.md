@@ -2,7 +2,7 @@
 
 ## Status da documentação
 
-**Versão consolidada de regras funcionais — 17/07/2026.**
+**Versão revisada contra o código em produção — 27/09/2026.**
 
 Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
 
@@ -12,17 +12,22 @@ Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as 
 
 Ela substitui as versões anteriores em que a Matriarca aparecia como planejada e em que as habilidades antigas da Dominadora e do Banqueiro ainda estavam descritas.
 
+### Fonte de verdade atual
+
+A rotação que vale no jogo é a registrada em:
+
+- `js/boss/bosses/banker.js`;
+- `js/boss/bosses/dominatrix.js`;
+- `js/boss/bosses/matriarch.js`;
+- validações e resolução em `js/boss/boss-engine.js`.
+
+O resumo enxuto e atualizado das habilidades ativas está em `docs/INVENTARIO_HABILIDADES_CHEFES.md`. O HUD da partida usa a mesma lista de definições do registro de chefes para exibir **Habilidades do chefe**, evitando manter uma segunda lista manual de nomes/fases na interface.
+
 ### Estado técnico da base revisada
 
-No pacote `Buraco(17)`:
+A documentação não fixa mais uma contagem histórica de testes, porque a suíte evolui junto com o projeto. Alterações no modo Chefe devem ser validadas principalmente pelos testes `boss-*.test.mjs`, pelos testes de integração e por uma partida manual em dois clientes quando houver mudança de sincronização ou apresentação.
 
-```text
-152 testes executados
-152 testes aprovados
-9 arquivos JavaScript validados por sintaxe
-```
-
-A auditoria posterior identificou comportamentos que também fazem parte da regra final descrita neste documento:
+A auditoria funcional identificou comportamentos que também fazem parte da regra final descrita neste documento:
 
 - Dívida máxima por Limite de Crédito encerra a partida imediatamente;
 - Limite de Crédito conta apenas cartas originadas da mão;
@@ -429,9 +434,9 @@ A equipe possui uma franquia compartilhada de cartas colocadas na mesa.
 
 | Fase | Franquia | Dívida por excedente | Cobrança máxima |
 | ---- | -------: | -------------------: | --------------: |
-| 1    |        7 |                   +1 |              +4 |
-| 2    |        6 |                   +1 |              +5 |
-| 3    |        5 |                   +1 |              +6 |
+| 1    |        3 |                   +1 |              +4 |
+| 2    |        2 |                   +1 |              +5 |
+| 3    |        1 |                   +1 |              +6 |
 
 ### Cartas que contam
 
@@ -476,7 +481,7 @@ Em jogada com várias cartas:
 HUD:
 
 ```text
-CRÉDITO 5/7
+CRÉDITO 2/3
 Próxima excedente: +1 Dívida
 Cobrança: 2/4
 ```
@@ -1146,20 +1151,34 @@ peso: 3
 fases: 1, 2 e 3
 ```
 
-| Fase | Cura base |
-| ---- | --------: |
-| 1    |       150 |
-| 2    |       180 |
-| 3    |       220 |
+A cura atual funciona por **faixas de progresso**, não por redução linear de 15 HP por carta.
 
-Cada carta nova da mão colocada legalmente reduz 15.
+### Fases 1 e 2
 
-- cada ID uma vez;
-- mínimo zero;
+| Cartas novas colocadas legalmente | Cura prevista |
+| --------------------------------: | ------------: |
+| 0–1                               |        150 HP |
+| 2–3                               |        100 HP |
+| 4–5                               |         50 HP |
+| 6+                                |          0 HP |
+
+### Fase 3
+
+| Cartas novas colocadas legalmente | Cura prevista |
+| --------------------------------: | ------------: |
+| 0–1                               |        180 HP |
+| 2–3                               |        120 HP |
+| 4–5                               |         60 HP |
+| 6+                                |          0 HP |
+
+Regras:
+
+- cada carta conta uma única vez pelo ID;
 - reorganização não conta;
-- Coringa reposicionado não conta;
-- HUD mostra cura prevista;
-- não gera Flor.
+- Coringa apenas reposicionado não conta como carta nova;
+- o HUD mostra a cura prevista da faixa atual;
+- a cura ainda respeita o limite total de cura da rodada;
+- Orvalho não gera Flor.
 
 ## 6.10 Trepadeiras Gêmeas
 
@@ -1465,7 +1484,7 @@ Mostrar:
 - escolhas;
 - progresso.
 
-Detalhes extensos ficam recolhidos.
+O painel recolhível do HUD mostra **Habilidades do chefe**: condição especial, habilidades da rotação, fases em que cada uma pode aparecer e destaque da habilidade ativa. O registro técnico da batalha continua no estado para sincronização e diagnóstico, mas não ocupa mais esse painel.
 
 ## 8.2 Banqueiro
 

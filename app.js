@@ -4867,6 +4867,95 @@ function renderBossDetailFields(element, details) {
   });
 }
 
+const BOSS_GUIDE_CORE = Object.freeze({
+  banker: 'A equipe acumula Dívida. Se chegar a 100, o Banqueiro vence imediatamente. Canastras Limpa, Real e Ás-a-Ás também reduzem a Dívida enquanto causam dano.',
+  dominadora: 'Cada jogador acumula Chicotes. Com 3 fica Sob Controle; com 4 fica Dominado. Se os dois cooperadores chegarem a 4 ao mesmo tempo, a equipe perde.',
+  matriarca_esmeralda: 'Falhas alimentam o Florescimento. Ao chegar a 5 Flores, a Matriarca vence. Evoluções de canastra podem remover Flores e, na Fase 3, ela pode usar Renascimento.',
+});
+
+const BOSS_GUIDE_OVERRIDES = Object.freeze({
+  fixed_interest: 'Um jogador escolhe entre receber a cobrança integral de Dívida ou deixar uma carta como garantia no Cofre. A garantia volta depois com custo base e juros acumulados.',
+  maintenance_fee: 'Cada jogador recebe cartas extras junto da compra normal. As cartas financiadas que continuarem na mão ao fim do turno geram Dívida.',
+  suit_audit: 'A equipe precisa baixar a quantidade exigida de cartas do naipe sorteado durante a rodada. Cumprir reduz a Dívida; falhar aumenta a Dívida.',
+  credit_limit: 'A rodada recebe uma franquia compartilhada de cartas vindas da mão. Cartas que ultrapassarem essa franquia geram Dívida, até o limite da cobrança.',
+  forced_choice: 'O alvo escolhe: receber 1 Chicote imediatamente ou aceitar uma ordem válida para o próximo turno.',
+  possession: 'Um jogo fica possuído: o dano já acumulado fica suspenso até a condição de libertação ser cumprida. Novas cartas ainda causam o próprio dano normalmente.',
+  break_will: 'Um jogador que já tenha 2 Chicotes recebe uma escolha pessoal entre punições da Dominadora.',
+  final_order: 'Cada cooperador recebe uma escolha diferente de punição; as duas decisões fazem parte da mesma habilidade.',
+  restorative_dew: 'A Matriarca prepara uma cura. Quanto mais cartas novas a equipe baixar legalmente durante a janela da habilidade, menor será a cura; com progresso suficiente ela zera.',
+  harvest: 'No fim do turno do alvo, o tamanho da mão define o resultado: até 7 cartas não há efeito; mãos maiores podem curar a Matriarca e, no pior caso, gerar Flor.',
+  royal_bloom: 'Cria vários objetivos naturais independentes. Cada objetivo precisa ser resolvido separadamente; falhas alimentam o Florescimento.',
+  spring_crown: 'Marca uma ameaça natural. Se ela falhar, a Coroa prepara uma Raiz Fortalecida, que exige cooperação para ser removida.',
+});
+
+function bossAbilityGuideDescription(definition, ability, phase) {
+  if (BOSS_GUIDE_OVERRIDES[ability.id]) return BOSS_GUIDE_OVERRIDES[ability.id];
+  if (typeof ability.describe !== 'function') return '';
+  const previewPhase = ability.phases?.includes(phase) ? phase : Math.max(...(ability.phases || [phase || 1]));
+  try {
+    return ability.describe({
+      phase: previewPhase,
+      suitLabel: 'um naipe sorteado',
+      targetCount: 2,
+      markedThreatName: 'uma ameaça natural',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function renderBossAbilityGuide(definition, boss) {
+  const root = document.getElementById('bossAbilityGuide');
+  if (!root || !definition || !boss) return;
+
+  const currentAbilityId = boss.currentIntent?.abilityId || '';
+  const signature = `${definition.id}:${boss.phase}:${currentAbilityId}`;
+  if (root.dataset.signature === signature) return;
+  root.dataset.signature = signature;
+  root.replaceChildren();
+
+  const intro = document.createElement('section');
+  intro.className = 'boss-ability-overview';
+  const title = document.createElement('strong');
+  title.textContent = `Como ${definition.name} funciona`;
+  const rule = document.createElement('span');
+  rule.textContent = BOSS_GUIDE_CORE[definition.id] || 'O chefe alterna habilidades conforme a fase atual.';
+  intro.append(title, rule);
+  root.appendChild(intro);
+
+  const grid = document.createElement('div');
+  grid.className = 'boss-ability-grid';
+
+  (definition.abilities || []).forEach((ability) => {
+    const availableNow = ability.phases?.includes(boss.phase);
+    const activeNow = currentAbilityId === ability.id;
+    const card = document.createElement('article');
+    card.className = `boss-ability-card${availableNow ? ' is-current-phase' : ''}${activeNow ? ' is-active' : ''}`;
+
+    const header = document.createElement('header');
+    const name = document.createElement('strong');
+    name.textContent = ability.name;
+    const phases = document.createElement('span');
+    phases.className = 'boss-ability-phases';
+    phases.textContent = (ability.phases || []).map((value) => `F${value}`).join(' · ');
+    header.append(name, phases);
+
+    const description = document.createElement('p');
+    description.textContent = bossAbilityGuideDescription(definition, ability, boss.phase);
+    card.append(header, description);
+
+    if (activeNow) {
+      const badge = document.createElement('b');
+      badge.className = 'boss-ability-active-badge';
+      badge.textContent = 'ATIVA AGORA';
+      card.appendChild(badge);
+    }
+    grid.appendChild(card);
+  });
+
+  root.appendChild(grid);
+}
+
 function bossFlowHostIndex() {
   const humanIndex = state?.players?.findIndex((player) => player && !player.name?.toUpperCase().includes('BOT')) ?? -1;
   return humanIndex >= 0 ? humanIndex : myPlayerIndex;
@@ -5239,6 +5328,7 @@ function renderBossHud() {
   hud.dataset.springCrownStage = springCrownBuffed ? boss.springCrown.status : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
   setBossPortrait(document.getElementById('bossPortraitImage'), definition);
+  renderBossAbilityGuide(definition, boss);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
   const phaseRules = {
     1: 'Próxima fase: primeiro morto, monte com 40 cartas ou HP em 70%.',

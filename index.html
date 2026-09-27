@@ -709,55 +709,41 @@
               <small id="bossDialogueConsequence"></small>
             </div>
             <div id="bossDamageReaction" class="boss-dialogue-presentation boss-damage-reaction" style="display: none" aria-live="polite"></div>
-            <details id="bossBattleDetails" class="boss-battle-details">
+            <details id="bossBattleDetails" class="boss-battle-details" aria-label="Detalhes da batalha">
               <summary>
-                <span aria-hidden="true">ⓘ</span>
-                Detalhes da batalha
+                <span aria-hidden="true">✦</span>
+                Habilidades do chefe
               </summary>
-              <div class="boss-detail-content">
-                <div id="bossPhaseTrack" class="boss-phase-track" aria-label="Progresso das fases">
-                  <span data-phase="1">
-                    <i></i>
-                    Fase 1
-                  </span>
-                  <span data-phase="2">
-                    <i></i>
-                    Fase 2
-                  </span>
-                  <span data-phase="3">
-                    <i></i>
-                    Fase 3
-                  </span>
-                </div>
-                <div class="boss-damage-guide" aria-label="Dano das canastras">
-                  <span>
-                    SUJA
-                    <strong>100</strong>
-                  </span>
-                  <span>
-                    LIMPA
-                    <strong>180</strong>
-                  </span>
-                  <span>
-                    REAL
-                    <strong>300</strong>
-                  </span>
-                  <span>
-                    ÁS-A-ÁS
-                    <strong>450</strong>
-                  </span>
-                </div>
-                <small id="bossTotalDamage" class="boss-total-damage">0 de dano total</small>
-                <div id="bossActionDetails" class="boss-action-details"></div>
-                <div id="bossEffects" class="boss-effects"></div>
-                <section class="boss-log-card">
-                  <div class="boss-log-title">
-                    <span>REGISTRO DA BATALHA</span>
-                    <span id="bossLogNew" class="boss-log-new" hidden>NOVO</span>
-                    <strong id="bossLogCount">0</strong>
+              <div class="boss-detail-content boss-ability-content">
+                <div id="bossAbilityGuide" class="boss-ability-guide" aria-live="polite"></div>
+
+                <!-- Mantidos no DOM para preservar sincronização, efeitos e compatibilidade
+                     com partidas antigas. Não fazem mais parte da interface visível. -->
+                <div class="boss-legacy-battle-details" hidden aria-hidden="true">
+                  <span>Detalhes da batalha</span>
+                  <div id="bossPhaseTrack" class="boss-phase-track" aria-label="Progresso das fases">
+                    <span data-phase="1"><i></i>Fase 1</span>
+                    <span data-phase="2"><i></i>Fase 2</span>
+                    <span data-phase="3"><i></i>Fase 3</span>
                   </div>
-                  <div id="bossEventLog" class="boss-event-log"></div>
-                </section>
+                  <div class="boss-damage-guide" aria-label="Dano das canastras">
+                    <span>SUJA <strong>100</strong></span>
+                    <span>LIMPA <strong>180</strong></span>
+                    <span>REAL <strong>300</strong></span>
+                    <span>ÁS-A-ÁS <strong>450</strong></span>
+                  </div>
+                  <small id="bossTotalDamage" class="boss-total-damage">0 de dano total</small>
+                  <div id="bossActionDetails" class="boss-action-details"></div>
+                  <div id="bossEffects" class="boss-effects"></div>
+                  <section class="boss-log-card">
+                    <div class="boss-log-title">
+                      <span>REGISTRO DA BATALHA</span>
+                      <span id="bossLogNew" class="boss-log-new" hidden>NOVO</span>
+                      <strong id="bossLogCount">0</strong>
+                    </div>
+                    <div id="bossEventLog" class="boss-event-log"></div>
+                  </section>
+                </div>
               </div>
             </details>
             <div id="bossChoicePanel" class="boss-choice-panel" style="display: none">
