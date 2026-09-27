@@ -14,3 +14,9 @@ export function createVersionTapGesture({ now = Date.now, onUnlock, count = 7, w
 export function validDevToolsClaims(claims, now = Date.now()) {
   return claims?.devtools === true && Number(claims.devtoolsUntil) > now;
 }
+
+// A convenience UI lock only, not server-side authorization.
+export function matchesDevToolsPassword(config, password) {
+  return config?.enabled !== false && typeof config?.password === 'string'
+    && config.password.length > 0 && typeof password === 'string' && password === config.password;
+}

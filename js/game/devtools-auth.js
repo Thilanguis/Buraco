@@ -1,41 +1,32 @@
-import { firebaseApp } from '../firebase.js';
-import { getAuth, browserSessionPersistence, setPersistence, signInWithCustomToken, signOut, getIdTokenResult } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
-import { createVersionTapGesture, validDevToolsClaims } from './devtools-access.js';
+import { db, doc, getDocFromServer } from '../firebase.js';
+import { createVersionTapGesture, validDevToolsClaims, matchesDevToolsPassword } from './devtools-access.js';
 
-const auth = getAuth(firebaseApp);
 const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-const ready = setPersistence(auth, browserSessionPersistence).then(() => auth.authStateReady());
-ready.catch(() => {}); // Network failures are reported by the access check/form.
 
 export async function hasDevToolsAccess() {
   if (sessionStorage.getItem('buraco_devtools_disabled') === '1') return false;
   if (local) return true;
   try {
-    await ready;
-    if (!auth.currentUser) return false;
-    const result = await getIdTokenResult(auth.currentUser);
-    const allowed = validDevToolsClaims(result.claims);
-    if (allowed) setTimeout(leaveDevTools, Math.min(3600000, Number(result.claims.devtoolsUntil) - Date.now()));
+    const session = JSON.parse(sessionStorage.getItem('buraco_devtools_session') || 'null');
+    const allowed = validDevToolsClaims(session);
+    if (allowed) setTimeout(leaveDevTools, Math.min(3600000, Number(session.devtoolsUntil) - Date.now()));
     return allowed;
   } catch { return false; }
 }
 
 export async function leaveDevTools() {
   sessionStorage.setItem('buraco_devtools_disabled', '1');
-  try { await ready; await signOut(auth); }
-  finally {
-    const url = new URL(location.href);
-    url.searchParams.delete('debug');
-    location.replace(url.href);
-  }
+  sessionStorage.removeItem('buraco_devtools_session');
+  const url = new URL(location.href);
+  url.searchParams.delete('debug');
+  location.replace(url.href);
 }
 
 export function installDevToolsAccessUI() {
   const version = document.createElement('button');
   version.id = 'appVersionButton';
   version.type = 'button';
-  version.textContent = 'v195';
+  version.textContent = 'v197';
   version.setAttribute('aria-label', 'Versão do aplicativo');
   version.style.cssText = 'position:fixed;bottom:4px;left:8px;z-index:100001;background:#0f172acc;color:#cbd5e1;border:0;border-radius:4px;padding:3px 6px;font-size:10px;touch-action:manipulation;';
   document.body.append(version);
@@ -71,20 +62,19 @@ export function installDevToolsAccessUI() {
     const password = input.value;
     input.value = '';
     try {
-      await ready;
-      const verify = httpsCallable(getFunctions(firebaseApp, 'us-central1'), 'unlockDevTools');
-      const response = await verify({ password });
-      await signInWithCustomToken(auth, response.data.token);
-      const result = await getIdTokenResult(auth.currentUser);
-      if (!validDevToolsClaims(result.claims)) throw new Error('invalid-claims');
+      const snapshot = await getDocFromServer(doc(db, 'appConfig', 'devtools'));
+      if (!snapshot.exists()) throw new Error('missing-config');
+      if (!matchesDevToolsPassword(snapshot.data(), password)) {
+        status.textContent = 'Senha incorreta ou acesso desativado.';
+        return;
+      }
+      sessionStorage.setItem('buraco_devtools_session', JSON.stringify({ devtools: true, devtoolsUntil: Date.now() + 3600000 }));
       sessionStorage.removeItem('buraco_devtools_disabled');
       location.reload();
     } catch (error) {
-      status.textContent = error.code === 'functions/resource-exhausted'
-        ? 'Muitas tentativas. Aguarde 15 minutos.'
-        : error.code === 'functions/permission-denied'
-          ? 'Senha incorreta.'
-          : 'Não foi possível validar o acesso. Verifique a conexão e a configuração da função no Firebase.';
+      status.textContent = error.message === 'missing-config'
+        ? 'A senha do DevTools ainda não foi configurada no banco.'
+        : 'Não foi possível consultar a senha no banco. Verifique a conexão e tente novamente.';
     } finally { busy = false; submit.disabled = false; }
   });
 }

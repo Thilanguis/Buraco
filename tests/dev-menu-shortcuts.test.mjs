@@ -49,7 +49,7 @@ test('exit DevTools is attached outside menu/game screens and removes debug URL 
   const authSource = readFileSync(new URL('../js/game/devtools-auth.js', import.meta.url), 'utf8');
   const leaveSource = authSource.slice(authSource.indexOf('export async function leaveDevTools()'), authSource.indexOf('export function installDevToolsAccessUI()')).replace('export ', '');
   const context = { isLocalDevelopment: false, URL, ready: Promise.resolve(), auth: {}, signOut: async () => {}, document: { createElement: () => button, body: { append: element => assert.equal(element, button) } },
-    sessionStorage: { setItem: (key, value) => { context.saved = [key, value]; } },
+    sessionStorage: { setItem: (key, value) => { context.saved = [key, value]; }, removeItem() {} },
     window: { location: { href: 'https://example.test/?game=test&debug=1', replace: url => { context.destination = url; } } } };
   context.location = context.window.location;
   vm.runInNewContext(leaveSource + source, context);
