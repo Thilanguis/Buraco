@@ -704,12 +704,17 @@ export class BuracoBot {
 
       const naturePriorities = engine.getNaturePriorities?.(me.id);
       const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
-      const markedCards = new Set(naturePriorities?.markedCardIds || []);
+      const dimitrescuPriorities = engine.getDimitrescuPriorities?.(me.id);
+      const markedCards = new Set([
+        ...(naturePriorities?.markedCardIds || []),
+        ...(dimitrescuPriorities?.markedCardIds || []),
+      ]);
       const markedMelds = new Set([
         ...(naturePriorities?.meldIndexes || []),
         ...(dominatrixPriorities?.meldIndexes || []),
+        ...(dimitrescuPriorities?.meldIndexes || []),
       ]);
-      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive;
+      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dimitrescuPriorities?.urgent;
       if (markedCards.size || markedMelds.size || priorityUrgent) {
         if (priorityUrgent) {
           (team.melds || []).forEach((meld, index) => {

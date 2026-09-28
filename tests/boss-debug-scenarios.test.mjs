@@ -36,12 +36,13 @@ function build(bossId = 'banker', abilityId = 'fixed_interest', overrides = {}) 
   });
 }
 
-test('catalogo do laboratorio nasce do registro oficial e cobre as 31 habilidades ativas', () => {
+test('catalogo do laboratorio nasce do registro oficial e cobre todas as habilidades ativas', () => {
   const definitions = listBossDefinitions();
   const catalog = getBossDebugCatalog();
+  const abilityCount = definitions.reduce((total, boss) => total + boss.abilities.length, 0);
   assert.deepEqual(catalog.map((boss) => boss.id), definitions.map((boss) => boss.id));
-  assert.equal(catalog.reduce((total, boss) => total + boss.abilities.length, 0), 31);
-  assert.equal(Object.keys(bossDebugScenarioRegistry).length, 31);
+  assert.equal(catalog.reduce((total, boss) => total + boss.abilities.length, 0), abilityCount);
+  assert.equal(Object.keys(bossDebugScenarioRegistry).length, abilityCount);
   for (const definition of definitions) {
     for (const ability of definition.abilities) {
       const scenario = bossDebugScenarioRegistry[`${definition.id}:${ability.id}`];
@@ -197,8 +198,9 @@ test('snapshot de reset e ciclo de Voltar preservam o estado sem timers ou carta
 
 test('varredura prepara todas as habilidades e denuncia qualquer lacuna', () => {
   const report = runBossDebugSweep();
-  assert.equal(report.total, 31);
-  assert.equal(report.passed, 31);
+  const abilityCount = listBossDefinitions().reduce((total, boss) => total + boss.abilities.length, 0);
+  assert.equal(report.total, abilityCount);
+  assert.equal(report.passed, abilityCount);
   assert.deepEqual(report.failed, []);
   assert.equal(report.results.every((entry) => entry.ok), true);
 });

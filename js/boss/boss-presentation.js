@@ -39,6 +39,19 @@ const DOMINATRIX_SPEECHES = Object.freeze({
   interdict: 'Este jogo evolui somente se eu permitir.',
 });
 
+const DIMITRESCU_SPEECHES = Object.freeze({
+  bela_hunt: 'Bela adora quando a presa tenta fugir.',
+  cassandra_feast: 'Cassandra escolheu onde vai servir o jantar.',
+  daniela_swarm: 'Daniela transformou o lixo em um enxame faminto.',
+  blood_tithe: 'Toda mão cheia me deve um tributo.',
+  red_wine: 'Um bom vinho melhora com sangue fresco.',
+  crimson_brand: 'Vou deixar a minha marca em cada uma de vocês.',
+  cassandra_dead_feast: 'Cassandra, prepare o banquete onde elas menos esperam.',
+  crimson_clot: 'Meu sangue sabe muito bem como fechar uma ferida.',
+  castle_lockdown: 'As portas estão trancadas. Ninguém sai para o lixo.',
+  three_daughters: 'Meninas, divirtam-se com nossos convidados.',
+});
+
 const MATRIARCH_SPEECHES = Object.freeze({
   living_seed: 'Uma semente basta para tomar toda a sua mao.',
   hungry_root: 'Alimentem as raizes, ou elas alimentarao a mim.',
@@ -85,13 +98,23 @@ const RESULT_CATEGORY_BY_ABILITY = Object.freeze({
   royal_bloom: 'Objetivos resolvidos',
   emerald_cocoon: 'Protecao encerrada',
   spring_crown: 'Efeito encerrado',
+  bela_hunt: 'Caçada resolvida',
+  cassandra_feast: 'Banquete resolvido',
+  daniela_swarm: 'Enxame resolvido',
+  blood_tithe: 'Tributo cobrado',
+  red_wine: 'Cura aplicada',
+  crimson_brand: 'Marcas resolvidas',
+  cassandra_dead_feast: 'Morto profanado',
+  crimson_clot: 'Proteção formada',
+  castle_lockdown: 'Restrição encerrada',
+  three_daughters: 'Caçada conjunta resolvida',
 });
 
 const PREPARED_CHOICE_ABILITIES = new Set(['break_will', 'final_order']);
-const ACTIVE_RESTRICTIONS = new Set(['credit_block', 'pledge', 'collar', 'exposure', 'hands_tied', 'double_collar', 'separation', 'absolute_control', 'interdict']);
-const ROUND_OBJECTIVES = new Set(['suit_audit', 'possession', 'iron_etiquette', 'credit_limit', 'discard_surcharge']);
+const ACTIVE_RESTRICTIONS = new Set(['credit_block', 'pledge', 'collar', 'exposure', 'hands_tied', 'double_collar', 'separation', 'absolute_control', 'interdict', 'castle_lockdown']);
+const ROUND_OBJECTIVES = new Set(['suit_audit', 'possession', 'iron_etiquette', 'credit_limit', 'discard_surcharge', 'bela_hunt', 'crimson_brand', 'cassandra_feast', 'daniela_swarm', 'blood_tithe', 'three_daughters']);
 const NATURE_OBJECTIVES = new Set(['living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft', 'discard_pollen', 'harvest', 'royal_bloom']);
-const ACTIVE_NATURE_EFFECTS = new Set(['emerald_cocoon', 'spring_crown']);
+const ACTIVE_NATURE_EFFECTS = new Set(['emerald_cocoon', 'spring_crown', 'cassandra_dead_feast', 'crimson_clot']);
 
 function actionCategory(intent) {
   if (intent.abilityId === 'maintenance_fee') return 'Tarifa ativa nesta rodada';
@@ -178,6 +201,36 @@ function royalBloomProgress(gameState, intent) {
     return `${marker} ${royalBloomObjectiveLabel(gameState, threat)}${result}`;
   });
   return [`${completed}/${threats.length} concluídos`, ...lines].join('\n');
+}
+
+function dimitrescuDaughterObjectiveLabel(gameState, objective) {
+  if (objective?.type === 'bela') return `Bela — ${playerName(gameState, objective.targetPlayerId)} usa ${cardLabelAnywhere(gameState, objective.cardId)}`;
+  if (objective?.type === 'cassandra') return `Cassandra — alimentar o Jogo ${Number(objective.meldIndex) + 1}`;
+  if (objective?.type === 'daniela') return `Daniela — não recolher ${cardLabelAnywhere(gameState, objective.discardCardId)} do lixo`;
+  return 'Objetivo das filhas';
+}
+
+function dimitrescuMultiObjectiveProgress(gameState, objectives = []) {
+  if (!objectives.length) return 'Objetivos sendo preparados';
+  const done = objectives.filter((objective) => objective.status === 'success').length;
+  const lines = objectives.map((objective) => {
+    const marker = objective.status === 'success' ? '☑' : objective.status === 'failed' ? '✕' : '☐';
+    const suffix = objective.status === 'success' ? ' · concluído' : objective.status === 'failed' ? ' · falhou' : '';
+    return `${marker} ${dimitrescuDaughterObjectiveLabel(gameState, objective)}${suffix}`;
+  });
+  return [`${done}/${objectives.length} concluídos`, ...lines].join('\n');
+}
+
+function crimsonBrandProgress(gameState, intent) {
+  const marks = intent?.payload?.marks || [];
+  if (!marks.length) return 'Marcas sendo preparadas';
+  const done = marks.filter((mark) => mark.status === 'success').length;
+  const lines = marks.map((mark) => {
+    const marker = mark.status === 'success' ? '☑' : mark.status === 'failed' ? '✕' : '☐';
+    const result = mark.status === 'success' ? ' · removida' : mark.status === 'failed' ? ' · sangrou' : '';
+    return `${marker} ${playerName(gameState, mark.playerId)} — usar ${cardLabelAnywhere(gameState, mark.cardId)}${result}`;
+  });
+  return [`${done}/${marks.length} marcas removidas`, ...lines].join('\n');
 }
 
 function compactNatureProgress(gameState, intent) {
@@ -457,6 +510,66 @@ function dominatrixDetails(gameState, intent) {
   }
 }
 
+function dimitrescuDetails(gameState, intent) {
+  const payload = intent.payload || {};
+  const target = playerName(gameState, payload.targetPlayerId);
+  const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
+  const objectiveLabel = (objective) => dimitrescuDaughterObjectiveLabel(gameState, objective);
+  switch (intent.abilityId) {
+    case 'bela_hunt':
+      return detailFields([
+        ['Filha', 'Bela'], ['Alvo', target], ['Carta', card], ['Prazo', 'fim do turno do alvo'],
+        ['Sucesso', 'Sede -3'], ['Falha', `Sede +${Number(intent.announcedPhase) === 3 ? 16 : 14}`],
+      ]);
+    case 'cassandra_feast':
+      return detailFields([
+        ['Filha', 'Cassandra'], ['Jogo', `#${Number(payload.meldIndex) + 1}`], ['Prazo', 'fim da rodada'],
+        ['Sucesso', 'Sede -4'], ['Falha', `Sede +${Number(intent.announcedPhase) === 3 ? 18 : 16}`],
+      ]);
+    case 'daniela_swarm':
+      return detailFields([
+        ['Filha', 'Daniela'], ['Carta contaminada', cardLabelAnywhere(gameState, payload.discardCardId)], ['Prazo', 'esta rodada'],
+        ['Evitar o lixo', 'Sede -3'], ['Recolher o lixo', `Sede +${Number(intent.announcedPhase) === 3 ? 15 : 12}`],
+      ]);
+    case 'blood_tithe':
+      return detailFields([
+        ['Prazo', 'fim da rodada'], ['0–7 cartas', 'sem efeito'],
+        ['8–10 cartas', `Sede +${Number(intent.announcedPhase) === 3 ? 6 : 4} por jogador`],
+        ['11+ cartas', `Sede +${Number(intent.announcedPhase) === 3 ? 10 : 8} por jogador`],
+      ]);
+    case 'red_wine':
+      return detailFields([
+        ['Requisito', 'Lady ferida e Sede 20+'], ['Cura', `${payload.healAmount || 0} HP`], ['Custo', `${payload.bloodCost || 15} de Sede`],
+      ]);
+    case 'crimson_brand':
+      return detailFields([
+        ...(payload.marks || []).map((mark, index) => [`Marca ${index + 1}`, `${playerName(gameState, mark.playerId)} — ${cardLabelAnywhere(gameState, mark.cardId)}`]),
+        ['Sucesso por marca', 'Sede -2'], ['Falha por marca', `Sede +${Number(intent.announcedPhase) === 3 ? 9 : 7}`],
+      ]);
+    case 'cassandra_dead_feast':
+      return detailFields([
+        ['Filha', 'Cassandra'], ['Alvo', `Morto ${Number(payload.deadIndex) + 1}`],
+        ['Ao tomar', `Sede +${payload.bloodAmount || 0} e cura ${payload.healAmount || 0} HP`],
+        ['Purificação', 'Canastra Real ou Ás-a-Ás: apenas +4 Sede, sem cura'],
+      ]);
+    case 'crimson_clot':
+      return detailFields([
+        ['Proteção', `${payload.amount || 0}`], ['Romper', 'Sede -6'], ['Sobreviver', 'metade da proteção restante vira cura'],
+      ]);
+    case 'castle_lockdown':
+      return detailFields([
+        ['Duração', 'rodada completa'], ['Restrição', 'ninguém pode pegar o lixo'], ['Compra permitida', 'somente do monte'],
+      ]);
+    case 'three_daughters':
+      return detailFields([
+        ...(payload.objectives || []).map((objective, index) => [`Objetivo ${index + 1}`, objectiveLabel(objective)]),
+        ['Cada sucesso', 'Sede -2'], ['Cada falha', 'Sede +8'],
+      ]);
+    default:
+      return detailFields([['Efeito', intent.description || 'habilidade ativa']]);
+  }
+}
+
 function matriarchDetails(gameState, intent) {
   const payload = intent.payload || {};
   const target = playerName(gameState, payload.targetPlayerId);
@@ -658,6 +771,41 @@ function compactAction(gameState, intent) {
         progress: '',
         consequence: 'Ao evoluir: obedecer cancela a tentativa; desobedecer conclui a evolução e aplica +1 Chicote',
       };
+    case 'bela_hunt': {
+      const completed = payload.used === true;
+      return { instruction: completed ? `✅ ${target} usou ${card}.` : `${target} precisa usar ${card} neste turno.`, progress: completed ? '✅ Bela perdeu a presa' : '🩸 Bela está caçando', consequence: completed ? 'Sede -3' : `Falha: Sede +${Number(intent.announcedPhase) === 3 ? 16 : 14}` };
+    }
+    case 'cassandra_feast':
+      return { instruction: `Alimente o Jogo ${Number(payload.meldIndex) + 1} nesta rodada.`, progress: payload.fed ? '✅ Cassandra ficou sem banquete' : '⬜ Jogo ainda não alimentado', consequence: payload.fed ? 'Sede -4' : `Falha: Sede +${Number(intent.announcedPhase) === 3 ? 18 : 16}` };
+    case 'daniela_swarm':
+      return { instruction: 'Não recolha o lixo contaminado nesta rodada.', progress: payload.triggered ? '❌ Daniela encontrou sangue' : '☣️ Lixo contaminado', consequence: payload.triggered ? 'Sede já aumentou' : `Evitar: Sede -3 · Recolher: +${Number(intent.announcedPhase) === 3 ? 15 : 12}` };
+    case 'blood_tithe':
+      return { instruction: 'Terminem a rodada com mãos leves.', progress: (gameState.players || []).map((player) => `${player.name}: ${player.hand?.length || 0}`).join(' · '), consequence: Number(intent.announcedPhase) === 3 ? '8–10: +6 · 11+: +10 por jogador' : '8–10: +4 · 11+: +8 por jogador' };
+    case 'red_wine':
+      return { instruction: `Lady Dimitrescu consome ${payload.bloodCost || 15} de Sede e recupera até ${payload.healAmount || 0} HP.`, progress: `Sede atual: ${gameState.boss?.danger || 0}/100`, consequence: 'A cura reduz a própria barra de Sede' };
+    case 'crimson_brand':
+      return { instruction: 'Cada cooperador precisa usar legalmente a própria carta marcada nesta rodada.', progress: crimsonBrandProgress(gameState, intent), consequence: `Cada sucesso: Sede -2 · Cada falha: Sede +${Number(intent.announcedPhase) === 3 ? 9 : 7}` };
+    case 'cassandra_dead_feast': {
+      const curse = gameState.boss?.bloodiedDead;
+      const active = curse?.status === 'active';
+      return {
+        instruction: `Cassandra profanou o Morto ${Number(payload.deadIndex) + 1}.`,
+        progress: active ? '🩸 MALDIÇÃO ATIVA NO MORTO' : 'A profanação foi preparada',
+        consequence: `Tomar: +${payload.bloodAmount || 0} Sede e cura ${payload.healAmount || 0} HP · Real/Ás-a-Ás purifica`,
+      };
+    }
+    case 'crimson_clot': {
+      const clot = gameState.boss?.crimsonClot;
+      const remaining = clot?.status === 'active' ? Math.max(0, Number(clot.remaining) || 0) : 0;
+      const maximum = Math.max(1, Number(clot?.max || payload.amount) || 1);
+      return { instruction: 'Rompa o Coágulo Carmesim antes do fim da rodada.', progress: clot?.status === 'active' ? `🩸 COÁGULO ${remaining}/${maximum}` : 'Coágulo preparado', consequence: 'Romper: Sede -6 · Sobreviver: 50% do restante vira cura' };
+    }
+    case 'castle_lockdown':
+      return { instruction: 'O lixo está trancado nesta rodada.', progress: '🔒 Portas do Castelo fechadas', consequence: 'Compre apenas do monte' };
+    case 'three_daughters': {
+      const objectives = payload.objectives || [];
+      return { instruction: 'Cumpra os três objetivos independentes das filhas.', progress: dimitrescuMultiObjectiveProgress(gameState, objectives), consequence: 'Cada sucesso: Sede -2 · Cada falha: Sede +8' };
+    }
     case 'living_seed':
       return { instruction: `${target} precisa usar ${card} no proximo turno.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor, sem cura' };
     case 'hungry_root':
@@ -1274,7 +1422,7 @@ export function buildBossActionPresentation(gameState) {
   const intent = gameState?.boss?.currentIntent;
   const flow = gameState?.boss?.bossFlow;
   const definition = getBossDefinition(gameState?.boss?.id);
-  const feminineBoss = ['dominadora', 'matriarca_esmeralda'].includes(definition?.id);
+  const feminineBoss = ['dominadora', 'matriarca_esmeralda', 'dimitrescu'].includes(definition?.id);
   if (flow?.stage === 'phase') {
     const phaseName = definition?.phaseNames?.[flow.phase] || '';
     return {
@@ -1453,6 +1601,7 @@ export function buildBossActionPresentation(gameState) {
       details = [`Custo: +${surcharge.amount || payload.amount} de Divida`, 'Gatilho: primeira retirada valida do lixo', 'O jogador pode desistir e comprar do monte', `Estado: ${surcharge.status === 'consumed' ? 'consumido' : 'ativo nesta rodada'}`];
     }
   } else if (gameState.boss.id === 'dominadora') details = dominatrixDetails(gameState, intent);
+  else if (gameState.boss.id === 'dimitrescu') details = dimitrescuDetails(gameState, intent);
   else details = matriarchDetails(gameState, intent);
 
   const compact = compactAction(gameState, intent);
@@ -1463,7 +1612,7 @@ export function buildBossActionPresentation(gameState) {
     speech:
       intent.abilityId === 'collar' && collarCards.length === 1
         ? 'Uma das suas opcoes agora me pertence.'
-        : (gameState.boss.id === 'banker' ? BANKER_SPEECHES : gameState.boss.id === 'dominadora' ? DOMINATRIX_SPEECHES : MATRIARCH_SPEECHES)[intent.abilityId] || intent.name,
+        : (gameState.boss.id === 'banker' ? BANKER_SPEECHES : gameState.boss.id === 'dominadora' ? DOMINATRIX_SPEECHES : gameState.boss.id === 'dimitrescu' ? DIMITRESCU_SPEECHES : MATRIARCH_SPEECHES)[intent.abilityId] || intent.name,
     description: intent.description || '',
     details,
     instruction: compact.instruction,
@@ -1506,7 +1655,7 @@ export function buildBossFinalPresentation(gameState) {
     reason: result?.detail || (playersWon ? 'O chefe foi derrotado.' : 'A equipe foi derrotada.'),
     speech: definition?.finalSpeeches?.[playersWon ? 'victory' : 'defeat'] || '',
     hp: `${Math.max(0, boss?.hp || 0)} / ${boss?.maxHp || 0}`,
-    dangerLabel: boss?.id === 'dominadora' ? 'Chicotes finais' : boss?.id === 'matriarca_esmeralda' ? 'Florescimento final' : 'Dívida final',
+    dangerLabel: boss?.id === 'dominadora' ? 'Chicotes finais' : boss?.id === 'matriarca_esmeralda' ? 'Florescimento final' : boss?.id === 'dimitrescu' ? 'Sede final' : 'Dívida final',
     danger: boss?.id === 'dominadora' ? chainSummary : `${Number(boss?.danger || 0)} / ${Number(boss?.maxDanger || 0)}`,
     totalDamage: Number(boss?.stats?.totalDamage || 0),
     canastras: Number(boss?.stats?.canastrasFormed || 0),

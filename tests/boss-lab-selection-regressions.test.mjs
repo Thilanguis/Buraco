@@ -24,7 +24,8 @@ test('all bosses preserve selected ability across phases and variants; fallback 
       count++;
     }
   }
-  assert.equal(count, 398);
+  const expected = catalog.reduce((total, boss) => total + boss.abilities.reduce((sum, ability) => sum + ability.phases.length * ability.variants.length, 0), 0);
+  assert.equal(count, expected);
 });
 
 test('all bosses reject stale scenario configuration', () => {

@@ -89,7 +89,7 @@ function harness(bossId, abilityId) {
   return { ctx, config, writes, elements, persisted: () => persisted };
 }
 
-test('all 31 preparations publish only the requested skill and retain the match identity on commit', async () => {
+test('all boss preparations publish only the requested skill and retain the match identity on commit', async () => {
   for (const boss of lab.getBossDebugCatalog()) for (const ability of boss.abilities) {
     const h = harness(boss.id, ability.id);
     assert.equal(await h.ctx.prepareBossLab(), true, h.elements.get('error')?.textContent);

@@ -32,10 +32,11 @@ const OBJECTIVE_ABILITIES = new Set([
   'royal_bloom',
   'emerald_cocoon',
   'spring_crown',
+  'crimson_brand',
 ]);
-const TARGETED_PLAYER_ABILITIES = new Set(['collar', 'forced_choice', 'exposure', 'favorite', 'absolute_control', 'break_will', 'harvest', 'living_seed']);
-const TARGETED_MELD_ABILITIES = new Set(['pledge', 'possession', 'hungry_root', 'twin_vines', 'graft', 'royal_bloom']);
-const NO_TARGET_ABILITIES = new Set(['pledge', 'collar', 'exposure', 'iron_etiquette', 'possession', 'living_seed', 'hungry_root', 'twin_vines', 'graft', 'discard_pollen', 'royal_bloom']);
+const TARGETED_PLAYER_ABILITIES = new Set(['collar', 'forced_choice', 'exposure', 'favorite', 'absolute_control', 'break_will', 'harvest', 'living_seed', 'bela_hunt']);
+const TARGETED_MELD_ABILITIES = new Set(['pledge', 'possession', 'hungry_root', 'twin_vines', 'graft', 'royal_bloom', 'cassandra_feast']);
+const NO_TARGET_ABILITIES = new Set(['pledge', 'collar', 'exposure', 'iron_etiquette', 'possession', 'living_seed', 'hungry_root', 'twin_vines', 'graft', 'discard_pollen', 'royal_bloom', 'bela_hunt', 'cassandra_feast', 'daniela_swarm', 'three_daughters', 'crimson_brand', 'cassandra_dead_feast']);
 
 const SPECIAL_VARIANTS = Object.freeze({
   fixed_interest: ['interactive', 'success', 'failure', 'reload', 'undo'],
@@ -45,6 +46,16 @@ const SPECIAL_VARIANTS = Object.freeze({
   forced_choice: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
   emerald_cocoon: ['interactive', 'success', 'failure', 'external_cancel', 'reload'],
   restorative_dew: ['interactive', 'success', 'failure', 'reload', 'undo'],
+  bela_hunt: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  cassandra_feast: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  daniela_swarm: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  blood_tithe: ['interactive', 'success', 'failure', 'reload', 'bot'],
+  red_wine: ['interactive', 'reload'],
+  crimson_brand: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  cassandra_dead_feast: ['interactive', 'reload'],
+  crimson_clot: ['interactive', 'reload'],
+  castle_lockdown: ['interactive', 'success', 'reload', 'bot'],
+  three_daughters: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
 });
 
 function variantsForAbility(abilityId) {
@@ -243,6 +254,15 @@ function configureAbilityState(state, abilityId) {
   }
   if (abilityId === 'emerald_cocoon') boss.emeraldCocoon = null;
   if (abilityId === 'forced_choice') boss.chainsByPlayer = { 0: 0, 1: 0 };
+  if (abilityId === 'red_wine') {
+    boss.hp = Math.max(1, boss.maxHp - 320);
+    boss.danger = Math.max(20, Number(boss.danger) || 0);
+  }
+  if (abilityId === 'crimson_clot') {
+    boss.danger = Math.max(30, Number(boss.danger) || 0);
+    boss.crimsonClot = null;
+  }
+  if (abilityId === 'cassandra_dead_feast') boss.bloodiedDead = null;
 }
 
 function moveCardsToStock(state, cards = []) {
@@ -250,11 +270,11 @@ function moveCardsToStock(state, cards = []) {
 }
 
 function configureNoTargetState(state, abilityId) {
-  if (TARGETED_MELD_ABILITIES.has(abilityId) || ['collar', 'exposure', 'living_seed', 'twin_vines', 'graft', 'royal_bloom'].includes(abilityId)) {
+  if (TARGETED_MELD_ABILITIES.has(abilityId) || ['collar', 'exposure', 'living_seed', 'twin_vines', 'graft', 'royal_bloom', 'bela_hunt', 'three_daughters', 'crimson_brand'].includes(abilityId)) {
     state.teams[0].melds.forEach((meld) => moveCardsToStock(state, meld));
     state.teams[0].melds = [];
   }
-  if (['collar', 'exposure', 'living_seed', 'royal_bloom'].includes(abilityId)) {
+  if (['collar', 'exposure', 'living_seed', 'royal_bloom', 'bela_hunt', 'three_daughters', 'crimson_brand'].includes(abilityId)) {
     state.players.forEach((player) => {
       const kept = player.hand.slice(0, 1);
       moveCardsToStock(state, player.hand.slice(1));
@@ -267,9 +287,12 @@ function configureNoTargetState(state, abilityId) {
       player.hand = [];
     });
   }
-  if (['discard_pollen', 'royal_bloom'].includes(abilityId)) {
+  if (['discard_pollen', 'royal_bloom', 'daniela_swarm', 'three_daughters'].includes(abilityId)) {
     moveCardsToStock(state, state.discard);
     state.discard = [];
+  }
+  if (abilityId === 'cassandra_dead_feast') {
+    (state.deadPiles || []).forEach((pile) => moveCardsToStock(state, pile.splice(0)));
   }
   if (['royal_bloom'].includes(abilityId)) {
     state.boss.natureThreats = [];
@@ -295,7 +318,7 @@ function scenarioExpected(state, abilityId, variant) {
     duplicateCardCount: 0,
     turnAdvanced: ['failure', 'bot'].includes(variant),
   };
-  if (variant === 'failure') expected.threatStatus = 'failed';
+  if (variant === 'failure' && state.boss?.id === 'matriarca_esmeralda') expected.threatStatus = 'failed';
   if (variant === 'external_cancel') expected.threatStatus = 'cancelled';
   if (variant === 'no_target') {
     expected.forcedAbilityRejected = abilityId;
@@ -597,6 +620,38 @@ function executeMinimalSuccess(state, preferredPlayerId = null) {
       action: 'final_order_choices_created',
       choiceTypes: choices.map((choice) => choice.type),
     };
+  }
+  if (intent.abilityId === 'three_daughters') {
+    const objectives = intent.payload?.objectives || [];
+    const moves = [];
+    const bela = objectives.find((objective) => objective.type === 'bela' && objective.status === 'active');
+    if (bela?.targetPlayerId != null && bela.cardId) {
+      const moved = addCardToLegalMeld(state, bela.targetPlayerId, bela.cardId);
+      if (moved) moves.push({ daughter: 'bela', ...moved });
+    }
+    const cassandra = objectives.find((objective) => objective.type === 'cassandra' && objective.status === 'active');
+    if (cassandra && Number.isInteger(cassandra.meldIndex)) {
+      for (const player of state.players || []) {
+        const moved = addCardToLegalMeld(state, player.id, null, cassandra.meldIndex);
+        if (moved) {
+          moves.push({ daughter: 'cassandra', ...moved });
+          break;
+        }
+      }
+    }
+    return { executed: moves.length > 0, action: 'three_daughters_objectives_fed', moves };
+  }
+  if (intent.abilityId === 'crimson_brand') {
+    const moves = [];
+    for (const mark of intent.payload?.marks || []) {
+      if (mark.status !== 'active' || mark.playerId == null || !mark.cardId) continue;
+      const moved = addCardToLegalMeld(state, mark.playerId, mark.cardId);
+      if (moved) moves.push(moved);
+    }
+    return { executed: moves.length > 0, action: 'crimson_brand_cards_played', moves };
+  }
+  if (['daniela_swarm', 'blood_tithe', 'castle_lockdown'].includes(intent.abilityId)) {
+    return { executed: true, action: `${intent.abilityId}_round_prepared` };
   }
   const payload = intent.payload || {};
   if (payload.cardId && payload.targetPlayerId != null) {

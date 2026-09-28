@@ -12,6 +12,7 @@ const modes = {
   boss_banker: 'O Banqueiro',
   boss_dominadora: 'A Dominadora',
   boss_matriarca: 'A Matriarca',
+  boss_dimitrescu: 'Lady Dimitrescu',
 };
 const categories = { players: 'Entre jogadores', all: 'Todas', bots: 'Contra bots', boss: 'Chefes', test: 'Testes' };
 const results = { win: 'Vitória', loss: 'Derrota', draw: 'Empate', unknown: 'Concluída' };

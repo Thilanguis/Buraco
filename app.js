@@ -33,6 +33,7 @@ import {
   getBossMeldContribution,
   getBossMeldNatureThreats,
   getBossDominatrixPriorities,
+  getBossDimitrescuPriorities,
   getBossNaturePriorities,
   getBossNatureThreatSummaries,
   getBossDiscardSurcharge,
@@ -466,6 +467,7 @@ function bossEventAddsResource(boss, event) {
   }
   if (boss.id === 'dominadora') return event.type === 'chainChange' && Number(event.amount) > 0;
   if (boss.id === 'matriarca_esmeralda') return event.type === 'bloomChange' && Number(event.amount) > 0;
+  if (boss.id === 'dimitrescu') return Number(event.dangerDelta) > 0 || (event.type === 'bloodChange' && Number(event.amount) > 0);
   return false;
 }
 
@@ -532,10 +534,11 @@ function syncBossResourceSounds(boss) {
     }
     if (bossEventAddsResource(boss, event)) {
       const pairedHeal = pairedHealByKey.get(matriarchNatureSoundPairKey(event, 'bloom'));
+      const resourceSfx = boss.id === 'dimitrescu' ? BOSS_SFX.dimitrescu?.blood : BOSS_SFX[boss.id]?.resource;
       if (pairedHeal) {
-        playBossSfxSequence(BOSS_SFX[boss.id]?.resource, BOSS_SFX.matriarca_esmeralda.heal);
+        playBossSfxSequence(resourceSfx, BOSS_SFX.matriarca_esmeralda.heal);
       } else {
-        playSfxClone(BOSS_SFX[boss.id]?.resource, { audioContext: audioCtx });
+        playSfxClone(resourceSfx, { audioContext: audioCtx });
       }
     }
     if (bossEventHealsMatriarch(boss, event) && !sequencedHealIds.has(event.actionId)) {
@@ -2968,7 +2971,7 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
     } else if (mode === '1x3') {
       tName = t === 0 ? 'Solo' : 'Trio';
     } else if (isBossMode(mode)) {
-      tName = t === 0 ? 'Cooperadores' : getBossDefinition(mode === BOSS_MODE_DOMINATRIX ? 'dominadora' : 'banker')?.name || 'Chefe';
+      tName = t === 0 ? 'Cooperadores' : getBossDefinitionForMode(mode)?.name || 'Chefe';
     }
 
     // O PIX AGORA PERTENCE AO TIME, NÃO AO JOGADOR!
@@ -4871,6 +4874,7 @@ const BOSS_GUIDE_CORE = Object.freeze({
   banker: 'A equipe acumula Dívida. Se chegar a 100, o Banqueiro vence imediatamente. Canastras Limpa, Real e Ás-a-Ás também reduzem a Dívida enquanto causam dano.',
   dominadora: 'Cada jogador acumula Chicotes. Com 3 fica Sob Controle; com 4 fica Dominado. Se os dois cooperadores chegarem a 4 ao mesmo tempo, a equipe perde.',
   matriarca_esmeralda: 'Falhas alimentam o Florescimento. Ao chegar a 5 Flores, a Matriarca vence. Evoluções de canastra podem remover Flores e, na Fase 3, ela pode usar Renascimento.',
+  dimitrescu: 'Lady Dimitrescu tem 2300 HP e acumula Sede de Sangue. Se chegar a 100, ela vence; mas a própria Lady também gasta Sede para se regenerar. Canastras Limpa, Real e Ás-a-Ás reduzem a Sede em 4, 8 e 12. Bela caça cartas, Cassandra toma jogos e o Morto, e Daniela contamina o lixo.',
 });
 
 const BOSS_GUIDE_OVERRIDES = Object.freeze({
@@ -4886,6 +4890,16 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   harvest: 'No fim do turno do alvo, o tamanho da mão define o resultado: até 7 cartas não há efeito; mãos maiores podem curar a Matriarca e, no pior caso, gerar Flor.',
   royal_bloom: 'Cria vários objetivos naturais independentes. Cada objetivo precisa ser resolvido separadamente; falhas alimentam o Florescimento.',
   spring_crown: 'Marca uma ameaça natural. Se ela falhar, a Coroa prepara uma Raiz Fortalecida, que exige cooperação para ser removida.',
+  bela_hunt: 'Bela marca uma carta jogável de um cooperador. Usá-la no turno indicado reduz a Sede; deixar a caça falhar alimenta Lady Dimitrescu.',
+  cassandra_feast: 'Cassandra marca um jogo da equipe. Ele precisa receber uma carta legal durante a rodada para evitar uma grande subida de Sede.',
+  daniela_swarm: 'Daniela contamina o lixo. Se alguém recolher a pilha, Lady ganha Sede imediatamente; se todos evitarem, a Sede recua.',
+  blood_tithe: 'No fim da rodada, cada mão grande paga um tributo de Sede. Quanto mais cartas sobraram, maior a cobrança.',
+  red_wine: 'Lady consome 15 de Sede para recuperar HP. A mesma barra que ameaça a equipe também funciona como combustível vampírico.',
+  crimson_brand: 'Lady marca uma carta de cada cooperador. Cada marca precisa ser usada legalmente na mesa; cumprir reduz a Sede, falhar alimenta a Lady.',
+  cassandra_dead_feast: 'Cassandra profana o próximo Morto. Tomá-lo alimenta e cura Lady; uma Canastra Real ou Ás-a-Ás antes do Morto enfraquece a maldição.',
+  crimson_clot: 'Lady coagula o próprio sangue em proteção temporária. Romper o Coágulo reduz a Sede; deixar proteção restante faz esse sangue voltar como cura.',
+  castle_lockdown: 'Durante a rodada inteira o lixo fica bloqueado. Os cooperadores só podem comprar do monte.',
+  three_daughters: 'Bela, Cassandra e Daniela impõem objetivos simultâneos. Cada sucesso reduz a Sede em 2; cada falha aumenta em 8.',
 });
 
 function bossAbilityGuideDescription(definition, ability, phase) {
@@ -4954,6 +4968,78 @@ function renderBossAbilityGuide(definition, boss) {
   });
 
   root.appendChild(grid);
+}
+
+function renderBossDaughterStrip(definition, boss) {
+  const strip = document.getElementById('bossDaughterStrip');
+  if (!strip) return;
+  if (definition?.id !== 'dimitrescu') {
+    strip.hidden = true;
+    strip.replaceChildren();
+    strip.dataset.signature = '';
+    return;
+  }
+
+  const resultEvent = boss.bossFlow?.stage === 'result' && boss.bossFlow?.eventActionId
+    ? boss.eventLog?.find((entry) => entry.actionId === boss.bossFlow.eventActionId) || null
+    : null;
+  const abilityId = boss.currentIntent?.abilityId || resultEvent?.abilityId || '';
+  const daughterIds = new Set(definition.abilityDaughters?.[abilityId] || []);
+  if (resultEvent?.daughter === 'all') ['bela', 'cassandra', 'daniela'].forEach((id) => daughterIds.add(id));
+  else if (resultEvent?.daughter) daughterIds.add(resultEvent.daughter);
+  if (boss.bloodiedDead?.status === 'active') daughterIds.add('cassandra');
+
+  const statusFor = (daughterId) => {
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'three_daughters') {
+      const objective = intent.payload?.objectives?.find((entry) => entry.type === daughterId);
+      if (objective) return objective.status || 'active';
+    }
+    if (intent && definition.abilityDaughters?.[intent.abilityId]?.includes(daughterId)) return 'active';
+    if (daughterId === 'cassandra' && boss.bloodiedDead?.status === 'active') return 'active';
+    if (resultEvent?.abilityId === 'three_daughters') {
+      return resultEvent.objectives?.find((entry) => entry.type === daughterId)?.status || 'active';
+    }
+    if (resultEvent?.type === 'bloodiedDead' && daughterId === 'cassandra') return resultEvent.purified ? 'success' : 'failed';
+    if (resultEvent?.daughter === daughterId) return resultEvent.success === false ? 'failed' : resultEvent.success === true ? 'success' : 'active';
+    return 'active';
+  };
+
+  const daughterList = [...daughterIds];
+  const signature = `${abilityId}:${daughterList.map((id) => `${id}:${statusFor(id)}`).join(',')}:${boss.bloodiedDead?.status || ''}`;
+  if (strip.dataset.signature === signature) {
+    strip.hidden = daughterList.length === 0;
+    return;
+  }
+  strip.dataset.signature = signature;
+  strip.replaceChildren();
+  if (!daughterList.length) {
+    strip.hidden = true;
+    return;
+  }
+
+  const stateLabels = { active: 'ATIVA', success: 'CONCLUÍDA', failed: 'FALHOU', consumed: 'CONCLUÍDA' };
+  daughterList.forEach((daughterId) => {
+    const daughter = definition.daughters?.[daughterId];
+    if (!daughter) return;
+    const status = statusFor(daughterId);
+    const card = document.createElement('span');
+    card.className = `boss-daughter-card is-${status}`;
+    card.dataset.daughter = daughterId;
+    card.dataset.status = status;
+    card.title = daughter.name;
+    const image = document.createElement('img');
+    image.src = daughter.portrait;
+    image.alt = '';
+    const name = document.createElement('b');
+    name.textContent = daughter.name;
+    const stateBadge = document.createElement('small');
+    stateBadge.className = 'boss-daughter-state';
+    stateBadge.textContent = stateLabels[status] || 'ATIVA';
+    card.append(image, name, stateBadge);
+    strip.appendChild(card);
+  });
+  strip.hidden = strip.childElementCount === 0;
 }
 
 function bossFlowHostIndex() {
@@ -5308,6 +5394,7 @@ function renderBossHud() {
   const definition = getBossDefinition(boss.id);
   const isDominatrix = boss.id === 'dominadora';
   const isMatriarch = boss.id === 'matriarca_esmeralda';
+  const isDimitrescu = boss.id === 'dimitrescu';
   document.body.dataset.bossId = boss.id;
   const flow = boss.bossFlow;
   const resolvingEvent = flow?.stage === 'result' ? boss.eventLog?.find((entry) => entry.actionId === flow.eventActionId) || null : null;
@@ -5315,19 +5402,27 @@ function renderBossHud() {
   hud.classList.remove('boss-resolving');
   hud.classList.toggle('boss-turn-active', isBossTurnActive(state));
   const cocoonActive = isMatriarch && boss.emeraldCocoon?.status === 'active';
+  const bloodClotActive = isDimitrescu && boss.crimsonClot?.status === 'active';
   const cocoonMaximum = 180;
   const cocoonRemaining = cocoonActive ? Math.max(0, Number(boss.emeraldCocoon.remaining) || 0) : 0;
+  const bloodClotMaximum = bloodClotActive ? Math.max(1, Number(boss.crimsonClot.max) || 1) : 0;
+  const bloodClotRemaining = bloodClotActive ? Math.max(0, Number(boss.crimsonClot.remaining) || 0) : 0;
   hud.classList.toggle('boss-cocoon-active', cocoonActive);
+  hud.classList.toggle('boss-blood-clot-active', bloodClotActive);
   hud.dataset.cocoonStage = cocoonActive ? (cocoonRemaining <= 60 ? 'critical' : cocoonRemaining <= 120 ? 'cracked' : 'full') : '';
+  hud.dataset.bloodClotStage = bloodClotActive ? (bloodClotRemaining <= bloodClotMaximum * 0.33 ? 'critical' : bloodClotRemaining <= bloodClotMaximum * 0.66 ? 'cracked' : 'full') : '';
   const cocoonStrength = cocoonActive ? cocoonRemaining / cocoonMaximum : 0;
+  const clotStrength = bloodClotActive ? bloodClotRemaining / bloodClotMaximum : 0;
   hud.style.setProperty('--boss-cocoon-strength', String(cocoonStrength));
   hud.style.setProperty('--boss-cocoon-opacity', String(0.5 + cocoonStrength * 0.35));
   hud.style.setProperty('--boss-cocoon-detail-opacity', String(0.42 + cocoonStrength * 0.4));
+  hud.style.setProperty('--boss-blood-clot-strength', String(clotStrength));
   const springCrownBuffed = isMatriarch && ['root_prepared', 'root_active'].includes(boss.springCrown?.status);
   hud.classList.toggle('boss-spring-crown-buffed', springCrownBuffed);
   hud.dataset.springCrownStage = springCrownBuffed ? boss.springCrown.status : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
   setBossPortrait(document.getElementById('bossPortraitImage'), definition);
+  renderBossDaughterStrip(definition, boss);
   renderBossAbilityGuide(definition, boss);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
   const phaseRules = {
@@ -5340,10 +5435,17 @@ function renderBossHud() {
   document.getElementById('bossHpBar').style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
   const cocoonMeter = document.getElementById('bossCocoonMeter');
   const cocoonText = document.getElementById('bossCocoonText');
+  const wardLabel = document.getElementById('bossWardLabel');
   if (cocoonMeter && cocoonText) {
-    cocoonMeter.hidden = !cocoonActive;
-    cocoonText.textContent = `${cocoonRemaining} / ${cocoonMaximum}`;
-    cocoonMeter.setAttribute('aria-label', cocoonActive ? `Casulo Esmeralda: ${cocoonRemaining} de ${cocoonMaximum} de protecao restante` : 'Casulo Esmeralda inativo');
+    const wardActive = cocoonActive || bloodClotActive;
+    cocoonMeter.hidden = !wardActive;
+    if (wardLabel) wardLabel.textContent = bloodClotActive ? 'COÁGULO' : 'CASULO';
+    cocoonText.textContent = bloodClotActive ? `${bloodClotRemaining} / ${bloodClotMaximum}` : `${cocoonRemaining} / ${cocoonMaximum}`;
+    cocoonMeter.setAttribute('aria-label', bloodClotActive
+      ? `Coágulo Carmesim: ${bloodClotRemaining} de ${bloodClotMaximum} de proteção restante`
+      : cocoonActive
+        ? `Casulo Esmeralda: ${cocoonRemaining} de ${cocoonMaximum} de protecao restante`
+        : 'Proteção do chefe inativa');
   }
   const dangerMeter = document.getElementById('bossDangerMeter');
   const chainStatus = document.getElementById('bossChainStatus');
@@ -5351,6 +5453,7 @@ function renderBossHud() {
   dangerMeter.style.display = isDominatrix ? 'none' : 'block';
   chainStatus.style.display = isDominatrix ? 'grid' : 'none';
   dangerMeter.classList.toggle('boss-bloom-meter', isMatriarch);
+  dangerMeter.classList.toggle('boss-blood-meter', isDimitrescu);
   bloomFlowers.style.display = isMatriarch ? 'flex' : 'none';
   if (isDominatrix) {
     chainStatus.innerHTML = state.players
@@ -5368,7 +5471,7 @@ function renderBossHud() {
       })
       .join('');
   } else {
-    document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : 'DÍVIDA COLETIVA';
+    document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : 'DÍVIDA COLETIVA';
     document.getElementById('bossDebtText').textContent = `${boss.danger} / ${boss.maxDanger}`;
     document.getElementById('bossDebtBar').style.width = `${Math.max(0, (boss.danger / boss.maxDanger) * 100)}%`;
     const bloomEventChanged = isMatriarch && boss.lastBloomEventId && boss.lastBloomEventId !== lastRenderedBossBloomEventId;
@@ -5728,6 +5831,7 @@ function renderBossHud() {
     if (entry.type === 'bloomChange') return { icon: '🌸', title: entry.origin || 'Florescimento', detail: `${entry.amount > 0 ? '+' : ''}${entry.amount} Flor${Math.abs(entry.amount) === 1 ? '' : 'es'}` };
     if (entry.type === 'natureThreat') return { icon: '🌿', title: `${definition?.name || 'Matriarca'} — ${entry.name || 'Ameaça natural'}`, detail: entry.outcome || 'A ameaça foi plantada na mesa.' };
     if (entry.type === 'rebirth') return { icon: '✨', title: 'Renascimento Esmeralda', detail: entry.outcome || 'A Matriarca retornou com 300 HP.' };
+    if (entry.type === 'bloodChange') return { icon: '🩸', title: entry.origin || 'Sede de Sangue', detail: entry.outcome || entry.dangerChangeLabel || `Sede ${entry.amount > 0 ? '+' : ''}${entry.amount}` };
     if (entry.type === 'playerTurn') return { icon: '👥', title: `${entry.playerName} concluiu o turno`, detail: `${entry.cardsInHand} carta(s) na mão` };
     if (entry.type === 'finalStrike') return { icon: '⚔️', title: 'Ataque final', detail: `${entry.damage} de dano` };
     return { icon: '📋', title: 'Evento da batalha', detail: entry.outcome || entry.reason || 'Estado atualizado' };
@@ -5777,7 +5881,13 @@ function renderBossHud() {
     const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
     const pollenActive = (boss.natureThreats || []).some((threat) => threat.status === 'active' && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId));
     discardButton.classList.toggle('boss-pollen-discard', pollenActive);
+    const dimitrescuIntent = boss.id === 'dimitrescu' ? boss.currentIntent : null;
+    const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
+    const danielaActive = dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered
+      || danielaObjective?.status === 'active';
+    discardButton.classList.toggle('boss-daniela-discard', !!danielaActive);
     if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
+    else if (danielaActive) discardButton.setAttribute('aria-label', 'Lixo cercado pelo Enxame de Daniela');
     else discardButton.removeAttribute('aria-label');
     discardButton.classList.toggle('boss-surcharge-discard', boss.id === 'banker' && boss.discardSurcharge?.status === 'active');
   }
@@ -5826,40 +5936,50 @@ function renderBossHud() {
       const isChain = feedback.type === 'chainChange' && feedback.amount;
       const isDebt = feedback.dangerChangeLabel && (feedback.type === 'bossAbility' || feedback.type === 'bossDamage' || feedback.type === 'debtReduction');
       const isHeal = feedback.type === 'bossHeal' && feedback.amount;
+      const isDimitrescuHeal = boss.id === 'dimitrescu' && feedback.type === 'bossAbility' && feedback.abilityId === 'red_wine' && Number(feedback.healAmount) > 0;
       const isBloom = feedback.type === 'bloomChange' && feedback.amount;
+      const isBlood = boss.id === 'dimitrescu' && feedback.dangerChangeLabel && ['bossAbility', 'bossDamage', 'bloodChange'].includes(feedback.type);
       const isRebirth = feedback.type === 'rebirth';
-      const isCocoonAbsorb = feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
-      const isCocoonBreak = feedback.type === 'bossDamage' && feedback.cocoonBroken;
+      const isCocoonAbsorb = boss.id === 'matriarca_esmeralda' && feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
+      const isCocoonBreak = boss.id === 'matriarca_esmeralda' && feedback.type === 'bossDamage' && feedback.cocoonBroken;
+      const isBloodClotAbsorb = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
+      const isBloodClotBreak = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && feedback.bloodClotBroken;
       const isNatureCreated = feedback.type === 'bossAbility' && Array.isArray(feedback.threatIds) && feedback.threatIds.length > 0;
-      if (isCocoonAbsorb) {
+      if (isCocoonAbsorb || isBloodClotAbsorb) {
         const portrait = document.querySelector('#bossHud .boss-portrait');
         if (portrait) {
-          const pulseClass = isCocoonBreak ? 'boss-cocoon-breaking' : 'boss-cocoon-impact';
-          portrait.classList.remove('boss-cocoon-impact', 'boss-cocoon-breaking');
+          const pulseClass = isBloodClotBreak ? 'boss-blood-clot-breaking' : isBloodClotAbsorb ? 'boss-blood-clot-impact' : isCocoonBreak ? 'boss-cocoon-breaking' : 'boss-cocoon-impact';
+          portrait.classList.remove('boss-cocoon-impact', 'boss-cocoon-breaking', 'boss-blood-clot-impact', 'boss-blood-clot-breaking');
           void portrait.offsetWidth;
           portrait.classList.add(pulseClass);
-          setTimeout(() => portrait.classList.remove(pulseClass), isCocoonBreak ? 820 : 620);
+          setTimeout(() => portrait.classList.remove(pulseClass), isCocoonBreak || isBloodClotBreak ? 820 : 620);
         }
       }
-      if (!isChain && !isDebt && !isHeal && !isBloom && !isRebirth && !isCocoonAbsorb && !isCocoonBreak && !isNatureCreated) return;
+      if (!isChain && !isDebt && !isHeal && !isDimitrescuHeal && !isBloom && !isBlood && !isRebirth && !isCocoonAbsorb && !isCocoonBreak && !isBloodClotAbsorb && !isBloodClotBreak && !isNatureCreated) return;
       const floating = document.createElement('div');
       const visualClass = isChain
         ? feedback.amount > 0
           ? 'chain-up'
           : 'chain-down'
-        : isHeal
+        : isHeal || isDimitrescuHeal
           ? 'nature-heal-up'
           : isBloom
             ? feedback.amount > 0
               ? 'bloom-up'
               : 'bloom-down'
-            : isRebirth
+            : isBlood
+              ? Number(feedback.dangerDelta ?? feedback.amount) > 0 ? 'blood-up' : 'blood-down'
+              : isRebirth
               ? 'nature-rebirth'
-              : isCocoonBreak
-                ? 'nature-cocoon-break'
-                : isCocoonAbsorb
-                  ? 'nature-cocoon-absorb'
-                  : isNatureCreated
+              : isBloodClotBreak
+                ? 'blood-clot-break'
+                : isBloodClotAbsorb
+                  ? 'blood-clot-absorb'
+                  : isCocoonBreak
+                    ? 'nature-cocoon-break'
+                    : isCocoonAbsorb
+                      ? 'nature-cocoon-absorb'
+                      : isNatureCreated
                     ? 'nature-threat-created'
                     : feedback.dangerDelta > 0
                       ? 'debt-up'
@@ -5869,23 +5989,29 @@ function renderBossHud() {
         ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Chicote`
         : isHeal
           ? `HP +${feedback.amount}`
+          : isDimitrescuHeal
+            ? `HP +${feedback.healAmount}`
           : isBloom
             ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Flor${Math.abs(feedback.amount) === 1 ? '' : 'es'}`
             : isRebirth
               ? 'RENASCIMENTO +300 HP'
-              : isCocoonBreak
-                ? `CASULO ROMPIDO · ${feedback.absorbedDamage || 0} ABSORVIDO`
-                : isCocoonAbsorb
-                  ? `CASULO ABSORVEU ${feedback.absorbedDamage}`
-                  : isNatureCreated
+              : isBloodClotBreak
+                ? `COÁGULO ROMPIDO · SEDE -6`
+                : isBloodClotAbsorb
+                  ? `COÁGULO ABSORVEU ${feedback.absorbedDamage}`
+                  : isCocoonBreak
+                    ? `CASULO ROMPIDO · ${feedback.absorbedDamage || 0} ABSORVIDO`
+                    : isCocoonAbsorb
+                      ? `CASULO ABSORVEU ${feedback.absorbedDamage}`
+                      : isNatureCreated
                     ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA'
                     : feedback.dangerChangeLabel;
       const chainPlayer = isChain ? [...document.querySelectorAll('#bossChainStatus .boss-chain-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId)) : null;
       const anchor = isChain
         ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
-        : isHeal || isRebirth
+        : isHeal || isDimitrescuHeal || isRebirth
           ? document.getElementById('bossHpBar')?.parentElement?.getBoundingClientRect()
-          : isCocoonBreak || isCocoonAbsorb
+          : isCocoonBreak || isCocoonAbsorb || isBloodClotBreak || isBloodClotAbsorb
             ? document.querySelector('.boss-portrait')?.getBoundingClientRect()
             : isNatureCreated
               ? document.getElementById('bossIntentName')?.parentElement?.getBoundingClientRect()
@@ -5908,7 +6034,7 @@ function renderBossResult() {
   }
   const boss = normalizeBossState(state);
   const presentation = buildBossFinalPresentation(state);
-  const specialDefeatReasons = new Set(['max_debt', 'both_players_dominated', 'max_bloom']);
+  const specialDefeatReasons = new Set(['max_debt', 'both_players_dominated', 'max_bloom', 'max_blood']);
   const bossVictoryKey = `${gameId}:${boss.id}:${boss.seed || 0}:${boss.result.reason || ''}`;
   const persistedVictoryKey = sessionStorage.getItem('buraco_boss_victory_sound');
   if (!boss.result.victory && bossVictoryKey !== lastBossVictorySoundKey && bossVictoryKey !== persistedVictoryKey) {
@@ -6176,7 +6302,19 @@ function renderAll() {
   const discardTop = state.discard[discardCount - 1];
   const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
   const pollenThreat = state.boss?.id === 'matriarca_esmeralda' ? (state.boss.natureThreats || []).find((threat) => threat.status === 'active' && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId)) : null;
+  const dimitrescuIntent = state.boss?.id === 'dimitrescu' ? state.boss.currentIntent : null;
+  const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters'
+    ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela')
+    : null;
+  const danielaCardId = dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered
+    ? dimitrescuIntent.payload?.discardCardId
+    : danielaObjective?.status === 'active'
+      ? danielaObjective.discardCardId
+      : null;
+  const danielaInDiscard = !!danielaCardId && discardCardIds.has(danielaCardId);
+  const danielaOnTop = danielaInDiscard && discardTop?.id === danielaCardId;
   document.getElementById('drawDiscardBtn')?.classList.toggle('boss-pollen-discard', !!pollenThreat);
+  document.getElementById('drawDiscardBtn')?.classList.toggle('boss-daniela-discard', danielaInDiscard);
   document.getElementById('drawDiscardBtn')?.classList.toggle('boss-surcharge-discard', state.boss?.id === 'banker' && state.boss.discardSurcharge?.status === 'active');
   if (!discardTop) {
     discardFace.style.display = 'none';
@@ -6193,10 +6331,15 @@ function renderAll() {
     discardFace.style.right = `${topIndex * 0.3}px`;
     discardFace.style.zIndex = 20;
 
-    const discardMarkup = cardFrontHTML(discardTop) + (pollenThreat ? '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>' : '');
+    const discardBossStatus = pollenThreat
+      ? '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>'
+      : danielaOnTop
+        ? '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-daniela" aria-hidden="true"><i>🩸</i><b>DANIELA</b></span>'
+        : '';
+    const discardMarkup = cardFrontHTML(discardTop) + discardBossStatus;
     if (discardFace._faceMarkup !== discardMarkup) discardFace.innerHTML = discardMarkup;
     discardFace._faceMarkup = discardMarkup;
-    discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}`;
+    discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}${danielaOnTop ? ' boss-discard-dimitrescu-card' : ''}`;
     discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
   }
 
@@ -6212,6 +6355,11 @@ function renderAll() {
 
     s0.classList.toggle('used', m0.length === 0);
     s1.classList.toggle('used', m1.length === 0);
+    const bloodiedDead = state.boss?.id === 'dimitrescu' && state.boss.bloodiedDead?.status === 'active' ? state.boss.bloodiedDead : null;
+    s0.classList.toggle('boss-dimitrescu-dead', bloodiedDead?.deadIndex === 0 && m0.length > 0);
+    s1.classList.toggle('boss-dimitrescu-dead', bloodiedDead?.deadIndex === 1 && m1.length > 0);
+    s0.title = bloodiedDead?.deadIndex === 0 && m0.length > 0 ? 'Morto 1 · BANQUETE DOS MORTOS' : 'Morto Time 1';
+    s1.title = bloodiedDead?.deadIndex === 1 && m1.length > 0 ? 'Morto 2 · BANQUETE DOS MORTOS' : 'Morto Time 2';
 
     updatePile3D(s0, 'morto-card-back', m0.length, m0.length ? m0[m0.length - 1].back : 'red', false);
     updatePile3D(s1, 'morto-card-back', m1.length, m1.length ? m1[m1.length - 1].back : 'blue', false);
@@ -6548,6 +6696,14 @@ function renderHand() {
       div.classList.add('boss-card-nature-pollen');
       div.title = bossDiscardFeedback?.message || 'Pólen da Matriarca: use esta carta neste turno';
     }
+    if (bossCardEffect === 'dimitrescu-hunt') {
+      div.classList.add('boss-card-dimitrescu-hunt');
+      div.title = 'Caçada de Bela: use esta carta antes do fim do turno';
+    }
+    if (bossCardEffect === 'dimitrescu-blood-mark') {
+      div.classList.add('boss-card-dimitrescu-blood-mark');
+      div.title = 'Marca Carmesim: use esta carta legalmente antes do fim da rodada';
+    }
     const swapHighlight = bossSwapReceivedHighlights.get(card.id);
     if (swapHighlight && swapHighlight.expiresAt > Date.now()) div.classList.add('boss-swap-received');
     if (bossDiscardFeedback) div.setAttribute('aria-label', `${card.rank}${card.suit}. ${bossDiscardFeedback.message}`);
@@ -6569,6 +6725,10 @@ function renderHand() {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-seed" aria-hidden="true"><i>&#10047;</i><b>SEMENTE</b></span>');
     } else if (bossCardEffect === 'nature-pollen') {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>POLEN</b></span>');
+    } else if (bossCardEffect === 'dimitrescu-hunt') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-blood-hunt" aria-hidden="true"><i>🩸</i><b>BELA</b></span>');
+    } else if (bossCardEffect === 'dimitrescu-blood-mark') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-crimson-brand" aria-hidden="true"><i>🩸</i><b>MARCA</b></span>');
     }
     if (swapHighlight && swapHighlight.expiresAt > Date.now()) {
       const sender = state.players.find((player) => player.id === swapHighlight.fromPlayerId);
@@ -7030,6 +7190,15 @@ function renderMelds() {
       const graftThreat = natureThreats.find((threat) => threat.type === 'graft');
       div.classList.toggle('rooted-by-matriarch', !!rootThreat);
       div.classList.toggle('grafted-by-matriarch', !!graftThreat);
+      const dimitrescuIntent = state.boss?.id === 'dimitrescu' ? state.boss.currentIntent : null;
+      const cassandraObjective = dimitrescuIntent?.abilityId === 'three_daughters'
+        ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'cassandra')
+        : null;
+      const stableMeldId = state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`];
+      const cassandraMarked = dimitrescuIntent?.abilityId === 'cassandra_feast'
+        ? !dimitrescuIntent.payload?.fed && (dimitrescuIntent.payload?.meldId ? dimitrescuIntent.payload.meldId === stableMeldId : dimitrescuIntent.payload?.meldIndex === midx)
+        : cassandraObjective?.status === 'active' && (cassandraObjective.meldId ? cassandraObjective.meldId === stableMeldId : cassandraObjective.meldIndex === midx);
+      div.classList.toggle('feasted-by-cassandra', !!cassandraMarked);
       if (graftThreat) {
         const graftSideIndex = (graftThreat.meldIds || []).indexOf(graftThreat.matchedMeldId);
         div.dataset.graftId = graftThreat.id;
@@ -7136,6 +7305,9 @@ function renderMelds() {
       }
       if (state.boss?.id === 'matriarca_esmeralda' && contribution?.matriarchBloomRemoved > 0) {
         contributionChips.push(contributionChip('bloom', contribution.matriarchBloomRemoved, '&#127800;', 'Florescimentos removidos por este jogo'));
+      }
+      if (state.boss?.id === 'dimitrescu' && contribution?.dimitrescuBloodRelief > 0) {
+        contributionChips.push(contributionChip('blood', contribution.dimitrescuBloodRelief, '&#129656;', 'Sede de Sangue reduzida por este jogo'));
       }
       const natureLabels = [];
       if (activeInterdict) {
@@ -8254,6 +8426,7 @@ const botEngine = {
   hasPendingBossChoice: () => hasPendingBossChoices(state),
   getNaturePriorities: (playerId) => getBossNaturePriorities(state, playerId),
   getDominatrixPriorities: (playerId) => getBossDominatrixPriorities(state, playerId),
+  getDimitrescuPriorities: (playerId) => getBossDimitrescuPriorities(state, playerId),
   shouldTakeBossDiscard: (playerId, intent, naturePlan) => shouldBossBotTakeDiscard(state, playerId, { intent, naturePlan }),
   async executeDominationPowers(botIndex) {
     await executeBotDominationPowers(this, botIndex);
@@ -9704,7 +9877,8 @@ window.updateMenuDynamic = function () {
   if (isBossMode(mode)) {
     const isDominatrixMenu = mode === BOSS_MODE_DOMINATRIX;
     const cooperativeColor = bossDefinition?.accent || (isDominatrixMenu ? '#ec4899' : '#22c55e');
-    const cooperativeStyle = `position: relative; border-left: 4px solid ${cooperativeColor}; background: rgba(${isDominatrixMenu ? '236, 72, 153' : '34, 197, 94'}, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;`;
+    const cooperativeRgb = bossDefinition?.id === 'dimitrescu' ? '185, 28, 28' : isDominatrixMenu ? '236, 72, 153' : '34, 197, 94';
+    const cooperativeStyle = `position: relative; border-left: 4px solid ${cooperativeColor}; background: rgba(${cooperativeRgb}, 0.08); padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; display: block;`;
     p1.style.cssText = cooperativeStyle;
     p2.style.cssText = cooperativeStyle;
     p3.style.cssText = styleNone;

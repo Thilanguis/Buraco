@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v215';
+const CACHE_NAME = 'buraco-v218';
 const ASSETS = [
   './js/history-totals.js',
   './js/history-comparison.js',
@@ -56,6 +56,7 @@ const ASSETS = [
   './js/boss/bosses/banker.js',
   './js/boss/bosses/dominatrix.js',
   './js/boss/bosses/matriarch.js',
+  './js/boss/bosses/dimitrescu.js',
   './styles/base-menu.css',
   './styles/game.css',
   './styles/table-themes.css',
@@ -68,6 +69,11 @@ const ASSETS = [
   './assets/images/boss-banqueiro.png',
   './assets/images/boss-dominadora.png',
   './assets/images/boss-elfa.png',
+  './assets/images/boss-dimitrescu.png',
+  './assets/images/boss-dimitrescu-bela.png',
+  './assets/images/boss-dimitrescu-cassandra.png',
+  './assets/images/boss-dimitrescu-daniela.png',
+  './assets/sfx/ganho-sangue-dimitresco.mp3',
   './manifest.json',
   './manifest.webmanifest',
   './icon-192.png',

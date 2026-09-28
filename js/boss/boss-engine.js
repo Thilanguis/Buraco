@@ -17,6 +17,7 @@ const BOSS_RANKS_LOW = Object.freeze(['A', '2', '3', '4', '5', '6', '7', '8', '9
 export const BOSS_MODE_BANKER = 'boss_banker';
 export const BOSS_MODE_DOMINATRIX = 'boss_dominadora';
 export const BOSS_MODE_MATRIARCH = 'boss_matriarca';
+export const BOSS_MODE_DIMITRESCU = 'boss_dimitrescu';
 
 export function isBossMode(stateOrMode) {
   const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
@@ -31,6 +32,11 @@ export function isDominatrixMode(stateOrMode) {
 export function isMatriarchMode(stateOrMode) {
   const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
   return mode === BOSS_MODE_MATRIARCH;
+}
+
+export function isDimitrescuMode(stateOrMode) {
+  const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
+  return mode === BOSS_MODE_DIMITRESCU;
 }
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -428,6 +434,7 @@ function ensureBossMeldContribution(boss, meldId) {
     dominatrixResistanceTier: 0,
     matriarchBloomRemoved: 0,
     matriarchBloomTier: 0,
+    dimitrescuBloodRelief: 0,
   };
   return boss.meldContributions[meldId];
 }
@@ -583,6 +590,117 @@ function buildRoyalBloomObjectives(gameState) {
   return objectives;
 }
 
+function dimitrescuHuntCandidates(gameState) {
+  return (gameState.players || []).flatMap((player) => (player.hand || [])
+    .filter((card) => card?.id && cardHasSafeLegalPlay(gameState, player, card))
+    .map((card) => ({ player, card })));
+}
+
+function dimitrescuMeldCandidates(gameState) {
+  return eligibleMeldIndexes(gameState).map((meldIndex) => ({
+    meldIndex,
+    meldId: resolveBossMeldId(gameState, 0, meldIndex, true),
+  })).filter((entry) => entry.meldId);
+}
+
+function buildDimitrescuCrimsonMarks(gameState) {
+  return (gameState.players || []).map((player, index) => {
+    const candidates = (player.hand || []).filter((card) => card?.id && cardHasSafeLegalPlay(gameState, player, card));
+    const card = chooseSeeded(candidates, gameState, 263 + index * 11);
+    return card ? { playerId: player.id, cardId: card.id, status: 'active' } : null;
+  }).filter(Boolean);
+}
+
+function dimitrescuDeadCandidate(gameState) {
+  const deadIndex = (gameState.deadPiles || []).findIndex((pile) => Array.isArray(pile) && pile.length > 0);
+  return deadIndex >= 0 ? { deadIndex } : null;
+}
+
+function teamHasRoyalCanastra(gameState) {
+  return (gameState.teams?.[0]?.melds || []).some((meld) => (MELD_TIER[classifyBossMeldKind(meld)] || 0) >= 2);
+}
+
+function buildDimitrescuThreeDaughtersObjectives(gameState) {
+  const objectives = [];
+  const hunt = chooseSeeded(dimitrescuHuntCandidates(gameState), gameState, 251);
+  if (hunt) objectives.push({ type: 'bela', targetPlayerId: hunt.player.id, cardId: hunt.card.id, status: 'active' });
+  const feast = chooseSeeded(dimitrescuMeldCandidates(gameState), gameState, 257);
+  if (feast) objectives.push({ type: 'cassandra', ...feast, status: 'active' });
+  const discard = matriarchDiscardCandidate(gameState);
+  if (discard?.id) objectives.push({ type: 'daniela', discardCardId: discard.id, status: 'active' });
+  return objectives;
+}
+
+function dimitrescuObjective(intent, type) {
+  return intent?.payload?.objectives?.find((objective) => objective?.type === type) || null;
+}
+
+function confirmDimitrescuBloodDefeat(gameState, sourceActionId = 'blood') {
+  const boss = gameState?.boss;
+  if (!boss || boss.id !== 'dimitrescu') return null;
+  boss.danger = clamp(Number(boss.danger) || 0, 0, boss.maxDanger);
+  if (boss.danger < boss.maxDanger) return null;
+  const actionId = `dimitrescu_blood_defeat_${sourceActionId}`;
+  const existing = (boss.eventLog || []).find((event) => event.actionId === actionId) || null;
+  if (!boss.result) {
+    boss.result = {
+      victory: false,
+      reason: 'max_blood',
+      title: 'Banquete Carmesim',
+      detail: 'A Sede de Sangue chegou a 100. Lady Dimitrescu tomou a mesa para si.',
+    };
+    boss.stats.finalDebt = boss.danger;
+  }
+  if (existing) return existing;
+  return recordEvent(boss, {
+    type: 'bossDefeat',
+    actionId,
+    reason: 'max_blood',
+    danger: boss.danger,
+    outcome: 'A Sede de Sangue chegou ao limite.',
+  });
+}
+
+function changeDimitrescuBlood(gameState, amount, origin = 'Sede de Sangue', actionKey = null) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'dimitrescu' || boss.result || !amount) return null;
+  const before = boss.danger;
+  boss.danger = clamp(before + amount, 0, boss.maxDanger);
+  const applied = boss.danger - before;
+  if (!applied) return null;
+  boss.actionSequence += 1;
+  const actionId = actionKey || `blood_${boss.actionSequence}`;
+  const event = recordEvent(boss, {
+    type: 'bloodChange',
+    actionId,
+    amount: applied,
+    dangerDelta: applied,
+    danger: boss.danger,
+    origin,
+    dangerChangeLabel: `${origin}: Sede ${applied > 0 ? '+' : ''}${applied}`,
+    outcome: `${origin}: Sede ${applied > 0 ? '+' : ''}${applied}.`,
+  });
+  if (applied > 0) event.defeatEvent = confirmDimitrescuBloodDefeat(gameState, event.actionId);
+  return event;
+}
+
+function healDimitrescu(gameState, requested, origin = 'Regeneração Vampírica', actionKey = null) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'dimitrescu' || boss.result) return null;
+  const amount = Math.max(0, Math.min(Number(requested) || 0, boss.maxHp - boss.hp));
+  if (!amount) return null;
+  boss.hp = clamp(boss.hp + amount, 0, boss.maxHp);
+  boss.actionSequence += 1;
+  return recordEvent(boss, {
+    type: 'bossHeal',
+    actionId: actionKey || `dimitrescu_heal_${boss.actionSequence}`,
+    amount,
+    hp: boss.hp,
+    origin,
+    outcome: `${origin}: HP +${amount}.`,
+  });
+}
+
 function createPayload(gameState, abilityId) {
   const boss = gameState.boss;
   if (abilityId === 'fixed_interest') return weightedContract(gameState);
@@ -671,6 +789,37 @@ function createPayload(gameState, abilityId) {
         eligiblePlayerIds: selected?.eligiblePlayerIds || [],
       };
     }
+  }
+
+  if (boss.id === 'dimitrescu') {
+    if (abilityId === 'bela_hunt') {
+      const candidate = chooseSeeded(dimitrescuHuntCandidates(gameState), gameState, 241);
+      return { targetPlayerId: candidate?.player?.id ?? null, cardId: candidate?.card?.id ?? null, used: false };
+    }
+    if (abilityId === 'cassandra_feast') {
+      const target = chooseSeeded(dimitrescuMeldCandidates(gameState), gameState, 243);
+      return { meldIndex: target?.meldIndex ?? null, meldId: target?.meldId ?? null, fed: false };
+    }
+    if (abilityId === 'daniela_swarm') {
+      const discard = matriarchDiscardCandidate(gameState);
+      return { discardCardId: discard?.id ?? null, triggered: false, triggeredByPlayerId: null };
+    }
+    if (abilityId === 'red_wine') {
+      const healAmount = { 1: 140, 2: 200, 3: 260 }[boss.phase] || 140;
+      return { healAmount, bloodCost: 15 };
+    }
+    if (abilityId === 'crimson_brand') return { marks: buildDimitrescuCrimsonMarks(gameState) };
+    if (abilityId === 'cassandra_dead_feast') {
+      const target = dimitrescuDeadCandidate(gameState);
+      return {
+        deadIndex: target?.deadIndex ?? null,
+        bloodAmount: boss.phase === 3 ? 16 : 12,
+        healAmount: boss.phase === 3 ? 130 : 90,
+      };
+    }
+    if (abilityId === 'crimson_clot') return { amount: boss.phase === 3 ? 260 : 180 };
+    if (abilityId === 'three_daughters') return { objectives: buildDimitrescuThreeDaughtersObjectives(gameState) };
+    if (abilityId === 'blood_tithe' || abilityId === 'castle_lockdown') return {};
   }
 
   if (boss.id === 'matriarca_esmeralda') {
@@ -767,6 +916,24 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'forced_swap' || abilityId === 'hands_tied' || abilityId === 'separation') {
     return players.length >= 2;
   }
+  if (abilityId === 'bela_hunt') {
+    return dimitrescuHuntCandidates(gameState).some((candidate) => candidate.player?.id === payload.targetPlayerId && candidate.card?.id === payload.cardId);
+  }
+  if (abilityId === 'cassandra_feast') return !!payload.meldId && dimitrescuMeldCandidates(gameState).some((entry) => entry.meldId === payload.meldId);
+  if (abilityId === 'daniela_swarm') return !!payload.discardCardId && matriarchDiscardCandidate(gameState)?.id === payload.discardCardId;
+  if (abilityId === 'red_wine') return gameState.boss?.hp < gameState.boss?.maxHp && gameState.boss?.danger >= 20;
+  if (abilityId === 'crimson_brand') {
+    const marks = payload.marks || [];
+    return marks.length === players.length && marks.every((mark) => players.some((player) => player.id === mark.playerId && player.hand?.some((card) => card?.id === mark.cardId)));
+  }
+  if (abilityId === 'cassandra_dead_feast') {
+    return Number.isInteger(payload.deadIndex)
+      && !!gameState.deadPiles?.[payload.deadIndex]?.length
+      && gameState.boss?.bloodiedDead?.status !== 'active';
+  }
+  if (abilityId === 'crimson_clot') return gameState.boss?.danger >= 30 && gameState.boss?.crimsonClot?.status !== 'active';
+  if (abilityId === 'three_daughters') return Array.isArray(payload.objectives) && payload.objectives.length >= 2;
+  if (abilityId === 'blood_tithe' || abilityId === 'castle_lockdown') return true;
   if (abilityId === 'living_seed') {
     return natureThreatSlots(gameState) > 0 && matriarchSeedCandidates(gameState).some((candidate) => candidate.player?.id === payload.targetPlayerId && candidate.card?.id === payload.cardId);
   }
@@ -799,6 +966,10 @@ const ABILITY_DURATION = Object.freeze({
   favorite: 'immediate',
   iron_etiquette: 'full_round',
   interdict: 'full_round',
+  bela_hunt: 'target_turn',
+  red_wine: 'immediate',
+  cassandra_dead_feast: 'immediate',
+  crimson_clot: 'immediate',
 });
 
 export const BOSS_PRESENTATION_MS = Object.freeze({
@@ -824,6 +995,8 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     maxDanger: definition.maxDanger,
     bloom: 0,
     natureThreats: [],
+    crimsonClot: null,
+    bloodiedDead: null,
     natureHealingThisRound: 0,
     natureHealingRound: 1,
     emeraldCocoon: null,
@@ -933,6 +1106,7 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
     entry.dominatrixResistanceTier ||= 0;
     entry.matriarchBloomRemoved ||= 0;
     entry.matriarchBloomTier ||= 0;
+    entry.dimitrescuBloodRelief ||= 0;
   });
   boss.meldIdsByCardId ||= {};
   boss.meldIdsByPosition ||= {};
@@ -953,6 +1127,8 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   boss.bloom = clamp(Number(boss.bloom ?? (boss.id === 'matriarca_esmeralda' ? boss.danger : 0)) || 0, 0, 5);
   if (boss.id === 'matriarca_esmeralda') boss.danger = boss.bloom;
   boss.natureThreats ||= [];
+  boss.crimsonClot ||= null;
+  boss.bloodiedDead ||= null;
   boss.natureHealingThisRound ||= 0;
   boss.natureHealingRound ||= boss.roundNumber || 1;
   boss.emeraldCocoon ||= null;
@@ -1601,6 +1777,7 @@ function applyDamageToBoss(gameState, damage, { breaksCocoon = false, sourceActi
   let remaining = Math.max(0, Number(damage) || 0);
   let absorbed = 0;
   let cocoonBroken = false;
+  let bloodClotBroken = false;
   if (boss.id === 'matriarca_esmeralda' && boss.emeraldCocoon?.status === 'active') {
     if (breaksCocoon) {
       boss.emeraldCocoon.remaining = 0;
@@ -1616,11 +1793,28 @@ function applyDamageToBoss(gameState, damage, { breaksCocoon = false, sourceActi
       }
     }
   }
+  if (boss.id === 'dimitrescu' && boss.crimsonClot?.status === 'active') {
+    if (breaksCocoon) {
+      boss.crimsonClot.remaining = 0;
+      boss.crimsonClot.status = 'broken';
+      bloodClotBroken = true;
+    } else {
+      const clotAbsorbed = Math.min(remaining, Math.max(0, Number(boss.crimsonClot.remaining) || 0));
+      absorbed += clotAbsorbed;
+      boss.crimsonClot.remaining -= clotAbsorbed;
+      remaining -= clotAbsorbed;
+      if (boss.crimsonClot.remaining <= 0) {
+        boss.crimsonClot.status = 'broken';
+        bloodClotBroken = true;
+        changeDimitrescuBlood(gameState, -6, 'Coágulo rompido', `crimson_clot_broken_${boss.crimsonClot.id || sourceActionId}`);
+      }
+    }
+  }
   const before = boss.hp;
   boss.hp = clamp(boss.hp - remaining, 0, boss.maxHp);
   const hpDamage = before - boss.hp;
   const reborn = triggerMatriarchRebirth(gameState, sourceActionId);
-  return { hpDamage, absorbed, cocoonBroken, reborn, remainingDamage: remaining };
+  return { hpDamage, absorbed, cocoonBroken, bloodClotBroken, reborn, remainingDamage: remaining };
 }
 
 function addNatureThreat(gameState, data) {
@@ -1934,11 +2128,59 @@ function resolveMatriarchRound(gameState) {
   return events.filter(Boolean);
 }
 
+function resolveDimitrescuRoundEffects(gameState) {
+  const boss = gameState.boss;
+  if (!boss || boss.id !== 'dimitrescu' || boss.result) return [];
+  const events = [];
+  if (boss.crimsonClot?.status === 'active' && Number(boss.crimsonClot.createdRound) <= Number(boss.roundNumber)) {
+    const remaining = Math.max(0, Number(boss.crimsonClot.remaining) || 0);
+    const healAmount = Math.floor(remaining / 2);
+    boss.crimsonClot.status = 'expired';
+    boss.crimsonClot.resolvedRound = boss.roundNumber;
+    if (healAmount > 0) {
+      const healEvent = healDimitrescu(gameState, healAmount, 'Coágulo Carmesim', `${boss.crimsonClot.id}:heal`);
+      if (healEvent) events.push(healEvent);
+    } else {
+      boss.actionSequence += 1;
+      events.push(recordEvent(boss, {
+        type: 'bloodClot',
+        actionId: `${boss.crimsonClot.id}:expired`,
+        status: 'expired',
+        amount: 0,
+        outcome: 'O Coágulo Carmesim terminou sem sangue restante para regenerar Lady Dimitrescu.',
+      }));
+    }
+  }
+  return events.filter(Boolean);
+}
+
 export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
+  // This hook runs after the cards have already left the discard pile. Do not
+  // normalize here: Matriarch pollen (and Daniela's contaminated card) must
+  // resolve against the pre-existing serialized effect before target cleanup.
   const boss = gameState?.boss;
-  if (!boss || boss.id !== 'matriarca_esmeralda') return [];
+  if (!boss) return [];
   const takenIds = new Set(takenCards.map((card) => card?.id).filter(Boolean));
   const resolved = [];
+  if (boss.id === 'dimitrescu') {
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'daniela_swarm' && !intent.payload?.triggered && takenIds.has(intent.payload?.discardCardId)) {
+      intent.payload.triggered = true;
+      intent.payload.triggeredByPlayerId = playerId;
+      const amount = Number(intent.announcedPhase || boss.phase) === 3 ? 15 : 12;
+      const event = changeDimitrescuBlood(gameState, amount, 'Enxame de Daniela', `daniela_swarm_${intent.id}_${playerId}`);
+      if (event) resolved.push(event);
+    }
+    if (intent?.abilityId === 'three_daughters') {
+      const daniela = dimitrescuObjective(intent, 'daniela');
+      if (daniela?.status === 'active' && takenIds.has(daniela.discardCardId)) {
+        daniela.status = 'failed';
+        daniela.triggeredByPlayerId = playerId;
+      }
+    }
+    return resolved;
+  }
+  if (boss.id !== 'matriarca_esmeralda') return resolved;
   const triggeredThreats = (boss.natureThreats || []).filter((threat) => (
     threat?.status === 'active'
     && ['pollen', 'royal_pollen'].includes(threat.type)
@@ -2147,6 +2389,44 @@ export function getBossDominatrixPriorities(gameState, playerId) {
   };
 }
 
+export function getBossDimitrescuPriorities(gameState, playerId) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'dimitrescu') return null;
+  const player = (gameState.players || []).find((entry) => entry.id === playerId);
+  if (!player) return null;
+  const intent = boss.currentIntent;
+  const markedCardIds = [];
+  const meldIndexes = [];
+  let avoidDiscard = false;
+
+  if (intent?.abilityId === 'bela_hunt' && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId && !intent.payload.used) {
+    markedCardIds.push(intent.payload.cardId);
+  }
+  if (intent?.abilityId === 'cassandra_feast' && !intent.payload?.fed && Number.isInteger(intent.payload?.meldIndex)) {
+    meldIndexes.push(intent.payload.meldIndex);
+  }
+  if (intent?.abilityId === 'crimson_brand') {
+    for (const mark of intent.payload?.marks || []) {
+      if (mark.status === 'active' && mark.playerId === playerId && mark.cardId) markedCardIds.push(mark.cardId);
+    }
+  }
+  if (intent?.abilityId === 'daniela_swarm' && !intent.payload?.triggered) avoidDiscard = true;
+  if (intent?.abilityId === 'three_daughters') {
+    const bela = dimitrescuObjective(intent, 'bela');
+    const cassandra = dimitrescuObjective(intent, 'cassandra');
+    const daniela = dimitrescuObjective(intent, 'daniela');
+    if (bela?.status === 'active' && bela.targetPlayerId === playerId && bela.cardId) markedCardIds.push(bela.cardId);
+    if (cassandra?.status === 'active' && Number.isInteger(cassandra.meldIndex)) meldIndexes.push(cassandra.meldIndex);
+    if (daniela?.status === 'active') avoidDiscard = true;
+  }
+  return {
+    urgent: boss.danger >= 75 || markedCardIds.length > 0 || meldIndexes.length > 0,
+    markedCardIds: [...new Set(markedCardIds)],
+    meldIndexes: [...new Set(meldIndexes)],
+    avoidDiscard,
+  };
+}
+
 export function getBossMeldNatureThreats(gameState, teamId, meldIndex) {
   if (teamId !== 0) return [];
   const boss = normalizeBossState(gameState);
@@ -2287,6 +2567,14 @@ export function getBossCardEffect(gameState, playerId, cardId) {
     const threat = activeNatureThreats(boss).find((entry) => entry.targetPlayerId === playerId && entry.cardId === cardId);
     if (!threat) return null;
     return ['pollen', 'royal_pollen'].includes(threat.type) ? 'nature-pollen' : 'nature-seed';
+  }
+  if (boss.id === 'dimitrescu') {
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'bela_hunt' && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId === cardId && !intent.payload.used) return 'dimitrescu-hunt';
+    if (intent?.abilityId === 'crimson_brand' && (intent.payload?.marks || []).some((mark) => mark.status === 'active' && mark.playerId === playerId && mark.cardId === cardId)) return 'dimitrescu-blood-mark';
+    const bela = intent?.abilityId === 'three_daughters' ? dimitrescuObjective(intent, 'bela') : null;
+    if (bela?.status === 'active' && bela.targetPlayerId === playerId && bela.cardId === cardId) return 'dimitrescu-hunt';
+    return null;
   }
   if (boss.id !== 'dominadora') return null;
   const intent = boss.currentIntent;
@@ -2561,6 +2849,10 @@ export function shouldBossBotTakeDiscard(gameState, playerId, { intent = null, n
   const boss = normalizeBossState(gameState);
   if (!intent?.wants) return false;
   const surcharge = boss?.id === 'banker' ? getBossDiscardSurcharge(gameState) : null;
+  if (boss?.id === 'dimitrescu') {
+    const dimitrescuPlan = getBossDimitrescuPriorities(gameState, playerId);
+    if (dimitrescuPlan?.avoidDiscard) return false;
+  }
   const pile = (gameState.discard || []).filter(Boolean);
   const pileValue = pile.reduce((sum, card) => sum + botPileCardValue(card), 0);
   if (naturePlan?.pollenOnDiscard && naturePlan.bloom >= 4) return false;
@@ -2918,6 +3210,7 @@ export function applyBossMeldTransition(gameState, {
   let canastraDamage = Math.max(0, nextDamageValue - previous.damageValue);
   let cardDamage = 0;
   let debtReduction = boss.id === 'banker' ? Math.max(0, nextDebtValue - previous.debtValue) : 0;
+  let bloodReduction = boss.id === 'dimitrescu' ? Math.max(0, nextDebtValue - previous.debtValue) : 0;
   let possessionProgressed = false;
   let possessionReleased = false;
   let possessionProgress = null;
@@ -2961,6 +3254,28 @@ export function applyBossMeldTransition(gameState, {
       if (intent.payload.meldOwners[meldIndex] == null) intent.payload.meldOwners[meldIndex] = playerId;
     }
     orderEvents = resolveOrdersFromMeldAction(gameState, playerId, meldId, isNewMeld, oldKind, newKind, cardsAdded);
+  }
+
+  if (boss.id === 'dimitrescu') {
+    const intent = boss.currentIntent;
+    const addedIds = new Set(cardsAdded.map((card) => card?.id).filter(Boolean));
+    if (intent?.abilityId === 'bela_hunt' && intent.payload?.targetPlayerId === playerId && addedIds.has(intent.payload?.cardId)) {
+      intent.payload.used = true;
+    }
+    if (intent?.abilityId === 'cassandra_feast' && addedIds.size && (intent.payload?.meldId ? intent.payload.meldId === meldId : intent.payload?.meldIndex === meldIndex)) {
+      intent.payload.fed = true;
+    }
+    if (intent?.abilityId === 'crimson_brand') {
+      for (const mark of intent.payload?.marks || []) {
+        if (mark.status === 'active' && mark.playerId === playerId && addedIds.has(mark.cardId)) mark.status = 'success';
+      }
+    }
+    if (intent?.abilityId === 'three_daughters') {
+      const bela = dimitrescuObjective(intent, 'bela');
+      const cassandra = dimitrescuObjective(intent, 'cassandra');
+      if (bela?.status === 'active' && bela.targetPlayerId === playerId && addedIds.has(bela.cardId)) bela.status = 'success';
+      if (cassandra?.status === 'active' && addedIds.size && (cassandra.meldId ? cassandra.meldId === meldId : cassandra.meldIndex === meldIndex)) cassandra.status = 'success';
+    }
   }
 
   const accountedCardIds = new Set(boss.damagedCardIds);
@@ -3052,7 +3367,7 @@ export function applyBossMeldTransition(gameState, {
     }
   }
 
-  if (damage <= 0 && debtReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length) return null;
+  if (damage <= 0 && debtReduction <= 0 && bloodReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length) return null;
   const breaksCocoon = boss.id === 'matriarca_esmeralda'
     && canastraDamage > 0
     && ({ limpa: 1, real: 2, asas: 3 }[newKind] || 0) >= 1;
@@ -3060,8 +3375,11 @@ export function applyBossMeldTransition(gameState, {
     breaksCocoon,
     sourceActionId: `meld_${key}_${boss.actionSequence + 1}`,
   });
-  const dangerAfterRelief = clamp(boss.danger - debtReduction, 0, boss.maxDanger);
-  const appliedDebtReduction = Math.max(0, boss.danger - dangerAfterRelief);
+  const totalDangerRelief = debtReduction + bloodReduction;
+  const dangerAfterRelief = clamp(boss.danger - totalDangerRelief, 0, boss.maxDanger);
+  const appliedDangerReduction = Math.max(0, boss.danger - dangerAfterRelief);
+  const appliedDebtReduction = boss.id === 'banker' ? appliedDangerReduction : 0;
+  const appliedBloodReduction = boss.id === 'dimitrescu' ? appliedDangerReduction : 0;
   boss.danger = dangerAfterRelief;
   if (creditLimitDebt) boss.danger = clamp(boss.danger + creditLimitDebt, 0, boss.maxDanger);
   const appliedDamage = damageResult.hpDamage;
@@ -3107,6 +3425,7 @@ export function applyBossMeldTransition(gameState, {
     // Damage restored after breaking Possession was already credited before possession.
     contribution.damageDone += Math.min(appliedDamage, canastraDamage + cardDamage);
     contribution.bankerDebtRelief += appliedDebtReduction;
+    contribution.dimitrescuBloodRelief += appliedBloodReduction;
     contribution.dominatrixChainsBroken += chainsRemoved;
   }
   boss.actionSequence += 1;
@@ -3119,12 +3438,15 @@ export function applyBossMeldTransition(gameState, {
     canastraDamage,
     possessionReappliedDamage,
     debtReduction,
+    bloodReduction: appliedBloodReduction,
     creditLimitDebt,
     chainsRemoved,
     resistanceSuppressedByInterdict,
     bloomRemoved,
     absorbedDamage: damageResult.absorbed,
     cocoonBroken: damageResult.cocoonBroken,
+    bloodClotBroken: damageResult.bloodClotBroken,
+    bloodClotRemaining: boss.id === 'dimitrescu' && boss.crimsonClot?.status === 'active' ? Math.max(0, Number(boss.crimsonClot.remaining) || 0) : null,
     reborn: damageResult.reborn,
     possessionProgress: possessionProgressed ? possessionProgress : null,
     possessionReleased,
@@ -3137,8 +3459,10 @@ export function applyBossMeldTransition(gameState, {
     dangerChangeLabel: creditLimitDebt
       ? `Limite de Credito: Divida +${creditLimitDebt}`
       : debtReduction
-      ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Dívida -${debtReduction}`
-      : bloomRemoved ? `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}: Florescimento -${bloomRemoved}` : '',
+      ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Dívida -${appliedDebtReduction}`
+      : appliedBloodReduction
+        ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Sede -${appliedBloodReduction}`
+        : bloomRemoved ? `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}: Florescimento -${bloomRemoved}` : '',
     pendingPhase,
   };
   const definition = getBossDefinition(boss.id);
@@ -3181,9 +3505,42 @@ export function applyBossDeadTaken(gameState) {
   const reduction = boss.id === 'banker' ? newlyApplied * 5 : 0;
   boss.deadRewardsApplied = taken;
   boss.danger = clamp(boss.danger - reduction, 0, boss.maxDanger);
+
+  let dimitrescuEvent = null;
+  if (boss.id === 'dimitrescu' && boss.bloodiedDead?.status === 'active') {
+    const curse = boss.bloodiedDead;
+    const purified = teamHasRoyalCanastra(gameState);
+    const bloodAmount = purified ? 4 : Math.max(0, Number(curse.bloodAmount) || 0);
+    const healAmount = purified ? 0 : Math.max(0, Number(curse.healAmount) || 0);
+    curse.status = 'consumed';
+    curse.consumedRound = boss.roundNumber;
+    curse.purified = purified;
+    const bloodEvent = bloodAmount
+      ? changeDimitrescuBlood(gameState, bloodAmount, purified ? 'Morto Profanado enfraquecido' : 'Banquete dos Mortos', `${curse.id}:blood`)
+      : null;
+    const healEvent = healAmount
+      ? healDimitrescu(gameState, healAmount, 'Banquete dos Mortos', `${curse.id}:heal`)
+      : null;
+    boss.actionSequence += 1;
+    const resolved = recordEvent(boss, {
+      type: 'bloodiedDead',
+      actionId: `${curse.id}:resolved`,
+      daughter: 'cassandra',
+      deadIndex: curse.deadIndex,
+      purified,
+      bloodAdded: bloodEvent?.amount || 0,
+      healed: healEvent?.amount || 0,
+      outcome: purified
+        ? 'A Canastra Real/Ás-a-Ás purificou o Morto: apenas +4 de Sede e nenhuma cura.'
+        : `Cassandra bebeu do Morto: Sede +${bloodEvent?.amount || 0} e Lady curou ${healEvent?.amount || 0} HP.`,
+    });
+    curse.resolvedEventId = resolved.actionId;
+    dimitrescuEvent = resolved;
+  }
+
   const pendingPhase = detectPendingPhase(gameState);
   boss.actionSequence += 1;
-  return recordEvent(boss, {
+  const progressEvent = recordEvent(boss, {
     type: reduction ? 'debtReduction' : 'bossProgress',
     actionId: `dead_${taken}_${boss.actionSequence}`,
     amount: reduction,
@@ -3192,6 +3549,7 @@ export function applyBossDeadTaken(gameState) {
     pendingPhase,
     dangerChangeLabel: reduction ? `Morto conquistado: Dívida -${reduction}` : '',
   });
+  return dimitrescuEvent || progressEvent;
 }
 
 export function isBossDiscardBlocked(gameState) {
@@ -3199,6 +3557,7 @@ export function isBossDiscardBlocked(gameState) {
   const boss = normalizeBossState(gameState);
   const playerId = gameState.players?.[gameState.currentPlayer]?.id ?? gameState.currentPlayer;
   if (boss.id === 'banker') return boss.currentIntent?.abilityId === 'credit_block' || isBossVaultDrawRequired(gameState, playerId);
+  if (boss.id === 'dimitrescu') return boss.currentIntent?.abilityId === 'castle_lockdown';
   return (boss.chainsByPlayer?.[playerId] || 0) >= 4;
 }
 
@@ -3576,6 +3935,103 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else {
       outcome = `${intent.name} foi encerrada.`;
     }
+  } else if (boss.id === 'dimitrescu') {
+    const phase = Number(intent.announcedPhase || boss.phase || 1);
+    if (intent.abilityId === 'bela_hunt') {
+      const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);
+      const success = intent.payload.used === true;
+      dangerDelta = success ? -3 : (phase === 3 ? 16 : 14);
+      outcome = success
+        ? `${target?.name || 'O alvo'} escapou da Caçada de Bela: Sede -3.`
+        : `${target?.name || 'O alvo'} não usou a carta marcada: Sede +${dangerDelta}.`;
+      resultData = { daughter: 'bela', success };
+    } else if (intent.abilityId === 'cassandra_feast') {
+      const success = intent.payload.fed === true;
+      dangerDelta = success ? -4 : (phase === 3 ? 18 : 16);
+      outcome = success
+        ? `O jogo marcado foi alimentado e Cassandra perdeu o banquete: Sede -4.`
+        : `O jogo marcado ficou sem alimento: Sede +${dangerDelta}.`;
+      resultData = { daughter: 'cassandra', success, meldIndex: intent.payload.meldIndex };
+    } else if (intent.abilityId === 'daniela_swarm') {
+      const success = !intent.payload.triggered;
+      if (success) dangerDelta = -3;
+      outcome = success
+        ? 'Ninguém tocou no lixo contaminado de Daniela: Sede -3.'
+        : 'O Enxame de Daniela já bebeu sangue quando o lixo foi recolhido.';
+      resultData = { daughter: 'daniela', success, triggeredByPlayerId: intent.payload.triggeredByPlayerId ?? null };
+    } else if (intent.abilityId === 'blood_tithe') {
+      const bands = gameState.players.map((player) => {
+        const cards = player.hand?.length || 0;
+        const amount = cards >= 11 ? (phase === 3 ? 10 : 8) : cards >= 8 ? (phase === 3 ? 6 : 4) : 0;
+        return { playerId: player.id, cards, amount };
+      });
+      dangerDelta = bands.reduce((sum, entry) => sum + entry.amount, 0);
+      outcome = dangerDelta
+        ? `Tributo de Sangue cobrado: Sede +${dangerDelta}.`
+        : 'As mãos ficaram leves o bastante; o Tributo de Sangue não encontrou alimento.';
+      resultData = { bloodTitheBands: bands };
+    } else if (intent.abilityId === 'crimson_brand') {
+      const marks = intent.payload.marks || [];
+      marks.forEach((mark) => {
+        if (mark.status === 'active') mark.status = 'failed';
+      });
+      const successes = marks.filter((mark) => mark.status === 'success').length;
+      const failures = marks.filter((mark) => mark.status === 'failed').length;
+      dangerDelta = failures * (phase === 3 ? 9 : 7) - successes * 2;
+      outcome = `Marca Carmesim: ${successes} removida${successes === 1 ? '' : 's'}, ${failures} ainda sangrando${dangerDelta ? ` · Sede ${dangerDelta > 0 ? '+' : ''}${dangerDelta}` : ''}.`;
+      resultData = { crimsonMarks: marks.map((mark) => ({ ...mark })), successes, failures };
+    } else if (intent.abilityId === 'red_wine') {
+      const requested = Number(intent.payload.healAmount) || ({ 1: 140, 2: 200, 3: 260 }[phase] || 140);
+      const bloodCost = Math.min(Math.max(0, Number(intent.payload.bloodCost) || 15), boss.danger);
+      const healed = Math.max(0, Math.min(requested, boss.maxHp - boss.hp));
+      boss.hp = clamp(boss.hp + healed, 0, boss.maxHp);
+      dangerDelta = -bloodCost;
+      outcome = healed
+        ? `Vinho Carmesim consumiu ${bloodCost} de Sede e restaurou ${healed} HP.`
+        : `Vinho Carmesim consumiu ${bloodCost} de Sede, mas não encontrou ferimentos para restaurar.`;
+      resultData = { healAmount: healed, bloodCost };
+    } else if (intent.abilityId === 'cassandra_dead_feast') {
+      boss.bloodiedDead = {
+        id: `bloodied_dead_${intent.id}`,
+        sourceIntentId: intent.id,
+        deadIndex: intent.payload.deadIndex,
+        bloodAmount: intent.payload.bloodAmount,
+        healAmount: intent.payload.healAmount,
+        createdRound: boss.roundNumber,
+        status: 'active',
+        resolvedEventId: null,
+      };
+      outcome = `Cassandra profanou o Morto ${Number(intent.payload.deadIndex) + 1}. A maldição ficará ativa até alguém tomá-lo.`;
+      resultData = { daughter: 'cassandra', deadIndex: intent.payload.deadIndex, bloodiedDead: true };
+    } else if (intent.abilityId === 'crimson_clot') {
+      const amount = Math.max(0, Number(intent.payload.amount) || (phase === 3 ? 260 : 180));
+      boss.crimsonClot = {
+        id: `crimson_clot_${intent.id}`,
+        sourceIntentId: intent.id,
+        createdRound: boss.roundNumber,
+        max: amount,
+        remaining: amount,
+        status: 'active',
+      };
+      outcome = `Coágulo Carmesim formado com ${amount} de proteção. Rompê-lo reduz a Sede em 6; se sobreviver, vira cura.`;
+      resultData = { bloodClotAmount: amount };
+    } else if (intent.abilityId === 'castle_lockdown') {
+      outcome = 'As Portas do Castelo se abriram novamente; o lixo volta a ficar disponível.';
+    } else if (intent.abilityId === 'three_daughters') {
+      const objectives = intent.payload.objectives || [];
+      const daniela = objectives.find((objective) => objective.type === 'daniela');
+      if (daniela?.status === 'active') daniela.status = 'success';
+      objectives.forEach((objective) => {
+        if (objective.status === 'active') objective.status = 'failed';
+      });
+      const successes = objectives.filter((objective) => objective.status === 'success').length;
+      const failures = objectives.filter((objective) => objective.status === 'failed').length;
+      dangerDelta = failures * 8 - successes * 2;
+      outcome = `As Três Filhas encerraram a caçada: ${successes} objetivo${successes === 1 ? '' : 's'} cumprido${successes === 1 ? '' : 's'}, ${failures} falho${failures === 1 ? '' : 's'}${dangerDelta ? ` · Sede ${dangerDelta > 0 ? '+' : ''}${dangerDelta}` : ''}.`;
+      resultData = { daughter: 'all', successes, failures, objectives: objectives.map((objective) => ({ ...objective })) };
+    } else {
+      outcome = `${intent.name} foi encerrada.`;
+    }
   } else if (boss.id === 'matriarca_esmeralda') {
     const baseThreat = {
       sourceAbilityId: intent.abilityId,
@@ -3740,7 +4196,9 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     dangerDelta,
     danger: boss.danger,
     dangerChangeLabel: dangerDelta
-      ? `${intent.abilityId === 'suit_audit' ? (dangerDelta < 0 ? 'Auditoria concluída' : 'Auditoria falhou') : intent.name}: Dívida ${dangerDelta > 0 ? '+' : ''}${dangerDelta}`
+      ? boss.id === 'dimitrescu'
+        ? `${intent.name}: Sede ${dangerDelta > 0 ? '+' : ''}${dangerDelta}`
+        : `${intent.abilityId === 'suit_audit' ? (dangerDelta < 0 ? 'Auditoria concluída' : 'Auditoria falhou') : intent.name}: Dívida ${dangerDelta > 0 ? '+' : ''}${dangerDelta}`
       : '',
     targetPlayerId: intent.payload?.targetPlayerId ?? null,
     cardId: intent.payload?.cardId ?? null,
@@ -3756,6 +4214,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
   };
   const recorded = recordEvent(boss, event);
   if (boss.id === 'banker' && dangerDelta > 0) recorded.defeatEvent = confirmBankerDebtDefeat(gameState, recorded.actionId);
+  if (boss.id === 'dimitrescu' && dangerDelta > 0) recorded.defeatEvent = confirmDimitrescuBloodDefeat(gameState, recorded.actionId);
   if (keepIntent) {
     intent.immediateApplied = true;
     intent.immediateEventActionId = recorded.actionId;
@@ -3871,6 +4330,10 @@ export function completeBossPlayerTurn(gameState, playerId) {
     natureEvents.push(...resolveMatriarchRound(gameState));
     event ||= natureEvents.filter(Boolean).at(-1) || null;
   }
+  if (allPlayersActed && boss.id === 'dimitrescu') {
+    const bloodEvents = resolveDimitrescuRoundEffects(gameState);
+    event ||= bloodEvents.at(-1) || null;
+  }
   if (event) {
     boss.resolvedRoundEventActionId = event.actionId;
   }
@@ -3887,6 +4350,7 @@ export function completeBossPlayerTurn(gameState, playerId) {
     phaseEvent = activatePendingPhase(gameState);
   }
   if (boss.id === 'banker') confirmBankerDebtDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
+  if (boss.id === 'dimitrescu') confirmDimitrescuBloodDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
   if (allPlayersActed && !boss.result) {
     const resultEvent = boss.eventLog.find((entry) => entry.actionId === boss.resolvedRoundEventActionId) || event;
     boss.resolvedRoundEventActionId = null;
@@ -3920,7 +4384,9 @@ export function applyBossFinalStrike(gameState, projectedTeamScore, playerId = g
       ? 'Vontade Quebrada'
       : boss.id === 'matriarca_esmeralda'
         ? 'Primavera Eterna'
-        : 'Execução da Dívida';
+        : boss.id === 'dimitrescu'
+          ? 'Banquete Carmesim'
+          : 'Execução da Dívida';
     boss.result = { victory: false, reason: 'insufficient_final_strike', title: survivalTitle, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP.` };
   }
   return recordEvent(boss, {
@@ -3928,6 +4394,8 @@ export function applyBossFinalStrike(gameState, projectedTeamScore, playerId = g
     actionId: `final_${boss.actionSequence}`,
     damage,
     absorbedDamage: damageResult.absorbed,
+    cocoonBroken: damageResult.cocoonBroken,
+    bloodClotBroken: damageResult.bloodClotBroken,
     hp: boss.hp,
     reborn: damageResult.reborn,
     victory: boss.result?.victory ?? false,
@@ -3938,7 +4406,11 @@ export function applyBossResourceDefeat(gameState) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.result) return null;
   boss.stats.finalDebt = boss.danger;
-  boss.result = { victory: false, reason: 'resources_exhausted', title: boss.id === 'dominadora' ? 'Dominação sem fim' : 'Cobrança sem fim', detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP quando os recursos acabaram.` };
+  const title = boss.id === 'dominadora' ? 'Dominação sem fim'
+    : boss.id === 'matriarca_esmeralda' ? 'Primavera Eterna'
+      : boss.id === 'dimitrescu' ? 'Banquete Carmesim'
+        : 'Cobrança sem fim';
+  boss.result = { victory: false, reason: 'resources_exhausted', title, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP quando os recursos acabaram.` };
   boss.actionSequence += 1;
   return recordEvent(boss, { type: 'bossDefeat', actionId: `resources_${boss.actionSequence}`, reason: boss.result.reason });
 }

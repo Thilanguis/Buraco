@@ -2,13 +2,14 @@
 
 ## Status da documentação
 
-**Versão revisada contra o código em produção — 27/09/2026.**
+**Versão revisada contra o código atual — 28/09/2026.**
 
 Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
 
 - **O Banqueiro**;
 - **A Dominadora**;
-- **A Matriarca Esmeralda**.
+- **A Matriarca Esmeralda**;
+- **Lady Dimitrescu**.
 
 Ela substitui as versões anteriores em que a Matriarca aparecia como planejada e em que as habilidades antigas da Dominadora e do Banqueiro ainda estavam descritas.
 
@@ -19,6 +20,7 @@ A rotação que vale no jogo é a registrada em:
 - `js/boss/bosses/banker.js`;
 - `js/boss/bosses/dominatrix.js`;
 - `js/boss/bosses/matriarch.js`;
+- `js/boss/bosses/dimitrescu.js`;
 - validações e resolução em `js/boss/boss-engine.js`.
 
 O resumo enxuto e atualizado das habilidades ativas está em `docs/INVENTARIO_HABILIDADES_CHEFES.md`. O HUD da partida usa a mesma lista de definições do registro de chefes para exibir **Habilidades do chefe**, evitando manter uma segunda lista manual de nomes/fases na interface.
@@ -617,7 +619,7 @@ Chefe de controle direto, ordens, Chicotes individuais e perda de eficiência.
 ## 5.2 Vida e Chicotes
 
 ```text
-HP: 2100
+HP: 2500
 Chicotes por jogador: 0..4
 ```
 
@@ -688,8 +690,8 @@ fases: 1 e 2
 
 ```text
 id: exposure
-peso: 3
-fases: 1 e 2
+peso: 4
+fases: 1, 2 e 3
 ```
 
 - marca carta com jogada legal;
@@ -702,8 +704,8 @@ fases: 1 e 2
 
 ```text
 id: forced_choice
-peso: 4
-fases: 1 e 2
+peso: 5
+fases: 1, 2 e 3
 ```
 
 A versão antiga de comprar duas cartas foi removida.
@@ -755,7 +757,7 @@ Ao desobedecer:
 ```text
 id: iron_etiquette
 peso: 4
-fases: 1 e 2
+fases: 1, 2 e 3
 ```
 
 A Dominadora ordena o naipe do descarte no próximo turno.
@@ -927,12 +929,12 @@ Se perder a possibilidade por mudança externa, cancela.
 
 ```text
 id: favorite
-peso: 3
+peso: 4
 fases: 2 e 3
 ```
 
-- protegida perde 1 Chicote;
-- punida recebe 1;
+- nas Fases 1–2, a protegida perde 1 Chicote e a punida recebe 1;
+- na Fase 3, a favorita não perde Chicote e somente a outra recebe +1;
 - respeita limites;
 - aplica uma vez.
 
@@ -980,20 +982,20 @@ A carta presa deve ser identificada no HUD, na mão e no histórico. Depois das 
 
 | Habilidade             | Peso | Fases |
 | ---------------------- | ---: | ----- |
-| Coleira                |    5 | 1 e 2 |
-| Escolha Forçada        |    4 | 1 e 2 |
-| Exposição              |    3 | 1 e 2 |
-| Etiqueta de Ferro      |    4 | 1 e 2 |
-| Troca Forçada          |    4 | 2 e 3 |
-| Mãos Atadas            |    4 | 2 e 3 |
-| Posse                  |    3 | 2 e 3 |
-| Interdito (desativado) |    — | —     |
-| Favorita               |    3 | 2 e 3 |
-| Dupla Coleira          |    5 | 3     |
-| Separação              |    4 | 3     |
-| Controle Absoluto      |    3 | 3     |
-| Quebra de Vontade      |    3 | 3     |
-| Ordem Final            |    2 | 3     |
+| Coleira                |    5 | 1 e 2    |
+| Escolha Forçada        |    5 | 1, 2 e 3 |
+| Exposição              |    4 | 1, 2 e 3 |
+| Etiqueta de Ferro      |    4 | 1, 2 e 3 |
+| Troca Forçada          |    4 | 2 e 3    |
+| Mãos Atadas            |    4 | 2 e 3    |
+| Posse                  |    3 | 2 e 3    |
+| Interdito (desativado) |    — | —        |
+| Favorita               |    4 | 2 e 3    |
+| Dupla Coleira          |    5 | 3        |
+| Separação              |    4 | 3        |
+| Controle Absoluto      |    4 | 3        |
+| Quebra de Vontade      |    4 | 3        |
+| Ordem Final            |    4 | 3        |
 
 ---
 
@@ -1088,7 +1090,8 @@ Propagação cria somente **Raiz Faminta**.
 - sem alvo válido, não acontece;
 - ameaça cancelada não propaga;
 - `eventId` impede duplicação;
-- origem aparece no HUD.
+- origem aparece no HUD;
+- uma Raiz criada por propagação **não pode iniciar outra propagação**. A cadeia termina nessa segunda Raiz.
 
 ## 6.7 Semente Viva
 
@@ -1414,9 +1417,224 @@ Vitória da Matriarca:
 
 ---
 
-# 7. Bot
+# 7. Lady Dimitrescu
 
-## 7.1 Regras gerais
+## 7.1 Identidade
+
+Chefe vampírica de pressão progressiva. A **Sede de Sangue** não funciona apenas como uma barra de derrota: ela também é combustível para cura e proteção, o que diferencia a Dimitrescu do Banqueiro. Usa a mesa e o baralho `resident`.
+
+```text
+HP: 2300
+Sede de Sangue: 0..100
+```
+
+A equipe perde imediatamente se a Sede chegar a **100**. Se os recursos da partida acabarem e Lady Dimitrescu ainda estiver viva, ela também vence.
+
+## 7.2 Redução de Sede
+
+Evoluções de canastra removem Sede apenas quando o jogo alcança um tier novo:
+
+| Evolução | Sede removida |
+|---|---:|
+| Simples / Suja | 0 |
+| Limpa | 4 |
+| Real | 8 |
+| Ás-a-Ás | 12 |
+
+A Sede também pode cair ao cumprir objetivos das filhas, romper a Marca Carmesim ou destruir o Coágulo Carmesim.
+
+## 7.3 Fases
+
+| Fase | Nome | Identidade |
+|---:|---|---|
+| 1 | A Caçada | Bela caça cartas; Lady cobra sangue, marca vítimas e pode gastar Sede para se curar |
+| 2 | As Filhas | Cassandra passa a atacar jogos e o Morto; Daniela contamina o lixo; o Coágulo cria proteção |
+| 3 | Banquete Carmesim | as três filhas podem agir juntas e Lady combina bloqueio, cura e defesa vampírica |
+
+## 7.4 Caçada de Bela
+
+```text
+id: bela_hunt
+peso: 5
+fases: 1, 2 e 3
+```
+
+Bela marca **uma carta exata** de um cooperador; somente essa carta recebe a mancha de sangue da Caçada.
+
+- usar a carta legalmente até o fim do turno: **Sede -3**;
+- falhar nas Fases 1–2: **Sede +14**;
+- falhar na Fase 3: **Sede +16**.
+
+## 7.5 Tributo de Sangue
+
+```text
+id: blood_tithe
+peso: 4
+fases: 1, 2 e 3
+```
+
+No fechamento da rodada, cada mão é avaliada separadamente:
+
+| Cartas na mão | Fases 1–2 | Fase 3 |
+|---:|---:|---:|
+| 0–7 | +0 | +0 |
+| 8–10 | +4 | +6 |
+| 11+ | +8 | +10 |
+
+## 7.6 Vinho Carmesim
+
+```text
+id: red_wine
+peso: 2
+fases: 1, 2 e 3
+```
+
+Elegível quando Lady está ferida e possui Sede suficiente. Ela **consome 15 de Sede** para se regenerar:
+
+- Fase 1: até **140 HP**;
+- Fase 2: até **200 HP**;
+- Fase 3: até **260 HP**.
+
+A cura deixa de ser gratuita: o jogador pode ver a Sede cair, mas em troca a luta é prolongada.
+
+## 7.7 Marca Carmesim
+
+```text
+id: crimson_brand
+peso: 4
+fases: 1, 2 e 3
+```
+
+Lady marca uma carta jogável de **cada cooperador**. O HUD usa o mesmo padrão amarelo de objetivos múltiplos já adotado pelos outros chefes e mostra cada marca separadamente.
+
+- cada carta marcada usada legalmente: **Sede -2**;
+- cada marca que sobreviver à rodada: **Sede +7** nas Fases 1–2 ou **+9** na Fase 3.
+
+A Marca Carmesim usa uma mancha de sangue diferente da Caçada de Bela para que as duas mecânicas sejam reconhecíveis visualmente.
+
+## 7.8 Banquete de Cassandra
+
+```text
+id: cassandra_feast
+peso: 5
+fases: 2 e 3
+```
+
+Cassandra marca um jogo existente e ele recebe uma moldura/mancha própria de sangue.
+
+- alimentar o jogo na rodada: **Sede -4**;
+- falhar na Fase 2: **Sede +16**;
+- falhar na Fase 3: **Sede +18**.
+
+## 7.9 Banquete dos Mortos
+
+```text
+id: cassandra_dead_feast
+peso: 3
+fases: 2 e 3
+```
+
+Cassandra profana o próximo Morto disponível. A maldição permanece visível no próprio monte do Morto até ele ser tomado.
+
+Quando o Morto profanado é conquistado:
+
+- Fase 2: **Sede +12** e Lady cura até **90 HP**;
+- Fase 3: **Sede +16** e Lady cura até **130 HP**;
+- se a equipe já possui Canastra **Real ou Ás-a-Ás**, o Morto é purificado: apenas **Sede +4** e a cura é anulada.
+
+## 7.10 Enxame de Daniela
+
+```text
+id: daniela_swarm
+peso: 4
+fases: 2 e 3
+```
+
+Daniela contamina **uma carta real do lixo**. A pilha e a própria carta-alvo recebem sangue visual quando ela está no topo.
+
+- evitar o lixo durante a rodada: **Sede -3**;
+- retirar o lixo na Fase 2: **Sede +12**;
+- retirar o lixo na Fase 3: **Sede +15**.
+
+## 7.11 Coágulo Carmesim
+
+```text
+id: crimson_clot
+peso: 3
+fases: 2 e 3
+```
+
+Lady solidifica o sangue em uma proteção própria, distinta do Casulo da Matriarca:
+
+- Fase 2: **180** de proteção;
+- Fase 3: **260** de proteção;
+- o dano atinge primeiro o Coágulo;
+- romper o Coágulo: **Sede -6**;
+- se ele sobreviver até o fim da rodada, **50% da proteção restante vira cura**.
+
+O HUD reutiliza a área de proteção, mas com identidade visual de sangue/coágulo e estados de integridade próprios.
+
+## 7.12 Portas do Castelo
+
+```text
+id: castle_lockdown
+peso: 3
+fase: 3
+```
+
+Bloqueia o lixo durante toda a rodada. Os cooperadores precisam comprar do monte até o efeito terminar.
+
+## 7.13 As Três Filhas
+
+```text
+id: three_daughters
+peso: 5
+fase: 3
+```
+
+Cria até três objetivos válidos, um por filha:
+
+- **Bela:** usar a carta marcada;
+- **Cassandra:** alimentar o jogo marcado;
+- **Daniela:** evitar a carta contaminada do lixo.
+
+O HUD lista cada objetivo numa linha separada com o padrão de feedback amarelo (`☐`, `☑`, `✕`). Os retratos de Bela, Cassandra e Daniela aparecem simultaneamente e mudam de estado conforme cada objetivo é concluído ou falha.
+
+No fechamento:
+
+- cada objetivo cumprido: **Sede -2**;
+- cada objetivo falho: **Sede +8**.
+
+## 7.14 Filhas, marcas de sangue e áudio
+
+Lady permanece no retrato principal. Bela, Cassandra e Daniela aparecem em uma faixa independente sob o HUD, em três posições fixas de 1/3 da largura. Cada filha aparece somente quando participa da habilidade ativa ou de um efeito persistente ligado a ela.
+
+Os retratos preservam proporção com `object-fit: cover`: **184×116** no desktop, **134×86** em tablet e **112×76** no mobile. Estados: ativa em amarelo, concluída em verde e falha em vermelho.
+
+A linguagem visual de sangue é aplicada ao **alvo real**, não à zona inteira: carta de Bela, carta da Marca Carmesim, jogo de Cassandra, carta contaminada de Daniela e Morto profanado. A barra de Sede usa bordô/vinho escuro com textura e gotas em CSS; animações pesadas ficam desativadas em touch e `prefers-reduced-motion`.
+
+O áudio `ganho-sangue-dimitresco.mp3` toca sempre que a Sede aumenta. A risada eventual da Dimitrescu continua reservada para uma implementação futura.
+
+## 7.15 Habilidades e pesos
+
+| Habilidade | Peso | Fases |
+|---|---:|---|
+| Caçada de Bela | 5 | 1, 2 e 3 |
+| Tributo de Sangue | 4 | 1, 2 e 3 |
+| Vinho Carmesim | 2 | 1, 2 e 3 |
+| Marca Carmesim | 4 | 1, 2 e 3 |
+| Banquete de Cassandra | 5 | 2 e 3 |
+| Banquete dos Mortos | 3 | 2 e 3 |
+| Enxame de Daniela | 4 | 2 e 3 |
+| Coágulo Carmesim | 3 | 2 e 3 |
+| Portas do Castelo | 3 | 3 |
+| As Três Filhas | 5 | 3 |
+
+---
+
+# 8. Bot
+
+## 8.1 Regras gerais
 
 O bot:
 
@@ -1427,7 +1645,7 @@ O bot:
 - não cria soft lock;
 - considera condição especial e fim do monte.
 
-## 7.2 Banqueiro
+## 8.2 Banqueiro
 
 Avalia:
 
@@ -1441,7 +1659,7 @@ Avalia:
 
 Não rejeita custo apenas quando letal; compara utilidade real.
 
-## 7.3 Dominadora
+## 8.3 Dominadora
 
 Avalia:
 
@@ -1452,7 +1670,7 @@ Avalia:
 - Posse coordenada;
 - Mãos Atadas compartilhada.
 
-## 7.4 Matriarca
+## 8.4 Matriarca
 
 Prioriza:
 
@@ -1466,11 +1684,23 @@ Prioriza:
 - ruptura do Casulo;
 - Pólen conforme risco real.
 
+## 8.5 Dimitrescu
+
+Prioriza:
+
+- carta exata marcada pela Caçada de Bela;
+- as duas cartas da Marca Carmesim;
+- jogo marcado por Cassandra;
+- risco do Morto profanado;
+- evitar o lixo durante Daniela;
+- objetivos correspondentes em `As Três Filhas`;
+- urgência maior quando a Sede chega a 75 ou mais e quando o Coágulo está ativo.
+
 ---
 
-# 8. HUD e identidade visual
+# 9. HUD e identidade visual
 
-## 8.1 HUD compacto
+## 9.1 HUD compacto
 
 Mostrar:
 
@@ -1486,7 +1716,7 @@ Mostrar:
 
 O painel recolhível do HUD mostra **Habilidades do chefe**: condição especial, habilidades da rotação, fases em que cada uma pode aparecer e destaque da habilidade ativa. O registro técnico da batalha continua no estado para sincronização e diagnóstico, mas não ocupa mais esse painel.
 
-## 8.2 Banqueiro
+## 9.2 Banqueiro
 
 Mostrar:
 
@@ -1497,7 +1727,7 @@ Mostrar:
 - Limite de Crédito;
 - Ágio.
 
-## 8.3 Dominadora
+## 9.3 Dominadora
 
 Mostrar:
 
@@ -1509,7 +1739,7 @@ Mostrar:
 - disponibilidade de Mãos Atadas;
 - contribuições de Posse.
 
-## 8.4 Matriarca
+## 9.4 Matriarca
 
 Mostrar:
 
@@ -1522,7 +1752,21 @@ Mostrar:
 - Casulo;
 - Raiz Fortalecida e contribuições.
 
-## 8.5 Animações
+## 9.5 Dimitrescu
+
+Mostrar:
+
+- Sede de Sangue 0/100;
+- objetivo ativo e consequência;
+- marca de Bela somente na carta-alvo;
+- Marca Carmesim individual por cooperador;
+- marca de Cassandra no jogo e no Morto profanado;
+- contaminação de Daniela na carta real do lixo;
+- Coágulo Carmesim e proteção restante;
+- faixa contextual das filhas sob o HUD, com estado por objetivo;
+- barra de Sede visualmente distinta da barra de HP.
+
+## 9.6 Animações
 
 Toda animação depende de evento, não de render.
 
@@ -1539,7 +1783,7 @@ Touch, tablet e `prefers-reduced-motion` usam fades curtos.
 
 ---
 
-# 9. Persistência, sincronização e Voltar
+# 10. Persistência, sincronização e Voltar
 
 Persistir:
 
@@ -1567,16 +1811,18 @@ Persistir:
 - Renascimento;
 - IDs de dano;
 - marcadores por jogo;
+- Sede de Sangue e objetivos das filhas;
+- estado contextual da faixa das filhas;
 - IDs de eventos.
 
-## 9.1 Autoridade
+## 10.1 Autoridade
 
 - um cliente aplica efeitos;
 - observador não executa;
 - todos veem o mesmo estado público;
 - mãos secretas permanecem secretas.
 
-## 9.2 Idempotência
+## 10.2 Idempotência
 
 Snapshot não duplica:
 
@@ -1585,12 +1831,13 @@ Snapshot não duplica:
 - Dívida;
 - Chicote;
 - Flor;
+- Sede de Sangue;
 - propagação;
 - contribuições;
 - sorteio;
 - animação.
 
-## 9.3 Voltar
+## 10.3 Voltar
 
 Voltar é transacional e restaura:
 
@@ -1620,7 +1867,7 @@ Quando uma ação é irreversível pelas regras, o botão fica claramente indisp
 
 ---
 
-# 10. Segurança e soft lock
+# 11. Segurança e soft lock
 
 O sistema deve impedir ou cancelar com segurança:
 
@@ -1632,6 +1879,7 @@ O sistema deve impedir ou cancelar com segurança:
 - Cofre inválido;
 - Posse fantasma;
 - ameaça da Matriarca impossível;
+- objetivo da Dimitrescu sem alvo legal;
 - prazo resolvido antecipadamente;
 - escolha perdida em reload;
 - evento duplicado;
@@ -1642,7 +1890,7 @@ Mudança externa cancela somente o efeito afetado, sem punição indevida.
 
 ---
 
-# 11. Tablet, desempenho e acessibilidade
+# 12. Tablet, desempenho e acessibilidade
 
 Em touch, tablet e `prefers-reduced-motion`:
 
@@ -1653,25 +1901,27 @@ Em touch, tablet e `prefers-reduced-motion`:
 - sem estroboscópio;
 - partículas são removidas ou reduzidas;
 - números e rótulos continuam completos;
-- controles continuam acessíveis.
+- controles continuam acessíveis;
+- os três retratos das filhas mantêm as dimensões equivalentes ao retrato principal por breakpoint;
+- a animação da barra de sangue fica desativada em touch e `prefers-reduced-motion`.
 
 ---
 
-# 12. Comparação dos chefes
+# 13. Comparação dos chefes
 
-| Característica        | Banqueiro                     | Dominadora                    | Matriarca             |
-| --------------------- | ----------------------------- | ----------------------------- | --------------------- |
-| HP                    | 2500                          | 2100                          | 2000                  |
-| Perigo                | Dívida coletiva               | Chicotes individuais          | Florescimento         |
-| Derrota               | Dívida 100                    | ambos com 4                   | 5 Flores              |
-| Pressão               | preços e recursos             | ordens e eficiência           | ameaças e propagação  |
-| Recuperação da equipe | redução de Dívida             | Resistência                   | poda por evolução     |
-| Compra/lixo           | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle           | Pólen                 |
-| Jogos                 | Penhora e Limite              | Posse, Mãos Atadas, Interdito | Raiz, Enxerto, Casulo |
+| Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu |
+|---|---|---|---|---|
+| HP | 2500 | 2500 | 2000 | 2300 |
+| Perigo | Dívida coletiva | Chicotes individuais | Florescimento | Sede de Sangue |
+| Derrota especial | Dívida 100 | ambos com 4 Chicotes | 5 Flores | Sede 100 |
+| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção |
+| Recuperação da equipe | redução de Dívida | Resistência | poda por evolução | redução de Sede por canastra |
+| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle | Pólen | Daniela, Morto profanado e Portas do Castelo |
+| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim |
 
 ---
 
-# 13. Testes e validação
+# 14. Testes e validação
 
 A suíte deve cobrir comportamento, não apenas presença de strings.
 
@@ -1692,7 +1942,10 @@ A suíte deve cobrir comportamento, não apenas presença de strings.
 - cliente observador;
 - reload;
 - ataques finais;
-- marcadores.
+- marcadores;
+- Sede de Sangue;
+- objetivos de Bela, Cassandra e Daniela;
+- layout responsivo da faixa das filhas.
 
 Comandos:
 

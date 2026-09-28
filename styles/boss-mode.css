@@ -3033,3 +3033,522 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
 .boss-vault-required .boss-vault-copy strong {
   color: #fde68a;
 }
+
+/* Lady Dimitrescu: vinho, sangue e retratos contextuais das filhas. */
+body[data-boss-id='dimitrescu'] .boss-hud {
+  border-color: rgba(185, 28, 28, 0.82);
+  background: linear-gradient(180deg, rgba(35, 7, 10, 0.985), rgba(12, 5, 9, 0.975));
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.56),
+    inset 0 1px rgba(255, 255, 255, 0.07),
+    0 0 25px rgba(153, 27, 27, 0.2);
+}
+body[data-boss-id='dimitrescu'] .boss-hud::before,
+body[data-boss-id='dimitrescu'] .boss-hud::after {
+  border-color: #dc2626;
+}
+body[data-boss-id='dimitrescu'] .boss-hud-kicker,
+body[data-boss-id='dimitrescu'] .boss-round-summary #bossCurrentActor {
+  color: #fca5a5;
+}
+body[data-boss-id='dimitrescu'] .boss-phase {
+  border-color: rgba(248, 113, 113, 0.72);
+  color: #fecaca;
+}
+body[data-boss-id='dimitrescu'] .boss-portrait {
+  isolation: isolate;
+  contain: paint;
+  border-color: rgba(248, 113, 113, 0.78);
+  box-shadow:
+    0 0 17px rgba(185, 28, 28, 0.34),
+    inset 0 0 0 1px rgba(254, 226, 226, 0.08);
+}
+body[data-boss-id='dimitrescu'] .boss-portrait img {
+  position: relative;
+  z-index: 1;
+  object-position: 50% 24%;
+  transform: scale(1.12);
+  transform-origin: 50% 24%;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-label {
+  color: #d9a1a8;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-label > span:first-child {
+  color: #e7a0a8;
+  letter-spacing: 0.65px;
+  text-shadow: 0 0 8px rgba(91, 7, 17, 0.45);
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-label strong {
+  color: #ffd6d9;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track {
+  height: 16px;
+  overflow: visible;
+  border-color: rgba(116, 22, 31, 0.78);
+  background:
+    radial-gradient(circle at 22% 40%, rgba(91, 7, 17, 0.38) 0 2px, transparent 3px),
+    radial-gradient(circle at 63% 62%, rgba(71, 5, 13, 0.46) 0 2px, transparent 3px),
+    linear-gradient(180deg, #210208, #0e0104 70%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.78),
+    inset 0 0 9px rgba(83, 7, 17, 0.42),
+    0 0 0 1px rgba(22, 1, 5, 0.66);
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span {
+  position: relative;
+  overflow: visible;
+  border-radius: 2px;
+  background:
+    radial-gradient(circle at 13% 40%, rgba(255, 194, 199, 0.14) 0 2px, transparent 3px),
+    radial-gradient(circle at 31% 68%, rgba(255, 214, 217, 0.09) 0 1px, transparent 2px),
+    radial-gradient(circle at 69% 35%, rgba(255, 194, 199, 0.12) 0 2px, transparent 3px),
+    linear-gradient(180deg, #7d1521 0%, #5a0914 38%, #36040c 74%, #220208 100%);
+  background-size: 74px 16px, 96px 16px, 112px 16px, 100% 100%;
+  box-shadow:
+    inset 0 1px rgba(255, 219, 222, 0.16),
+    inset 0 -3px 4px rgba(15, 0, 3, 0.48),
+    0 0 9px rgba(91, 7, 17, 0.62);
+  animation: dimitrescuBloodFlow 5.8s linear infinite;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::before {
+  content: '';
+  position: absolute;
+  inset: 2px 0 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.5;
+  background:
+    linear-gradient(90deg, transparent 0 18%, rgba(255,255,255,0.08) 20%, transparent 23% 54%, rgba(255,255,255,0.055) 57%, transparent 60% 100%);
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  right: 5px;
+  top: calc(100% - 1px);
+  width: 7px;
+  height: 8px;
+  border-radius: 0 0 70% 70%;
+  background: #43050e;
+  box-shadow:
+    -21px -2px 0 -2px #5d0915,
+    -43px 1px 0 -2.5px #32030a;
+  filter: drop-shadow(0 2px 1px rgba(0,0,0,0.42));
+  transform-origin: 50% 0;
+  animation: dimitrescuBloodDrip 2.8s ease-in-out infinite;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0']::after {
+  display: none;
+}
+@keyframes dimitrescuBloodFlow {
+  from { background-position: 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 74px 0, -96px 0, 112px 0, 0 0; }
+}
+@keyframes dimitrescuBloodDrip {
+  0%, 100% { transform: scaleY(0.72); opacity: 0.72; }
+  48% { transform: scaleY(1.18); opacity: 1; }
+}
+
+/* Filhas de Lady Dimitrescu: faixa independente sob o HUD principal. */
+.boss-daughter-strip {
+  width: calc(100% - 240px);
+  max-width: 1080px;
+  margin: -5px auto 12px;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+  position: relative;
+  z-index: 31;
+  pointer-events: none;
+}
+.boss-daughter-strip[hidden],
+body:not([data-boss-id='dimitrescu']) .boss-daughter-strip {
+  display: none !important;
+}
+.boss-daughter-card {
+  min-width: 0;
+  min-height: 145px;
+  display: grid;
+  grid-template-rows: 116px auto;
+  justify-items: center;
+  align-content: start;
+  overflow: hidden;
+  border: 1px solid rgba(127, 29, 29, 0.62);
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(33, 5, 9, 0.96), rgba(11, 3, 6, 0.985));
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.48),
+    inset 0 1px rgba(255, 255, 255, 0.045),
+    0 0 15px rgba(127, 29, 29, 0.12);
+}
+.boss-daughter-card[data-daughter='bela'] { grid-column: 1; }
+.boss-daughter-card[data-daughter='cassandra'] { grid-column: 2; }
+.boss-daughter-card[data-daughter='daniela'] { grid-column: 3; }
+.boss-daughter-card img {
+  width: 184px;
+  height: 116px;
+  max-width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: 50% 27%;
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  background: #080204;
+}
+.boss-daughter-card b {
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+  padding: 7px 8px 8px;
+  overflow: hidden;
+  border-top: 1px solid rgba(127, 29, 29, 0.34);
+  color: #fecaca;
+  background: rgba(35, 5, 9, 0.82);
+  font-size: 9px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.7px;
+  text-align: center;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.boss-daughter-state {
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  z-index: 4;
+  padding: 3px 5px;
+  border: 1px solid rgba(250, 204, 21, 0.74);
+  border-radius: 3px;
+  color: #fef3c7;
+  background: rgba(66, 32, 6, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.48), 0 0 10px rgba(245, 158, 11, 0.12);
+  font-size: 6px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+.boss-daughter-card.is-active {
+  position: relative;
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(250, 204, 21, 0.1),
+    0 0 16px rgba(245, 158, 11, 0.16);
+}
+.boss-daughter-card.is-success {
+  position: relative;
+  border-color: rgba(74, 222, 128, 0.66) !important;
+  filter: saturate(0.86);
+}
+.boss-daughter-card.is-success .boss-daughter-state {
+  border-color: rgba(74, 222, 128, 0.72);
+  color: #bbf7d0;
+  background: rgba(5, 46, 22, 0.92);
+}
+.boss-daughter-card.is-failed {
+  position: relative;
+  border-color: rgba(248, 113, 113, 0.72) !important;
+  filter: saturate(0.62) brightness(0.72);
+}
+.boss-daughter-card.is-failed .boss-daughter-state {
+  border-color: rgba(248, 113, 113, 0.76);
+  color: #fecaca;
+  background: rgba(69, 10, 10, 0.94);
+}
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='bela'] { border-color: rgba(254, 240, 138, 0.48); }
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='cassandra'] { border-color: rgba(248, 113, 113, 0.6); }
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] { border-color: rgba(251, 146, 60, 0.5); }
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='bela'] img { object-position: 50% 28%; }
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='cassandra'] img { object-position: 50% 25%; }
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img { object-position: 50% 27%; }
+
+.boss-mode .carta.boss-card-dimitrescu-hunt {
+  isolation: isolate;
+  border-color: #ef4444 !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(126, 11, 24, 0.74),
+    0 0 0 2px rgba(254, 202, 202, 0.42),
+    0 0 14px rgba(220, 38, 38, 0.46) !important;
+}
+.boss-mode .carta.boss-card-dimitrescu-hunt::before,
+.boss-mode .carta.boss-card-dimitrescu-blood-mark::before,
+.boss-mode .discard-face.boss-discard-dimitrescu-card::before {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.9;
+  background:
+    radial-gradient(circle at 13% 18%, rgba(88, 3, 14, 0.78) 0 5%, rgba(117, 7, 20, 0.42) 6% 9%, transparent 10%),
+    radial-gradient(ellipse at 82% 73%, rgba(73, 2, 12, 0.72) 0 6%, rgba(112, 6, 19, 0.38) 7% 12%, transparent 13%),
+    radial-gradient(circle at 69% 22%, rgba(127, 9, 25, 0.48) 0 2%, transparent 3%),
+    linear-gradient(108deg, transparent 0 58%, rgba(72, 2, 12, 0.2) 65%, transparent 72%);
+  mix-blend-mode: multiply;
+}
+.boss-mode .carta.boss-card-dimitrescu-blood-mark {
+  isolation: isolate;
+  border-color: #991b1b !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(69, 10, 10, 0.76),
+    0 0 0 2px rgba(248, 113, 113, 0.3),
+    0 0 15px rgba(127, 29, 29, 0.5) !important;
+}
+.boss-mode .carta.boss-card-dimitrescu-blood-mark::before {
+  opacity: 0.97;
+  background:
+    radial-gradient(circle at 17% 18%, rgba(74, 2, 12, 0.88) 0 7%, rgba(123, 8, 24, 0.52) 8% 12%, transparent 13%),
+    radial-gradient(ellipse at 76% 68%, rgba(69, 2, 11, 0.82) 0 8%, rgba(121, 7, 20, 0.45) 9% 14%, transparent 15%),
+    radial-gradient(circle at 61% 31%, rgba(112, 6, 20, 0.56) 0 3%, transparent 4%),
+    linear-gradient(111deg, transparent 0 48%, rgba(68, 2, 11, 0.24) 56%, transparent 64%);
+}
+.boss-mode .boss-card-status-blood-hunt {
+  color: #fff1f2;
+  background: rgba(127, 29, 29, 0.96);
+  border-color: rgba(254, 202, 202, 0.72);
+}
+.boss-mode .boss-card-status-blood-hunt i {
+  width: auto !important;
+  height: auto !important;
+  font-style: normal;
+  line-height: 1;
+}
+.boss-mode .boss-card-status-crimson-brand {
+  color: #ffe4e6;
+  background: rgba(69, 10, 10, 0.97);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.52), 0 0 8px rgba(153, 27, 27, 0.26);
+}
+.boss-mode .meld-line.feasted-by-cassandra {
+  position: relative;
+  isolation: isolate;
+}
+.boss-mode .meld-line.feasted-by-cassandra::before {
+  content: 'BANQUETE DE CASSANDRA';
+  position: absolute;
+  inset: -5px -5px auto;
+  z-index: 0;
+  min-height: calc(100% + 10px);
+  padding: 3px 5px;
+  border: 2px solid rgba(220, 38, 38, 0.62);
+  border-radius: 7px;
+  color: rgba(254, 202, 202, 0.88);
+  background:
+    radial-gradient(circle at 11% 22%, rgba(92, 4, 17, 0.3) 0 5px, transparent 7px),
+    radial-gradient(circle at 87% 72%, rgba(112, 5, 20, 0.24) 0 7px, transparent 9px),
+    linear-gradient(180deg, rgba(69, 10, 10, 0.17), transparent 48%);
+  box-shadow: 0 0 14px rgba(185, 28, 28, 0.25), inset 0 0 13px rgba(127, 29, 29, 0.1);
+  font-size: 6px;
+  font-weight: 1000;
+  letter-spacing: 0.45px;
+  pointer-events: none;
+}
+.boss-mode .meld-line.feasted-by-cassandra .meld-line-cards,
+.boss-mode .meld-line.feasted-by-cassandra .meld-meta {
+  position: relative;
+  z-index: 2;
+}
+.boss-mode #drawDiscardBtn.boss-daniela-discard .pile-card {
+  box-shadow:
+    0 0 0 2px rgba(248, 113, 113, 0.92),
+    0 0 0 5px rgba(127, 29, 29, 0.28),
+    0 0 18px rgba(220, 38, 38, 0.48) !important;
+}
+.boss-mode .discard-face.boss-discard-dimitrescu-card {
+  isolation: isolate;
+  border-color: #991b1b !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(69, 10, 10, 0.72),
+    0 0 0 2px rgba(248, 113, 113, 0.44),
+    0 0 16px rgba(153, 27, 27, 0.54) !important;
+}
+.boss-mode .discard-face.boss-discard-dimitrescu-card::before {
+  opacity: 1;
+}
+.boss-mode #drawDiscardBtn.boss-daniela-discard::after {
+  content: 'ENXAME DE DANIELA';
+  display: block;
+  margin-top: 3px;
+  color: #fca5a5;
+  font-size: 7px;
+  font-weight: 1000;
+  text-align: center;
+}
+.boss-mode .morto-container.boss-dimitrescu-dead {
+  filter: drop-shadow(0 0 9px rgba(153, 27, 27, 0.62));
+}
+.boss-mode .morto-container.boss-dimitrescu-dead::before {
+  content: 'BANQUETE';
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  z-index: 35;
+  min-width: 52px;
+  padding: 3px 5px;
+  border: 1px solid rgba(248, 113, 113, 0.72);
+  border-radius: 3px;
+  transform: translateX(-50%) rotate(calc(var(--morto-label-rotation, 0deg) * -1));
+  color: #ffe4e6;
+  background: rgba(69, 10, 10, 0.95);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.58), 0 0 11px rgba(153, 27, 27, 0.32);
+  font-size: 6px;
+  font-weight: 1000;
+  letter-spacing: 0.55px;
+  text-align: center;
+  pointer-events: none;
+}
+.boss-mode .morto-container.boss-dimitrescu-dead::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  z-index: 30;
+  border: 2px solid rgba(185, 28, 28, 0.74);
+  border-radius: 8px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 14% 20%, rgba(91, 7, 17, 0.56) 0 5px, transparent 7px),
+    radial-gradient(circle at 79% 76%, rgba(112, 5, 20, 0.45) 0 6px, transparent 8px);
+  box-shadow: inset 0 0 15px rgba(91, 7, 17, 0.2), 0 0 11px rgba(153, 27, 27, 0.35);
+}
+
+/* Coágulo Carmesim: proteção vampírica própria, distinta do Casulo da Matriarca. */
+body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active .boss-cocoon-meter {
+  border-color: rgba(153, 27, 27, 0.74);
+  color: #fecaca;
+  background: linear-gradient(180deg, rgba(69, 10, 10, 0.9), rgba(34, 3, 8, 0.92));
+  box-shadow: inset 0 0 8px rgba(127, 29, 29, 0.24), 0 0 8px rgba(185, 28, 28, 0.18);
+}
+body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active .boss-portrait {
+  box-shadow:
+    0 0 17px rgba(185, 28, 28, 0.4),
+    inset 0 0 0 2px rgba(127, 29, 29, calc(0.2 + var(--boss-blood-clot-strength, 0) * 0.45)),
+    0 0 24px rgba(127, 29, 29, calc(0.08 + var(--boss-blood-clot-strength, 0) * 0.22));
+}
+body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active .boss-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: 3;
+  border-radius: inherit;
+  border: 2px solid rgba(117, 12, 27, calc(0.35 + var(--boss-blood-clot-strength, 0) * 0.5));
+  background:
+    radial-gradient(circle at 15% 20%, rgba(92, 3, 17, 0.35) 0 8%, transparent 10%),
+    radial-gradient(circle at 81% 68%, rgba(71, 2, 13, 0.32) 0 11%, transparent 13%);
+  pointer-events: none;
+}
+body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active[data-blood-clot-stage='cracked'] .boss-portrait::after {
+  background:
+    linear-gradient(68deg, transparent 48%, rgba(248, 113, 113, 0.5) 49% 50%, transparent 51%) 52% 24% / 54% 68% no-repeat,
+    radial-gradient(circle at 15% 20%, rgba(92, 3, 17, 0.34) 0 8%, transparent 10%);
+}
+body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active[data-blood-clot-stage='critical'] .boss-portrait::after {
+  opacity: 0.58;
+  border-style: dashed;
+}
+.boss-floating-number.blood-clot-absorb {
+  color: #fda4af;
+  text-shadow: 0 0 10px rgba(153, 27, 27, 0.72), 0 2px 8px #000;
+}
+.boss-floating-number.blood-clot-break {
+  color: #fecdd3;
+  text-shadow: 0 0 13px rgba(248, 113, 113, 0.82), 0 2px 8px #000;
+}
+@keyframes dimitrescuClotImpact {
+  0% { transform: scale(1); filter: brightness(1); }
+  48% { transform: scale(1.035); filter: brightness(1.25) saturate(1.25); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-impact,
+body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
+  animation: dimitrescuClotImpact 520ms ease-out both;
+}
+.boss-floating-number.blood-up {
+  color: #f87171;
+  text-shadow: 0 0 10px rgba(220, 38, 38, 0.7), 0 2px 8px #000;
+}
+.boss-floating-number.blood-down {
+  color: #fecaca;
+}
+
+@media (max-width: 900px) {
+  body[data-boss-id='dimitrescu'] .boss-portrait img {
+    object-position: 50% 23%;
+    transform: scale(1.09);
+  }
+  .boss-daughter-strip {
+    width: calc(100% - 28px);
+    gap: 8px;
+    margin-top: -4px;
+  }
+  .boss-daughter-card {
+    min-height: 111px;
+    grid-template-rows: 86px auto;
+  }
+  .boss-daughter-card img {
+    width: 134px;
+    height: 86px;
+  }
+  .boss-daughter-card b {
+    padding: 6px 6px 7px;
+    font-size: 8px;
+  }
+  .boss-daughter-state {
+    right: 5px;
+    top: 5px;
+    padding: 2px 4px;
+    font-size: 5.5px;
+  }
+}
+
+@media (max-width: 620px) {
+  .boss-daughter-strip {
+    width: calc(100% - 16px);
+    gap: 6px;
+    margin-top: -3px;
+  }
+  .boss-daughter-card {
+    min-height: 101px;
+    grid-template-rows: 76px auto;
+    border-radius: 6px;
+  }
+  .boss-daughter-card img {
+    width: 112px;
+    height: 76px;
+  }
+  .boss-daughter-card b {
+    padding: 6px 4px 7px;
+    font-size: 7px;
+    letter-spacing: 0.35px;
+  }
+  .boss-daughter-state {
+    right: 4px;
+    top: 4px;
+    max-width: calc(100% - 8px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .boss-mode .morto-container.boss-dimitrescu-dead::before {
+    min-width: 44px;
+    padding-inline: 3px;
+    font-size: 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse) {
+  body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span,
+  body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after,
+  body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-impact,
+  body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
+    animation: none !important;
+  }
+}
+.boss-mode .boss-meld-contribution-blood {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.2);
+}
