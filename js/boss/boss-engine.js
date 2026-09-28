@@ -1878,7 +1878,7 @@ function resolveMatriarchRound(gameState) {
     if (['root', 'twin_root', 'royal_root'].includes(threat.type)) {
       const event = failNatureThreat(gameState, threat, { bloom: 1, heal: 0, outcome: `O jogo ${Number(threat.meldIndex) + 1} nao alimentou a raiz.` });
       events.push(event);
-      if (threat.type === 'root' || threat.type === 'royal_root') requestRootPropagation(gameState, threat);
+      if ((threat.type === 'root' || threat.type === 'royal_root') && !threat.propagated) requestRootPropagation(gameState, threat);
     } else if (threat.type === 'graft') {
       const fed = new Set(threat.fedMeldIds || []).size;
       if (fed >= 2) events.push(succeedNatureThreat(gameState, threat, 'Os dois jogos alimentaram o Enxerto.'));
@@ -2048,7 +2048,9 @@ export function getBossNatureThreatSummaries(gameState) {
       condition = threat.strengthened
         ? `Cada cooperador deve adicionar 1 carta legal (${contributors}/${threat.requiredContributorCount || 2}).`
         : 'Adicionar 1 carta legal ao jogo marcado nesta rodada.';
-      consequence = `Falha: +${threat.bloomAmount || 1} Flor e pode propagar uma Raiz.`;
+      consequence = threat.propagated
+        ? `Falha: +${threat.bloomAmount || 1} Flor. Esta Raiz ja veio de propagacao e nao se propaga novamente.`
+        : `Falha: +${threat.bloomAmount || 1} Flor e pode propagar uma unica nova Raiz.`;
     } else if (threat.type === 'graft') {
       const fed = new Set(threat.fedMeldIds || []).size;
       condition = `Alimentar os dois jogos ligados (${fed}/2).`;
@@ -3487,11 +3489,14 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         : 'A troca falhou por falta de cartas.';
       resultData = swap || {};
     } else if (intent.abilityId === 'favorite') {
-      changeChains(gameState, intent.payload.protectedPlayerId, -1, 'favorite_protection');
-      changeChains(gameState, intent.payload.punishedPlayerId, 1, 'favorite_punishment');
+      const phase = Number(intent.announcedPhase || boss.phase || 1);
       const protectedPlayer = gameState.players.find((player) => player.id === intent.payload.protectedPlayerId);
       const punishedPlayer = gameState.players.find((player) => player.id === intent.payload.punishedPlayerId);
-      outcome = `${protectedPlayer?.name || 'A favorita'} foi protegida; ${punishedPlayer?.name || 'o outro cooperador'} recebeu 1 Chicote.`;
+      if (phase < 3) changeChains(gameState, intent.payload.protectedPlayerId, -1, 'favorite_protection');
+      changeChains(gameState, intent.payload.punishedPlayerId, 1, 'favorite_punishment');
+      outcome = phase >= 3
+        ? `${protectedPlayer?.name || 'A favorita'} foi poupada, mas nao perdeu Chicote; ${punishedPlayer?.name || 'o outro cooperador'} recebeu 1 Chicote.`
+        : `${protectedPlayer?.name || 'A favorita'} foi protegida e perdeu 1 Chicote; ${punishedPlayer?.name || 'o outro cooperador'} recebeu 1 Chicote.`;
       resultData = { protectedPlayerId: intent.payload.protectedPlayerId, punishedPlayerId: intent.payload.punishedPlayerId };
     } else if (intent.abilityId === 'exposure') {
       const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);

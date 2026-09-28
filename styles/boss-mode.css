@@ -2103,6 +2103,38 @@ body.boss-mode .brasao-dominacao {
   body.boss-mode #gameSection .board-melds > .grow:first-child {
     padding-top: 8px !important;
   }
+
+  /* Tablet/celular: o painel aberto precisa se destacar da mesa.
+     Evitamos backdrop-filter aqui para não adicionar custo de GPU durante o jogo. */
+  body.boss-mode .boss-battle-details[open] {
+    padding: 7px 8px 9px;
+    border: 1px solid rgba(100, 116, 139, 0.32);
+    border-radius: 8px;
+    background: rgba(2, 6, 23, 0.97);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+  }
+  body.boss-mode .boss-battle-details[open] > summary {
+    background: rgba(15, 23, 42, 0.98);
+    border-color: rgba(148, 163, 184, 0.42);
+    color: #e2e8f0;
+  }
+  body.boss-mode .boss-ability-overview {
+    background: rgba(15, 23, 42, 0.97);
+    border-color: rgba(148, 163, 184, 0.3);
+  }
+  body.boss-mode .boss-ability-card {
+    background: rgba(7, 12, 24, 0.96);
+    border-color: rgba(100, 116, 139, 0.32);
+    opacity: 0.88;
+  }
+  body.boss-mode .boss-ability-card.is-current-phase {
+    background: rgba(15, 23, 42, 0.99);
+    border-color: rgba(148, 163, 184, 0.5);
+    opacity: 1;
+  }
+  body.boss-mode .boss-ability-card p {
+    color: #b8c4d4;
+  }
 }
 
 @media (max-width: 620px) {

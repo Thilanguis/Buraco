@@ -8,7 +8,7 @@ export const dominatrixDefinition = Object.freeze({
   tableTheme: 'submissao',
   deckTheme: 'mythic',
   accent: '#ec4899',
-  maxHp: 2100,
+  maxHp: 2500,
   dangerType: 'chains',
   maxDanger: 4,
   phaseNames: Object.freeze({ 1: 'Marcação', 2: 'Controle', 3: 'Dominação Total' }),
@@ -31,17 +31,21 @@ export const dominatrixDefinition = Object.freeze({
   }),
   abilities: Object.freeze([
     ability('collar', 'Coleira', 5, [1, 2], () => 'Até duas cartas do jogador marcado ficarão presas durante o turno dele.'),
-    ability('forced_choice', 'Escolha Forçada', 4, [1, 2], () => 'O jogador marcado escolherá entre receber 1 Chicote ou aceitar uma ordem válida para o próximo turno.'),
-    ability('exposure', 'Exposição', 3, [1, 2], () => 'Uma carta deverá ser usada antes do fim do turno ou causará 1 Chicote.'),
+    ability('forced_choice', 'Escolha Forçada', 5, [1, 2, 3], ({ phase = 1 }) => phase === 3
+      ? 'O jogador marcado escolherá entre receber 1 Chicote ou aceitar uma ordem sob Dominação Total.'
+      : 'O jogador marcado escolherá entre receber 1 Chicote ou aceitar uma ordem válida para o próximo turno.'),
+    ability('exposure', 'Exposição', 4, [1, 2, 3], () => 'Uma carta deverá ser usada antes do fim do turno ou causará 1 Chicote.'),
     ability('forced_swap', 'Troca Forçada', 4, [2, 3], () => 'Uma carta será trocada entre as mãos dos cooperadores.'),
     ability('hands_tied', 'Mãos Atadas', 4, [2, 3], () => 'A equipe inteira poderá criar somente 1 novo jogo nesta rodada.'),
     ability('possession', 'Posse', 3, [2, 3], () => 'O dano de um jogo fica suspenso até ambos cooperarem ou o jogo evoluir.'),
-    ability('iron_etiquette', 'Etiqueta de Ferro', 4, [1, 2], () => 'O alvo deverá encerrar o próximo turno descartando o naipe ordenado.'),
-    ability('favorite', 'Favorita', 3, [2, 3], () => 'Uma favorita será protegida e o outro jogador receberá 1 Chicote.'),
+    ability('iron_etiquette', 'Etiqueta de Ferro', 4, [1, 2, 3], () => 'O alvo deverá encerrar o próximo turno descartando o naipe ordenado; falhar causa 1 Chicote.'),
+    ability('favorite', 'Favorita', 4, [2, 3], ({ phase = 2 }) => phase === 3
+      ? 'Na Dominação Total, a favorita não perde Chicote e o outro jogador recebe 1 Chicote.'
+      : 'Uma favorita será protegida, perdendo 1 Chicote, e o outro jogador receberá 1 Chicote.'),
     ability('double_collar', 'Dupla Coleira', 5, [3], () => 'Uma carta de cada jogador ficará presa nesta rodada.'),
     ability('separation', 'Separação', 4, [3], () => 'Os jogadores não poderão alimentar o mesmo jogo nesta rodada.'),
-    ability('absolute_control', 'Controle Absoluto', 3, [3], () => 'Um jogador ficará Dominado durante o próximo turno.'),
-    ability('break_will', 'Quebra de Vontade', 3, [3], () => 'Um jogador com 2 Chicotes enfrentará uma escolha pessoal.'),
-    ability('final_order', 'Ordem Final', 2, [3], () => 'Cada cooperador receberá uma punição diferente para escolher.'),
+    ability('absolute_control', 'Controle Absoluto', 4, [3], () => 'Um jogador ficará Dominado durante o próximo turno, sem poder abrir novos jogos e com golpe final reduzido.'),
+    ability('break_will', 'Quebra de Vontade', 4, [3], () => 'Um jogador com 2 Chicotes enfrentará uma escolha entre ganhar outro Chicote ou desmontar uma canastra.'),
+    ability('final_order', 'Ordem Final', 4, [3], () => 'Cada cooperador receberá uma punição diferente e deverá escolher entre obedecer ou receber 1 Chicote.'),
   ]),
 });

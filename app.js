@@ -6600,19 +6600,11 @@ function renderHand() {
 
       if (selectedHandIndexes.size === 0) selectedMeldTarget = null; // Auto-clear de segurança
 
-      // Do not rebuild the entire hand and every meld just to toggle one card.
-      // This is especially important after a large discard pickup, when the
-      // hand can temporarily contain dozens of cards until the turn ends.
-      div.classList.toggle('selected', selectedHandIndexes.has(idx));
-      if (pendingDiscardChoice) {
-        // Changing the hand selection invalidates the previous closed-discard
-        // destination calculation, so refresh only in that exceptional path.
-        renderMelds();
-      } else {
-        const teamIndex = state.teams.findIndex((team) => team.id === me.teamId);
-        const panel = teamIndex >= 0 ? document.getElementById(`teamPanel${teamIndex + 1}`) : null;
-        panel?.classList.toggle('can-drop-new', selectedHandIndexes.size > 0);
-      }
+      // Re-render using the live DOM card nodes. renderHand() rebinds indexes
+      // safely when the hand DOM is reused after a draw, and renderMelds()
+      // refreshes the drop targets for the current selection.
+      renderHand();
+      renderMelds();
     };
     nextCards.appendChild(div);
   });
