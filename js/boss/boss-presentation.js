@@ -274,14 +274,15 @@ function compactNatureProgress(gameState, intent) {
     const threat = threats[0];
     const cards = Number.isFinite(Number(threat?.observedHandSize)) ? Number(threat.observedHandSize) : player?.hand?.length || 0;
     const reductionNeeded = Math.max(0, cards - 7);
-    if (threat?.status === 'success') return `✅ COLHEITA EVITADA · terminou com ${cards} carta${cards === 1 ? '' : 's'}`;
+    const targetName = player?.name || playerName(gameState, intent.payload?.targetPlayerId) || 'Jogador';
+    if (threat?.status === 'success') return `☑ ${targetName} — terminou com ${cards} carta${cards === 1 ? '' : 's'} · meta cumprida`;
     if (threat?.status === 'failed') {
       const result = [threat.bloomApplied ? `+${threat.bloomApplied} Flor` : '', threat.healApplied ? `cura ${threat.healApplied} HP` : ''].filter(Boolean).join(' · ');
-      return `❌ ${cards >= 11 ? 'COLHEITA CRÍTICA' : 'COLHEITA ALIMENTADA'} · terminou com ${cards} cartas${result ? ` · ${result}` : ''}`;
+      return `✕ ${targetName} — terminou com ${cards} cartas${result ? ` · ${result}` : ''}`;
     }
-    if (threat?.status === 'cancelled') return `— COLHEITA CANCELADA · ${cards} carta${cards === 1 ? '' : 's'}`;
-    if (cards <= 7) return `✅ META ATINGIDA AGORA · ${cards} carta${cards === 1 ? '' : 's'} na mão`;
-    return `${cards >= 11 ? '🔴' : '🟡'} ${cards} CARTAS NA MÃO · reduza ${reductionNeeded} para ficar seguro`;
+    if (threat?.status === 'cancelled') return `— ${targetName} — Colheita cancelada`;
+    if (cards <= 7) return `☑ ${targetName} — ${cards} carta${cards === 1 ? '' : 's'} na mão · meta atingida`;
+    return `☐ ${targetName} — ${cards} cartas na mão · descarte ${reductionNeeded}`;
   }
   if (intent.abilityId === 'restorative_dew') {
     const threat = threats[0];
@@ -350,22 +351,44 @@ function crownThreatProgress(threat) {
   return 'Pendente';
 }
 
+
+function maintenanceFeeProgress(gameState, intent) {
+  const boss = gameState.boss || {};
+  const maintenance = (boss.effects || []).find((entry) => entry.id === 'maintenance_fee' && entry.sourceActionId === intent.id);
+  const activeFinanced = (boss.effects || []).filter((entry) => entry.id === 'financed_card' && entry.sourceActionId === intent.id);
+  const lines = (gameState.players || []).flatMap((player) => {
+    const playerCards = activeFinanced.filter((entry) => entry.playerId === player.id);
+    if (playerCards.length) {
+      return playerCards.map((entry) => `☐ ${playerName(gameState, player.id)} — use ${cardLabelAnywhere(gameState, entry.cardId)} em jogo`);
+    }
+
+    const pendingDraw = boss.pendingFinancedDrawsByPlayer?.[player.id];
+    if (pendingDraw?.sourceActionId === intent.id) return [`☐ ${playerName(gameState, player.id)} — recebendo carta financiada`];
+    if (maintenance?.pendingPlayerIds?.includes(player.id)) return [`☐ ${playerName(gameState, player.id)} — aguarda a compra financiada`];
+
+    const resolved = [...(boss.eventLog || [])].reverse().find((event) => event.type === 'financedCharge'
+      && event.round === boss.roundNumber
+      && event.playerId === player.id
+      && (!event.sourceActionId || event.sourceActionId === intent.id));
+    if (resolved) {
+      return [resolved.dangerDelta
+        ? `✕ ${playerName(gameState, player.id)} — +${resolved.dangerDelta} Dívida`
+        : `☑ ${playerName(gameState, player.id)} — financiada usada em jogo`];
+    }
+
+    return [`☐ ${playerName(gameState, player.id)} — aguarda a compra financiada`];
+  });
+  return lines.join('\n');
+}
+
 function compactBankerProgress(gameState, intent) {
   const boss = gameState.boss || {};
   const payload = intent.payload || {};
   switch (intent.abilityId) {
     case 'fixed_interest':
       return 'Cobrança no fim da rodada';
-    case 'maintenance_fee': {
-      const total = Math.max(1, gameState.players?.length || 0);
-      const effect = (boss.effects || []).find((entry) => entry.id === 'maintenance_fee' && entry.sourceActionId === intent.id);
-      if (effect) {
-        const pending = new Set(effect.pendingPlayerIds || []).size;
-        return pending ? `Tarifa ativa · ${total - pending}/${total} compras aplicadas` : '✅ Tarifa aplicada aos cooperadores';
-      }
-      if (boss.lastMaintenanceRound === boss.roundNumber) return '✅ Tarifa aplicada aos cooperadores';
-      return `Tarifa preparada · 0/${total} compras aplicadas`;
-    }
+    case 'maintenance_fee':
+      return maintenanceFeeProgress(gameState, intent);
     case 'credit_block':
       return '🔒 Lixo bloqueado nesta rodada';
     case 'suit_audit':
@@ -481,12 +504,16 @@ function dominatrixDetails(gameState, intent) {
         ['Resolucao', 'ao final da rodada'],
         ['Escolha', 'receber 1 Chicote ou retirar carta de canastra'],
       ]);
-    case 'final_order':
+    case 'final_order': {
+      const orders = payload.orders || [];
       return detailFields([
         ['Alvos', 'os dois cooperadores'],
-        ['Resolucao', 'ao final da rodada'],
-        ['Escolha', 'cada jogador recebera uma decisao individual'],
+        ['Cartas marcadas', orders.map((order) => `${playerName(gameState, order.playerId)}: ${(order.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).join(' e ')}`).join(' · ')],
+        ['Resolucao', 'cada jogador decide agora, antes dos turnos dos cooperadores'],
+        ['Escolha', 'aceitar a ordem ou receber 1 Chicote imediatamente'],
+        ['Falha ao obedecer', '1 Chicote por carta marcada que nao entrar em jogo'],
       ]);
+    }
     case 'iron_etiquette':
       return detailFields([
         ['Alvo', target],
@@ -638,12 +665,7 @@ function matriarchDetails(gameState, intent) {
         ['Consequência imediata', '+1 Flor e cura de até 40 HP'],
       ]);
     case 'harvest':
-      return detailFields([
-        ['Alvo', target],
-        ['Meta', 'terminar o turno com 7 cartas ou menos'],
-        ['8–10 cartas ao final', 'Matriarca cura 60 HP'],
-        ['11+ cartas ao final', 'Matriarca ganha +1 Flor e cura 100 HP'],
-      ]);
+      return [];
     case 'royal_bloom': {
       const threats = natureThreatsForIntent(gameState, intent);
       const objectives = threats.length
@@ -684,36 +706,70 @@ function compactAction(gameState, intent) {
   switch (intent.abilityId) {
     case 'fixed_interest': {
       const holder = playerName(gameState, payload.holderPlayerId);
+      const fullDebt = payload.fullDebt ?? payload.amount;
+      const guaranteedDebt = payload.guaranteedDebt ?? payload.collateralAmount;
+      const interestStep = payload.interestStep ?? (intent.announcedPhase === 3 ? 3 : 2);
       return {
-        instruction: `${holder} decide o pagamento no fim da rodada.`,
-        progress: `Contrato ${bankerContractTierLabel(payload.contractTier)} · Titular sorteado: ${holder}`,
-        consequence: `Integral: +${payload.fullDebt ?? payload.amount} Dívida · Cofre: carta aleatória; resgate começa em +${payload.guaranteedDebt ?? payload.collateralAmount}`,
+        instruction: `${holder} escolhe no fim da rodada.`,
+        progress: [
+          `☐ Integral → +${fullDebt} Dívida`,
+          `☐ Cofre → 1 carta presa · resgate +${guaranteedDebt}`,
+          `☐ Adiar → +${interestStep}/turno · máximo +${fullDebt}`,
+        ].join('\n'),
+        consequence: '',
       };
     }
     case 'maintenance_fee':
-      return { instruction: `Nesta rodada: +${payload.extraDraw} carta(s) junto da compra normal de cada jogador.`, progress: compactBankerProgress(gameState, intent), consequence: 'Se ficar na mão ao fim do turno, gera Dívida' };
+      return {
+        instruction: `Cada cooperador recebe +${payload.extraDraw} carta${payload.extraDraw === 1 ? '' : 's'} FINANCIADA${payload.extraDraw === 1 ? '' : 'S'}.`,
+        progress: maintenanceFeeProgress(gameState, intent),
+        consequence: `Falha por carta: +${payload.financedDebt ?? (intent.announcedPhase === 3 ? 7 : 5)} Dívida · descartar não quita`,
+      };
     case 'credit_block':
       return { instruction: 'O lixo esta bloqueado nesta rodada.', progress: compactBankerProgress(gameState, intent), consequence: 'Encerra na virada da rodada' };
     case 'suit_audit':
-      return { instruction: `Joguem ${payload.required} cartas de ${payload.suitLabel}.`, progress: compactBankerProgress(gameState, intent), consequence: `Sucesso: ${payload.successDelta} | Falha: +${payload.failureDelta}` };
+      return { instruction: `Joguem ${payload.required} cartas de ${payload.suitLabel}.`, progress: compactBankerProgress(gameState, intent), consequence: `Sucesso → sem cobrança · Falha → +${payload.failureDelta} Dívida` };
     case 'pledge':
       return { instruction: `Jogo ${Number(payload.meldIndex) + 1} nao pode receber cartas.`, progress: compactBankerProgress(gameState, intent), consequence: 'Libera ao fim da cobranca' };
     case 'compound_interest': {
       const total = gameState.players?.reduce((sum, player) => sum + (player.hand?.length || 0), 0) || 0;
-      return { instruction: `${total} cartas nas maos.`, progress: compactBankerProgress(gameState, intent), consequence: `Estimativa: +${Math.min(12, 4 + Math.floor(total / 4))} de Divida` };
+      const safeMax = payload.safeMax ?? 7;
+      const warningMax = payload.warningMax ?? 13;
+      const phase3 = intent.announcedPhase === 3;
+      const safeDebt = payload.safeDebt ?? (phase3 ? 8 : 6);
+      const warningDebt = payload.warningDebt ?? (phase3 ? 12 : 10);
+      const dangerDebt = payload.dangerDebt ?? (phase3 ? 16 : 14);
+      const band = total <= safeMax ? 'safe' : total <= warningMax ? 'warning' : 'danger';
+      return {
+        instruction: `${total} cartas nas mãos da equipe.`,
+        progress: [
+          `${band === 'safe' ? '☑' : '☐'} 0–${safeMax} → +${safeDebt} Dívida`,
+          `${band === 'warning' ? '☑' : '☐'} ${safeMax + 1}–${warningMax} → +${warningDebt} Dívida`,
+          `${band === 'danger' ? '☑' : '☐'} ${warningMax + 1}+ → +${dangerDebt} Dívida`,
+        ].join('\n'),
+        consequence: '',
+      };
     }
     case 'credit_limit': {
       const limit = gameState.boss?.creditLimit || payload;
       const counted = new Set(limit.countedCardIds || []).size;
       const allowance = limit.allowance || payload.allowance || 0;
+      const exceeded = Math.max(0, counted - allowance);
+      const debtPerCard = limit.debtPerCard || payload.debtPerCard || 1;
+      const chargedDebt = Number(limit.chargedDebt) || 0;
+      const maxCharge = limit.maxCharge || payload.maxCharge || 0;
       return {
-        instruction: `Nesta rodada, a equipe compartilha ${allowance} carta(s) sem taxa. Não é uma obrigação de baixar cartas.`,
-        progress: compactBankerProgress(gameState, intent),
-        consequence: `Cada carta excedente: +${limit.debtPerCard || 1} Dívida. Cobrado: ${limit.chargedDebt || 0}/${limit.maxCharge || payload.maxCharge || 0}. Após o teto, não há taxa extra nesta rodada.`,
+        instruction: 'Só contam cartas que saíram da mão.',
+        progress: [
+          `${exceeded ? '✕' : '☑'} Uso ${counted}/${allowance}${exceeded ? ` · ${exceeded} excedente${exceeded === 1 ? '' : 's'}` : ' · dentro da franquia'}`,
+          `☐ Excedente → +${debtPerCard} Dívida por carta`,
+          `☐ Cobrança ${chargedDebt}/${maxCharge} · teto +${maxCharge}`,
+        ].join('\n'),
+        consequence: '',
       };
     }
     case 'discard_surcharge':
-      return { instruction: `A primeira retirada valida do lixo custa Divida +${payload.amount}.`, progress: compactBankerProgress(gameState, intent), consequence: 'O jogador pode desistir e comprar do monte' };
+      return { instruction: `Primeira retirada do lixo → +${payload.amount} Dívida.`, progress: compactBankerProgress(gameState, intent), consequence: 'Comprar do monte evita a cobrança' };
     case 'collar':
       return { instruction: `${target} nao pode jogar nem descartar ${collarCards.join(' e ')} ate o fim do turno.`, progress: '', consequence: '' };
     case 'exposure': {
@@ -768,8 +824,15 @@ function compactAction(gameState, intent) {
       return { instruction: `${playerName(gameState, payload.protectedPlayerId)} sera protegida; ${playerName(gameState, payload.punishedPlayerId)} recebera 1 Chicote.`, progress: '', consequence: 'Aplicado depois deste anuncio' };
     case 'break_will':
       return { instruction: `Ao final da rodada, ${target} devera escolher sua punicao.`, progress: '', consequence: 'Chicote ou retirada de canastra' };
-    case 'final_order':
-      return { instruction: 'Ao final da rodada, cada cooperador devera cumprir uma escolha.', progress: '', consequence: '' };
+    case 'final_order': {
+      const orders = payload.orders || [];
+      const lines = orders.map((order) => `☐ ${playerName(gameState, order.playerId)} — ${(order.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).join(' e ')}`);
+      return {
+        instruction: 'A Dominadora marcou 2 cartas da mao de cada cooperador. As escolhas acontecem agora, antes dos turnos.',
+        progress: lines.join('\n'),
+        consequence: 'Recusar: +1 Chicote · Aceitar: +1 Chicote por carta que nao entrar em jogo no proximo turno',
+      };
+    }
     case 'iron_etiquette':
       return {
         instruction: `${target} deve encerrar o próximo turno descartando ${payload.suitLabel}.`,
@@ -861,9 +924,9 @@ function compactAction(gameState, intent) {
     }
     case 'harvest':
       return {
-        instruction: `${target}: termine o turno com no máximo 7 cartas na mão.`,
-        progress: compactNatureProgress(gameState, intent),
-        consequence: '8–10 ao final: cura 60 HP · 11+ ao final: +1 Flor e cura 100 HP',
+        instruction: `${target}: termine o turno com 7 cartas ou menos.`,
+        progress: `${compactNatureProgress(gameState, intent)}\n• 0–7 ao final → sem efeito`,
+        consequence: '• 8–10 ao final → cura 60 HP\n• 11+ ao final → +1 Flor e cura 100 HP',
       };
     case 'royal_bloom':
       return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos independentes.`, progress: compactNatureProgress(gameState, intent), consequence: 'Cada falha: +1 Flor, sem cura' };
@@ -1387,7 +1450,7 @@ function matriarchStatusPresentation(gameState) {
         name: MATRIARCH_ABILITY_NAMES[event.abilityId],
         speech: '',
         description: '',
-        details: [...(event.presentation?.details || [])],
+        details: event.abilityId === 'harvest' ? [] : [...(event.presentation?.details || [])],
         instruction: event.outcome || 'A habilidade foi registrada.',
         progress: '',
         consequence: '',
@@ -1448,6 +1511,7 @@ function pendingChoicePresentation(gameState, choice) {
   const names = {
     forced_choice: 'Escolha Forcada',
     break_will: 'Quebra de Vontade',
+    final_order: 'Ordem Final',
     final_order_draw: 'Ordem Final',
     final_order_lock: 'Ordem Final',
     fixed_interest_payment: 'Pagamento dos Juros Fixos',
@@ -1462,7 +1526,19 @@ function pendingChoicePresentation(gameState, choice) {
     ['Estado', 'a partida permanece pausada ate a decisao'],
   ]);
 
-  if (choice.type === 'final_order_draw') {
+  if (choice.type === 'final_order') {
+    const cards = (choice.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).filter(Boolean);
+    instruction = `${target}: ${cards.join(' e ')} foram marcadas. Aceite usar as duas em jogo no proximo turno ou receba 1 Chicote agora.`;
+    progress = `☐ 0/${cards.length || 2} — cada carta nao usada vale +1 Chicote`;
+    consequence = 'Obedecer pode resultar em 0, 1 ou 2 Chicotes';
+    details = detailFields([
+      ['Alvo', target],
+      ['Cartas marcadas', cards.join(' e ')],
+      ['Recusar', '+1 Chicote agora'],
+      ['Aceitar', 'usar as 2 cartas em jogos no proximo turno'],
+      ['Falha parcial', '+1 Chicote por carta nao usada'],
+    ]);
+  } else if (choice.type === 'final_order_draw') {
     instruction = `${target} escolhe entre comprar 2 cartas presas no proximo turno ou receber 1 Chicote.`;
   } else if (choice.type === 'final_order_lock') {
     instruction = `${target} escolhe entre prender 1 carta aleatoria da propria mao no proximo turno ou receber 1 Chicote.`;
@@ -1610,6 +1686,22 @@ export function buildBossActionPresentation(gameState) {
     const dimitrescuStatus = dimitrescuStatusPresentation(gameState);
     if (dimitrescuStatus) return dimitrescuStatus;
 
+    const finalOrderMarks = (gameState.boss?.effects || []).filter((effect) => effect.id === 'final_order_mark');
+    if (finalOrderMarks.length) {
+      const meldCardIds = new Set((gameState.teams || []).flatMap((team) => (team.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean))));
+      const lines = finalOrderMarks.map((effect) => `${meldCardIds.has(effect.cardId) ? '☑' : '☐'} ${playerName(gameState, effect.playerId)} — ${cardLabelAnywhere(gameState, effect.cardId)}${meldCardIds.has(effect.cardId) ? ' · usada em jogo' : ' · use em jogo'}`);
+      return {
+        category: 'Ordem aceita em vigor',
+        name: 'Ordem Final',
+        speech: '',
+        description: '',
+        details: [],
+        instruction: 'As cartas marcadas precisam entrar em jogo até o fim do turno de cada jogador.',
+        progress: lines.join('\n'),
+        consequence: 'Cada carta marcada que não entrar em jogo: +1 Chicote',
+      };
+    }
+
     const orders = (gameState.boss?.activeOrders || []).filter(order => order.status === 'active' && order.sourceAbilityId === 'forced_choice');
     if (orders.length) return {
       category: 'Ordem aceita em vigor', name: 'Escolha Forçada', speech: '', description: '', details: [],
@@ -1657,42 +1749,47 @@ export function buildBossActionPresentation(gameState) {
   let details = [];
 
   if (gameState.boss.id === 'banker') {
-    if (intent.abilityId === 'fixed_interest')
+    if (intent.abilityId === 'fixed_interest') {
+      const fullDebt = payload.fullDebt ?? payload.amount ?? (phase === 3 ? 16 : 12);
+      const guaranteedDebt = payload.guaranteedDebt ?? payload.collateralAmount ?? (phase === 3 ? 7 : 5);
+      const interestStep = payload.interestStep ?? (phase === 3 ? 3 : 2);
       details = [
-        `Contrato: ${bankerContractTierLabel(payload.contractTier)}`,
-        `Titular sorteado: ${playerName(gameState, payload.holderPlayerId)}`,
-        `Pagamento integral: +${payload.fullDebt ?? payload.amount ?? (phase === 3 ? 8 : 6)} de Dívida agora`,
-        'Com garantia: o Banqueiro apreende 1 carta aleatória do titular',
-        `Resgate inicial: +${payload.guaranteedDebt ?? payload.collateralAmount ?? (phase === 3 ? 5 : 3)} de Dívida`,
-        'Cada compra normal adiada acrescenta +1 ao resgate',
-        `Ao alcançar +${payload.fullDebt ?? payload.amount ?? (phase === 3 ? 8 : 6)}, o resgate seguinte é obrigatório`,
+        `Integral: +${fullDebt} de Dívida`,
+        `Cofre: carta aleatória · resgate começa em +${guaranteedDebt}`,
+        `Adiar resgate: +${interestStep} por turno, até +${fullDebt}`,
       ];
-    else if (intent.abilityId === 'maintenance_fee') details = ['Compra extra inevitavel nesta rodada', `Cada jogador comprara +${payload.extraDraw ?? (phase === 3 ? 2 : 1)} carta(s)`, 'Aplicada junto da compra normal; cobrada ao fim desse turno se ficar na mão'];
-    else if (intent.abilityId === 'credit_block') details = ['Lixo bloqueado agora', `Duracao: ate o fim da rodada ${gameState.boss.roundNumber}`, 'Encerra depois da acao do ultimo cooperador'];
+    } else if (intent.abilityId === 'maintenance_fee') {
+      details = [
+        `Cada jogador: +${payload.extraDraw ?? (phase === 3 ? 2 : 1)} carta(s) FINANCIADA(S)`,
+        'Quitação: a carta precisa entrar em um jogo neste turno',
+        `Descartar ou terminar com ela na mão: +${payload.financedDebt ?? (phase === 3 ? 7 : 5)} de Dívida cada`,
+      ];
+    } else if (intent.abilityId === 'credit_block') details = ['Lixo bloqueado nesta rodada'];
     else if (intent.abilityId === 'suit_audit')
       details = [
-        `Naipe: ${payload.suitLabel}`,
+        `Meta: ${payload.required} cartas de ${payload.suitLabel}`,
         `Progresso: ${payload.progress || 0}/${payload.required}`,
-        `Sucesso: ${payload.successDelta ?? -5} de Divida`,
-        `Falha: +${payload.failureDelta ?? (phase === 3 ? 12 : 10)} de Divida`,
-        'Encerra ao fim da rodada',
+        'Sucesso: sem cobrança',
+        `Falha: +${payload.failureDelta ?? (phase === 3 ? 16 : 12)} de Dívida`,
       ];
-    else if (intent.abilityId === 'pledge') details = [`Jogo bloqueado: ${payload.meldIndex == null ? 'nenhum jogo disponivel' : `Jogo #${Number(payload.meldIndex) + 1}`}`, 'Nao pode receber cartas', 'Encerra na proxima cobranca'];
+    else if (intent.abilityId === 'pledge') details = [`Jogo bloqueado: ${payload.meldIndex == null ? 'nenhum' : `#${Number(payload.meldIndex) + 1}`}`, 'Não pode receber cartas nesta rodada'];
     else if (intent.abilityId === 'compound_interest') {
       const totalCards = gameState.players?.reduce((sum, player) => sum + (player.hand?.length || 0), 0) || 0;
-      details = [`Cartas nas maos agora: ${totalCards}`, `Estimativa atual: +${Math.min(12, 4 + Math.floor(totalCards / 4))} de Divida`, 'O valor e recalculado quando a cobranca resolver'];
+      const safeMax = payload.safeMax ?? 7;
+      const warningMax = payload.warningMax ?? 13;
+      const currentDebt = totalCards <= safeMax ? payload.safeDebt : totalCards <= warningMax ? payload.warningDebt : payload.dangerDebt;
+      details = [`Cartas nas mãos: ${totalCards}`, `Cobrança atual: +${currentDebt} de Dívida`];
     } else if (intent.abilityId === 'credit_limit') {
       const limit = gameState.boss.creditLimit || payload;
       const counted = new Set(limit.countedCardIds || []).size;
       details = [
-        `Franquia compartilhada: ${limit.allowance || payload.allowance} cartas`,
-        `Cartas contadas: ${counted}/${limit.allowance || payload.allowance}`,
-        `Cobranca acumulada: ${limit.chargedDebt || 0}/${limit.maxCharge || payload.maxCharge}`,
-        `Proxima carta excedente: +${limit.debtPerCard || payload.debtPerCard || 1} de Divida`,
+        `Uso: ${counted}/${limit.allowance || payload.allowance} cartas da mão`,
+        `Excedente: +${limit.debtPerCard || payload.debtPerCard} por carta`,
+        `Teto: +${limit.maxCharge || payload.maxCharge}`,
       ];
     } else if (intent.abilityId === 'discard_surcharge') {
       const surcharge = gameState.boss.discardSurcharge || payload;
-      details = [`Custo: +${surcharge.amount || payload.amount} de Divida`, 'Gatilho: primeira retirada valida do lixo', 'O jogador pode desistir e comprar do monte', `Estado: ${surcharge.status === 'consumed' ? 'consumido' : 'ativo nesta rodada'}`];
+      details = [`Primeira retirada do lixo: +${surcharge.amount || payload.amount} de Dívida`, 'Comprar do monte evita o Ágio'];
     }
   } else if (gameState.boss.id === 'dominadora') details = dominatrixDetails(gameState, intent);
   else if (gameState.boss.id === 'dimitrescu') details = dimitrescuDetails(gameState, intent);

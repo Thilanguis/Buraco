@@ -1627,25 +1627,46 @@ body[data-boss-id='matriarca_esmeralda'] .boss-ability-overview { border-left-co
 
 .boss-mode .carta.boss-card-financed {
   box-shadow:
-    0 0 0 2px #22c55e,
-    0 0 14px rgba(34, 197, 94, 0.58) !important;
+    0 0 0 3px #facc15,
+    0 0 16px rgba(250, 204, 21, 0.62),
+    inset 0 0 0 1px rgba(34, 197, 94, 0.46) !important;
 }
 .boss-mode .carta.boss-card-financed::after {
   content: '$';
   position: absolute;
   right: 4px;
-  bottom: 4px;
+  top: 4px;
   width: 17px;
   height: 17px;
   display: grid;
   place-items: center;
-  border: 1px solid #86efac;
+  border: 1px solid #fde68a;
   border-radius: 50%;
-  background: #052e16;
-  color: #86efac;
+  background: #14532d;
+  color: #fef3c7;
   font-size: 10px;
   font-weight: 1000;
-  z-index: 5;
+  z-index: 7;
+}
+.boss-financed-marker {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  z-index: 8;
+  max-width: calc(100% - 8px);
+  padding: 2px 4px;
+  border: 1px solid rgba(253, 230, 138, 0.94);
+  border-radius: 3px;
+  background: rgba(20, 83, 45, 0.96);
+  color: #fef3c7;
+  box-shadow: 0 0 7px rgba(250, 204, 21, 0.52);
+  font-size: 6px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.25px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .boss-financed-chip {
   border-color: rgba(34, 197, 94, 0.55) !important;

@@ -736,9 +736,15 @@ export class BuracoBot {
       const naturePriorities = engine.getNaturePriorities?.(me.id);
       const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
       const dimitrescuPriorities = engine.getDimitrescuPriorities?.(me.id);
+      const financedCardIds = (s.boss?.id === 'banker' ? (s.boss.effects || []) : [])
+        .filter((effect) => effect.id === 'financed_card' && effect.playerId === me.id)
+        .map((effect) => effect.cardId)
+        .filter(Boolean);
       const markedCards = new Set([
         ...(naturePriorities?.markedCardIds || []),
+        ...(dominatrixPriorities?.markedCardIds || []),
         ...(dimitrescuPriorities?.markedCardIds || []),
+        ...financedCardIds,
       ]);
       const markedMelds = new Set([
         ...(naturePriorities?.meldIndexes || []),
@@ -1125,6 +1131,11 @@ export class BuracoBot {
     let minDanger = 9999;
     const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
     const orderedSuit = dominatrixPriorities?.discardSuit || null;
+    const finalOrderCardIds = new Set(dominatrixPriorities?.markedCardIds || []);
+    const financedCardIds = new Set((state.boss?.id === 'banker' ? (state.boss.effects || []) : [])
+      .filter((effect) => effect.id === 'financed_card' && effect.playerId === me.id)
+      .map((effect) => effect.cardId)
+      .filter(Boolean));
     const growingClean = state.mode === '1x1_dominacao' && botIndex === 1
       ? cleanDominationMelds(state.teams[me.teamId].melds, {
         prepare: meld => this.simulateMeld(meld, [], engine),
@@ -1137,6 +1148,10 @@ export class BuracoBot {
       if (!c || state.pickedDiscardCardId === c.id || engine.isCardBlocked?.(me.id, c.id, 'discard')) continue;
 
       let danger = 0;
+      // A Carta Financiada só quita a Tarifa se entrar em jogo. O bot tenta
+      // preservá-la para uma jogada e só a descarta como último recurso.
+      if (financedCardIds.has(c.id)) danger += 5000;
+      if (finalOrderCardIds.has(c.id)) danger += 5000;
       if (!c.joker) {
         const needed = growingClean.filter(meld => meld[0].suit === c.suit).reduce((sum, meld) =>
           sum + Math.max(0, (c.rank === 'A' ? 2 : 1) - meld.filter(card => card.rank === c.rank).length), 0);

@@ -44,14 +44,14 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const MELD_TIER = Object.freeze({ simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 });
 const BANKER_CONTRACTS = Object.freeze({
   early: Object.freeze([
-    Object.freeze({ tier: 'mild', fullDebt: 5, guaranteedDebt: 2 }),
-    Object.freeze({ tier: 'standard', fullDebt: 6, guaranteedDebt: 3 }),
-    Object.freeze({ tier: 'severe', fullDebt: 7, guaranteedDebt: 4 }),
+    Object.freeze({ tier: 'mild', fullDebt: 10, guaranteedDebt: 4 }),
+    Object.freeze({ tier: 'standard', fullDebt: 12, guaranteedDebt: 5 }),
+    Object.freeze({ tier: 'severe', fullDebt: 14, guaranteedDebt: 6 }),
   ]),
   late: Object.freeze([
-    Object.freeze({ tier: 'mild', fullDebt: 7, guaranteedDebt: 4 }),
-    Object.freeze({ tier: 'standard', fullDebt: 8, guaranteedDebt: 5 }),
-    Object.freeze({ tier: 'severe', fullDebt: 9, guaranteedDebt: 6 }),
+    Object.freeze({ tier: 'mild', fullDebt: 14, guaranteedDebt: 6 }),
+    Object.freeze({ tier: 'standard', fullDebt: 16, guaranteedDebt: 7 }),
+    Object.freeze({ tier: 'severe', fullDebt: 17, guaranteedDebt: 8 }),
   ]),
 });
 
@@ -77,6 +77,7 @@ function weightedContract(gameState) {
     guaranteedDebt: contract.guaranteedDebt,
     amount: contract.fullDebt,
     collateralAmount: contract.guaranteedDebt,
+    interestStep: gameState.boss.phase === 3 ? 3 : 2,
     holderPlayerId: holder?.id ?? null,
     rollEventId: `contract_${gameState.boss.roundNumber}_${gameState.boss.actionSequence + 1}`,
   };
@@ -136,6 +137,13 @@ function chooseCards(player, gameState, salt, count) {
     available.splice(available.findIndex((entry) => entry.id === card.id), 1);
   }
   return selected;
+}
+
+function buildFinalOrderTargets(gameState) {
+  return (gameState.players || []).map((player, index) => ({
+    playerId: player.id,
+    cardIds: chooseCards(player, gameState, 211 + index * 23, 2).map((card) => card.id),
+  }));
 }
 
 function legalDiscardCards(gameState, player) {
@@ -706,17 +714,26 @@ function createPayload(gameState, abilityId) {
   if (abilityId === 'fixed_interest') return weightedContract(gameState);
   if (abilityId === 'maintenance_fee') return {
     extraDraw: boss.phase === 3 ? 2 : 1,
-    financedDebt: boss.phase === 3 ? 4 : 3,
+    financedDebt: boss.phase === 3 ? 7 : 5,
   };
   if (abilityId === 'suit_audit') {
     const suit = SUITS[Math.floor(seededUnit(bossSeed(gameState, 17)) * SUITS.length) % SUITS.length];
-    return { suit: suit.value, suitLabel: suit.label, required: boss.phase === 3 ? 4 : 3, progress: 0, successDelta: -5, failureDelta: boss.phase === 3 ? 12 : 10 };
+    return { suit: suit.value, suitLabel: suit.label, required: boss.phase === 3 ? 4 : 3, progress: 0, successDelta: 0, failureDelta: boss.phase === 3 ? 16 : 12 };
+  }
+  if (abilityId === 'compound_interest') {
+    return boss.phase === 3
+      ? { safeMax: 7, warningMax: 13, safeDebt: 8, warningDebt: 12, dangerDebt: 16 }
+      : { safeMax: 7, warningMax: 13, safeDebt: 6, warningDebt: 10, dangerDebt: 14 };
   }
   if (abilityId === 'credit_limit') {
-    const config = { 1: { allowance: 3, maxCharge: 4 }, 2: { allowance: 2, maxCharge: 5 }, 3: { allowance: 1, maxCharge: 6 } }[boss.phase];
-    return { ...config, debtPerCard: 1 };
+    const config = {
+      1: { allowance: 3, debtPerCard: 3, maxCharge: 9 },
+      2: { allowance: 2, debtPerCard: 4, maxCharge: 12 },
+      3: { allowance: 1, debtPerCard: 5, maxCharge: 15 },
+    }[boss.phase];
+    return { ...config };
   }
-  if (abilityId === 'discard_surcharge') return { amount: boss.phase === 3 ? 6 : 4 };
+  if (abilityId === 'discard_surcharge') return { amount: boss.phase === 3 ? 10 : 7 };
 
   if (abilityId === 'pledge') {
     const candidates = eligibleMeldIndexes(gameState)
@@ -771,7 +788,13 @@ function createPayload(gameState, abilityId) {
       const target = choosePlayer(gameState, 79, (player) => (boss.chainsByPlayer?.[player.id] || 0) >= 2);
       return { targetPlayerId: target?.id ?? null };
     }
-    if (abilityId === 'final_order') return { orderedPlayerIds: (gameState.players || []).map((player) => player.id) };
+    if (abilityId === 'final_order') {
+      const orders = buildFinalOrderTargets(gameState);
+      return {
+        orderedPlayerIds: orders.map((entry) => entry.playerId),
+        orders,
+      };
+    }
     if (abilityId === 'iron_etiquette') {
       const candidates = (gameState.players || []).flatMap((player) => discardSuitOrderCandidates(gameState, player).map((suit) => ({ player, suit })));
       const selected = chooseSeeded(candidates, gameState, 83);
@@ -911,7 +934,15 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
     return players.some((player) => player.id === payload.protectedPlayerId) && players.some((player) => player.id === payload.punishedPlayerId);
   }
   if (abilityId === 'final_order') {
-    return payload.orderedPlayerIds?.length === players.length && payload.orderedPlayerIds.every((id) => players.some((player) => player.id === id));
+    const orders = payload.orders || [];
+    return players.length >= 2
+      && orders.length === players.length
+      && orders.every((order) => {
+        const cardIds = [...new Set(order.cardIds || [])];
+        return cardIds.length === 2
+          && players.some((player) => player.id === order.playerId)
+          && cardIds.every((cardId) => playerHasCard(gameState, order.playerId, cardId));
+      });
   }
   if (abilityId === 'forced_swap' || abilityId === 'hands_tied' || abilityId === 'separation') {
     return players.length >= 2;
@@ -1178,8 +1209,8 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
       vault.maxDebt,
     );
     vault.interestDebt = vault.currentDebt - vault.baseDebt;
-    vault.deferredTurns = Math.max(0, Number(vault.deferredTurns ?? vault.interestDebt) || 0);
     vault.interestStep = Math.max(1, Number(vault.interestStep) || 1);
+    vault.deferredTurns = Math.max(0, Number(vault.deferredTurns ?? Math.ceil(vault.interestDebt / vault.interestStep)) || 0);
     vault.state = vault.state === 'locked' || vault.state === 'open'
       ? vault.state
       : (vault.deferredTurns > 0 || vault.requiredDraw ? 'open' : 'locked');
@@ -1405,10 +1436,12 @@ function eligibleAbilityCandidates(gameState, entries, { avoidLast = false } = {
   if (!(gameState.players || []).some((player) => (boss.chainsByPlayer?.[player.id] || 0) >= 2)) choices = choices.filter((entry) => entry.id !== 'break_will');
   const players = gameState.players || [];
   const allPlayersHaveCards = players.length > 0 && players.every((player) => player.hand?.some((card) => card?.id));
+  const allPlayersHaveTwoCards = players.length > 0 && players.every((player) => (player.hand || []).filter((card) => card?.id).length >= 2);
   if (!players.length) choices = choices.filter((entry) => !['forced_choice', 'absolute_control', 'break_will'].includes(entry.id));
   if (!players.some((player) => player.hand?.some((card) => card?.id))) choices = choices.filter((entry) => entry.id !== 'collar');
   if (!players.some((player) => eligibleExposureCards(gameState, player).length)) choices = choices.filter((entry) => entry.id !== 'exposure');
-  if (players.length < 2 || !allPlayersHaveCards) choices = choices.filter((entry) => !['forced_swap', 'double_collar', 'final_order'].includes(entry.id));
+  if (players.length < 2 || !allPlayersHaveCards) choices = choices.filter((entry) => !['forced_swap', 'double_collar'].includes(entry.id));
+  if (players.length < 2 || !allPlayersHaveTwoCards) choices = choices.filter((entry) => entry.id !== 'final_order');
   if (players.length < 2) choices = choices.filter((entry) => entry.id !== 'favorite');
   return choices
     .map((entry) => ({ entry, payload: createPayload(gameState, entry.id) }))
@@ -1553,7 +1586,7 @@ function activateAnnouncedBankerRoundEffect(gameState, intent) {
   if (intent.abilityId === 'maintenance_fee') {
     if (boss.lastMaintenanceIntentId === intent.id) return null;
     const extraDraw = intent.payload.extraDraw ?? (intent.announcedPhase === 3 ? 2 : 1);
-    const financedDebt = intent.payload.financedDebt ?? (intent.announcedPhase === 3 ? 4 : 3);
+    const financedDebt = intent.payload.financedDebt ?? (intent.announcedPhase === 3 ? 7 : 5);
     boss.effects = boss.effects.filter((entry) => entry.id !== 'maintenance_fee');
     boss.effects.push({ id: 'maintenance_fee', extraDraw, financedDebt, sourceActionId: intent.id, pendingPlayerIds: gameState.players.map((player) => player.id) });
     boss.lastMaintenanceIntentId = intent.id;
@@ -1605,13 +1638,14 @@ export function advanceBossTurn(gameState, now = Date.now()) {
     const dominatrixPersistentActivation = boss.id === 'dominadora'
       && ['iron_etiquette', 'interdict'].includes(announcedIntent?.abilityId);
     const persistentActivation = matriarchActivation || dominatrixPersistentActivation;
+    const choiceBeforePlayers = ['forced_choice', 'final_order'].includes(announcedIntent?.abilityId);
     const resolvesBeforePlayers = announcedIntent?.duration === 'immediate'
-      || announcedIntent?.abilityId === 'forced_choice'
+      || choiceBeforePlayers
       || persistentActivation;
     if (resolvesBeforePlayers && !announcedIntent.immediateApplied) {
       const immediateEvent = resolveIntent(gameState, { keepIntent: true, appliedAt: now });
       if (immediateEvent && !persistentActivation) flow.queue.unshift({ kind: 'result', eventActionId: immediateEvent.actionId });
-      if (announcedIntent?.abilityId === 'forced_choice' && boss.pendingChoices.length) {
+      if (choiceBeforePlayers && boss.pendingChoices.length) {
         flow.stage = 'choice';
         flow.startedAt = now;
         flow.endsAt = 0;
@@ -2380,9 +2414,14 @@ export function getBossDominatrixPriorities(gameState, playerId) {
     .filter(({ meldId }) => meldId && priorityMeldIds.has(meldId))
     .map(({ meldIndex }) => meldIndex);
   const discardOrder = activeOrderForPlayer(boss, playerId, 'discard_suit');
+  const markedCardIds = (boss.effects || [])
+    .filter((effect) => effect.id === 'final_order_mark' && effect.playerId === playerId)
+    .map((effect) => effect.cardId)
+    .filter((cardId) => player.hand?.some((card) => card?.id === cardId));
   return {
     urgent: getBossChains(gameState, playerId) >= 3,
     meldIndexes,
+    markedCardIds,
     discardSuit: discardOrder?.suit || null,
     discardSuitLabel: discardOrder?.suitLabel || null,
     orderType: activeOrderForPlayer(boss, playerId)?.type || null,
@@ -2580,6 +2619,8 @@ export function getBossCardEffect(gameState, playerId, cardId) {
   const intent = boss.currentIntent;
   if (intent?.abilityId === 'exposure' && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId === cardId) return 'exposed';
   if (boss.effects.some((effect) => effect.id === 'choice_exposure' && effect.playerId === playerId && effect.cardId === cardId)) return 'exposed';
+  if (boss.pendingChoices.some((choice) => choice.type === 'final_order' && choice.playerId === playerId && choice.cardIds?.includes(cardId))) return 'final-order';
+  if (boss.effects.some((effect) => effect.id === 'final_order_mark' && effect.playerId === playerId && effect.cardId === cardId)) return 'final-order';
   return isBossCardBlocked(gameState, playerId, cardId, 'play') ? 'locked' : null;
 }
 
@@ -2951,7 +2992,7 @@ export function resolveBossChoice(gameState, playerId, option) {
         currentDebt: baseDebt,
         maxDebt,
         interestDebt: 0,
-        interestStep: 1,
+        interestStep: Math.max(1, Number(choice.interestStep) || 2),
         deferredTurns: 0,
         state: 'locked',
         ownerTurnsStarted: gameState.currentPlayer === collateralPlayerId ? 1 : 0,
@@ -2980,7 +3021,7 @@ export function resolveBossChoice(gameState, playerId, option) {
         currentDebt: baseDebt,
         maxDebt,
         interestDebt: 0,
-        interestStep: 1,
+        interestStep: Math.max(1, Number(choice.interestStep) || 2),
         deferredTurns: 0,
         state: 'locked',
         ownerTurnsStarted: gameState.currentPlayer === playerId ? 1 : 0,
@@ -3027,6 +3068,7 @@ export function resolveBossChoice(gameState, playerId, option) {
   let drawnCards = [];
   let lockedCard = null;
   let lockedCardId = null;
+  let markedCards = [];
   if (option === 'draw2') {
     if (availableChoiceDraws(gameState) < 2) {
       changeChains(gameState, playerId, 1, `${choice.type}_draw_unavailable`);
@@ -3089,6 +3131,25 @@ export function resolveBossChoice(gameState, playerId, option) {
     };
     boss.activeOrders.push(order);
     outcome = `Ordem aceita: ${order.label}.`;
+  } else if (option === 'obey' && choice.type === 'final_order') {
+    const player = gameState.players.find((entry) => entry.id === playerId);
+    const cardIds = [...new Set(choice.cardIds || [])];
+    markedCards = cardIds
+      .map((cardId) => player?.hand?.find((card) => card?.id === cardId))
+      .filter(Boolean);
+    if (markedCards.length !== 2) return null;
+    markedCards.forEach((card) => {
+      boss.effects.push({
+        id: 'final_order_mark',
+        source: 'final_order',
+        sourceChoiceId: choice.id,
+        playerId,
+        cardId: card.id,
+        expiresAfterTurn: true,
+        appliedAtRound: boss.roundNumber,
+      });
+    });
+    outcome = `Ordem aceita: ${markedCards.map(compactCardLabel).join(' e ')} devem entrar em jogo no proximo turno. Cada carta nao usada aplica 1 Chicote.`;
   } else if (option === 'lock_card') {
     const player = gameState.players.find((entry) => entry.id === playerId);
     const card = chooseSeeded((player?.hand || []).filter((entry) => entry?.id && canApplyDiscardLock(gameState, player, [entry.id])), gameState, 97);
@@ -3132,6 +3193,8 @@ export function resolveBossChoice(gameState, playerId, option) {
     lockedCardLabel: compactCardLabel(lockedCard || drawnCards.find((card) => card.id === lockedCardId)),
     lockedCardLabels: lockedCard ? [compactCardLabel(lockedCard)] : drawnCards.map(compactCardLabel),
     exposedCardIds: drawnCards.filter((card) => boss.effects.some((effect) => effect.id === 'choice_exposure' && effect.cardId === card.id)).map((card) => card.id),
+    markedCardIds: markedCards.map((card) => card.id),
+    markedCardLabels: markedCards.map(compactCardLabel),
     order: option === 'order' ? { ...choice.order } : null,
   });
   const resumesPlayers = !boss.pendingChoices.length
@@ -3502,9 +3565,8 @@ export function applyBossDeadTaken(gameState) {
   const taken = gameState.deadChunksTaken?.[0] || 0;
   const newlyApplied = Math.max(0, taken - (boss.deadRewardsApplied || 0));
   if (!newlyApplied) return null;
-  const reduction = boss.id === 'banker' ? newlyApplied * 5 : 0;
+  const reduction = 0;
   boss.deadRewardsApplied = taken;
-  boss.danger = clamp(boss.danger - reduction, 0, boss.maxDanger);
 
   let dimitrescuEvent = null;
   if (boss.id === 'dimitrescu' && boss.bloodiedDead?.status === 'active') {
@@ -3624,6 +3686,7 @@ export function getBossVaultQuote(gameState, playerId) {
     totalDebt: currentDebt,
     maxDebt,
     deferredTurns: Math.max(0, Number(vault.deferredTurns) || 0),
+    interestStep: Math.max(1, Number(vault.interestStep) || 1),
     ownerTurnsStarted: Math.max(0, Number(vault.ownerTurnsStarted) || 0),
     forced: state === 'open' && currentDebt >= maxDebt,
     canDefer: state === 'open' && currentDebt < maxDebt,
@@ -3742,7 +3805,7 @@ export function consumeBossExtraDraw(gameState, playerId) {
   if (!effect) return 0;
   boss.pendingFinancedDrawsByPlayer[playerId] = {
     count: effect.extraDraw || 1,
-    debtPerCard: effect.financedDebt || 3,
+    debtPerCard: effect.financedDebt || 5,
     sourceActionId: effect.sourceActionId || null,
   };
   effect.pendingPlayerIds = effect.pendingPlayerIds.filter((id) => id !== playerId);
@@ -3764,6 +3827,7 @@ export function registerBossFinancedCards(gameState, playerId, cards = []) {
       playerId,
       cardId: card.id,
       debtPerCard: pending.debtPerCard,
+      mustUseInMeld: true,
       appliedRound: boss.roundNumber,
       sourceActionId: pending.sourceActionId,
     });
@@ -3870,10 +3934,13 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       enqueueChoice(boss, intent.payload.targetPlayerId, 'break_will', ['chain', 'break_meld']);
       outcome = 'A Quebra de Vontade aguarda uma decisão.';
     } else if (intent.abilityId === 'final_order') {
-      const ids = intent.payload.orderedPlayerIds || [];
-      enqueueChoice(boss, ids[0], 'final_order_draw', ['draw2', 'chain']);
-      enqueueChoice(boss, ids[1], 'final_order_lock', ['lock_card', 'chain']);
-      outcome = 'Cada cooperador recebeu uma ordem diferente.';
+      const orders = intent.payload.orders?.length
+        ? intent.payload.orders
+        : buildFinalOrderTargets(gameState);
+      orders.forEach((order) => enqueueChoice(boss, order.playerId, 'final_order', ['obey', 'chain'], {
+        cardIds: [...(order.cardIds || [])],
+      }));
+      outcome = 'Cada cooperador recebeu duas cartas marcadas e precisa escolher entre obedecer ou receber 1 Chicote.';
     } else if (intent.abilityId === 'possession') {
       const alreadyPossessed = boss.possessions.some((entry) => entry.meldIndex === intent.payload.meldIndex);
       if (!alreadyPossessed && boss.possessions.length < 2 && eligibleMeldIndexes(gameState, { excludePossessed: true }).includes(intent.payload.meldIndex)) {
@@ -4141,8 +4208,8 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       }
     }
   } else if (intent.abilityId === 'fixed_interest') {
-    const amount = intent.payload.fullDebt ?? intent.payload.amount ?? (intent.announcedPhase === 3 ? 8 : 6);
-    const collateralAmount = intent.payload.guaranteedDebt ?? intent.payload.collateralAmount ?? (intent.announcedPhase === 3 ? 5 : 3);
+    const amount = intent.payload.fullDebt ?? intent.payload.amount ?? (intent.announcedPhase === 3 ? 16 : 12);
+    const collateralAmount = intent.payload.guaranteedDebt ?? intent.payload.collateralAmount ?? (intent.announcedPhase === 3 ? 7 : 5);
     const holder = (gameState.players || []).find((player) => player.id === intent.payload.holderPlayerId)
       || fixedInterestHolder(gameState)
       || gameState.players?.[0];
@@ -4153,8 +4220,10 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         collateralAmount,
         holderPlayerId: holder.id,
         contractTier: intent.payload.contractTier,
+        interestStep: intent.payload.interestStep ?? (intent.announcedPhase === 3 ? 3 : 2),
       });
-      outcome = `${holder.name} deve escolher entre Dívida +${amount} agora ou aceitar o Cofre. No Cofre, uma carta aleatória é apreendida e o resgate começa em Dívida +${collateralAmount}.`;
+      const interestStep = intent.payload.interestStep ?? (intent.announcedPhase === 3 ? 3 : 2);
+      outcome = `${holder.name}: Integral +${amount} de Dívida ou Cofre com carta aleatória. Resgate inicia em +${collateralAmount} e sobe +${interestStep} por turno adiado até +${amount}.`;
     } else {
       dangerDelta = amount;
       outcome = `Juros Fixos: Dívida +${dangerDelta}. A garantia do titular estava indisponível.`;
@@ -4167,14 +4236,19 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     outcome = 'Bloqueio de Crédito encerrado.';
   } else if (intent.abilityId === 'suit_audit') {
     const success = (intent.payload.progress || 0) >= intent.payload.required;
-    dangerDelta = success ? (intent.payload.successDelta ?? -5) : (intent.payload.failureDelta ?? (intent.announcedPhase === 3 ? 12 : 10));
-    outcome = success ? 'Auditoria concluída: Dívida -5.' : `Auditoria falhou: Dívida +${dangerDelta}.`;
+    dangerDelta = success ? (intent.payload.successDelta ?? 0) : (intent.payload.failureDelta ?? (intent.announcedPhase === 3 ? 16 : 12));
+    outcome = success ? 'Auditoria concluída: sem cobrança.' : `Auditoria falhou: Dívida +${dangerDelta}.`;
   } else if (intent.abilityId === 'pledge') {
     outcome = 'A Penhora foi liberada.';
   } else if (intent.abilityId === 'compound_interest') {
     const totalCards = gameState.players.reduce((sum, player) => sum + (player.hand?.length || 0), 0);
-    dangerDelta = Math.min(12, 4 + Math.floor(totalCards / 4));
-    outcome = `Juros Compostos: Dívida +${dangerDelta}.`;
+    const safeMax = intent.payload.safeMax ?? 7;
+    const warningMax = intent.payload.warningMax ?? 13;
+    const safeDebt = intent.payload.safeDebt ?? (intent.announcedPhase === 3 ? 8 : 6);
+    const warningDebt = intent.payload.warningDebt ?? (intent.announcedPhase === 3 ? 12 : 10);
+    const dangerDebt = intent.payload.dangerDebt ?? (intent.announcedPhase === 3 ? 16 : 14);
+    dangerDelta = totalCards <= safeMax ? safeDebt : totalCards <= warningMax ? warningDebt : dangerDebt;
+    outcome = `Juros Compostos: ${totalCards} cartas nas mãos → Dívida +${dangerDelta}.`;
   } else if (intent.abilityId === 'credit_limit') {
     outcome = `Limite de Crédito: franquia compartilhada de ${intent.payload.allowance} cartas; cobrança máxima de ${intent.payload.maxCharge}.`;
   } else if (intent.abilityId === 'discard_surcharge') {
@@ -4246,7 +4320,13 @@ export function completeBossPlayerTurn(gameState, playerId) {
     const financedCards = boss.effects.filter((effect) => effect.id === 'financed_card' && effect.playerId === playerId);
     if (financedCards.length) {
       const heldCardIds = new Set((player?.hand || []).map((card) => card?.id).filter(Boolean));
-      const chargedCards = financedCards.filter((effect) => heldCardIds.has(effect.cardId));
+      const discardedCardIds = new Set((gameState.discard || []).map((card) => card?.id).filter(Boolean));
+      const meldCardIds = new Set((gameState.teams?.[player?.teamId]?.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean)));
+      const usedInMeldCards = financedCards.filter((effect) => meldCardIds.has(effect.cardId));
+      // A Tarifa só é quitada quando a carta termina o turno em um jogo da equipe.
+      // Descartar a financiada não evita a cobrança; isso impede a solução trivial
+      // de comprar a carta extra e jogá-la imediatamente no lixo.
+      const chargedCards = financedCards.filter((effect) => !meldCardIds.has(effect.cardId));
       const dangerDelta = chargedCards.reduce((total, effect) => total + (Number(effect.debtPerCard) || 0), 0);
       boss.effects = boss.effects.filter((effect) => !(effect.id === 'financed_card' && effect.playerId === playerId));
       boss.danger = clamp(boss.danger + dangerDelta, 0, boss.maxDanger);
@@ -4255,14 +4335,18 @@ export function completeBossPlayerTurn(gameState, playerId) {
         type: 'financedCharge',
         actionId: `financed_charge_${playerId}_${boss.actionSequence}`,
         playerId,
+        sourceActionId: financedCards[0]?.sourceActionId || null,
         financedCardIds: financedCards.map((effect) => effect.cardId),
+        usedInMeldCardIds: usedInMeldCards.map((effect) => effect.cardId),
+        heldCardIds: chargedCards.filter((effect) => heldCardIds.has(effect.cardId)).map((effect) => effect.cardId),
+        discardedCardIds: chargedCards.filter((effect) => discardedCardIds.has(effect.cardId)).map((effect) => effect.cardId),
         chargedCardIds: chargedCards.map((effect) => effect.cardId),
         dangerDelta,
         danger: boss.danger,
         dangerChangeLabel: dangerDelta ? `Tarifa de Manutenção: Dívida +${dangerDelta}` : '',
         outcome: dangerDelta
-          ? `${chargedCards.length} Carta${chargedCards.length === 1 ? '' : 's'} Financiada${chargedCards.length === 1 ? '' : 's'} permaneceram na mão.`
-          : 'Todas as Cartas Financiadas foram usadas ou descartadas; nenhuma Dívida foi aplicada.',
+          ? `${chargedCards.length} Carta${chargedCards.length === 1 ? '' : 's'} Financiada${chargedCards.length === 1 ? '' : 's'} não entraram em jogo.`
+          : 'Todas as Cartas Financiadas foram usadas em jogo; nenhuma Dívida foi aplicada.',
       });
     }
     deferBossVault(gameState, playerId);
@@ -4271,9 +4355,28 @@ export function completeBossPlayerTurn(gameState, playerId) {
   if (boss.id === 'dominadora') {
     const expiringExposures = boss.effects.filter((effect) => effect.id === 'choice_exposure' && effect.playerId === playerId && effect.expiresAfterTurn);
     const exposedCardsHeld = expiringExposures.filter((effect) => player?.hand?.some((card) => card?.id === effect.cardId));
+    const finalOrderMarks = boss.effects.filter((effect) => effect.id === 'final_order_mark' && effect.playerId === playerId && effect.expiresAfterTurn);
+    const teamMeldCardIds = new Set((gameState.teams?.[player?.teamId]?.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean)));
+    const finalOrderUsed = finalOrderMarks.filter((effect) => teamMeldCardIds.has(effect.cardId));
+    const finalOrderMissed = finalOrderMarks.filter((effect) => !teamMeldCardIds.has(effect.cardId));
     delete boss.choiceDrawnCardIdsByPlayer[playerId];
     boss.effects = boss.effects.filter((effect) => !(effect.expiresAfterTurn && effect.playerId === playerId));
     exposedCardsHeld.forEach((effect) => changeChains(gameState, playerId, 1, `forced_choice_exposure:${effect.cardId}`));
+    finalOrderMissed.forEach((effect) => changeChains(gameState, playerId, 1, `final_order:${effect.cardId}`));
+    if (finalOrderMarks.length) {
+      boss.actionSequence += 1;
+      recordEvent(boss, {
+        type: 'finalOrderResolved',
+        actionId: `final_order_${playerId}_${boss.actionSequence}`,
+        playerId,
+        usedCardIds: finalOrderUsed.map((effect) => effect.cardId),
+        missedCardIds: finalOrderMissed.map((effect) => effect.cardId),
+        chainsApplied: finalOrderMissed.length,
+        outcome: finalOrderMissed.length
+          ? `${finalOrderUsed.length}/2 cartas da Ordem Final entraram em jogo; +${finalOrderMissed.length} Chicote${finalOrderMissed.length === 1 ? '' : 's'}.`
+          : 'As 2 cartas da Ordem Final entraram em jogo; nenhum Chicote foi aplicado.',
+      });
+    }
     for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active' && entry.targetPlayerId === playerId)) {
       if (order.type === 'no_new_meld') {
         finishDominatrixOrder(gameState, order, 'obeyed', 'O jogador encerrou o turno sem criar um jogo novo.');

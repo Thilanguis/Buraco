@@ -230,38 +230,39 @@ test('contribuicoes por jogo nao sao expostas nos modos comuns', () => {
   assert.equal(getBossMeldContribution(state, 0, 0), null);
 });
 
-test('morto reduz divida uma vez por morto', () => {
+test('morto nao reduz a divida do Banqueiro', () => {
   const state = game();
   state.boss.danger = 30;
   state.deadChunksTaken[0] = 1;
-  assert.equal(applyBossDeadTaken(state).amount, 5);
-  assert.equal(state.boss.danger, 25);
+  assert.equal(applyBossDeadTaken(state).amount, 0);
+  assert.equal(state.boss.danger, 30);
   assert.equal(applyBossDeadTaken(state), null);
   state.deadChunksTaken[0] = 2;
   applyBossDeadTaken(state);
-  assert.equal(state.boss.danger, 20);
+  assert.equal(state.boss.danger, 30);
 });
 
 test('alteracoes de divida preservam a origem no evento', () => {
   const state = game();
   state.boss.danger = 30;
   state.deadChunksTaken[0] = 1;
-  assert.equal(applyBossDeadTaken(state).dangerChangeLabel, 'Morto conquistado: Dívida -5');
+  assert.equal(applyBossDeadTaken(state).dangerChangeLabel, '');
   const meld = applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
   assert.equal(meld.dangerChangeLabel, 'Canastra limpa: Dívida -4');
 });
 
-test('Auditoria reduz cinco de divida uma unica vez no fim da rodada', () => {
+test('Auditoria concluida evita cobranca sem reduzir divida', () => {
   const state = game();
   state.boss.danger = 20;
-  state.boss.currentIntent = { id: 'audit-once', abilityId: 'suit_audit', name: 'Auditoria', duration: 'full_round', payload: { suit: '♦', suitLabel: 'Ouros', required: 3, progress: 3, successDelta: -5, failureDelta: 10 } };
+  state.boss.currentIntent = { id: 'audit-once', abilityId: 'suit_audit', name: 'Auditoria', duration: 'full_round', payload: { suit: '♦', suitLabel: 'Ouros', required: 3, progress: 3, successDelta: 0, failureDelta: 12 } };
   completeBossPlayerTurn(state, 0);
   const event = completeBossPlayerTurn(state, 1);
-  assert.equal(event.dangerDelta, -5);
-  assert.equal(event.dangerChangeLabel, 'Auditoria concluída: Dívida -5');
-  assert.equal(state.boss.danger, 15);
+  assert.equal(event.dangerDelta, 0);
+  assert.equal(event.dangerChangeLabel, '');
+  assert.equal(event.outcome, 'Auditoria concluída: sem cobrança.');
+  assert.equal(state.boss.danger, 20);
   assert.equal(completeBossPlayerTurn(state, 1), null);
-  assert.equal(state.boss.danger, 15);
+  assert.equal(state.boss.danger, 20);
   assert.equal(state.boss.eventLog.filter((entry) => entry.abilityId === 'suit_audit').length, 1);
 });
 
@@ -286,7 +287,7 @@ test('chefe resolve uma vez depois dos dois jogadores', () => {
   assert.equal(event.abilityId, 'fixed_interest');
   assert.equal(event.round, 1);
   assert.equal(typeof event.at, 'number');
-  assert.equal(state.boss.danger, 6);
+  assert.equal(state.boss.danger, 12);
   assert.equal(state.boss.roundNumber, 2);
   assert.equal(completeBossPlayerTurn(state, 1), null);
 });
@@ -335,6 +336,7 @@ test('Carta Financiada usada não gera Dívida e a marca é removida', () => {
   state.players[0].hand.push(financed);
   registerBossFinancedCards(state, 0, [financed]);
   state.players[0].hand = state.players[0].hand.filter((card) => card.id !== financed.id);
+  state.teams[0].melds = [[financed]];
   completeBossPlayerTurn(state, 0);
   assert.equal(state.boss.danger, 0);
   assert.equal(state.boss.effects.some((effect) => effect.id === 'financed_card'), false);
@@ -353,11 +355,29 @@ test('Carta Financiada restante cobra uma vez e Fase 3 trata duas cartas separad
   const registered = registerBossFinancedCards(state, 0, cards);
   assert.deepEqual(registered.cardIds, cards.map((card) => card.id));
   state.players[0].hand = state.players[0].hand.filter((card) => card.id !== 'financed-played');
+  state.teams[0].melds = [[cards[1]]];
   completeBossPlayerTurn(state, 0);
   assert.equal(state.boss.danger, 4);
   state.turnNumber += 1;
   completeBossPlayerTurn(state, 0);
   assert.equal(state.boss.danger, 4);
+});
+
+test('Carta Financiada descartada ainda cobra porque so jogo quita a Tarifa', () => {
+  const state = game();
+  state.boss.effects = [{ id: 'maintenance_fee', extraDraw: 1, financedDebt: 5, pendingPlayerIds: [0] }];
+  assert.equal(consumeBossExtraDraw(state, 0), 1);
+  const financed = { id: 'financed-discarded', rank: '6', suit: '♥' };
+  state.players[0].hand.push(financed);
+  registerBossFinancedCards(state, 0, [financed]);
+  state.players[0].hand = state.players[0].hand.filter((card) => card.id !== financed.id);
+  state.discard = [financed];
+  completeBossPlayerTurn(state, 0);
+  assert.equal(state.boss.danger, 5);
+  const charge = state.boss.eventLog.findLast((entry) => entry.type === 'financedCharge');
+  assert.ok(charge);
+  assert.deepEqual(charge.discardedCardIds, [financed.id]);
+  assert.deepEqual(charge.usedInMeldCardIds, []);
 });
 
 test('ataque final decide vitoria ou derrota imediatamente', () => {
@@ -588,18 +608,78 @@ test('Troca Forçada e Favorita alteram as mãos e Correntes sem destruir cartas
   assert.equal(getBossChains(favoriteState, 1), 1);
 });
 
-test('Ordem Final cria escolhas diferentes para os dois cooperadores', () => {
+test('Ordem Final sorteada seleciona duas cartas existentes de cada mao', () => {
+  const state = dominatrixGame();
+  state.boss.phase = 3;
+  state.boss.phaseTransitions = [1, 2, 3];
+  const intent = selectNextBossIntent(state, { debug: true, forcedAbilityId: 'final_order' });
+
+  assert.equal(intent.abilityId, 'final_order');
+  assert.equal(intent.payload.orders.length, 2);
+  for (const order of intent.payload.orders) {
+    const player = state.players.find((entry) => entry.id === order.playerId);
+    assert.equal(order.cardIds.length, 2);
+    assert.equal(new Set(order.cardIds).size, 2);
+    assert.ok(order.cardIds.every((cardId) => player.hand.some((card) => card.id === cardId)));
+  }
+});
+
+test('Ordem Final marca duas cartas da mao de cada cooperador e oferece a mesma escolha', () => {
   const state = dominatrixGame();
   state.boss.phase = 3;
   state.stock.length = 18;
-  state.boss.currentIntent = { id: 'final-order', abilityId: 'final_order', name: 'Ordem Final', payload: { orderedPlayerIds: [0, 1] } };
+  state.boss.currentIntent = {
+    id: 'final-order',
+    abilityId: 'final_order',
+    name: 'Ordem Final',
+    payload: {
+      orderedPlayerIds: [0, 1],
+      orders: [
+        { playerId: 0, cardIds: ['d0-a', 'd0-b'] },
+        { playerId: 1, cardIds: ['d1-a', 'd1-b'] },
+      ],
+    },
+  };
   assert.equal(completeBossPlayerTurn(state, 0), null);
   const event = completeBossPlayerTurn(state, 1);
   assert.equal(event.abilityId, 'final_order');
+  assert.deepEqual(state.boss.pendingChoices.map((choice) => choice.type), ['final_order', 'final_order']);
   assert.deepEqual(state.boss.pendingChoices.map((choice) => choice.options), [
-    ['draw2', 'chain'],
-    ['lock_card', 'chain'],
+    ['obey', 'chain'],
+    ['obey', 'chain'],
   ]);
+  assert.deepEqual(state.boss.pendingChoices[0].cardIds, ['d0-a', 'd0-b']);
+  assert.deepEqual(state.boss.pendingChoices[1].cardIds, ['d1-a', 'd1-b']);
+  assert.equal(getBossCardEffect(state, 0, 'd0-a'), 'final-order');
+  assert.equal(isBossCardBlocked(state, 0, 'd0-a', 'discard'), false);
+
+  const choiceEvent = resolveBossChoice(state, 0, 'obey');
+  assert.deepEqual(choiceEvent.markedCardIds, ['d0-a', 'd0-b']);
+  assert.equal(state.boss.effects.filter((effect) => effect.id === 'final_order_mark' && effect.playerId === 0).length, 2);
+  assert.equal(getBossCardEffect(state, 0, 'd0-b'), 'final-order');
+});
+
+test('Ordem Final aplica um Chicote por carta aceita que nao entrou em jogo', () => {
+  const state = dominatrixGame();
+  state.boss.currentIntent = null;
+  state.boss.pendingChoices = [];
+  state.boss.bossFlow = null;
+  state.boss.effects.push(
+    { id: 'final_order_mark', source: 'final_order', playerId: 0, cardId: 'd0-a', expiresAfterTurn: true },
+    { id: 'final_order_mark', source: 'final_order', playerId: 0, cardId: 'd0-b', expiresAfterTurn: true },
+  );
+  const used = state.players[0].hand.find((card) => card.id === 'd0-a');
+  state.players[0].hand = state.players[0].hand.filter((card) => card.id !== used.id);
+  state.teams[0].melds = [[used]];
+
+  completeBossPlayerTurn(state, 0);
+
+  assert.equal(getBossChains(state, 0), 1);
+  assert.equal(state.boss.effects.some((effect) => effect.id === 'final_order_mark' && effect.playerId === 0), false);
+  const resolved = [...state.boss.eventLog].reverse().find((entry) => entry.type === 'finalOrderResolved');
+  assert.equal(resolved.chainsApplied, 1);
+  assert.deepEqual(resolved.usedCardIds, ['d0-a']);
+  assert.deepEqual(resolved.missedCardIds, ['d0-b']);
 });
 
 test('Ataque final perde força quando o jogador está Dominado', () => {

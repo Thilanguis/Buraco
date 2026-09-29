@@ -383,17 +383,17 @@ test('Juros Fixos usa somente tres contratos na proporcao 25/50/25 e media aprov
     selectedContracts += 1;
     counts[intent.payload.contractTier] += 1;
     assert.ok([
-      'mild:5:2',
-      'standard:6:3',
-      'severe:7:4',
+      'mild:10:4',
+      'standard:12:5',
+      'severe:14:6',
     ].includes(`${intent.payload.contractTier}:${intent.payload.fullDebt}:${intent.payload.guaranteedDebt}`));
   }
-  const average = (counts.mild * 5 + counts.standard * 6 + counts.severe * 7) / selectedContracts;
+  const average = (counts.mild * 10 + counts.standard * 12 + counts.severe * 14) / selectedContracts;
   assert.ok(selectedContracts > 3000);
   assert.ok(Math.abs(counts.mild / selectedContracts - 0.25) < 0.02);
   assert.ok(Math.abs(counts.standard / selectedContracts - 0.5) < 0.02);
   assert.ok(Math.abs(counts.severe / selectedContracts - 0.25) < 0.02);
-  assert.equal(average, 6);
+  assert.equal(average, 12);
 });
 
 test('contrato sorteado sobrevive a reload e Voltar sem novo sorteio', () => {
@@ -451,7 +451,7 @@ test('Limite de Credito fica ativo desde o anuncio no fluxo real e expira sem se
   assert.equal(state.boss.creditLimit.round, state.boss.roundNumber);
   assert.equal(state.boss.creditLimit.sourceIntentId, intent.id);
   assert.equal(state.boss.creditLimit.allowance, 2);
-  assert.equal(getBossCreditLimitQuote(state, []).maxCharge, 5);
+  assert.equal(getBossCreditLimitQuote(state, []).maxCharge, 12);
 
   const reloaded = structuredClone(state);
   normalizeBossState(reloaded);
@@ -465,15 +465,15 @@ test('Limite de Credito fica ativo desde o anuncio no fluxo real e expira sem se
     meldIndex: 0,
     cardsAdded: played,
   });
-  assert.equal(event.creditLimitDebt, 2);
-  assert.equal(reloaded.boss.creditLimit.chargedDebt, 2);
-  assert.equal(reloaded.boss.danger, 2);
+  assert.equal(event.creditLimitDebt, 8);
+  assert.equal(reloaded.boss.creditLimit.chargedDebt, 8);
+  assert.equal(reloaded.boss.danger, 8);
 
   completeBossPlayerTurn(reloaded, 0);
   completeBossPlayerTurn(reloaded, 1);
   assert.equal(reloaded.boss.roundNumber, 2);
   assert.equal(reloaded.boss.creditLimit.status, 'expired');
-  assert.equal(reloaded.boss.creditLimit.chargedDebt, 2);
+  assert.equal(reloaded.boss.creditLimit.chargedDebt, 8);
   assert.equal(getBossCreditLimitQuote(reloaded, played), null);
 });
 
@@ -516,7 +516,7 @@ test('Agio do Lixo fica ativo desde o anuncio no fluxo real e nao renasce no fec
 
   assert.equal(state.boss.discardSurcharge.createdRound, state.boss.roundNumber);
   assert.equal(state.boss.discardSurcharge.sourceIntentId, intent.id);
-  assert.equal(getBossDiscardSurcharge(state).amount, 4);
+  assert.equal(getBossDiscardSurcharge(state).amount, 7);
 
   const unconsumed = structuredClone(state);
   advanceBossTurn(unconsumed, unconsumed.boss.bossFlow.endsAt + 1);
@@ -530,14 +530,14 @@ test('Agio do Lixo fica ativo desde o anuncio no fluxo real e nao renasce no fec
   normalizeBossState(reloaded);
   advanceBossTurn(reloaded, reloaded.boss.bossFlow.endsAt + 1);
   const event = consumeBossDiscardSurcharge(reloaded, 0);
-  assert.equal(event.amount, 4);
-  assert.equal(reloaded.boss.danger, 4);
+  assert.equal(event.amount, 7);
+  assert.equal(reloaded.boss.danger, 7);
   assert.equal(consumeBossDiscardSurcharge(reloaded, 1), null);
 
   const chargedReload = structuredClone(reloaded);
   normalizeBossState(chargedReload);
   assert.equal(consumeBossDiscardSurcharge(chargedReload, 0), null);
-  assert.equal(chargedReload.boss.danger, 4);
+  assert.equal(chargedReload.boss.danger, 7);
 });
 
 test('Semente e Raiz falham sem cura, e a Raiz propaga somente na rodada seguinte', () => {

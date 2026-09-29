@@ -3225,6 +3225,14 @@ function teamHasGoodCanastra(teamId) {
   });
 }
 
+function financedTariffMessage(event, ownerName = '') {
+  if (!event) return '';
+  const labels = (event.cardLabels || []).filter(Boolean);
+  const cards = labels.length ? labels.join(labels.length > 1 ? ' e ' : '') : `${event.count || 1} carta${(event.count || 1) === 1 ? '' : 's'}`;
+  const owner = ownerName ? `${ownerName}: ` : '';
+  return `${owner}Tarifa de Manutenção — ${cards} ${labels.length === 1 ? 'é' : 'são'} FINANCIADA${labels.length === 1 ? '' : 'S'}. Use ${labels.length === 1 ? 'essa carta' : 'essas cartas'} em um jogo neste turno. Descartar não quita a Tarifa; cada carta que não entrar em jogo gera +${event.debtPerCard} Dívida.`;
+}
+
 async function drawBossTurnExtras(player) {
   if (hasPendingBossChoices(state)) {
     showPendingBossChoiceMessage(player?.id);
@@ -3260,7 +3268,7 @@ async function drawBossTurnExtras(player) {
     }
   }
   if (financedEvent && player.id === myPlayerIndex) {
-    showMessage(`${financedEvent.outcome} Use ou descarte neste turno. Cada carta restante gera Dívida.`);
+    showMessage(financedTariffMessage(financedEvent));
   }
   return cards;
 }
@@ -3350,7 +3358,7 @@ async function drawFromStockOnce() {
   }
 
   const drawMessages = [];
-  if (financedEvent) drawMessages.push(`${financedEvent.outcome} Use ou descarte neste turno. Cada carta restante gera Dívida.`);
+  if (financedEvent) drawMessages.push(financedTariffMessage(financedEvent));
   if (vaultInterestEvent) drawMessages.push(vaultInterestEvent.outcome);
   showMessage(drawMessages.join(' '));
 
@@ -4982,14 +4990,14 @@ const BOSS_GUIDE_CORE = Object.freeze({
 });
 
 const BOSS_GUIDE_OVERRIDES = Object.freeze({
-  fixed_interest: 'Um jogador escolhe entre receber a cobrança integral de Dívida ou deixar uma carta como garantia no Cofre. A garantia volta depois com custo base e juros acumulados.',
-  maintenance_fee: 'Cada jogador recebe cartas extras junto da compra normal. As cartas financiadas que continuarem na mão ao fim do turno geram Dívida.',
-  suit_audit: 'A equipe precisa baixar a quantidade exigida de cartas do naipe sorteado durante a rodada. Cumprir reduz a Dívida; falhar aumenta a Dívida.',
-  credit_limit: 'A rodada recebe uma franquia compartilhada de cartas vindas da mão. Cartas que ultrapassarem essa franquia geram Dívida, até o limite da cobrança.',
+  fixed_interest: 'O titular escolhe: pagar a cobrança integral ou prender uma carta aleatória no Cofre. Adiar o resgate aumenta o custo até o valor integral.',
+  maintenance_fee: 'Todos recebem cartas financiadas na compra. Para quitar a Tarifa, a carta marcada precisa entrar em um jogo neste turno; descartar também gera a cobrança.',
+  suit_audit: 'A equipe precisa baixar a quantidade exigida de cartas do naipe sorteado durante a rodada. Cumprir evita a cobrança; falhar aumenta a Dívida.',
+  credit_limit: 'A equipe tem uma franquia compartilhada de cartas vindas da mão. Cada excedente gera Dívida até o teto da rodada.',
   forced_choice: 'O alvo escolhe: receber 1 Chicote imediatamente ou aceitar uma ordem válida para o próximo turno.',
   possession: 'Um jogo fica possuído: o dano já acumulado fica suspenso até a condição de libertação ser cumprida. Novas cartas ainda causam o próprio dano normalmente.',
   break_will: 'Um jogador que já tenha 2 Chicotes recebe uma escolha pessoal entre punições da Dominadora.',
-  final_order: 'Cada cooperador recebe uma escolha diferente de punição; as duas decisões fazem parte da mesma habilidade.',
+  final_order: 'Duas cartas da mão de cada cooperador são marcadas. Cada jogador escolhe entre receber 1 Chicote agora ou aceitar a ordem; ao aceitar, cada carta marcada que não entrar em jogo no próximo turno causa 1 Chicote.',
   restorative_dew: 'A Matriarca prepara uma cura. Quanto mais cartas novas a equipe baixar legalmente durante a janela da habilidade, menor será a cura; com progresso suficiente ela zera.',
   harvest: 'No fim do turno do alvo, o tamanho da mão define o resultado: até 7 cartas não há efeito; mãos maiores podem curar a Matriarca e, no pior caso, gerar Flor.',
   royal_bloom: 'Cria vários objetivos naturais independentes. Cada objetivo precisa ser resolvido separadamente; falhas alimentam o Florescimento.',
@@ -5246,6 +5254,7 @@ function renderBossVaultSlot(root, player, isLocal = false) {
   root.classList.toggle('boss-vault-opening', vaultOpening);
   root.dataset.vaultState = vaultReceiving ? 'receiving' : vaultClosing ? 'closing' : vaultOpening ? 'opening' : quote?.state === 'open' ? 'open' : 'closed';
   const frameSrc = vaultReceiving || quote?.state === 'open' ? 'assets/images/boss-vault-open.png' : 'assets/images/boss-vault-frame.png';
+  const interestStep = quote?.interestStep || 1;
   const status = vaultReceiving
     ? 'RECEBENDO GARANTIA...'
     : vaultClosing
@@ -5253,13 +5262,13 @@ function renderBossVaultSlot(root, player, isLocal = false) {
       : vaultOpening
         ? 'ABRINDO COFRE...'
         : reclaimRequired
-          ? `RESGATE OBRIGATÓRIO · +${quote?.totalDebt || 0} DÍVIDA`
+          ? `RESGATE OBRIGATÓRIO · +${quote?.totalDebt || 0} DÍVIDA · SUBSTITUI A COMPRA`
           : reclaimAvailable
-            ? `RESGATAR +${quote?.currentDebt || 0} · OU FAZER A COMPRA NORMAL`
+            ? `RESGATAR +${quote?.currentDebt || 0} · OU COMPRAR NORMAL (+${interestStep} NO COFRE)`
             : quote?.state === 'open'
-              ? `COFRE ABERTO · CUSTO ATUAL +${quote?.currentDebt || 0}`
-              : `CARÊNCIA · ${Math.min(1, quote?.ownerTurnsStarted || 0)}/1 TURNO`;
-  const vaultMarkup = `<div class="boss-vault-visual"><div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : `back back-${vault.card.back === 'blue' ? 'blue' : 'red'} boss-vault-card-back`}">${cardFace}</div><img class="boss-vault-frame" src="${frameSrc}" alt="" aria-hidden="true"></div><div class="boss-vault-copy"><span class="boss-vault-kicker">GARANTIA NO COFRE</span><small>${player.name} · base +${quote?.baseDebt || 0} · juros +${quote?.interestDebt || 0} · atual +${quote?.currentDebt || 0}</small><strong>${status}</strong></div>`;
+              ? `ABERTO · RESGATE +${quote?.currentDebt || 0} NO PRÓXIMO TURNO`
+              : 'ABRE NO PRÓXIMO TURNO DO TITULAR';
+  const vaultMarkup = `<div class="boss-vault-visual"><div class="boss-vault-card carta mini ${isLocal ? `${suitClass(vault.card)} ${deckFaceClass(vault.card)}` : `back back-${vault.card.back === 'blue' ? 'blue' : 'red'} boss-vault-card-back`}">${cardFace}</div><img class="boss-vault-frame" src="${frameSrc}" alt="" aria-hidden="true"></div><div class="boss-vault-copy"><span class="boss-vault-kicker">GARANTIA NO COFRE</span><small>${player.name} · base +${quote?.baseDebt || 0} · +${interestStep} por turno adiado · atual +${quote?.currentDebt || 0}</small><strong>${status}</strong></div>`;
   if (root._vaultMarkup !== vaultMarkup) {
     root.innerHTML = vaultMarkup;
     root._vaultMarkup = vaultMarkup;
@@ -5495,6 +5504,7 @@ function renderBossHud() {
   const boss = normalizeBossState(state);
   const definition = getBossDefinition(boss.id);
   const isDominatrix = boss.id === 'dominadora';
+  const isBanker = boss.id === 'banker';
   const isMatriarch = boss.id === 'matriarca_esmeralda';
   const isDimitrescu = boss.id === 'dimitrescu';
   document.body.dataset.bossId = boss.id;
@@ -5599,40 +5609,11 @@ function renderBossHud() {
 
   const intentDescription = document.getElementById('bossIntentDescription');
   const intentProgress = document.getElementById('bossIntentProgress');
-  const activeHarvestThreat = [...(boss.natureThreats || [])].reverse().find((threat) => threat.type === 'harvest' && threat.status === 'active');
-  const harvestIntent = boss.currentIntent?.abilityId === 'harvest' ? boss.currentIntent : null;
-  const isHarvestLive = isMatriarch && flow?.stage !== 'result' && Boolean(activeHarvestThreat || harvestIntent);
+  const escapeBossHudText = (value) => String(value ?? '')
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 
-  if (isHarvestLive) {
-    const targetPlayerId = activeHarvestThreat?.targetPlayerId || harvestIntent?.payload?.targetPlayerId;
-    const targetPlayer = state.players.find((player) => player.id === targetPlayerId);
-    const cards = targetPlayer?.hand?.length ?? Number(activeHarvestThreat?.observedHandSize || 0);
-    const discardNeeded = Math.max(0, cards - 7);
-    const currentBand = cards <= 7 ? 'safe' : cards <= 10 ? 'warning' : 'danger';
-    const countText = cards <= 7 ? `✅ ${cards} carta${cards === 1 ? '' : 's'} · meta atingida` : `${cards >= 11 ? '🔴' : '🟡'} ${cards} cartas · descarte ${discardNeeded}`;
-
-    intentDescription.className = 'boss-harvest-panel';
-    intentDescription.innerHTML = `
-      <span class="boss-harvest-hint">
-       ${targetPlayer ? `${targetPlayer.name} ` : ''}: Descarte cartas. O total na sua mão ao fim do turno define o efeito.
-      </span>
-      <span class="boss-harvest-count ${currentBand}">${countText}</span>
-      <span class="boss-harvest-rules">
-        <span class="boss-harvest-rule ${currentBand === 'safe' ? 'active' : ''}">
-          <b>0–7</b><span>Sem efeito</span>
-        </span>
-        <span class="boss-harvest-rule ${currentBand === 'warning' ? 'active' : ''}">
-          <b>8–10</b><span>Cura 60 HP</span>
-        </span>
-        <span class="boss-harvest-rule ${currentBand === 'danger' ? 'active' : ''}">
-          <b>11+</b><span>+1 Flor e cura 100 HP</span>
-        </span>
-      </span>
-    `;
-
-    intentProgress.className = '';
-    intentProgress.textContent = '';
-  } else if (isDimitrescu && boss.currentIntent?.abilityId === 'blood_tithe' && flow?.stage !== 'result') {
+  if (isDimitrescu && boss.currentIntent?.abilityId === 'blood_tithe' && flow?.stage !== 'result') {
     const phase = Number(boss.currentIntent.announcedPhase) || 1;
     const medium = phase === 3 ? 6 : 4;
     const heavy = phase === 3 ? 10 : 8;
@@ -5726,7 +5707,7 @@ function renderBossHud() {
         if (effect.id === 'financed_card') {
           const owner = state.players.find((player) => player.id === effect.playerId);
           const card = owner?.hand?.find((entry) => entry.id === effect.cardId);
-          return `<span class="boss-effect-chip boss-financed-chip">$ ${owner?.name || 'Jogador'}: ${card ? `${card.rank}${card.suit}` : 'carta'} financiada · +${effect.debtPerCard}</span>`;
+          return `<span class="boss-effect-chip boss-financed-chip">$ ${owner?.name || 'Jogador'}: ${card ? `${card.rank}${card.suit}` : 'carta'} FINANCIADA · use em jogo · +${effect.debtPerCard} se falhar</span>`;
         }
         if (effect.id === 'choice_lock') {
           const owner = state.players.find((player) => player.id === effect.playerId);
@@ -5747,6 +5728,11 @@ function renderBossHud() {
         if (effect.id === 'hands_tied_team')
           return `<span class="boss-effect-chip">Maos Atadas: ${effect.teamMeldAvailable === false ? `criacao consumida por ${state.players.find((player) => player.id === effect.consumedByPlayerId)?.name || 'cooperador'}` : '1 criacao disponivel para a equipe'}</span>`;
         if (effect.id === 'dominatrix_order') return `<span class="boss-effect-chip">Ordem: ${effect.label || effect.suitLabel || effect.type} · ${state.players.find((player) => player.id === effect.targetPlayerId)?.name || 'alvo'}</span>`;
+        if (effect.id === 'final_order_mark') {
+          const owner = state.players.find((player) => player.id === effect.playerId);
+          const marked = owner?.hand?.find((card) => card.id === effect.cardId);
+          return `<span class="boss-effect-chip">Ordem Final: ${marked ? `${marked.rank}${marked.suit}` : 'carta marcada'} · ${owner?.name || 'alvo'}</span>`;
+        }
         if (effect.id === 'interdict') return `<span class="boss-effect-chip">Interdito: jogo ${Number(effect.meldIndex) + 1} · primeira evolucao</span>`;
         if (effect.id === 'credit_limit') return `<span class="boss-effect-chip">Credito ${new Set(effect.countedCardIds || []).size}/${effect.allowance} · cobranca ${effect.chargedDebt || 0}/${effect.maxCharge}</span>`;
         if (effect.id === 'discard_surcharge') return `<span class="boss-effect-chip">Agio do Lixo: +${effect.amount} Divida na primeira retirada valida</span>`;
@@ -5777,6 +5763,7 @@ function renderBossHud() {
     draw2: 'Comprar 2 cartas',
     chain: 'Receber 1 Chicote',
     order: 'Aceitar a ordem',
+    obey: 'Aceitar Ordem Final',
     lock_card: 'Prender 1 carta',
     break_meld: 'Retirar carta da canastra',
     full: 'Pagar valor integral',
@@ -5819,14 +5806,19 @@ function renderBossHud() {
       myChoice.type === 'break_will'
         ? 'Quebra de Vontade: escolha sua punição.'
         : myChoice.type === 'fixed_interest_payment'
-          ? `${choiceOwner?.name || 'Titular'}: pague agora ou aceite uma carta aleatória no Cofre.`
+          ? `${choiceOwner?.name || 'Titular'}: +${myChoice.amount} agora ou Cofre (carta aleatória · resgate +${myChoice.collateralAmount} · +${myChoice.interestStep || 2} por turno adiado).`
           : collateralChoice
             ? 'Clique em uma carta da sua mão e confirme a garantia.'
-            : myChoice.type === 'final_order_draw'
-              ? 'Ordem Final: escolha entre comprar 2 cartas que ficarao presas no proximo turno ou receber 1 Chicote.'
-              : myChoice.type === 'final_order_lock'
-                ? 'Ordem Final: escolha entre deixar 1 carta aleatoria da sua mao presa no proximo turno ou receber 1 Chicote.'
-                : myChoice.type === 'forced_choice' && myChoice.order?.description
+            : myChoice.type === 'final_order'
+              ? `Ordem Final: ${myChoice.cardIds?.map((cardId) => {
+                  const marked = state.players[myPlayerIndex]?.hand?.find((card) => card.id === cardId);
+                  return marked ? `${marked.rank}${marked.suit}` : 'carta marcada';
+                }).join(' e ')}. Aceite usar as duas em jogo no proximo turno ou receba 1 Chicote agora.`
+              : myChoice.type === 'final_order_draw'
+                ? 'Ordem Final: escolha entre comprar 2 cartas que ficarao presas no proximo turno ou receber 1 Chicote.'
+                : myChoice.type === 'final_order_lock'
+                  ? 'Ordem Final: escolha entre deixar 1 carta aleatoria da sua mao presa no proximo turno ou receber 1 Chicote.'
+                  : myChoice.type === 'forced_choice' && myChoice.order?.description
                   ? `Escolha Forçada: receba 1 Chicote agora ou aceite a ordem: ${myChoice.order.description}`
                   : 'A Dominadora exige uma escolha.';
     const actions = document.getElementById('bossChoiceActions');
@@ -5844,7 +5836,7 @@ function renderBossHud() {
           if (option === 'full' && myChoice.type === 'fixed_interest_payment') {
             label = `Assumir +${myChoice.amount} Dívida`;
           } else if ((option === 'guarantee' || option.startsWith('guarantee:')) && myChoice.type === 'fixed_interest_payment') {
-            label = `Aceitar Cofre · resgate +${myChoice.collateralAmount}`;
+            label = `Aceitar Cofre · começa +${myChoice.collateralAmount}`;
           } else if (option.startsWith('guarantee:')) {
             const player = state.players.find((entry) => entry.id === Number(option.split(':')[1]));
             label = `Garantia: ${player?.name || 'Jogador'}`;
@@ -5887,6 +5879,8 @@ function renderBossHud() {
           const lockedMessage = event.lockedCardLabels?.length ? ` ${event.lockedCardLabels.join(' e ')} ficaram presas.` : ' As duas cartas ficaram presas.';
 
           showMessage(`2 cartas adicionadas à sua mão.${lockedMessage} Sua compra normal do turno continua sendo 1 carta.`);
+        } else if (event.choiceType === 'final_order' && event.option === 'obey' && event.markedCardLabels?.length) {
+          showMessage(`Ordem Final aceita: use ${event.markedCardLabels.join(' e ')} em jogo no proximo turno. Cada carta nao usada causa 1 Chicote.`);
         } else if (event.choiceType === 'final_order_lock' && event.lockedCardLabel) {
           showMessage(`Ordem Final: ${event.lockedCardLabel} ficou presa durante o proximo turno completo.`);
         }
@@ -6830,6 +6824,10 @@ function renderHand() {
       div.classList.add('boss-card-exposed');
       div.title = 'Carta exposta: não pode ser descartada';
     }
+    if (bossCardEffect === 'final-order') {
+      div.classList.add('boss-card-exposed');
+      div.title = 'Ordem Final: use esta carta em um jogo no próximo turno; descartar não cumpre a ordem';
+    }
     if (bossCardEffect === 'nature-seed') {
       div.classList.add('boss-card-nature-seed');
       div.title = bossDiscardFeedback?.message || 'Semente Viva: use esta carta antes do fim do turno';
@@ -6853,17 +6851,23 @@ function renderHand() {
     const financedCard = state.boss?.effects?.find((effect) => effect.id === 'financed_card' && effect.playerId === me.id && effect.cardId === card.id);
     if (financedCard) {
       div.classList.add('boss-card-financed');
-      div.title = `Carta Financiada: Dívida +${financedCard.debtPerCard} se permanecer na mão ao fim do turno`;
+      // A compra normal continua como NOVA; a extra da Tarifa recebe uma identidade própria.
+      div.classList.remove('just-bought');
+      div.title = `Carta FINANCIADA: use em um jogo neste turno. Descartar não quita a Tarifa; se não entrar em jogo, Dívida +${financedCard.debtPerCard}.`;
     }
 
     div.innerHTML = cardFrontHTML(card);
-    if (div.classList.contains('just-bought')) {
+    if (financedCard) {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-financed-marker" role="img" aria-label="Carta financiada: use em um jogo neste turno"><span aria-hidden="true">FINANCIADA</span></span>');
+    } else if (div.classList.contains('just-bought')) {
       div.insertAdjacentHTML('beforeend', '<span class="bought-card-marker" role="img" aria-label="Carta recém-comprada"><span aria-hidden="true">NOVA</span></span>');
     }
     if (bossCardLocked) {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-locked" aria-hidden="true"><i></i><b>PRESA</b></span>');
     } else if (bossCardEffect === 'exposed') {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-exposed" aria-hidden="true"><i></i><b>USE NESTE TURNO</b></span>');
+    } else if (bossCardEffect === 'final-order') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-exposed" aria-hidden="true"><i></i><b>ORDEM FINAL</b></span>');
     } else if (bossCardEffect === 'nature-seed') {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-seed" aria-hidden="true"><i>&#10047;</i><b>SEMENTE</b></span>');
     } else if (bossCardEffect === 'nature-pollen') {
@@ -8235,7 +8239,11 @@ async function playRemoteAction(a) {
       if (i < financedCards.length - 1) await new Promise((resolve) => setTimeout(resolve, 220));
     }
     const playerName = state.players?.find((player) => player.id === a.playerId)?.name || 'Jogador';
-    showMessage(`Tarifa de Manutenção: ${playerName} recebeu +${financedCards.length} carta${financedCards.length === 1 ? '' : 's'} financiada${financedCards.length === 1 ? '' : 's'}. Cada carta restante gera Dívida.`);
+    showMessage(financedTariffMessage(a.bossEvent || {
+      count: financedCards.length,
+      cardLabels: financedCards.map((card) => `${card.rank || ''}${card.suit || ''}`),
+      debtPerCard: state.boss?.phase === 3 ? 7 : 5,
+    }, playerName));
   };
 
   if (a.type === 'dominatorBonus' && state.mode === '1x1_dominacao') {
@@ -8597,6 +8605,23 @@ const botEngine = {
       const partnerChains = Math.max(0, ...(state.players || []).filter((entry) => entry.id !== playerId).map((entry) => getBossChains(state, entry.id)));
       const practicalOrder = ['discard_suit', 'no_new_meld', 'feed_specific_meld'].includes(choice.order?.type);
       option = choice.order && (ownChains >= 3 || partnerChains >= 3 || practicalOrder) ? 'order' : 'chain';
+    } else if (choice.type === 'final_order' && choice.options.includes('obey') && choice.options.includes('chain')) {
+      const ownChains = getBossChains(state, playerId);
+      const markedCards = (choice.cardIds || []).map((cardId) => player?.hand?.find((card) => card?.id === cardId)).filter(Boolean);
+      const team = state.teams?.[player?.teamId];
+      const canCreate = canBossCreateMeld(state, playerId);
+      const playableCount = markedCards.filter((marked) => {
+        if ((team?.melds || []).some((meld) => isValidSequenceMeld([...(meld || []), marked]))) return true;
+        if (!canCreate) return false;
+        const others = (player?.hand || []).filter((card) => card?.id && card.id !== marked.id);
+        for (let i = 0; i < others.length; i += 1) {
+          for (let j = i + 1; j < others.length; j += 1) {
+            if (isValidSequenceMeld([marked, others[i], others[j]])) return true;
+          }
+        }
+        return false;
+      }).length;
+      option = ownChains >= 3 || playableCount >= 1 ? 'obey' : 'chain';
     } else if (choice.options.includes('chain') && getBossChains(state, playerId) >= 2) {
       option = choice.options.find((entry) => entry !== 'chain') || 'chain';
     }

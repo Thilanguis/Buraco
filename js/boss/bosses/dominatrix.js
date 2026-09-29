@@ -46,6 +46,6 @@ export const dominatrixDefinition = Object.freeze({
     ability('separation', 'Separação', 4, [3], () => 'Os jogadores não poderão alimentar o mesmo jogo nesta rodada.'),
     ability('absolute_control', 'Controle Absoluto', 4, [3], () => 'Um jogador ficará Dominado durante o próximo turno, sem poder abrir novos jogos e com golpe final reduzido.'),
     ability('break_will', 'Quebra de Vontade', 4, [3], () => 'Um jogador com 2 Chicotes enfrentará uma escolha entre ganhar outro Chicote ou desmontar uma canastra.'),
-    ability('final_order', 'Ordem Final', 4, [3], () => 'Cada cooperador receberá uma punição diferente e deverá escolher entre obedecer ou receber 1 Chicote.'),
+    ability('final_order', 'Ordem Final', 4, [3], () => 'Duas cartas da mão de cada cooperador são marcadas. Antes dos turnos, cada jogador escolhe entre receber 1 Chicote agora ou aceitar a ordem; cada carta marcada que não entrar em jogo no próximo turno causa 1 Chicote.'),
   ]),
 });

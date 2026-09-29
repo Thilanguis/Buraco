@@ -278,9 +278,14 @@ test('Tarifa identifica e anima separadamente as Cartas Financiadas em todos os 
   assert.match(app, /registerBossFinancedCards\(s, botIndex, bossExtraCards\)/);
   assert.match(app, /bossExtraCards:\s*bossExtraCards\.map\(packCard\)/);
   assert.match(app, /animateRemoteFinancedCards/);
-  assert.match(app, /Use ou descarte neste turno\. Cada carta restante gera Dívida/);
+  assert.match(app, /Descartar não quita a Tarifa/);
   assert.match(app, /boss-card-financed/);
+  assert.match(app, /boss-financed-marker/);
+  assert.match(app, /classList\.remove\('just-bought'\)/);
+  assert.match(bot, /effect\.id === 'financed_card'/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-card-financed/);
+  assert.match(bossCss, /\.boss-financed-marker/);
+  assert.doesNotMatch(app, /boss-banker-maintenance-panel/);
 });
 
 test('Troca Forçada apresenta os dois voos e identifica a carta recebida', () => {

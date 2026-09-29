@@ -1,6 +1,6 @@
 # Inventário atual de habilidades dos chefes
 
-**Atualizado em 28/09/2026 a partir da rotação ativa em `js/boss/bosses/*.js` e do motor `js/boss/boss-engine.js`.**
+**Atualizado em 29/09/2026 a partir da rotação ativa em `js/boss/bosses/*.js` e do motor `js/boss/boss-engine.js`.**
 
 Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
 
@@ -8,14 +8,14 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
-| Juros Fixos | 1, 2 e 3 | 5 | Sorteia um contrato. O titular escolhe receber a cobrança integral de Dívida ou colocar uma carta aleatória como garantia no Cofre. O resgate posterior cobra custo base e juros acumulados. |
-| Tarifa de Manutenção | 1, 2 e 3 | 3 | Cada cooperador recebe cartas extras junto da compra normal: +1 nas Fases 1–2 e +2 na Fase 3. Cartas financiadas que permanecerem na mão ao fim do turno geram Dívida. |
+| Juros Fixos | 1, 2 e 3 | 5 | Sorteia um contrato 25/50/25. Fases 1–2 cobram 10/12/14 integral ou Cofre iniciando em 4/5/6; Fase 3 cobra 14/16/17 ou Cofre 6/7/8. Adiar o resgate acrescenta +2 por turno nas Fases 1–2 e +3 na Fase 3, até o valor integral. |
+| Tarifa de Manutenção | 1, 2 e 3 | 3 | Cada cooperador recebe +1 Carta Financiada nas Fases 1–2 e +2 na Fase 3. A carta fica marcada como FINANCIADA e só quita a Tarifa se entrar em um jogo; descartá-la ou terminar o turno com ela na mão gera +5 ou +7 de Dívida, respectivamente. |
 | Bloqueio de Crédito | 1, 2 e 3 | 3 | Bloqueia a retirada do lixo durante a rodada. |
-| Auditoria de Naipe | 2 e 3 | 4 | Sorteia um naipe. A equipe precisa baixar 3 cartas dele na Fase 2 ou 4 na Fase 3. Sucesso reduz 5 de Dívida; falha adiciona 10 ou 12. |
+| Auditoria de Naipe | 2 e 3 | 4 | Sorteia um naipe. A equipe precisa baixar 3 cartas dele na Fase 2 ou 4 na Fase 3. Sucesso evita a cobrança; falha adiciona +12 ou +16 de Dívida. |
 | Penhora | 2 e 3 | 2 | Bloqueia temporariamente um jogo elegível da equipe até a próxima cobrança. |
-| Juros Compostos | 2 e 3 | 4 | No fechamento, adiciona Dívida conforme o total de cartas restantes nas mãos, limitado a 12. |
-| Limite de Crédito | 1, 2 e 3 | 4 | Define franquia compartilhada de cartas vindas da mão. Excedentes geram Dívida, com franquia menor e teto maior conforme a fase avança. |
-| Ágio do Lixo | 2 e 3 | 3 | A primeira retirada confirmada do lixo na rodada cobra Dívida: +4 na Fase 2 e +6 na Fase 3. |
+| Juros Compostos | 2 e 3 | 4 | No fechamento, usa faixas pelo total das mãos: Fase 2 = +6/+10/+14; Fase 3 = +8/+12/+16 para 0–7 / 8–13 / 14+ cartas. |
+| Limite de Crédito | 1, 2 e 3 | 4 | Define franquia compartilhada de cartas vindas da mão. Fases 1/2/3: franquia 3/2/1, custo por excedente +3/+4/+5 e teto +9/+12/+15. |
+| Ágio do Lixo | 2 e 3 | 3 | A primeira retirada confirmada do lixo na rodada cobra Dívida: +7 na Fase 2 e +10 na Fase 3. |
 
 **Condição especial de derrota:** a equipe perde imediatamente se a Dívida coletiva chegar a 100.
 
@@ -35,7 +35,7 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 | Separação | 3 | 4 | Impede que os dois cooperadores alimentem o mesmo jogo naquela rodada. |
 | Controle Absoluto | 3 | 4 | Mantém um jogador Dominado durante o próximo turno. |
 | Quebra de Vontade | 3 | 4 | Um jogador com pelo menos 2 Chicotes recebe uma escolha pessoal entre punições. |
-| Ordem Final | 3 | 4 | Cada cooperador recebe uma escolha de punição diferente na mesma habilidade. |
+| Ordem Final | 3 | 4 | Marca 2 cartas da mão de cada cooperador. Logo após o anúncio, antes de qualquer turno dos cooperadores, cada jogador escolhe entre receber 1 Chicote imediatamente ou aceitar a ordem; ao aceitar, recebe +1 Chicote por carta marcada que não entrar em jogo no próximo turno. |
 
 **Chicotes:** com 3 o jogador fica **Sob Controle**; com 4 fica **Dominado**. A equipe perde se os dois cooperadores chegarem a 4 ao mesmo tempo.
 

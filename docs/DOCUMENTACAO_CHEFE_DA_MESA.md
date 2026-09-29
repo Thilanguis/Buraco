@@ -101,7 +101,7 @@ Resultados concluídos usam toast, indicador ou histórico.
 Exemplos:
 
 ```text
-Auditoria concluída: Dívida -5
+Auditoria concluída: sem cobrança
 Biel perdeu 1 Chicote
 Raiz Faminta falhou: +1 Flor
 Orvalho Restaurador: +60 HP
@@ -314,9 +314,10 @@ A alteração é limitada a 100 e a derrota é confirmada uma única vez no mesm
 | Canastra limpa |       4 |
 | Canastra real  |       8 |
 | Ás-a-Ás        |      12 |
-| Morto retirado |       5 |
 
 Cada tier contribui somente uma vez.
+
+Pegar o Morto não reduz a Dívida coletiva; a progressão por Morto continua valendo apenas para mudança de fase e demais mecânicas do chefe.
 
 ## 4.4 Juros Fixos
 
@@ -332,17 +333,17 @@ Ao selecionar a habilidade, o motor sorteia um contrato fechado.
 
 | Contrato | Sem Garantia | Com Garantia | Chance |
 | -------- | -----------: | -----------: | -----: |
-| Leve     |           +5 |           +2 |    25% |
-| Padrão   |           +6 |           +3 |    50% |
-| Severo   |           +7 |           +4 |    25% |
+| Leve     |          +10 |           +4 |    25% |
+| Padrão   |          +12 |           +5 |    50% |
+| Severo   |          +14 |           +6 |    25% |
 
 ### Fase 3
 
 | Contrato | Sem Garantia | Com Garantia | Chance |
 | -------- | -----------: | -----------: | -----: |
-| Leve     |           +7 |           +4 |    25% |
-| Padrão   |           +8 |           +5 |    50% |
-| Severo   |           +9 |           +6 |    25% |
+| Leve     |          +14 |           +6 |    25% |
+| Padrão   |          +16 |           +7 |    50% |
+| Severo   |          +17 |           +8 |    25% |
 
 Regras:
 
@@ -376,7 +377,9 @@ No turno do dono:
 
 - pode resgatar a carta no lugar da compra e receber a Dívida acumulada;
 - pode comprar normalmente e deixar a carta no Cofre;
-- cada compra adiada acrescenta +1 ao preço do resgate;
+- nas Fases 1–2, cada compra normal feita sem resgatar acrescenta +2 ao preço do Cofre;
+- na Fase 3, cada compra normal feita sem resgatar acrescenta +3;
+- o custo nunca ultrapassa o valor integral do contrato;
 - ao alcançar o valor integral do contrato, o resgate do próximo turno é obrigatório;
 - depois do resgate, o turno continua normalmente após a compra substituída;
 - o bot decide entre resgatar e adiar conforme o valor da carta e o custo acumulado.
@@ -405,13 +408,15 @@ fases: 1, 2 e 3
 
 Cada Carta Financiada:
 
-- pode ser jogada ou descartada;
-- permanece marcada durante o turno;
-- se continuar na mão:
-  - Fases 1 e 2: Dívida +3;
-  - Fase 3: Dívida +4;
-- perde a marca ao usar, descartar ou cobrar;
-- nunca é cobrada duas vezes.
+- fica identificada diretamente na mão com o marcador **FINANCIADA**; a compra normal continua usando apenas **NOVA**;
+- para quitar a Tarifa, precisa terminar o turno dentro de um jogo da equipe;
+- descartar a carta **não** quita a Tarifa: o descarte continua permitido como saída de segurança, mas gera a mesma cobrança;
+- se terminar na mão ou for descartada sem entrar em jogo:
+  - Fases 1 e 2: Dívida +5;
+  - Fase 3: Dívida +7;
+- perde a marca depois da resolução do turno;
+- nunca é cobrada duas vezes;
+- o bot prioriza usar a Carta Financiada em um jogo e evita descartá-la enquanto houver alternativa.
 
 ## 4.6 Bloqueio de Crédito
 
@@ -436,9 +441,9 @@ A equipe possui uma franquia compartilhada de cartas colocadas na mesa.
 
 | Fase | Franquia | Dívida por excedente | Cobrança máxima |
 | ---- | -------: | -------------------: | --------------: |
-| 1    |        3 |                   +1 |              +4 |
-| 2    |        2 |                   +1 |              +5 |
-| 3    |        1 |                   +1 |              +6 |
+| 1    |        3 |                   +3 |              +9 |
+| 2    |        2 |                   +4 |             +12 |
+| 3    |        1 |                   +5 |             +15 |
 
 ### Cartas que contam
 
@@ -484,8 +489,8 @@ HUD:
 
 ```text
 CRÉDITO 2/3
-Próxima excedente: +1 Dívida
-Cobrança: 2/4
+Próxima excedente: +3 Dívida
+Cobrança: 0/9
 ```
 
 Voltar restaura:
@@ -514,8 +519,8 @@ fases: 2 e 3
 Valores:
 
 ```text
-Fase 2: +4 Dívida
-Fase 3: +6 Dívida
+Fase 2: +7 Dívida
+Fase 3: +10 Dívida
 ```
 
 A primeira retirada válida do lixo na rodada paga o Ágio.
@@ -553,10 +558,10 @@ peso: 4
 fases: 2 e 3
 ```
 
-| Fase | Exigência |   Sucesso |      Falha |
-| ---- | --------: | --------: | ---------: |
-| 2    |  3 cartas | Dívida -5 | Dívida +10 |
-| 3    |  4 cartas | Dívida -5 | Dívida +12 |
+| Fase | Exigência | Sucesso |      Falha |
+| ---- | --------: | ------: | ---------: |
+| 2    |  3 cartas | sem cobrança | Dívida +12 |
+| 3    |  4 cartas | sem cobrança | Dívida +16 |
 
 - somente cartas reais do naipe;
 - Coringas não contam;
@@ -585,13 +590,25 @@ peso: 4
 fases: 2 e 3
 ```
 
-Fórmula atual:
+A cobrança usa faixas rápidas conforme o total de cartas nas duas mãos.
 
-```text
-mínimo de 12, calculado por 4 + piso(total das mãos / 4)
-```
+### Fase 2
 
-A habilidade já varia naturalmente pelo tamanho das mãos e não recebe randomização adicional.
+| Cartas nas mãos | Dívida |
+| --- | ---: |
+| 0–7 | +6 |
+| 8–13 | +10 |
+| 14+ | +14 |
+
+### Fase 3
+
+| Cartas nas mãos | Dívida |
+| --- | ---: |
+| 0–7 | +8 |
+| 8–13 | +12 |
+| 14+ | +16 |
+
+A faixa é congelada pelos valores anunciados da habilidade e o HUD destaca a faixa atual.
 
 ## 4.12 Habilidades e pesos
 
@@ -969,12 +986,22 @@ Jogador com pelo menos 2 Chicotes escolhe entre Chicote ou retirar carta válida
 
 ### Ordem Final
 
-Ao fim da rodada, cada cooperador recebe uma decisão diferente e a partida permanece bloqueada até as duas respostas:
+Na Fase 3, a Dominadora marca **2 cartas da própria mão de cada cooperador**. As duas escolhas são simétricas e acontecem **logo após o anúncio da habilidade, antes de começar qualquer turno dos cooperadores**. A partida permanece bloqueada até ambos responderem; somente depois das duas decisões o fluxo entra na etapa de jogadores.
 
-- um cooperador escolhe entre comprar 2 cartas extras, que ficam presas durante o próximo turno completo, ou receber 1 Chicote;
-- o outro escolhe entre deixar 1 carta aleatória da própria mão presa durante o próximo turno completo ou receber 1 Chicote.
+Cada jogador vê exatamente quais são suas duas cartas marcadas e escolhe individualmente entre:
 
-A carta presa deve ser identificada no HUD, na mão e no histórico. Depois das duas decisões, a partida continua normalmente.
+- **receber 1 Chicote imediatamente** e recusar a ordem; ou
+- **aceitar a Ordem Final** e tentar colocar as 2 cartas marcadas em jogos no próximo turno.
+
+Se aceitar:
+
+- 2/2 cartas usadas em jogos: **0 Chicotes**;
+- 1/2 carta usada: **+1 Chicote**;
+- 0/2 cartas usadas: **+2 Chicotes**.
+
+Descartar uma carta marcada não cumpre a ordem. As cartas ficam identificadas visualmente como **ORDEM FINAL** enquanto a decisão estiver pendente e, após aceitar, até o prazo do turno.
+
+Depois das duas decisões, a partida continua normalmente.
 
 **Hierarquia não faz parte do jogo e não deve ser registrada.**
 

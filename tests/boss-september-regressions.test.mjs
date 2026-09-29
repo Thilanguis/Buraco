@@ -30,7 +30,8 @@ test('crédito tem franquia compartilhada 3/2/1, sem aumentar o teto de cobranç
     const s = game(); s.boss.phase = phase;
     activate(s, 'credit_limit');
     assert.equal(s.boss.creditLimit.allowance, 4 - phase);
-    assert.equal(s.boss.creditLimit.maxCharge, phase + 3);
+    assert.equal(s.boss.creditLimit.debtPerCard, [0, 3, 4, 5][phase]);
+    assert.equal(s.boss.creditLimit.maxCharge, [0, 9, 12, 15][phase]);
   }
 });
 test('tarifa já está ativa antes da primeira compra, sem repetir na rodada seguinte', () => {

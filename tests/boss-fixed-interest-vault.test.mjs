@@ -12,7 +12,7 @@ import {
   resolveBossChoice,
 } from '../js/boss/boss-engine.js';
 
-function stateWithChoice({ full = 6, guarantee = 3, playerId = 0 } = {}) {
+function stateWithChoice({ full = 6, guarantee = 3, interestStep = 2, playerId = 0 } = {}) {
   const state = {
     mode: 'boss_banker',
     currentPlayer: playerId,
@@ -51,6 +51,7 @@ function stateWithChoice({ full = 6, guarantee = 3, playerId = 0 } = {}) {
     options: ['full', 'guarantee'],
     amount: full,
     collateralAmount: guarantee,
+    interestStep,
   }];
   return state;
 }
@@ -93,6 +94,7 @@ test('Prender a garantia cria Cofre fechado no valor-base e emite fechamento uma
     totalDebt: 3,
     maxDebt: 6,
     deferredTurns: 0,
+    interestStep: 2,
     ownerTurnsStarted: 1,
     forced: false,
     canDefer: false,
@@ -130,7 +132,7 @@ test('Segundo turno do titular abre o Cofre no valor-base e emite abertura uma v
   assert.equal(state.hasDrawnThisTurn, true);
 });
 
-test('Primeiro turno aberto sem resgate soma um unico ponto de juros', () => {
+test('Primeiro turno aberto sem resgate soma o passo de juros do contrato', () => {
   const state = stateWithChoice();
   lockVault(state);
   enterNextOwnerTurn(state);
@@ -138,10 +140,10 @@ test('Primeiro turno aberto sem resgate soma um unico ponto de juros', () => {
 
   const interest = deferBossVault(state, 0);
   assert.ok(interest);
-  assert.equal(getBossVaultQuote(state, 0).currentDebt, 4);
-  assert.equal(getBossVaultQuote(state, 0).interestDebt, 1);
+  assert.equal(getBossVaultQuote(state, 0).currentDebt, 5);
+  assert.equal(getBossVaultQuote(state, 0).interestDebt, 2);
   assert.equal(deferBossVault(state, 0), null);
-  assert.equal(getBossVaultQuote(state, 0).currentDebt, 4);
+  assert.equal(getBossVaultQuote(state, 0).currentDebt, 5);
 });
 
 test('Juros param no valor integral e tornam o proximo resgate obrigatorio', () => {
@@ -149,7 +151,7 @@ test('Juros param no valor integral e tornam o proximo resgate obrigatorio', () 
   lockVault(state);
   enterNextOwnerTurn(state);
 
-  for (let expected = 4; expected <= 6; expected += 1) {
+  for (const expected of [5, 6]) {
     state.hasDrawnThisTurn = true;
     const event = deferBossVault(state, 0);
     assert.ok(event);
@@ -168,8 +170,8 @@ test('Juros param no valor integral e tornam o proximo resgate obrigatorio', () 
 
 test('Preco-base e limite acompanham a variante do contrato', () => {
   for (const values of [
-    { full: 5, guarantee: 2 },
-    { full: 9, guarantee: 6 },
+    { full: 10, guarantee: 4 },
+    { full: 17, guarantee: 8, interestStep: 3 },
   ]) {
     const state = stateWithChoice(values);
     lockVault(state);
