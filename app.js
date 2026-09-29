@@ -1621,6 +1621,110 @@ function ensureCardId(card) {
   return card.id;
 }
 
+function applyDimitrescuBloodScatter(element, key = '', profile = 'card') {
+  if (!element) return;
+  const seedText = `${profile}:${String(key || 'blood')}`;
+  let seed = 23;
+  for (let i = 0; i < seedText.length; i += 1) seed = (seed * 33 + seedText.charCodeAt(i)) % 2147483647;
+  const next = () => {
+    seed = (seed * 48271) % 2147483647;
+    return seed / 2147483647;
+  };
+  const pick = (min, max, digits = 2) => (min + next() * (max - min)).toFixed(digits);
+  const spec = {
+    card: {
+      blobX: [10, 88],
+      blobY: [11, 79],
+      blobR: [5.4, 12.8],
+      dripCount: 3,
+      dripX: [14, 82],
+      dripTop: [58, 76],
+      dripW: [6, 14],
+      dripH: [16, 30],
+      dripBulge: [34, 58],
+      mistOpacity: [0.16, 0.3],
+    },
+    feast: {
+      blobX: [8, 90],
+      blobY: [10, 82],
+      blobR: [6.8, 14.5],
+      dripCount: 4,
+      dripX: [12, 84],
+      dripTop: [54, 74],
+      dripW: [7, 16],
+      dripH: [18, 36],
+      dripBulge: [38, 64],
+      mistOpacity: [0.2, 0.34],
+    },
+    discard: {
+      blobX: [12, 86],
+      blobY: [12, 76],
+      blobR: [5.6, 12.4],
+      dripCount: 3,
+      dripX: [16, 80],
+      dripTop: [60, 78],
+      dripW: [6, 13],
+      dripH: [15, 28],
+      dripBulge: [32, 54],
+      mistOpacity: [0.15, 0.28],
+    },
+    dead: {
+      blobX: [10, 88],
+      blobY: [10, 82],
+      blobR: [7.2, 16.8],
+      dripCount: 4,
+      dripX: [14, 84],
+      dripTop: [50, 72],
+      dripW: [6, 15],
+      dripH: [18, 34],
+      dripBulge: [36, 62],
+      mistOpacity: [0.18, 0.34],
+    },
+  }[profile] || {
+    blobX: [10, 88],
+    blobY: [11, 79],
+    blobR: [5.4, 12.8],
+    dripCount: 3,
+    dripX: [14, 82],
+    dripTop: [58, 76],
+    dripW: [6, 14],
+    dripH: [16, 30],
+    dripBulge: [34, 58],
+    mistOpacity: [0.16, 0.3],
+  };
+
+  for (let i = 1; i <= 6; i += 1) {
+    element.style.setProperty(`--blood-blob-x${i}`, `${pick(spec.blobX[0], spec.blobX[1])}%`);
+    element.style.setProperty(`--blood-blob-y${i}`, `${pick(spec.blobY[0], spec.blobY[1])}%`);
+    element.style.setProperty(`--blood-blob-r${i}`, `${pick(spec.blobR[0], spec.blobR[1])}%`);
+    element.style.setProperty(`--blood-blob-o${i}`, pick(0.48, 0.96, 3));
+  }
+
+  for (let i = 1; i <= 4; i += 1) {
+    const enabled = i <= spec.dripCount;
+    element.style.setProperty(`--blood-drip-x${i}`, `${pick(spec.dripX[0], spec.dripX[1])}%`);
+    element.style.setProperty(`--blood-drip-top${i}`, `${pick(spec.dripTop[0], spec.dripTop[1])}%`);
+    element.style.setProperty(`--blood-drip-w${i}`, enabled ? `${pick(spec.dripW[0], spec.dripW[1])}px` : '0px');
+    element.style.setProperty(`--blood-drip-h${i}`, enabled ? `${pick(spec.dripH[0], spec.dripH[1])}px` : '0px');
+    element.style.setProperty(`--blood-drip-bulge${i}`, enabled ? `${pick(spec.dripBulge[0], spec.dripBulge[1])}%` : '0%');
+    element.style.setProperty(`--blood-drip-sway${i}`, enabled ? `${pick(-1.8, 1.8)}px` : '0px');
+  }
+
+  element.style.setProperty('--blood-smear-angle', `${pick(96, 128)}deg`);
+  element.style.setProperty('--blood-sheen-angle', `${pick(84, 110)}deg`);
+  element.style.setProperty('--blood-mist-opacity', pick(spec.mistOpacity[0], spec.mistOpacity[1], 3));
+}
+
+function syncDimitrescuDeadPileVisual(container, active, key = '') {
+  if (!container) return;
+  container.querySelectorAll('.boss-dead-blood-layer').forEach((layer) => layer.classList.remove('boss-dead-blood-layer'));
+  if (!active) return;
+  const topLayer = [...container.querySelectorAll('.visual-layer')].at(-1);
+  if (!topLayer) return;
+  topLayer.classList.add('boss-dead-blood-layer');
+  applyDimitrescuBloodScatter(topLayer, key, 'dead');
+}
+
 const ANIM_MS = 900;
 const ANIM_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
@@ -4987,7 +5091,6 @@ function renderBossDaughterStrip(definition, boss) {
   const daughterIds = new Set(definition.abilityDaughters?.[abilityId] || []);
   if (resultEvent?.daughter === 'all') ['bela', 'cassandra', 'daniela'].forEach((id) => daughterIds.add(id));
   else if (resultEvent?.daughter) daughterIds.add(resultEvent.daughter);
-  if (boss.bloodiedDead?.status === 'active') daughterIds.add('cassandra');
 
   const statusFor = (daughterId) => {
     const intent = boss.currentIntent;
@@ -4996,7 +5099,6 @@ function renderBossDaughterStrip(definition, boss) {
       if (objective) return objective.status || 'active';
     }
     if (intent && definition.abilityDaughters?.[intent.abilityId]?.includes(daughterId)) return 'active';
-    if (daughterId === 'cassandra' && boss.bloodiedDead?.status === 'active') return 'active';
     if (resultEvent?.abilityId === 'three_daughters') {
       return resultEvent.objectives?.find((entry) => entry.type === daughterId)?.status || 'active';
     }
@@ -5006,7 +5108,7 @@ function renderBossDaughterStrip(definition, boss) {
   };
 
   const daughterList = [...daughterIds];
-  const signature = `${abilityId}:${daughterList.map((id) => `${id}:${statusFor(id)}`).join(',')}:${boss.bloodiedDead?.status || ''}`;
+  const signature = `${abilityId}:${daughterList.map((id) => `${id}:${statusFor(id)}`).join(',')}`;
   if (strip.dataset.signature === signature) {
     strip.hidden = daughterList.length === 0;
     return;
@@ -5528,6 +5630,43 @@ function renderBossHud() {
       </span>
     `;
 
+    intentProgress.className = '';
+    intentProgress.textContent = '';
+  } else if (isDimitrescu && boss.currentIntent?.abilityId === 'blood_tithe' && flow?.stage !== 'result') {
+    const phase = Number(boss.currentIntent.announcedPhase) || 1;
+    const medium = phase === 3 ? 6 : 4;
+    const heavy = phase === 3 ? 10 : 8;
+    const players = (state.players || []).map((player) => {
+      const cards = player.hand?.length || 0;
+      const band = cards <= 7 ? 'safe' : cards <= 10 ? 'warning' : 'danger';
+      const amount = band === 'danger' ? heavy : band === 'warning' ? medium : 0;
+      return { name: player.name || 'Jogador', cards, band, amount };
+    });
+    const projected = players.reduce((sum, player) => sum + player.amount, 0);
+    const escapeRangeText = (value) => String(value ?? '')
+      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+    const badges = (band) => players
+      .filter((player) => player.band === band)
+      .map((player) => `<span class="boss-range-player ${band}">✓ ${escapeRangeText(player.name)} · ${player.cards}</span>`)
+      .join('');
+
+    intentDescription.className = 'boss-range-panel boss-blood-tithe-panel';
+    intentDescription.innerHTML = `
+      <span class="boss-range-hint">No fim da rodada, cada mão é cobrada separadamente.</span>
+      <span class="boss-range-rules">
+        <span class="boss-range-rule ${players.some((player) => player.band === 'safe') ? 'occupied safe' : ''}">
+          <b>0–7</b><span>Sem efeito</span><em>${badges('safe')}</em>
+        </span>
+        <span class="boss-range-rule ${players.some((player) => player.band === 'warning') ? 'occupied warning' : ''}">
+          <b>8–10</b><span>+${medium} Sede</span><em>${badges('warning')}</em>
+        </span>
+        <span class="boss-range-rule ${players.some((player) => player.band === 'danger') ? 'occupied danger' : ''}">
+          <b>11+</b><span>+${heavy} Sede</span><em>${badges('danger')}</em>
+        </span>
+      </span>
+      <span class="boss-range-total">Cobrança se a rodada acabasse agora: <b>+${projected} Sede</b></span>
+    `;
     intentProgress.className = '';
     intentProgress.textContent = '';
   } else {
@@ -6340,6 +6479,7 @@ function renderAll() {
     if (discardFace._faceMarkup !== discardMarkup) discardFace.innerHTML = discardMarkup;
     discardFace._faceMarkup = discardMarkup;
     discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}${danielaOnTop ? ' boss-discard-dimitrescu-card' : ''}`;
+    if (danielaOnTop) applyDimitrescuBloodScatter(discardFace, discardTop?.id || 'daniela-discard', 'discard');
     discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
   }
 
@@ -6363,6 +6503,8 @@ function renderAll() {
 
     updatePile3D(s0, 'morto-card-back', m0.length, m0.length ? m0[m0.length - 1].back : 'red', false);
     updatePile3D(s1, 'morto-card-back', m1.length, m1.length ? m1[m1.length - 1].back : 'blue', false);
+    syncDimitrescuDeadPileVisual(s0, bloodiedDead?.deadIndex === 0 && m0.length > 0, m0[m0.length - 1]?.id || 'dead-0');
+    syncDimitrescuDeadPileVisual(s1, bloodiedDead?.deadIndex === 1 && m1.length > 0, m1[m1.length - 1]?.id || 'dead-1');
   }
 
   renderOpponentHands();
@@ -6704,6 +6846,7 @@ function renderHand() {
       div.classList.add('boss-card-dimitrescu-blood-mark');
       div.title = 'Marca Carmesim: use esta carta legalmente antes do fim da rodada';
     }
+    if (['dimitrescu-hunt', 'dimitrescu-blood-mark'].includes(bossCardEffect)) applyDimitrescuBloodScatter(div, card.id, 'card');
     const swapHighlight = bossSwapReceivedHighlights.get(card.id);
     if (swapHighlight && swapHighlight.expiresAt > Date.now()) div.classList.add('boss-swap-received');
     if (bossDiscardFeedback) div.setAttribute('aria-label', `${card.rank}${card.suit}. ${bossDiscardFeedback.message}`);
@@ -7245,6 +7388,10 @@ function renderMelds() {
           miniCard.style.zIndex = cardIndex;
           miniCard.setAttribute('aria-hidden', 'true');
         } else miniCard.innerHTML = cardFrontHTML(card);
+        if (cassandraMarked) {
+          miniCard.classList.add('boss-card-cassandra-feast');
+          applyDimitrescuBloodScatter(miniCard, card.id || `${midx}:${cardIndex}`, 'feast');
+        }
 
         row.appendChild(miniCard);
       });
@@ -7264,6 +7411,10 @@ function renderMelds() {
           }
 
           closedCard.dataset.cardIndex = String(meld.length - 1);
+          if (cassandraMarked) {
+            closedCard.classList.add('boss-card-cassandra-feast');
+            applyDimitrescuBloodScatter(closedCard, lastCard.id || `${midx}:closed`, 'feast');
+          }
 
           closedCard.innerHTML = cardFrontHTML(lastCard);
 
@@ -9540,7 +9691,7 @@ onSnapshot(gameRef, async (snap) => {
           // Caso contrário, espera apenas o delay normal de processamento (0.6s)
           const botDelay = state.turnNumber === 0 ? 4000 : 600;
           const scheduledTurn = state.turnNumber;
-          const scheduledPlayerId = currentPlayerObj.id;
+          const scheduledBotIndex = state.currentPlayer;
           const scheduledSessionId = window.gameSessionId;
           const scheduledSignal = botTurnController.signal;
 
@@ -9559,13 +9710,24 @@ onSnapshot(gameRef, async (snap) => {
             if (state.debugPaused) return; // 🛑 CORTA A IA IMEDIATAMENTE
             if (isBossLabAutomationPaused()) return;
             if (state.turnNumber !== scheduledTurn) return;
-            if (state.currentPlayer !== scheduledPlayerId) return;
+            if (state.currentPlayer !== scheduledBotIndex) return;
 
             window.lastBotTurnPlayed = state.turnNumber;
             const sessionEngine = createBotEngineForSession(scheduledSessionId, scheduledSignal);
             const activeBotTurn = { turnNumber: scheduledTurn, sessionId: scheduledSessionId, promise: null };
             window.activeBotTurn = activeBotTurn;
-            activeBotTurn.promise = BuracoBot.playTurn(state, state.currentPlayer, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId }).catch((err) => {
+            activeBotTurn.promise = BuracoBot.playTurn(state, scheduledBotIndex, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId }).then(async () => {
+              // Blindagem: se a rotina do bot terminou sem passar o turno, não
+              // deixamos lastBotTurnPlayed congelar a partida para sempre.
+              const live = state;
+              const sameTurn = live && !live.finished && live.turnNumber === scheduledTurn && live.currentPlayer === scheduledBotIndex;
+              if (sameTurn && canPerformCommonGameAction(live) && !isBossTurnActive(live) && !hasPendingBossChoices(live)) {
+                console.warn('[BOT] Rotina terminou sem avançar o turno; aplicando recuperação segura.');
+                window.lastBotTurnPlayed = null;
+                if (!live.hasDrawnThisTurn) await sessionEngine.executeDrawStock(scheduledBotIndex);
+                if (state?.currentPlayer === scheduledBotIndex && !state.finished) await sessionEngine.recoverBotTurn(scheduledBotIndex);
+              }
+            }).catch((err) => {
               if (BuracoBot.isCancellationError(err)) return;
               console.error('Erro na Matrix:', err);
               window.lastBotTurnPlayed = null;

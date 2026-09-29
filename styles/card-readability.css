@@ -36,7 +36,8 @@
 .carta.mini { width: var(--readable-meld-width); height: var(--readable-meld-height); margin-right: var(--readable-meld-overlap, -45.6px); font-size: 15.6px; }
 .carta.mini .carta-canto { font-size: 12px; }
 .carta.mini .carta-meio { font-size: 26.4px; }
-.carta.mini:last-child { margin-right: 0; }
+.carta.mini:last-child,
+.carta.mini:has(+ .canastra-fechada) { margin-right: 0; }
 .meld-container { column-gap: 8px; }
 #gameSection .board[data-mode='1x1_dominacao'] .meld-container > .meld-line { margin-right: 8px; }
 #gameSection .board[data-mode='1x1_dominacao'] .meld-container > .meld-line:last-child { margin-right: 0; }

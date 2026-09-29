@@ -23,7 +23,11 @@
         height: 85px;
         flex-wrap: nowrap;
         transition: transform 0.15s ease;
-        position: relative; /* <- ADICIONE ESTA LINHA */
+        position: relative;
+        width: fit-content;
+      }
+      .meld-line-cards.has-closed-card {
+        padding-right: var(--closed-meld-slot, calc(var(--readable-meld-width, 55px) * 0.88));
       }
 
       .carta.mini.canastra-fechada {
@@ -35,6 +39,12 @@
         margin: 0 !important;
         z-index: 10;
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6) !important;
+      }
+      .meld-line-cards.has-closed-card > .carta.mini.canastra-fechada {
+        left: auto;
+        right: 0;
+        top: 50%;
+        transform: translateY(-35%) rotate(90deg) !important;
       }
       .meld-meta {
         font-size: 10px;
@@ -1443,10 +1453,9 @@
       .carta.mini:has(+ .canastra-fechada) {
         margin-right: 0 !important;
       }
-      .carta.mini.canastra-fechada {
-        transform: rotate(90deg);
-        margin-right: -12px;
-        margin-bottom: -12px;
+      .meld-line-cards.has-closed-card > .carta.mini.canastra-fechada {
+        margin-right: 0 !important;
+        margin-bottom: 0 !important;
       }
       .carta.mini.wild-pickable {
         cursor: pointer;

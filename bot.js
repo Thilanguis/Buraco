@@ -1,6 +1,6 @@
 // bot.js
 import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './js/game/domination-strategy.js';
-import { planPairIndexesWithTop, planTripleIndexes, plannerFingerprint } from './js/game/bot-planner.js';
+import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint } from './js/game/bot-planner.js';
 
 export class BuracoBot {
   static _turnLocks = new Set();
@@ -73,15 +73,32 @@ export class BuracoBot {
     if (!current || plannerFingerprint(current, botIndex) !== token) throw this.createStalePlanError();
   }
 
+  static async planTriplesLocally(hand, engine, signal) {
+    const cards = Array.isArray(hand) ? hand : [];
+    const result = [];
+    let checked = 0;
+    for (let i = 0; i < cards.length - 2; i += 1) {
+      for (let j = i + 1; j < cards.length - 1; j += 1) {
+        for (let k = j + 1; k < cards.length; k += 1) {
+          if (isPlausibleSequenceTriple([cards[i], cards[j], cards[k]])) result.push([i, j, k]);
+          checked += 1;
+          if (checked % 420 === 0) await this.cooperativeYield(engine, signal);
+        }
+      }
+    }
+    return result;
+  }
+
   static async planTriples(state, botIndex, engine, signal) {
     const hand = state?.players?.[botIndex]?.hand || [];
     const token = plannerFingerprint(state, botIndex);
     const worker = hand.length >= this._plannerWorkerThreshold ? this.getPlannerWorker() : null;
-    if (!worker) return { token, indexes: planTripleIndexes(hand), worker: false };
+    if (!worker) return { token, indexes: await this.planTriplesLocally(hand, engine, signal), worker: false };
 
     const requestId = ++this._plannerRequestId;
     try {
       const indexes = await new Promise((resolve, reject) => {
+        let watchdog = null;
         const onAbort = () => {
           const pending = this._plannerPending.get(requestId);
           if (!pending) return;
@@ -89,9 +106,23 @@ export class BuracoBot {
           pending.cleanup?.();
           reject(this.createPlannerAbortError());
         };
-        const cleanup = () => signal?.removeEventListener?.('abort', onAbort);
+        const cleanup = () => {
+          signal?.removeEventListener?.('abort', onAbort);
+          if (watchdog != null) clearTimeout(watchdog);
+        };
         this._plannerPending.set(requestId, { resolve, reject, cleanup });
         signal?.addEventListener?.('abort', onAbort, { once: true });
+        // Alguns navegadores móveis já deixaram Workers vivos sem devolver
+        // mensagem. Não deixamos um turno inteiro depender indefinidamente disso.
+        watchdog = setTimeout(() => {
+          const pending = this._plannerPending.get(requestId);
+          if (!pending) return;
+          this._plannerPending.delete(requestId);
+          pending.cleanup?.();
+          const error = new Error('Planner do bot excedeu o tempo de resposta; usando fallback local.');
+          error.code = 'BOT_PLANNER_TIMEOUT';
+          reject(error);
+        }, 2200);
         worker.postMessage({ requestId, token, kind: 'triples', payload: { hand } });
       });
       this.assertActive(engine, signal);
@@ -104,7 +135,7 @@ export class BuracoBot {
       this.destroyPlannerWorker('Worker desativado após falha.');
       this.assertActive(engine, signal);
       this.assertPlanCurrent(token, engine, botIndex);
-      return { token, indexes: planTripleIndexes(hand), worker: false };
+      return { token, indexes: await this.planTriplesLocally(hand, engine, signal), worker: false };
     }
   }
 
@@ -725,9 +756,12 @@ export class BuracoBot {
           || Number(this.isMeldDirty([a.card])) - Number(this.isMeldDirty([b.card])));
         const meldIndexes = (team.melds || []).map((meld, index) => ({ meld, index })).sort((a, b) => Number(markedMelds.has(b.index)) - Number(markedMelds.has(a.index)));
 
+        let priorityChecks = 0;
         for (const { meld, index: meldIndex } of meldIndexes) {
           if (engine.isMeldLocked?.(team.id, meldIndex)) continue;
           for (const { card, index: handIndex } of cardIndexes) {
+            priorityChecks += 1;
+            if (priorityChecks % 48 === 0) await this.cooperativeYield(engine, signal);
             if (!card || (!markedCards.has(card.id) && !markedMelds.has(meldIndex))) continue;
             const testMeld = this.simulateMeld(meld, [card], engine);
             if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
@@ -752,10 +786,13 @@ export class BuracoBot {
         if (markedCards.size && engine.canCreateMeld?.(me.id) !== false && me.hand.length >= 3) {
           const markedIndex = me.hand.findIndex((card) => markedCards.has(card?.id));
           if (markedIndex >= 0) {
+            let markedComboChecks = 0;
             outerNatureCombo: for (let first = 0; first < me.hand.length - 1; first += 1) {
               if (first === markedIndex) continue;
               for (let second = first + 1; second < me.hand.length; second += 1) {
                 if (second === markedIndex) continue;
+                markedComboChecks += 1;
+                if (markedComboChecks % 48 === 0) await this.cooperativeYield(engine, signal);
                 const indexes = [markedIndex, first, second];
                 const combo = indexes.map((index) => me.hand[index]);
                 if (!allowsOpening(combo)) continue;

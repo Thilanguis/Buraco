@@ -531,12 +531,23 @@ function dimitrescuDetails(gameState, intent) {
         ['Filha', 'Daniela'], ['Carta contaminada', cardLabelAnywhere(gameState, payload.discardCardId)], ['Prazo', 'esta rodada'],
         ['Evitar o lixo', 'Sede -3'], ['Recolher o lixo', `Sede +${Number(intent.announcedPhase) === 3 ? 15 : 12}`],
       ]);
-    case 'blood_tithe':
+    case 'blood_tithe': {
+      const phase = Number(intent.announcedPhase) || 1;
+      const medium = phase === 3 ? 6 : 4;
+      const heavy = phase === 3 ? 10 : 8;
+      const players = (gameState.players || []).map((player) => {
+        const cards = player.hand?.length || 0;
+        const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
+        return [player.name || 'Jogador', `${cards} carta${cards === 1 ? '' : 's'} → ${amount ? `+${amount} Sede` : 'sem tributo'}`];
+      });
       return detailFields([
-        ['Prazo', 'fim da rodada'], ['0–7 cartas', 'sem efeito'],
-        ['8–10 cartas', `Sede +${Number(intent.announcedPhase) === 3 ? 6 : 4} por jogador`],
-        ['11+ cartas', `Sede +${Number(intent.announcedPhase) === 3 ? 10 : 8} por jogador`],
+        ['Cobrança', 'cada jogador é avaliado separadamente no fim da rodada'],
+        ...players,
+        ['0–7 cartas', 'sem efeito'],
+        ['8–10 cartas', `Sede +${medium} por jogador`],
+        ['11+ cartas', `Sede +${heavy} por jogador`],
       ]);
+    }
     case 'red_wine':
       return detailFields([
         ['Requisito', 'Lady ferida e Sede 20+'], ['Cura', `${payload.healAmount || 0} HP`], ['Custo', `${payload.bloodCost || 15} de Sede`],
@@ -779,8 +790,26 @@ function compactAction(gameState, intent) {
       return { instruction: `Alimente o Jogo ${Number(payload.meldIndex) + 1} nesta rodada.`, progress: payload.fed ? '✅ Cassandra ficou sem banquete' : '⬜ Jogo ainda não alimentado', consequence: payload.fed ? 'Sede -4' : `Falha: Sede +${Number(intent.announcedPhase) === 3 ? 18 : 16}` };
     case 'daniela_swarm':
       return { instruction: 'Não recolha o lixo contaminado nesta rodada.', progress: payload.triggered ? '❌ Daniela encontrou sangue' : '☣️ Lixo contaminado', consequence: payload.triggered ? 'Sede já aumentou' : `Evitar: Sede -3 · Recolher: +${Number(intent.announcedPhase) === 3 ? 15 : 12}` };
-    case 'blood_tithe':
-      return { instruction: 'Terminem a rodada com mãos leves.', progress: (gameState.players || []).map((player) => `${player.name}: ${player.hand?.length || 0}`).join(' · '), consequence: Number(intent.announcedPhase) === 3 ? '8–10: +6 · 11+: +10 por jogador' : '8–10: +4 · 11+: +8 por jogador' };
+    case 'blood_tithe': {
+      const phase = Number(intent.announcedPhase) || 1;
+      const medium = phase === 3 ? 6 : 4;
+      const heavy = phase === 3 ? 10 : 8;
+      const rows = (gameState.players || []).map((player) => {
+        const cards = player.hand?.length || 0;
+        const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
+        const marker = amount ? '🩸' : '✓';
+        return `${marker} ${player.name}: ${cards} carta${cards === 1 ? '' : 's'} → ${amount ? `+${amount} Sede` : 'sem tributo'}`;
+      });
+      const projected = (gameState.players || []).reduce((sum, player) => {
+        const cards = player.hand?.length || 0;
+        return sum + (cards >= 11 ? heavy : cards >= 8 ? medium : 0);
+      }, 0);
+      return {
+        instruction: 'No fim da rodada, Lady cobra CADA jogador separadamente pelas cartas que ainda restarem na própria mão.',
+        progress: rows.join('\n'),
+        consequence: `0–7 = 0 · 8–10 = +${medium} · 11+ = +${heavy} Sede por jogador · cobrança atual: +${projected}`,
+      };
+    }
     case 'red_wine':
       return { instruction: `Lady Dimitrescu consome ${payload.bloodCost || 15} de Sede e recupera até ${payload.healAmount || 0} HP.`, progress: `Sede atual: ${gameState.boss?.danger || 0}/100`, consequence: 'A cura reduz a própria barra de Sede' };
     case 'crimson_brand':
@@ -1263,6 +1292,62 @@ const MATRIARCH_ABILITY_NAMES = Object.freeze({
   spring_crown: 'Coroa da Primavera',
 });
 
+function dimitrescuStatusPresentation(gameState) {
+  const boss = gameState?.boss;
+  if (boss?.id !== 'dimitrescu') return null;
+  const clot = boss.crimsonClot;
+  const event = flowResultEvent(gameState);
+
+  if (clot?.status === 'active') {
+    const maximum = Math.max(1, Number(clot.max) || 1);
+    const remaining = Math.max(0, Number(clot.remaining) || 0);
+    const projectedHeal = Math.floor(remaining / 2);
+    return {
+      category: 'Proteção vampírica ativa',
+      name: 'Coágulo Carmesim',
+      speech: '',
+      description: '',
+      details: detailFields([
+        ['Proteção restante', `${remaining}/${maximum}`],
+        ['Prazo', `fim da rodada ${boss.roundNumber}`],
+        ['Se romper', 'Sede -6'],
+        ['Se sobreviver', `${projectedHeal} HP de cura com o valor atual`],
+      ]),
+      instruction: 'Rompa o Coágulo Carmesim antes do fim da rodada.',
+      progress: `🩸 COÁGULO ${remaining}/${maximum}`,
+      consequence: `Romper: Sede -6 · Sobreviver agora: +${projectedHeal} HP`,
+    };
+  }
+
+  if (event?.type === 'bossHeal' && event.origin === 'Coágulo Carmesim') {
+    return {
+      category: 'Proteção convertida em cura',
+      name: 'Coágulo Carmesim',
+      speech: '',
+      description: '',
+      details: detailFields([['Cura aplicada', `+${event.amount || 0} HP`]]),
+      instruction: event.outcome || `O Coágulo sobrevivente restaurou ${event.amount || 0} HP.`,
+      progress: 'Coágulo consumido',
+      consequence: `Lady Dimitrescu recuperou ${event.amount || 0} HP`,
+    };
+  }
+
+  if (event?.type === 'bloodClot') {
+    return {
+      category: 'Proteção encerrada',
+      name: 'Coágulo Carmesim',
+      speech: '',
+      description: '',
+      details: [],
+      instruction: event.outcome || 'O Coágulo Carmesim foi encerrado.',
+      progress: 'Coágulo encerrado',
+      consequence: '',
+    };
+  }
+
+  return null;
+}
+
 function matriarchStatusPresentation(gameState) {
   const boss = gameState?.boss;
   if (boss?.id !== 'matriarca_esmeralda') return null;
@@ -1464,6 +1549,12 @@ export function buildBossActionPresentation(gameState) {
       return matriarchStatus;
     }
 
+    const dimitrescuStatus = dimitrescuStatusPresentation(gameState);
+
+    if (dimitrescuStatus) {
+      return dimitrescuStatus;
+    }
+
     const possessionStatus = possessionPresentation(gameState);
 
     if (possessionStatus) {
@@ -1516,6 +1607,9 @@ export function buildBossActionPresentation(gameState) {
   }
 
   if (!intent) {
+    const dimitrescuStatus = dimitrescuStatusPresentation(gameState);
+    if (dimitrescuStatus) return dimitrescuStatus;
+
     const orders = (gameState.boss?.activeOrders || []).filter(order => order.status === 'active' && order.sourceAbilityId === 'forced_choice');
     if (orders.length) return {
       category: 'Ordem aceita em vigor', name: 'Escolha Forçada', speech: '', description: '', details: [],

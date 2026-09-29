@@ -2984,6 +2984,52 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
   color: #fda4af;
 }
 
+/* Faixas rápidas: habilidades cujo resultado depende de um intervalo. */
+.boss-intent .boss-range-panel {
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  white-space: normal;
+}
+.boss-range-hint {
+  color: #dbeafe;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.boss-range-rules {
+  display: grid;
+  gap: 3px;
+}
+.boss-range-rule {
+  display: grid;
+  grid-template-columns: 42px minmax(64px, .8fr) minmax(0, 1.5fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.38);
+  color: #cbd5e1;
+  font-size: 8px;
+  line-height: 1.15;
+}
+.boss-range-rule > b { color: #fbbf24; font-size: 8px; font-weight: 1000; white-space: nowrap; }
+.boss-range-rule > span { font-weight: 900; }
+.boss-range-rule > em { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; min-width: 0; font-style: normal; }
+.boss-range-rule.occupied { border-color: rgba(251, 191, 36, 0.68); background: rgba(120, 53, 15, 0.34); box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.07); }
+.boss-range-player { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 2px 4px; border: 1px solid rgba(251, 191, 36, 0.5); border-radius: 999px; color: #fff7cc; background: rgba(92, 50, 7, 0.82); font-size: 7px; font-weight: 1000; white-space: nowrap; }
+.boss-range-player.safe { border-color: rgba(74, 222, 128, 0.56); color: #bbf7d0; background: rgba(20, 83, 45, 0.62); }
+.boss-range-player.warning { border-color: rgba(250, 204, 21, 0.7); color: #fef08a; }
+.boss-range-player.danger { border-color: rgba(248, 113, 113, 0.72); color: #fecaca; background: rgba(127, 29, 29, 0.62); }
+.boss-range-total { color: #fda4af; font-size: 8px; font-weight: 800; line-height: 1.2; }
+.boss-range-total b { color: #fecdd3; font-weight: 1000; }
+@media (max-width: 620px) {
+  .boss-range-rule { grid-template-columns: 35px minmax(54px, .75fr) minmax(0, 1.5fr); gap: 4px; padding: 3px 4px; }
+  .boss-range-player { font-size: 6px; padding-inline: 3px; }
+}
+
 /* Juros Fixos: escolha da garantia diretamente na mão do titular. */
 .boss-choice-panel .boss-collateral-selection-summary {
   align-self: center;
@@ -3097,56 +3143,66 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track {
 body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span {
   position: relative;
   overflow: visible;
-  border-radius: 2px;
+  border-radius: 5px 2px 2px 5px;
   background:
-    radial-gradient(circle at 13% 40%, rgba(255, 194, 199, 0.14) 0 2px, transparent 3px),
-    radial-gradient(circle at 31% 68%, rgba(255, 214, 217, 0.09) 0 1px, transparent 2px),
-    radial-gradient(circle at 69% 35%, rgba(255, 194, 199, 0.12) 0 2px, transparent 3px),
-    linear-gradient(180deg, #7d1521 0%, #5a0914 38%, #36040c 74%, #220208 100%);
-  background-size: 74px 16px, 96px 16px, 112px 16px, 100% 100%;
+    radial-gradient(circle, rgba(255, 226, 228, 0.18) 0 1.4px, transparent 2.2px) 7px 2px / 37px 13px repeat-x,
+    radial-gradient(circle, rgba(255, 190, 196, 0.12) 0 1.8px, transparent 2.8px) 21px 7px / 53px 17px repeat-x,
+    radial-gradient(ellipse, rgba(255, 238, 239, 0.1) 0 2px, transparent 3.4px) 4px 4px / 71px 19px repeat-x,
+    linear-gradient(180deg, #8f1a29 0%, #67101c 24%, #4b0712 59%, #250208 100%);
   box-shadow:
-    inset 0 1px rgba(255, 219, 222, 0.16),
-    inset 0 -3px 4px rgba(15, 0, 3, 0.48),
-    0 0 9px rgba(91, 7, 17, 0.62);
-  animation: dimitrescuBloodFlow 5.8s linear infinite;
+    inset 0 2px 0 rgba(255, 226, 228, 0.12),
+    inset 0 -5px 6px rgba(12, 0, 3, 0.58),
+    inset -5px 0 8px rgba(28, 0, 6, 0.34),
+    0 0 11px rgba(116, 10, 25, 0.68);
+  filter: saturate(1.12) contrast(1.04);
+  animation: dimitrescuBloodFlow 6.4s linear infinite, dimitrescuBloodThrob 3.2s ease-in-out infinite;
 }
 body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::before {
   content: '';
   position: absolute;
-  inset: 2px 0 1px;
+  inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.76;
   background:
-    linear-gradient(90deg, transparent 0 18%, rgba(255,255,255,0.08) 20%, transparent 23% 54%, rgba(255,255,255,0.055) 57%, transparent 60% 100%);
+    radial-gradient(ellipse at 50% 100%, rgba(47, 1, 8, 0.7) 0 38%, transparent 42%) 3px 100% / 29px 8px repeat-x,
+    radial-gradient(ellipse at 50% 100%, rgba(99, 7, 21, 0.44) 0 31%, transparent 36%) 17px 100% / 43px 10px repeat-x,
+    linear-gradient(100deg, transparent 0 9%, rgba(255, 232, 233, 0.14) 13%, transparent 19% 41%, rgba(255, 213, 216, 0.09) 47%, transparent 55% 100%);
+  mix-blend-mode: screen;
 }
 body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after {
   content: '';
   position: absolute;
   z-index: 2;
-  right: 5px;
-  top: calc(100% - 1px);
-  width: 7px;
-  height: 8px;
-  border-radius: 0 0 70% 70%;
-  background: #43050e;
-  box-shadow:
-    -21px -2px 0 -2px #5d0915,
-    -43px 1px 0 -2.5px #32030a;
-  filter: drop-shadow(0 2px 1px rgba(0,0,0,0.42));
+  left: 0;
+  right: 0;
+  top: calc(100% - 2px);
+  height: 18px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 0%, #5f0a17 0 34%, transparent 39%) 2px 0 / 31px 12px repeat-x,
+    radial-gradient(ellipse at 50% 0%, #74101d 0 28%, transparent 34%) 17px 1px / 47px 16px repeat-x,
+    radial-gradient(circle, #47050e 0 2px, transparent 2.8px) 9px 7px / 59px 13px repeat-x,
+    radial-gradient(circle, #68101a 0 1.6px, transparent 2.4px) 28px 10px / 73px 16px repeat-x;
+  filter: drop-shadow(0 3px 1px rgba(0, 0, 0, 0.52)) drop-shadow(0 1px 2px rgba(88, 4, 18, 0.36));
   transform-origin: 50% 0;
-  animation: dimitrescuBloodDrip 2.8s ease-in-out infinite;
+  animation: dimitrescuBloodDripField 3.4s ease-in-out infinite;
 }
 body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0']::after {
   display: none;
 }
 @keyframes dimitrescuBloodFlow {
-  from { background-position: 0 0, 0 0, 0 0, 0 0; }
-  to { background-position: 74px 0, -96px 0, 112px 0, 0 0; }
+  from { background-position: 7px 2px, 21px 7px, 4px 4px, 0 0; }
+  to { background-position: 44px 2px, -32px 7px, 75px 4px, 0 0; }
 }
-@keyframes dimitrescuBloodDrip {
-  0%, 100% { transform: scaleY(0.72); opacity: 0.72; }
-  48% { transform: scaleY(1.18); opacity: 1; }
+@keyframes dimitrescuBloodThrob {
+  0%, 100% { filter: saturate(1.08) brightness(0.96) contrast(1.04); }
+  50% { filter: saturate(1.2) brightness(1.08) contrast(1.08); }
+}
+@keyframes dimitrescuBloodDripField {
+  0%, 100% { transform: scaleY(0.78) translateY(-1px); opacity: 0.68; background-position: 2px 0, 17px 1px, 9px 7px, 28px 10px; }
+  45% { transform: scaleY(1.06) translateY(1px); opacity: 0.98; background-position: 6px 0, 14px 1px, 13px 8px, 24px 11px; }
+  72% { transform: scaleY(0.92) translateY(0); opacity: 0.84; background-position: 4px 0, 20px 1px, 11px 6px, 31px 10px; }
 }
 
 /* Filhas de Lady Dimitrescu: faixa independente sob o HUD principal. */
@@ -3265,8 +3321,17 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='bela'] img { 
 body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='cassandra'] img { object-position: 50% 25%; }
 body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img { object-position: 50% 27%; }
 
-.boss-mode .carta.boss-card-dimitrescu-hunt {
+.boss-mode .carta.boss-card-dimitrescu-hunt,
+.boss-mode .carta.boss-card-dimitrescu-blood-mark,
+.boss-mode .carta.boss-card-cassandra-feast,
+.boss-mode .discard-face.boss-discard-dimitrescu-card,
+.boss-mode .morto-container .boss-dead-blood-layer {
+  position: relative;
   isolation: isolate;
+  overflow: visible;
+}
+
+.boss-mode .carta.boss-card-dimitrescu-hunt {
   border-color: #ef4444 !important;
   box-shadow:
     inset 0 0 0 2px rgba(126, 11, 24, 0.74),
@@ -3275,7 +3340,9 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
 }
 .boss-mode .carta.boss-card-dimitrescu-hunt::before,
 .boss-mode .carta.boss-card-dimitrescu-blood-mark::before,
-.boss-mode .discard-face.boss-discard-dimitrescu-card::before {
+.boss-mode .carta.boss-card-cassandra-feast::before,
+.boss-mode .discard-face.boss-discard-dimitrescu-card::before,
+.boss-mode .morto-container .boss-dead-blood-layer::before {
   content: '';
   display: block;
   position: absolute;
@@ -3283,16 +3350,48 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   z-index: 4;
   border-radius: inherit;
   pointer-events: none;
+  opacity: 0.96;
+  background:
+    radial-gradient(ellipse at var(--blood-blob-x1, 15%) var(--blood-blob-y1, 20%), rgb(72 2 14 / var(--blood-blob-o1, 0.9)) 0 calc(var(--blood-blob-r1, 10%) - 2%), rgb(130 12 31 / calc(var(--blood-blob-o1, 0.9) * 0.72)) calc(var(--blood-blob-r1, 10%) - 1%) var(--blood-blob-r1, 10%), transparent calc(var(--blood-blob-r1, 10%) + 2%)),
+    radial-gradient(ellipse at var(--blood-blob-x2, 78%) var(--blood-blob-y2, 64%), rgb(64 1 11 / var(--blood-blob-o2, 0.82)) 0 calc(var(--blood-blob-r2, 9%) - 2%), rgb(148 10 32 / calc(var(--blood-blob-o2, 0.82) * 0.6)) calc(var(--blood-blob-r2, 9%) - 1%) var(--blood-blob-r2, 9%), transparent calc(var(--blood-blob-r2, 9%) + 2%)),
+    radial-gradient(circle at var(--blood-blob-x3, 60%) var(--blood-blob-y3, 28%), rgb(146 12 31 / var(--blood-blob-o3, 0.68)) 0 calc(var(--blood-blob-r3, 5%) - 1%), transparent calc(var(--blood-blob-r3, 5%) + 1%)),
+    radial-gradient(circle at var(--blood-blob-x4, 31%) var(--blood-blob-y4, 74%), rgb(108 5 22 / var(--blood-blob-o4, 0.62)) 0 calc(var(--blood-blob-r4, 4.8%) - 1%), transparent calc(var(--blood-blob-r4, 4.8%) + 1%)),
+    radial-gradient(circle at var(--blood-blob-x5, 46%) var(--blood-blob-y5, 43%), rgb(92 3 19 / var(--blood-blob-o5, 0.55)) 0 calc(var(--blood-blob-r5, 4.2%) - 1%), transparent calc(var(--blood-blob-r5, 4.2%) + 1%)),
+    radial-gradient(circle at var(--blood-blob-x6, 84%) var(--blood-blob-y6, 18%), rgb(170 20 45 / var(--blood-blob-o6, 0.42)) 0 calc(var(--blood-blob-r6, 3.6%) - 1%), transparent calc(var(--blood-blob-r6, 3.6%) + 1%)),
+    linear-gradient(var(--blood-smear-angle, 112deg), transparent 0 34%, rgb(78 2 13 / var(--blood-mist-opacity, 0.22)) 45%, rgb(121 8 27 / calc(var(--blood-mist-opacity, 0.22) + 0.09)) 55%, transparent 66%),
+    linear-gradient(var(--blood-sheen-angle, 98deg), transparent 0 18%, rgb(255 233 236 / 0.06) 24%, transparent 30% 58%, rgb(255 228 231 / 0.04) 66%, transparent 72%);
+  mix-blend-mode: multiply;
+  filter: saturate(1.18) contrast(1.08);
+}
+.boss-mode .carta.boss-card-dimitrescu-hunt::after,
+.boss-mode .carta.boss-card-dimitrescu-blood-mark::after,
+.boss-mode .carta.boss-card-cassandra-feast::after,
+.boss-mode .discard-face.boss-discard-dimitrescu-card::after,
+.boss-mode .morto-container .boss-dead-blood-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 -16px 0;
+  z-index: 8;
+  pointer-events: none;
   opacity: 0.9;
   background:
-    radial-gradient(circle at 13% 18%, rgba(88, 3, 14, 0.78) 0 5%, rgba(117, 7, 20, 0.42) 6% 9%, transparent 10%),
-    radial-gradient(ellipse at 82% 73%, rgba(73, 2, 12, 0.72) 0 6%, rgba(112, 6, 19, 0.38) 7% 12%, transparent 13%),
-    radial-gradient(circle at 69% 22%, rgba(127, 9, 25, 0.48) 0 2%, transparent 3%),
-    linear-gradient(108deg, transparent 0 58%, rgba(72, 2, 12, 0.2) 65%, transparent 72%);
-  mix-blend-mode: multiply;
+    linear-gradient(180deg, rgba(109, 5, 22, 0.94) 0 22%, rgba(150, 12, 34, 0.6) 60%, transparent 100%) var(--blood-drip-x1, 20%) var(--blood-drip-top1, 66%) / var(--blood-drip-w1, 8px) var(--blood-drip-h1, 18px) no-repeat,
+    radial-gradient(circle at 50% 100%, rgba(86, 3, 18, 0.94) 0 var(--blood-drip-bulge1, 42%), transparent calc(var(--blood-drip-bulge1, 42%) + 16%)) var(--blood-drip-x1, 20%) calc(var(--blood-drip-top1, 66%) + var(--blood-drip-h1, 18px) - 8px) / calc(var(--blood-drip-w1, 8px) + 7px) 10px no-repeat,
+    linear-gradient(180deg, rgba(100, 4, 19, 0.92) 0 24%, rgba(145, 8, 31, 0.56) 62%, transparent 100%) var(--blood-drip-x2, 50%) var(--blood-drip-top2, 70%) / var(--blood-drip-w2, 9px) var(--blood-drip-h2, 22px) no-repeat,
+    radial-gradient(circle at 50% 100%, rgba(74, 2, 14, 0.94) 0 var(--blood-drip-bulge2, 50%), transparent calc(var(--blood-drip-bulge2, 50%) + 16%)) var(--blood-drip-x2, 50%) calc(var(--blood-drip-top2, 70%) + var(--blood-drip-h2, 22px) - 8px) / calc(var(--blood-drip-w2, 9px) + 8px) 10px no-repeat,
+    linear-gradient(180deg, rgba(105, 4, 20, 0.9) 0 20%, rgba(141, 8, 29, 0.56) 58%, transparent 100%) var(--blood-drip-x3, 78%) var(--blood-drip-top3, 68%) / var(--blood-drip-w3, 7px) var(--blood-drip-h3, 18px) no-repeat,
+    radial-gradient(circle at 50% 100%, rgba(87, 4, 17, 0.92) 0 var(--blood-drip-bulge3, 44%), transparent calc(var(--blood-drip-bulge3, 44%) + 16%)) var(--blood-drip-x3, 78%) calc(var(--blood-drip-top3, 68%) + var(--blood-drip-h3, 18px) - 8px) / calc(var(--blood-drip-w3, 7px) + 6px) 9px no-repeat,
+    linear-gradient(180deg, rgba(119, 7, 25, 0.88) 0 24%, rgba(164, 14, 38, 0.52) 60%, transparent 100%) var(--blood-drip-x4, 34%) var(--blood-drip-top4, 72%) / var(--blood-drip-w4, 0px) var(--blood-drip-h4, 0px) no-repeat,
+    radial-gradient(circle at 50% 100%, rgba(93, 4, 18, 0.92) 0 var(--blood-drip-bulge4, 0%), transparent calc(var(--blood-drip-bulge4, 0%) + 16%)) var(--blood-drip-x4, 34%) calc(var(--blood-drip-top4, 72%) + var(--blood-drip-h4, 0px) - 8px) / calc(var(--blood-drip-w4, 0px) + 7px) 10px no-repeat;
+  transform: translateY(0);
+  filter: drop-shadow(0 2px 2px rgba(62, 1, 10, 0.52));
+  animation: dimitrescuCardBloodWet 3.1s ease-in-out infinite;
+}
+@keyframes dimitrescuCardBloodWet {
+  0%, 100% { opacity: 0.72; transform: translateY(0); }
+  48% { opacity: 0.98; transform: translateY(1.5px); }
 }
 .boss-mode .carta.boss-card-dimitrescu-blood-mark {
-  isolation: isolate;
   border-color: #991b1b !important;
   box-shadow:
     inset 0 0 0 2px rgba(69, 10, 10, 0.76),
@@ -3300,12 +3399,8 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
     0 0 15px rgba(127, 29, 29, 0.5) !important;
 }
 .boss-mode .carta.boss-card-dimitrescu-blood-mark::before {
-  opacity: 0.97;
-  background:
-    radial-gradient(circle at 17% 18%, rgba(74, 2, 12, 0.88) 0 7%, rgba(123, 8, 24, 0.52) 8% 12%, transparent 13%),
-    radial-gradient(ellipse at 76% 68%, rgba(69, 2, 11, 0.82) 0 8%, rgba(121, 7, 20, 0.45) 9% 14%, transparent 15%),
-    radial-gradient(circle at 61% 31%, rgba(112, 6, 20, 0.56) 0 3%, transparent 4%),
-    linear-gradient(111deg, transparent 0 48%, rgba(68, 2, 11, 0.24) 56%, transparent 64%);
+  opacity: 0.98;
+  filter: saturate(1.22) contrast(1.12);
 }
 .boss-mode .boss-card-status-blood-hunt {
   color: #fff1f2;
@@ -3323,34 +3418,21 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   background: rgba(69, 10, 10, 0.97);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.52), 0 0 8px rgba(153, 27, 27, 0.26);
 }
-.boss-mode .meld-line.feasted-by-cassandra {
-  position: relative;
-  isolation: isolate;
+/* Banquete de Cassandra: somente as cartas do jogo alvo sangram, sem cobrir a linha inteira. */
+.boss-mode .carta.boss-card-cassandra-feast {
+  border-color: #b91c1c !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(69, 10, 10, 0.78),
+    0 0 0 2px rgba(248, 113, 113, 0.34),
+    0 0 13px rgba(185, 28, 28, 0.48) !important;
 }
-.boss-mode .meld-line.feasted-by-cassandra::before {
-  content: 'BANQUETE DE CASSANDRA';
-  position: absolute;
-  inset: -5px -5px auto;
-  z-index: 0;
-  min-height: calc(100% + 10px);
-  padding: 3px 5px;
-  border: 2px solid rgba(220, 38, 38, 0.62);
-  border-radius: 7px;
-  color: rgba(254, 202, 202, 0.88);
-  background:
-    radial-gradient(circle at 11% 22%, rgba(92, 4, 17, 0.3) 0 5px, transparent 7px),
-    radial-gradient(circle at 87% 72%, rgba(112, 5, 20, 0.24) 0 7px, transparent 9px),
-    linear-gradient(180deg, rgba(69, 10, 10, 0.17), transparent 48%);
-  box-shadow: 0 0 14px rgba(185, 28, 28, 0.25), inset 0 0 13px rgba(127, 29, 29, 0.1);
-  font-size: 6px;
-  font-weight: 1000;
-  letter-spacing: 0.45px;
-  pointer-events: none;
+.boss-mode .carta.boss-card-cassandra-feast::before {
+  opacity: 1;
+  filter: saturate(1.24) contrast(1.12);
 }
-.boss-mode .meld-line.feasted-by-cassandra .meld-line-cards,
-.boss-mode .meld-line.feasted-by-cassandra .meld-meta {
-  position: relative;
-  z-index: 2;
+.boss-mode .carta.boss-card-cassandra-feast::after {
+  inset: 0 0 -20px 0;
+  opacity: 0.96;
 }
 .boss-mode #drawDiscardBtn.boss-daniela-discard .pile-card {
   box-shadow:
@@ -3377,6 +3459,20 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   font-size: 7px;
   font-weight: 1000;
   text-align: center;
+}
+.boss-mode .morto-container .boss-dead-blood-layer {
+  overflow: visible !important;
+  box-shadow:
+    0 0 0 2px rgba(248, 113, 113, 0.48),
+    0 0 16px rgba(153, 27, 27, 0.52) !important;
+}
+.boss-mode .morto-container .boss-dead-blood-layer::before {
+  opacity: 1;
+  filter: saturate(1.24) contrast(1.1);
+}
+.boss-mode .morto-container .boss-dead-blood-layer::after {
+  inset: 0 0 -18px 0;
+  opacity: 0.94;
 }
 .boss-mode .morto-container.boss-dimitrescu-dead {
   filter: drop-shadow(0 0 9px rgba(153, 27, 27, 0.62));
@@ -3542,6 +3638,9 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
 @media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse) {
   body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span,
   body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after,
+  .boss-mode .carta.boss-card-dimitrescu-hunt::after,
+  .boss-mode .carta.boss-card-dimitrescu-blood-mark::after,
+  .boss-mode .discard-face.boss-discard-dimitrescu-card::after,
   body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-impact,
   body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
     animation: none !important;
@@ -3551,4 +3650,9 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
   border-color: rgba(248, 113, 113, 0.5);
   color: #fecaca;
   background: rgba(127, 29, 29, 0.2);
+}
+
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .boss-mode .carta.boss-card-cassandra-feast::after,
+  .boss-mode .morto-container .boss-dead-blood-layer::after { animation: none; }
 }
