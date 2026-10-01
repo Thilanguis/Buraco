@@ -1,10 +1,17 @@
 import { createDeck } from '../deck.js';
-import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, queueDebugBossAbility, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
+import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
 import { getBossDefinition, listBossDefinitions } from './boss-registry.js';
 
 const SUITS = Object.freeze(['\u2660', '\u2666', '\u2663', '\u2665']);
 const RANKS = Object.freeze(['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']);
 const DEBUG_SEED = 41721;
+let neheleniaInteractiveSerial = 0;
+
+function nextNeheleniaInteractiveSeed() {
+  neheleniaInteractiveSerial = (neheleniaInteractiveSerial + 1) >>> 0;
+  const timeBits = Date.now() >>> 0;
+  return (DEBUG_SEED ^ timeBits ^ Math.imul(neheleniaInteractiveSerial, 0x9e3779b1)) >>> 0;
+}
 
 const VARIANTS = Object.freeze({
   interactive: { id: 'interactive', label: 'Interativo padrao' },
@@ -33,10 +40,25 @@ const OBJECTIVE_ABILITIES = new Set([
   'emerald_cocoon',
   'spring_crown',
   'crimson_brand',
+  'false_image',
+  'mirrored_meld',
+  'follow_reflection',
+  'dream_theft',
+  'discard_mirror',
+  'shattered_mirror',
+  'mirror_prison',
+  'eternal_nightmare',
+  'tiger_link',
+  'tiger_prey',
+  'hawk_suit',
+  'hawk_watch',
+  'fish_marked_card',
+  'fish_inverted',
 ]);
-const TARGETED_PLAYER_ABILITIES = new Set(['collar', 'forced_choice', 'exposure', 'favorite', 'absolute_control', 'break_will', 'harvest', 'living_seed', 'bela_hunt']);
-const TARGETED_MELD_ABILITIES = new Set(['pledge', 'possession', 'hungry_root', 'twin_vines', 'graft', 'royal_bloom', 'cassandra_feast']);
-const NO_TARGET_ABILITIES = new Set(['pledge', 'collar', 'exposure', 'iron_etiquette', 'possession', 'living_seed', 'hungry_root', 'twin_vines', 'graft', 'discard_pollen', 'royal_bloom', 'bela_hunt', 'cassandra_feast', 'daniela_swarm', 'three_daughters', 'crimson_brand', 'cassandra_dead_feast']);
+const TARGETED_PLAYER_ABILITIES = new Set(['collar', 'forced_choice', 'exposure', 'favorite', 'absolute_control', 'break_will', 'harvest', 'living_seed', 'bela_hunt', 'false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare', 'tiger_prey', 'hawk_suit', 'hawk_watch', 'fish_marked_card', 'fish_inverted']);
+const NEHELENIA_ATTENDANT_PLAYER_ABILITIES = new Set(['tiger_prey', 'hawk_suit', 'hawk_watch', 'fish_marked_card', 'fish_inverted']);
+const TARGETED_MELD_ABILITIES = new Set(['pledge', 'possession', 'hungry_root', 'twin_vines', 'graft', 'royal_bloom', 'cassandra_feast', 'mirrored_meld', 'mirror_prison', 'tiger_prey', 'hawk_watch']);
+const NO_TARGET_ABILITIES = new Set(['pledge', 'collar', 'exposure', 'iron_etiquette', 'possession', 'living_seed', 'hungry_root', 'twin_vines', 'graft', 'discard_pollen', 'royal_bloom', 'bela_hunt', 'cassandra_feast', 'daniela_swarm', 'three_daughters', 'crimson_brand', 'cassandra_dead_feast', 'false_image', 'mirrored_meld', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'mirror_prison', 'eternal_nightmare', 'tiger_link', 'tiger_prey', 'hawk_suit', 'hawk_watch', 'fish_marked_card', 'fish_inverted']);
 
 const SPECIAL_VARIANTS = Object.freeze({
   fixed_interest: ['interactive', 'success', 'failure', 'reload', 'undo'],
@@ -56,6 +78,17 @@ const SPECIAL_VARIANTS = Object.freeze({
   crimson_clot: ['interactive', 'reload'],
   castle_lockdown: ['interactive', 'success', 'reload', 'bot'],
   three_daughters: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  false_image: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  dream_theft: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  discard_mirror: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  shattered_mirror: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  eternal_nightmare: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  tiger_link: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  tiger_prey: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  hawk_suit: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  hawk_watch: ['interactive', 'success', 'reload', 'undo', 'bot'],
+  fish_marked_card: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
+  fish_inverted: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
 });
 
 function variantsForAbility(abilityId) {
@@ -263,6 +296,11 @@ function configureAbilityState(state, abilityId) {
     boss.crimsonClot = null;
   }
   if (abilityId === 'cassandra_dead_feast') boss.bloodiedDead = null;
+  if (abilityId === 'discard_mirror' && state.discard.length < 2 && state.stock.length) state.discard.push(state.stock.pop());
+  if (abilityId === 'mirror_prison') {
+    boss.dreamMirrorsByPlayer = { 0: 'stolen', 1: 'intact' };
+    boss.danger = 1;
+  }
 }
 
 function moveCardsToStock(state, cards = []) {
@@ -270,11 +308,11 @@ function moveCardsToStock(state, cards = []) {
 }
 
 function configureNoTargetState(state, abilityId) {
-  if (TARGETED_MELD_ABILITIES.has(abilityId) || ['collar', 'exposure', 'living_seed', 'twin_vines', 'graft', 'royal_bloom', 'bela_hunt', 'three_daughters', 'crimson_brand'].includes(abilityId)) {
+  if (TARGETED_MELD_ABILITIES.has(abilityId) || ['collar', 'exposure', 'living_seed', 'twin_vines', 'graft', 'royal_bloom', 'bela_hunt', 'three_daughters', 'crimson_brand', 'false_image', 'mirrored_meld', 'dream_theft', 'shattered_mirror', 'mirror_prison', 'eternal_nightmare'].includes(abilityId)) {
     state.teams[0].melds.forEach((meld) => moveCardsToStock(state, meld));
     state.teams[0].melds = [];
   }
-  if (['collar', 'exposure', 'living_seed', 'royal_bloom', 'bela_hunt', 'three_daughters', 'crimson_brand'].includes(abilityId)) {
+  if (['collar', 'exposure', 'living_seed', 'royal_bloom', 'bela_hunt', 'three_daughters', 'crimson_brand', 'false_image', 'mirrored_meld', 'dream_theft', 'shattered_mirror', 'mirror_prison', 'eternal_nightmare'].includes(abilityId)) {
     state.players.forEach((player) => {
       const kept = player.hand.slice(0, 1);
       moveCardsToStock(state, player.hand.slice(1));
@@ -287,7 +325,7 @@ function configureNoTargetState(state, abilityId) {
       player.hand = [];
     });
   }
-  if (['discard_pollen', 'royal_bloom', 'daniela_swarm', 'three_daughters'].includes(abilityId)) {
+  if (['discard_pollen', 'royal_bloom', 'daniela_swarm', 'three_daughters', 'discard_mirror'].includes(abilityId)) {
     moveCardsToStock(state, state.discard);
     state.discard = [];
   }
@@ -336,18 +374,20 @@ function payloadMatchesTarget(payload, target) {
   }
   const expectedIndex = target === 'meld_1' ? 0 : target === 'meld_2' ? 1 : null;
   if (expectedIndex == null) return true;
-  const indexes = [payload?.meldIndex, ...(payload?.targets || []).map((entry) => entry?.meldIndex)].filter(Number.isInteger);
+  const nightmareMeld = (payload?.objectives || []).find((entry) => entry?.type === 'meld');
+  const indexes = [payload?.meldIndex, ...(payload?.targets || []).map((entry) => entry?.meldIndex), payload?.reflection?.meldIndex, payload?.original?.meldIndex, nightmareMeld?.meldIndex].filter(Number.isInteger);
   return indexes.includes(expectedIndex);
 }
 
 function findSeedForTarget(state, abilityId, target) {
+  const seedStart = Number(state.boss?.seed) || DEBUG_SEED;
   if (!target || target === 'auto' || target === 'team') {
     // No Laboratório, Interdito precisa ser testável pelo jogador humano.
     // O cenário base possui um jogo de Paus evoluível por Biel e um jogo de
     // Copas evoluível pelo bot. Sem esta preferência, o sorteio podia marcar
     // o jogo do bot e deixar o usuário sem qualquer forma de disparar a escolha.
     if (abilityId === 'interdict') {
-      for (let seed = DEBUG_SEED; seed < DEBUG_SEED + 256; seed += 1) {
+      for (let seed = seedStart; seed < seedStart + 256; seed += 1) {
         state.boss.seed = seed;
         const eligibility = inspectBossAbilityEligibility(state, abilityId);
         if (eligibility.eligible && eligibility.payload?.eligiblePlayerIds?.includes(0)) {
@@ -359,7 +399,7 @@ function findSeedForTarget(state, abilityId, target) {
     return inspectBossAbilityEligibility(state, abilityId);
   }
 
-  for (let seed = DEBUG_SEED; seed < DEBUG_SEED + 256; seed += 1) {
+  for (let seed = seedStart; seed < seedStart + 256; seed += 1) {
     state.boss.seed = seed;
     const eligibility = inspectBossAbilityEligibility(state, abilityId);
     if (eligibility.eligible && payloadMatchesTarget(eligibility.payload, target)) return eligibility;
@@ -402,7 +442,11 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
   const variant = options.variant || 'interactive';
   let phase = resolveBossDebugPhase(definition.id, ability.id, options.phase);
   if (variant === 'no_target' && options.phase === 'auto' && definition.id === 'dominadora' && ability.phases.includes(2)) phase = 2;
-  const target = options.target || (variant === 'bot' ? 'bot' : 'auto');
+  const requestedTarget = options.target || (variant === 'bot' ? 'bot' : 'auto');
+  const target = definition.id === 'nehelenia' && variant === 'interactive'
+    && requestedTarget === 'auto' && NEHELENIA_ATTENDANT_PLAYER_ABILITIES.has(ability.id)
+    ? 'human'
+    : requestedTarget;
   if (!variantsForAbility(ability.id).some((entry) => entry.id === variant)) {
     throw new Error(`${ability.name} nao oferece a variante ${variant}.`);
   }
@@ -422,6 +466,13 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
   state.boss.bossFlow = null;
   configureAbilityState(state, ability.id);
   configureVariantState(state, ability.id, variant);
+  if (['discard_mirror', 'mirrored_meld', 'eternal_nightmare'].includes(ability.id) && variant === 'interactive') {
+    // No Laboratório, cada preparação interativa precisa nascer com uma seed nova.
+    // Isso evita que Espelho do Lixo, Jogo Espelhado ou Pesadelo Eterno repitam
+    // sistematicamente o mesmo lado/casa entre preparações independentes. O valor
+    // sorteado continua persistido no estado daquela ativação para reload/sync.
+    state.boss.seed = nextNeheleniaInteractiveSeed();
+  }
 
   const eligibility = findSeedForTarget(state, ability.id, target);
   if (variant !== 'no_target' && !eligibility.eligible) throw new Error(eligibility.reason);
@@ -436,12 +487,13 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
     abilityId: ability.id,
     requestedPhase: String(options.phase ?? 'auto'),
     variant,
-    target,
+    target: requestedTarget,
+    effectiveTarget: target,
     seed: state.boss.seed,
     pauseAutomation: true,
     executionCount: 0,
     expected: scenarioExpected(state, ability.id, variant),
-    preparedAt: 0,
+    preparedAt: Date.now(),
   };
 
   const validation = validateBossDebugScenario(state, { bossId: definition.id, abilityId: ability.id, phase, variant });
@@ -649,6 +701,70 @@ function executeMinimalSuccess(state, preferredPlayerId = null) {
       if (moved) moves.push(moved);
     }
     return { executed: moves.length > 0, action: 'crimson_brand_cards_played', moves };
+  }
+  if (['false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare'].includes(intent.abilityId)) {
+    finishCurrentDebugRound(state);
+    const choice = state.boss?.pendingChoices?.[0];
+    if (!choice) return { executed: false, reason: 'A ilusão não criou escolha.' };
+    const event = resolveBossChoice(state, choice.playerId, choice.correctOption || choice.options?.[0]);
+    return { executed: !!event, action: `${intent.abilityId}_choice_resolved`, event };
+  }
+  if (intent.abilityId === 'mirrored_meld') {
+    const moved = addCardToLegalMeld(state, intent.payload?.targetPlayerId, null, intent.payload?.meldIndex);
+    return { executed: !!moved, action: 'mirrored_meld_fed', move: moved };
+  }
+  if (intent.abilityId === 'mirror_prison') {
+    const moved = addCardToLegalMeld(state, intent.payload?.rescuerPlayerId, null, intent.payload?.meldIndex);
+    return { executed: !!moved, action: 'mirror_prison_fed', move: moved };
+  }
+  if (intent.abilityId === 'follow_reflection') {
+    const first = addCardToLegalMeld(state, intent.payload?.firstPlayerId);
+    const second = addCardToLegalMeld(state, intent.payload?.secondPlayerId);
+    return { executed: !!first && !!second, action: 'follow_reflection_matched', moves: [first, second].filter(Boolean) };
+  }
+  if (intent.abilityId === 'tiger_link') {
+    const moves = [];
+    for (const target of intent.payload?.targets || []) {
+      let moved = null;
+      const ordered = [...(target.eligiblePlayerIds || []), ...(state.players || []).map((player) => player.id)];
+      for (const playerId of [...new Set(ordered)]) {
+        moved = addCardToLegalMeld(state, playerId, null, target.meldIndex);
+        if (moved) break;
+      }
+      if (moved) moves.push(moved);
+    }
+    return { executed: moves.length === (intent.payload?.targets || []).length, action: 'tiger_link_fed', moves };
+  }
+  if (intent.abilityId === 'tiger_prey') {
+    const moved = addCardToLegalMeld(state, intent.payload?.targetPlayerId, null, intent.payload?.meldIndex);
+    return { executed: !!moved, action: 'tiger_prey_fed', move: moved };
+  }
+  if (intent.abilityId === 'hawk_suit') {
+    const player = state.players.find((entry) => entry.id === intent.payload?.targetPlayerId);
+    const index = player?.hand?.findIndex((card) => !card.joker && card.suit === intent.payload?.suit) ?? -1;
+    if (index < 0) return { executed: false, reason: 'O alvo não possui mais o naipe exigido.' };
+    const [discarded] = player.hand.splice(index, 1);
+    state.discard.push(discarded);
+    notifyBossCardDiscarded(state, player.id, discarded);
+    return { executed: true, action: 'hawk_suit_discarded', cardId: discarded.id };
+  }
+  if (intent.abilityId === 'hawk_watch') {
+    return { executed: true, action: 'hawk_watch_respected' };
+  }
+  if (intent.abilityId === 'fish_marked_card') {
+    const moved = addCardToLegalMeld(state, intent.payload?.targetPlayerId, intent.payload?.cardId);
+    if (moved) return { executed: true, action: 'fish_marked_card_played', move: moved };
+    const player = state.players.find((entry) => entry.id === intent.payload?.targetPlayerId);
+    const index = player?.hand?.findIndex((card) => card.id === intent.payload?.cardId) ?? -1;
+    if (index < 0) return { executed: false, reason: 'A carta marcada não está mais na mão.' };
+    const [discarded] = player.hand.splice(index, 1);
+    state.discard.push(discarded);
+    notifyBossCardDiscarded(state, player.id, discarded);
+    return { executed: true, action: 'fish_marked_card_discarded', cardId: discarded.id };
+  }
+  if (intent.abilityId === 'fish_inverted') {
+    const moved = addCardToLegalMeld(state, intent.payload?.targetPlayerId);
+    return { executed: !!moved, action: 'fish_inverted_existing_meld_fed', move: moved };
   }
   if (['daniela_swarm', 'blood_tithe', 'castle_lockdown'].includes(intent.abilityId)) {
     return { executed: true, action: `${intent.abilityId}_round_prepared` };

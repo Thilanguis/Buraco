@@ -667,13 +667,17 @@ export class BuracoBot {
     if (ctx && ctx.isFarming && cardsLeft <= 1) return false;
 
     if (engine.canTeamTakeDeadNow(team.id)) return true;
-    if (engine.teamHasGoodCanastra(team.id)) return true;
+    const bossState = engine.getState?.();
+    const bossMode = !!bossState?.mode?.startsWith('boss_');
+    const safeBossFinish = !bossMode || typeof engine.canSafelyFinishBoss !== 'function' || engine.canSafelyFinishBoss();
+    if (engine.teamHasGoodCanastra(team.id)) return safeBossFinish;
 
-    // Se ele for zerar a mão, mas o jogo que ele está montando FORMAR a canastra, a jogada é legalizada!
+    // Se ele for zerar a mão, mas o jogo que ele está montando FORMAR a canastra,
+    // isso só autoriza a batida no modo Chefe quando o ataque final projetado mata.
     if (pendingMeld && pendingMeld.length >= 7) {
       const realSuit = this.getRealSuit(pendingMeld);
       const hasWild = pendingMeld.some((c) => c.joker || (c.rank === '2' && c.suit !== realSuit) || c.forceWild);
-      if (!hasWild) return true; // É limpa/real/ás, pode bater!
+      if (!hasWild && safeBossFinish) return true; // É limpa/real/ás e a batida é segura.
     }
 
     // Risco de Batida do Parceiro
@@ -736,6 +740,26 @@ export class BuracoBot {
       const naturePriorities = engine.getNaturePriorities?.(me.id);
       const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
       const dimitrescuPriorities = engine.getDimitrescuPriorities?.(me.id);
+      const neheleniaPriorities = engine.getNeheleniaPriorities?.(me.id);
+      const exactPlayTarget = Number.isInteger(neheleniaPriorities?.exactPlayCount) ? neheleniaPriorities.exactPlayCount : null;
+      const exactAlreadyPlayed = Math.max(0, Number(neheleniaPriorities?.exactPlayedCount) || 0);
+      const exactRemaining = exactPlayTarget == null ? null : Math.max(0, exactPlayTarget - exactAlreadyPlayed);
+      const requiredDiscardSuit = neheleniaPriorities?.discardSuit || null;
+      const withinNeheleniaPlayLimit = (count) => exactRemaining == null || Math.max(0, Number(count) || 0) <= exactRemaining;
+      const preservesNeheleniaDiscardSuit = (cards) => {
+        if (!requiredDiscardSuit) return true;
+        const spentIds = new Set((cards || []).map((card) => card?.id).filter(Boolean));
+        const remainingLegalSuitCards = (me.hand || []).filter((card) => card?.id
+          && !spentIds.has(card.id)
+          && card.id !== s.pickedDiscardCardId
+          && !card.joker
+          && card.suit === requiredDiscardSuit
+          && !engine.isCardBlocked?.(me.id, card.id, 'discard'));
+        return remainingLegalSuitCards.length > 0;
+      };
+      // Siga o Reflexo: quando o BOT já atingiu exatamente o padrão, ele para
+      // de baixar cartas e preserva o resultado até o descarte.
+      if (exactRemaining === 0) break;
       const financedCardIds = (s.boss?.id === 'banker' ? (s.boss.effects || []) : [])
         .filter((effect) => effect.id === 'financed_card' && effect.playerId === me.id)
         .map((effect) => effect.cardId)
@@ -744,16 +768,18 @@ export class BuracoBot {
         ...(naturePriorities?.markedCardIds || []),
         ...(dominatrixPriorities?.markedCardIds || []),
         ...(dimitrescuPriorities?.markedCardIds || []),
+        ...(neheleniaPriorities?.markedCardIds || []),
         ...financedCardIds,
       ]);
       const markedMelds = new Set([
         ...(naturePriorities?.meldIndexes || []),
         ...(dominatrixPriorities?.meldIndexes || []),
         ...(dimitrescuPriorities?.meldIndexes || []),
+        ...(neheleniaPriorities?.meldIndexes || []),
       ]);
-      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dimitrescuPriorities?.urgent;
+      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dimitrescuPriorities?.urgent || !!neheleniaPriorities?.urgent;
       if (markedCards.size || markedMelds.size || priorityUrgent) {
-        if (priorityUrgent) {
+        if (priorityUrgent && !neheleniaPriorities?.strictMeldTargets) {
           (team.melds || []).forEach((meld, index) => {
             if (meld?.length) markedMelds.add(index);
           });
@@ -769,6 +795,7 @@ export class BuracoBot {
             priorityChecks += 1;
             if (priorityChecks % 48 === 0) await this.cooperativeYield(engine, signal);
             if (!card || (!markedCards.has(card.id) && !markedMelds.has(meldIndex))) continue;
+            if (!withinNeheleniaPlayLimit(1) || !preservesNeheleniaDiscardSuit([card])) continue;
             const testMeld = this.simulateMeld(meld, [card], engine);
             if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
             // Feed natural threats with a natural card first. Do not ruin a
@@ -801,6 +828,7 @@ export class BuracoBot {
                 if (markedComboChecks % 48 === 0) await this.cooperativeYield(engine, signal);
                 const indexes = [markedIndex, first, second];
                 const combo = indexes.map((index) => me.hand[index]);
+                if (!withinNeheleniaPlayLimit(combo.length) || !preservesNeheleniaDiscardSuit(combo)) continue;
                 if (!allowsOpening(combo)) continue;
                 if (!engine.isValidSequenceMeld(combo) || !this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
                 this.assertActive(engine, signal);
@@ -823,6 +851,7 @@ export class BuracoBot {
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
             if (c.joker || c.rank === '2') continue;
+            if (!withinNeheleniaPlayLimit(1) || !preservesNeheleniaDiscardSuit([c])) continue;
 
             // CORREÇÃO 1: Usa o simulador para ignorar a armadura do 2
             const testMeld = this.simulateMeld(team.melds[mIdx], [c], engine);
@@ -858,6 +887,7 @@ export class BuracoBot {
           for (let i = 0; i < me.hand.length; i++) {
             const c = me.hand[i];
             if (c.rank === '2' && c.suit === realSuit) {
+              if (!withinNeheleniaPlayLimit(1) || !preservesNeheleniaDiscardSuit([c])) continue;
               // CORREÇÃO 2: Usa o simulador para o Coringa Perfeito
               const testMeld = this.simulateMeld(meld, [c], engine);
               if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
@@ -898,7 +928,9 @@ export class BuracoBot {
           if (meld.length >= 14 || engine.isMeldLocked?.(team.id, mIdx)) continue;
           for (let first = 0; first < me.hand.length - 1 && !madeMove; first++) {
             for (let second = first + 1; second < me.hand.length; second++) {
-              const after = this.simulateMeld(meld, [me.hand[first], me.hand[second]], engine);
+              const bridgeCards = [me.hand[first], me.hand[second]];
+              if (!withinNeheleniaPlayLimit(bridgeCards.length) || !preservesNeheleniaDiscardSuit(bridgeCards)) continue;
+              const after = this.simulateMeld(meld, bridgeCards, engine);
               if (this.isMeldDirty(after) || !engine.isValidSequenceMeld(after)
                 || !this.canMeldSafely(me, team, 2, engine, after, ctx)) continue;
               this.assertActive(engine, signal);
@@ -928,6 +960,7 @@ export class BuracoBot {
           const indexes = plan.indexes[candidateIndex];
           const combo = indexes.map((index) => me.hand[index]);
           if (combo.some((card) => !card)) continue;
+          if (!withinNeheleniaPlayLimit(combo.length) || !preservesNeheleniaDiscardSuit(combo)) continue;
           if (!allowsOpening(combo)) continue;
           if (!this.canMeldSafely(me, team, 3, engine, combo, ctx)) continue;
 
@@ -1008,6 +1041,7 @@ export class BuracoBot {
             for (let i = 0; i < me.hand.length; i++) {
               const c = me.hand[i];
               if (!c.joker && c.rank !== '2') continue;
+              if (!withinNeheleniaPlayLimit(1) || !preservesNeheleniaDiscardSuit([c])) continue;
 
               // 🛑 TRAVA DE PRESERVAÇÃO DO 2 (Anti-Cross-Suit)
               // Impede que o bot queime um 2 natural em outro naipe, preservando o caminho para o Ás-a-Ás.
@@ -1063,6 +1097,7 @@ export class BuracoBot {
             const indexes = panicPlan.indexes[candidateIndex];
             const combo = indexes.map((index) => me.hand[index]);
             if (combo.some((card) => !card)) continue;
+            if (!withinNeheleniaPlayLimit(combo.length) || !preservesNeheleniaDiscardSuit(combo)) continue;
             if (!allowsOpening(combo)) continue;
             if (!this.canMeldSafely(me, team, 3, engine, combo)) continue;
 
@@ -1130,8 +1165,11 @@ export class BuracoBot {
     let discardIndex = -1;
     let minDanger = 9999;
     const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
-    const orderedSuit = dominatrixPriorities?.discardSuit || null;
     const finalOrderCardIds = new Set(dominatrixPriorities?.markedCardIds || []);
+    const neheleniaPriorities = engine.getNeheleniaPriorities?.(me.id);
+    const orderedSuit = dominatrixPriorities?.discardSuit || neheleniaPriorities?.discardSuit || null;
+    const neheleniaMarkedCardIds = new Set(neheleniaPriorities?.markedCardIds || []);
+    const neheleniaPreferredDiscardCardIds = new Set(neheleniaPriorities?.preferredDiscardCardIds || []);
     const financedCardIds = new Set((state.boss?.id === 'banker' ? (state.boss.effects || []) : [])
       .filter((effect) => effect.id === 'financed_card' && effect.playerId === me.id)
       .map((effect) => effect.cardId)
@@ -1152,6 +1190,11 @@ export class BuracoBot {
       // preservá-la para uma jogada e só a descarta como último recurso.
       if (financedCardIds.has(c.id)) danger += 5000;
       if (finalOrderCardIds.has(c.id)) danger += 5000;
+      if (neheleniaMarkedCardIds.has(c.id)) {
+        // Mão no Espelho aceita jogar OU descartar a carta marcada. Se o BOT
+        // não conseguiu usá-la em jogo, o descarte é a saída correta.
+        danger += neheleniaPreferredDiscardCardIds.has(c.id) ? -6200 : 4200;
+      }
       if (!c.joker) {
         const needed = growingClean.filter(meld => meld[0].suit === c.suit).reduce((sum, meld) =>
           sum + Math.max(0, (c.rank === 'A' ? 2 : 1) - meld.filter(card => card.rank === c.rank).length), 0);

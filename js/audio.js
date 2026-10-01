@@ -32,6 +32,9 @@ export const BOSS_SFX = Object.freeze({
   dimitrescu: Object.freeze({
     blood: createBossSfx('assets/sfx/ganho-sangue-dimitresco.mp3', 0.92),
   }),
+  nehelenia: Object.freeze({
+    laugh: createBossSfx('assets/sfx/risada-nehelenia.mp3', 0.95),
+  }),
 });
 
 export const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');

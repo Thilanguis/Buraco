@@ -18,6 +18,7 @@ export const BOSS_MODE_BANKER = 'boss_banker';
 export const BOSS_MODE_DOMINATRIX = 'boss_dominadora';
 export const BOSS_MODE_MATRIARCH = 'boss_matriarca';
 export const BOSS_MODE_DIMITRESCU = 'boss_dimitrescu';
+export const BOSS_MODE_NEHELENIA = 'boss_nehelenia';
 
 export function isBossMode(stateOrMode) {
   const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
@@ -37,6 +38,11 @@ export function isMatriarchMode(stateOrMode) {
 export function isDimitrescuMode(stateOrMode) {
   const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
   return mode === BOSS_MODE_DIMITRESCU;
+}
+
+export function isNeheleniaMode(stateOrMode) {
+  const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
+  return mode === BOSS_MODE_NEHELENIA;
 }
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -443,6 +449,8 @@ function ensureBossMeldContribution(boss, meldId) {
     matriarchBloomRemoved: 0,
     matriarchBloomTier: 0,
     dimitrescuBloodRelief: 0,
+    neheleniaMirrorRelief: 0,
+    neheleniaMirrorTier: 0,
   };
   return boss.meldContributions[meldId];
 }
@@ -495,6 +503,14 @@ function isCardBlockedByBossState(boss, playerId, cardId, action = 'play') {
       && ['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type)
     ));
   }
+  if (boss.id === 'nehelenia') {
+    return boss.effects.some((effect) => {
+      if (effect.playerId !== playerId || effect.cardId !== cardId) return false;
+      if (effect.id === 'nehelenia_illusion_lock') return true;
+      if (effect.id === 'nehelenia_fish_dead_card') return action === 'play';
+      return false;
+    });
+  }
   if (boss.id !== 'dominadora') return false;
   const intent = boss.currentIntent;
   if (intent?.abilityId === 'collar' && intent.payload?.targetPlayerId === playerId) {
@@ -519,6 +535,15 @@ export function validateBossMeldPlay(gameState, playerId, cardsToPlay = [], inco
   if (!boss) return { allowed: true, message: '' };
   const player = gameState.players?.find((entry) => entry.id === playerId);
   if (!player) return { allowed: false, message: 'Jogador inválido.' };
+  const disoriented = boss.id === 'nehelenia' && boss.effects.some((effect) => effect.id === 'nehelenia_disoriented' && effect.playerId === playerId);
+  if (disoriented) return { allowed: false, message: 'Espelho quebrado: você está Desorientado. Neste turno, apenas descarte para encerrar.' };
+  if (boss.id === 'nehelenia') {
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'mirrored_meld' && intent.payload?.targetPlayerId === playerId && !intent.payload?.resolved && !intent.payload?.realChosen) {
+      return { allowed: false, message: 'Jogo Espelhado: escolha primeiro qual dos dois reflexos é o jogo verdadeiro.' };
+    }
+    // Siga o Reflexo não bloqueia jogadas: qualquer excesso ou falta é cobrado no fim do segundo turno.
+  }
   const cardIds = cardsToPlay.map((card) => card?.id).filter(Boolean);
   if (hasLegalDiscard(gameState, player, cardIds, incomingCards)) return { allowed: true, message: '' };
   return { allowed: false, message: 'Você precisa conservar uma carta livre para encerrar o turno.' };
@@ -626,6 +651,343 @@ function dimitrescuDeadCandidate(gameState) {
 
 function teamHasRoyalCanastra(gameState) {
   return (gameState.teams?.[0]?.melds || []).some((meld) => (MELD_TIER[classifyBossMeldKind(meld)] || 0) >= 2);
+}
+
+
+function neheleniaPlayableCandidates(gameState) {
+  return (gameState.players || []).flatMap((player) => (player.hand || [])
+    .filter((card) => card?.id)
+    .map((card) => ({ player, card })));
+}
+
+
+function syncNeheleniaDreamMirrors(gameState) {
+  const boss = gameState?.boss;
+  if (!boss || boss.id !== 'nehelenia') return null;
+
+  boss.dreamMirrorMarksByPlayer ||= {};
+  boss.dreamMirrorsByPlayer ||= {};
+
+  // Migra saves antigos em que cada jogador tinha apenas intact/stolen.
+  if (!boss.dreamMirrorMarksMigrated) {
+    for (const player of gameState.players || []) {
+      if (boss.dreamMirrorMarksByPlayer[player.id] == null) {
+        boss.dreamMirrorMarksByPlayer[player.id] = boss.dreamMirrorsByPlayer[player.id] === 'stolen' ? 1 : 0;
+      }
+    }
+    boss.dreamMirrorMarksMigrated = true;
+  }
+
+  const validIds = new Set((gameState.players || []).map((player) => String(player.id)));
+  for (const player of gameState.players || []) {
+    const count = clamp(Number(boss.dreamMirrorMarksByPlayer[player.id]) || 0, 0, 5);
+    boss.dreamMirrorMarksByPlayer[player.id] = count;
+    boss.dreamMirrorsByPlayer[player.id] = count > 0 ? 'stolen' : 'intact';
+  }
+  for (const key of Object.keys(boss.dreamMirrorMarksByPlayer)) {
+    if (!validIds.has(String(key))) delete boss.dreamMirrorMarksByPlayer[key];
+  }
+  for (const key of Object.keys(boss.dreamMirrorsByPlayer)) {
+    if (!validIds.has(String(key))) delete boss.dreamMirrorsByPlayer[key];
+  }
+
+  boss.maxDanger = 5;
+  boss.danger = clamp(
+    Object.values(boss.dreamMirrorMarksByPlayer).reduce((sum, count) => sum + (Number(count) || 0), 0),
+    0,
+    boss.maxDanger,
+  );
+  boss.mirrorWorldActive = boss.danger >= 3 && boss.danger < boss.maxDanger;
+  return boss.dreamMirrorMarksByPlayer;
+}
+
+function neheleniaMirrorStatus(gameState, playerId) {
+  syncNeheleniaDreamMirrors(gameState);
+  return (Number(gameState.boss?.dreamMirrorMarksByPlayer?.[playerId]) || 0) > 0 ? 'stolen' : 'intact';
+}
+
+function confirmNeheleniaMirrorDefeat(gameState, sourceActionId = 'mirror') {
+  const boss = gameState?.boss;
+  if (!boss || boss.id !== 'nehelenia') return null;
+  syncNeheleniaDreamMirrors(gameState);
+  if (boss.danger < boss.maxDanger) {
+    boss.mirrorWorldAnnounced = false;
+    return null;
+  }
+
+  const actionId = `nehelenia_mirror_defeat_${sourceActionId}`;
+  const existing = (boss.eventLog || []).find((event) => event.actionId === actionId) || null;
+  if (!boss.result) {
+    boss.result = {
+      victory: false,
+      reason: 'five_dream_mirrors',
+      title: 'Mundo do Espelho',
+      detail: 'Nehelenia tomou os 5 Espelhos dos Sonhos e fechou a equipe dentro do reflexo.',
+    };
+    boss.stats.finalDebt = boss.danger;
+  }
+  if (existing) return existing;
+  return recordEvent(boss, {
+    type: 'bossDefeat',
+    actionId,
+    reason: 'five_dream_mirrors',
+    danger: boss.danger,
+    sourceActionId,
+    outcome: 'Os 5 Espelhos dos Sonhos foram tomados. O Mundo do Espelho se fechou.',
+  });
+}
+
+function stealNeheleniaDreamMirror(gameState, playerId, origin = 'Nehelenia', actionKey = null) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'nehelenia' || boss.result || playerId == null) return null;
+  syncNeheleniaDreamMirrors(gameState);
+  if (boss.danger >= boss.maxDanger) return confirmNeheleniaMirrorDefeat(gameState, actionKey || 'mirror');
+
+  const before = boss.danger;
+  boss.dreamMirrorMarksByPlayer[playerId] = Math.max(0, Number(boss.dreamMirrorMarksByPlayer[playerId]) || 0) + 1;
+  syncNeheleniaDreamMirrors(gameState);
+  const applied = boss.danger - before;
+  if (applied <= 0) return null;
+
+  boss.actionSequence += 1;
+  const player = (gameState.players || []).find((entry) => entry.id === playerId);
+  const event = recordEvent(boss, {
+    type: 'dreamMirror',
+    actionId: actionKey || `dream_mirror_stolen_${playerId}_${boss.actionSequence}`,
+    playerId,
+    status: 'stolen',
+    stack: Number(boss.dreamMirrorMarksByPlayer[playerId]) || 0,
+    dangerDelta: applied,
+    danger: boss.danger,
+    origin,
+    dangerChangeLabel: `${origin}: Espelho +${applied}`,
+    outcome: `${origin}: Nehelenia tomou 1 Espelho dos Sonhos de ${player?.name || `Jogador ${Number(playerId) + 1}`} (${boss.danger}/${boss.maxDanger}).`,
+  });
+  event.defeatEvent = confirmNeheleniaMirrorDefeat(gameState, event.actionId);
+  return event;
+}
+
+function restoreNeheleniaDreamMirror(gameState, playerId = null, origin = 'Canastra Limpa', actionKey = null) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'nehelenia' || boss.result) return null;
+  syncNeheleniaDreamMirrors(gameState);
+
+  const candidates = (gameState.players || [])
+    .filter((player) => (Number(boss.dreamMirrorMarksByPlayer[player.id]) || 0) > 0)
+    .sort((a, b) => (Number(boss.dreamMirrorMarksByPlayer[b.id]) || 0) - (Number(boss.dreamMirrorMarksByPlayer[a.id]) || 0));
+  const target = playerId == null ? candidates[0] : candidates.find((player) => player.id === playerId);
+  if (!target) return null;
+
+  const before = boss.danger;
+  boss.dreamMirrorMarksByPlayer[target.id] = Math.max(0, (Number(boss.dreamMirrorMarksByPlayer[target.id]) || 0) - 1);
+  syncNeheleniaDreamMirrors(gameState);
+  const applied = boss.danger - before;
+  if (applied >= 0) return null;
+
+  boss.mirrorWorldAnnounced = false;
+  boss.actionSequence += 1;
+  return recordEvent(boss, {
+    type: 'dreamMirror',
+    actionId: actionKey || `dream_mirror_restored_${target.id}_${boss.actionSequence}`,
+    playerId: target.id,
+    status: (Number(boss.dreamMirrorMarksByPlayer[target.id]) || 0) > 0 ? 'stolen' : 'intact',
+    stack: Number(boss.dreamMirrorMarksByPlayer[target.id]) || 0,
+    dangerDelta: applied,
+    danger: boss.danger,
+    origin,
+    dangerChangeLabel: `${origin}: Espelho -1`,
+    outcome: `${origin}: a equipe recuperou 1 Espelho dos Sonhos (${boss.danger}/${boss.maxDanger}).`,
+  });
+}
+
+// Compatibilidade com eventos/saves experimentais da V1/V2.
+function changeNeheleniaFragments(gameState, amount, origin = 'Espelho Negro', actionKey = null) {
+  if (amount > 0) {
+    const players = (gameState.players || []).filter((player) => player?.id != null);
+    const target = chooseSeeded(players, gameState, 997);
+    return target ? stealNeheleniaDreamMirror(gameState, target.id, origin, actionKey) : null;
+  }
+  if (amount < 0) return restoreNeheleniaDreamMirror(gameState, null, origin, actionKey);
+  return null;
+}
+
+
+function neheleniaFakeCardLabel(gameState, forbiddenLabels, salt = 0) {
+  const used = new Set(forbiddenLabels || []);
+  const ranks = BOSS_RANKS_HIGH.filter((rank) => rank !== 'JOKER');
+  for (let offset = 0; offset < 80; offset += 1) {
+    const rank = ranks[Math.floor(seededUnit(bossSeed(gameState, salt + offset * 13)) * ranks.length) % ranks.length];
+    const suit = SUITS[Math.floor(seededUnit(bossSeed(gameState, salt + offset * 17 + 5)) * SUITS.length) % SUITS.length]?.value;
+    const label = `${rank}${suit}`;
+    if (!used.has(label)) return label;
+  }
+  return 'A★';
+}
+
+function neheleniaShuffle(items, gameState, salt = 0) {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(seededUnit(bossSeed(gameState, salt + index * 19)) * (index + 1)) % (index + 1);
+    [result[index], result[swap]] = [result[swap], result[index]];
+  }
+  return result;
+}
+
+function buildNeheleniaReflectionChoice(gameState, targetPlayer, salt = 0, { pickFake = false } = {}) {
+  if (!targetPlayer?.hand?.length) return null;
+  const handLabels = new Set((targetPlayer.hand || []).map(compactCardLabel));
+  if (pickFake) {
+    const realCards = chooseCards(targetPlayer, gameState, salt, Math.min(2, targetPlayer.hand.length));
+    if (realCards.length < 2) return null;
+    const labels = realCards.map(compactCardLabel);
+    const fake = neheleniaFakeCardLabel(gameState, [...handLabels], salt + 71);
+    const entries = neheleniaShuffle([
+      ...labels.map((label, index) => ({ label, real: true, cardId: realCards[index].id })),
+      { label: fake, real: false, cardId: null },
+    ], gameState, salt + 83).map((entry, index) => ({ ...entry, option: `reflection:${index}` }));
+    return {
+      targetPlayerId: targetPlayer.id,
+      reflections: entries,
+      correctOption: entries.find((entry) => !entry.real)?.option || null,
+      realCardIds: realCards.map((card) => card.id),
+      mode: 'find_fake',
+    };
+  }
+  const trueCard = chooseCard(targetPlayer, gameState, salt + 3);
+  if (!trueCard) return null;
+  const trueLabel = compactCardLabel(trueCard);
+  const fakeOne = neheleniaFakeCardLabel(gameState, [...handLabels], salt + 29);
+  const fakeTwo = neheleniaFakeCardLabel(gameState, [...handLabels, fakeOne], salt + 47);
+  const entries = neheleniaShuffle([
+    { label: trueLabel, real: true, cardId: trueCard.id },
+    { label: fakeOne, real: false, cardId: null },
+    { label: fakeTwo, real: false, cardId: null },
+  ], gameState, salt + 59).map((entry, index) => ({ ...entry, option: `reflection:${index}` }));
+  return {
+    targetPlayerId: targetPlayer.id,
+    cardId: trueCard.id,
+    reflections: entries,
+    correctOption: entries.find((entry) => entry.real)?.option || null,
+    mode: 'find_real',
+  };
+}
+
+function neheleniaFeedablePairs(gameState) {
+  const pairs = [];
+  for (const player of gameState.players || []) {
+    for (const meldIndex of (gameState.teams?.[player.teamId]?.melds || []).map((_, index) => index)) {
+      const meld = gameState.teams?.[player.teamId]?.melds?.[meldIndex];
+      const canFeed = (player.hand || []).some((card) => card?.id
+        && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play')
+        && isValidBossSequence([...(meld || []), card]));
+      if (!canFeed) continue;
+      const meldId = resolveBossMeldId(gameState, player.teamId, meldIndex, true);
+      if (meldId) pairs.push({ playerId: player.id, meldIndex, meldId });
+    }
+  }
+  return pairs;
+}
+
+function neheleniaSafeFeedablePairs(gameState) {
+  const pairs = [];
+  for (const player of gameState.players || []) {
+    for (const meldIndex of (gameState.teams?.[player.teamId]?.melds || []).map((_, index) => index)) {
+      const meld = gameState.teams?.[player.teamId]?.melds?.[meldIndex];
+      const canFeed = (player.hand || []).some((card) => card?.id
+        && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play')
+        && isValidBossSequence([...(meld || []), card])
+        && hasLegalDiscard(gameState, player, [card.id]));
+      if (!canFeed) continue;
+      const meldId = resolveBossMeldId(gameState, player.teamId, meldIndex, true);
+      if (meldId) pairs.push({ playerId: player.id, meldIndex, meldId });
+    }
+  }
+  return pairs;
+}
+
+function neheleniaFeedableMeldTargets(gameState) {
+  const byMeld = new Map();
+  for (const pair of neheleniaSafeFeedablePairs(gameState)) {
+    const key = pair.meldId || `0:${pair.meldIndex}`;
+    const current = byMeld.get(key) || { meldIndex: pair.meldIndex, meldId: pair.meldId, eligiblePlayerIds: [] };
+    if (!current.eligiblePlayerIds.includes(pair.playerId)) current.eligiblePlayerIds.push(pair.playerId);
+    byMeld.set(key, current);
+  }
+  return [...byMeld.values()];
+}
+
+function neheleniaTigerLinkPairs(gameState) {
+  const targets = neheleniaFeedableMeldTargets(gameState);
+  const legalOptionsFor = (target) => {
+    const options = [];
+    for (const player of gameState.players || []) {
+      const meld = gameState.teams?.[player.teamId]?.melds?.[target.meldIndex];
+      if (!Array.isArray(meld)) continue;
+      for (const card of player.hand || []) {
+        if (!card?.id || isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play')) continue;
+        if (!isValidBossSequence([...(meld || []), card])) continue;
+        if (!hasLegalDiscard(gameState, player, [card.id])) continue;
+        options.push({ playerId: player.id, cardId: card.id });
+      }
+    }
+    return options;
+  };
+  const optionsByMeld = new Map(targets.map((target) => [target.meldId, legalOptionsFor(target)]));
+  const pairs = [];
+  for (let left = 0; left < targets.length; left += 1) {
+    for (let right = left + 1; right < targets.length; right += 1) {
+      const first = targets[left];
+      const second = targets[right];
+      const firstOptions = optionsByMeld.get(first.meldId) || [];
+      const secondOptions = optionsByMeld.get(second.meldId) || [];
+      const feasible = firstOptions.some((firstOption) => secondOptions.some((secondOption) => {
+        if (firstOption.cardId === secondOption.cardId) return false;
+        if (firstOption.playerId !== secondOption.playerId) return true;
+        const player = (gameState.players || []).find((entry) => entry.id === firstOption.playerId);
+        return !!player && hasLegalDiscard(gameState, player, [firstOption.cardId, secondOption.cardId]);
+      }));
+      if (feasible) pairs.push([first, second]);
+    }
+  }
+  return pairs;
+}
+
+function neheleniaMarkedCardCandidates(gameState) {
+  const candidates = [];
+  for (const player of gameState.players || []) {
+    for (const card of player.hand || []) {
+      if (!card?.id || isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play')) continue;
+      const canPlay = cardHasSafeLegalPlay(gameState, player, card);
+      const canDiscard = card.id !== gameState.pickedDiscardCardId && !isCardBlockedByBossState(gameState.boss, player.id, card.id, 'discard');
+      if (canPlay || canDiscard) candidates.push({ playerId: player.id, cardId: card.id });
+    }
+  }
+  return candidates;
+}
+
+function neheleniaDiscardSuitTargets(gameState) {
+  const targets = [];
+  for (const player of gameState.players || []) {
+    for (const suit of discardSuitOrderCandidates(gameState, player)) {
+      targets.push({ targetPlayerId: player.id, suit: suit.value, suitLabel: suit.label });
+    }
+  }
+  return targets;
+}
+
+function neheleniaMeldTargetMatches(target, meldId, meldIndex) {
+  if (!target) return false;
+  return Boolean((target.meldId && meldId && target.meldId === meldId) || Number(target.meldIndex) === Number(meldIndex));
+}
+
+function neheleniaIntactPlayers(gameState) {
+  syncNeheleniaDreamMirrors(gameState);
+  return (gameState.players || []).filter((player) => (Number(gameState.boss.dreamMirrorMarksByPlayer?.[player.id]) || 0) < gameState.boss.maxDanger);
+}
+
+function neheleniaStolenPlayers(gameState) {
+  syncNeheleniaDreamMirrors(gameState);
+  return (gameState.players || []).filter((player) => (Number(gameState.boss.dreamMirrorMarksByPlayer?.[player.id]) || 0) > 0);
 }
 
 function buildDimitrescuThreeDaughtersObjectives(gameState) {
@@ -845,6 +1207,135 @@ function createPayload(gameState, abilityId) {
     if (abilityId === 'blood_tithe' || abilityId === 'castle_lockdown') return {};
   }
 
+  if (boss.id === 'nehelenia') {
+    syncNeheleniaDreamMirrors(gameState);
+    if (abilityId === 'false_image') {
+      const target = chooseSeeded((gameState.players || []).filter((player) => player.hand?.length), gameState, 371);
+      return buildNeheleniaReflectionChoice(gameState, target, 373) || {};
+    }
+    if (abilityId === 'mirrored_meld') {
+      const pair = chooseSeeded(neheleniaFeedablePairs(gameState).filter((entry) => (gameState.players || []).find((player) => player.id === entry.playerId)?.hand?.length >= 3), gameState, 379);
+      const realSlot = seededUnit(bossSeed(gameState, 381)) < 0.5 ? 'left' : 'right';
+      return pair ? { targetPlayerId: pair.playerId, meldIndex: pair.meldIndex, meldId: pair.meldId, fed: false, resolved: false, failed: false, realSlot } : {};
+    }
+    if (abilityId === 'follow_reflection') {
+      const players = [...(gameState.players || [])];
+      if (players.length < 2) return {};
+      const first = players[gameState.currentPlayer] || players[0];
+      const second = players.find((player) => player.id !== first.id) || players[1];
+      return { firstPlayerId: first.id, secondPlayerId: second.id, patternCount: null, firstPlayedCount: 0, patternLocked: false, secondPlayedCount: 0, cardsPlayedByPlayer: {}, resolved: false };
+    }
+    if (abilityId === 'dream_theft') {
+      const target = chooseSeeded(neheleniaIntactPlayers(gameState).filter((player) => player.hand?.length), gameState, 389);
+      return buildNeheleniaReflectionChoice(gameState, target, 397) || {};
+    }
+    if (abilityId === 'discard_mirror') {
+      const target = chooseSeeded((gameState.players || []).filter((player) => player?.id != null), gameState, 401);
+      const top = gameState.discard?.at?.(-1) || null;
+      if (!target || !top) return {};
+      const trueLabel = compactCardLabel(top);
+      const realIndex = seededUnit(bossSeed(gameState, 431)) < 0.5 ? 0 : 1;
+      const reflections = [0, 1].map((index) => ({
+        label: trueLabel,
+        real: index === realIndex,
+        option: `reflection:${index}`,
+      }));
+      return { targetPlayerId: target.id, discardCardId: top.id, reflections, correctOption: `reflection:${realIndex}`, mirrorCount: 2 };
+    }
+    if (abilityId === 'shattered_mirror') {
+      const target = chooseSeeded((gameState.players || []).filter((player) => (player.hand?.length || 0) >= 2), gameState, 433);
+      return buildNeheleniaReflectionChoice(gameState, target, 439, { pickFake: true }) || {};
+    }
+    if (abilityId === 'mirror_prison') {
+      const trapped = chooseSeeded(neheleniaStolenPlayers(gameState), gameState, 443);
+      if (!trapped) return {};
+      const rescuer = (gameState.players || []).find((player) => player.id !== trapped.id);
+      const pair = chooseSeeded(neheleniaFeedablePairs(gameState).filter((entry) => entry.playerId === rescuer?.id), gameState, 449);
+      return trapped && rescuer && pair ? { trappedPlayerId: trapped.id, rescuerPlayerId: rescuer.id, meldIndex: pair.meldIndex, meldId: pair.meldId, fed: false } : {};
+    }
+    if (abilityId === 'eternal_nightmare') {
+      const target = chooseSeeded((gameState.players || []).filter((player) => player.hand?.length), gameState, 457);
+      const trueCard = chooseCard(target, gameState, 461);
+      if (!target || !trueCard) return {};
+      const label = compactCardLabel(trueCard);
+      // Há exatamente UMA carta verdadeira. Tanto a identidade quanto a casa final
+      // do embaralhamento são sorteadas e persistidas no payload desta ativação.
+      const realIndex = Math.floor(seededUnit(bossSeed(gameState, 463)) * 3) % 3;
+      const shuffleFinalSlot = Math.floor(seededUnit(bossSeed(gameState, 467)) * 3) % 3;
+      const shuffleSeed = bossSeed(gameState, 471);
+      const reflections = [0, 1, 2].map((index) => ({
+        label,
+        real: index === realIndex,
+        option: `reflection:${index}`,
+        cardId: index === realIndex ? trueCard.id : null,
+      }));
+      return {
+        targetPlayerId: target.id,
+        cardId: trueCard.id,
+        reflections,
+        correctOption: `reflection:${realIndex}`,
+        shuffleFinalSlot,
+        shuffleSeed,
+        mode: 'shell_game',
+        nightmare: true,
+      };
+    }
+    if (abilityId === 'tiger_link') {
+      const pair = chooseSeeded(neheleniaTigerLinkPairs(gameState), gameState, 481);
+      return pair ? { targets: pair, fedMeldIds: [] } : {};
+    }
+    if (abilityId === 'tiger_prey') {
+      const pairs = neheleniaSafeFeedablePairs(gameState)
+        .filter((entry) => !gameState.boss?.effects?.some((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === entry.playerId));
+      const invertedPlayerIds = new Set((gameState.boss?.effects || [])
+        .filter((effect) => effect.id === 'nehelenia_inverted_reflection')
+        .map((effect) => effect.playerId));
+      const comboPairs = pairs.filter((entry) => invertedPlayerIds.has(entry.playerId));
+      const pair = chooseSeeded(comboPairs.length ? comboPairs : pairs, gameState, 491);
+      return pair ? { targetPlayerId: pair.playerId, meldIndex: pair.meldIndex, meldId: pair.meldId, fed: false, comboWithFish: invertedPlayerIds.has(pair.playerId) } : {};
+    }
+    if (abilityId === 'hawk_suit') {
+      const targets = neheleniaDiscardSuitTargets(gameState);
+      const deadFishByPlayer = new Map((gameState.boss?.effects || [])
+        .filter((effect) => effect.id === 'nehelenia_fish_dead_card')
+        .map((effect) => [effect.playerId, effect.cardId]));
+      const comboTargets = targets.filter((target) => {
+        const cardId = deadFishByPlayer.get(target.targetPlayerId);
+        const card = gameState.players?.find((player) => player.id === target.targetPlayerId)?.hand?.find((entry) => entry.id === cardId);
+        return !!card && !card.joker && card.suit === target.suit;
+      });
+      const target = chooseSeeded(comboTargets.length ? comboTargets : targets, gameState, 499);
+      return target ? { ...target, discardedCorrectSuit: false, discardedCardId: null, discardedSuit: null, comboWithFish: comboTargets.includes(target) } : {};
+    }
+    if (abilityId === 'hawk_watch') {
+      const pairs = neheleniaSafeFeedablePairs(gameState);
+      const eligiblePlayers = (gameState.players || []).filter((player) => new Set(pairs.filter((entry) => entry.playerId === player.id).map((entry) => entry.meldId)).size >= 2);
+      const preyEffects = (gameState.boss?.effects || []).filter((effect) => effect.id === 'nehelenia_tiger_prey');
+      const comboPair = preyEffects.map((prey) => pairs.find((entry) => entry.playerId === prey.playerId && neheleniaMeldTargetMatches(prey, entry.meldId, entry.meldIndex)))
+        .find((entry) => entry && eligiblePlayers.some((player) => player.id === entry.playerId));
+      const target = comboPair ? gameState.players.find((player) => player.id === comboPair.playerId) : chooseSeeded(eligiblePlayers, gameState, 503);
+      const pair = comboPair || (target ? chooseSeeded(pairs.filter((entry) => entry.playerId === target.id), gameState, 509) : null);
+      return pair ? { targetPlayerId: target.id, meldIndex: pair.meldIndex, meldId: pair.meldId, comboWithTiger: !!comboPair } : {};
+    }
+    if (abilityId === 'fish_marked_card') {
+      const candidate = chooseSeeded(neheleniaMarkedCardCandidates(gameState), gameState, 521);
+      return candidate ? { targetPlayerId: candidate.playerId, cardId: candidate.cardId, used: false, discarded: false } : {};
+    }
+    if (abilityId === 'fish_inverted') {
+      const pairs = neheleniaSafeFeedablePairs(gameState);
+      const preyPlayerIds = new Set((gameState.boss?.effects || [])
+        .filter((effect) => effect.id === 'nehelenia_tiger_prey')
+        .map((effect) => effect.playerId));
+      const eligiblePlayers = (gameState.players || []).filter((player) => (
+        pairs.some((entry) => entry.playerId === player.id)
+        && !gameState.boss?.effects?.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === player.id)
+      ));
+      const comboPlayers = eligiblePlayers.filter((player) => preyPlayerIds.has(player.id));
+      const target = chooseSeeded(comboPlayers.length ? comboPlayers : eligiblePlayers, gameState, 523);
+      return target ? { targetPlayerId: target.id, fedExisting: false, comboWithTiger: preyPlayerIds.has(target.id) } : {};
+    }
+  }
+
   if (boss.id === 'matriarca_esmeralda') {
     if (abilityId === 'living_seed') {
       const candidate = chooseSeeded(matriarchSeedCandidates(gameState), gameState, 181);
@@ -965,6 +1456,44 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'crimson_clot') return gameState.boss?.danger >= 30 && gameState.boss?.crimsonClot?.status !== 'active';
   if (abilityId === 'three_daughters') return Array.isArray(payload.objectives) && payload.objectives.length >= 2;
   if (abilityId === 'blood_tithe' || abilityId === 'castle_lockdown') return true;
+  if (abilityId === 'false_image') {
+    return payload.targetPlayerId != null && Array.isArray(payload.reflections) && payload.reflections.length === 3 && !!payload.correctOption;
+  }
+  if (abilityId === 'mirrored_meld') return payload.targetPlayerId != null && !!payload.meldId;
+  if (abilityId === 'follow_reflection') return payload.firstPlayerId != null && payload.secondPlayerId != null && payload.firstPlayerId !== payload.secondPlayerId;
+  if (abilityId === 'dream_theft') {
+    return payload.targetPlayerId != null && neheleniaMirrorStatus(gameState, payload.targetPlayerId) === 'intact' && !!payload.correctOption;
+  }
+  if (abilityId === 'discard_mirror') return payload.targetPlayerId != null && !!payload.discardCardId && !!payload.correctOption;
+  if (abilityId === 'shattered_mirror') return payload.targetPlayerId != null && (payload.realCardIds || []).length === 2 && !!payload.correctOption;
+  if (abilityId === 'mirror_prison') {
+    return payload.trappedPlayerId != null && payload.rescuerPlayerId != null && !!payload.meldId
+      && neheleniaMirrorStatus(gameState, payload.trappedPlayerId) === 'stolen';
+  }
+  if (abilityId === 'eternal_nightmare') return payload.targetPlayerId != null && !!payload.correctOption;
+  if (abilityId === 'tiger_link') return Array.isArray(payload.targets) && payload.targets.length === 2
+    && payload.targets.every((target) => !!target?.meldId)
+    && neheleniaTigerLinkPairs(gameState).some(([first, second]) => {
+      const actual = new Set(payload.targets.map((target) => target.meldId));
+      return actual.has(first.meldId) && actual.has(second.meldId);
+    });
+  if (abilityId === 'tiger_prey') return payload.targetPlayerId != null && !!payload.meldId
+    && neheleniaSafeFeedablePairs(gameState).some((entry) => entry.playerId === payload.targetPlayerId && entry.meldId === payload.meldId);
+  if (abilityId === 'hawk_suit') return payload.targetPlayerId != null
+    && neheleniaDiscardSuitTargets(gameState).some((entry) => entry.targetPlayerId === payload.targetPlayerId && entry.suit === payload.suit);
+  if (abilityId === 'hawk_watch') {
+    const pairs = neheleniaSafeFeedablePairs(gameState).filter((entry) => entry.playerId === payload.targetPlayerId);
+    return payload.targetPlayerId != null && !!payload.meldId
+      && pairs.some((entry) => entry.meldId === payload.meldId)
+      && new Set(pairs.map((entry) => entry.meldId)).size >= 2;
+  }
+  if (abilityId === 'fish_marked_card') return payload.targetPlayerId != null && !!payload.cardId
+    && neheleniaMarkedCardCandidates(gameState).some((entry) => entry.playerId === payload.targetPlayerId && entry.cardId === payload.cardId);
+  if (abilityId === 'fish_inverted') return payload.targetPlayerId != null
+    && !gameState.boss?.effects?.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === payload.targetPlayerId)
+    && neheleniaSafeFeedablePairs(gameState).some((entry) => entry.playerId === payload.targetPlayerId);
+
+
   if (abilityId === 'living_seed') {
     return natureThreatSlots(gameState) > 0 && matriarchSeedCandidates(gameState).some((candidate) => candidate.player?.id === payload.targetPlayerId && candidate.card?.id === payload.cardId);
   }
@@ -1001,6 +1530,17 @@ const ABILITY_DURATION = Object.freeze({
   red_wine: 'immediate',
   cassandra_dead_feast: 'immediate',
   crimson_clot: 'immediate',
+  mirrored_meld: 'target_turn',
+  tiger_prey: 'target_turn',
+  hawk_suit: 'target_turn',
+  hawk_watch: 'target_turn',
+  fish_marked_card: 'target_turn',
+  fish_inverted: 'target_turn',
+  false_image: 'until_choice',
+  dream_theft: 'until_choice',
+  discard_mirror: 'until_choice',
+  shattered_mirror: 'until_choice',
+  eternal_nightmare: 'until_choice',
 });
 
 export const BOSS_PRESENTATION_MS = Object.freeze({
@@ -1028,6 +1568,15 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     natureThreats: [],
     crimsonClot: null,
     bloodiedDead: null,
+    mirrorReturn: null,
+    totalEclipse: null,
+    dreamMirrorsByPlayer: {},
+    dreamMirrorMarksByPlayer: {},
+    dreamMirrorMarksMigrated: false,
+    mirrorWorldActive: false,
+    mirrorWorldAnnounced: false,
+    lastMirrorWorldEventId: null,
+    neheleniaDiscardSealRound: 0,
     natureHealingThisRound: 0,
     natureHealingRound: 1,
     emeraldCocoon: null,
@@ -1160,6 +1709,16 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   boss.natureThreats ||= [];
   boss.crimsonClot ||= null;
   boss.bloodiedDead ||= null;
+  boss.mirrorReturn ||= null;
+  boss.totalEclipse ||= null;
+  boss.dreamMirrorsByPlayer ||= {};
+  boss.dreamMirrorMarksByPlayer ||= {};
+  boss.dreamMirrorMarksMigrated ||= false;
+  boss.mirrorWorldActive ||= false;
+  boss.mirrorWorldAnnounced ||= false;
+  boss.lastMirrorWorldEventId ||= null;
+  boss.neheleniaDiscardSealRound ||= 0;
+  if (boss.id === 'nehelenia') syncNeheleniaDreamMirrors(gameState);
   boss.natureHealingThisRound ||= 0;
   boss.natureHealingRound ||= boss.roundNumber || 1;
   boss.emeraldCocoon ||= null;
@@ -1638,7 +2197,7 @@ export function advanceBossTurn(gameState, now = Date.now()) {
     const dominatrixPersistentActivation = boss.id === 'dominadora'
       && ['iron_etiquette', 'interdict'].includes(announcedIntent?.abilityId);
     const persistentActivation = matriarchActivation || dominatrixPersistentActivation;
-    const choiceBeforePlayers = ['forced_choice', 'final_order'].includes(announcedIntent?.abilityId);
+    const choiceBeforePlayers = ['forced_choice', 'final_order', 'false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare'].includes(announcedIntent?.abilityId);
     const resolvesBeforePlayers = announcedIntent?.duration === 'immediate'
       || choiceBeforePlayers
       || persistentActivation;
@@ -1806,12 +2365,65 @@ function triggerMatriarchRebirth(gameState, sourceActionId) {
   return true;
 }
 
-function applyDamageToBoss(gameState, damage, { breaksCocoon = false, sourceActionId = '' } = {}) {
+function applyDamageToBoss(gameState, damage, { breaksCocoon = false, breaksMirrorEclipse = false, sourceActionId = '' } = {}) {
   const boss = gameState.boss;
   let remaining = Math.max(0, Number(damage) || 0);
   let absorbed = 0;
   let cocoonBroken = false;
   let bloodClotBroken = false;
+  let mirrorReleasedDamage = 0;
+  let mirrorStoredDamage = 0;
+  let mirrorBroken = false;
+  if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'mirror_return' && !['active', 'broken'].includes(boss.mirrorReturn?.status)) {
+    boss.mirrorReturn = {
+      id: `mirror_return_${boss.currentIntent.id}`,
+      status: 'active',
+      threshold: boss.currentIntent.payload?.threshold || 80,
+      requiredTotal: boss.currentIntent.payload?.requiredTotal || (boss.currentIntent.payload?.threshold || 80) * 2,
+      storedDamage: 0,
+      createdRound: boss.roundNumber,
+    };
+  }
+  if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'total_eclipse' && !['active', 'broken'].includes(boss.totalEclipse?.status)) {
+    boss.totalEclipse = {
+      id: `total_eclipse_${boss.currentIntent.id}`,
+      status: 'active',
+      storedDamage: 0,
+      createdRound: boss.roundNumber,
+    };
+  }
+  if (boss.id === 'nehelenia' && boss.totalEclipse?.status === 'active') {
+    if (breaksMirrorEclipse) {
+      mirrorReleasedDamage = Math.max(0, Number(boss.totalEclipse.storedDamage) || 0) + remaining;
+      boss.totalEclipse.storedDamage = 0;
+      boss.totalEclipse.status = 'broken';
+      boss.totalEclipse.brokenAt = sourceActionId || null;
+      boss.totalEclipse.releasedDamage = mirrorReleasedDamage;
+      remaining = mirrorReleasedDamage;
+      mirrorBroken = true;
+    } else if (remaining > 0) {
+      boss.totalEclipse.storedDamage = Math.max(0, Number(boss.totalEclipse.storedDamage) || 0) + remaining;
+      mirrorStoredDamage = boss.totalEclipse.storedDamage;
+      absorbed += remaining;
+      remaining = 0;
+    }
+  } else if (boss.id === 'nehelenia' && boss.mirrorReturn?.status === 'active' && remaining > 0) {
+    boss.mirrorReturn.storedDamage = Math.max(0, Number(boss.mirrorReturn.storedDamage) || 0) + remaining;
+    mirrorStoredDamage = boss.mirrorReturn.storedDamage;
+    const required = Math.max(1, Number(boss.mirrorReturn.requiredTotal) || 1);
+    if (boss.mirrorReturn.storedDamage >= required) {
+      mirrorReleasedDamage = boss.mirrorReturn.storedDamage;
+      boss.mirrorReturn.storedDamage = 0;
+      boss.mirrorReturn.status = 'broken';
+      boss.mirrorReturn.brokenAt = sourceActionId || null;
+      boss.mirrorReturn.releasedDamage = mirrorReleasedDamage;
+      remaining = mirrorReleasedDamage;
+      mirrorBroken = true;
+    } else {
+      absorbed += remaining;
+      remaining = 0;
+    }
+  }
   if (boss.id === 'matriarca_esmeralda' && boss.emeraldCocoon?.status === 'active') {
     if (breaksCocoon) {
       boss.emeraldCocoon.remaining = 0;
@@ -1848,7 +2460,7 @@ function applyDamageToBoss(gameState, damage, { breaksCocoon = false, sourceActi
   boss.hp = clamp(boss.hp - remaining, 0, boss.maxHp);
   const hpDamage = before - boss.hp;
   const reborn = triggerMatriarchRebirth(gameState, sourceActionId);
-  return { hpDamage, absorbed, cocoonBroken, bloodClotBroken, reborn, remainingDamage: remaining };
+  return { hpDamage, absorbed, cocoonBroken, bloodClotBroken, mirrorReleasedDamage, mirrorStoredDamage, mirrorBroken, reborn, remainingDamage: remaining };
 }
 
 function addNatureThreat(gameState, data) {
@@ -2196,6 +2808,24 @@ export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
   if (!boss) return [];
   const takenIds = new Set(takenCards.map((card) => card?.id).filter(Boolean));
   const resolved = [];
+  if (boss.id === 'nehelenia') {
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'discard_mirror' && !intent.payload?.triggered) {
+      intent.payload.triggered = true;
+      intent.payload.targetPlayerId = playerId;
+      intent.payload.takenCardIds = [...takenIds];
+      intent.payload.resolved = false;
+      boss.actionSequence += 1;
+      resolved.push(recordEvent(boss, {
+        type: 'mirrorDiscardTaken',
+        actionId: `discard_mirror_${intent.id}_${playerId}_${boss.actionSequence}`,
+        playerId,
+        takenCardIds: [...takenIds],
+        outcome: `O Espelho do Lixo foi aceito: 2 cartas desta retirada precisam entrar em jogo neste turno.`,
+      }));
+    }
+    return resolved;
+  }
   if (boss.id === 'dimitrescu') {
     const intent = boss.currentIntent;
     if (intent?.abilityId === 'daniela_swarm' && !intent.payload?.triggered && takenIds.has(intent.payload?.discardCardId)) {
@@ -2234,6 +2864,59 @@ export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
     if (event) resolved.push(event);
   }
   return resolved;
+}
+
+export function resolveNeheleniaMirroredMeldChoice(gameState, playerId, slot, cardId) {
+  const boss = normalizeBossState(gameState);
+  const intent = boss?.id === 'nehelenia' ? boss.currentIntent : null;
+  if (!intent || intent.abilityId !== 'mirrored_meld' || intent.payload?.resolved) {
+    return { allowed: false, message: 'O Jogo Espelhado não está aguardando uma escolha.' };
+  }
+  if (intent.payload?.targetPlayerId !== playerId) return { allowed: false, message: 'Este reflexo pertence ao turno do outro cooperador.' };
+  if (!['left', 'right'].includes(slot)) return { allowed: false, message: 'Reflexo inválido.' };
+  const player = (gameState.players || []).find((entry) => entry.id === playerId);
+  const card = player?.hand?.find((entry) => entry?.id === cardId);
+  const meld = gameState.teams?.[player?.teamId]?.melds?.[intent.payload.meldIndex];
+  if (!player || !card || !meld) return { allowed: false, message: 'Carta ou jogo refletido indisponível.' };
+  if (!isValidBossSequence([...(meld || []), card])) return { allowed: false, message: 'Essa carta não encaixa no jogo refletido.' };
+  if (!hasLegalDiscard(gameState, player, [card.id])) return { allowed: false, message: 'Você precisa conservar uma carta livre para encerrar o turno.' };
+  const safety = validateBossMeldPlay(gameState, playerId, [card]);
+  if (!safety.allowed && !/Jogo Espelhado/.test(safety.message || '')) return safety;
+
+  if (slot === intent.payload.realSlot) {
+    intent.payload.realChosen = true;
+    intent.payload.chosenSlot = slot;
+    return { allowed: true, real: true, meldIndex: intent.payload.meldIndex, meldId: intent.payload.meldId };
+  }
+
+  const index = player.hand.findIndex((entry) => entry?.id === cardId);
+  if (index < 0) return { allowed: false, message: 'A carta selecionada não está mais na sua mão.' };
+  const [lostCard] = player.hand.splice(index, 1);
+  gameState.stock ||= [];
+  gameState.stock.unshift(lostCard);
+  intent.payload.failed = true;
+  intent.payload.resolved = true;
+  intent.payload.chosenSlot = slot;
+  intent.payload.lostCardId = lostCard.id;
+  boss.effects.push({
+    id: 'nehelenia_disoriented',
+    source: 'mirrored_meld',
+    playerId,
+    expiresAfterTurn: true,
+    appliedAtRound: boss.roundNumber,
+  });
+  boss.actionSequence += 1;
+  const event = recordEvent(boss, {
+    type: 'mirrorDeception',
+    actionId: `mirrored_meld_fake_${intent.id}_${boss.actionSequence}`,
+    abilityId: 'mirrored_meld',
+    playerId,
+    cardId: lostCard.id,
+    fakeSlot: slot,
+    realSlot: intent.payload.realSlot,
+    outcome: `${player.name || 'O jogador'} alimentou o reflexo falso: ${compactCardLabel(lostCard)} foi para o fundo do monte e não pode mais baixar cartas neste turno.`,
+  });
+  return { allowed: true, real: false, event, lostCardId: lostCard.id };
 }
 
 export function getBossNatureThreats(gameState) {
@@ -2411,7 +3094,7 @@ export function getBossDominatrixPriorities(gameState, playerId) {
 
   const meldIndexes = (gameState.teams?.[player.teamId]?.melds || [])
     .map((meld, meldIndex) => ({ meldIndex, meldId: resolveBossMeldId(gameState, player.teamId, meldIndex, false) }))
-    .filter(({ meldId }) => meldId && priorityMeldIds.has(meldId))
+    .filter(({ meldId, meldIndex }) => (meldId && priorityMeldIds.has(meldId)) || priorityMeldIndexes.has(meldIndex))
     .map(({ meldIndex }) => meldIndex);
   const discardOrder = activeOrderForPlayer(boss, playerId, 'discard_suit');
   const markedCardIds = (boss.effects || [])
@@ -2463,6 +3146,72 @@ export function getBossDimitrescuPriorities(gameState, playerId) {
     markedCardIds: [...new Set(markedCardIds)],
     meldIndexes: [...new Set(meldIndexes)],
     avoidDiscard,
+  };
+}
+
+
+export function getBossNeheleniaPriorities(gameState, playerId) {
+  const boss = normalizeBossState(gameState);
+  if (!boss || boss.id !== 'nehelenia') return null;
+  const player = (gameState.players || []).find((entry) => entry.id === playerId);
+  if (!player) return null;
+  const intent = boss.currentIntent;
+  const priorityMeldIds = new Set();
+  const priorityMeldIndexes = new Set();
+  const addTarget = (target) => {
+    if (target?.meldId) priorityMeldIds.add(target.meldId);
+    if (Number.isInteger(target?.meldIndex)) priorityMeldIndexes.add(target.meldIndex);
+  };
+  if (intent?.abilityId === 'mirrored_meld' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fed) addTarget(intent.payload);
+  if (intent?.abilityId === 'mirror_prison' && intent.payload?.rescuerPlayerId === playerId && !intent.payload?.fed) addTarget(intent.payload);
+  if (intent?.abilityId === 'tiger_link') {
+    const alreadyFed = new Set(intent.payload?.fedMeldIds || []);
+    (intent.payload?.targets || []).forEach((target) => {
+      if (!alreadyFed.has(target?.meldId) && (target.eligiblePlayerIds || []).includes(playerId)) addTarget(target);
+    });
+  }
+  if (intent?.abilityId === 'tiger_prey' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fed) addTarget(intent.payload);
+  const persistentPrey = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId);
+  if (persistentPrey) addTarget(persistentPrey);
+  boss.effects.filter((effect) => effect.id === 'nehelenia_tiger_claw' && (effect.teamId == null || effect.teamId === player.teamId)).forEach(addTarget);
+  const persistentInverted = boss.effects.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId);
+  if ((intent?.abilityId === 'fish_inverted' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fedExisting) || persistentInverted) {
+    neheleniaSafeFeedablePairs(gameState).filter((entry) => entry.playerId === playerId).forEach(addTarget);
+  }
+  const meldIndexes = (gameState.teams?.[player.teamId]?.melds || [])
+    .map((meld, meldIndex) => ({ meldIndex, meldId: resolveBossMeldId(gameState, player.teamId, meldIndex, false) }))
+    .filter(({ meldId, meldIndex }) => (meldId && priorityMeldIds.has(meldId)) || priorityMeldIndexes.has(meldIndex))
+    .map(({ meldIndex }) => meldIndex);
+  const lockedCardIds = boss.effects
+    .filter((effect) => effect.id === 'nehelenia_illusion_lock' && effect.playerId === playerId)
+    .map((effect) => effect.cardId);
+  const reflectionPattern = intent?.abilityId === 'follow_reflection' && intent.payload?.secondPlayerId === playerId && intent.payload?.patternLocked === true
+    ? { target: Math.max(0, Number(intent.payload.patternCount) || 0), played: Math.max(0, Number(intent.payload.secondPlayedCount) || 0) }
+    : null;
+  const markedCardIds = intent?.abilityId === 'fish_marked_card' && intent.payload?.targetPlayerId === playerId
+    && !intent.payload?.used && !intent.payload?.discarded ? [intent.payload.cardId].filter(Boolean) : [];
+  const fishDeadCardIds = boss.effects.filter((effect) => effect.id === 'nehelenia_fish_dead_card' && effect.playerId === playerId).map((effect) => effect.cardId).filter(Boolean);
+  const preferredDiscardCardIds = [
+    ...(intent?.abilityId === 'fish_marked_card' && intent.payload?.targetPlayerId === playerId
+      && !intent.payload?.used && !intent.payload?.discarded ? [intent.payload.cardId].filter(Boolean) : []),
+    ...fishDeadCardIds,
+  ];
+  const discardSuit = intent?.abilityId === 'hawk_suit' && intent.payload?.targetPlayerId === playerId && !intent.payload?.discardedCorrectSuit
+    ? intent.payload.suit : null;
+  const strictMeldTargets = ['tiger_prey', 'fish_inverted'].includes(intent?.abilityId) || !!persistentPrey || persistentInverted;
+  const discardLocked = boss.neheleniaDiscardSealRound === boss.roundNumber
+    || boss.effects.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === playerId);
+  return {
+    urgent: meldIndexes.length > 0 || !!reflectionPattern || markedCardIds.length > 0 || fishDeadCardIds.length > 0 || !!discardSuit || persistentInverted,
+    strictMeldTargets,
+    markedCardIds,
+    preferredDiscardCardIds,
+    meldIndexes: [...new Set(meldIndexes)],
+    avoidCardIds: [...new Set([...lockedCardIds, ...fishDeadCardIds])],
+    avoidDiscard: discardLocked,
+    discardSuit,
+    exactPlayCount: reflectionPattern?.target ?? null,
+    exactPlayedCount: reflectionPattern?.played ?? 0,
   };
 }
 
@@ -2580,6 +3329,21 @@ export function getBossCardBlockFeedback(gameState, playerId, cardId, action = '
     };
   }
 
+  if (boss.id === 'nehelenia') {
+    const fishDead = boss.effects.some((effect) => effect.id === 'nehelenia_fish_dead_card' && effect.playerId === playerId && effect.cardId === cardId);
+    if (fishDead && action === 'play') {
+      return {
+        effect: 'nehelenia-fish-dead',
+        reason: 'nehelenia_fish_dead_card',
+        message: '🐟 Reflexo Morto: esta carta perdeu o caminho para a mesa. Ela só pode sair da sua mão pelo descarte.',
+      };
+    }
+    return {
+      effect: 'illusion',
+      reason: 'nehelenia_illusion',
+      message: '◈ Esta carta está presa dentro de uma ilusão de Nehelenia até o fim do turno.',
+    };
+  }
   return {
     effect: 'locked',
     reason: 'boss_lock',
@@ -2615,6 +3379,15 @@ export function getBossCardEffect(gameState, playerId, cardId) {
     if (bela?.status === 'active' && bela.targetPlayerId === playerId && bela.cardId === cardId) return 'dimitrescu-hunt';
     return null;
   }
+  if (boss.id === 'nehelenia') {
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'fish_marked_card' && intent.payload?.targetPlayerId === playerId
+      && intent.payload?.cardId === cardId && !intent.payload?.used && !intent.payload?.discarded) return 'nehelenia-fish-mark';
+    if (boss.effects.some((effect) => effect.id === 'nehelenia_fish_dead_card' && effect.playerId === playerId && effect.cardId === cardId)) return 'nehelenia-fish-dead';
+    if (boss.effects.some((effect) => effect.id === 'nehelenia_illusion_lock' && effect.playerId === playerId && effect.cardId === cardId)) return 'nehelenia-illusion-lock';
+    return null;
+  }
+
   if (boss.id !== 'dominadora') return null;
   const intent = boss.currentIntent;
   if (intent?.abilityId === 'exposure' && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId === cardId) return 'exposed';
@@ -2626,7 +3399,14 @@ export function getBossCardEffect(gameState, playerId, cardId) {
 
 export function canBossCreateMeld(gameState, playerId) {
   const boss = normalizeBossState(gameState);
-  if (!boss || boss.id !== 'dominadora') return true;
+  if (!boss) return true;
+  if (boss.id === 'nehelenia') {
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'fish_inverted' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fedExisting) return false;
+    if (boss.effects.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId)) return false;
+    return true;
+  }
+  if (boss.id !== 'dominadora') return true;
   if ((boss.chainsByPlayer[playerId] || 0) >= 3 || isBossPlayerDominated(gameState, playerId)) return false;
   const intent = boss.currentIntent;
   if (intent?.abilityId !== 'hands_tied') return true;
@@ -2635,7 +3415,30 @@ export function canBossCreateMeld(gameState, playerId) {
 
 export function canBossUseMeld(gameState, playerId, meldIndex) {
   const boss = normalizeBossState(gameState);
-  if (!boss || boss.id !== 'dominadora') return true;
+  if (!boss) return true;
+  if (boss.id === 'nehelenia') {
+    const intent = boss.currentIntent;
+    const player = (gameState.players || []).find((entry) => entry.id === playerId);
+    const teamId = player?.teamId ?? 0;
+    const meldId = resolveBossMeldId(gameState, teamId, meldIndex, false);
+    const persistentLock = boss.effects.some((effect) => (
+      effect.id === 'nehelenia_meld_lock'
+      && (effect.playerId == null || effect.playerId === playerId)
+      && (effect.teamId == null || effect.teamId === teamId)
+      && neheleniaMeldTargetMatches(effect, meldId, meldIndex)
+    ));
+    if (persistentLock) return false;
+    const currentPrey = intent?.abilityId === 'tiger_prey' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fed
+      ? intent.payload : null;
+    const persistentPrey = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId);
+    const prey = currentPrey || persistentPrey;
+    if (prey && !neheleniaMeldTargetMatches(prey, meldId, meldIndex)) return false;
+    if (intent?.abilityId === 'hawk_watch' && intent.payload?.targetPlayerId === playerId) {
+      return !neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex);
+    }
+    return true;
+  }
+  if (boss.id !== 'dominadora') return true;
   const intent = boss.currentIntent;
   if (intent?.abilityId !== 'separation') return true;
   const owner = intent.payload?.meldOwners?.[meldIndex];
@@ -2695,7 +3498,36 @@ function resolveOrdersFromMeldAction(gameState, playerId, meldId, isNewMeld, old
 
 export function notifyBossCardDiscarded(gameState, playerId, card) {
   const boss = normalizeBossState(gameState);
-  if (!boss || boss.id !== 'dominadora' || !card?.id) return [];
+  if (!boss || !card?.id) return [];
+  if (boss.id === 'nehelenia') {
+    const events = [];
+    const intent = boss.currentIntent;
+    // Qualquer novo descarte tira do topo a carta que Hawk estava guardando.
+    boss.effects = boss.effects.filter((effect) => effect.id !== 'nehelenia_hawk_guarded_discard');
+    if (intent?.abilityId === 'hawk_suit' && intent.payload?.targetPlayerId === playerId) {
+      intent.payload.discardedCardId = card.id;
+      intent.payload.discardedSuit = card.suit || null;
+      if (!card.joker && card.suit === intent.payload?.suit) intent.payload.discardedCorrectSuit = true;
+    }
+    if (intent?.abilityId === 'fish_marked_card' && intent.payload?.targetPlayerId === playerId
+      && intent.payload?.cardId === card.id) intent.payload.discarded = true;
+    const fishDead = boss.effects.find((effect) => effect.id === 'nehelenia_fish_dead_card' && effect.playerId === playerId && effect.cardId === card.id);
+    if (fishDead) {
+      boss.effects = boss.effects.filter((effect) => effect !== fishDead);
+      boss.actionSequence += 1;
+      events.push(recordEvent(boss, {
+        type: 'neheleniaAttendantRelease',
+        actionId: `fish_dead_release_${playerId}_${boss.actionSequence}`,
+        abilityId: 'fish_marked_card',
+        attendant: 'fish',
+        playerId,
+        cardId: card.id,
+        outcome: `${gameState.players.find((player) => player.id === playerId)?.name || 'O alvo'} descartou o Reflexo Morto e libertou a mão.`,
+      }));
+    }
+    return events;
+  }
+  if (boss.id !== 'dominadora') return [];
   const events = [];
   for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active'
     && entry.targetPlayerId === playerId && entry.type === 'discard_suit')) {
@@ -3063,6 +3895,82 @@ export function resolveBossChoice(gameState, playerId, option) {
     return event;
   }
 
+  if (boss.id === 'nehelenia') {
+    const correct = option === choice.correctOption;
+    const target = (gameState.players || []).find((player) => player.id === playerId);
+    let outcome = '';
+    let mirrorEvent = null;
+    let lockedCardIds = [];
+    if (choice.type === 'false_image') {
+      if (correct) outcome = `${target?.name || 'O alvo'} reconheceu a imagem verdadeira.`;
+      else {
+        if (choice.cardId) {
+          boss.effects.push({ id: 'nehelenia_illusion_lock', source: 'false_image', playerId, cardId: choice.cardId, expiresAfterTurn: true, appliedAtRound: boss.roundNumber });
+          lockedCardIds = [choice.cardId];
+        }
+        outcome = `${target?.name || 'O alvo'} seguiu a imagem falsa; a carta verdadeira ficou aprisionada até o fim do próximo turno.`;
+      }
+    } else if (choice.type === 'dream_theft') {
+      if (correct) outcome = `${target?.name || 'O alvo'} protegeu o próprio Espelho dos Sonhos.`;
+      else {
+        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Roubo de Sonho', `dream_theft_${choice.id}`);
+        outcome = mirrorEvent?.outcome || 'O reflexo falso foi escolhido.';
+      }
+    } else if (choice.type === 'discard_mirror') {
+      if (correct) outcome = `${target?.name || 'O alvo'} reconheceu o topo verdadeiro; o lixo continua disponível.`;
+      else {
+        boss.neheleniaDiscardSealRound = boss.roundNumber;
+        outcome = `${target?.name || 'O alvo'} escolheu um reflexo falso; o lixo ficou selado nesta rodada.`;
+      }
+    } else if (choice.type === 'shattered_mirror') {
+      if (correct) outcome = `${target?.name || 'O alvo'} encontrou o fragmento falso.`;
+      else {
+        lockedCardIds = [...(choice.realCardIds || [])];
+        lockedCardIds.forEach((cardId) => boss.effects.push({ id: 'nehelenia_illusion_lock', source: 'shattered_mirror', playerId, cardId, expiresAfterTurn: true, appliedAtRound: boss.roundNumber }));
+        outcome = `${target?.name || 'O alvo'} apontou um reflexo verdadeiro; as duas cartas reais ficaram presas no espelho até o fim do próximo turno.`;
+      }
+    } else if (choice.type === 'eternal_nightmare') {
+      if (correct) outcome = `${target?.name || 'O alvo'} atravessou o Pesadelo Eterno sem perder o próprio reflexo.`;
+      else {
+        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Pesadelo Eterno', `eternal_nightmare_${choice.id}`);
+        outcome = mirrorEvent?.outcome || 'O Pesadelo Eterno venceu a escolha.';
+      }
+    } else return null;
+
+    boss.pendingChoices = boss.pendingChoices.filter((entry) => entry.id !== choice.id);
+    boss.actionSequence += 1;
+    const event = recordEvent(boss, {
+      type: 'bossChoice',
+      actionId: `choice_${boss.actionSequence}`,
+      playerId,
+      choiceType: choice.type,
+      option,
+      correct,
+      outcome,
+      lockedCardIds,
+      dangerDelta: mirrorEvent?.dangerDelta || 0,
+      danger: boss.danger,
+      mirrorEventId: mirrorEvent?.actionId || null,
+    });
+    const resumesPlayers = !boss.pendingChoices.length
+      && boss.awaitingBossTurn?.resumePlayersAfterChoice
+      && boss.awaitingBossTurn.flowId === boss.bossFlow?.id;
+    if (resumesPlayers) {
+      boss.currentIntent = null;
+      boss.awaitingBossTurn = false;
+      boss.bossFlow.stage = 'players';
+      boss.bossFlow.startedAt = Date.now();
+      boss.bossFlow.endsAt = 0;
+      boss.bossFlow.eventActionId = null;
+      boss.presentationUntil = 0;
+    }
+    if (!boss.pendingChoices.length && !boss.currentIntent && !boss.result && !resumesPlayers) {
+      const awaiting = boss.awaitingBossTurn || {};
+      beginBossTurn(gameState, { first: !!awaiting.first, phaseChanged: !!awaiting.phaseChanged, resultEvent: event });
+    }
+    return event;
+  }
+
   if (boss.id !== 'dominadora') return null;
   let outcome = '';
   let drawnCards = [];
@@ -3274,6 +4182,11 @@ export function applyBossMeldTransition(gameState, {
   let cardDamage = 0;
   let debtReduction = boss.id === 'banker' ? Math.max(0, nextDebtValue - previous.debtValue) : 0;
   let bloodReduction = boss.id === 'dimitrescu' ? Math.max(0, nextDebtValue - previous.debtValue) : 0;
+  let mirrorFragmentRelief = 0;
+  let dreamBonusDamage = 0;
+  let newMoonSuppressedDamage = 0;
+  let tigerClawSuppressedDamage = 0;
+  let tigerClawEffect = null;
   let possessionProgressed = false;
   let possessionReleased = false;
   let possessionProgress = null;
@@ -3341,12 +4254,126 @@ export function applyBossMeldTransition(gameState, {
     }
   }
 
-  const accountedCardIds = new Set(boss.damagedCardIds);
+  if (boss.id === 'nehelenia') {
+    const intent = boss.currentIntent;
+    const addedIds = new Set(cardsAdded.map((card) => card?.id).filter(Boolean));
+    const addedCount = addedIds.size;
+    if (intent?.abilityId === 'mirrored_meld' && intent.payload?.targetPlayerId === playerId && addedCount && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex)) {
+      intent.payload.fed = true;
+      intent.payload.resolved = true;
+      intent.payload.realChosen = false;
+      intent.payload.fedCardIds = [...new Set([...(intent.payload.fedCardIds || []), ...addedIds])];
+    }
+    if (intent?.abilityId === 'mirror_prison' && intent.payload?.rescuerPlayerId === playerId && addedCount && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex)) {
+      intent.payload.fed = true;
+      intent.payload.fedCardIds = [...new Set([...(intent.payload.fedCardIds || []), ...addedIds])];
+    }
+    if (intent?.abilityId === 'follow_reflection' && addedCount) {
+      intent.payload.cardsPlayedByPlayer ||= {};
+      intent.payload.cardsPlayedByPlayer[playerId] = (Number(intent.payload.cardsPlayedByPlayer[playerId]) || 0) + addedCount;
+      if (playerId === intent.payload.firstPlayerId) {
+        intent.payload.firstPlayedCount = (Number(intent.payload.firstPlayedCount) || 0) + addedCount;
+      } else if (playerId === intent.payload.secondPlayerId) {
+        intent.payload.secondPlayedCount = (Number(intent.payload.secondPlayedCount) || 0) + addedCount;
+      }
+    }
+    if (intent?.abilityId === 'tiger_link' && addedCount) {
+      intent.payload.fedMeldIds ||= [];
+      const target = (intent.payload.targets || []).find((entry) => neheleniaMeldTargetMatches(entry, meldId, meldIndex));
+      if (target?.meldId && !intent.payload.fedMeldIds.includes(target.meldId)) intent.payload.fedMeldIds.push(target.meldId);
+    }
+    if (intent?.abilityId === 'tiger_prey' && intent.payload?.targetPlayerId === playerId && addedCount
+      && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex)) intent.payload.fed = true;
+    if (addedCount && !isNewMeld) {
+      const persistentPrey = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId
+        && neheleniaMeldTargetMatches(effect, meldId, meldIndex));
+      if (persistentPrey) {
+        boss.effects = boss.effects.filter((effect) => effect !== persistentPrey);
+        boss.actionSequence += 1;
+        recordEvent(boss, {
+          type: 'neheleniaAttendantRelease',
+          actionId: `tiger_prey_release_${playerId}_${boss.actionSequence}`,
+          abilityId: 'tiger_prey',
+          attendant: 'tiger',
+          playerId,
+          meldId,
+          meldIndex,
+          outcome: `${gameState.players.find((player) => player.id === playerId)?.name || 'O alvo'} alimentou a Presa Marcada e saiu da mira de Tiger's Eye.`,
+        });
+      }
+      tigerClawEffect = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_claw'
+        && (effect.teamId == null || effect.teamId === teamId)
+        && neheleniaMeldTargetMatches(effect, meldId, meldIndex)) || null;
+      if (tigerClawEffect) boss.effects = boss.effects.filter((effect) => effect !== tigerClawEffect);
+    }
+    if (intent?.abilityId === 'fish_marked_card' && intent.payload?.targetPlayerId === playerId
+      && addedIds.has(intent.payload?.cardId)) intent.payload.used = true;
+    if (intent?.abilityId === 'fish_inverted' && intent.payload?.targetPlayerId === playerId && addedCount && !isNewMeld) {
+      intent.payload.fedExisting = true;
+    }
+    if (addedCount && !isNewMeld) {
+      const releasedInverted = boss.effects.filter((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId);
+      if (releasedInverted.length) {
+        boss.effects = boss.effects.filter((effect) => !(effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId));
+        boss.actionSequence += 1;
+        recordEvent(boss, {
+          type: 'neheleniaAttendantRelease',
+          actionId: `fish_inverted_release_${playerId}_${boss.actionSequence}`,
+          abilityId: 'fish_inverted',
+          attendant: 'fish',
+          playerId,
+          meldId,
+          meldIndex,
+          outcome: `${gameState.players.find((player) => player.id === playerId)?.name || 'O alvo'} alimentou um jogo existente e rompeu o Reflexo Invertido persistente.`,
+        });
+      }
+    }
+  }
+
+  const accountedCardIds = new Set(boss.damagedCardIds || []);
   for (const card of cardsAdded) {
     if (!card?.id || accountedCardIds.has(card.id)) continue;
     accountedCardIds.add(card.id);
     boss.damagedCardIds.push(card.id);
-    cardDamage += bossCardDamage(card);
+    let individualDamage = bossCardDamage(card);
+    if (boss.id === 'nehelenia' && tigerClawEffect && individualDamage > 0) {
+      tigerClawSuppressedDamage += individualDamage;
+      individualDamage = 0;
+    }
+    if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'new_moon' && !card.joker && card.suit === boss.currentIntent.payload?.suit) {
+      const payload = boss.currentIntent.payload;
+      payload.countedCardIds ||= [];
+      if (!payload.countedCardIds.includes(card.id)) {
+        payload.countedCardIds.push(card.id);
+        payload.progress = Math.min(Number(payload.required) || 3, Math.max(0, Number(payload.progress) || 0) + 1);
+      }
+      if ((payload.countedCardIds || []).indexOf(card.id) < (Number(payload.required) || 3)) {
+        newMoonSuppressedDamage += individualDamage;
+        individualDamage = 0;
+      }
+    }
+    if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'dream_mirror'
+      && boss.currentIntent.payload?.targetPlayerId === playerId && boss.currentIntent.payload?.cardId === card.id
+      && individualDamage > 0) {
+      dreamBonusDamage += individualDamage;
+      boss.currentIntent.payload.bonusDamage = Math.max(Number(boss.currentIntent.payload.bonusDamage) || 0, individualDamage);
+    }
+    cardDamage += individualDamage;
+  }
+  cardDamage += dreamBonusDamage;
+  if (boss.id === 'nehelenia' && tigerClawEffect) {
+    boss.actionSequence += 1;
+    recordEvent(boss, {
+      type: 'neheleniaAttendantRelease',
+      actionId: `tiger_claw_release_${meldId || meldIndex}_${boss.actionSequence}`,
+      abilityId: 'tiger_link',
+      attendant: 'tiger',
+      playerId,
+      meldId,
+      meldIndex,
+      suppressedDamage: tigerClawSuppressedDamage,
+      outcome: `As garras de Tiger's Eye se romperam no Jogo ${Number(meldIndex) + 1}, mas engoliram ${tigerClawSuppressedDamage} de dano das cartas usadas para quebrá-las.`,
+    });
   }
   if (boss.id === 'banker' && boss.creditLimit?.status === 'active' && boss.creditLimit.round === boss.roundNumber) {
     const limit = boss.creditLimit;
@@ -3430,12 +4457,33 @@ export function applyBossMeldTransition(gameState, {
     }
   }
 
-  if (damage <= 0 && debtReduction <= 0 && bloodReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length) return null;
+  if (boss.id === 'nehelenia' && contribution) {
+    const mirrorTier = MELD_TIER[newKind] || 0;
+    const previousMirrorTier = Math.max(Number(contribution.neheleniaMirrorTier) || 0, MELD_TIER[oldKind] || 0);
+    const tierIncrease = Math.max(0, mirrorTier - previousMirrorTier);
+    contribution.neheleniaMirrorTier = Math.max(previousMirrorTier, mirrorTier);
+    contribution.neheleniaMirrorRelief = Math.max(0, Number(contribution.neheleniaMirrorRelief) || 0);
+    if (tierIncrease > 0 && mirrorTier >= 1 && boss.danger > 0) {
+      const reliefEvent = restoreNeheleniaDreamMirror(
+        gameState,
+        null,
+        `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}`,
+        `dream_mirror_relief_${meldId}_${mirrorTier}`,
+      );
+      mirrorFragmentRelief = Math.abs(reliefEvent?.dangerDelta || 0);
+      contribution.neheleniaMirrorRelief += mirrorFragmentRelief;
+    }
+  }
+
+
+  if (damage <= 0 && debtReduction <= 0 && bloodReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length && mirrorFragmentRelief <= 0) return null;
   const breaksCocoon = boss.id === 'matriarca_esmeralda'
     && canastraDamage > 0
     && ({ limpa: 1, real: 2, asas: 3 }[newKind] || 0) >= 1;
+  const breaksMirrorEclipse = false;
   const damageResult = applyDamageToBoss(gameState, damage, {
     breaksCocoon,
+    breaksMirrorEclipse,
     sourceActionId: `meld_${key}_${boss.actionSequence + 1}`,
   });
   const totalDangerRelief = debtReduction + bloodReduction;
@@ -3506,6 +4554,12 @@ export function applyBossMeldTransition(gameState, {
     chainsRemoved,
     resistanceSuppressedByInterdict,
     bloomRemoved,
+    mirrorFragmentRelief,
+    dreamBonusDamage,
+    newMoonSuppressedDamage,
+    mirrorStoredDamage: damageResult.mirrorStoredDamage || 0,
+    mirrorReleasedDamage: damageResult.mirrorReleasedDamage || 0,
+    mirrorBroken: !!damageResult.mirrorBroken,
     absorbedDamage: damageResult.absorbed,
     cocoonBroken: damageResult.cocoonBroken,
     bloodClotBroken: damageResult.bloodClotBroken,
@@ -3525,7 +4579,9 @@ export function applyBossMeldTransition(gameState, {
       ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Dívida -${appliedDebtReduction}`
       : appliedBloodReduction
         ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Sede -${appliedBloodReduction}`
-        : bloomRemoved ? `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}: Florescimento -${bloomRemoved}` : '',
+        : bloomRemoved
+          ? `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}: Florescimento -${bloomRemoved}`
+          : mirrorFragmentRelief ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Fragmento -${mirrorFragmentRelief}` : '',
     pendingPhase,
   };
   const definition = getBossDefinition(boss.id);
@@ -3620,6 +4676,13 @@ export function isBossDiscardBlocked(gameState) {
   const playerId = gameState.players?.[gameState.currentPlayer]?.id ?? gameState.currentPlayer;
   if (boss.id === 'banker') return boss.currentIntent?.abilityId === 'credit_block' || isBossVaultDrawRequired(gameState, playerId);
   if (boss.id === 'dimitrescu') return boss.currentIntent?.abilityId === 'castle_lockdown';
+  if (boss.id === 'nehelenia') {
+    if (boss.neheleniaDiscardSealRound === boss.roundNumber) return true;
+    if (boss.effects.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === playerId)) return true;
+    const topDiscardId = gameState.discard?.at?.(-1)?.id || null;
+    if (topDiscardId && boss.effects.some((effect) => effect.id === 'nehelenia_hawk_guarded_discard' && effect.cardId === topDiscardId)) return true;
+    return false;
+  }
   return (boss.chainsByPlayer?.[playerId] || 0) >= 4;
 }
 
@@ -4099,6 +5162,149 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else {
       outcome = `${intent.name} foi encerrada.`;
     }
+  } else if (boss.id === 'nehelenia') {
+    syncNeheleniaDreamMirrors(gameState);
+    const payload = intent.payload || {};
+    if (['false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare'].includes(intent.abilityId)) {
+      const type = intent.abilityId;
+      const targetPlayerId = payload.targetPlayerId;
+      const options = (payload.reflections || []).map((entry) => entry.option).filter(Boolean);
+      if (targetPlayerId != null && options.length && payload.correctOption) {
+        enqueueChoice(boss, targetPlayerId, type, options, {
+          correctOption: payload.correctOption,
+          optionLabels: Object.fromEntries((payload.reflections || []).map((entry) => [entry.option, entry.label])),
+          cardId: payload.cardId || null,
+          realCardIds: [...(payload.realCardIds || [])],
+          discardCardId: payload.discardCardId || null,
+          shuffleFinalSlot: Number.isInteger(payload.shuffleFinalSlot) ? payload.shuffleFinalSlot : null,
+          shuffleSeed: Number.isFinite(payload.shuffleSeed) ? payload.shuffleSeed : null,
+          sourceAbilityId: intent.abilityId,
+        });
+        outcome = `${intent.name}: ${gameState.players.find((player) => player.id === targetPlayerId)?.name || 'o alvo'} precisa identificar o reflexo correto antes de a rodada continuar.`;
+      } else outcome = `${intent.name} não encontrou uma ilusão válida e terminou sem efeito.`;
+      resultData = { choicePrepared: !!boss.pendingChoices.find((choice) => choice.type === type && choice.playerId === targetPlayerId) };
+    } else if (intent.abilityId === 'mirrored_meld') {
+      const success = !!payload.fed;
+      let mirrorEvent = null;
+      if (!success && !payload.failed) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.targetPlayerId, 'Jogo Espelhado ignorado', `mirrored_meld_${intent.id}`);
+      outcome = success
+        ? `${gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo'} encontrou o jogo verdadeiro e quebrou o reflexo.`
+        : payload.failed
+          ? `${gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo'} alimentou o reflexo falso; a carta foi para o fundo do monte e o turno ficou Desorientado.`
+          : mirrorEvent?.outcome || 'O Jogo Espelhado foi ignorado até o fim do turno.';
+      resultData = { success, failed: !!payload.failed, lostCardId: payload.lostCardId || null, fedCardIds: [...(payload.fedCardIds || [])], mirrorEventId: mirrorEvent?.actionId || null };
+    } else if (intent.abilityId === 'follow_reflection') {
+      const first = Math.max(0, Number(payload.patternCount) || 0);
+      const second = Math.max(0, Number(payload.secondPlayedCount) || 0);
+      const success = second === first;
+      let mirrorEvent = null;
+      if (!success) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.secondPlayerId, 'Siga o Reflexo', `follow_reflection_${intent.id}`);
+      const firstName = gameState.players.find((player) => player.id === payload.firstPlayerId)?.name || 'Primeiro jogador';
+      const secondName = gameState.players.find((player) => player.id === payload.secondPlayerId)?.name || 'Segundo jogador';
+      outcome = success
+        ? `${secondName} repetiu exatamente o turno de ${firstName}: ${first} carta${first === 1 ? '' : 's'}.`
+        : mirrorEvent?.outcome || `${secondName} baixou ${second}; o padrão era ${first}.`;
+      resultData = { success, firstCount: first, secondCount: second, firstPlayerId: payload.firstPlayerId, secondPlayerId: payload.secondPlayerId, mirrorEventId: mirrorEvent?.actionId || null };
+    } else if (intent.abilityId === 'mirror_prison') {
+      const success = !!payload.fed;
+      let mirrorEvent = null;
+      if (success) mirrorEvent = restoreNeheleniaDreamMirror(gameState, payload.trappedPlayerId, 'Prisão no Espelho', `mirror_prison_${intent.id}`);
+      outcome = success
+        ? mirrorEvent?.outcome || 'O parceiro alimentou o reflexo e abriu a Prisão no Espelho.'
+        : 'A Prisão no Espelho resistiu; o Espelho dos Sonhos roubado continua com Nehelenia.';
+      resultData = { success, trappedPlayerId: payload.trappedPlayerId, rescuerPlayerId: payload.rescuerPlayerId, fedCardIds: [...(payload.fedCardIds || [])], mirrorEventId: mirrorEvent?.actionId || null };
+    } else if (intent.abilityId === 'tiger_link') {
+      const fed = new Set(payload.fedMeldIds || []);
+      const targets = payload.targets || [];
+      const missing = targets.filter((target) => !fed.has(target.meldId));
+      const success = missing.length === 0;
+      for (const target of missing) {
+        const duplicate = boss.effects.some((effect) => effect.id === 'nehelenia_tiger_claw' && effect.meldId === target.meldId);
+        if (!duplicate) boss.effects.push({
+          id: 'nehelenia_tiger_claw',
+          source: 'tiger_link',
+          attendant: 'tiger',
+          teamId: 0,
+          meldId: target.meldId,
+          meldIndex: target.meldIndex,
+          appliedAtRound: boss.roundNumber,
+        });
+      }
+      outcome = success
+        ? "Tiger's Eye perdeu o Laço: os dois jogos foram alimentados."
+        : `Laço do Tigre: ${missing.length} lado${missing.length === 1 ? '' : 's'} ficou${missing.length === 1 ? '' : 'ram'} sob as garras. A próxima alimentação de cada lado rompe o efeito, mas essas cartas não causam dano individual.`;
+      resultData = { attendant: 'tiger', success, fedMeldIds: [...fed], missingMeldIds: missing.map((entry) => entry.meldId), persistentClaws: !success };
+    } else if (intent.abilityId === 'tiger_prey') {
+      const success = !!payload.fed;
+      const targetName = gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo';
+      if (!success && !boss.effects.some((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === payload.targetPlayerId)) boss.effects.push({
+        id: 'nehelenia_tiger_prey',
+        source: 'tiger_prey',
+        attendant: 'tiger',
+        playerId: payload.targetPlayerId,
+        teamId: 0,
+        meldId: payload.meldId,
+        meldIndex: payload.meldIndex,
+        appliedAtRound: boss.roundNumber,
+      });
+      outcome = success
+        ? `${targetName} alimentou a Presa Marcada e saiu da mira de Tiger's Eye.`
+        : `${targetName} ignorou a Presa Marcada; ela permanece ativa e, até alimentá-la, os outros jogos existentes ficam fora do alcance desse jogador.`;
+      resultData = { attendant: 'tiger', success, meldId: payload.meldId, meldIndex: payload.meldIndex, persistsUntilFed: !success };
+    } else if (intent.abilityId === 'hawk_suit') {
+      const success = payload.discardedCorrectSuit === true;
+      const targetName = gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo';
+      if (!success && payload.discardedCardId) boss.effects.push({
+        id: 'nehelenia_hawk_guarded_discard',
+        source: 'hawk_suit',
+        attendant: 'hawk',
+        playerId: payload.targetPlayerId,
+        cardId: payload.discardedCardId,
+        appliedAtRound: boss.roundNumber,
+      });
+      outcome = success
+        ? `${targetName} encerrou o turno sob o Olho do Falcão com o naipe exigido.`
+        : payload.discardedCardId
+          ? `${targetName} descartou outro naipe; Hawk's Eye fica sobre essa carta e ninguém pode recolher o lixo enquanto ela permanecer no topo.`
+          : `${targetName} não cumpriu o descarte exigido por Hawk's Eye.`;
+      resultData = { attendant: 'hawk', success, suit: payload.suit, suitLabel: payload.suitLabel, guardedDiscardCardId: success ? null : payload.discardedCardId || null };
+    } else if (intent.abilityId === 'hawk_watch') {
+      outcome = `A Vigilância de Hawk's Eye terminou; o jogo marcado voltou a ficar disponível.`;
+      resultData = { attendant: 'hawk', success: true, meldId: payload.meldId, meldIndex: payload.meldIndex, targetPlayerId: payload.targetPlayerId };
+    } else if (intent.abilityId === 'fish_marked_card') {
+      const target = gameState.players.find((player) => player.id === payload.targetPlayerId);
+      const stillHeld = !!target?.hand?.some((card) => card?.id === payload.cardId);
+      const success = payload.used === true || payload.discarded === true || !stillHeld;
+      if (!success && !boss.effects.some((effect) => effect.id === 'nehelenia_fish_dead_card' && effect.playerId === payload.targetPlayerId && effect.cardId === payload.cardId)) boss.effects.push({
+        id: 'nehelenia_fish_dead_card',
+        source: 'fish_marked_card',
+        attendant: 'fish',
+        playerId: payload.targetPlayerId,
+        cardId: payload.cardId,
+        appliedAtRound: boss.roundNumber,
+      });
+      outcome = success
+        ? `${target?.name || 'O alvo'} tirou a carta marcada da mão antes do fim do turno.`
+        : `${target?.name || 'O alvo'} segurou a carta até o fim. Fish Eye matou o reflexo: essa carta não pode mais entrar em jogo e só sai da mão quando for descartada.`;
+      resultData = { attendant: 'fish', success, cardId: payload.cardId, used: !!payload.used, discarded: !!payload.discarded, deadReflection: !success };
+    } else if (intent.abilityId === 'fish_inverted') {
+      const success = !!payload.fedExisting;
+      const targetName = gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo';
+      if (!success && !boss.effects.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === payload.targetPlayerId)) {
+        boss.effects.push({
+          id: 'nehelenia_inverted_reflection',
+          source: 'fish_inverted',
+          attendant: 'fish',
+          playerId: payload.targetPlayerId,
+          appliedAtRound: boss.roundNumber,
+        });
+      }
+      outcome = success
+        ? `${targetName} alimentou um jogo existente e rompeu o Reflexo Invertido.`
+        : `${targetName} não alimentou nenhum jogo existente; o Reflexo Invertido continua ativo até ele alimentar um jogo já aberto.`;
+      resultData = { attendant: 'fish', success, targetPlayerId: payload.targetPlayerId, persistsUntilFed: !success };
+    }
+
   } else if (boss.id === 'matriarca_esmeralda') {
     const baseThreat = {
       sourceAbilityId: intent.abilityId,
@@ -4272,7 +5478,9 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     dangerChangeLabel: dangerDelta
       ? boss.id === 'dimitrescu'
         ? `${intent.name}: Sede ${dangerDelta > 0 ? '+' : ''}${dangerDelta}`
-        : `${intent.abilityId === 'suit_audit' ? (dangerDelta < 0 ? 'Auditoria concluída' : 'Auditoria falhou') : intent.name}: Dívida ${dangerDelta > 0 ? '+' : ''}${dangerDelta}`
+        : boss.id === 'nehelenia'
+          ? `${intent.name}: Espelho dos Sonhos ${dangerDelta > 0 ? '+' : ''}${dangerDelta}`
+          : `${intent.abilityId === 'suit_audit' ? (dangerDelta < 0 ? 'Auditoria concluída' : 'Auditoria falhou') : intent.name}: Dívida ${dangerDelta > 0 ? '+' : ''}${dangerDelta}`
       : '',
     targetPlayerId: intent.payload?.targetPlayerId ?? null,
     cardId: intent.payload?.cardId ?? null,
@@ -4289,6 +5497,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
   const recorded = recordEvent(boss, event);
   if (boss.id === 'banker' && dangerDelta > 0) recorded.defeatEvent = confirmBankerDebtDefeat(gameState, recorded.actionId);
   if (boss.id === 'dimitrescu' && dangerDelta > 0) recorded.defeatEvent = confirmDimitrescuBloodDefeat(gameState, recorded.actionId);
+  if (boss.id === 'nehelenia' && dangerDelta > 0) recorded.mirrorWorldEvent = confirmNeheleniaMirrorDefeat(gameState, recorded.actionId);
   if (keepIntent) {
     intent.immediateApplied = true;
     intent.immediateEventActionId = recorded.actionId;
@@ -4315,6 +5524,22 @@ export function completeBossPlayerTurn(gameState, playerId) {
     playerName: player?.name || `Jogador ${playerId + 1}`,
     cardsInHand: player?.hand?.length || 0,
   });
+
+  if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'follow_reflection') {
+    const payload = boss.currentIntent.payload || {};
+    if (payload.firstPlayerId === playerId && !payload.patternLocked) {
+      payload.patternCount = Math.max(0, Number(payload.firstPlayedCount) || 0);
+      payload.patternLocked = true;
+      boss.actionSequence += 1;
+      recordEvent(boss, {
+        type: 'reflectionPattern',
+        actionId: `follow_reflection_pattern_${boss.currentIntent.id}_${boss.actionSequence}`,
+        playerId,
+        patternCount: payload.patternCount,
+        outcome: `${player?.name || 'O primeiro jogador'} definiu o padrão: ${payload.patternCount} carta${payload.patternCount === 1 ? '' : 's'}.`,
+      });
+    }
+  }
 
   if (boss.id === 'banker') {
     const financedCards = boss.effects.filter((effect) => effect.id === 'financed_card' && effect.playerId === playerId);
@@ -4406,6 +5631,8 @@ export function completeBossPlayerTurn(gameState, playerId) {
     natureEvents = resolveMatriarchPlayerDeadline(gameState, playerId);
   }
 
+
+
   const allPlayersActed = gameState.players.every((player) => boss.playersActedThisRound.includes(player.id));
   if (allPlayersActed && boss.id === 'dominadora') {
     (boss.interdicts || []).filter((entry) => entry.status === 'active').forEach((interdict) => {
@@ -4429,6 +5656,17 @@ export function completeBossPlayerTurn(gameState, playerId) {
   const shouldResolve = targetTurnFinished || (duration !== 'until_released' && allPlayersActed);
   let event = null;
   if (shouldResolve) event = resolveIntent(gameState);
+  if (boss.id === 'nehelenia') {
+    const turnNumber = Number(gameState.turnNumber) || 0;
+    boss.effects = boss.effects.filter((effect) => {
+      if (effect.expiresAfterTurn && effect.playerId === playerId) {
+        const appliedTurn = Number(effect.appliedTurnNumber);
+        if (!Number.isFinite(appliedTurn) || appliedTurn < turnNumber) return false;
+      }
+      if (allPlayersActed && Number.isFinite(Number(effect.expiresAfterRound)) && Number(effect.expiresAfterRound) <= boss.roundNumber) return false;
+      return true;
+    });
+  }
   if (allPlayersActed && boss.id === 'matriarca_esmeralda') {
     natureEvents.push(...resolveMatriarchRound(gameState));
     event ||= natureEvents.filter(Boolean).at(-1) || null;
@@ -4444,6 +5682,7 @@ export function completeBossPlayerTurn(gameState, playerId) {
   if (allPlayersActed) {
     boss.roundNumber += 1;
     boss.playersActedThisRound = [];
+    if (boss.id === 'nehelenia') boss.neheleniaDiscardSealRound = 0;
     if (boss.id === 'matriarca_esmeralda') {
       boss.natureHealingRound = boss.roundNumber;
       boss.natureHealingThisRound = 0;
@@ -4454,6 +5693,7 @@ export function completeBossPlayerTurn(gameState, playerId) {
   }
   if (boss.id === 'banker') confirmBankerDebtDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
   if (boss.id === 'dimitrescu') confirmDimitrescuBloodDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
+  if (boss.id === 'nehelenia') confirmNeheleniaMirrorDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
   if (allPlayersActed && !boss.result) {
     const resultEvent = boss.eventLog.find((entry) => entry.actionId === boss.resolvedRoundEventActionId) || event;
     boss.resolvedRoundEventActionId = null;
@@ -4489,7 +5729,9 @@ export function applyBossFinalStrike(gameState, projectedTeamScore, playerId = g
         ? 'Primavera Eterna'
         : boss.id === 'dimitrescu'
           ? 'Banquete Carmesim'
-          : 'Execução da Dívida';
+          : boss.id === 'nehelenia'
+            ? 'Pesadelo Eterno'
+            : 'Execução da Dívida';
     boss.result = { victory: false, reason: 'insufficient_final_strike', title: survivalTitle, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP.` };
   }
   return recordEvent(boss, {
@@ -4512,7 +5754,8 @@ export function applyBossResourceDefeat(gameState) {
   const title = boss.id === 'dominadora' ? 'Dominação sem fim'
     : boss.id === 'matriarca_esmeralda' ? 'Primavera Eterna'
       : boss.id === 'dimitrescu' ? 'Banquete Carmesim'
-        : 'Cobrança sem fim';
+        : boss.id === 'nehelenia' ? 'Pesadelo Eterno'
+          : 'Cobrança sem fim';
   boss.result = { victory: false, reason: 'resources_exhausted', title, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP quando os recursos acabaram.` };
   boss.actionSequence += 1;
   return recordEvent(boss, { type: 'bossDefeat', actionId: `resources_${boss.actionSequence}`, reason: boss.result.reason });

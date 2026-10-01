@@ -52,6 +52,23 @@ const DIMITRESCU_SPEECHES = Object.freeze({
   three_daughters: 'Meninas, divirtam-se com nossos convidados.',
 });
 
+const NEHELENIA_SPEECHES = Object.freeze({
+  false_image: 'Qual dessas imagens vocês ainda chamam de verdade?',
+  mirrored_meld: 'O jogo de vocês fica mais bonito dentro do meu espelho.',
+  follow_reflection: 'Repitam o reflexo. Se conseguirem lembrar qual veio primeiro.',
+  dream_theft: 'Um sonho tão frágil merece uma moldura melhor.',
+  discard_mirror: 'O lixo mostra exatamente o que vocês querem enxergar.',
+  shattered_mirror: 'Três fragmentos. Duas verdades. Uma mentira.',
+  mirror_prison: 'Um de vocês já está aqui dentro. Venham buscá-lo.',
+  eternal_nightmare: 'No meu pesadelo, a mentira sempre parece familiar.',
+  tiger_link: "Tiger's Eye: amarrem os jogos até eles rasgarem.",
+  tiger_prey: "Tiger's Eye já escolheu a presa. Não o façam esperar.",
+  hawk_suit: "Hawk's Eye viu até a carta que vocês pretendiam descartar.",
+  hawk_watch: "Hawk's Eye fechou os olhos de vocês para um caminho.",
+  fish_marked_card: 'Fish Eye quer ver quanto tempo vocês conseguem segurar essa carta.',
+  fish_inverted: 'Fish Eye prefere quando vocês começam pelo reflexo errado.',
+});
+
 const MATRIARCH_SPEECHES = Object.freeze({
   living_seed: 'Uma semente basta para tomar toda a sua mao.',
   hungry_root: 'Alimentem as raizes, ou elas alimentarao a mim.',
@@ -108,13 +125,28 @@ const RESULT_CATEGORY_BY_ABILITY = Object.freeze({
   crimson_clot: 'Proteção formada',
   castle_lockdown: 'Restrição encerrada',
   three_daughters: 'Caçada conjunta resolvida',
+  false_image: 'Ilusão resolvida',
+  mirrored_meld: 'Jogo Espelhado resolvido',
+  follow_reflection: 'Reflexo resolvido',
+  dream_theft: 'Roubo de Sonho resolvido',
+  discard_mirror: 'Espelho do Lixo resolvido',
+  shattered_mirror: 'Espelho Estilhaçado resolvido',
+  mirror_prison: 'Prisão no Espelho resolvida',
+  eternal_nightmare: 'Pesadelo resolvido',
+  tiger_link: 'Laço do Tigre resolvido',
+  tiger_prey: 'Presa Marcada resolvida',
+  hawk_suit: 'Olho do Falcão resolvido',
+  hawk_watch: 'Vigilância encerrada',
+  fish_marked_card: 'Mão no Espelho resolvida',
+  fish_inverted: 'Reflexo Invertido encerrado',
 });
 
-const PREPARED_CHOICE_ABILITIES = new Set(['break_will', 'final_order']);
-const ACTIVE_RESTRICTIONS = new Set(['credit_block', 'pledge', 'collar', 'exposure', 'hands_tied', 'double_collar', 'separation', 'absolute_control', 'interdict', 'castle_lockdown']);
-const ROUND_OBJECTIVES = new Set(['suit_audit', 'possession', 'iron_etiquette', 'credit_limit', 'discard_surcharge', 'bela_hunt', 'crimson_brand', 'cassandra_feast', 'daniela_swarm', 'blood_tithe', 'three_daughters']);
+const PREPARED_CHOICE_ABILITIES = new Set(['break_will', 'final_order', 'false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare']);
+const ACTIVE_RESTRICTIONS = new Set(['credit_block', 'pledge', 'collar', 'exposure', 'hands_tied', 'double_collar', 'separation', 'absolute_control', 'interdict', 'castle_lockdown', 'hawk_watch', 'fish_inverted']);
+const ROUND_OBJECTIVES = new Set(['suit_audit', 'possession', 'iron_etiquette', 'credit_limit', 'discard_surcharge', 'bela_hunt', 'crimson_brand', 'cassandra_feast', 'daniela_swarm', 'blood_tithe', 'three_daughters', 'mirrored_meld', 'follow_reflection', 'mirror_prison', 'tiger_link', 'tiger_prey', 'hawk_suit', 'fish_marked_card']);
 const NATURE_OBJECTIVES = new Set(['living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft', 'discard_pollen', 'harvest', 'royal_bloom']);
 const ACTIVE_NATURE_EFFECTS = new Set(['emerald_cocoon', 'spring_crown', 'cassandra_dead_feast', 'crimson_clot']);
+const ACTIVE_MIRROR_EFFECTS = new Set([]);
 
 function actionCategory(intent) {
   if (intent.abilityId === 'maintenance_fee') return 'Tarifa ativa nesta rodada';
@@ -125,6 +157,7 @@ function actionCategory(intent) {
   if (intent.abilityId === 'discard_surcharge') return 'Cobranca preparada';
   if (ROUND_OBJECTIVES.has(intent.abilityId)) return 'Objetivo da rodada';
   if (NATURE_OBJECTIVES.has(intent.abilityId)) return 'Ameaca natural ativa';
+  if (ACTIVE_MIRROR_EFFECTS.has(intent.abilityId)) return 'Efeito do espelho ativo';
   if (ACTIVE_NATURE_EFFECTS.has(intent.abilityId)) return 'Efeito natural ativo';
   return 'Efeito no fim da rodada';
 }
@@ -698,6 +731,86 @@ function matriarchDetails(gameState, intent) {
   }
 }
 
+
+function neheleniaObjectiveMarker(status = 'active') {
+  return status === 'success' ? '☑' : status === 'failed' ? '✕' : status === 'cancelled' ? '—' : '☐';
+}
+
+function neheleniaDreamMirrorSummary(gameState) {
+  const boss = gameState.boss || {};
+  const taken = Math.max(0, Number(boss.danger) || 0);
+  const maximum = Math.max(1, Number(boss.maxDanger) || 5);
+  const mirrors = Array.from({ length: maximum }, (_, index) => index < taken ? '◆' : '◇').join(' ');
+  const lines = [`${mirrors}  ${taken}/${maximum} Espelhos tomados`];
+  if (boss.mirrorWorldActive) lines.push('◆ Mundo do Espelho pressionando a mesa');
+  return lines.join('\n');
+}
+
+function neheleniaMirrorProgress(gameState, intent) {
+  const payload = intent?.payload || {};
+  if (intent.abilityId === 'mirrored_meld') {
+    const target = playerName(gameState, payload.targetPlayerId);
+    const marker = payload.fed ? '☑' : payload.failed ? '✕' : '☐';
+    const stateLabel = payload.fed ? 'jogo verdadeiro encontrado' : payload.failed ? 'reflexo falso · carta enviada ao fundo' : 'escolha REFLEXO I ou II com 1 carta';
+    return `${marker} ${target} — ${stateLabel}`;
+  }
+  if (intent.abilityId === 'follow_reflection') {
+    const firstName = playerName(gameState, payload.firstPlayerId);
+    const secondName = playerName(gameState, payload.secondPlayerId);
+    const locked = payload.patternLocked === true;
+    const first = locked ? Math.max(0, Number(payload.patternCount) || 0) : Math.max(0, Number(payload.firstPlayedCount) || 0);
+    const second = Math.max(0, Number(payload.secondPlayedCount) || 0);
+    return [
+      `${locked ? '☑' : '☐'} ${firstName} — ${locked ? `padrão fechado: ${first} carta${first === 1 ? '' : 's'}` : `${first} baixada${first === 1 ? '' : 's'} até agora · o turno inteiro define o padrão`}`,
+      `${locked && second === first ? '☑' : '☐'} ${secondName} — ${locked ? `${second}/${first} · pode jogar livremente, mas precisa terminar exatamente igual` : 'aguarda o fim do primeiro turno'}`,
+    ].join('\n');
+  }
+  if (intent.abilityId === 'mirror_prison') {
+    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.rescuerPlayerId)} — alimente o Jogo ${Number(payload.meldIndex) + 1} para libertar ${playerName(gameState, payload.trappedPlayerId)}`;
+  }
+  if (intent.abilityId === 'tiger_link') {
+    const fed = new Set(payload.fedMeldIds || []);
+    return (payload.targets || []).map((target, index) => `${fed.has(target.meldId) ? '☑' : '☐'} Laço ${index + 1} — Jogo ${Number(target.meldIndex) + 1}`).join('\n');
+  }
+  if (intent.abilityId === 'tiger_prey') {
+    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — alimente o Jogo ${Number(payload.meldIndex) + 1}`;
+  }
+  if (intent.abilityId === 'hawk_suit') {
+    return `${payload.discardedCorrectSuit ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — descarte ${payload.suitLabel || payload.suit}`;
+  }
+  if (intent.abilityId === 'hawk_watch') {
+    return `👁 ${playerName(gameState, payload.targetPlayerId)} — Jogo ${Number(payload.meldIndex) + 1} bloqueado neste turno`;
+  }
+  if (intent.abilityId === 'fish_marked_card') {
+    const done = payload.used || payload.discarded;
+    return `${done ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — retire ${cardLabelAnywhere(gameState, payload.cardId)} da mão`;
+  }
+  if (intent.abilityId === 'fish_inverted') {
+    return `${payload.fedExisting ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — alimente 1 jogo existente antes de abrir outro`;
+  }
+  return neheleniaDreamMirrorSummary(gameState);
+}
+
+function neheleniaStatusPresentation(gameState) {
+  const boss = gameState?.boss;
+  if (boss?.id !== 'nehelenia') return null;
+  const event = flowResultEvent(gameState);
+  if (!event) return null;
+  const abilityId = event.abilityId || event.sourceAbilityId;
+  const ability = getBossDefinition('nehelenia')?.abilities.find((entry) => entry.id === abilityId);
+  if (!ability && !['dreamMirror', 'mirrorWorld'].includes(event.type)) return null;
+  return {
+    category: ['dreamMirror', 'mirrorWorld'].includes(event.type) ? 'Espelhos dos Sonhos' : 'Resultado da habilidade',
+    name: ability?.name || event.origin || 'Espelho dos Sonhos',
+    speech: '',
+    description: '',
+    details: event.presentation?.details || [],
+    instruction: event.outcome || `${ability?.name || 'A ilusão'} foi resolvida.`,
+    progress: neheleniaDreamMirrorSummary(gameState),
+    consequence: event.dangerChangeLabel || '',
+  };
+}
+
 function compactAction(gameState, intent) {
   const payload = intent.payload || {};
   const target = playerName(gameState, payload.targetPlayerId);
@@ -991,6 +1104,34 @@ function compactAction(gameState, intent) {
         consequence,
       };
     }
+    case 'false_image':
+      return { instruction: `${target}: descubra qual dos três reflexos realmente existe na sua mão.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → a carta verdadeira fica presa no espelho durante o próximo turno' };
+    case 'mirrored_meld':
+      return { instruction: `${playerName(gameState, payload.targetPlayerId)}: o mesmo jogo apareceu duas vezes. Selecione 1 carta e escolha qual reflexo é o verdadeiro.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Reflexo falso → carta ao fundo do monte + Desorientado · Ignorar até o fim do turno → Espelho dos Sonhos roubado' };
+    case 'follow_reflection':
+      return { instruction: `Tudo o que ${playerName(gameState, payload.firstPlayerId)} baixar no turno vira o padrão. Depois, ${playerName(gameState, payload.secondPlayerId)} pode jogar livremente, mas precisa terminar com exatamente a mesma quantidade — inclusive 0.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Quantidade diferente no fim do segundo turno → +1 Espelho para Nehelenia' };
+    case 'dream_theft':
+      return { instruction: `${target}: reconheça qual reflexo realmente existe na sua mão.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → seu Espelho dos Sonhos é roubado' };
+    case 'discard_mirror':
+      return { instruction: `${target}: o topo do lixo foi duplicado em dois reflexos idênticos. Escolha um deles — não há pista visual.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: '50/50 · erro → o lixo fica selado durante esta rodada' };
+    case 'shattered_mirror':
+      return { instruction: `${target}: dois reflexos são cartas reais da sua mão; encontre o único fragmento falso.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → as duas cartas verdadeiras ficam presas no espelho durante o próximo turno' };
+    case 'mirror_prison':
+      return { instruction: `${playerName(gameState, payload.rescuerPlayerId)} precisa alimentar o reflexo para libertar ${playerName(gameState, payload.trappedPlayerId)}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Sucesso → recupera o Espelho dos Sonhos roubado' };
+    case 'eternal_nightmare':
+      return { instruction: `${target}: observe a carta ORIGINAL gerar dois reflexos e acompanhe-a durante o embaralhamento.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → +1 Espelho para Nehelenia · 5/5 encerra a batalha' };
+    case 'tiger_link':
+      return { instruction: "Tiger's Eye ligou dois jogos. Alimente os dois antes do fim da rodada.", progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Lado ignorado → as garras persistem; a próxima alimentação rompe o efeito, mas o dano individual dessas cartas é anulado' };
+    case 'tiger_prey':
+      return { instruction: `${target}: Tiger's Eye marcou o Jogo ${Number(payload.meldIndex) + 1}. Alimente essa Presa.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Enquanto a Presa continuar ativa, você não pode alimentar outro jogo existente' };
+    case 'hawk_suit':
+      return { instruction: `${target}: encerre o turno descartando ${payload.suitLabel || payload.suit}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Outro naipe → Hawk vigia a carta descartada; ninguém pode recolher o lixo enquanto ela estiver no topo' };
+    case 'hawk_watch':
+      return { instruction: `${target}: Hawk's Eye está vigiando o Jogo ${Number(payload.meldIndex) + 1}. Você não pode alimentá-lo neste turno.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Os demais jogos continuam disponíveis' };
+    case 'fish_marked_card':
+      return { instruction: `${target}: Fish Eye marcou ${cardLabelAnywhere(gameState, payload.cardId)}. Use-a em jogo ou descarte-a neste turno.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Se continuar na mão → vira Reflexo Morto: não pode entrar em jogo e só sai pelo descarte' };
+    case 'fish_inverted':
+      return { instruction: `${target}: antes de abrir qualquer jogo novo, alimente 1 jogo que já existe.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Enquanto não alimentar um jogo existente, criar jogo novo fica bloqueado' };
     default:
       return { instruction: intent.description || 'Habilidade ativa.', progress: '', consequence: '' };
   }
@@ -1516,6 +1657,11 @@ function pendingChoicePresentation(gameState, choice) {
     final_order_lock: 'Ordem Final',
     fixed_interest_payment: 'Pagamento dos Juros Fixos',
     banker_collateral_card: 'Garantia do Cofre',
+    false_image: 'Imagem Falsa',
+    dream_theft: 'Roubo de Sonho',
+    discard_mirror: 'Espelho do Lixo',
+    shattered_mirror: 'Espelho Estilhaçado',
+    eternal_nightmare: 'Pesadelo Eterno',
   };
   let instruction = `${target} precisa decidir antes de a partida continuar.`;
   let progress = '';
@@ -1526,7 +1672,27 @@ function pendingChoicePresentation(gameState, choice) {
     ['Estado', 'a partida permanece pausada ate a decisao'],
   ]);
 
-  if (choice.type === 'final_order') {
+  if (['false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare'].includes(choice.type)) {
+    const labels = choice.options.map((option) => choice.optionLabels?.[option] || option);
+    const findFake = choice.type === 'shattered_mirror';
+    instruction = findFake
+      ? `${target}: dois reflexos existem na sua mão e um é falso. Aponte a mentira.`
+      : `${target}: escolha qual reflexo corresponde à imagem verdadeira.`;
+    if (choice.type === 'discard_mirror') instruction = `${target}: escolha um dos dois reflexos idênticos do topo do lixo. É 50/50.`;
+    if (choice.type === 'dream_theft') instruction = `${target}: reconheça sua carta real antes que Nehelenia roube seu Espelho dos Sonhos.`;
+    if (choice.type === 'eternal_nightmare') instruction = `${target}: acompanhe a carta ORIGINAL depois que dois reflexos nascerem e os três se embaralharem.`;
+    progress = labels.map((label) => `◇ ${label}`).join('   ');
+    consequence = choice.type === 'dream_theft' || choice.type === 'eternal_nightmare'
+      ? 'Erro → +1 Espelho para Nehelenia'
+      : choice.type === 'discard_mirror'
+        ? 'Erro → lixo selado nesta rodada'
+        : 'Erro → cartas reais presas no espelho durante o próximo turno';
+    details = detailFields([
+      ['Alvo', target],
+      ['Reflexos', labels.join(' · ')],
+      ['Regra', findFake ? 'encontre o reflexo falso' : 'encontre a imagem verdadeira'],
+    ]);
+  } else   if (choice.type === 'final_order') {
     const cards = (choice.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).filter(Boolean);
     instruction = `${target}: ${cards.join(' e ')} foram marcadas. Aceite usar as duas em jogo no proximo turno ou receba 1 Chicote agora.`;
     progress = `☐ 0/${cards.length || 2} — cada carta nao usada vale +1 Chicote`;
@@ -1583,7 +1749,7 @@ export function buildBossActionPresentation(gameState) {
   const intent = gameState?.boss?.currentIntent;
   const flow = gameState?.boss?.bossFlow;
   const definition = getBossDefinition(gameState?.boss?.id);
-  const feminineBoss = ['dominadora', 'matriarca_esmeralda', 'dimitrescu'].includes(definition?.id);
+  const feminineBoss = ['dominadora', 'matriarca_esmeralda', 'dimitrescu', 'nehelenia'].includes(definition?.id);
   if (flow?.stage === 'phase') {
     const phaseName = definition?.phaseNames?.[flow.phase] || '';
     return {
@@ -1630,6 +1796,9 @@ export function buildBossActionPresentation(gameState) {
     if (dimitrescuStatus) {
       return dimitrescuStatus;
     }
+
+    const neheleniaStatus = neheleniaStatusPresentation(gameState);
+    if (neheleniaStatus) return neheleniaStatus;
 
     const possessionStatus = possessionPresentation(gameState);
 
@@ -1793,6 +1962,7 @@ export function buildBossActionPresentation(gameState) {
     }
   } else if (gameState.boss.id === 'dominadora') details = dominatrixDetails(gameState, intent);
   else if (gameState.boss.id === 'dimitrescu') details = dimitrescuDetails(gameState, intent);
+  else if (gameState.boss.id === 'nehelenia') details = [];
   else details = matriarchDetails(gameState, intent);
 
   const compact = compactAction(gameState, intent);
@@ -1803,7 +1973,7 @@ export function buildBossActionPresentation(gameState) {
     speech:
       intent.abilityId === 'collar' && collarCards.length === 1
         ? 'Uma das suas opcoes agora me pertence.'
-        : (gameState.boss.id === 'banker' ? BANKER_SPEECHES : gameState.boss.id === 'dominadora' ? DOMINATRIX_SPEECHES : gameState.boss.id === 'dimitrescu' ? DIMITRESCU_SPEECHES : MATRIARCH_SPEECHES)[intent.abilityId] || intent.name,
+        : (gameState.boss.id === 'banker' ? BANKER_SPEECHES : gameState.boss.id === 'dominadora' ? DOMINATRIX_SPEECHES : gameState.boss.id === 'dimitrescu' ? DIMITRESCU_SPEECHES : gameState.boss.id === 'nehelenia' ? NEHELENIA_SPEECHES : MATRIARCH_SPEECHES)[intent.abilityId] || intent.name,
     description: intent.description || '',
     details,
     instruction: compact.instruction,
@@ -1846,7 +2016,7 @@ export function buildBossFinalPresentation(gameState) {
     reason: result?.detail || (playersWon ? 'O chefe foi derrotado.' : 'A equipe foi derrotada.'),
     speech: definition?.finalSpeeches?.[playersWon ? 'victory' : 'defeat'] || '',
     hp: `${Math.max(0, boss?.hp || 0)} / ${boss?.maxHp || 0}`,
-    dangerLabel: boss?.id === 'dominadora' ? 'Chicotes finais' : boss?.id === 'matriarca_esmeralda' ? 'Florescimento final' : boss?.id === 'dimitrescu' ? 'Sede final' : 'Dívida final',
+    dangerLabel: boss?.id === 'dominadora' ? 'Chicotes finais' : boss?.id === 'matriarca_esmeralda' ? 'Florescimento final' : boss?.id === 'dimitrescu' ? 'Sede final' : boss?.id === 'nehelenia' ? 'Espelhos roubados' : 'Dívida final',
     danger: boss?.id === 'dominadora' ? chainSummary : `${Number(boss?.danger || 0)} / ${Number(boss?.maxDanger || 0)}`,
     totalDamage: Number(boss?.stats?.totalDamage || 0),
     canastras: Number(boss?.stats?.canastrasFormed || 0),

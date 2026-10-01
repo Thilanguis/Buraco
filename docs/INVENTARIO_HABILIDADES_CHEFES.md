@@ -35,7 +35,7 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 | Separação | 3 | 4 | Impede que os dois cooperadores alimentem o mesmo jogo naquela rodada. |
 | Controle Absoluto | 3 | 4 | Mantém um jogador Dominado durante o próximo turno. |
 | Quebra de Vontade | 3 | 4 | Um jogador com pelo menos 2 Chicotes recebe uma escolha pessoal entre punições. |
-| Ordem Final | 3 | 4 | Marca 2 cartas da mão de cada cooperador. Logo após o anúncio, antes de qualquer turno dos cooperadores, cada jogador escolhe entre receber 1 Chicote imediatamente ou aceitar a ordem; ao aceitar, recebe +1 Chicote por carta marcada que não entrar em jogo no próximo turno. |
+| Ordem Final | 3 | 4 | Marca 2 cartas da mão de cada cooperador. Cada jogador escolhe entre receber 1 Chicote imediatamente ou aceitar a ordem; ao aceitar, recebe +1 Chicote por carta marcada que não entrar em jogo no próximo turno. |
 
 **Chicotes:** com 3 o jogador fica **Sob Controle**; com 4 fica **Dominado**. A equipe perde se os dois cooperadores chegarem a 4 ao mesmo tempo.
 
@@ -82,3 +82,20 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 
 **Apresentação:** sangue visual aparece no alvo real (carta, jogo, lixo ou Morto). As filhas aparecem em posições fixas sob o HUD e exibem estado ativo/concluído/falhou. `ganho-sangue-dimitresco.mp3` toca quando a Sede aumenta.
 
+
+
+## Rainha Nehelenia
+
+**HP:** 2400. **Espelhos dos Sonhos:** Nehelenia pode tomar até **5 Espelhos**. Cada falha relevante adiciona 1; chegar a **5/5** causa derrota imediata pelo **Mundo do Espelho**. Uma Canastra Limpa ou superior recupera 1 Espelho ao atingir um novo tier válido.
+
+| Habilidade | Fases | Peso | Funcionamento atual |
+|---|---:|---:|---|
+| Jogo Espelhado | 1, 2 e 3 | 5 | Um jogo real é clonado fisicamente na mesa em dois reflexos completos e idênticos. O alvo escolhe um deles com exatamente 1 carta legal. Acerto joga normalmente; erro manda a carta ao fundo do monte e deixa o jogador **Desorientado**, sem novas baixadas naquele turno. |
+| Siga o Reflexo | 1, 2 e 3 | 5 | **Tudo** que o primeiro cooperador baixar durante o turno vira o padrão. O segundo pode jogar livremente, mas ao final precisa ter baixado exatamente a mesma quantidade, inclusive `0`. Qualquer diferença adiciona +1 Espelho. |
+| Espelho do Lixo | 2 e 3 | 4 | O topo do lixo aparece em **dois reflexos idênticos**. Não há pista de verdadeiro/falso: a escolha é 50/50. Errar sela o lixo durante a rodada. |
+| Prisão no Espelho | 2 e 3 | 3 | Com pelo menos 1 Espelho tomado, o parceiro pode alimentar o jogo refletido para recuperar 1 Espelho. |
+| Pesadelo Eterno | 3 | 5 | Uma carta ORIGINAL é mostrada, gera dois reflexos idênticos e os três são embaralhados visualmente. O alvo precisa acompanhar a original; errar adiciona +1 Espelho. |
+
+**Fases:** 1 = Espelhos dos Sonhos; 2 = Circo da Lua Morta; 3 = Pesadelo Eterno.
+
+**Apresentação:** o feedback textual continua no painel amarelo padrão (`☐ / ☑ / ✕`). As ilusões acontecem fisicamente na mesa: clonagem de jogos, espelhos centrais e embaralhamento visual. Nenhum reflexo falso recebe `X`, rótulo ou pista automática.

@@ -1,4 +1,22 @@
-import { ALL_CANASTRA_SFX, DECK_MOVE_SFX, TABLE_ASAS_SFX, TABLE_CANASTRA_SFX, BOSS_SFX, CANASTRA_SFX, TABLE_AMBIENT_MAX_VOLUME, TABLE_AMBIENT_MUSIC, TABLE_AMBIENT_STORAGE_KEY, clampMediaVolume, playSfxClone, sfxCardMove, sfxHeartbeat, sfxMyTurn, sfxSearch, sfxSteal, stopAllGameSfx } from './js/audio.js';
+import {
+  ALL_CANASTRA_SFX,
+  DECK_MOVE_SFX,
+  TABLE_ASAS_SFX,
+  TABLE_CANASTRA_SFX,
+  BOSS_SFX,
+  CANASTRA_SFX,
+  TABLE_AMBIENT_MAX_VOLUME,
+  TABLE_AMBIENT_MUSIC,
+  TABLE_AMBIENT_STORAGE_KEY,
+  clampMediaVolume,
+  playSfxClone,
+  sfxCardMove,
+  sfxHeartbeat,
+  sfxMyTurn,
+  sfxSearch,
+  sfxSteal,
+  stopAllGameSfx,
+} from './js/audio.js';
 import { chooseDominationSearchCard } from './js/game/domination-search.js';
 import { applyPauseVote, pauseBlocksPlay, stockIsExhausted, createActionGate } from './js/game/match-control.js';
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
@@ -34,6 +52,7 @@ import {
   getBossMeldNatureThreats,
   getBossDominatrixPriorities,
   getBossDimitrescuPriorities,
+  getBossNeheleniaPriorities,
   getBossNaturePriorities,
   getBossNatureThreatSummaries,
   getBossDiscardSurcharge,
@@ -59,6 +78,7 @@ import {
   reclaimBossVault,
   shouldBossBotReclaimVault,
   resolveBossChoice,
+  resolveNeheleniaMirroredMeldChoice,
   resolveBossInterdictAttempt,
   validateBossClosedDiscardSelection,
   validateBossMeldPlay,
@@ -395,7 +415,9 @@ const friendSoundQueue = createFriendSoundQueue({
 });
 let currentLobby = null;
 let accountSeatStamp = '';
-window.addEventListener('account-profile-updated', () => { void syncAccountSeat(true); });
+window.addEventListener('account-profile-updated', () => {
+  void syncAccountSeat(true);
+});
 
 async function syncAccountSeat(force = false, previousSeat = -1) {
   if (!activeAccount || state || !currentLobby || (myPlayerIndex < 0 && !force)) return;
@@ -406,7 +428,7 @@ async function syncAccountSeat(force = false, previousSeat = -1) {
   if (!force && accountSeatStamp === stamp) return;
   accountSeatStamp = stamp;
   try {
-    await runTransaction(db, async transaction => {
+    await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(gameRef);
       const data = snap.data();
       if (!data?.lobby || data.stateJson || data.lobby.mode !== mode || myPlayerIndex !== seat) return;
@@ -479,6 +501,22 @@ function matriarchNatureSoundPairKey(event, suffix) {
   const actionId = String(event?.actionId || '');
   const marker = `:${suffix}`;
   return actionId.endsWith(marker) ? actionId.slice(0, -marker.length) : '';
+}
+
+const NEHELENIA_WRONG_MIRROR_CHOICE_TYPES = new Set([
+  'false_image',
+  'dream_theft',
+  'discard_mirror',
+  'shattered_mirror',
+  'eternal_nightmare',
+]);
+
+function playNeheleniaWrongMirrorLaugh(choice, selectedOption) {
+  if (state?.boss?.id !== 'nehelenia' || !choice?.correctOption) return false;
+  if (!NEHELENIA_WRONG_MIRROR_CHOICE_TYPES.has(choice.type)) return false;
+  if (String(selectedOption) === String(choice.correctOption)) return false;
+  playSfxClone(BOSS_SFX.nehelenia?.laugh, { audioContext: audioCtx });
+  return true;
 }
 
 function playBossSfxSequence(firstSource, secondSource) {
@@ -689,6 +727,39 @@ function confirmBossDiscardPickup() {
   const surcharge = getBossDiscardSurcharge(state);
   if (!surcharge) return { allowed: true, surcharge: null };
   return { allowed: true, surcharge };
+}
+
+function bossCreateMeldDeniedMessage(playerId) {
+  const intent = state?.boss?.currentIntent;
+  const persistentInverted = state?.boss?.id === 'nehelenia'
+    && state.boss.effects?.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId);
+  if (state?.boss?.id === 'nehelenia'
+    && ((intent?.abilityId === 'fish_inverted' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fedExisting) || persistentInverted)) {
+    return '🪞 Reflexo Invertido: alimente primeiro um jogo que já existe. O efeito só termina quando você fizer isso.';
+  }
+  return '⛓ Você não pode criar outro jogo durante esta ordem.';
+}
+
+function bossUseMeldDeniedMessage(playerId, meldIndex) {
+  const intent = state?.boss?.currentIntent;
+  if (state?.boss?.id === 'nehelenia') {
+    if (intent?.abilityId === 'hawk_watch' && intent.payload?.targetPlayerId === playerId
+      && (Number(intent.payload?.meldIndex) === Number(meldIndex))) {
+      return "👁 Vigilância de Hawk's Eye: este jogo está fora do seu alcance neste turno.";
+    }
+    const player = state.players?.find((entry) => entry.id === playerId);
+    const meldId = state.teams?.[player?.teamId ?? 0]?.melds?.[meldIndex]?.bossMeldId || null;
+    const currentPrey = intent?.abilityId === 'tiger_prey' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fed ? intent.payload : null;
+    const persistentPrey = state.boss.effects?.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId);
+    const prey = currentPrey || persistentPrey;
+    const preyMatches = prey && ((prey.meldId && meldId && prey.meldId === meldId) || Number(prey.meldIndex) === Number(meldIndex));
+    if (prey && !preyMatches) return "🐯 Presa Marcada: Tiger's Eye não deixa você alimentar outro jogo antes da presa.";
+    const tigerLock = state.boss.effects?.some((effect) => effect.id === 'nehelenia_meld_lock'
+      && (effect.playerId == null || effect.playerId === playerId)
+      && ((effect.meldId && meldId && effect.meldId === meldId) || Number(effect.meldIndex) === Number(meldIndex)));
+    if (tigerLock) return "🐯 As garras de Tiger's Eye mantêm este jogo bloqueado.";
+  }
+  return '⛓ Separação ativa: seu cooperador já usou este jogo na rodada.';
 }
 
 async function prepareBossMeldMutation(player, meldIndex, oldKind, newKind, cardsAdded, undoType, selectedCardIds = [], options = {}) {
@@ -1059,11 +1130,10 @@ function getSafeAmbientVolume(theme) {
 function dominationAudioHasPriority() {
   // Any themed Ás-a-Ás celebration needs a clear background in every game mode.
   // Queued canastra sounds are already covered by friendSoundQueue.busy.
-  if (Object.values(TABLE_ASAS_SFX).some(sound => !sound.paused && !sound.ended)) return true;
-  return state?.mode === '1x1_dominacao' && (
-    friendSoundQueue.busy || (state.powerActiveThisTurn && !state.hasDrawnThisTurn) ||
-    document.getElementById('cardSearchDialog')?.open ||
-    (!sfxSteal.paused && !sfxSteal.ended) || (!sfxSearch.paused && !sfxSearch.ended)
+  if (Object.values(TABLE_ASAS_SFX).some((sound) => !sound.paused && !sound.ended)) return true;
+  return (
+    state?.mode === '1x1_dominacao' &&
+    (friendSoundQueue.busy || (state.powerActiveThisTurn && !state.hasDrawnThisTurn) || document.getElementById('cardSearchDialog')?.open || (!sfxSteal.paused && !sfxSteal.ended) || (!sfxSearch.paused && !sfxSearch.ended))
   );
 }
 
@@ -1087,7 +1157,10 @@ document.getElementById('cardSearchDialog')?.addEventListener('close', () => syn
 
 function fadeTableAmbientTo(targetVolume, duration = 850, onDone = null) {
   if (!tableAmbientAudio) return;
-  if (targetVolume > 0 && dominationAudioHasPriority()) { pauseAmbientForDomination(); return; }
+  if (targetVolume > 0 && dominationAudioHasPriority()) {
+    pauseAmbientForDomination();
+    return;
+  }
   const audio = tableAmbientAudio;
   const fadeId = ++tableAmbientFadeId;
   const startVolume = clampMediaVolume(audio.volume);
@@ -1985,7 +2058,14 @@ function renderMatchDuration() {
 function canSearchDominationCard(gameState = state, actorId = myPlayerIndex) {
   if (pauseBlocksPlay(gameState)) return false;
   return (
-    dominationFeatureEnabled(gameState, 'search') && actorId === 1 && gameState.currentPlayer === 1 && !gameState.finished && !gameState.surrender?.active && !gameState.debugPaused && !gameState.dominatorSearchUsed && !isDominationFriendBusy(gameState)
+    dominationFeatureEnabled(gameState, 'search') &&
+    actorId === 1 &&
+    gameState.currentPlayer === 1 &&
+    !gameState.finished &&
+    !gameState.surrender?.active &&
+    !gameState.debugPaused &&
+    !gameState.dominatorSearchUsed &&
+    !isDominationFriendBusy(gameState)
   );
 }
 
@@ -2468,7 +2548,7 @@ async function commitState() {
         if (state === localState) state.friendRevision = saved.state.friendRevision;
       } else {
         const proposal = structuredClone(state);
-        const saved = await runTransaction(db, async transaction => {
+        const saved = await runTransaction(db, async (transaction) => {
           const snapshot = await transaction.get(gameRef);
           if (!snapshot.exists() || !snapshot.data().stateJson) return null;
           const latest = JSON.parse(snapshot.data().stateJson);
@@ -2527,8 +2607,11 @@ function passTurn({ preserveUndo = false } = {}) {
 }
 
 async function autoPlayTimeout() {
-  try { return await localActionGate.run(autoPlayTimeoutOnce); }
-  finally { window.isAutoPlaying = false; }
+  try {
+    return await localActionGate.run(autoPlayTimeoutOnce);
+  } finally {
+    window.isAutoPlaying = false;
+  }
 }
 async function autoPlayTimeoutOnce() {
   if (!canPerformCommonGameAction(state)) {
@@ -2666,7 +2749,10 @@ async function autoPlayTimeoutOnce() {
     return;
   }
 
-  if (stockIsExhausted(state)) { await finishGame(null); return; }
+  if (stockIsExhausted(state)) {
+    await finishGame(null);
+    return;
+  }
   passTurn();
 
   state.lastAction = {
@@ -2747,7 +2833,10 @@ function classifyMeldPreview(meld) {
 
 let activeTurnNumber = -1;
 function startTurnTimerIfNeeded() {
-  if (pauseBlocksPlay(state)) { updateTimerLabel(); return; }
+  if (pauseBlocksPlay(state)) {
+    updateTimerLabel();
+    return;
+  }
   if (!state || state.finished) {
     stopTurnTimer();
     updateTimerLabel();
@@ -3174,10 +3263,20 @@ function showPendingBossChoiceMessage(playerId = myPlayerIndex) {
   else showMessage(`Aguardando ${target?.name || 'o jogador alvo'} decidir.`);
 }
 function canPerformCommonGameAction(gameState = state) {
-  return !pauseBlocksPlay(gameState) && !gameState?.surrender?.active && !discardPickupAnimating && !isDominationFriendBusy(gameState) && !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback)) && canBossPerformCommonAction(gameState);
+  return (
+    !pauseBlocksPlay(gameState) &&
+    !gameState?.surrender?.active &&
+    !discardPickupAnimating &&
+    !isDominationFriendBusy(gameState) &&
+    !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback)) &&
+    canBossPerformCommonAction(gameState)
+  );
 }
 function ensureMyTurn() {
-  if (pauseBlocksPlay(state)) { showMessage('⏸ Partida pausada ou aguardando votação.'); return false; }
+  if (pauseBlocksPlay(state)) {
+    showMessage('⏸ Partida pausada ou aguardando votação.');
+    return false;
+  }
   if (!state || state.finished) {
     showMessage('Fim de jogo.');
     return false;
@@ -3476,7 +3575,13 @@ async function drawFromDiscardOnce(options = {}) {
     return;
   }
   if (!state.hasDrawnThisTurn && isBossDiscardBlocked(state)) {
-    showMessage('🔒 Bloqueio de Crédito: o lixo está indisponível nesta cobrança.');
+    const currentPlayerId = state.players?.[state.currentPlayer]?.id ?? state.currentPlayer;
+    const topDiscardId = state.discard?.at?.(-1)?.id || null;
+    const hawkSeal = state.boss?.id === 'nehelenia' && (
+      state.boss.effects?.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === currentPlayerId)
+      || (topDiscardId && state.boss.effects?.some((effect) => effect.id === 'nehelenia_hawk_guarded_discard' && effect.cardId === topDiscardId))
+    );
+    showMessage(hawkSeal ? "👁 Hawk's Eye está vigiando o topo do lixo. Enquanto essa carta estiver ali, ninguém pode recolhê-lo." : '🔒 Bloqueio de Crédito: o lixo está indisponível nesta cobrança.');
     return;
   }
 
@@ -3580,7 +3685,7 @@ async function drawFromDiscardOnce(options = {}) {
     // 2. Se não encaixou na mesa, tenta formar um NOVO JOGO
     else if (!selectedMeldTarget && selectedCards.length >= 2 && isValidSequenceMeld([...selectedCards, top])) {
       if (!canBossCreateMeld(state, me.id)) {
-        showMessage('⛓ Você não pode criar outro jogo durante esta ordem.');
+        showMessage(bossCreateMeldDeniedMessage(me.id));
         return;
       }
       isNewMeld = true;
@@ -4102,7 +4207,7 @@ async function attemptExtendExistingMeld(cards, indexes) {
       return false;
     }
     if (!canBossUseMeld(state, currentPlayer().id, forcedIndex)) {
-      showMessage('⛓ Separação ativa: seu cooperador já usou este jogo na rodada.');
+      showMessage(bossUseMeldDeniedMessage(currentPlayer().id, forcedIndex));
       return false;
     }
     const targetMeld = team.melds[forcedIndex];
@@ -4695,7 +4800,10 @@ async function discardSelectedCardOnce() {
 
   if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
 
-  if (stockIsExhausted(state)) { await finishGame(null); return; }
+  if (stockIsExhausted(state)) {
+    await finishGame(null);
+    return;
+  }
   passTurn({ preserveUndo: true });
 
   state.lastAction = {
@@ -4880,7 +4988,7 @@ let historyRecoveryPromise = null;
 function recoverFinishedHistory() {
   if (historyRecoveryPromise) return historyRecoveryPromise;
   historyRecoveryPromise = (async () => {
-    await runTransaction(db, async transaction => {
+    await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(gameRef);
       const data = snap.data();
       if (!data?.stateJson || data.historySummary) return;
@@ -4890,7 +4998,9 @@ function recoverFinishedHistory() {
       const save = await prepareMatchHistory(transaction, finished);
       save();
     });
-  })().finally(() => { historyRecoveryPromise = null; });
+  })().finally(() => {
+    historyRecoveryPromise = null;
+  });
   return historyRecoveryPromise;
 }
 
@@ -4986,7 +5096,9 @@ const BOSS_GUIDE_CORE = Object.freeze({
   banker: 'A equipe acumula Dívida. Se chegar a 100, o Banqueiro vence imediatamente. Canastras Limpa, Real e Ás-a-Ás também reduzem a Dívida enquanto causam dano.',
   dominadora: 'Cada jogador acumula Chicotes. Com 3 fica Sob Controle; com 4 fica Dominado. Se os dois cooperadores chegarem a 4 ao mesmo tempo, a equipe perde.',
   matriarca_esmeralda: 'Falhas alimentam o Florescimento. Ao chegar a 5 Flores, a Matriarca vence. Evoluções de canastra podem remover Flores e, na Fase 3, ela pode usar Renascimento.',
-  dimitrescu: 'Lady Dimitrescu tem 2300 HP e acumula Sede de Sangue. Se chegar a 100, ela vence; mas a própria Lady também gasta Sede para se regenerar. Canastras Limpa, Real e Ás-a-Ás reduzem a Sede em 4, 8 e 12. Bela caça cartas, Cassandra toma jogos e o Morto, e Daniela contamina o lixo.',
+  dimitrescu:
+    'Lady Dimitrescu tem 2300 HP e acumula Sede de Sangue. Se chegar a 100, ela vence; mas a própria Lady também gasta Sede para se regenerar. Canastras Limpa, Real e Ás-a-Ás reduzem a Sede em 4, 8 e 12. Bela caça cartas, Cassandra toma jogos e o Morto, e Daniela contamina o lixo.',
+  nehelenia: 'Rainha Nehelenia engana a equipe pela própria mesa. Espelhos dos Sonhos roubados aumentam a pressão, mas não causam derrota automática; Canastra Limpa ou superior recupera um Espelho roubado.',
 });
 
 const BOSS_GUIDE_OVERRIDES = Object.freeze({
@@ -5012,6 +5124,12 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   crimson_clot: 'Lady coagula o próprio sangue em proteção temporária. Romper o Coágulo reduz a Sede; deixar proteção restante faz esse sangue voltar como cura.',
   castle_lockdown: 'Durante a rodada inteira o lixo fica bloqueado. Os cooperadores só podem comprar do monte.',
   three_daughters: 'Bela, Cassandra e Daniela impõem objetivos simultâneos. Cada sucesso reduz a Sede em 2; cada falha aumenta em 8.',
+  tiger_link: "Tiger's Eye liga dois jogos. Se um lado for ignorado, as garras permanecem nele: a próxima alimentação rompe o efeito, mas as cartas usadas para romper não causam dano individual.",
+  tiger_prey: "Tiger's Eye escolhe uma presa. Enquanto ela não for alimentada, aquele jogador não pode alimentar nenhum outro jogo já existente. O efeito continua até ser resolvido.",
+  hawk_suit: "Hawk's Eye exige um naipe no descarte. Se o alvo descartar outro, Hawk fica vigiando essa carta e o lixo não pode ser recolhido enquanto ela permanecer no topo.",
+  hawk_watch: "Hawk's Eye fecha um jogo específico para o alvo durante o turno. Os outros jogos continuam disponíveis — salvo se outro efeito persistente restringir a rota.",
+  fish_marked_card: 'Fish Eye marca uma carta segura da mão. Se ela continuar na mão ao fim do turno, vira um Reflexo Morto: não pode mais entrar em jogo e só sai pelo descarte.',
+  fish_inverted: 'Fish Eye bloqueia a criação de jogos novos até o alvo alimentar pelo menos um jogo já existente. O efeito persiste até ser resolvido.',
 });
 
 function bossAbilityGuideDescription(definition, ability, phase) {
@@ -5085,7 +5203,9 @@ function renderBossAbilityGuide(definition, boss) {
 function renderBossDaughterStrip(definition, boss) {
   const strip = document.getElementById('bossDaughterStrip');
   if (!strip) return;
-  if (definition?.id !== 'dimitrescu') {
+  const isDimitrescu = definition?.id === 'dimitrescu';
+  const isNehelenia = definition?.id === 'nehelenia';
+  if (!isDimitrescu && !isNehelenia) {
     strip.hidden = true;
     strip.replaceChildren();
     strip.dataset.signature = '';
@@ -5096,56 +5216,86 @@ function renderBossDaughterStrip(definition, boss) {
     ? boss.eventLog?.find((entry) => entry.actionId === boss.bossFlow.eventActionId) || null
     : null;
   const abilityId = boss.currentIntent?.abilityId || resultEvent?.abilityId || '';
-  const daughterIds = new Set(definition.abilityDaughters?.[abilityId] || []);
-  if (resultEvent?.daughter === 'all') ['bela', 'cassandra', 'daniela'].forEach((id) => daughterIds.add(id));
-  else if (resultEvent?.daughter) daughterIds.add(resultEvent.daughter);
+  const roster = isDimitrescu ? definition.daughters : definition.attendants;
+  const abilityMap = isDimitrescu ? definition.abilityDaughters : definition.abilityAttendants;
+  const activeIds = new Set(abilityMap?.[abilityId] || []);
 
-  const statusFor = (daughterId) => {
+  if (isDimitrescu) {
+    if (resultEvent?.daughter === 'all') ['bela', 'cassandra', 'daniela'].forEach((id) => activeIds.add(id));
+    else if (resultEvent?.daughter) activeIds.add(resultEvent.daughter);
+  } else {
+    if (resultEvent?.attendant) activeIds.add(resultEvent.attendant);
+    // Efeitos persistentes permitem que os capangas se sobreponham e formem combos.
+    (boss.effects || []).forEach((effect) => {
+      if (effect?.attendant && roster?.[effect.attendant]) activeIds.add(effect.attendant);
+    });
+  }
+
+  const statusFor = (memberId) => {
     const intent = boss.currentIntent;
-    if (intent?.abilityId === 'three_daughters') {
-      const objective = intent.payload?.objectives?.find((entry) => entry.type === daughterId);
-      if (objective) return objective.status || 'active';
+    if (isDimitrescu) {
+      if (intent?.abilityId === 'three_daughters') {
+        const objective = intent.payload?.objectives?.find((entry) => entry.type === memberId);
+        if (objective) return objective.status || 'active';
+      }
+      if (intent && abilityMap?.[intent.abilityId]?.includes(memberId)) return 'active';
+      if (resultEvent?.abilityId === 'three_daughters') {
+        return resultEvent.objectives?.find((entry) => entry.type === memberId)?.status || 'active';
+      }
+      if (resultEvent?.type === 'bloodiedDead' && memberId === 'cassandra') return resultEvent.purified ? 'success' : 'failed';
+      if (resultEvent?.daughter === memberId) return resultEvent.success === false ? 'failed' : resultEvent.success === true ? 'success' : 'active';
+      return 'active';
     }
-    if (intent && definition.abilityDaughters?.[intent.abilityId]?.includes(daughterId)) return 'active';
-    if (resultEvent?.abilityId === 'three_daughters') {
-      return resultEvent.objectives?.find((entry) => entry.type === daughterId)?.status || 'active';
+    if (intent && abilityMap?.[intent.abilityId]?.includes(memberId)) return 'active';
+    if ((boss.effects || []).some((effect) => effect?.attendant === memberId)) return 'active';
+    if (resultEvent && abilityMap?.[resultEvent.abilityId]?.includes(memberId)) {
+      return resultEvent.success === false ? 'failed' : resultEvent.success === true ? 'success' : 'active';
     }
-    if (resultEvent?.type === 'bloodiedDead' && daughterId === 'cassandra') return resultEvent.purified ? 'success' : 'failed';
-    if (resultEvent?.daughter === daughterId) return resultEvent.success === false ? 'failed' : resultEvent.success === true ? 'success' : 'active';
-    return 'active';
+    return 'idle';
   };
 
-  const daughterList = [...daughterIds];
-  const signature = `${abilityId}:${daughterList.map((id) => `${id}:${statusFor(id)}`).join(',')}`;
+  // Dimitrescu e Nehelenia usam o mesmo comportamento de palco:
+  // sem participante ativo, a faixa some e não ocupa espaço; quando a habilidade
+  // chama alguém, renderiza somente o(s) participante(s) daquela habilidade.
+  const memberList = [...activeIds];
+  const signature = `${definition.id}:${abilityId}:${memberList.map((id) => `${id}:${statusFor(id)}`).join(',')}`;
   if (strip.dataset.signature === signature) {
-    strip.hidden = daughterList.length === 0;
+    strip.hidden = memberList.length === 0;
     return;
   }
   strip.dataset.signature = signature;
   strip.replaceChildren();
-  if (!daughterList.length) {
+  if (!memberList.length) {
     strip.hidden = true;
     return;
   }
 
-  const stateLabels = { active: 'ATIVA', success: 'CONCLUÍDA', failed: 'FALHOU', consumed: 'CONCLUÍDA' };
-  daughterList.forEach((daughterId) => {
-    const daughter = definition.daughters?.[daughterId];
-    if (!daughter) return;
-    const status = statusFor(daughterId);
+  strip.setAttribute('aria-label', isDimitrescu ? 'Filhas de Lady Dimitrescu' : 'Capangas de Rainha Nehelenia');
+  const stateLabels = { idle: 'AGUARDANDO', active: 'ATIVO', success: 'CONCLUÍDO', failed: 'FALHOU', consumed: 'CONCLUÍDO' };
+  memberList.forEach((memberId) => {
+    const member = roster?.[memberId];
+    if (!member) return;
+    const status = statusFor(memberId);
     const card = document.createElement('span');
-    card.className = `boss-daughter-card is-${status}`;
-    card.dataset.daughter = daughterId;
+    card.className = `boss-daughter-card is-${status}${isNehelenia ? ' boss-nehelenia-attendant-card' : ''}`;
+    if (isDimitrescu) card.dataset.daughter = memberId;
+    else card.dataset.attendant = memberId;
     card.dataset.status = status;
-    card.title = daughter.name;
+    card.title = member.name;
+
     const image = document.createElement('img');
-    image.src = daughter.portrait;
+    image.src = member.portrait;
     image.alt = '';
+    image.addEventListener('error', () => {
+      card.classList.add('is-missing-art');
+      image.remove();
+    }, { once: true });
+
     const name = document.createElement('b');
-    name.textContent = daughter.name;
+    name.textContent = member.name;
     const stateBadge = document.createElement('small');
     stateBadge.className = 'boss-daughter-state';
-    stateBadge.textContent = stateLabels[status] || 'ATIVA';
+    stateBadge.textContent = stateLabels[status] || 'ATIVO';
     card.append(image, name, stateBadge);
     strip.appendChild(card);
   });
@@ -5488,6 +5638,480 @@ function setBossPortrait(image, definition) {
   }
 }
 
+const NEHELENIA_VISUAL_TIMING = Object.freeze({
+  nightmareOriginalHold: 1450,
+  nightmareCloneBirth: 1350,
+  nightmareSettle: 650,
+  nightmareShuffle: 3000,
+  discardMirrorReveal: 1050,
+  discardMirrorReturn: 1050,
+  discardMirrorSealDrop: 1350,
+  mirroredMeldMarkHold: 1400,
+  mirroredMeldCloneBirth: 1000,
+  mirroredMeldSplit: 1700,
+  mirroredMeldSettle: 220,
+});
+
+const locallyAnimatedNeheleniaMirrorMelds = new Set();
+const locallyAnimatingNeheleniaMirrorMelds = new Set();
+
+function neheleniaChoiceCardFromLabel(label) {
+  const text = String(label || '').trim();
+  const suit = ['♠', '♦', '♣', '♥'].find((entry) => text.endsWith(entry));
+  const rank = suit ? text.slice(0, -1) : text;
+  const card = { rank: rank || 'A', suit: suit || '♠' };
+  return `<i class="carta mini ${suitClass(card)} ${deckFaceClass(card)}" aria-hidden="true">${cardFrontHTML(card)}</i>`;
+}
+
+function clearNeheleniaChoiceStageTimers(actions) {
+  const timers = actions?._neheleniaChoiceTimers || [];
+  timers.forEach((timer) => clearTimeout(timer));
+  const animations = actions?._neheleniaChoiceAnimations || [];
+  animations.forEach((animation) => {
+    try {
+      animation.cancel();
+    } catch (_) {}
+  });
+  if (actions) {
+    actions._neheleniaChoiceTimers = [];
+    actions._neheleniaChoiceAnimations = [];
+  }
+}
+
+function neheleniaShuffleSeed(value) {
+  return String(value ?? 'nehelenia')
+    .split('')
+    .reduce((sum, char) => (sum * 33 + char.charCodeAt(0)) >>> 0, 5381);
+}
+
+function renderNeheleniaChoiceStage(actions, choice) {
+  if (!actions || !choice) return false;
+  if (!['discard_mirror', 'eternal_nightmare'].includes(choice.type)) return false;
+  if (actions.dataset.neheleniaChoiceId === String(choice.id) && actions.querySelector('.nehelenia-choice-stage')) return true;
+
+  clearNeheleniaChoiceStageTimers(actions);
+  actions.dataset.neheleniaChoiceId = String(choice.id);
+  actions.classList.add('nehelenia-choice-stage-host');
+
+  const options = [...(choice.options || [])];
+  const labels = options.map((option) => choice.optionLabels?.[option] || '');
+  const buttons = options
+    .map(
+      (option, index) => `
+    <button type="button" class="nehelenia-shell-option" data-boss-choice="${option}" data-shell-index="${index}" disabled>
+      <span class="nehelenia-shell-frame">
+        <span class="nehelenia-shell-glass"></span>
+        ${neheleniaChoiceCardFromLabel(labels[index] || labels[0])}
+      </span>
+      <span class="nehelenia-shell-label">REFLEXO ${index + 1}</span>
+    </button>
+  `,
+    )
+    .join('');
+
+  if (choice.type === 'discard_mirror') {
+    actions.innerHTML = `
+      <div class="nehelenia-choice-stage is-discard-mirror">
+        <div class="nehelenia-choice-stage-title">ESPELHO DO LIXO</div>
+        <div class="nehelenia-choice-stage-subtitle">Dois reflexos idênticos. Nenhuma pista. Escolha um.</div>
+        <div class="nehelenia-discard-mirror-pair">${buttons}</div>
+        <div class="nehelenia-choice-stage-foot">50% de chance · erro sela o lixo nesta rodada</div>
+      </div>
+    `;
+    const unlock = setTimeout(() => {
+      if (actions.dataset.neheleniaChoiceId !== String(choice.id)) return;
+      actions.querySelectorAll('.nehelenia-shell-option').forEach((button) => {
+        button.disabled = false;
+      });
+      actions.querySelector('.nehelenia-choice-stage')?.classList.add('is-ready');
+    }, NEHELENIA_VISUAL_TIMING.discardMirrorReveal + 90);
+    actions._neheleniaChoiceTimers = [unlock];
+    return true;
+  }
+
+  actions.innerHTML = `
+    <div class="nehelenia-choice-stage is-eternal-nightmare">
+      <div class="nehelenia-choice-stage-title">PESADELO ETERNO</div>
+      <div class="nehelenia-choice-stage-subtitle">Observe a ORIGINAL. Depois dela nascem dois reflexos; só então os três serão embaralhados.</div>
+      <div class="nehelenia-shell-arena">${buttons}</div>
+      <div class="nehelenia-choice-stage-foot">Acompanhe a carta verdadeira até o fim do embaralhamento</div>
+    </div>
+  `;
+
+  const tokens = [...actions.querySelectorAll('.nehelenia-shell-option')];
+  const correctToken = tokens.find((button) => button.dataset.bossChoice === choice.correctOption) || tokens[0];
+  const fakeTokens = tokens.filter((button) => button !== correctToken);
+  correctToken?.classList.add('is-origin');
+  fakeTokens.forEach((button) => {
+    button.classList.add('is-clone-pending');
+    button.style.opacity = '0';
+    button.style.transform = 'translate(calc(-50% + 0px), 0) scale(.72)';
+    button.style.filter = 'blur(8px) brightness(1.45)';
+  });
+
+  const arena = actions.querySelector('.nehelenia-shell-arena');
+  const revealTimer = setTimeout(() => {
+    if (actions.dataset.neheleniaChoiceId !== String(choice.id) || !arena?.isConnected || !correctToken) return;
+    const spread = Math.max(92, Math.min(158, (arena.clientWidth || 420) * 0.28));
+    const leftFake = fakeTokens[0] || tokens[0];
+    const rightFake = fakeTokens[1] || tokens[tokens.length - 1];
+    const birthTargets = new Map([
+      [leftFake, -spread],
+      [correctToken, 0],
+      [rightFake, spread],
+    ]);
+    const birthAnimations = [];
+
+    fakeTokens.forEach((button) => {
+      const targetX = birthTargets.get(button) || 0;
+      const animation = button.animate(
+        [
+          { transform: 'translate(calc(-50% + 0px), 0) scale(.72)', opacity: 0, filter: 'blur(9px) brightness(1.65)' },
+          { transform: `translate(calc(-50% + ${targetX * 0.36}px), -5px) scale(.88)`, opacity: 0.62, filter: 'blur(4px) brightness(1.38)', offset: 0.42 },
+          { transform: `translate(calc(-50% + ${targetX}px), 0) scale(1)`, opacity: 1, filter: 'blur(0) brightness(1)' },
+        ],
+        {
+          duration: NEHELENIA_VISUAL_TIMING.nightmareCloneBirth,
+          easing: 'cubic-bezier(.18,.78,.18,1)',
+          fill: 'forwards',
+        },
+      );
+      birthAnimations.push(animation);
+    });
+    const originAnimation = correctToken.animate(
+      [
+        { transform: 'translate(calc(-50% + 0px), 0) scale(1)', filter: 'brightness(1.18)' },
+        { transform: 'translate(calc(-50% + 0px), -3px) scale(1.035)', filter: 'brightness(1.32)', offset: 0.48 },
+        { transform: 'translate(calc(-50% + 0px), 0) scale(1)', filter: 'brightness(1)' },
+      ],
+      {
+        duration: NEHELENIA_VISUAL_TIMING.nightmareCloneBirth,
+        easing: 'ease-in-out',
+        fill: 'forwards',
+      },
+    );
+    birthAnimations.push(originAnimation);
+    actions._neheleniaChoiceAnimations.push(...birthAnimations);
+
+    const shuffleTimer = setTimeout(() => {
+      if (actions.dataset.neheleniaChoiceId !== String(choice.id) || !arena?.isConnected) return;
+      fakeTokens.forEach((button) => button.classList.remove('is-clone-pending'));
+      correctToken.classList.remove('is-origin');
+      tokens.forEach((button) => button.classList.add('is-shuffling'));
+
+      const identityOrder = [leftFake, correctToken, rightFake];
+      const seed = neheleniaShuffleSeed(choice.id);
+      const finaleVariants = [
+        [identityOrder[2], identityOrder[0], identityOrder[1]],
+        [identityOrder[1], identityOrder[2], identityOrder[0]],
+        [identityOrder[0], identityOrder[2], identityOrder[1]],
+        [identityOrder[2], identityOrder[1], identityOrder[0]],
+      ];
+      const orders = [
+        identityOrder,
+        [identityOrder[1], identityOrder[2], identityOrder[0]],
+        [identityOrder[2], identityOrder[0], identityOrder[1]],
+        [identityOrder[1], identityOrder[0], identityOrder[2]],
+        [identityOrder[0], identityOrder[2], identityOrder[1]],
+        [identityOrder[2], identityOrder[1], identityOrder[0]],
+        finaleVariants[seed % finaleVariants.length],
+      ];
+      const lanes = [-spread, 0, spread];
+      const finalXs = new Map();
+      const shuffleAnimations = [];
+
+      tokens.forEach((button, tokenIndex) => {
+        const keyframes = orders.map((order, step) => {
+          const laneIndex = Math.max(0, order.indexOf(button));
+          const x = lanes[laneIndex];
+          const last = step === orders.length - 1;
+          if (last) finalXs.set(button, x);
+          const y = last ? 0 : step % 2 === tokenIndex % 2 ? -9 : 8;
+          const scale = last ? 1 : step % 2 ? 0.985 : 1.018;
+          return {
+            transform: `translate(calc(-50% + ${x}px), ${y}px) scale(${scale})`,
+            opacity: 1,
+            filter: `brightness(${last ? 1 : step % 2 ? 0.95 : 1.08})`,
+            offset: step / (orders.length - 1),
+          };
+        });
+        const animation = button.animate(keyframes, {
+          duration: NEHELENIA_VISUAL_TIMING.nightmareShuffle,
+          easing: 'cubic-bezier(.42,.05,.18,1)',
+          fill: 'forwards',
+        });
+        shuffleAnimations.push(animation);
+      });
+      actions._neheleniaChoiceAnimations.push(...shuffleAnimations);
+
+      const unlockTimer = setTimeout(() => {
+        if (actions.dataset.neheleniaChoiceId !== String(choice.id)) return;
+        tokens.forEach((button) => {
+          const finalX = finalXs.get(button) || 0;
+          button.style.transform = `translate(calc(-50% + ${finalX}px), 0) scale(1)`;
+          button.style.opacity = '1';
+          button.style.filter = '';
+          button.classList.remove('is-shuffling');
+          button.disabled = false;
+        });
+        actions.querySelector('.nehelenia-choice-stage')?.classList.add('is-ready');
+      }, NEHELENIA_VISUAL_TIMING.nightmareShuffle + 90);
+      actions._neheleniaChoiceTimers.push(unlockTimer);
+    }, NEHELENIA_VISUAL_TIMING.nightmareCloneBirth + NEHELENIA_VISUAL_TIMING.nightmareSettle);
+    actions._neheleniaChoiceTimers.push(shuffleTimer);
+  }, NEHELENIA_VISUAL_TIMING.nightmareOriginalHold);
+  actions._neheleniaChoiceTimers = [revealTimer];
+  return true;
+}
+
+async function animateNeheleniaDiscardMirrorReturn(button, { trap = false } = {}) {
+  const stage = button?.closest('.nehelenia-choice-stage.is-discard-mirror');
+  const sourceCard = button?.querySelector('.carta.mini');
+  const sourceMirror = button?.querySelector('.nehelenia-shell-frame');
+  const discardButton = document.getElementById('drawDiscardBtn');
+  const discardTarget = document.querySelector('#drawDiscardBtn .pile-card') || discardButton;
+  if (!stage || !sourceCard || !discardTarget) return;
+
+  stage.classList.add('is-resolving');
+  stage.querySelectorAll('.nehelenia-shell-option').forEach((entry) => {
+    entry.disabled = true;
+  });
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  if (reducedMotion) {
+    if (trap) discardButton?.classList.add('boss-nehelenia-seal-preview');
+    await waitForVisualDuration(80);
+    return;
+  }
+
+  const fromRect = getRect(sourceCard);
+  const toRect = getRect(discardTarget);
+  if (!fromRect.width || !fromRect.height || !toRect.width || !toRect.height) {
+    if (trap) discardButton?.classList.add('boss-nehelenia-seal-preview');
+    await waitForVisualDuration(220);
+    return;
+  }
+
+  const cardGhost = sourceCard.cloneNode(true);
+  cardGhost.classList.add('nehelenia-discard-flight-card');
+  cardGhost.removeAttribute('id');
+  cardGhost.setAttribute('aria-hidden', 'true');
+  cardGhost.style.setProperty('position', 'fixed', 'important');
+  cardGhost.style.setProperty('left', `${fromRect.left}px`, 'important');
+  cardGhost.style.setProperty('top', `${fromRect.top}px`, 'important');
+  cardGhost.style.setProperty('width', `${fromRect.width}px`, 'important');
+  cardGhost.style.setProperty('height', `${fromRect.height}px`, 'important');
+  cardGhost.style.setProperty('margin', '0', 'important');
+  cardGhost.style.setProperty('z-index', '10080', 'important');
+  cardGhost.style.setProperty('pointer-events', 'none', 'important');
+  cardGhost.style.setProperty('transform-origin', 'center center', 'important');
+  document.body.appendChild(cardGhost);
+  sourceCard.style.opacity = '0';
+
+  let mirrorGhost = null;
+  let mirrorFlight = null;
+  if (trap && sourceMirror) {
+    const mirrorRect = getRect(sourceMirror);
+    if (mirrorRect.width && mirrorRect.height) {
+      mirrorGhost = sourceMirror.cloneNode(true);
+      mirrorGhost.querySelector('.carta.mini')?.remove();
+      mirrorGhost.classList.add('nehelenia-discard-flight-mirror');
+      mirrorGhost.setAttribute('aria-hidden', 'true');
+      mirrorGhost.style.setProperty('position', 'fixed', 'important');
+      mirrorGhost.style.setProperty('left', `${mirrorRect.left}px`, 'important');
+      mirrorGhost.style.setProperty('top', `${mirrorRect.top}px`, 'important');
+      mirrorGhost.style.setProperty('width', `${mirrorRect.width}px`, 'important');
+      mirrorGhost.style.setProperty('height', `${mirrorRect.height}px`, 'important');
+      mirrorGhost.style.setProperty('margin', '0', 'important');
+      mirrorGhost.style.setProperty('z-index', '10079', 'important');
+      mirrorGhost.style.setProperty('pointer-events', 'none', 'important');
+      mirrorGhost.style.setProperty('transform-origin', 'center center', 'important');
+      document.body.appendChild(mirrorGhost);
+
+      const mirrorDx = toRect.left + toRect.width / 2 - (mirrorRect.left + mirrorRect.width / 2);
+      const mirrorDy = toRect.top + toRect.height / 2 - (mirrorRect.top + mirrorRect.height / 2);
+      // A moldura PNG é mais alta que a antiga moldura CSS. O voo termina
+      // no mesmo tamanho visual do selo que permanece no lixo, evitando
+      // encolher e depois "pular" de tamanho quando a animação termina.
+      const targetWidth = toRect.width * 1.42;
+      const targetHeight = targetWidth * (1671 / 941);
+      const mirrorScale = Math.max(0.72, Math.min(1.35, Math.min(targetWidth / mirrorRect.width, targetHeight / mirrorRect.height)));
+      mirrorFlight = mirrorGhost.animate(
+        [
+          { transform: 'translate3d(0,0,0) scale(1)', opacity: 1, filter: 'brightness(1.12) drop-shadow(0 0 16px rgba(196,181,253,.5))' },
+          { transform: `translate3d(${mirrorDx * 0.08}px,-14px,0) scale(.99)`, opacity: 1, filter: 'brightness(1.28) drop-shadow(0 0 22px rgba(196,181,253,.72))', offset: 0.28 },
+          { transform: `translate3d(${mirrorDx * 0.66}px,${mirrorDy * 0.58}px,0) scale(${Math.max(mirrorScale, 0.84)})`, opacity: 0.98, filter: 'brightness(1.06) drop-shadow(0 0 14px rgba(167,139,250,.6))', offset: 0.72 },
+          { transform: `translate3d(${mirrorDx}px,${mirrorDy}px,0) scale(${mirrorScale})`, opacity: 0.96, filter: 'brightness(.94) drop-shadow(0 0 11px rgba(124,58,237,.5))' },
+        ],
+        {
+          duration: NEHELENIA_VISUAL_TIMING.discardMirrorSealDrop,
+          easing: 'cubic-bezier(.2,.7,.16,1)',
+          fill: 'forwards',
+        },
+      );
+    }
+  }
+
+  const dx = toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
+  const dy = toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2);
+  const endScale = Math.max(0.5, Math.min(1, Math.min(toRect.width / fromRect.width, toRect.height / fromRect.height)));
+  const cardFlight = cardGhost.animate(
+    [
+      { transform: 'translate3d(0,0,0) scale(1)', opacity: 1, filter: 'brightness(1.18) drop-shadow(0 0 10px rgba(196,181,253,.55))' },
+      { transform: `translate3d(${dx * 0.08}px,-38px,0) scale(1.08)`, opacity: 1, filter: 'brightness(1.35) drop-shadow(0 0 20px rgba(196,181,253,.75))', offset: 0.22 },
+      { transform: `translate3d(${dx * 0.62}px,${dy * 0.56 - 18}px,0) scale(${Math.max(endScale, 0.82)})`, opacity: 0.96, filter: 'brightness(1.08) drop-shadow(0 0 13px rgba(167,139,250,.58))', offset: 0.66 },
+      { transform: `translate3d(${dx}px,${dy}px,0) scale(${endScale})`, opacity: 0.12, filter: 'brightness(.95) drop-shadow(0 0 5px rgba(167,139,250,.35))' },
+    ],
+    {
+      duration: NEHELENIA_VISUAL_TIMING.discardMirrorReturn,
+      easing: 'cubic-bezier(.24,.72,.18,1)',
+      fill: 'forwards',
+    },
+  );
+
+  const flights = [cardFlight.finished];
+  if (mirrorFlight) flights.push(mirrorFlight.finished);
+  await Promise.allSettled(flights);
+  if (trap) discardButton?.classList.add('boss-nehelenia-seal-preview');
+  cardGhost.remove();
+  mirrorGhost?.remove();
+}
+function neheleniaMirrorMeldAnimationKey(intent, teamId, meldIndex) {
+  const visualEpoch = state?.debugScenario?.preparedAt || state?.boss?.seed || 'match';
+  return `${String(visualEpoch)}:${String(intent?.id ?? 'mirror')}:${String(teamId)}:${String(meldIndex)}`;
+}
+
+function setNeheleniaGhostRect(ghost, rect) {
+  ghost.style.setProperty('position', 'fixed', 'important');
+  ghost.style.setProperty('left', `${rect.left}px`, 'important');
+  ghost.style.setProperty('top', `${rect.top}px`, 'important');
+  ghost.style.setProperty('width', `${rect.width}px`, 'important');
+  ghost.style.setProperty('min-width', `${rect.width}px`, 'important');
+  ghost.style.setProperty('max-width', `${rect.width}px`, 'important');
+  ghost.style.setProperty('height', `${rect.height}px`, 'important');
+  ghost.style.setProperty('margin', '0', 'important');
+  ghost.style.setProperty('z-index', '10065', 'important');
+  ghost.style.setProperty('pointer-events', 'none', 'important');
+  ghost.style.setProperty('transform-origin', 'top left', 'important');
+}
+
+function animateNeheleniaMeldGhostToRect(ghost, fromRect, toRect) {
+  const dx = toRect.left - fromRect.left;
+  const dy = toRect.top - fromRect.top;
+  return ghost.animate(
+    [
+      { transform: 'translate3d(0,0,0)', filter: 'blur(0) brightness(1.12)', opacity: 1 },
+      { transform: `translate3d(${dx * 0.24}px,${dy * 0.18 - 3}px,0)`, filter: 'blur(.35px) brightness(1.22)', opacity: 1, offset: 0.28 },
+      { transform: `translate3d(${dx * 0.68}px,${dy * 0.62 + 2}px,0)`, filter: 'blur(0) brightness(1.07)', opacity: 1, offset: 0.68 },
+      { transform: `translate3d(${dx}px,${dy}px,0)`, filter: 'blur(0) brightness(1)', opacity: 1 },
+    ],
+    {
+      duration: NEHELENIA_VISUAL_TIMING.mirroredMeldSplit,
+      easing: 'cubic-bezier(.2,.72,.18,1)',
+      fill: 'forwards',
+    },
+  );
+}
+
+function scheduleNeheleniaMirroredMeldSplit(intent, teamId, meldIndex) {
+  if (!intent || intent.abilityId !== 'mirrored_meld') return;
+  const animationKey = neheleniaMirrorMeldAnimationKey(intent, teamId, meldIndex);
+  if (locallyAnimatedNeheleniaMirrorMelds.has(animationKey) || locallyAnimatingNeheleniaMirrorMelds.has(animationKey)) return;
+  locallyAnimatingNeheleniaMirrorMelds.add(animationKey);
+
+  requestAnimationFrame(async () => {
+    let firstGhost = null;
+    let secondGhost = null;
+    let sourceCards = null;
+    try {
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      if (reducedMotion) {
+        locallyAnimatedNeheleniaMirrorMelds.add(animationKey);
+        renderMelds();
+        return;
+      }
+
+      await waitForVisualDuration(NEHELENIA_VISUAL_TIMING.mirroredMeldMarkHold);
+      const liveIntent = state?.boss?.id === 'nehelenia' ? state.boss.currentIntent : null;
+      if (!liveIntent || liveIntent.abilityId !== 'mirrored_meld' || String(liveIntent.id) !== String(intent.id) || liveIntent.payload?.resolved) return;
+      const source = document.querySelector(`[data-meld-key="${teamId}:${meldIndex}"]`);
+      sourceCards = source?.querySelector('.meld-line-cards');
+      if (!sourceCards?.isConnected) return;
+      const sourceRect = getRect(sourceCards);
+      if (!sourceRect.width || !sourceRect.height) return;
+
+      // A animação deve mover SOMENTE as cartas. "Canastra / Limpa" e o
+      // contêiner do jogo não participam da clonagem e, portanto, não sobem.
+      firstGhost = sourceCards.cloneNode(true);
+      secondGhost = sourceCards.cloneNode(true);
+      for (const ghost of [firstGhost, secondGhost]) {
+        ghost.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
+        ghost.classList.add('nehelenia-mirror-split-ghost');
+        ghost.classList.remove('nehelenia-mirror-split-pending');
+        setNeheleniaGhostRect(ghost, sourceRect);
+      }
+      firstGhost.dataset.neheleniaMirror = 'REFLEXO I';
+      secondGhost.dataset.neheleniaMirror = 'REFLEXO II';
+      secondGhost.style.opacity = '0';
+      document.body.append(firstGhost, secondGhost);
+      sourceCards.style.visibility = 'hidden';
+
+      const birth = secondGhost.animate(
+        [
+          { opacity: 0, transform: 'translate3d(0,0,0)', filter: 'blur(9px) brightness(1.8)' },
+          { opacity: 0.58, transform: 'translate3d(3px,-2px,0)', filter: 'blur(4px) brightness(1.5)', offset: 0.48 },
+          { opacity: 1, transform: 'translate3d(0,0,0)', filter: 'blur(0) brightness(1.12)' },
+        ],
+        {
+          duration: NEHELENIA_VISUAL_TIMING.mirroredMeldCloneBirth,
+          easing: 'cubic-bezier(.16,.84,.22,1)',
+          fill: 'forwards',
+        },
+      );
+      const sourcePulse = firstGhost.animate([{ filter: 'brightness(1.05)' }, { filter: 'brightness(1.42) drop-shadow(0 0 20px rgba(196,181,253,.55))', offset: 0.52 }, { filter: 'brightness(1.12)' }], {
+        duration: NEHELENIA_VISUAL_TIMING.mirroredMeldCloneBirth,
+        easing: 'ease-in-out',
+        fill: 'forwards',
+      });
+      await Promise.allSettled([birth.finished, sourcePulse.finished]);
+
+      const stillLiveIntent = state?.boss?.id === 'nehelenia' ? state.boss.currentIntent : null;
+      if (!stillLiveIntent || stillLiveIntent.abilityId !== 'mirrored_meld' || String(stillLiveIntent.id) !== String(intent.id) || stillLiveIntent.payload?.resolved) return;
+      locallyAnimatedNeheleniaMirrorMelds.add(animationKey);
+      renderMelds();
+
+      const finalLeftMeld = document.querySelector(`[data-nehelenia-mirror-slot="left"][data-nehelenia-clone-for="${teamId}:${meldIndex}"], [data-meld-key="${teamId}:${meldIndex}"][data-nehelenia-mirror-slot="left"]`);
+      const finalRightMeld = document.querySelector(`[data-nehelenia-mirror-slot="right"][data-nehelenia-clone-for="${teamId}:${meldIndex}"], [data-meld-key="${teamId}:${meldIndex}"][data-nehelenia-mirror-slot="right"]`);
+      const finalLeft = finalLeftMeld?.querySelector('.meld-line-cards');
+      const finalRight = finalRightMeld?.querySelector('.meld-line-cards');
+      if (!finalLeft || !finalRight) return;
+      const leftRect = getRect(finalLeft);
+      const rightRect = getRect(finalRight);
+      finalLeft.style.visibility = 'hidden';
+      finalRight.style.visibility = 'hidden';
+
+      const leftFlight = animateNeheleniaMeldGhostToRect(firstGhost, sourceRect, leftRect);
+      const rightFlight = animateNeheleniaMeldGhostToRect(secondGhost, sourceRect, rightRect);
+      await Promise.allSettled([leftFlight.finished, rightFlight.finished]);
+      await waitForVisualDuration(NEHELENIA_VISUAL_TIMING.mirroredMeldSettle);
+      document.querySelectorAll(`[data-meld-key="${teamId}:${meldIndex}"], [data-nehelenia-clone-for="${teamId}:${meldIndex}"]`).forEach((node) => {
+        node.classList.remove('nehelenia-mirror-split-underlay');
+        const cards = node.querySelector('.meld-line-cards');
+        if (cards) cards.style.visibility = '';
+      });
+    } finally {
+      firstGhost?.remove();
+      secondGhost?.remove();
+      locallyAnimatingNeheleniaMirrorMelds.delete(animationKey);
+      if (sourceCards?.isConnected) sourceCards.style.visibility = '';
+      document.querySelectorAll(`[data-meld-key="${teamId}:${meldIndex}"], [data-nehelenia-clone-for="${teamId}:${meldIndex}"]`).forEach((node) => {
+        node.classList.remove('nehelenia-mirror-split-underlay');
+        const cards = node.querySelector('.meld-line-cards');
+        if (cards) cards.style.visibility = '';
+      });
+    }
+  });
+}
+
 function renderBossHud() {
   const hud = document.getElementById('bossHud');
   const resultSection = document.getElementById('bossResultSection');
@@ -5507,6 +6131,7 @@ function renderBossHud() {
   const isBanker = boss.id === 'banker';
   const isMatriarch = boss.id === 'matriarca_esmeralda';
   const isDimitrescu = boss.id === 'dimitrescu';
+  const isNehelenia = boss.id === 'nehelenia';
   document.body.dataset.bossId = boss.id;
   const flow = boss.bossFlow;
   const resolvingEvent = flow?.stage === 'result' ? boss.eventLog?.find((entry) => entry.actionId === flow.eventActionId) || null : null;
@@ -5515,12 +6140,22 @@ function renderBossHud() {
   hud.classList.toggle('boss-turn-active', isBossTurnActive(state));
   const cocoonActive = isMatriarch && boss.emeraldCocoon?.status === 'active';
   const bloodClotActive = isDimitrescu && boss.crimsonClot?.status === 'active';
+  const mirrorReturnActive = false;
+  const totalEclipseActive = false;
+  const mirrorPrisonActive = mirrorReturnActive || totalEclipseActive;
+  const mirrorStoredDamage = mirrorReturnActive ? Math.max(0, Number(boss.mirrorReturn?.storedDamage) || 0) : totalEclipseActive ? Math.max(0, Number(boss.totalEclipse?.storedDamage) || 0) : 0;
+  const mirrorRequiredDamage = mirrorReturnActive ? Math.max(1, Number(boss.mirrorReturn?.requiredTotal) || 1) : 0;
   const cocoonMaximum = 180;
   const cocoonRemaining = cocoonActive ? Math.max(0, Number(boss.emeraldCocoon.remaining) || 0) : 0;
   const bloodClotMaximum = bloodClotActive ? Math.max(1, Number(boss.crimsonClot.max) || 1) : 0;
   const bloodClotRemaining = bloodClotActive ? Math.max(0, Number(boss.crimsonClot.remaining) || 0) : 0;
   hud.classList.toggle('boss-cocoon-active', cocoonActive);
   hud.classList.toggle('boss-blood-clot-active', bloodClotActive);
+  hud.classList.toggle('boss-mirror-prison-active', mirrorPrisonActive);
+  hud.classList.toggle('boss-mirror-return-active', mirrorReturnActive);
+  hud.classList.toggle('boss-nehelenia-dream-stolen', isNehelenia && Number(boss.danger || 0) > 0);
+  hud.classList.toggle('boss-nehelenia-mirror-world', isNehelenia && !!boss.mirrorWorldActive);
+  hud.classList.toggle('boss-total-eclipse-active', totalEclipseActive);
   hud.dataset.cocoonStage = cocoonActive ? (cocoonRemaining <= 60 ? 'critical' : cocoonRemaining <= 120 ? 'cracked' : 'full') : '';
   hud.dataset.bloodClotStage = bloodClotActive ? (bloodClotRemaining <= bloodClotMaximum * 0.33 ? 'critical' : bloodClotRemaining <= bloodClotMaximum * 0.66 ? 'cracked' : 'full') : '';
   const cocoonStrength = cocoonActive ? cocoonRemaining / cocoonMaximum : 0;
@@ -5549,24 +6184,45 @@ function renderBossHud() {
   const cocoonText = document.getElementById('bossCocoonText');
   const wardLabel = document.getElementById('bossWardLabel');
   if (cocoonMeter && cocoonText) {
-    const wardActive = cocoonActive || bloodClotActive;
+    const wardActive = cocoonActive || bloodClotActive || mirrorPrisonActive;
     cocoonMeter.hidden = !wardActive;
-    if (wardLabel) wardLabel.textContent = bloodClotActive ? 'COÁGULO' : 'CASULO';
-    cocoonText.textContent = bloodClotActive ? `${bloodClotRemaining} / ${bloodClotMaximum}` : `${cocoonRemaining} / ${cocoonMaximum}`;
-    cocoonMeter.setAttribute('aria-label', bloodClotActive
-      ? `Coágulo Carmesim: ${bloodClotRemaining} de ${bloodClotMaximum} de proteção restante`
+    if (wardLabel) wardLabel.textContent = bloodClotActive ? 'COÁGULO' : cocoonActive ? 'CASULO' : totalEclipseActive ? 'ECLIPSE' : 'ESPELHO';
+    cocoonText.textContent = bloodClotActive
+      ? `${bloodClotRemaining} / ${bloodClotMaximum}`
       : cocoonActive
-        ? `Casulo Esmeralda: ${cocoonRemaining} de ${cocoonMaximum} de protecao restante`
-        : 'Proteção do chefe inativa');
+        ? `${cocoonRemaining} / ${cocoonMaximum}`
+        : mirrorReturnActive
+          ? `${mirrorStoredDamage} / ${mirrorRequiredDamage}`
+          : `${mirrorStoredDamage} PRESO`;
+    cocoonMeter.setAttribute(
+      'aria-label',
+      bloodClotActive
+        ? `Coágulo Carmesim: ${bloodClotRemaining} de ${bloodClotMaximum} de proteção restante`
+        : cocoonActive
+          ? `Casulo Esmeralda: ${cocoonRemaining} de ${cocoonMaximum} de protecao restante`
+          : mirrorReturnActive
+            ? `Espelho de Retorno: ${mirrorStoredDamage} de ${mirrorRequiredDamage} de dano aprisionado`
+            : totalEclipseActive
+              ? `Eclipse Total: ${mirrorStoredDamage} de dano aprisionado`
+              : 'Proteção do chefe inativa',
+    );
   }
   const dangerMeter = document.getElementById('bossDangerMeter');
   const chainStatus = document.getElementById('bossChainStatus');
   const bloomFlowers = document.getElementById('bossBloomFlowers');
+  const escapeBossHudText = (value) =>
+    String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   dangerMeter.style.display = isDominatrix ? 'none' : 'block';
   chainStatus.style.display = isDominatrix ? 'grid' : 'none';
   dangerMeter.classList.toggle('boss-bloom-meter', isMatriarch);
   dangerMeter.classList.toggle('boss-blood-meter', isDimitrescu);
-  bloomFlowers.style.display = isMatriarch ? 'flex' : 'none';
+  dangerMeter.classList.toggle('boss-mirror-meter', isNehelenia);
+  bloomFlowers.style.display = isMatriarch || isNehelenia ? 'flex' : 'none';
   if (isDominatrix) {
     chainStatus.innerHTML = state.players
       .map((player) => {
@@ -5583,8 +6239,8 @@ function renderBossHud() {
       })
       .join('');
   } else {
-    document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : 'DÍVIDA COLETIVA';
-    document.getElementById('bossDebtText').textContent = `${boss.danger} / ${boss.maxDanger}`;
+    document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : isNehelenia ? 'ESPELHOS SOB CONTROLE' : 'DÍVIDA COLETIVA';
+    document.getElementById('bossDebtText').textContent = isNehelenia ? `${boss.danger} / ${boss.maxDanger} ESPELHOS` : `${boss.danger} / ${boss.maxDanger}`;
     document.getElementById('bossDebtBar').style.width = `${Math.max(0, (boss.danger / boss.maxDanger) * 100)}%`;
     const bloomEventChanged = isMatriarch && boss.lastBloomEventId && boss.lastBloomEventId !== lastRenderedBossBloomEventId;
     const previousBloom = lastRenderedBossBloom;
@@ -5595,7 +6251,12 @@ function renderBossHud() {
           const isWilting = bloomEventChanged && previousBloom != null && boss.bloom < previousBloom && index >= boss.bloom && index < previousBloom;
           return `<i class="${[isOpen ? 'open' : '', isOpening ? 'opening' : '', isWilting ? 'wilting' : ''].filter(Boolean).join(' ')}" title="Flor ${index + 1}">✿</i>`;
         }).join('')
-      : '';
+      : isNehelenia
+        ? Array.from({ length: Math.max(1, Number(boss.maxDanger) || 5) }, (_, index) => {
+            const taken = index < (Number(boss.danger) || 0);
+            return `<i class="boss-dream-mirror-orb${taken ? ' taken' : ' intact'}" title="Espelho ${index + 1} de ${boss.maxDanger}"><span class="boss-dream-mirror-glass"></span><b>${index + 1}</b></i>`;
+          }).join('')
+        : '';
     if (isMatriarch) {
       lastRenderedBossBloom = boss.bloom;
       lastRenderedBossBloomEventId = boss.lastBloomEventId || null;
@@ -5609,9 +6270,6 @@ function renderBossHud() {
 
   const intentDescription = document.getElementById('bossIntentDescription');
   const intentProgress = document.getElementById('bossIntentProgress');
-  const escapeBossHudText = (value) => String(value ?? '')
-    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 
   if (isDimitrescu && boss.currentIntent?.abilityId === 'blood_tithe' && flow?.stage !== 'result') {
     const phase = Number(boss.currentIntent.announcedPhase) || 1;
@@ -5624,13 +6282,18 @@ function renderBossHud() {
       return { name: player.name || 'Jogador', cards, band, amount };
     });
     const projected = players.reduce((sum, player) => sum + player.amount, 0);
-    const escapeRangeText = (value) => String(value ?? '')
-      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
-    const badges = (band) => players
-      .filter((player) => player.band === band)
-      .map((player) => `<span class="boss-range-player ${band}">✓ ${escapeRangeText(player.name)} · ${player.cards}</span>`)
-      .join('');
+    const escapeRangeText = (value) =>
+      String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    const badges = (band) =>
+      players
+        .filter((player) => player.band === band)
+        .map((player) => `<span class="boss-range-player ${band}">✓ ${escapeRangeText(player.name)} · ${player.cards}</span>`)
+        .join('');
 
     intentDescription.className = 'boss-range-panel boss-blood-tithe-panel';
     intentDescription.innerHTML = `
@@ -5802,37 +6465,54 @@ function renderBossHud() {
       selectedBossCollateralCardId = null;
     }
 
-    document.getElementById('bossChoicePrompt').textContent =
-      myChoice.type === 'break_will'
+    document.getElementById('bossChoicePrompt').textContent = ['false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare'].includes(myChoice.type)
+      ? myChoice.type === 'shattered_mirror'
+        ? 'Espelho Estilhaçado: dois reflexos são reais. Escolha a única mentira.'
+        : myChoice.type === 'discard_mirror'
+          ? 'Espelho do Lixo: dois reflexos idênticos mostram o topo. Escolha um deles.'
+          : myChoice.type === 'dream_theft'
+            ? 'Roubo de Sonho: qual dessas imagens realmente existe na sua mão?'
+            : myChoice.type === 'eternal_nightmare'
+              ? 'Pesadelo Eterno: acompanhe a carta ORIGINAL depois que dois reflexos nascerem e os três se embaralharem.'
+              : 'Imagem Falsa: qual dessas imagens realmente existe na sua mão?'
+      : myChoice.type === 'break_will'
         ? 'Quebra de Vontade: escolha sua punição.'
         : myChoice.type === 'fixed_interest_payment'
           ? `${choiceOwner?.name || 'Titular'}: +${myChoice.amount} agora ou Cofre (carta aleatória · resgate +${myChoice.collateralAmount} · +${myChoice.interestStep || 2} por turno adiado).`
           : collateralChoice
             ? 'Clique em uma carta da sua mão e confirme a garantia.'
             : myChoice.type === 'final_order'
-              ? `Ordem Final: ${myChoice.cardIds?.map((cardId) => {
-                  const marked = state.players[myPlayerIndex]?.hand?.find((card) => card.id === cardId);
-                  return marked ? `${marked.rank}${marked.suit}` : 'carta marcada';
-                }).join(' e ')}. Aceite usar as duas em jogo no proximo turno ou receba 1 Chicote agora.`
+              ? `Ordem Final: ${myChoice.cardIds
+                  ?.map((cardId) => {
+                    const marked = state.players[myPlayerIndex]?.hand?.find((card) => card.id === cardId);
+                    return marked ? `${marked.rank}${marked.suit}` : 'carta marcada';
+                  })
+                  .join(' e ')}. Aceite usar as duas em jogo no proximo turno ou receba 1 Chicote agora.`
               : myChoice.type === 'final_order_draw'
                 ? 'Ordem Final: escolha entre comprar 2 cartas que ficarao presas no proximo turno ou receber 1 Chicote.'
                 : myChoice.type === 'final_order_lock'
                   ? 'Ordem Final: escolha entre deixar 1 carta aleatoria da sua mao presa no proximo turno ou receber 1 Chicote.'
                   : myChoice.type === 'forced_choice' && myChoice.order?.description
-                  ? `Escolha Forçada: receba 1 Chicote agora ou aceite a ordem: ${myChoice.order.description}`
-                  : 'A Dominadora exige uma escolha.';
+                    ? `Escolha Forçada: receba 1 Chicote agora ou aceite a ordem: ${myChoice.order.description}`
+                    : 'A Dominadora exige uma escolha.';
     const actions = document.getElementById('bossChoiceActions');
 
     if (collateralChoice) {
+      clearNeheleniaChoiceStageTimers(actions);
+      actions.classList.remove('nehelenia-choice-stage-host');
+      delete actions.dataset.neheleniaChoiceId;
       const selectedCard = state.players[myPlayerIndex]?.hand?.find((card) => card.id === selectedBossCollateralCardId);
       actions.innerHTML = `
         <span class="boss-collateral-selection-summary">${selectedCard ? `Selecionada: <strong>${selectedCard.rank}${selectedCard.suit}</strong>` : 'Nenhuma carta selecionada'}</span>
         <button type="button" class="boss-confirm-collateral" ${selectedCard ? `data-boss-choice="card:${selectedCard.id}"` : 'disabled'}>Confirmar garantia</button>
       `;
-    } else {
+    } else if (!renderNeheleniaChoiceStage(actions, myChoice)) {
+      clearNeheleniaChoiceStageTimers(actions);
+      actions.classList.remove('nehelenia-choice-stage-host');
+      delete actions.dataset.neheleniaChoiceId;
       actions.innerHTML = myChoice.options
         .map((option) => {
-          let label = choiceLabels[option] || option;
+          let label = myChoice.optionLabels?.[option] || choiceLabels[option] || option;
           if (option === 'full' && myChoice.type === 'fixed_interest_payment') {
             label = `Assumir +${myChoice.amount} Dívida`;
           } else if ((option === 'guarantee' || option.startsWith('guarantee:')) && myChoice.type === 'fixed_interest_payment') {
@@ -5851,7 +6531,15 @@ function renderBossHud() {
 
     actions.querySelectorAll('[data-boss-choice]').forEach((button) => {
       button.onclick = async () => {
-        if (!state || state.finished || pauseBlocksPlay(state) || !getBossPendingChoice(state, myPlayerIndex)) return;
+        if (!state || state.finished || pauseBlocksPlay(state)) return;
+        const activeChoiceBeforeClick = getBossPendingChoice(state, myPlayerIndex);
+        if (!activeChoiceBeforeClick) return;
+        const discardMirrorTrap = activeChoiceBeforeClick.type === 'discard_mirror' && button.dataset.bossChoice !== activeChoiceBeforeClick.correctOption;
+        if (activeChoiceBeforeClick.type === 'discard_mirror') {
+          await animateNeheleniaDiscardMirrorReturn(button, { trap: discardMirrorTrap });
+          const stillPending = getBossPendingChoice(state, myPlayerIndex);
+          if (!stillPending || String(stillPending.id) !== String(activeChoiceBeforeClick.id)) return;
+        }
         const stockEl = document.querySelector('#drawStockBtn .pile-card');
         const stockRect = stockEl ? getRect(stockEl) : null;
         const visibleCardRects = snapshotVisibleCardRects();
@@ -5859,8 +6547,14 @@ function renderBossHud() {
         const selectedCollateralEl = selectedCollateralId ? cardElById(selectedCollateralId) : null;
         const selectedCollateralRect = selectedCollateralEl ? getRect(selectedCollateralEl) : null;
         localUndoStack = [];
-        const event = resolveBossChoice(state, myPlayerIndex, button.dataset.bossChoice);
-        if (!event) return;
+        const selectedBossChoiceOption = button.dataset.bossChoice;
+        const event = resolveBossChoice(state, myPlayerIndex, selectedBossChoiceOption);
+        if (!event) {
+          renderAll();
+          if (activeChoiceBeforeClick.type === 'discard_mirror') document.getElementById('drawDiscardBtn')?.classList.remove('boss-nehelenia-seal-preview');
+          return;
+        }
+        playNeheleniaWrongMirrorLaugh(activeChoiceBeforeClick, selectedBossChoiceOption);
         if (event.collateralCardId && event.actionId) {
           locallyAnimatedBossVaultSoundEventIds.add(event.actionId);
           locallyAnimatingBossVaultStates.set(event.collateralPlayerId, 'receiving');
@@ -5886,6 +6580,7 @@ function renderBossHud() {
         }
         state.lastAction = { id: newActionId(), type: 'bossChoice', playerId: myPlayerIndex, bossEvent: event, ts: Date.now() };
         renderAll();
+        if (activeChoiceBeforeClick.type === 'discard_mirror') document.getElementById('drawDiscardBtn')?.classList.remove('boss-nehelenia-seal-preview');
         const commitPromise = commitState();
         if (event.drawnCardIds?.length) await animateForcedChoiceDraw(event, myPlayerIndex, stockRect);
         if (event.collateralCardId) {
@@ -5907,12 +6602,20 @@ function renderBossHud() {
     const target = state.players.find((player) => player.id === pendingChoice.playerId);
     choicePanel.style.display = 'flex';
     document.getElementById('bossChoicePrompt').textContent = `Aguardando ${target?.name || 'o jogador alvo'} decidir.`;
-    document.getElementById('bossChoiceActions').innerHTML = '';
+    const waitingActions = document.getElementById('bossChoiceActions');
+    clearNeheleniaChoiceStageTimers(waitingActions);
+    waitingActions.classList.remove('nehelenia-choice-stage-host');
+    delete waitingActions.dataset.neheleniaChoiceId;
+    waitingActions.innerHTML = '';
   } else {
     selectedBossCollateralCardId = null;
     selectedBossCollateralChoiceId = null;
     choicePanel.style.display = 'none';
-    document.getElementById('bossChoiceActions').innerHTML = '';
+    const hiddenActions = document.getElementById('bossChoiceActions');
+    clearNeheleniaChoiceStageTimers(hiddenActions);
+    hiddenActions.classList.remove('nehelenia-choice-stage-host');
+    delete hiddenActions.dataset.neheleniaChoiceId;
+    hiddenActions.innerHTML = '';
   }
 
   document.getElementById('bossTotalDamage').textContent = `${boss.stats.totalDamage || 0} de dano total`;
@@ -6016,8 +6719,7 @@ function renderBossHud() {
     discardButton.classList.toggle('boss-pollen-discard', pollenActive);
     const dimitrescuIntent = boss.id === 'dimitrescu' ? boss.currentIntent : null;
     const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
-    const danielaActive = dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered
-      || danielaObjective?.status === 'active';
+    const danielaActive = (dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered) || danielaObjective?.status === 'active';
     discardButton.classList.toggle('boss-daniela-discard', !!danielaActive);
     if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
     else if (danielaActive) discardButton.setAttribute('aria-label', 'Lixo cercado pelo Enxame de Daniela');
@@ -6072,23 +6774,53 @@ function renderBossHud() {
       const isDimitrescuHeal = boss.id === 'dimitrescu' && feedback.type === 'bossAbility' && feedback.abilityId === 'red_wine' && Number(feedback.healAmount) > 0;
       const isBloom = feedback.type === 'bloomChange' && feedback.amount;
       const isBlood = boss.id === 'dimitrescu' && feedback.dangerChangeLabel && ['bossAbility', 'bossDamage', 'bloodChange'].includes(feedback.type);
+      const isMirrorFragment = boss.id === 'nehelenia' && feedback.type === 'dreamMirror' && Number(feedback.dangerDelta);
+      const isMirrorStore = boss.id === 'nehelenia' && feedback.type === 'bossDamage' && Number(feedback.mirrorStoredDamage) > 0 && !feedback.mirrorBroken;
+      const isMirrorBreak = boss.id === 'nehelenia' && feedback.type === 'bossDamage' && feedback.mirrorBroken;
       const isRebirth = feedback.type === 'rebirth';
       const isCocoonAbsorb = boss.id === 'matriarca_esmeralda' && feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
       const isCocoonBreak = boss.id === 'matriarca_esmeralda' && feedback.type === 'bossDamage' && feedback.cocoonBroken;
       const isBloodClotAbsorb = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
       const isBloodClotBreak = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && feedback.bloodClotBroken;
       const isNatureCreated = feedback.type === 'bossAbility' && Array.isArray(feedback.threatIds) && feedback.threatIds.length > 0;
-      if (isCocoonAbsorb || isBloodClotAbsorb) {
+      if (isCocoonAbsorb || isBloodClotAbsorb || isMirrorStore || isMirrorBreak) {
         const portrait = document.querySelector('#bossHud .boss-portrait');
         if (portrait) {
-          const pulseClass = isBloodClotBreak ? 'boss-blood-clot-breaking' : isBloodClotAbsorb ? 'boss-blood-clot-impact' : isCocoonBreak ? 'boss-cocoon-breaking' : 'boss-cocoon-impact';
-          portrait.classList.remove('boss-cocoon-impact', 'boss-cocoon-breaking', 'boss-blood-clot-impact', 'boss-blood-clot-breaking');
+          const pulseClass = isMirrorBreak
+            ? 'boss-mirror-breaking'
+            : isMirrorStore
+              ? 'boss-mirror-impact'
+              : isBloodClotBreak
+                ? 'boss-blood-clot-breaking'
+                : isBloodClotAbsorb
+                  ? 'boss-blood-clot-impact'
+                  : isCocoonBreak
+                    ? 'boss-cocoon-breaking'
+                    : 'boss-cocoon-impact';
+          portrait.classList.remove('boss-cocoon-impact', 'boss-cocoon-breaking', 'boss-blood-clot-impact', 'boss-blood-clot-breaking', 'boss-mirror-impact', 'boss-mirror-breaking');
           void portrait.offsetWidth;
           portrait.classList.add(pulseClass);
-          setTimeout(() => portrait.classList.remove(pulseClass), isCocoonBreak || isBloodClotBreak ? 820 : 620);
+          setTimeout(() => portrait.classList.remove(pulseClass), isCocoonBreak || isBloodClotBreak || isMirrorBreak ? 820 : 620);
         }
       }
-      if (!isChain && !isDebt && !isHeal && !isDimitrescuHeal && !isBloom && !isBlood && !isRebirth && !isCocoonAbsorb && !isCocoonBreak && !isBloodClotAbsorb && !isBloodClotBreak && !isNatureCreated) return;
+      if (
+        !isChain &&
+        !isDebt &&
+        !isHeal &&
+        !isDimitrescuHeal &&
+        !isBloom &&
+        !isBlood &&
+        !isMirrorFragment &&
+        !isMirrorStore &&
+        !isMirrorBreak &&
+        !isRebirth &&
+        !isCocoonAbsorb &&
+        !isCocoonBreak &&
+        !isBloodClotAbsorb &&
+        !isBloodClotBreak &&
+        !isNatureCreated
+      )
+        return;
       const floating = document.createElement('div');
       const visualClass = isChain
         ? feedback.amount > 0
@@ -6101,22 +6833,32 @@ function renderBossHud() {
               ? 'bloom-up'
               : 'bloom-down'
             : isBlood
-              ? Number(feedback.dangerDelta ?? feedback.amount) > 0 ? 'blood-up' : 'blood-down'
-              : isRebirth
-              ? 'nature-rebirth'
-              : isBloodClotBreak
-                ? 'blood-clot-break'
-                : isBloodClotAbsorb
-                  ? 'blood-clot-absorb'
-                  : isCocoonBreak
-                    ? 'nature-cocoon-break'
-                    : isCocoonAbsorb
-                      ? 'nature-cocoon-absorb'
-                      : isNatureCreated
-                    ? 'nature-threat-created'
-                    : feedback.dangerDelta > 0
-                      ? 'debt-up'
-                      : 'debt-down';
+              ? Number(feedback.dangerDelta ?? feedback.amount) > 0
+                ? 'blood-up'
+                : 'blood-down'
+              : isMirrorFragment
+                ? Number(feedback.dangerDelta) > 0
+                  ? 'mirror-up'
+                  : 'mirror-down'
+                : isMirrorBreak
+                  ? 'mirror-break'
+                  : isMirrorStore
+                    ? 'mirror-absorb'
+                    : isRebirth
+                      ? 'nature-rebirth'
+                      : isBloodClotBreak
+                        ? 'blood-clot-break'
+                        : isBloodClotAbsorb
+                          ? 'blood-clot-absorb'
+                          : isCocoonBreak
+                            ? 'nature-cocoon-break'
+                            : isCocoonAbsorb
+                              ? 'nature-cocoon-absorb'
+                              : isNatureCreated
+                                ? 'nature-threat-created'
+                                : feedback.dangerDelta > 0
+                                  ? 'debt-up'
+                                  : 'debt-down';
       floating.className = `boss-floating-number ${visualClass}`;
       floating.textContent = isChain
         ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Chicote`
@@ -6124,27 +6866,34 @@ function renderBossHud() {
           ? `HP +${feedback.amount}`
           : isDimitrescuHeal
             ? `HP +${feedback.healAmount}`
-          : isBloom
-            ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Flor${Math.abs(feedback.amount) === 1 ? '' : 'es'}`
-            : isRebirth
-              ? 'RENASCIMENTO +300 HP'
-              : isBloodClotBreak
-                ? `COÁGULO ROMPIDO · SEDE -6`
-                : isBloodClotAbsorb
-                  ? `COÁGULO ABSORVEU ${feedback.absorbedDamage}`
-                  : isCocoonBreak
-                    ? `CASULO ROMPIDO · ${feedback.absorbedDamage || 0} ABSORVIDO`
-                    : isCocoonAbsorb
-                      ? `CASULO ABSORVEU ${feedback.absorbedDamage}`
-                      : isNatureCreated
-                    ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] || 'AMEAÇA CRIADA'
-                    : feedback.dangerChangeLabel;
+            : isBloom
+              ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Flor${Math.abs(feedback.amount) === 1 ? '' : 'es'}`
+              : isMirrorFragment
+                ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} FRAGMENTO${Math.abs(feedback.amount) === 1 ? '' : 'S'}`
+                : isMirrorBreak
+                  ? `ESPELHO ROMPIDO · ${feedback.mirrorReleasedDamage || 0} LIBERADO`
+                  : isMirrorStore
+                    ? `DANO PRESO ${feedback.mirrorStoredDamage}`
+                    : isRebirth
+                      ? 'RENASCIMENTO +300 HP'
+                      : isBloodClotBreak
+                        ? `COÁGULO ROMPIDO · SEDE -6`
+                        : isBloodClotAbsorb
+                          ? `COÁGULO ABSORVEU ${feedback.absorbedDamage}`
+                          : isCocoonBreak
+                            ? `CASULO ROMPIDO · ${feedback.absorbedDamage || 0} ABSORVIDO`
+                            : isCocoonAbsorb
+                              ? `CASULO ABSORVEU ${feedback.absorbedDamage}`
+                              : isNatureCreated
+                                ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] ||
+                                  'AMEAÇA CRIADA'
+                                : feedback.dangerChangeLabel;
       const chainPlayer = isChain ? [...document.querySelectorAll('#bossChainStatus .boss-chain-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId)) : null;
       const anchor = isChain
         ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
         : isHeal || isDimitrescuHeal || isRebirth
           ? document.getElementById('bossHpBar')?.parentElement?.getBoundingClientRect()
-          : isCocoonBreak || isCocoonAbsorb || isBloodClotBreak || isBloodClotAbsorb
+          : isCocoonBreak || isCocoonAbsorb || isBloodClotBreak || isBloodClotAbsorb || isMirrorStore || isMirrorBreak
             ? document.querySelector('.boss-portrait')?.getBoundingClientRect()
             : isNatureCreated
               ? document.getElementById('bossIntentName')?.parentElement?.getBoundingClientRect()
@@ -6335,7 +7084,7 @@ function renderAll() {
     const existingLayers = [...container.querySelectorAll('.visual-layer')];
 
     if (count === 0) {
-      existingLayers.forEach(layer => layer.remove());
+      existingLayers.forEach((layer) => layer.remove());
       container.style.background = '';
       container.style.border = '';
       container.style.boxShadow = '';
@@ -6358,7 +7107,7 @@ function renderAll() {
 
     const topClass = backColor === 'blue' ? 'back-blue' : backColor === 'red' ? 'back-red' : 'visual-discard-layer';
     const visibleLayers = isDiscard ? layers - 1 : layers;
-    existingLayers.slice(visibleLayers).forEach(layer => layer.remove());
+    existingLayers.slice(visibleLayers).forEach((layer) => layer.remove());
 
     for (let i = 0; i < layers; i++) {
       if (isDiscard && i === layers - 1) continue;
@@ -6436,19 +7185,33 @@ function renderAll() {
   const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
   const pollenThreat = state.boss?.id === 'matriarca_esmeralda' ? (state.boss.natureThreats || []).find((threat) => threat.status === 'active' && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId)) : null;
   const dimitrescuIntent = state.boss?.id === 'dimitrescu' ? state.boss.currentIntent : null;
-  const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters'
-    ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela')
-    : null;
-  const danielaCardId = dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered
-    ? dimitrescuIntent.payload?.discardCardId
-    : danielaObjective?.status === 'active'
-      ? danielaObjective.discardCardId
-      : null;
+  const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
+  const danielaCardId = dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered ? dimitrescuIntent.payload?.discardCardId : danielaObjective?.status === 'active' ? danielaObjective.discardCardId : null;
   const danielaInDiscard = !!danielaCardId && discardCardIds.has(danielaCardId);
   const danielaOnTop = danielaInDiscard && discardTop?.id === danielaCardId;
-  document.getElementById('drawDiscardBtn')?.classList.toggle('boss-pollen-discard', !!pollenThreat);
-  document.getElementById('drawDiscardBtn')?.classList.toggle('boss-daniela-discard', danielaInDiscard);
-  document.getElementById('drawDiscardBtn')?.classList.toggle('boss-surcharge-discard', state.boss?.id === 'banker' && state.boss.discardSurcharge?.status === 'active');
+  const neheleniaDiscardMirror = state.boss?.id === 'nehelenia' && state.boss.currentIntent?.abilityId === 'discard_mirror' && !state.boss.currentIntent.payload?.resolved;
+  const neheleniaCurrentPlayerId = state.players?.[state.currentPlayer]?.id ?? state.currentPlayer;
+  const neheleniaMirrorDiscardSealed = state.boss?.id === 'nehelenia' && (
+    Number(state.boss.neheleniaDiscardSealRound) === Number(state.boss.roundNumber)
+    || state.boss.effects?.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === neheleniaCurrentPlayerId)
+  );
+  const neheleniaHawkGuardedDiscard = state.boss?.id === 'nehelenia' && !!discardTop?.id
+    && state.boss.effects?.some((effect) => effect.id === 'nehelenia_hawk_guarded_discard' && effect.cardId === discardTop.id);
+  const hawkSuitIntent = state.boss?.id === 'nehelenia' && state.boss.currentIntent?.abilityId === 'hawk_suit'
+    ? state.boss.currentIntent
+    : null;
+  const neheleniaHawkDiscardDemand = !!hawkSuitIntent
+    && hawkSuitIntent.payload?.targetPlayerId === neheleniaCurrentPlayerId
+    && !hawkSuitIntent.payload?.resolved;
+  const discardButtonEl = document.getElementById('drawDiscardBtn');
+  discardButtonEl?.classList.toggle('boss-pollen-discard', !!pollenThreat);
+  discardButtonEl?.classList.toggle('boss-daniela-discard', danielaInDiscard);
+  discardButtonEl?.classList.toggle('boss-surcharge-discard', state.boss?.id === 'banker' && state.boss.discardSurcharge?.status === 'active');
+  discardButtonEl?.classList.toggle('boss-nehelenia-discard', neheleniaDiscardMirror);
+  discardButtonEl?.classList.toggle('boss-nehelenia-discard-sealed', neheleniaMirrorDiscardSealed);
+  discardButtonEl?.classList.toggle('boss-nehelenia-hawk-discard', neheleniaHawkGuardedDiscard || neheleniaHawkDiscardDemand);
+  discardButtonEl?.classList.toggle('is-hawk-guarded', neheleniaHawkGuardedDiscard);
+  discardButtonEl?.classList.toggle('is-hawk-demand', neheleniaHawkDiscardDemand && !neheleniaHawkGuardedDiscard);
   if (!discardTop) {
     discardFace.style.display = 'none';
   } else {
@@ -6464,15 +7227,22 @@ function renderAll() {
     discardFace.style.right = `${topIndex * 0.3}px`;
     discardFace.style.zIndex = 20;
 
+    const hawkSuitLabel = hawkSuitIntent?.payload?.suit || hawkSuitIntent?.payload?.suitLabel || '';
     const discardBossStatus = pollenThreat
       ? '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>'
       : danielaOnTop
         ? '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-daniela" aria-hidden="true"><i>🩸</i><b>DANIELA</b></span>'
-        : '';
+        : neheleniaHawkGuardedDiscard
+          ? '<span class="boss-card-status boss-card-status-nehelenia-hawk" aria-hidden="true"><i>◉</i><b>VIGIADO</b></span>'
+          : neheleniaHawkDiscardDemand
+            ? `<span class="boss-card-status boss-card-status-nehelenia-hawk" aria-hidden="true"><i>◉</i><b>DESCARTE ${hawkSuitLabel}</b></span>`
+            : neheleniaDiscardMirror || neheleniaMirrorDiscardSealed
+              ? `<span class="boss-card-status boss-card-status-nehelenia" aria-hidden="true"><i>◇</i><b>${neheleniaMirrorDiscardSealed ? 'SELADO' : 'ESPELHO'}</b></span>`
+              : '';
     const discardMarkup = cardFrontHTML(discardTop) + discardBossStatus;
     if (discardFace._faceMarkup !== discardMarkup) discardFace.innerHTML = discardMarkup;
     discardFace._faceMarkup = discardMarkup;
-    discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}${danielaOnTop ? ' boss-discard-dimitrescu-card' : ''}`;
+    discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}${danielaOnTop ? ' boss-discard-dimitrescu-card' : ''}${neheleniaDiscardMirror || neheleniaMirrorDiscardSealed ? ' boss-discard-nehelenia-card' : ''}${neheleniaHawkGuardedDiscard || neheleniaHawkDiscardDemand ? ' boss-discard-nehelenia-hawk-card' : ''}`;
     if (danielaOnTop) applyDimitrescuBloodScatter(discardFace, discardTop?.id || 'daniela-discard', 'discard');
     discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
   }
@@ -6706,10 +7476,9 @@ function renderHand() {
   const container = document.querySelector('#handContainer .cards-row');
   const nextCards = document.createDocumentFragment();
   const commitHand = () => {
-    const oldCards = new Map([...container.children].map(node => [node.dataset.cardId, node]));
+    const oldCards = new Map([...container.children].map((node) => [node.dataset.cardId, node]));
     const desired = [...nextCards.children];
-    const orderChanged = desired.length !== container.children.length
-      || desired.some((node, index) => node.dataset.cardId !== container.children[index]?.dataset.cardId);
+    const orderChanged = desired.length !== container.children.length || desired.some((node, index) => node.dataset.cardId !== container.children[index]?.dataset.cardId);
     if (orderChanged) handRoot.classList.add('hand-hover-reset');
     desired.forEach((fresh, index) => {
       const existing = oldCards.get(fresh.dataset.cardId);
@@ -6735,7 +7504,7 @@ function renderHand() {
       if (container.children[index] !== node) container.insertBefore(node, container.children[index] || null);
       oldCards.delete(fresh.dataset.cardId);
     });
-    oldCards.forEach(node => node.remove());
+    oldCards.forEach((node) => node.remove());
   };
   const localLabelEl = document.getElementById('localPlayerLabel'); // Captura o novo elemento
 
@@ -6746,7 +7515,10 @@ function renderHand() {
       localLabelEl.classList.remove('boss-player-targeted');
     }
     const p0 = state.players[0];
-    if (!p0) { commitHand(); return; }
+    if (!p0) {
+      commitHand();
+      return;
+    }
 
     p0.hand.forEach((card) => {
       ensureCardId(card);
@@ -6844,6 +7616,26 @@ function renderHand() {
       div.classList.add('boss-card-dimitrescu-blood-mark');
       div.title = 'Marca Carmesim: use esta carta legalmente antes do fim da rodada';
     }
+    if (bossCardEffect === 'nehelenia-reflection') {
+      div.classList.add('boss-card-nehelenia-reflection');
+      div.title = 'Reflexo de Nehelenia: use esta carta legalmente nesta rodada';
+    }
+    if (bossCardEffect === 'nehelenia-dream') {
+      div.classList.add('boss-card-nehelenia-dream');
+      div.title = 'Espelho dos Sonhos: use esta carta em jogo para dobrar o dano individual';
+    }
+    if (bossCardEffect === 'nehelenia-nightmare') {
+      div.classList.add('boss-card-nehelenia-nightmare');
+      div.title = 'Pesadelo Eterno: esta carta faz parte do objetivo de Reflexos';
+    }
+    if (bossCardEffect === 'nehelenia-fish-mark') {
+      div.classList.add('boss-card-nehelenia-fish-mark');
+      div.title = 'Mão no Espelho · Fish Eye: use esta carta em jogo ou descarte-a antes do fim do turno';
+    }
+    if (bossCardEffect === 'nehelenia-fish-dead') {
+      div.classList.add('boss-card-nehelenia-fish-mark', 'boss-card-nehelenia-fish-dead');
+      div.title = 'Reflexo Morto · Fish Eye: esta carta não pode mais entrar em jogo; descarte-a para quebrar o efeito';
+    }
     if (['dimitrescu-hunt', 'dimitrescu-blood-mark'].includes(bossCardEffect)) applyDimitrescuBloodScatter(div, card.id, 'card');
     const swapHighlight = bossSwapReceivedHighlights.get(card.id);
     if (swapHighlight && swapHighlight.expiresAt > Date.now()) div.classList.add('boss-swap-received');
@@ -6876,6 +7668,18 @@ function renderHand() {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-blood-hunt" aria-hidden="true"><i>🩸</i><b>BELA</b></span>');
     } else if (bossCardEffect === 'dimitrescu-blood-mark') {
       div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-crimson-brand" aria-hidden="true"><i>🩸</i><b>MARCA</b></span>');
+    } else if (bossCardEffect === 'nehelenia-reflection') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-nehelenia" aria-hidden="true"><i>◇</i><b>REFLEXO</b></span>');
+    } else if (bossCardEffect === 'nehelenia-dream') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-nehelenia" aria-hidden="true"><i>☾</i><b>SONHO</b></span>');
+    } else if (bossCardEffect === 'nehelenia-nightmare') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-nehelenia" aria-hidden="true"><i>◆</i><b>PESADELO</b></span>');
+    } else if (bossCardEffect === 'nehelenia-illusion-lock') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-nehelenia" aria-hidden="true"><i>◈</i><b>NO ESPELHO</b></span>');
+    } else if (bossCardEffect === 'nehelenia-fish-mark') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-nehelenia-fish" aria-hidden="true"><i>◉</i><b>FISH EYE</b></span>');
+    } else if (bossCardEffect === 'nehelenia-fish-dead') {
+      div.insertAdjacentHTML('beforeend', '<span class="boss-card-status boss-card-status-nehelenia-fish is-dead" aria-hidden="true"><i>✦</i><b>REFLEXO MORTO</b></span>');
     }
     if (swapHighlight && swapHighlight.expiresAt > Date.now()) {
       const sender = state.players.find((player) => player.id === swapHighlight.fromPlayerId);
@@ -7184,6 +7988,84 @@ function scheduleMatriarchGraftLinks() {
 window.addEventListener('resize', scheduleMatriarchGraftLinks);
 document.addEventListener('scroll', scheduleMatriarchGraftLinks, true);
 
+async function resolveNeheleniaMirrorVisualChoice(slot, teamId, meldIndex, mirrorElement = null) {
+  if (!state || state.finished || state.boss?.id !== 'nehelenia') return;
+  if (!ensureMyTurn()) return;
+  if (!state.hasDrawnThisTurn) {
+    showMessage('Compre primeiro.');
+    return;
+  }
+  const intent = state.boss?.currentIntent;
+  const me = currentPlayer();
+  if (!intent || intent.abilityId !== 'mirrored_meld' || intent.payload?.targetPlayerId !== me?.id || intent.payload?.resolved) {
+    showMessage('Este reflexo não está ativo para o seu turno.');
+    return;
+  }
+  if (Number(intent.payload.meldIndex) !== Number(meldIndex) || teamId !== me.teamId) {
+    showMessage('A ilusão está ligada a outro jogo.');
+    return;
+  }
+  const indexes = [...selectedHandIndexes];
+  if (indexes.length !== 1) {
+    showMessage('🪞 Jogo Espelhado: selecione exatamente 1 carta para testar um dos reflexos.');
+    return;
+  }
+  const card = me.hand[indexes[0]];
+  if (!card) return;
+  const targetMeld = state.teams?.[teamId]?.melds?.[meldIndex];
+  if (!targetMeld || !isValidSequenceMeld([...(targetMeld || []), { ...card }])) {
+    showMessage('❌ Essa carta não encaixa no jogo refletido.');
+    return;
+  }
+
+  const mirrorUndoSaved = slot !== intent.payload.realSlot;
+  if (mirrorUndoSaved) saveStateForUndo('neheleniaMirrorChoice', [card.id]);
+  const fromEl = cardElById(card.id);
+  const fromRect = fromEl ? getRect(fromEl) : null;
+  const mirrorRect = mirrorElement ? getRect(mirrorElement) : null;
+  const result = resolveNeheleniaMirroredMeldChoice(state, me.id, slot, card.id);
+  if (!result?.allowed) {
+    if (mirrorUndoSaved) localUndoStack.pop();
+    showMessage(result?.message || 'A ilusão não aceitou essa jogada.');
+    return;
+  }
+
+  if (result.real) {
+    selectedMeldTarget = `${teamId}:${meldIndex}`;
+    await makeMeldFromSelection(false);
+    if (state?.boss?.currentIntent?.abilityId === 'mirrored_meld' && !state.boss.currentIntent.payload?.fed) {
+      state.boss.currentIntent.payload.realChosen = false;
+    }
+    return;
+  }
+
+  playSfxClone(BOSS_SFX.nehelenia?.laugh, { audioContext: audioCtx });
+  if (mirrorElement) mirrorElement.classList.add('is-shattering');
+  if (fromEl) fromEl.style.visibility = 'hidden';
+  if (fromRect && mirrorRect) {
+    await flyRectToRect(card, fromRect, mirrorRect, 'front').catch(() => {});
+    impactAtRect(mirrorRect);
+    const stockFace = document.querySelector('#drawStockBtn .pile-card') || document.getElementById('drawStockBtn');
+    const stockRect = stockFace ? getRect(stockFace) : null;
+    if (stockRect) await flyRectToRect(card, mirrorRect, stockRect, 'back').catch(() => {});
+  }
+  selectedHandIndexes.clear();
+  selectedMeldTarget = null;
+  state.lastAction = {
+    id: newActionId(),
+    type: 'neheleniaMirrorTrap',
+    playerId: me.id,
+    card: packCard(card),
+    meldIndex,
+    fakeSlot: slot,
+    bossEvent: result.event || null,
+    ts: Date.now(),
+  };
+  renderAll();
+  await commitState();
+  showMessage(`💥 Reflexo falso! ${card.rank}${card.suit} foi para o fundo do monte. Você ficou Desorientado: apenas descarte para encerrar.`);
+}
+
 function renderMelds() {
   if (!discardChoiceIsCurrent()) pendingDiscardChoice = null;
   const m1 = document.getElementById('meldsP1');
@@ -7338,14 +8220,32 @@ function renderMelds() {
       div.classList.toggle('rooted-by-matriarch', !!rootThreat);
       div.classList.toggle('grafted-by-matriarch', !!graftThreat);
       const dimitrescuIntent = state.boss?.id === 'dimitrescu' ? state.boss.currentIntent : null;
-      const cassandraObjective = dimitrescuIntent?.abilityId === 'three_daughters'
-        ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'cassandra')
-        : null;
+      const cassandraObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'cassandra') : null;
       const stableMeldId = state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`];
-      const cassandraMarked = dimitrescuIntent?.abilityId === 'cassandra_feast'
-        ? !dimitrescuIntent.payload?.fed && (dimitrescuIntent.payload?.meldId ? dimitrescuIntent.payload.meldId === stableMeldId : dimitrescuIntent.payload?.meldIndex === midx)
-        : cassandraObjective?.status === 'active' && (cassandraObjective.meldId ? cassandraObjective.meldId === stableMeldId : cassandraObjective.meldIndex === midx);
+      const cassandraMarked =
+        dimitrescuIntent?.abilityId === 'cassandra_feast'
+          ? !dimitrescuIntent.payload?.fed && (dimitrescuIntent.payload?.meldId ? dimitrescuIntent.payload.meldId === stableMeldId : dimitrescuIntent.payload?.meldIndex === midx)
+          : cassandraObjective?.status === 'active' && (cassandraObjective.meldId ? cassandraObjective.meldId === stableMeldId : cassandraObjective.meldIndex === midx);
       div.classList.toggle('feasted-by-cassandra', !!cassandraMarked);
+      const neheleniaIntent = state.boss?.id === 'nehelenia' ? state.boss.currentIntent : null;
+      let neheleniaMirrorLabel = '';
+      let neheleniaMirrorChoice = false;
+      if (neheleniaIntent?.abilityId === 'mirrored_meld') {
+        const target = neheleniaIntent.payload;
+        if (target && ((target.meldId && stableMeldId && target.meldId === stableMeldId) || Number(target.meldIndex) === Number(midx))) {
+          neheleniaMirrorLabel = target.fed ? 'JOGO ESPELHADO · QUEBRADO' : 'JOGO ESPELHADO';
+          neheleniaMirrorChoice = !target.resolved;
+        }
+      } else if (neheleniaIntent?.abilityId === 'mirror_prison') {
+        const target = neheleniaIntent.payload;
+        if (target && ((target.meldId && stableMeldId && target.meldId === stableMeldId) || Number(target.meldIndex) === Number(midx)))
+          neheleniaMirrorLabel = `PRISÃO · LIBERTE ${state.players.find((player) => player.id === target.trappedPlayerId)?.name || 'PARCEIRO'}`;
+      }
+      const neheleniaMirrorAnimationKey = neheleniaMirrorChoice ? neheleniaMirrorMeldAnimationKey(neheleniaIntent, t.id, midx) : '';
+      const neheleniaMirrorSplitComplete = !neheleniaMirrorChoice || locallyAnimatedNeheleniaMirrorMelds.has(neheleniaMirrorAnimationKey);
+      div.classList.toggle('mirrored-by-nehelenia', !!neheleniaMirrorLabel);
+      if (neheleniaMirrorLabel) div.dataset.neheleniaMirror = neheleniaMirrorLabel;
+      else delete div.dataset.neheleniaMirror;
       if (graftThreat) {
         const graftSideIndex = (graftThreat.meldIds || []).indexOf(graftThreat.matchedMeldId);
         div.dataset.graftId = graftThreat.id;
@@ -7354,6 +8254,11 @@ function renderMelds() {
 
       const row = document.createElement('div');
       row.className = 'meld-line-cards';
+      if (neheleniaMirrorLabel) {
+        row.classList.add('nehelenia-mirror-card-frame');
+        row.dataset.neheleniaMirror = neheleniaMirrorLabel;
+        if (neheleniaMirrorLabel.startsWith('PRISÃO')) row.classList.add('is-prison');
+      }
       const mInfo = classifyMeldForUi(meld);
 
       // Se for uma canastra Ás-a-Ás, injeta o visual BDSM de destaque
@@ -7464,6 +8369,9 @@ function renderMelds() {
       if (state.boss?.id === 'dimitrescu' && contribution?.dimitrescuBloodRelief > 0) {
         contributionChips.push(contributionChip('blood', contribution.dimitrescuBloodRelief, '&#129656;', 'Sede de Sangue reduzida por este jogo'));
       }
+      if (state.boss?.id === 'nehelenia' && contribution?.neheleniaMirrorRelief > 0) {
+        contributionChips.push(contributionChip('mirror', contribution.neheleniaMirrorRelief, '&#9671;', 'Espelhos dos Sonhos recuperados por este jogo'));
+      }
       const natureLabels = [];
       if (activeInterdict) {
         const evolutionLabel = mInfo.kind === 'real' ? 'REAL → ÁS-A-ÁS' : 'LIMPA → REAL';
@@ -7476,6 +8384,53 @@ function renderMelds() {
         const sideLabel = sideIndex === 1 ? 'B' : 'A';
         natureLabels.push(`<span class="boss-meld-nature-seal boss-meld-nature-graft">ENXERTO ${sideLabel} · ${fed.size}/${graftThreat.required || 2}</span>`);
       }
+      if (state.boss?.id === 'nehelenia') {
+        const capangaIntent = state.boss.currentIntent;
+        const currentMeldId = contribution?.meldId || null;
+        const matchesTarget = (target) => !!target && (
+          (target.meldId && currentMeldId && target.meldId === currentMeldId)
+          || Number(target.meldIndex) === Number(midx)
+        );
+        let tigerVisual = false;
+        let tigerDone = false;
+        let tigerClaw = false;
+        let hawkVisual = false;
+
+        if (capangaIntent?.abilityId === 'tiger_link') {
+          const linkedIndex = (capangaIntent.payload?.targets || []).findIndex(matchesTarget);
+          if (linkedIndex >= 0) {
+            const fed = new Set(capangaIntent.payload?.fedMeldIds || []).has(capangaIntent.payload.targets[linkedIndex].meldId);
+            tigerVisual = true;
+            tigerDone = fed;
+            natureLabels.push(`<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger${fed ? ' is-done' : ''}">LAÇO ${linkedIndex + 1}</span>`);
+          }
+        } else if (capangaIntent?.abilityId === 'tiger_prey' && matchesTarget(capangaIntent.payload)) {
+          tigerVisual = true;
+          tigerDone = !!capangaIntent.payload?.fed;
+          natureLabels.push(`<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger${capangaIntent.payload?.fed ? ' is-done' : ''}">PRESA MARCADA</span>`);
+        } else if (capangaIntent?.abilityId === 'hawk_watch' && matchesTarget(capangaIntent.payload)) {
+          hawkVisual = true;
+          natureLabels.push('<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-hawk">VIGILÂNCIA</span>');
+        }
+
+        const persistentTiger = (state.boss.effects || []).filter((effect) => effect.attendant === 'tiger' && matchesTarget(effect));
+        if (persistentTiger.some((effect) => effect.id === 'nehelenia_tiger_prey')) {
+          tigerVisual = true;
+          natureLabels.push('<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger">PRESA PERSISTENTE</span>');
+        }
+        if (persistentTiger.some((effect) => effect.id === 'nehelenia_tiger_claw')) {
+          tigerVisual = true;
+          tigerClaw = true;
+          natureLabels.push('<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger">GARRAS · DANO SELADO</span>');
+        }
+
+        // A assinatura visual dos capangas envolve SOMENTE as cartas do jogo.
+        // O container externo inclui meta (Canastra/Limpa + selos), então não deve receber o contorno.
+        if (tigerVisual) row.classList.add('boss-meld-nehelenia-tiger-mark');
+        if (tigerDone) row.classList.add('is-attendant-done');
+        if (tigerClaw) row.classList.add('is-tiger-claw');
+        if (hawkVisual) row.classList.add('boss-meld-nehelenia-hawk-mark');
+      }
       meta.innerHTML = `
               <span class="meld-meta-label">${mInfo.kind === 'asas' ? 'Ás-a-Ás' : `${mInfo.base}${mInfo.tag ? ` <span class="meld-tag ${mInfo.tag.cls}">${mInfo.tag.text}</span>` : ''}`}</span>
               ${contributionChips.length ? `<span class="boss-meld-contributions" data-meld-id="${contribution.meldId}">${contributionChips.join('')}</span>` : ''}
@@ -7483,10 +8438,31 @@ function renderMelds() {
             `;
 
       div.appendChild(row);
+      if (neheleniaMirrorChoice && neheleniaMirrorSplitComplete) {
+        const realSlot = neheleniaIntent?.payload?.realSlot === 'right' ? 'right' : 'left';
+        div.classList.add('nehelenia-mirror-twin', 'nehelenia-mirror-source');
+        if (locallyAnimatingNeheleniaMirrorMelds.has(neheleniaMirrorAnimationKey)) div.classList.add('nehelenia-mirror-split-underlay');
+        div.dataset.neheleniaMirrorSlot = realSlot;
+        div.dataset.neheleniaMirror = `REFLEXO ${realSlot === 'left' ? 'I' : 'II'}`;
+        row.dataset.neheleniaMirror = div.dataset.neheleniaMirror;
+      } else if (neheleniaMirrorChoice) {
+        div.classList.add('nehelenia-mirror-split-pending');
+        div.dataset.neheleniaMirror = 'JOGO ESPELHADO';
+        row.dataset.neheleniaMirror = 'JOGO ESPELHADO';
+      }
       div.appendChild(meta);
       div.onclick = (ev) => {
         ev.stopPropagation(); // Impede o clique de vazar pro fundo da caixa
 
+        if (neheleniaMirrorChoice) {
+          if (!neheleniaMirrorSplitComplete) {
+            showMessage('🪞 O jogo ainda está se dividindo no espelho.');
+            return;
+          }
+          const slot = div.dataset.neheleniaMirrorSlot === 'right' ? 'right' : 'left';
+          void resolveNeheleniaMirrorVisualChoice(slot, t.id, midx, div);
+          return;
+        }
         if (!canPerformCommonGameAction(state)) {
           showPendingBossChoiceMessage();
           return;
@@ -7498,7 +8474,7 @@ function renderMelds() {
           return;
         }
         if (meLocal && !canBossUseMeld(state, meLocal.id, midx)) {
-          showMessage('⛓ Separação ativa: seu cooperador já usou este jogo na rodada.');
+          showMessage(bossUseMeldDeniedMessage(meLocal.id, midx));
           resetDeniedCardSelection();
           return;
         }
@@ -7519,14 +8495,51 @@ function renderMelds() {
       // Compare the requested render, not live DOM mutated by card flights
       // (visibility/transforms) or theme animations.
       const renderMarkup = div.outerHTML;
+      let renderedMeld = div;
       if (existing && existing._meldRenderMarkup === renderMarkup) {
         existing.onclick = div.onclick; // Refresh closures without resetting animations.
+        renderedMeld = existing;
       } else if (existing) {
         existing.replaceWith(div);
       } else {
         target.appendChild(div);
       }
-      (existing && existing._meldRenderMarkup === renderMarkup ? existing : div)._meldRenderMarkup = renderMarkup;
+      renderedMeld._meldRenderMarkup = renderMarkup;
+
+      const oldMirrorClone = target.querySelector(`[data-nehelenia-clone-for="${key}"]`);
+      if (neheleniaMirrorChoice && neheleniaMirrorSplitComplete) {
+        const realSlot = neheleniaIntent?.payload?.realSlot === 'right' ? 'right' : 'left';
+        const cloneSlot = realSlot === 'left' ? 'right' : 'left';
+        renderedMeld.classList.remove('nehelenia-mirror-split-pending');
+        renderedMeld.classList.add('nehelenia-mirror-twin', 'nehelenia-mirror-source');
+        renderedMeld.dataset.neheleniaMirrorSlot = realSlot;
+        renderedMeld.dataset.neheleniaMirror = `REFLEXO ${realSlot === 'left' ? 'I' : 'II'}`;
+        renderedMeld.onclick = (ev) => {
+          ev.stopPropagation();
+          void resolveNeheleniaMirrorVisualChoice(realSlot, t.id, midx, renderedMeld);
+        };
+
+        const clone = renderedMeld.cloneNode(true);
+        clone.removeAttribute('data-meld-key');
+        clone.dataset.neheleniaCloneFor = key;
+        clone.dataset.neheleniaMirrorSlot = cloneSlot;
+        clone.dataset.neheleniaMirror = `REFLEXO ${cloneSlot === 'left' ? 'I' : 'II'}`;
+        clone.querySelector('.nehelenia-mirror-card-frame')?.setAttribute('data-nehelenia-mirror', clone.dataset.neheleniaMirror);
+        clone.classList.remove('nehelenia-mirror-source');
+        clone.classList.add('nehelenia-mirror-clone');
+        if (locallyAnimatingNeheleniaMirrorMelds.has(neheleniaMirrorAnimationKey)) clone.classList.add('nehelenia-mirror-split-underlay');
+        clone.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
+        clone.onclick = (ev) => {
+          ev.stopPropagation();
+          void resolveNeheleniaMirrorVisualChoice(cloneSlot, t.id, midx, clone);
+        };
+        oldMirrorClone?.remove();
+        if (realSlot === 'left') renderedMeld.after(clone);
+        else renderedMeld.before(clone);
+      } else {
+        oldMirrorClone?.remove();
+        if (neheleniaMirrorChoice) scheduleNeheleniaMirroredMeldSplit(neheleniaIntent, t.id, midx);
+      }
     });
   });
 
@@ -7534,6 +8547,9 @@ function renderMelds() {
     for (const container of [m1, m2]) {
       for (const node of container.querySelectorAll('[data-meld-key]')) {
         if (!retainedMeldKeys.has(node.dataset.meldKey)) node.remove();
+      }
+      for (const clone of container.querySelectorAll('[data-nehelenia-clone-for]')) {
+        if (!retainedMeldKeys.has(clone.dataset.neheleniaCloneFor)) clone.remove();
       }
     }
 
@@ -8239,11 +9255,16 @@ async function playRemoteAction(a) {
       if (i < financedCards.length - 1) await new Promise((resolve) => setTimeout(resolve, 220));
     }
     const playerName = state.players?.find((player) => player.id === a.playerId)?.name || 'Jogador';
-    showMessage(financedTariffMessage(a.bossEvent || {
-      count: financedCards.length,
-      cardLabels: financedCards.map((card) => `${card.rank || ''}${card.suit || ''}`),
-      debtPerCard: state.boss?.phase === 3 ? 7 : 5,
-    }, playerName));
+    showMessage(
+      financedTariffMessage(
+        a.bossEvent || {
+          count: financedCards.length,
+          cardLabels: financedCards.map((card) => `${card.rank || ''}${card.suit || ''}`),
+          debtPerCard: state.boss?.phase === 3 ? 7 : 5,
+        },
+        playerName,
+      ),
+    );
   };
 
   if (a.type === 'dominatorBonus' && state.mode === '1x1_dominacao') {
@@ -8578,6 +9599,17 @@ const botEngine = {
   isValidSequenceMeld: (cards) => isValidSequenceMeld(cards),
   canTeamTakeDeadNow: (teamId) => canTeamTakeDeadNow(teamId),
   teamHasGoodCanastra: (teamId) => teamHasGoodCanastra(teamId),
+  canSafelyFinishBoss: () => {
+    if (!isCurrentBossMode() || !state?.boss || state.boss.result) return true;
+    try {
+      const probe = typeof structuredClone === 'function' ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+      applyBossFinalStrike(probe, getCooperativeProjectedScore());
+      return probe.boss?.result?.victory === true;
+    } catch (error) {
+      console.warn('[BOT-BOSS] Não foi possível simular o ataque final; mantendo a partida aberta.', error);
+      return false;
+    }
+  },
   isDiscardBlocked: () => isBossDiscardBlocked(state),
   isMeldLocked: (teamId, meldIndex) => isBossMeldLocked(state, teamId, meldIndex) || !canBossUseMeld(state, state.currentPlayer, meldIndex),
   isCardBlocked: (playerId, cardId, action = 'play') => isBossCardBlocked(state, playerId, cardId, action),
@@ -8586,6 +9618,7 @@ const botEngine = {
   getNaturePriorities: (playerId) => getBossNaturePriorities(state, playerId),
   getDominatrixPriorities: (playerId) => getBossDominatrixPriorities(state, playerId),
   getDimitrescuPriorities: (playerId) => getBossDimitrescuPriorities(state, playerId),
+  getNeheleniaPriorities: (playerId) => getBossNeheleniaPriorities(state, playerId),
   shouldTakeBossDiscard: (playerId, intent, naturePlan) => shouldBossBotTakeDiscard(state, playerId, { intent, naturePlan }),
   async executeDominationPowers(botIndex) {
     await executeBotDominationPowers(this, botIndex);
@@ -8599,6 +9632,16 @@ const botEngine = {
     let option = choice.options[0];
     if (choice.type === 'fixed_interest_payment' || choice.type === 'banker_collateral_card') {
       option = chooseBossFixedInterestBotOption(state, choice) || option;
+    }
+    if (state.boss?.id === 'nehelenia' && ['false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare'].includes(choice.type) && choice.correctOption) {
+      if (choice.type === 'discard_mirror') {
+        // Espelho do Lixo é deliberadamente 50/50: nem o bot recebe a resposta.
+        const options = choice.options || [];
+        option = options.length ? options[(Number(state.turnNumber || 0) + Number(state.boss?.actionSequence || 0) + Number(playerId || 0)) % options.length] : option;
+      } else {
+        // Nas ilusões de memória, o bot modela o acompanhamento visual da carta original.
+        option = choice.correctOption;
+      }
     }
     if (choice.type === 'forced_choice' && choice.options.includes('chain') && choice.options.includes('order')) {
       const ownChains = getBossChains(state, playerId);
@@ -8757,6 +9800,27 @@ const botEngine = {
     const team = s.teams[me.teamId];
     const cards = handIndexes.map((i) => me.hand[i]);
     if (cards.some((card) => isBossCardBlocked(s, me.id, card?.id, 'play'))) return false;
+    const mirrorIntent = s.boss?.id === 'nehelenia' && s.boss.currentIntent?.abilityId === 'mirrored_meld' ? s.boss.currentIntent : null;
+    if (mirrorIntent?.payload?.targetPlayerId === me.id && Number(mirrorIntent.payload?.meldIndex) === Number(meldIndex) && !mirrorIntent.payload?.resolved) {
+      if (cards.length !== 1) return false;
+      const deterministicPick = ((Number(s.turnNumber) || 0) + (Number(s.boss?.actionSequence) || 0) + String(cards[0]?.id || '').length) % 2 ? 'right' : 'left';
+      const mirrorDecision = resolveNeheleniaMirroredMeldChoice(s, me.id, deterministicPick, cards[0]?.id);
+      if (!mirrorDecision?.allowed) return false;
+      if (!mirrorDecision.real) {
+        s.lastAction = {
+          id: newActionId(),
+          type: 'neheleniaMirrorTrap',
+          playerId: botIndex,
+          card: packCard(cards[0]),
+          meldIndex,
+          fakeSlot: deterministicPick,
+          bossEvent: mirrorDecision.event || null,
+          ts: Date.now(),
+        };
+        await this.commitState();
+        return true;
+      }
+    }
     if (!validateBossMeldPlay(s, me.id, cards).allowed) return false;
 
     const kindBefore = classifyMeldForUi(team.melds[meldIndex]).kind;
@@ -9070,7 +10134,10 @@ const botEngine = {
       return true;
     }
 
-    if (stockIsExhausted(s)) { await finishGame(null); return true; }
+    if (stockIsExhausted(s)) {
+      await finishGame(null);
+      return true;
+    }
     passTurn({ preserveUndo: true });
 
     const freshS = this.getState();
@@ -9529,7 +10596,7 @@ onSnapshot(gameRef, async (snap) => {
   const newState = normalizeDominationFriends(JSON.parse(data.stateJson));
   newState.matchStartedAt ||= data.createdAt?.toMillis?.() || Number(data.createdAt) || null;
   if (newState.finished) newState.matchFinishedAt ||= newState.lastAction?.ts || Number(data.updatedAt) || Date.now();
-  if (newState.finished && !data.historySummary) void recoverFinishedHistory().catch(error => console.warn('Histórico pendente: reconecte para tentar novamente.', error.code));
+  if (newState.finished && !data.historySummary) void recoverFinishedHistory().catch((error) => console.warn('Histórico pendente: reconecte para tentar novamente.', error.code));
   normalizeLegacyDiscardPurchase(newState);
   if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.
@@ -9741,24 +10808,27 @@ onSnapshot(gameRef, async (snap) => {
             const sessionEngine = createBotEngineForSession(scheduledSessionId, scheduledSignal);
             const activeBotTurn = { turnNumber: scheduledTurn, sessionId: scheduledSessionId, promise: null };
             window.activeBotTurn = activeBotTurn;
-            activeBotTurn.promise = BuracoBot.playTurn(state, scheduledBotIndex, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId }).then(async () => {
-              // Blindagem: se a rotina do bot terminou sem passar o turno, não
-              // deixamos lastBotTurnPlayed congelar a partida para sempre.
-              const live = state;
-              const sameTurn = live && !live.finished && live.turnNumber === scheduledTurn && live.currentPlayer === scheduledBotIndex;
-              if (sameTurn && canPerformCommonGameAction(live) && !isBossTurnActive(live) && !hasPendingBossChoices(live)) {
-                console.warn('[BOT] Rotina terminou sem avançar o turno; aplicando recuperação segura.');
+            activeBotTurn.promise = BuracoBot.playTurn(state, scheduledBotIndex, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId })
+              .then(async () => {
+                // Blindagem: se a rotina do bot terminou sem passar o turno, não
+                // deixamos lastBotTurnPlayed congelar a partida para sempre.
+                const live = state;
+                const sameTurn = live && !live.finished && live.turnNumber === scheduledTurn && live.currentPlayer === scheduledBotIndex;
+                if (sameTurn && canPerformCommonGameAction(live) && !isBossTurnActive(live) && !hasPendingBossChoices(live)) {
+                  console.warn('[BOT] Rotina terminou sem avançar o turno; aplicando recuperação segura.');
+                  window.lastBotTurnPlayed = null;
+                  if (!live.hasDrawnThisTurn) await sessionEngine.executeDrawStock(scheduledBotIndex);
+                  if (state?.currentPlayer === scheduledBotIndex && !state.finished) await sessionEngine.recoverBotTurn(scheduledBotIndex);
+                }
+              })
+              .catch((err) => {
+                if (BuracoBot.isCancellationError(err)) return;
+                console.error('Erro na Matrix:', err);
                 window.lastBotTurnPlayed = null;
-                if (!live.hasDrawnThisTurn) await sessionEngine.executeDrawStock(scheduledBotIndex);
-                if (state?.currentPlayer === scheduledBotIndex && !state.finished) await sessionEngine.recoverBotTurn(scheduledBotIndex);
-              }
-            }).catch((err) => {
-              if (BuracoBot.isCancellationError(err)) return;
-              console.error('Erro na Matrix:', err);
-              window.lastBotTurnPlayed = null;
-            }).finally(() => {
-              if (window.activeBotTurn === activeBotTurn) window.activeBotTurn = null;
-            });
+              })
+              .finally(() => {
+                if (window.activeBotTurn === activeBotTurn) window.activeBotTurn = null;
+              });
           }, botDelay);
         }
       }
@@ -9780,20 +10850,24 @@ window.pushLobby = function () {
   if (!pt1.disabled) pt1.dataset.rawPix = pt1.value.trim();
   if (!pt2.disabled) pt2.dataset.rawPix = pt2.value.trim();
 
-  const lobby = profileInLobby({
-    seatAccountIds: currentLobby?.seatAccountIds || ['', '', '', ''],
-    mode: mode,
-    dominationOptions,
-    bossId: getBossDefinitionForMode(mode)?.id || null,
-    variant: normalizeVariantForMode(mode, document.getElementById('variantSelect').value),
-    deckTheme: document.getElementById('deckThemeSelect').value,
-    tableTheme: document.getElementById('tableThemeSelect').value, // Sincroniza escolha no lobby do Firebase
-    betToggle: document.getElementById('betToggle').value,
-    betBase: document.getElementById('betBase').value,
-    betPerPoint: document.getElementById('betPerPoint').value,
-    names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
-    pixKeys: [pt1.dataset.rawPix || '', pt2.dataset.rawPix || ''],
-  }, myPlayerIndex, activeAccount);
+  const lobby = profileInLobby(
+    {
+      seatAccountIds: currentLobby?.seatAccountIds || ['', '', '', ''],
+      mode: mode,
+      dominationOptions,
+      bossId: getBossDefinitionForMode(mode)?.id || null,
+      variant: normalizeVariantForMode(mode, document.getElementById('variantSelect').value),
+      deckTheme: document.getElementById('deckThemeSelect').value,
+      tableTheme: document.getElementById('tableThemeSelect').value, // Sincroniza escolha no lobby do Firebase
+      betToggle: document.getElementById('betToggle').value,
+      betBase: document.getElementById('betBase').value,
+      betPerPoint: document.getElementById('betPerPoint').value,
+      names: [document.getElementById('p1Name').value, document.getElementById('p2Name').value, document.getElementById('p3Name').value, document.getElementById('p4Name').value],
+      pixKeys: [pt1.dataset.rawPix || '', pt2.dataset.rawPix || ''],
+    },
+    myPlayerIndex,
+    activeAccount,
+  );
 
   let readyArray = [false, false, false, false];
   if (currentLobby && currentLobby.ready && !resetReady) {
@@ -10324,13 +11398,13 @@ window.debugSetDeckTheme = async (theme) => {
 
 if (isDebugMode) {
   if (!isLocalDevelopment) {
-  const exitDevTools = document.createElement('button');
-  exitDevTools.id = 'exitDevToolsBtn';
-  exitDevTools.type = 'button';
-  exitDevTools.textContent = 'Sair do modo DEV';
-  exitDevTools.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:2147483647;padding:8px 12px;background:#7f1d1d;color:white;border:1px solid #fca5a5;border-radius:8px;font-size:11px;';
-  exitDevTools.addEventListener('click', leaveDevTools);
-  document.body.append(exitDevTools);
+    const exitDevTools = document.createElement('button');
+    exitDevTools.id = 'exitDevToolsBtn';
+    exitDevTools.type = 'button';
+    exitDevTools.textContent = 'Sair do modo DEV';
+    exitDevTools.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:2147483647;padding:8px 12px;background:#7f1d1d;color:white;border:1px solid #fca5a5;border-radius:8px;font-size:11px;';
+    exitDevTools.addEventListener('click', leaveDevTools);
+    document.body.append(exitDevTools);
   }
   window.toggleDebugPanel(true);
   // 🔥 Exibe o painel de atalhos rápidos do menu principal
@@ -10378,9 +11452,7 @@ if (isDebugMode) {
 
     window.updateMenuDynamic();
 
-    const debugDominationOptions = selectedMode === '1x1_dominacao'
-      ? { ...readDominationMenuOptions(), friend: true, friendCapacity: 2 }
-      : undefined;
+    const debugDominationOptions = selectedMode === '1x1_dominacao' ? { ...readDominationMenuOptions(), friend: true, friendCapacity: 2 } : undefined;
     if (debugDominationOptions) syncDominationMenuOptions(debugDominationOptions);
 
     if (preparedState) {
@@ -10389,7 +11461,9 @@ if (isDebugMode) {
       preparedState.matchStartedAt = Date.now();
       preparedState.matchFinishedAt = null;
       preparedState.historyTest = true;
-      preparedState.players.forEach(p => { p.accountUid = p.id === targetSeat ? activeAccount?.uid || null : null; });
+      preparedState.players.forEach((p) => {
+        p.accountUid = p.id === targetSeat ? activeAccount?.uid || null : null;
+      });
       preparedState.isBetting = false;
       preparedState.betBase = 0;
       preparedState.betPerPoint = 0;
@@ -10569,9 +11643,11 @@ if (isDebugMode) {
       await window.debugInstantStart(definition.mode, 0, prepared.state);
       await activatePreparedBossLabState(prepared, config);
       if (instructions) instructions.textContent = prepared.instructions;
-      showMessage(config.variant === 'no_target'
-        ? `Sem alvo: habilidade rejeitada. ${state.boss.currentIntent?.name ? `Fallback: ${state.boss.currentIntent.name}.` : 'Nenhuma alternativa elegivel nesta fase.'}`
-        : `${definition.name}: ${state.boss.currentIntent?.name} preparado no laboratorio.`);
+      showMessage(
+        config.variant === 'no_target'
+          ? `Sem alvo: habilidade rejeitada. ${state.boss.currentIntent?.name ? `Fallback: ${state.boss.currentIntent.name}.` : 'Nenhuma alternativa elegivel nesta fase.'}`
+          : `${definition.name}: ${state.boss.currentIntent?.name} preparado no laboratorio.`,
+      );
       return true;
     } catch (error) {
       setBossLabError(error.message || String(error));
@@ -10848,7 +11924,7 @@ window.debugRestartGame = async (fromRematch = false) => {
 
   // Inicia a nova partida no Firebase
   if (state.finished) await recoverFinishedHistory();
-  await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions), { test: !!state.historyTest || !fromRematch, accountIds: state.players.map(p => p.accountUid || null) });
+  await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions), { test: !!state.historyTest || !fromRematch, accountIds: state.players.map((p) => p.accountUid || null) });
 
   // Esconde o painel do DevTools para o jogador ver os dados rolarem
   window.toggleDebugPanel(keepDevToolsOpen);
@@ -11290,12 +12366,16 @@ document.getElementById('drawDiscardBtn').onclick = drawFromDiscard;
 
 // Suppress all overlapping table gestures until a purchase/discard is saved.
 for (const type of ['click', 'dblclick', 'pointerdown', 'keydown']) {
-  window.addEventListener(type, event => {
-    if (localActionGate.pending && event.target.closest?.('#gameSection')) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-  }, true);
+  window.addEventListener(
+    type,
+    (event) => {
+      if (localActionGate.pending && event.target.closest?.('#gameSection')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true,
+  );
 }
 
 let pauseVotePending = false;
@@ -11304,7 +12384,7 @@ async function votePause(action) {
   pauseVotePending = true;
   try {
     const startedAt = state.matchStartedAt;
-    await runTransaction(db, async transaction => {
+    await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(gameRef);
       if (!snapshot.exists() || !snapshot.data().stateJson) return;
       const latest = JSON.parse(snapshot.data().stateJson);
@@ -11316,7 +12396,9 @@ async function votePause(action) {
   } catch (error) {
     console.error('Falha na votação de pausa:', error);
     showMessage('Não foi possível salvar o voto. Tente novamente.');
-  } finally { pauseVotePending = false; }
+  } finally {
+    pauseVotePending = false;
+  }
 }
 document.getElementById('pauseGameBtn').onclick = () => votePause('request');
 
@@ -11325,7 +12407,10 @@ function renderPauseVote() {
   button.hidden = !state || state.finished || myPlayerIndex < 0;
   button.disabled = isDominationFriendBusy(state);
   let overlay = document.getElementById('pauseVoteOverlay');
-  if (!pauseBlocksPlay(state) || state.finished || state.surrender?.active) { overlay?.remove(); return; }
+  if (!pauseBlocksPlay(state) || state.finished || state.surrender?.active) {
+    overlay?.remove();
+    return;
+  }
   for (const id of ['cardArtDialog', 'cardSearchDialog']) {
     const dialog = document.getElementById(id);
     if (dialog?.open) dialog.close();
@@ -11349,11 +12434,12 @@ function renderPauseVote() {
   const text = document.createElement('p');
   text.textContent = 'Relógio e jogadas congelados. Todos precisam concordar; bots votam sim.';
   panel.append(text);
-  if (pause.request) for (const player of state.players) {
-    const row = document.createElement('p');
-    row.textContent = `${player.name}: ${pause.votes[player.id] ? '✅ Sim' : '⏳ Aguardando'}`;
-    panel.append(row);
-  }
+  if (pause.request)
+    for (const player of state.players) {
+      const row = document.createElement('p');
+      row.textContent = `${player.name}: ${pause.votes[player.id] ? '✅ Sim' : '⏳ Aguardando'}`;
+      panel.append(row);
+    }
   const addButton = (label, action) => {
     const control = document.createElement('button');
     control.textContent = label;
@@ -11379,11 +12465,11 @@ async function voteExit(action) {
   try {
     // Arquivar o resultado antes de encerrar a sala; nunca perder o histórico.
     await recoverFinishedHistory();
-    await runTransaction(db, async transaction => {
+    await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(gameRef);
       if (!snapshot.exists() || !snapshot.data().stateJson) return;
       const latest = JSON.parse(snapshot.data().stateJson);
-      if (latest.matchStartedAt !== startedAt || latest.rematch?.starting || !latest.players.some(p => p.id === myPlayerIndex)) return;
+      if (latest.matchStartedAt !== startedAt || latest.rematch?.starting || !latest.players.some((p) => p.id === myPlayerIndex)) return;
       if (latest.finished) {
         if (action === 'no') return;
         if (!snapshot.data().historySummary) throw new Error('Resultado ainda não arquivado');
@@ -11398,7 +12484,7 @@ async function voteExit(action) {
         if (!latest.surrender.active) latest.surrender = { active: true, votes: {} };
         latest.surrender.votes[myPlayerIndex] = true;
         for (const p of latest.players) if (p.name?.toUpperCase().includes('BOT')) latest.surrender.votes[p.id] = true;
-        if (latest.players.every(p => latest.surrender.votes[p.id] === true)) {
+        if (latest.players.every((p) => latest.surrender.votes[p.id] === true)) {
           transaction.delete(gameRef);
           return;
         }
@@ -11410,7 +12496,9 @@ async function voteExit(action) {
   } catch (error) {
     console.error('Falha na votação de saída:', error);
     showMessage('Não foi possível concluir a saída. Confira a conexão e tente novamente.');
-  } finally { exitVotePending = false; }
+  } finally {
+    exitVotePending = false;
+  }
 }
 document.getElementById('endGameBtn').onclick = () => voteExit('request');
 document.getElementById('voteYesBtn').onclick = () => voteExit('yes');
@@ -11612,7 +12700,7 @@ window.voteRematch = async () => {
   rematchVotePending = true;
   const startedAt = state.matchStartedAt;
   try {
-    const restart = await runTransaction(db, async transaction => {
+    const restart = await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(gameRef);
       if (!snapshot.exists() || !snapshot.data().stateJson) return false;
       const latest = JSON.parse(snapshot.data().stateJson);
@@ -11620,7 +12708,7 @@ window.voteRematch = async () => {
       latest.rematch ||= { votes: {} };
       latest.rematch.votes[myPlayerIndex] = true;
       for (const p of latest.players) if (p.name?.toUpperCase().includes('BOT')) latest.rematch.votes[p.id] = true;
-      const ready = latest.players.every(p => latest.rematch.votes[p.id] === true);
+      const ready = latest.players.every((p) => latest.rematch.votes[p.id] === true);
       latest.rematch.starting = ready;
       if (latest.mode === '1x1_dominacao') latest.friendRevision = (latest.friendRevision || 0) + 1;
       transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
@@ -11630,7 +12718,7 @@ window.voteRematch = async () => {
   } catch (error) {
     console.error('Falha na revanche:', error);
     showMessage('Não foi possível iniciar a revanche. Tente novamente.');
-    await runTransaction(db, async transaction => {
+    await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(gameRef);
       if (!snapshot.exists() || !snapshot.data().stateJson) return;
       const latest = JSON.parse(snapshot.data().stateJson);
@@ -11639,7 +12727,9 @@ window.voteRematch = async () => {
         transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
       }
     }).catch(console.error);
-  } finally { rematchVotePending = false; }
+  } finally {
+    rematchVotePending = false;
+  }
 };
 
 // Usar uma ferramenta que altera a partida torna seu resultado um teste, não uma vitória válida.

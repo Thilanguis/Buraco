@@ -141,14 +141,14 @@
   transform: scale(0.94);
   border: 2px solid rgba(250, 204, 21, 0.92);
   border-radius: 48% 48% 42% 42% / 44% 44% 56% 56%;
-  background:
-    radial-gradient(ellipse at 50% 12%, rgba(254, 240, 138, 0.24), transparent 38%),
-    linear-gradient(112deg, transparent 26%, rgba(253, 230, 138, 0.16) 47%, transparent 66%);
+  background: radial-gradient(ellipse at 50% 12%, rgba(254, 240, 138, 0.24), transparent 38%), linear-gradient(112deg, transparent 26%, rgba(253, 230, 138, 0.16) 47%, transparent 66%);
   box-shadow:
     0 0 7px rgba(250, 204, 21, 0.85),
     0 0 15px rgba(52, 211, 153, 0.4),
     inset 0 0 10px rgba(253, 230, 138, 0.16);
-  transition: opacity 180ms ease, transform 220ms ease;
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease;
 }
 .boss-spring-crown {
   position: absolute;
@@ -163,7 +163,9 @@
   transform: translateX(-50%) scale(0.78);
   border-radius: 50%;
   background: radial-gradient(ellipse at center, rgba(255, 251, 209, 0.4) 0 5%, rgba(250, 204, 21, 0.14) 28%, transparent 68%);
-  transition: opacity 180ms ease, transform 260ms ease;
+  transition:
+    opacity 180ms ease,
+    transform 260ms ease;
 }
 .boss-spring-crown::before {
   content: '';
@@ -210,9 +212,18 @@ body[data-boss-id='matriarca_esmeralda'] .boss-crown-chip {
   box-shadow: inset 0 0 8px rgba(52, 211, 153, 0.13);
 }
 @keyframes bossSpringCrownEnter {
-  0% { opacity: 0; transform: translateX(-50%) translateY(7px) scale(0.72); }
-  68% { opacity: 1; transform: translateX(-50%) translateY(-1px) scale(1.08); }
-  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(7px) scale(0.72);
+  }
+  68% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-1px) scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
 }
 .boss-cocoon-ward::before,
 .boss-cocoon-ward::after {
@@ -246,7 +257,9 @@ body[data-boss-id='matriarca_esmeralda'] [data-cocoon-stage='cracked'] .boss-coc
 body[data-boss-id='matriarca_esmeralda'] [data-cocoon-stage='critical'] .boss-cocoon-ward {
   border-style: dashed;
   opacity: 0.5;
-  box-shadow: 0 0 7px rgba(250, 204, 21, 0.65), inset 0 0 8px rgba(52, 211, 153, 0.12);
+  box-shadow:
+    0 0 7px rgba(250, 204, 21, 0.65),
+    inset 0 0 8px rgba(52, 211, 153, 0.12);
 }
 body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-cocoon-impact .boss-cocoon-ward {
   animation: bossCocoonImpact 600ms ease-out;
@@ -255,14 +268,31 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-cocoon-breaking .bo
   animation: bossCocoonBreak 800ms ease-out forwards;
 }
 @keyframes bossCocoonImpact {
-  0%, 100% { transform: scale(1); }
-  28% { opacity: 1; transform: scale(1.055); }
-  58% { transform: scale(0.985); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  28% {
+    opacity: 1;
+    transform: scale(1.055);
+  }
+  58% {
+    transform: scale(0.985);
+  }
 }
 @keyframes bossCocoonBreak {
-  0% { opacity: 0.95; transform: scale(1); }
-  45% { opacity: 1; transform: scale(1.07); }
-  100% { opacity: 0; transform: scale(1.15); }
+  0% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.07);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
 }
 .boss-portrait img {
   width: 100%;
@@ -771,7 +801,9 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
 }
 .boss-ability-card.is-active {
   border-color: rgba(250, 204, 21, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.12), 0 0 12px rgba(250, 204, 21, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(250, 204, 21, 0.12),
+    0 0 12px rgba(250, 204, 21, 0.08);
 }
 .boss-ability-card header {
   display: flex;
@@ -817,9 +849,15 @@ body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
   font-weight: 1000;
   letter-spacing: 0.04em;
 }
-body[data-boss-id='banker'] .boss-ability-overview { border-left-color: #22c55e; }
-body[data-boss-id='dominadora'] .boss-ability-overview { border-left-color: #ec4899; }
-body[data-boss-id='matriarca_esmeralda'] .boss-ability-overview { border-left-color: #34d399; }
+body[data-boss-id='banker'] .boss-ability-overview {
+  border-left-color: #22c55e;
+}
+body[data-boss-id='dominadora'] .boss-ability-overview {
+  border-left-color: #ec4899;
+}
+body[data-boss-id='matriarca_esmeralda'] .boss-ability-overview {
+  border-left-color: #34d399;
+}
 .boss-legacy-battle-details[hidden] {
   display: none !important;
 }
@@ -1133,34 +1171,91 @@ body[data-boss-id='matriarca_esmeralda'] .boss-ability-overview { border-left-co
   font-size: 6px;
 }
 @keyframes bossVaultOpen {
-  0% { opacity: 0.45; transform: translateY(3px) scale(0.94); }
-  70% { opacity: 1; transform: translateY(-1px) scale(1.025); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0.45;
+    transform: translateY(3px) scale(0.94);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.025);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 @keyframes bossVaultAppear {
-  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
-  72% { opacity: 1; transform: translateY(-1px) scale(1.02); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 @keyframes bossVaultHoldOpen {
-  0% { opacity: 0.72; transform: translateY(4px) scale(0.95); }
-  28% { opacity: 1; transform: translateY(-2px) scale(1.03); }
-  100% { opacity: 1; transform: translateY(-1px) scale(1.015); }
+  0% {
+    opacity: 0.72;
+    transform: translateY(4px) scale(0.95);
+  }
+  28% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.015);
+  }
 }
 @keyframes bossVaultClose {
-  0% { opacity: 0.78; transform: translateY(-4px) scale(1.055); filter: brightness(1.24); }
-  58% { opacity: 1; transform: translateY(2px) scale(0.975); filter: brightness(0.92); }
-  82% { transform: translateY(-1px) scale(1.012); filter: brightness(1.08); }
-  100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+  0% {
+    opacity: 0.78;
+    transform: translateY(-4px) scale(1.055);
+    filter: brightness(1.24);
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(2px) scale(0.975);
+    filter: brightness(0.92);
+  }
+  82% {
+    transform: translateY(-1px) scale(1.012);
+    filter: brightness(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
 }
 @keyframes bossVaultCardSettle {
-  0% { opacity: 0.35; transform: scale(1.09); }
-  70% { opacity: 1; transform: scale(0.97); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0.35;
+    transform: scale(1.09);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 @keyframes bossVaultCopyReveal {
-  0% { opacity: 0; transform: translateX(7px); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% {
+    opacity: 0;
+    transform: translateX(7px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2460,7 +2555,9 @@ body[data-boss-id='matriarca_esmeralda'] #localPlayerLabel.boss-player-targeted:
 }
 .boss-floating-number.nature-cocoon-absorb {
   color: #fde68a;
-  text-shadow: 0 0 10px rgba(16, 185, 129, 0.76), 0 2px 8px #000;
+  text-shadow:
+    0 0 10px rgba(16, 185, 129, 0.76),
+    0 2px 8px #000;
 }
 .boss-floating-number.bloom-up {
   color: #f9a8d4;
@@ -3024,7 +3121,7 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
 }
 .boss-range-rule {
   display: grid;
-  grid-template-columns: 42px minmax(64px, .8fr) minmax(0, 1.5fr);
+  grid-template-columns: 42px minmax(64px, 0.8fr) minmax(0, 1.5fr);
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -3036,19 +3133,76 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
   font-size: 8px;
   line-height: 1.15;
 }
-.boss-range-rule > b { color: #fbbf24; font-size: 8px; font-weight: 1000; white-space: nowrap; }
-.boss-range-rule > span { font-weight: 900; }
-.boss-range-rule > em { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; min-width: 0; font-style: normal; }
-.boss-range-rule.occupied { border-color: rgba(251, 191, 36, 0.68); background: rgba(120, 53, 15, 0.34); box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.07); }
-.boss-range-player { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 2px 4px; border: 1px solid rgba(251, 191, 36, 0.5); border-radius: 999px; color: #fff7cc; background: rgba(92, 50, 7, 0.82); font-size: 7px; font-weight: 1000; white-space: nowrap; }
-.boss-range-player.safe { border-color: rgba(74, 222, 128, 0.56); color: #bbf7d0; background: rgba(20, 83, 45, 0.62); }
-.boss-range-player.warning { border-color: rgba(250, 204, 21, 0.7); color: #fef08a; }
-.boss-range-player.danger { border-color: rgba(248, 113, 113, 0.72); color: #fecaca; background: rgba(127, 29, 29, 0.62); }
-.boss-range-total { color: #fda4af; font-size: 8px; font-weight: 800; line-height: 1.2; }
-.boss-range-total b { color: #fecdd3; font-weight: 1000; }
+.boss-range-rule > b {
+  color: #fbbf24;
+  font-size: 8px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+.boss-range-rule > span {
+  font-weight: 900;
+}
+.boss-range-rule > em {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 0;
+  font-style: normal;
+}
+.boss-range-rule.occupied {
+  border-color: rgba(251, 191, 36, 0.68);
+  background: rgba(120, 53, 15, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.07);
+}
+.boss-range-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px 4px;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 999px;
+  color: #fff7cc;
+  background: rgba(92, 50, 7, 0.82);
+  font-size: 7px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+.boss-range-player.safe {
+  border-color: rgba(74, 222, 128, 0.56);
+  color: #bbf7d0;
+  background: rgba(20, 83, 45, 0.62);
+}
+.boss-range-player.warning {
+  border-color: rgba(250, 204, 21, 0.7);
+  color: #fef08a;
+}
+.boss-range-player.danger {
+  border-color: rgba(248, 113, 113, 0.72);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.62);
+}
+.boss-range-total {
+  color: #fda4af;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.boss-range-total b {
+  color: #fecdd3;
+  font-weight: 1000;
+}
 @media (max-width: 620px) {
-  .boss-range-rule { grid-template-columns: 35px minmax(54px, .75fr) minmax(0, 1.5fr); gap: 4px; padding: 3px 4px; }
-  .boss-range-player { font-size: 6px; padding-inline: 3px; }
+  .boss-range-rule {
+    grid-template-columns: 35px minmax(54px, 0.75fr) minmax(0, 1.5fr);
+    gap: 4px;
+    padding: 3px 4px;
+  }
+  .boss-range-player {
+    font-size: 6px;
+    padding-inline: 3px;
+  }
 }
 
 /* Juros Fixos: escolha da garantia diretamente na mão do titular. */
@@ -3067,17 +3221,23 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait::after {
 .boss-mode .carta.boss-collateral-selectable {
   cursor: pointer;
   box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.42) !important;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .boss-mode .carta.boss-collateral-selectable:hover {
   transform: translateY(-6px);
-  box-shadow: 0 0 0 2px #fbbf24, 0 0 12px rgba(251, 191, 36, 0.36) !important;
+  box-shadow:
+    0 0 0 2px #fbbf24,
+    0 0 12px rgba(251, 191, 36, 0.36) !important;
 }
 
 .boss-mode .carta.boss-collateral-selected {
   transform: translateY(-8px);
-  box-shadow: 0 0 0 3px #facc15, 0 0 18px rgba(250, 204, 21, 0.62) !important;
+  box-shadow:
+    0 0 0 3px #facc15,
+    0 0 18px rgba(250, 204, 21, 0.62) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3152,10 +3312,7 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track {
   height: 16px;
   overflow: visible;
   border-color: rgba(116, 22, 31, 0.78);
-  background:
-    radial-gradient(circle at 22% 40%, rgba(91, 7, 17, 0.38) 0 2px, transparent 3px),
-    radial-gradient(circle at 63% 62%, rgba(71, 5, 13, 0.46) 0 2px, transparent 3px),
-    linear-gradient(180deg, #210208, #0e0104 70%);
+  background: radial-gradient(circle at 22% 40%, rgba(91, 7, 17, 0.38) 0 2px, transparent 3px), radial-gradient(circle at 63% 62%, rgba(71, 5, 13, 0.46) 0 2px, transparent 3px), linear-gradient(180deg, #210208, #0e0104 70%);
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.78),
     inset 0 0 9px rgba(83, 7, 17, 0.42),
@@ -3176,7 +3333,9 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span {
     inset -5px 0 8px rgba(28, 0, 6, 0.34),
     0 0 11px rgba(116, 10, 25, 0.68);
   filter: saturate(1.12) contrast(1.04);
-  animation: dimitrescuBloodFlow 6.4s linear infinite, dimitrescuBloodThrob 3.2s ease-in-out infinite;
+  animation:
+    dimitrescuBloodFlow 6.4s linear infinite,
+    dimitrescuBloodThrob 3.2s ease-in-out infinite;
 }
 body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::before {
   content: '';
@@ -3213,17 +3372,59 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0'
   display: none;
 }
 @keyframes dimitrescuBloodFlow {
-  from { background-position: 7px 2px, 21px 7px, 4px 4px, 0 0; }
-  to { background-position: 44px 2px, -32px 7px, 75px 4px, 0 0; }
+  from {
+    background-position:
+      7px 2px,
+      21px 7px,
+      4px 4px,
+      0 0;
+  }
+  to {
+    background-position:
+      44px 2px,
+      -32px 7px,
+      75px 4px,
+      0 0;
+  }
 }
 @keyframes dimitrescuBloodThrob {
-  0%, 100% { filter: saturate(1.08) brightness(0.96) contrast(1.04); }
-  50% { filter: saturate(1.2) brightness(1.08) contrast(1.08); }
+  0%,
+  100% {
+    filter: saturate(1.08) brightness(0.96) contrast(1.04);
+  }
+  50% {
+    filter: saturate(1.2) brightness(1.08) contrast(1.08);
+  }
 }
 @keyframes dimitrescuBloodDripField {
-  0%, 100% { transform: scaleY(0.78) translateY(-1px); opacity: 0.68; background-position: 2px 0, 17px 1px, 9px 7px, 28px 10px; }
-  45% { transform: scaleY(1.06) translateY(1px); opacity: 0.98; background-position: 6px 0, 14px 1px, 13px 8px, 24px 11px; }
-  72% { transform: scaleY(0.92) translateY(0); opacity: 0.84; background-position: 4px 0, 20px 1px, 11px 6px, 31px 10px; }
+  0%,
+  100% {
+    transform: scaleY(0.78) translateY(-1px);
+    opacity: 0.68;
+    background-position:
+      2px 0,
+      17px 1px,
+      9px 7px,
+      28px 10px;
+  }
+  45% {
+    transform: scaleY(1.06) translateY(1px);
+    opacity: 0.98;
+    background-position:
+      6px 0,
+      14px 1px,
+      13px 8px,
+      24px 11px;
+  }
+  72% {
+    transform: scaleY(0.92) translateY(0);
+    opacity: 0.84;
+    background-position:
+      4px 0,
+      20px 1px,
+      11px 6px,
+      31px 10px;
+  }
 }
 
 /* Filhas de Lady Dimitrescu: faixa independente sob o HUD principal. */
@@ -3240,7 +3441,7 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0'
   pointer-events: none;
 }
 .boss-daughter-strip[hidden],
-body:not([data-boss-id='dimitrescu']) .boss-daughter-strip {
+body:not([data-boss-id='dimitrescu']):not([data-boss-id='nehelenia']) .boss-daughter-strip {
   display: none !important;
 }
 .boss-daughter-card {
@@ -3259,9 +3460,15 @@ body:not([data-boss-id='dimitrescu']) .boss-daughter-strip {
     inset 0 1px rgba(255, 255, 255, 0.045),
     0 0 15px rgba(127, 29, 29, 0.12);
 }
-.boss-daughter-card[data-daughter='bela'] { grid-column: 1; }
-.boss-daughter-card[data-daughter='cassandra'] { grid-column: 2; }
-.boss-daughter-card[data-daughter='daniela'] { grid-column: 3; }
+.boss-daughter-card[data-daughter='bela'] {
+  grid-column: 1;
+}
+.boss-daughter-card[data-daughter='cassandra'] {
+  grid-column: 2;
+}
+.boss-daughter-card[data-daughter='daniela'] {
+  grid-column: 3;
+}
 .boss-daughter-card img {
   width: 184px;
   height: 116px;
@@ -3301,7 +3508,9 @@ body:not([data-boss-id='dimitrescu']) .boss-daughter-strip {
   border-radius: 3px;
   color: #fef3c7;
   background: rgba(66, 32, 6, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.48), 0 0 10px rgba(245, 158, 11, 0.12);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.48),
+    0 0 10px rgba(245, 158, 11, 0.12);
   font-size: 6px;
   font-weight: 1000;
   line-height: 1;
@@ -3335,12 +3544,24 @@ body:not([data-boss-id='dimitrescu']) .boss-daughter-strip {
   color: #fecaca;
   background: rgba(69, 10, 10, 0.94);
 }
-body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='bela'] { border-color: rgba(254, 240, 138, 0.48); }
-body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='cassandra'] { border-color: rgba(248, 113, 113, 0.6); }
-body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] { border-color: rgba(251, 146, 60, 0.5); }
-body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='bela'] img { object-position: 50% 28%; }
-body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='cassandra'] img { object-position: 50% 25%; }
-body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img { object-position: 50% 27%; }
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='bela'] {
+  border-color: rgba(254, 240, 138, 0.48);
+}
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='cassandra'] {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] {
+  border-color: rgba(251, 146, 60, 0.5);
+}
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='bela'] img {
+  object-position: 50% 28%;
+}
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='cassandra'] img {
+  object-position: 50% 25%;
+}
+body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img {
+  object-position: 50% 27%;
+}
 
 .boss-mode .carta.boss-card-dimitrescu-hunt,
 .boss-mode .carta.boss-card-dimitrescu-blood-mark,
@@ -3373,8 +3594,18 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   pointer-events: none;
   opacity: 0.96;
   background:
-    radial-gradient(ellipse at var(--blood-blob-x1, 15%) var(--blood-blob-y1, 20%), rgb(72 2 14 / var(--blood-blob-o1, 0.9)) 0 calc(var(--blood-blob-r1, 10%) - 2%), rgb(130 12 31 / calc(var(--blood-blob-o1, 0.9) * 0.72)) calc(var(--blood-blob-r1, 10%) - 1%) var(--blood-blob-r1, 10%), transparent calc(var(--blood-blob-r1, 10%) + 2%)),
-    radial-gradient(ellipse at var(--blood-blob-x2, 78%) var(--blood-blob-y2, 64%), rgb(64 1 11 / var(--blood-blob-o2, 0.82)) 0 calc(var(--blood-blob-r2, 9%) - 2%), rgb(148 10 32 / calc(var(--blood-blob-o2, 0.82) * 0.6)) calc(var(--blood-blob-r2, 9%) - 1%) var(--blood-blob-r2, 9%), transparent calc(var(--blood-blob-r2, 9%) + 2%)),
+    radial-gradient(
+      ellipse at var(--blood-blob-x1, 15%) var(--blood-blob-y1, 20%),
+      rgb(72 2 14 / var(--blood-blob-o1, 0.9)) 0 calc(var(--blood-blob-r1, 10%) - 2%),
+      rgb(130 12 31 / calc(var(--blood-blob-o1, 0.9) * 0.72)) calc(var(--blood-blob-r1, 10%) - 1%) var(--blood-blob-r1, 10%),
+      transparent calc(var(--blood-blob-r1, 10%) + 2%)
+    ),
+    radial-gradient(
+      ellipse at var(--blood-blob-x2, 78%) var(--blood-blob-y2, 64%),
+      rgb(64 1 11 / var(--blood-blob-o2, 0.82)) 0 calc(var(--blood-blob-r2, 9%) - 2%),
+      rgb(148 10 32 / calc(var(--blood-blob-o2, 0.82) * 0.6)) calc(var(--blood-blob-r2, 9%) - 1%) var(--blood-blob-r2, 9%),
+      transparent calc(var(--blood-blob-r2, 9%) + 2%)
+    ),
     radial-gradient(circle at var(--blood-blob-x3, 60%) var(--blood-blob-y3, 28%), rgb(146 12 31 / var(--blood-blob-o3, 0.68)) 0 calc(var(--blood-blob-r3, 5%) - 1%), transparent calc(var(--blood-blob-r3, 5%) + 1%)),
     radial-gradient(circle at var(--blood-blob-x4, 31%) var(--blood-blob-y4, 74%), rgb(108 5 22 / var(--blood-blob-o4, 0.62)) 0 calc(var(--blood-blob-r4, 4.8%) - 1%), transparent calc(var(--blood-blob-r4, 4.8%) + 1%)),
     radial-gradient(circle at var(--blood-blob-x5, 46%) var(--blood-blob-y5, 43%), rgb(92 3 19 / var(--blood-blob-o5, 0.55)) 0 calc(var(--blood-blob-r5, 4.2%) - 1%), transparent calc(var(--blood-blob-r5, 4.2%) + 1%)),
@@ -3397,20 +3628,31 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   opacity: 0.9;
   background:
     linear-gradient(180deg, rgba(109, 5, 22, 0.94) 0 22%, rgba(150, 12, 34, 0.6) 60%, transparent 100%) var(--blood-drip-x1, 20%) var(--blood-drip-top1, 66%) / var(--blood-drip-w1, 8px) var(--blood-drip-h1, 18px) no-repeat,
-    radial-gradient(circle at 50% 100%, rgba(86, 3, 18, 0.94) 0 var(--blood-drip-bulge1, 42%), transparent calc(var(--blood-drip-bulge1, 42%) + 16%)) var(--blood-drip-x1, 20%) calc(var(--blood-drip-top1, 66%) + var(--blood-drip-h1, 18px) - 8px) / calc(var(--blood-drip-w1, 8px) + 7px) 10px no-repeat,
+    radial-gradient(circle at 50% 100%, rgba(86, 3, 18, 0.94) 0 var(--blood-drip-bulge1, 42%), transparent calc(var(--blood-drip-bulge1, 42%) + 16%)) var(--blood-drip-x1, 20%) calc(var(--blood-drip-top1, 66%) + var(--blood-drip-h1, 18px) - 8px) /
+      calc(var(--blood-drip-w1, 8px) + 7px) 10px no-repeat,
     linear-gradient(180deg, rgba(100, 4, 19, 0.92) 0 24%, rgba(145, 8, 31, 0.56) 62%, transparent 100%) var(--blood-drip-x2, 50%) var(--blood-drip-top2, 70%) / var(--blood-drip-w2, 9px) var(--blood-drip-h2, 22px) no-repeat,
-    radial-gradient(circle at 50% 100%, rgba(74, 2, 14, 0.94) 0 var(--blood-drip-bulge2, 50%), transparent calc(var(--blood-drip-bulge2, 50%) + 16%)) var(--blood-drip-x2, 50%) calc(var(--blood-drip-top2, 70%) + var(--blood-drip-h2, 22px) - 8px) / calc(var(--blood-drip-w2, 9px) + 8px) 10px no-repeat,
+    radial-gradient(circle at 50% 100%, rgba(74, 2, 14, 0.94) 0 var(--blood-drip-bulge2, 50%), transparent calc(var(--blood-drip-bulge2, 50%) + 16%)) var(--blood-drip-x2, 50%) calc(var(--blood-drip-top2, 70%) + var(--blood-drip-h2, 22px) - 8px) /
+      calc(var(--blood-drip-w2, 9px) + 8px) 10px no-repeat,
     linear-gradient(180deg, rgba(105, 4, 20, 0.9) 0 20%, rgba(141, 8, 29, 0.56) 58%, transparent 100%) var(--blood-drip-x3, 78%) var(--blood-drip-top3, 68%) / var(--blood-drip-w3, 7px) var(--blood-drip-h3, 18px) no-repeat,
-    radial-gradient(circle at 50% 100%, rgba(87, 4, 17, 0.92) 0 var(--blood-drip-bulge3, 44%), transparent calc(var(--blood-drip-bulge3, 44%) + 16%)) var(--blood-drip-x3, 78%) calc(var(--blood-drip-top3, 68%) + var(--blood-drip-h3, 18px) - 8px) / calc(var(--blood-drip-w3, 7px) + 6px) 9px no-repeat,
+    radial-gradient(circle at 50% 100%, rgba(87, 4, 17, 0.92) 0 var(--blood-drip-bulge3, 44%), transparent calc(var(--blood-drip-bulge3, 44%) + 16%)) var(--blood-drip-x3, 78%) calc(var(--blood-drip-top3, 68%) + var(--blood-drip-h3, 18px) - 8px) /
+      calc(var(--blood-drip-w3, 7px) + 6px) 9px no-repeat,
     linear-gradient(180deg, rgba(119, 7, 25, 0.88) 0 24%, rgba(164, 14, 38, 0.52) 60%, transparent 100%) var(--blood-drip-x4, 34%) var(--blood-drip-top4, 72%) / var(--blood-drip-w4, 0px) var(--blood-drip-h4, 0px) no-repeat,
-    radial-gradient(circle at 50% 100%, rgba(93, 4, 18, 0.92) 0 var(--blood-drip-bulge4, 0%), transparent calc(var(--blood-drip-bulge4, 0%) + 16%)) var(--blood-drip-x4, 34%) calc(var(--blood-drip-top4, 72%) + var(--blood-drip-h4, 0px) - 8px) / calc(var(--blood-drip-w4, 0px) + 7px) 10px no-repeat;
+    radial-gradient(circle at 50% 100%, rgba(93, 4, 18, 0.92) 0 var(--blood-drip-bulge4, 0%), transparent calc(var(--blood-drip-bulge4, 0%) + 16%)) var(--blood-drip-x4, 34%) calc(var(--blood-drip-top4, 72%) + var(--blood-drip-h4, 0px) - 8px) /
+      calc(var(--blood-drip-w4, 0px) + 7px) 10px no-repeat;
   transform: translateY(0);
   filter: drop-shadow(0 2px 2px rgba(62, 1, 10, 0.52));
   animation: dimitrescuCardBloodWet 3.1s ease-in-out infinite;
 }
 @keyframes dimitrescuCardBloodWet {
-  0%, 100% { opacity: 0.72; transform: translateY(0); }
-  48% { opacity: 0.98; transform: translateY(1.5px); }
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: translateY(0);
+  }
+  48% {
+    opacity: 0.98;
+    transform: translateY(1.5px);
+  }
 }
 .boss-mode .carta.boss-card-dimitrescu-blood-mark {
   border-color: #991b1b !important;
@@ -3437,7 +3679,9 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
 .boss-mode .boss-card-status-crimson-brand {
   color: #ffe4e6;
   background: rgba(69, 10, 10, 0.97);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.52), 0 0 8px rgba(153, 27, 27, 0.26);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.52),
+    0 0 8px rgba(153, 27, 27, 0.26);
 }
 /* Banquete de Cassandra: somente as cartas do jogo alvo sangram, sem cobrir a linha inteira. */
 .boss-mode .carta.boss-card-cassandra-feast {
@@ -3511,7 +3755,9 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   transform: translateX(-50%) rotate(calc(var(--morto-label-rotation, 0deg) * -1));
   color: #ffe4e6;
   background: rgba(69, 10, 10, 0.95);
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.58), 0 0 11px rgba(153, 27, 27, 0.32);
+  box-shadow:
+    0 2px 7px rgba(0, 0, 0, 0.58),
+    0 0 11px rgba(153, 27, 27, 0.32);
   font-size: 6px;
   font-weight: 1000;
   letter-spacing: 0.55px;
@@ -3526,10 +3772,10 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   border: 2px solid rgba(185, 28, 28, 0.74);
   border-radius: 8px;
   pointer-events: none;
-  background:
-    radial-gradient(circle at 14% 20%, rgba(91, 7, 17, 0.56) 0 5px, transparent 7px),
-    radial-gradient(circle at 79% 76%, rgba(112, 5, 20, 0.45) 0 6px, transparent 8px);
-  box-shadow: inset 0 0 15px rgba(91, 7, 17, 0.2), 0 0 11px rgba(153, 27, 27, 0.35);
+  background: radial-gradient(circle at 14% 20%, rgba(91, 7, 17, 0.56) 0 5px, transparent 7px), radial-gradient(circle at 79% 76%, rgba(112, 5, 20, 0.45) 0 6px, transparent 8px);
+  box-shadow:
+    inset 0 0 15px rgba(91, 7, 17, 0.2),
+    0 0 11px rgba(153, 27, 27, 0.35);
 }
 
 /* Coágulo Carmesim: proteção vampírica própria, distinta do Casulo da Matriarca. */
@@ -3537,7 +3783,9 @@ body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active .boss-cocoon-me
   border-color: rgba(153, 27, 27, 0.74);
   color: #fecaca;
   background: linear-gradient(180deg, rgba(69, 10, 10, 0.9), rgba(34, 3, 8, 0.92));
-  box-shadow: inset 0 0 8px rgba(127, 29, 29, 0.24), 0 0 8px rgba(185, 28, 28, 0.18);
+  box-shadow:
+    inset 0 0 8px rgba(127, 29, 29, 0.24),
+    0 0 8px rgba(185, 28, 28, 0.18);
 }
 body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active .boss-portrait {
   box-shadow:
@@ -3552,9 +3800,7 @@ body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active .boss-portrait:
   z-index: 3;
   border-radius: inherit;
   border: 2px solid rgba(117, 12, 27, calc(0.35 + var(--boss-blood-clot-strength, 0) * 0.5));
-  background:
-    radial-gradient(circle at 15% 20%, rgba(92, 3, 17, 0.35) 0 8%, transparent 10%),
-    radial-gradient(circle at 81% 68%, rgba(71, 2, 13, 0.32) 0 11%, transparent 13%);
+  background: radial-gradient(circle at 15% 20%, rgba(92, 3, 17, 0.35) 0 8%, transparent 10%), radial-gradient(circle at 81% 68%, rgba(71, 2, 13, 0.32) 0 11%, transparent 13%);
   pointer-events: none;
 }
 body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active[data-blood-clot-stage='cracked'] .boss-portrait::after {
@@ -3568,16 +3814,29 @@ body[data-boss-id='dimitrescu'] .boss-hud.boss-blood-clot-active[data-blood-clot
 }
 .boss-floating-number.blood-clot-absorb {
   color: #fda4af;
-  text-shadow: 0 0 10px rgba(153, 27, 27, 0.72), 0 2px 8px #000;
+  text-shadow:
+    0 0 10px rgba(153, 27, 27, 0.72),
+    0 2px 8px #000;
 }
 .boss-floating-number.blood-clot-break {
   color: #fecdd3;
-  text-shadow: 0 0 13px rgba(248, 113, 113, 0.82), 0 2px 8px #000;
+  text-shadow:
+    0 0 13px rgba(248, 113, 113, 0.82),
+    0 2px 8px #000;
 }
 @keyframes dimitrescuClotImpact {
-  0% { transform: scale(1); filter: brightness(1); }
-  48% { transform: scale(1.035); filter: brightness(1.25) saturate(1.25); }
-  100% { transform: scale(1); filter: brightness(1); }
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  48% {
+    transform: scale(1.035);
+    filter: brightness(1.25) saturate(1.25);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-impact,
 body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
@@ -3585,7 +3844,9 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
 }
 .boss-floating-number.blood-up {
   color: #f87171;
-  text-shadow: 0 0 10px rgba(220, 38, 38, 0.7), 0 2px 8px #000;
+  text-shadow:
+    0 0 10px rgba(220, 38, 38, 0.7),
+    0 2px 8px #000;
 }
 .boss-floating-number.blood-down {
   color: #fecaca;
@@ -3675,5 +3936,2581 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
 
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
   .boss-mode .carta.boss-card-cassandra-feast::after,
-  .boss-mode .morto-container .boss-dead-blood-layer::after { animation: none; }
+  .boss-mode .morto-container .boss-dead-blood-layer::after {
+    animation: none;
+  }
+}
+
+/* ==========================================================
+   RAINHA NEHELENIA — espelhos, Lua Nova e pesadelo
+   Efeitos estritamente visuais: não alteram layout de cartas/canastras.
+   ========================================================== */
+body[data-boss-id='nehelenia'] .boss-hud {
+  border-color: rgba(167, 139, 250, 0.78);
+  background: radial-gradient(circle at 18% 15%, rgba(91, 33, 182, 0.18), transparent 34%), linear-gradient(180deg, rgba(13, 7, 24, 0.985), rgba(3, 7, 18, 0.97));
+  box-shadow:
+    0 14px 38px rgba(0, 0, 0, 0.6),
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 0 30px rgba(139, 92, 246, 0.16);
+}
+body[data-boss-id='nehelenia'] .boss-hud::before,
+body[data-boss-id='nehelenia'] .boss-hud::after {
+  border-color: #a78bfa;
+}
+body[data-boss-id='nehelenia'] .boss-hud-kicker,
+body[data-boss-id='nehelenia'] .boss-round-summary #bossCurrentActor {
+  color: #c4b5fd;
+}
+body[data-boss-id='nehelenia'] .boss-phase {
+  border-color: rgba(167, 139, 250, 0.58);
+  background: rgba(76, 29, 149, 0.28);
+  color: #ddd6fe;
+}
+body[data-boss-id='nehelenia'] .boss-ability-overview {
+  border-left-color: #a78bfa;
+}
+body[data-boss-id='nehelenia'] .boss-portrait {
+  border-color: rgba(196, 181, 253, 0.68);
+  box-shadow:
+    0 0 0 1px rgba(76, 29, 149, 0.5),
+    0 0 22px rgba(139, 92, 246, 0.22);
+  background: radial-gradient(circle at 50% 40%, rgba(139, 92, 246, 0.3), rgba(10, 5, 20, 0.96) 70%);
+}
+body[data-boss-id='nehelenia'] .boss-portrait.boss-portrait-fallback::after {
+  color: #ddd6fe;
+  text-shadow: 0 0 14px rgba(167, 139, 250, 0.8);
+}
+body[data-boss-id='nehelenia'] .boss-mirror-meter .boss-meter-track {
+  display: none;
+}
+body[data-boss-id='nehelenia'] .boss-mirror-meter .boss-meter-label {
+  margin-bottom: 5px;
+}
+body[data-boss-id='nehelenia'] .boss-mirror-meter .boss-meter-label > span:first-child {
+  color: #c4b5fd;
+}
+body[data-boss-id='nehelenia'] .boss-mirror-meter .boss-meter-label strong {
+  color: #ede9fe;
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers {
+  display: flex;
+  justify-content: flex-start;
+  gap: 7px;
+  min-height: 20px;
+  margin-top: 1px;
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(196, 181, 253, 0.38);
+  border-radius: 5px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(46, 16, 101, 0.4));
+  color: rgba(196, 181, 253, 0.46);
+  font-style: normal;
+  font-size: 14px;
+  line-height: 1;
+  transform: rotate(4deg);
+  clip-path: polygon(12% 4%, 88% 0, 100% 35%, 91% 91%, 54% 100%, 4% 83%, 0 31%);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment:nth-child(even) {
+  transform: rotate(-5deg);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment.active {
+  border-color: rgba(221, 214, 254, 0.9);
+  background: linear-gradient(145deg, rgba(76, 29, 149, 0.92), rgba(15, 23, 42, 0.96));
+  color: #f5f3ff;
+  box-shadow:
+    inset 0 0 8px rgba(255, 255, 255, 0.16),
+    0 0 10px rgba(139, 92, 246, 0.48);
+}
+
+.boss-mode .carta.boss-card-nehelenia-reflection,
+.boss-mode .carta.boss-card-nehelenia-dream,
+.boss-mode .carta.boss-card-nehelenia-nightmare,
+.boss-mode .boss-discard-nehelenia-card {
+  box-shadow:
+    0 0 0 2px rgba(196, 181, 253, 0.9),
+    0 0 16px rgba(124, 58, 237, 0.55) !important;
+}
+.boss-mode .carta.boss-card-nehelenia-reflection::after,
+.boss-mode .carta.boss-card-nehelenia-dream::after,
+.boss-mode .carta.boss-card-nehelenia-nightmare::after,
+.boss-mode .boss-discard-nehelenia-card::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(61deg, transparent 47%, rgba(255, 255, 255, 0.5) 48%, rgba(255, 255, 255, 0.1) 49%, transparent 50%), linear-gradient(119deg, transparent 62%, rgba(196, 181, 253, 0.42) 63%, transparent 64%);
+  opacity: 0.72;
+}
+.boss-mode .carta.boss-card-nehelenia-dream {
+  box-shadow:
+    0 0 0 2px rgba(147, 197, 253, 0.9),
+    0 0 18px rgba(99, 102, 241, 0.55) !important;
+}
+.boss-mode .carta.boss-card-nehelenia-nightmare {
+  box-shadow:
+    0 0 0 2px rgba(216, 180, 254, 0.92),
+    0 0 18px rgba(88, 28, 135, 0.65) !important;
+}
+.boss-mode .boss-card-status-nehelenia {
+  background: linear-gradient(90deg, rgba(46, 16, 101, 0.96), rgba(15, 23, 42, 0.96));
+  color: #ede9fe;
+  border-color: rgba(196, 181, 253, 0.78);
+}
+.boss-mode .boss-card-status-nehelenia i {
+  color: #c4b5fd;
+}
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard .pile-card {
+  filter: drop-shadow(0 0 9px rgba(139, 92, 246, 0.55));
+}
+
+.boss-mode .meld-line.mirrored-by-nehelenia {
+  position: relative;
+  outline: 1px solid rgba(196, 181, 253, 0.7);
+  outline-offset: 4px;
+  border-radius: 7px;
+  filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.22));
+}
+.boss-mode .meld-line.mirrored-by-nehelenia::before {
+  content: attr(data-nehelenia-mirror);
+  position: absolute;
+  z-index: 18;
+  top: -16px;
+  left: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgba(196, 181, 253, 0.68);
+  border-radius: 999px;
+  background: rgba(30, 12, 55, 0.94);
+  color: #ede9fe;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.45px;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce), (max-width: 900px) {
+  body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment,
+  .boss-mode .carta.boss-card-nehelenia-reflection,
+  .boss-mode .carta.boss-card-nehelenia-dream,
+  .boss-mode .carta.boss-card-nehelenia-nightmare,
+  .boss-mode .meld-line.mirrored-by-nehelenia {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.boss-floating-number.mirror-up {
+  color: #ddd6fe;
+  text-shadow: 0 0 14px rgba(124, 58, 237, 0.9);
+}
+.boss-floating-number.mirror-down {
+  color: #bfdbfe;
+  text-shadow: 0 0 14px rgba(96, 165, 250, 0.82);
+}
+
+/* =========================================================
+   RAINHA NEHELENIA — V2 / ESPELHO NEGRO COMO ITEM VISUAL
+   ========================================================= */
+body[data-boss-id='nehelenia'] .boss-bloom-flowers {
+  position: relative;
+  width: 154px;
+  height: 58px;
+  min-height: 58px;
+  margin-top: 4px;
+  display: block !important;
+  border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%;
+  background: radial-gradient(ellipse at 50% 36%, rgba(226, 232, 240, 0.18), rgba(88, 28, 135, 0.2) 38%, rgba(8, 5, 20, 0.92) 74%), linear-gradient(145deg, rgba(221, 214, 254, 0.09), rgba(15, 23, 42, 0.08));
+  box-shadow:
+    inset 0 0 18px rgba(196, 181, 253, 0.12),
+    0 0 0 2px rgba(196, 181, 253, 0.18),
+    0 0 16px rgba(124, 58, 237, 0.18);
+  overflow: hidden;
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: 5;
+  border: 2px solid rgba(221, 214, 254, 0.7);
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 2px rgba(88, 28, 135, 0.42),
+    inset 0 0 14px rgba(255, 255, 255, 0.08),
+    0 0 9px rgba(167, 139, 250, 0.32);
+  pointer-events: none;
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers::after {
+  content: '';
+  position: absolute;
+  inset: 7px 14px;
+  z-index: 6;
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(113deg, transparent 0 31%, rgba(255, 255, 255, 0.18) 32% 34%, transparent 35% 100%), linear-gradient(67deg, transparent 0 57%, rgba(196, 181, 253, 0.16) 58% 60%, transparent 61% 100%);
+  mix-blend-mode: screen;
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment {
+  position: absolute;
+  z-index: 2;
+  width: 42px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 1px solid rgba(196, 181, 253, 0.28);
+  border-radius: 2px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(46, 16, 101, 0.34));
+  color: rgba(226, 232, 240, 0.25);
+  box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.03);
+  transform: none;
+  transition:
+    background 220ms ease,
+    box-shadow 220ms ease,
+    opacity 220ms ease,
+    transform 220ms ease;
+  clip-path: polygon(8% 0, 92% 4%, 100% 47%, 88% 100%, 12% 94%, 0 50%);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment:nth-child(1) {
+  left: 15px;
+  top: 9px;
+  transform: rotate(-3deg);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment:nth-child(2) {
+  left: 56px;
+  top: 7px;
+  transform: rotate(2deg);
+  clip-path: polygon(5% 8%, 90% 0, 100% 55%, 82% 100%, 10% 88%, 0 45%);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment:nth-child(3) {
+  right: 14px;
+  top: 10px;
+  transform: rotate(4deg);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment:nth-child(4) {
+  left: 17px;
+  bottom: 8px;
+  transform: rotate(3deg);
+  clip-path: polygon(0 38%, 15% 0, 88% 7%, 100% 52%, 82% 100%, 8% 92%);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment:nth-child(5) {
+  left: 57px;
+  bottom: 7px;
+  transform: rotate(-2deg);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment:nth-child(6) {
+  right: 16px;
+  bottom: 9px;
+  transform: rotate(-4deg);
+  clip-path: polygon(8% 4%, 88% 0, 100% 44%, 90% 96%, 15% 100%, 0 54%);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment span {
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.38;
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment.active {
+  border-color: rgba(237, 233, 254, 0.92);
+  background: linear-gradient(145deg, rgba(237, 233, 254, 0.52), rgba(109, 40, 217, 0.68) 48%, rgba(15, 23, 42, 0.92));
+  color: #fff;
+  box-shadow:
+    inset 0 0 10px rgba(255, 255, 255, 0.34),
+    0 0 10px rgba(167, 139, 250, 0.58);
+  opacity: 1;
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment.active span {
+  opacity: 0.9;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+}
+body[data-boss-id='nehelenia'] .boss-mirror-prison-active .boss-bloom-flowers {
+  box-shadow:
+    inset 0 0 24px rgba(196, 181, 253, 0.2),
+    0 0 0 2px rgba(196, 181, 253, 0.28),
+    0 0 22px rgba(124, 58, 237, 0.34);
+}
+
+body[data-boss-id='nehelenia'] .boss-hud.boss-mirror-prison-active .boss-cocoon-meter {
+  border-color: rgba(196, 181, 253, 0.82);
+  color: #ddd6fe;
+  background: linear-gradient(135deg, rgba(30, 12, 55, 0.96), rgba(15, 23, 42, 0.96));
+  box-shadow:
+    inset 0 0 9px rgba(167, 139, 250, 0.16),
+    0 0 8px rgba(124, 58, 237, 0.2);
+}
+body[data-boss-id='nehelenia'] .boss-hud.boss-mirror-prison-active .boss-cocoon-meter::before {
+  border-color: #ddd6fe;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(124, 58, 237, 0.4));
+  clip-path: polygon(8% 0, 94% 10%, 100% 72%, 58% 100%, 0 82%);
+  box-shadow: 0 0 7px rgba(196, 181, 253, 0.72);
+}
+body[data-boss-id='nehelenia'] .boss-hud.boss-mirror-prison-active .boss-cocoon-meter strong {
+  color: #f5f3ff;
+}
+
+body[data-boss-id='nehelenia'] .boss-hud.boss-mirror-prison-active .boss-portrait::before {
+  content: '';
+  position: absolute;
+  z-index: 6;
+  inset: 3px;
+  pointer-events: none;
+  border: 1px solid rgba(221, 214, 254, 0.72);
+  border-radius: 4px;
+  background:
+    linear-gradient(110deg, transparent 0 23%, rgba(255, 255, 255, 0.2) 24% 26%, transparent 27% 100%), linear-gradient(68deg, transparent 0 58%, rgba(196, 181, 253, 0.18) 59% 61%, transparent 62% 100%),
+    radial-gradient(circle at 46% 36%, rgba(196, 181, 253, 0.12), transparent 58%);
+  box-shadow:
+    inset 0 0 18px rgba(167, 139, 250, 0.16),
+    0 0 12px rgba(124, 58, 237, 0.22);
+  animation: neheleniaMirrorShimmer 2.6s ease-in-out infinite;
+}
+body[data-boss-id='nehelenia'] .boss-hud.boss-mirror-prison-active .boss-portrait::after {
+  content: '';
+  position: absolute;
+  z-index: 7;
+  inset: 8px 12px;
+  pointer-events: none;
+  background:
+    linear-gradient(27deg, transparent 47%, rgba(237, 233, 254, 0.7) 48% 49%, transparent 50%), linear-gradient(151deg, transparent 61%, rgba(196, 181, 253, 0.55) 62% 63%, transparent 64%),
+    linear-gradient(84deg, transparent 70%, rgba(255, 255, 255, 0.34) 71% 72%, transparent 73%);
+  opacity: 0.68;
+  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.55));
+}
+body[data-boss-id='nehelenia'] .boss-portrait.boss-mirror-impact {
+  animation: neheleniaMirrorImpact 620ms ease-out;
+}
+body[data-boss-id='nehelenia'] .boss-portrait.boss-mirror-breaking {
+  animation: neheleniaMirrorBreak 820ms ease-out;
+}
+
+.boss-mode .carta.boss-card-nehelenia-reflection,
+.boss-mode .carta.boss-card-nehelenia-dream,
+.boss-mode .carta.boss-card-nehelenia-nightmare,
+.boss-mode .boss-discard-nehelenia-card {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    0 0 0 2px rgba(221, 214, 254, 0.92),
+    0 0 0 4px rgba(88, 28, 135, 0.36),
+    0 0 18px rgba(124, 58, 237, 0.68) !important;
+}
+.boss-mode .carta.boss-card-nehelenia-reflection::before,
+.boss-mode .carta.boss-card-nehelenia-dream::before,
+.boss-mode .carta.boss-card-nehelenia-nightmare::before {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  min-width: 34px;
+  padding: 1px 4px;
+  border: 1px solid rgba(237, 233, 254, 0.82);
+  border-radius: 999px;
+  background: rgba(30, 12, 55, 0.92);
+  color: #f5f3ff;
+  font-size: 5px;
+  font-weight: 1000;
+  line-height: 1.25;
+  letter-spacing: 0.45px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 0 7px rgba(124, 58, 237, 0.48);
+}
+.boss-mode .carta.boss-card-nehelenia-reflection::before {
+  content: 'REFLEXO';
+}
+.boss-mode .carta.boss-card-nehelenia-dream::before {
+  content: 'SONHO';
+}
+.boss-mode .carta.boss-card-nehelenia-nightmare::before {
+  content: 'PESADELO';
+}
+.boss-mode .carta.boss-card-nehelenia-reflection::after,
+.boss-mode .carta.boss-card-nehelenia-dream::after,
+.boss-mode .carta.boss-card-nehelenia-nightmare::after,
+.boss-mode .boss-discard-nehelenia-card::after {
+  opacity: 0.92;
+  background:
+    radial-gradient(circle at 22% 24%, rgba(255, 255, 255, 0.34), transparent 23%), linear-gradient(61deg, transparent 43%, rgba(255, 255, 255, 0.7) 44% 45%, rgba(255, 255, 255, 0.12) 46%, transparent 47%),
+    linear-gradient(119deg, transparent 58%, rgba(196, 181, 253, 0.64) 59% 60%, transparent 61%), linear-gradient(18deg, transparent 70%, rgba(221, 214, 254, 0.38) 71% 72%, transparent 73%);
+}
+
+.boss-mode .meld-line.mirrored-by-nehelenia {
+  overflow: visible;
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.045), rgba(8, 5, 20, 0.04));
+}
+.boss-mode .meld-line.mirrored-by-nehelenia .meld-line-cards,
+.boss-mode .meld-line.mirrored-by-nehelenia .meld-meta {
+  position: relative;
+  z-index: 3;
+}
+.boss-mode .meld-line .nehelenia-mirror-echo {
+  position: absolute;
+  z-index: 1;
+  left: 9px;
+  right: 9px;
+  top: calc(100% - 13px);
+  height: 25px;
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.3;
+  transform: scaleY(-0.58);
+  transform-origin: top center;
+  filter: saturate(0.7) hue-rotate(18deg) blur(0.15px);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.88), transparent 90%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.88), transparent 90%);
+}
+.boss-mode .meld-line .nehelenia-mirror-echo-card {
+  display: block;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 21px;
+  border: 1px solid rgba(221, 214, 254, 0.66);
+  border-radius: 2px;
+  background: linear-gradient(125deg, transparent 0 40%, rgba(255, 255, 255, 0.42) 41% 44%, transparent 45%), linear-gradient(145deg, rgba(196, 181, 253, 0.42), rgba(30, 12, 55, 0.72));
+  box-shadow: 0 0 7px rgba(167, 139, 250, 0.35);
+}
+.boss-mode .meld-line.mirrored-by-nehelenia[data-nehelenia-mirror^='REFLEXO'] {
+  outline-color: rgba(221, 214, 254, 0.92);
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.18);
+}
+.boss-mode .meld-line.mirrored-by-nehelenia[data-nehelenia-mirror^='ORIGINAL'] {
+  outline-color: rgba(147, 197, 253, 0.76);
+}
+
+.boss-mode .boss-meld-contribution-mirror {
+  border-color: rgba(196, 181, 253, 0.62);
+  background: rgba(46, 16, 101, 0.76);
+  color: #ede9fe;
+}
+.boss-floating-number.mirror-absorb {
+  color: #ddd6fe;
+  text-shadow: 0 0 16px rgba(124, 58, 237, 0.95);
+}
+.boss-floating-number.mirror-break {
+  color: #fff;
+  text-shadow:
+    0 0 18px rgba(196, 181, 253, 1),
+    0 0 30px rgba(96, 165, 250, 0.72);
+}
+
+@keyframes neheleniaMirrorShimmer {
+  0%,
+  100% {
+    opacity: 0.62;
+    filter: brightness(0.94);
+  }
+  50% {
+    opacity: 0.94;
+    filter: brightness(1.16);
+  }
+}
+@keyframes neheleniaMirrorImpact {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  32% {
+    transform: scale(1.025);
+    filter: brightness(1.5) saturate(1.22);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+@keyframes neheleniaMirrorBreak {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(1.04) rotate(0.4deg);
+    filter: brightness(1.8);
+  }
+  48% {
+    transform: scale(0.985) rotate(-0.5deg);
+    filter: brightness(1.35);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce), (max-width: 900px) {
+  body[data-boss-id='nehelenia'] .boss-hud.boss-mirror-prison-active .boss-portrait::before,
+  body[data-boss-id='nehelenia'] .boss-portrait.boss-mirror-impact,
+  body[data-boss-id='nehelenia'] .boss-portrait.boss-mirror-breaking,
+  body[data-boss-id='nehelenia'] .boss-bloom-flowers .boss-mirror-fragment {
+    animation: none !important;
+    transition: none !important;
+  }
+  .boss-mode .meld-line .nehelenia-mirror-echo {
+    opacity: 0.11;
+    height: 20px;
+    top: calc(100% - 11px);
+  }
+}
+
+/* =========================================================
+   RAINHA NEHELENIA — V3 / ESPELHOS DOS SONHOS E ILUSOES
+   ========================================================= */
+body[data-boss-id='nehelenia'] .boss-bloom-flowers {
+  width: 100%;
+  max-width: 270px;
+  height: auto;
+  min-height: 68px;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  overflow: visible;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(20, 11, 36, 0.94), rgba(5, 9, 17, 0.95));
+  box-shadow:
+    inset 0 0 18px rgba(167, 139, 250, 0.08),
+    0 0 0 1px rgba(196, 181, 253, 0.18);
+}
+body[data-boss-id='nehelenia'] .boss-bloom-flowers::before,
+body[data-boss-id='nehelenia'] .boss-bloom-flowers::after {
+  display: none;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 7px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid rgba(196, 181, 253, 0.55);
+  border-radius: 9px 9px 14px 14px / 11px 11px 18px 18px;
+  background:
+    linear-gradient(118deg, transparent 0 42%, rgba(255, 255, 255, 0.1) 43% 45%, transparent 46%), radial-gradient(ellipse at 45% 28%, rgba(226, 232, 240, 0.12), transparent 44%), linear-gradient(155deg, rgba(51, 31, 83, 0.74), rgba(8, 5, 20, 0.94));
+  box-shadow:
+    inset 0 0 11px rgba(221, 214, 254, 0.1),
+    0 0 8px rgba(124, 58, 237, 0.16);
+  position: relative;
+  overflow: hidden;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  pointer-events: none;
+  border: 1px solid rgba(237, 233, 254, 0.16);
+  border-radius: inherit;
+  background: linear-gradient(63deg, transparent 46%, rgba(255, 255, 255, 0.15) 47% 48%, transparent 49%);
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot i {
+  grid-row: 1 / 3;
+  width: 28px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(221, 214, 254, 0.66);
+  border-radius: 48% 48% 43% 43% / 42% 42% 58% 58%;
+  color: #ede9fe;
+  font-size: 18px;
+  font-style: normal;
+  background: radial-gradient(ellipse at 45% 28%, rgba(255, 255, 255, 0.23), rgba(88, 28, 135, 0.28) 48%, rgba(8, 5, 20, 0.9) 78%);
+  box-shadow:
+    inset 0 0 7px rgba(255, 255, 255, 0.1),
+    0 0 6px rgba(167, 139, 250, 0.34);
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f5f3ff;
+  font-size: 8px;
+  font-weight: 900;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot b {
+  color: #c4b5fd;
+  font-size: 7px;
+  letter-spacing: 0.55px;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot.stolen {
+  border-color: rgba(244, 63, 94, 0.68);
+  background:
+    linear-gradient(132deg, transparent 0 35%, rgba(248, 113, 113, 0.22) 36% 38%, transparent 39%), linear-gradient(47deg, transparent 0 58%, rgba(237, 233, 254, 0.25) 59% 60%, transparent 61%),
+    radial-gradient(ellipse at 50% 40%, rgba(88, 28, 135, 0.46), rgba(8, 5, 20, 0.97) 72%);
+  box-shadow:
+    inset 0 0 13px rgba(127, 29, 29, 0.25),
+    0 0 11px rgba(88, 28, 135, 0.3);
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot.stolen i {
+  color: #fda4af;
+  border-color: rgba(251, 113, 133, 0.75);
+  filter: brightness(0.78);
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-slot.stolen b {
+  color: #fda4af;
+}
+
+.boss-mode .carta.boss-card-nehelenia-illusion-lock {
+  position: relative;
+  isolation: isolate;
+  filter: saturate(0.72) contrast(0.94);
+  box-shadow:
+    0 0 0 2px rgba(196, 181, 253, 0.92),
+    0 0 16px rgba(76, 29, 149, 0.7) !important;
+}
+.boss-mode .carta.boss-card-nehelenia-illusion-lock::after {
+  opacity: 0.95;
+  background:
+    linear-gradient(29deg, transparent 45%, rgba(237, 233, 254, 0.82) 46% 47%, transparent 48%), linear-gradient(145deg, transparent 57%, rgba(167, 139, 250, 0.7) 58% 59%, transparent 60%),
+    radial-gradient(circle at 72% 24%, rgba(255, 255, 255, 0.24), transparent 25%);
+}
+.boss-mode .carta.boss-card-nehelenia-illusion-lock .boss-card-status-nehelenia {
+  border-color: rgba(196, 181, 253, 0.85);
+  background: rgba(24, 9, 44, 0.96);
+}
+
+.boss-mode .meld-line.mirrored-by-nehelenia {
+  outline: 1px solid rgba(196, 181, 253, 0.68);
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.18);
+}
+.boss-mode .meld-line.mirrored-by-nehelenia[data-nehelenia-mirror^='JOGO ESPELHADO'] {
+  outline-color: rgba(221, 214, 254, 0.92);
+}
+.boss-mode .meld-line.mirrored-by-nehelenia[data-nehelenia-mirror^='PRISÃO'] {
+  outline-color: rgba(244, 114, 182, 0.82);
+  box-shadow: 0 0 17px rgba(126, 34, 206, 0.26);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body[data-boss-id='nehelenia'] .boss-dream-mirror-slot.stolen {
+    animation: neheleniaDreamMirrorStolen 2.8s ease-in-out infinite;
+  }
+}
+@keyframes neheleniaDreamMirrorStolen {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: brightness(0.88);
+  }
+  50% {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+  }
+}
+
+/* Nehelenia V3 — the mirror is deception, not a shield. */
+body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portrait::before {
+  content: '';
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.72;
+  background:
+    linear-gradient(118deg, transparent 0 36%, rgba(255, 255, 255, 0.28) 39%, rgba(196, 181, 253, 0.12) 42%, transparent 46%), linear-gradient(23deg, transparent 0 47%, rgba(226, 232, 240, 0.3) 48%, transparent 50%),
+    linear-gradient(156deg, transparent 0 61%, rgba(167, 139, 250, 0.26) 62%, transparent 64%);
+  mix-blend-mode: screen;
+  animation: neheleniaFalseReflection 3.1s ease-in-out infinite alternate;
+}
+
+body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portrait::after {
+  content: 'REFLEXO ROUBADO';
+  position: absolute;
+  z-index: 9;
+  right: 5px;
+  bottom: 5px;
+  padding: 2px 5px;
+  border: 1px solid rgba(196, 181, 253, 0.55);
+  border-radius: 3px;
+  background: rgba(15, 9, 28, 0.8);
+  color: #ddd6fe;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  pointer-events: none;
+}
+
+@keyframes neheleniaFalseReflection {
+  from {
+    transform: translateX(-4px) skewX(-1deg);
+    filter: brightness(0.9);
+  }
+  to {
+    transform: translateX(5px) skewX(1deg);
+    filter: brightness(1.2);
+  }
+}
+
+/* The reflected copy is a real interaction surface: clicking it bubbles to the real meld. */
+.boss-mode .meld-line.mirrored-by-nehelenia .nehelenia-mirror-echo {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portrait::before {
+    animation: none;
+  }
+}
+
+/* Nehelenia V4 — o Jogo Espelhado vira uma escolha física na mesa. */
+.boss-mode .meld-line.nehelenia-mirror-choice-active {
+  min-height: 116px;
+  padding: 8px 9px 10px;
+  overflow: visible;
+  background: radial-gradient(circle at 50% 38%, rgba(196, 181, 253, 0.08), transparent 58%), linear-gradient(180deg, rgba(30, 12, 55, 0.16), rgba(8, 5, 20, 0.08));
+}
+.boss-mode .meld-line.nehelenia-mirror-choice-active > .meld-line-cards,
+.boss-mode .meld-line.nehelenia-mirror-choice-active > .meld-meta,
+.boss-mode .meld-line.nehelenia-mirror-choice-active > .nehelenia-mirror-echo {
+  display: none !important;
+}
+.boss-mode .nehelenia-mirror-choice-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  position: relative;
+  z-index: 5;
+}
+.boss-mode .nehelenia-mirror-copy {
+  appearance: none;
+  min-width: 0;
+  min-height: 92px;
+  padding: 7px 7px 9px;
+  border: 1px solid rgba(221, 214, 254, 0.72);
+  border-radius: 12px 12px 7px 7px;
+  background:
+    linear-gradient(116deg, transparent 0 28%, rgba(255, 255, 255, 0.08) 29% 31%, transparent 32% 100%), radial-gradient(ellipse at 50% 24%, rgba(196, 181, 253, 0.13), transparent 62%),
+    linear-gradient(180deg, rgba(30, 12, 55, 0.88), rgba(8, 5, 20, 0.94));
+  color: #ede9fe;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    inset 0 0 22px rgba(124, 58, 237, 0.12),
+    0 0 14px rgba(124, 58, 237, 0.18);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.boss-mode .nehelenia-mirror-copy:hover,
+.boss-mode .nehelenia-mirror-copy:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(253, 230, 138, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(245, 158, 11, 0.34),
+    0 0 18px rgba(124, 58, 237, 0.3);
+  outline: none;
+}
+.boss-mode .nehelenia-mirror-copy-title {
+  display: block;
+  margin-bottom: 6px;
+  color: #fde68a;
+  font-size: 8px;
+  font-weight: 1000;
+  letter-spacing: 0.8px;
+  text-align: center;
+}
+.boss-mode .nehelenia-mirror-copy-cards {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 58px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 5%, #000 95%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 5%, #000 95%, transparent 100%);
+}
+.boss-mode .nehelenia-mirror-copy .carta.mini {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 44px;
+  margin-left: -8px;
+  pointer-events: none;
+  transform: none !important;
+  box-shadow: 0 0 6px rgba(196, 181, 253, 0.2);
+}
+.boss-mode .nehelenia-mirror-copy .carta.mini:first-child {
+  margin-left: 0;
+}
+.boss-mode .nehelenia-mirror-copy::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 34%, rgba(255, 255, 255, 0.12) 46%, transparent 57%);
+  transform: translateX(-85%);
+  animation: neheleniaChoiceGlint 2.7s ease-in-out infinite;
+}
+/* A mentira tem uma pista honesta: um risco de vidro curto e o brilho corre ao contrário. */
+.boss-mode .nehelenia-mirror-copy.is-false-reflection::before {
+  transform: translateX(85%) scaleX(-1);
+  animation-name: neheleniaChoiceGlintFalse;
+}
+.boss-mode .nehelenia-mirror-copy.is-false-reflection::after {
+  content: '';
+  position: absolute;
+  right: 16%;
+  top: 17%;
+  width: 21px;
+  height: 28px;
+  pointer-events: none;
+  opacity: 0.54;
+  background: linear-gradient(132deg, transparent 0 47%, rgba(237, 233, 254, 0.76) 48% 50%, transparent 51% 100%), linear-gradient(62deg, transparent 0 62%, rgba(196, 181, 253, 0.46) 63% 65%, transparent 66% 100%);
+  filter: drop-shadow(0 0 2px rgba(167, 139, 250, 0.52));
+}
+.boss-mode .nehelenia-mirror-copy.is-shattering {
+  pointer-events: none;
+  animation: neheleniaChoiceShatter 420ms ease-out both;
+}
+body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-mirror-world {
+  box-shadow:
+    0 14px 38px rgba(0, 0, 0, 0.58),
+    inset 0 1px rgba(255, 255, 255, 0.1),
+    0 0 34px rgba(124, 58, 237, 0.28);
+}
+@keyframes neheleniaChoiceGlint {
+  0%,
+  58% {
+    transform: translateX(-90%);
+    opacity: 0;
+  }
+  68% {
+    opacity: 0.65;
+  }
+  88%,
+  100% {
+    transform: translateX(90%);
+    opacity: 0;
+  }
+}
+@keyframes neheleniaChoiceGlintFalse {
+  0%,
+  58% {
+    transform: translateX(90%) scaleX(-1);
+    opacity: 0;
+  }
+  68% {
+    opacity: 0.62;
+  }
+  88%,
+  100% {
+    transform: translateX(-90%) scaleX(-1);
+    opacity: 0;
+  }
+}
+@keyframes neheleniaChoiceShatter {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+    opacity: 1;
+  }
+  38% {
+    transform: scale(1.035) rotate(-0.5deg);
+    filter: brightness(1.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.93) rotate(1.2deg);
+    filter: brightness(0.7);
+    opacity: 0.12;
+  }
+}
+@media (prefers-reduced-motion: reduce), (max-width: 900px) {
+  .boss-mode .nehelenia-mirror-copy::before {
+    animation: none !important;
+    opacity: 0.1;
+    transform: none !important;
+  }
+  .boss-mode .nehelenia-mirror-copy.is-false-reflection::after {
+    opacity: 0.6;
+  }
+  .boss-mode .nehelenia-mirror-copy.is-shattering {
+    animation-duration: 180ms;
+  }
+}
+
+/* ============================================================
+   NEHELENIA V6 — MESA MENTIROSA / ESPELHOS REAIS
+   ============================================================ */
+body[data-boss-id='nehelenia'] .boss-bloom-flowers {
+  display: flex !important;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 3px 2px 2px;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb {
+  position: relative;
+  width: 33px;
+  height: 41px;
+  flex: 0 0 33px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(196, 181, 253, 0.7);
+  border-radius: 48% 48% 44% 44% / 38% 38% 58% 58%;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(74, 31, 118, 0.2) 36%, rgba(7, 5, 18, 0.96) 80%);
+  box-shadow:
+    inset 0 0 0 2px rgba(15, 8, 31, 0.85),
+    inset 0 0 14px rgba(167, 139, 250, 0.18),
+    0 0 10px rgba(124, 58, 237, 0.18);
+  overflow: visible;
+  transform-origin: 50% 85%;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::before,
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::before {
+  top: -5px;
+  width: 13px;
+  height: 7px;
+  border: 2px solid rgba(221, 214, 254, 0.72);
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::after {
+  bottom: -8px;
+  width: 18px;
+  height: 9px;
+  border-top: 2px solid rgba(221, 214, 254, 0.62);
+  clip-path: polygon(18% 0, 82% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.26), transparent);
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-glass {
+  position: absolute;
+  inset: 5px 6px 7px;
+  border-radius: inherit;
+  background:
+    linear-gradient(118deg, transparent 0 34%, rgba(255, 255, 255, 0.24) 35% 40%, transparent 42% 100%), radial-gradient(circle at 36% 26%, rgba(224, 231, 255, 0.22), transparent 37%),
+    linear-gradient(160deg, rgba(91, 33, 182, 0.26), rgba(7, 5, 18, 0.9));
+  box-shadow: inset 0 0 10px rgba(196, 181, 253, 0.16);
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb > b {
+  position: relative;
+  z-index: 2;
+  font-size: 7px;
+  color: rgba(237, 233, 254, 0.58);
+  text-shadow: 0 1px 2px #000;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken {
+  border-color: rgba(244, 114, 182, 0.92);
+  background: linear-gradient(145deg, rgba(244, 114, 182, 0.24), rgba(88, 28, 135, 0.72) 44%, rgba(9, 4, 18, 0.98));
+  box-shadow:
+    inset 0 0 0 2px rgba(15, 8, 31, 0.9),
+    inset 0 0 16px rgba(244, 114, 182, 0.24),
+    0 0 13px rgba(190, 24, 93, 0.42);
+  animation: neheleniaMirrorTakenPulse 2.2s ease-in-out infinite;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken .boss-dream-mirror-glass {
+  background:
+    linear-gradient(132deg, transparent 0 46%, rgba(255, 255, 255, 0.58) 47% 49%, transparent 50%), linear-gradient(54deg, transparent 0 58%, rgba(251, 113, 133, 0.72) 59% 61%, transparent 62%),
+    radial-gradient(circle at 50% 45%, rgba(225, 29, 72, 0.3), rgba(25, 5, 30, 0.94) 70%);
+}
+@keyframes neheleniaMirrorTakenPulse {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+    filter: brightness(0.92);
+  }
+  50% {
+    transform: translateY(-2px) rotate(1deg);
+    filter: brightness(1.12);
+  }
+}
+
+/* Jogo Espelhado: dois jogos reais no layout, sem caixa mini dentro de caixa. */
+.boss-mode .meld-line.nehelenia-mirror-twin {
+  flex: 1 1 calc(50% - 7px) !important;
+  width: calc(50% - 7px);
+  max-width: calc(50% - 7px);
+  min-width: 260px;
+  min-height: 118px;
+  padding: 9px 10px 8px;
+  margin-top: 16px;
+  border: 1px solid rgba(196, 181, 253, 0.78) !important;
+  outline: 0 !important;
+  border-radius: 10px;
+  background: linear-gradient(112deg, transparent 0 28%, rgba(255, 255, 255, 0.055) 29% 31%, transparent 32% 100%), radial-gradient(ellipse at 50% 15%, rgba(167, 139, 250, 0.1), transparent 62%), rgba(13, 7, 31, 0.48);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    inset 0 0 26px rgba(124, 58, 237, 0.08),
+    0 0 17px rgba(124, 58, 237, 0.16);
+  overflow: visible;
+  isolation: isolate;
+}
+.boss-mode .meld-line.nehelenia-mirror-twin::before {
+  top: -17px;
+  left: 10px;
+  padding: 3px 9px;
+  border-color: rgba(253, 230, 138, 0.72);
+  background: linear-gradient(180deg, rgba(39, 16, 65, 0.98), rgba(15, 8, 31, 0.98));
+  color: #fde68a;
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.24);
+}
+.boss-mode .meld-line.nehelenia-mirror-twin::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 3px;
+  border-radius: 8px;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 0 39%, rgba(255, 255, 255, 0.11) 46%, transparent 53% 100%);
+  transform: translateX(-105%);
+  animation: neheleniaMeldGlassSweep 3.2s ease-in-out infinite;
+}
+.boss-mode .meld-line.nehelenia-mirror-twin .meld-line-cards {
+  /* Não fixe altura aqui: o Jogo Espelhado deve usar exatamente a mesma
+     geometria de .meld-line-cards definida pelo layout normal da mesa. */
+  transform: none !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-source {
+  animation: neheleniaMirrorSourceSplit 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.boss-mode .meld-line.nehelenia-mirror-clone.is-clone-birth {
+  animation: neheleniaMirrorCloneBirth 760ms cubic-bezier(0.16, 0.86, 0.25, 1) both;
+}
+@keyframes neheleniaMirrorSourceSplit {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 rgba(167, 139, 250, 0);
+  }
+  42% {
+    filter: brightness(1.48);
+    box-shadow: 0 0 34px rgba(196, 181, 253, 0.42);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+@keyframes neheleniaMirrorCloneBirth {
+  0% {
+    opacity: 0;
+    transform: translateX(-34%) scaleX(0.68) scaleY(0.88);
+    filter: blur(8px) brightness(1.8);
+  }
+  58% {
+    opacity: 0.82;
+    transform: translateX(4%) scaleX(1.035) scaleY(1);
+    filter: blur(1px) brightness(1.32);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0) brightness(1);
+  }
+}
+@keyframes neheleniaMeldGlassSweep {
+  0%,
+  55% {
+    transform: translateX(-110%);
+    opacity: 0;
+  }
+  64% {
+    opacity: 0.8;
+  }
+  82%,
+  100% {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
+/* Palco reutilizável das ilusões: o HUD amarelo continua sendo a instrução,
+   mas a decisão acontece num espelho central grande. */
+#bossChoiceActions.nehelenia-choice-stage-host {
+  display: block !important;
+  width: 100%;
+}
+#bossChoiceActions.nehelenia-choice-stage-host > .nehelenia-choice-stage {
+  position: fixed;
+  z-index: 10040;
+  left: 50%;
+  top: 58%;
+  transform: translate(-50%, -50%);
+  width: min(690px, calc(100vw - 34px));
+  min-height: 280px;
+  padding: 18px 22px 20px;
+  border: 1px solid rgba(253, 230, 138, 0.66);
+  border-radius: 22px 22px 16px 16px;
+  background:
+    linear-gradient(118deg, transparent 0 34%, rgba(255, 255, 255, 0.055) 35% 38%, transparent 39%), radial-gradient(ellipse at 50% 12%, rgba(167, 139, 250, 0.18), transparent 52%),
+    linear-gradient(180deg, rgba(27, 11, 49, 0.985), rgba(7, 4, 18, 0.99));
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.78),
+    0 0 0 1px rgba(167, 139, 250, 0.16),
+    inset 0 0 45px rgba(124, 58, 237, 0.1),
+    0 0 42px rgba(124, 58, 237, 0.26);
+  overflow: hidden;
+  animation: neheleniaStageOpen 480ms cubic-bezier(0.16, 0.86, 0.24, 1) both;
+}
+#bossChoiceActions.nehelenia-choice-stage-host > .nehelenia-choice-stage::before,
+#bossChoiceActions.nehelenia-choice-stage-host > .nehelenia-choice-stage::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  inset: 9px;
+  border: 1px solid rgba(196, 181, 253, 0.2);
+  border-radius: 17px;
+}
+#bossChoiceActions.nehelenia-choice-stage-host > .nehelenia-choice-stage::after {
+  inset: auto 8% -54px;
+  height: 110px;
+  border: 0;
+  background: radial-gradient(ellipse, rgba(124, 58, 237, 0.22), transparent 68%);
+  filter: blur(10px);
+}
+.nehelenia-choice-stage-title {
+  position: relative;
+  z-index: 3;
+  color: #fde68a;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: 1.7px;
+}
+.nehelenia-choice-stage-subtitle,
+.nehelenia-choice-stage-foot {
+  position: relative;
+  z-index: 3;
+  color: #ddd6fe;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+.nehelenia-choice-stage-foot {
+  color: #c4b5fd;
+  margin-top: 8px;
+}
+.nehelenia-discard-mirror-pair {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  gap: 54px;
+  margin: 16px auto 6px;
+}
+.nehelenia-shell-arena {
+  position: relative;
+  z-index: 4;
+  height: 170px;
+  margin: 8px auto 0;
+  max-width: 560px;
+  overflow: visible;
+}
+.boss-choice-panel .nehelenia-shell-option {
+  appearance: none;
+  width: 108px !important;
+  min-width: 108px !important;
+  height: 142px;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50px 50px 34px 34px !important;
+  background: transparent !important;
+  color: #ede9fe;
+  box-shadow: none !important;
+  cursor: pointer;
+  position: relative;
+  overflow: visible;
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+.nehelenia-shell-arena .nehelenia-shell-option {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+}
+.boss-choice-panel .nehelenia-shell-option:disabled {
+  cursor: default;
+}
+.boss-choice-panel .nehelenia-shell-option:not(:disabled):hover,
+.boss-choice-panel .nehelenia-shell-option:not(:disabled):focus-visible {
+  filter: brightness(1.18) drop-shadow(0 0 12px rgba(253, 230, 138, 0.38));
+  outline: none;
+}
+.nehelenia-shell-frame {
+  position: relative;
+  width: 92px;
+  height: 116px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border: 3px double rgba(221, 214, 254, 0.82);
+  border-radius: 50% 50% 43% 43% / 40% 40% 60% 60%;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.16), rgba(88, 28, 135, 0.34) 40%, rgba(6, 4, 15, 0.96));
+  box-shadow:
+    inset 0 0 0 3px rgba(9, 5, 20, 0.84),
+    inset 0 0 22px rgba(167, 139, 250, 0.16),
+    0 0 18px rgba(124, 58, 237, 0.28);
+}
+.nehelenia-shell-frame::before,
+.nehelenia-shell-frame::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 12px;
+  border: 2px solid rgba(221, 214, 254, 0.7);
+}
+.nehelenia-shell-frame::before {
+  top: -10px;
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+}
+.nehelenia-shell-frame::after {
+  bottom: -11px;
+  border-top: 0;
+  border-radius: 0 0 18px 18px;
+}
+.nehelenia-shell-glass {
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 0 35%, rgba(255, 255, 255, 0.22) 36% 41%, transparent 43%), radial-gradient(circle at 35% 24%, rgba(224, 231, 255, 0.14), transparent 36%);
+  mix-blend-mode: screen;
+  animation: neheleniaShellGlint 2.4s ease-in-out infinite;
+}
+.nehelenia-shell-frame .carta.mini {
+  position: relative;
+  z-index: 2;
+  width: 52px !important;
+  height: 76px !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-shadow:
+    0 4px 13px rgba(0, 0, 0, 0.56),
+    0 0 10px rgba(196, 181, 253, 0.18);
+  pointer-events: none;
+}
+
+/* Espelho do Lixo: usa a arte oficial enviada pelo usuário somente nas
+   duas opções desta habilidade. Pesadelo Eterno continua com o shell antigo. */
+.nehelenia-choice-stage.is-discard-mirror {
+  min-height: 330px;
+}
+.is-discard-mirror .nehelenia-shell-option {
+  height: 194px;
+}
+.is-discard-mirror .nehelenia-shell-frame {
+  width: 94px;
+  height: 167px;
+  border: 0;
+  border-radius: 0;
+  background: url('../assets/images/nehelenia-discard-mirror-frame.png') center / contain no-repeat;
+  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.44);
+}
+.is-discard-mirror .nehelenia-shell-frame::before,
+.is-discard-mirror .nehelenia-shell-frame::after {
+  content: none;
+  display: none;
+}
+.is-discard-mirror .nehelenia-shell-glass {
+  display: none;
+}
+.is-discard-mirror .nehelenia-shell-frame .carta.mini {
+  width: 52px !important;
+  height: 76px !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.58) !important;
+}
+.nehelenia-shell-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 8px;
+  font-weight: 1000;
+  letter-spacing: 0.85px;
+  color: #ddd6fe;
+  text-align: center;
+}
+.nehelenia-shell-option.is-origin .nehelenia-shell-frame {
+  border-color: #fde68a;
+  box-shadow:
+    inset 0 0 0 3px rgba(9, 5, 20, 0.84),
+    0 0 0 2px rgba(245, 158, 11, 0.2),
+    0 0 28px rgba(253, 230, 138, 0.55);
+  animation: neheleniaOriginPulse 0.72s ease-in-out infinite alternate;
+}
+.nehelenia-shell-option.is-origin::after {
+  content: 'ORIGINAL';
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  transform: translate(-50%, -100%);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(253, 230, 138, 0.75);
+  background: rgba(69, 26, 3, 0.94);
+  color: #fde68a;
+  font-size: 8px;
+  font-weight: 1000;
+  letter-spacing: 1px;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.24);
+}
+.nehelenia-shell-option.is-shuffling {
+  pointer-events: none;
+}
+.is-discard-mirror .nehelenia-shell-option {
+  animation: neheleniaDiscardMirrorSplit 720ms cubic-bezier(0.16, 0.86, 0.25, 1) both;
+}
+.is-discard-mirror .nehelenia-shell-option:nth-child(2) {
+  animation-delay: 70ms;
+}
+@keyframes neheleniaStageOpen {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -47%) scale(0.91);
+    filter: blur(7px) brightness(1.5);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    filter: blur(0) brightness(1);
+  }
+}
+@keyframes neheleniaShellGlint {
+  0%,
+  56% {
+    transform: translateX(-40%);
+    opacity: 0.2;
+  }
+  72% {
+    transform: translateX(12%);
+    opacity: 0.82;
+  }
+  100% {
+    transform: translateX(40%);
+    opacity: 0.18;
+  }
+}
+@keyframes neheleniaOriginPulse {
+  from {
+    filter: brightness(1);
+    transform: translateY(0);
+  }
+  to {
+    filter: brightness(1.22);
+    transform: translateY(-2px);
+  }
+}
+@keyframes neheleniaDiscardMirrorSplit {
+  0% {
+    opacity: 0;
+    transform: translateX(0) scale(0.62);
+    filter: blur(7px) brightness(1.7);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(0) scale(1.04);
+    filter: blur(0) brightness(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0) brightness(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .boss-mode .meld-line.nehelenia-mirror-twin {
+    min-width: calc(50% - 6px);
+    width: calc(50% - 6px);
+    max-width: calc(50% - 6px);
+    padding-inline: 4px;
+  }
+  #bossChoiceActions.nehelenia-choice-stage-host > .nehelenia-choice-stage {
+    top: 55%;
+    min-height: 250px;
+    padding-inline: 12px;
+  }
+  .nehelenia-discard-mirror-pair {
+    gap: 18px;
+  }
+  .boss-choice-panel .nehelenia-shell-option {
+    width: 90px !important;
+    min-width: 90px !important;
+  }
+  .nehelenia-shell-frame {
+    width: 76px;
+    height: 104px;
+  }
+  .nehelenia-shell-frame .carta.mini {
+    width: 46px !important;
+    height: 68px !important;
+  }
+  .nehelenia-choice-stage.is-discard-mirror {
+    min-height: 292px;
+  }
+  .is-discard-mirror .nehelenia-shell-option {
+    height: 166px;
+  }
+  .is-discard-mirror .nehelenia-shell-frame {
+    width: 78px;
+    height: 139px;
+  }
+  .is-discard-mirror .nehelenia-shell-frame .carta.mini {
+    width: 44px !important;
+    height: 64px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken,
+  .boss-mode .meld-line.nehelenia-mirror-source,
+  .boss-mode .meld-line.nehelenia-mirror-clone.is-clone-birth,
+  .boss-mode .meld-line.nehelenia-mirror-twin::after,
+  .nehelenia-shell-glass,
+  .nehelenia-shell-option.is-origin,
+  .is-discard-mirror .nehelenia-shell-option {
+    animation: none !important;
+  }
+}
+
+/* O clone nasce do jogo original e os dois cruzam no vidro antes de parar.
+   Nenhum dos lados recebe pista de verdadeiro/falso. */
+.boss-mode .meld-line.nehelenia-mirror-twin[data-nehelenia-mirror-slot='left'] {
+  animation: neheleniaMirrorTwinLeft 980ms cubic-bezier(0.2, 0.78, 0.2, 1) both !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-twin[data-nehelenia-mirror-slot='right'] {
+  animation: neheleniaMirrorTwinRight 980ms cubic-bezier(0.2, 0.78, 0.2, 1) both !important;
+}
+@keyframes neheleniaMirrorTwinLeft {
+  0% {
+    opacity: 0.18;
+    transform: translateX(52%) scale(0.9);
+    filter: blur(7px) brightness(1.7);
+  }
+  32% {
+    opacity: 1;
+    transform: translateX(26%) scale(1.02);
+    filter: blur(1px) brightness(1.34);
+  }
+  57% {
+    transform: translateX(-12%) scale(0.98);
+    filter: blur(0) brightness(0.92);
+  }
+  78% {
+    transform: translateX(8%) scale(1.01);
+    filter: brightness(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: brightness(1);
+  }
+}
+@keyframes neheleniaMirrorTwinRight {
+  0% {
+    opacity: 0.18;
+    transform: translateX(-52%) scale(0.9);
+    filter: blur(7px) brightness(1.7);
+  }
+  32% {
+    opacity: 1;
+    transform: translateX(-26%) scale(1.02);
+    filter: blur(1px) brightness(1.34);
+  }
+  57% {
+    transform: translateX(12%) scale(0.98);
+    filter: blur(0) brightness(0.92);
+  }
+  78% {
+    transform: translateX(-8%) scale(1.01);
+    filter: brightness(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+/* ============================================================
+   NEHELENIA V6.1 — TIMING E TRANSIÇÕES DE ESPELHO
+   Mantém o gameplay; só coreografa as ilusões em ritmo legível.
+   ============================================================ */
+.boss-mode .meld-line.nehelenia-mirror-split-pending {
+  animation: neheleniaMirrorMarkedHold 2.6s ease-in-out infinite !important;
+  transform-origin: 50% 50%;
+  cursor: wait;
+}
+.boss-mode .meld-line.nehelenia-mirror-source,
+.boss-mode .meld-line.nehelenia-mirror-clone,
+.boss-mode .meld-line.nehelenia-mirror-twin[data-nehelenia-mirror-slot='left'],
+.boss-mode .meld-line.nehelenia-mirror-twin[data-nehelenia-mirror-slot='right'] {
+  animation: none !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-split-ghost {
+  box-sizing: border-box;
+  animation: none !important;
+  will-change: transform, filter, opacity;
+  backface-visibility: hidden;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-split-ghost::after {
+  animation-duration: 4.8s;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-split-underlay {
+  visibility: visible !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-split-underlay > .meld-line-cards {
+  visibility: hidden !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-split-underlay > .meld-meta {
+  visibility: visible !important;
+}
+@keyframes neheleniaMirrorMarkedHold {
+  0%,
+  100% {
+    filter: brightness(1) drop-shadow(0 0 8px rgba(124, 58, 237, 0.22));
+  }
+  50% {
+    filter: brightness(1.16) drop-shadow(0 0 19px rgba(196, 181, 253, 0.46));
+  }
+}
+
+#bossChoiceActions.nehelenia-choice-stage-host > .nehelenia-choice-stage {
+  animation-duration: 680ms;
+}
+.nehelenia-shell-option.is-origin .nehelenia-shell-frame {
+  animation-duration: 1.15s;
+}
+.nehelenia-shell-option.is-clone-pending,
+.nehelenia-shell-option.is-shuffling {
+  pointer-events: none;
+  will-change: transform, opacity, filter;
+}
+.is-discard-mirror .nehelenia-shell-option {
+  animation-duration: 1050ms;
+}
+.is-discard-mirror .nehelenia-shell-option:nth-child(2) {
+  animation-delay: 110ms;
+}
+.nehelenia-choice-stage.is-discard-mirror.is-resolving {
+  pointer-events: none;
+  animation: neheleniaDiscardStageDissolve 980ms cubic-bezier(0.2, 0.72, 0.18, 1) forwards;
+}
+.nehelenia-choice-stage.is-discard-mirror.is-resolving .nehelenia-shell-option {
+  transition:
+    opacity 420ms ease,
+    filter 420ms ease,
+    transform 420ms ease;
+  opacity: 0.06;
+  filter: blur(5px) brightness(0.72);
+}
+.nehelenia-discard-flight-card {
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.62),
+    0 0 22px rgba(196, 181, 253, 0.44) !important;
+  will-change: transform, opacity, filter;
+}
+.nehelenia-discard-arrival-mirror {
+  position: fixed;
+  z-index: 10072;
+  width: 94px;
+  height: 124px;
+  border: 3px double rgba(221, 214, 254, 0.88);
+  border-radius: 50% 50% 43% 43% / 40% 40% 60% 60%;
+  background:
+    linear-gradient(115deg, transparent 0 35%, rgba(255, 255, 255, 0.24) 36% 41%, transparent 43%), radial-gradient(circle at 38% 24%, rgba(224, 231, 255, 0.18), transparent 38%), linear-gradient(155deg, rgba(88, 28, 135, 0.28), rgba(7, 4, 18, 0.82));
+  box-shadow:
+    inset 0 0 0 3px rgba(9, 5, 20, 0.84),
+    inset 0 0 24px rgba(167, 139, 250, 0.2),
+    0 0 28px rgba(124, 58, 237, 0.46);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.nehelenia-discard-arrival-mirror::before,
+.nehelenia-discard-arrival-mirror::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 12px;
+  border: 2px solid rgba(221, 214, 254, 0.76);
+}
+.nehelenia-discard-arrival-mirror::before {
+  top: -11px;
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+}
+.nehelenia-discard-arrival-mirror::after {
+  bottom: -12px;
+  border-top: 0;
+  border-radius: 0 0 18px 18px;
+}
+@keyframes neheleniaDiscardStageDissolve {
+  0% {
+    opacity: 1;
+    filter: blur(0) brightness(1);
+  }
+  45% {
+    opacity: 0.48;
+    filter: blur(2px) brightness(0.92);
+  }
+  100% {
+    opacity: 0.08;
+    filter: blur(7px) brightness(0.72);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-mode .meld-line.nehelenia-mirror-split-pending,
+  .nehelenia-choice-stage.is-discard-mirror.is-resolving,
+  .is-discard-mirror .nehelenia-shell-option,
+  .nehelenia-shell-option.is-origin .nehelenia-shell-frame {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   NEHELENIA V6.2 — JOGO ESPELHADO COM TAMANHO REAL + SELO DO LIXO
+   O reflexo usa o mesmo tamanho natural de qualquer jogo da mesa.
+   ============================================================ */
+.boss-mode .meld-line.nehelenia-mirror-twin {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: 100% !important;
+  border: 1px solid rgba(196, 181, 253, 0.72) !important;
+  outline: 0 !important;
+  border-radius: 7px !important;
+  background: linear-gradient(125deg, rgba(196, 181, 253, 0.055), transparent 34% 68%, rgba(124, 58, 237, 0.045)) !important;
+  box-shadow:
+    0 0 0 1px rgba(88, 28, 135, 0.24),
+    0 0 12px rgba(124, 58, 237, 0.2) !important;
+  overflow: visible !important;
+  isolation: isolate;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-twin::before {
+  top: -11px !important;
+  left: auto !important;
+  right: 1px !important;
+  padding: 2px 5px !important;
+  border: 1px solid rgba(196, 181, 253, 0.82) !important;
+  border-radius: 3px !important;
+  background: rgba(30, 12, 55, 0.96) !important;
+  color: #ede9fe !important;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.42),
+    0 0 10px rgba(124, 58, 237, 0.22) !important;
+  font-size: 7px !important;
+  line-height: 1 !important;
+  letter-spacing: 0.55px !important;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-twin::after {
+  z-index: 1 !important;
+  inset: 1px !important;
+  border-radius: 6px !important;
+  opacity: 0.46;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-twin .meld-line-cards,
+.boss-mode .meld-line.nehelenia-mirror-twin .meld-meta {
+  position: relative;
+  z-index: 3;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-twin .meld-line-cards {
+  transform: none !important;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-split-ghost {
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 7px !important;
+  transform: none;
+}
+
+/* A moldura escolhida na armadilha desce separada da carta e vira o selo. */
+.nehelenia-discard-flight-mirror {
+  display: grid !important;
+  place-items: center;
+  box-sizing: border-box;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url('../assets/images/nehelenia-discard-mirror-frame.png') center / contain no-repeat !important;
+  box-shadow: none !important;
+  will-change: transform, opacity, filter;
+}
+.nehelenia-discard-flight-mirror::before,
+.nehelenia-discard-flight-mirror::after,
+.nehelenia-discard-flight-mirror .nehelenia-shell-glass {
+  content: none !important;
+  display: none !important;
+}
+
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed,
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-seal-preview {
+  position: relative;
+  overflow: visible;
+}
+
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed::before,
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-seal-preview::before {
+  content: '';
+  position: absolute;
+  z-index: 34;
+  left: 50%;
+  top: 40px;
+  width: 76px;
+  height: 104px;
+  transform: translate(-50%, -50%);
+  border: 3px double rgba(221, 214, 254, 0.9);
+  border-radius: 50% 50% 43% 43% / 40% 40% 60% 60%;
+  background:
+    linear-gradient(115deg, transparent 0 35%, rgba(255, 255, 255, 0.18) 36% 41%, transparent 43%), radial-gradient(circle at 38% 24%, rgba(224, 231, 255, 0.14), transparent 38%), linear-gradient(155deg, rgba(88, 28, 135, 0.16), rgba(7, 4, 18, 0.34));
+  box-shadow:
+    inset 0 0 0 3px rgba(9, 5, 20, 0.58),
+    inset 0 0 20px rgba(167, 139, 250, 0.18),
+    0 0 21px rgba(124, 58, 237, 0.42);
+  pointer-events: none;
+}
+
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed.boss-locked {
+  opacity: 0.76;
+  filter: saturate(0.74) brightness(0.82);
+}
+
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed.boss-locked::after {
+  content: '🪞 Selado pela Nehelenia';
+  color: #ddd6fe;
+  background: rgba(30, 12, 55, 0.82);
+  border: 1px solid rgba(196, 181, 253, 0.45);
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin-top: 4px;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+}
+
+@media (max-width: 720px) {
+  .boss-mode .meld-line.nehelenia-mirror-twin {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ============================================================
+   NEHELENIA V6.3 — MARCAÇÃO SOMENTE NAS CARTAS + SELO COMPACTO
+   A moldura do jogo não inclui "Canastra/Limpa" nem cria altura extra.
+   ============================================================ */
+.boss-mode .meld-line.mirrored-by-nehelenia {
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+.boss-mode .meld-line.mirrored-by-nehelenia::before {
+  display: none !important;
+  content: none !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-twin {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  isolation: auto !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-twin::before,
+.boss-mode .meld-line.nehelenia-mirror-twin::after {
+  display: none !important;
+  content: none !important;
+}
+.boss-mode .meld-line .nehelenia-mirror-echo {
+  display: none !important;
+}
+
+.boss-mode .meld-line-cards.nehelenia-mirror-card-frame {
+  position: relative;
+  z-index: 4;
+  overflow: visible !important;
+  border-radius: 5px;
+  outline: 1px solid rgba(196, 181, 253, 0.9);
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 2px rgba(76, 29, 149, 0.24),
+    0 0 14px rgba(124, 58, 237, 0.28);
+}
+.boss-mode .meld-line-cards.nehelenia-mirror-card-frame::before {
+  content: attr(data-nehelenia-mirror);
+  position: absolute;
+  z-index: 30;
+  left: -3px;
+  top: -15px;
+  padding: 2px 6px;
+  border: 1px solid rgba(196, 181, 253, 0.78);
+  border-radius: 999px;
+  background: rgba(30, 12, 55, 0.96);
+  color: #ede9fe;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.44),
+    0 0 9px rgba(124, 58, 237, 0.24);
+  font-size: 7px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.55px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.boss-mode .meld-line-cards.nehelenia-mirror-card-frame::after {
+  content: '';
+  position: absolute;
+  z-index: 21;
+  inset: -4px;
+  border: 1px solid rgba(221, 214, 254, 0.58);
+  border-radius: 7px;
+  background: linear-gradient(112deg, transparent 0 42%, rgba(255, 255, 255, 0.08) 46%, transparent 50% 100%);
+  box-shadow: inset 0 0 10px rgba(167, 139, 250, 0.08);
+  pointer-events: none;
+}
+.boss-mode .meld-line-cards.nehelenia-mirror-card-frame.is-prison {
+  outline-color: rgba(244, 114, 182, 0.88);
+  box-shadow:
+    0 0 0 2px rgba(126, 34, 206, 0.22),
+    0 0 14px rgba(192, 38, 211, 0.24);
+}
+.boss-mode .meld-line-cards.nehelenia-mirror-card-frame.is-prison::before {
+  border-color: rgba(244, 114, 182, 0.76);
+  color: #fae8ff;
+  background: rgba(59, 7, 67, 0.96);
+}
+
+/* Espelho do Lixo selado: a mesma moldura PNG da escolha permanece
+   temporariamente sobre o lixo quando a opção escolhida era a armadilha. */
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed::before,
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-seal-preview::before {
+  left: 50% !important;
+  top: calc(var(--readable-pile-height, 80px) / 2) !important;
+  width: calc(var(--readable-pile-width, 55px) * 1.42) !important;
+  height: auto !important;
+  aspect-ratio: 941 / 1671;
+  transform: translate(-50%, -50%) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url('../assets/images/nehelenia-discard-mirror-frame.png') center / contain no-repeat !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 7px 12px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 8px rgba(96, 165, 250, 0.22));
+}
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed.boss-locked::after {
+  display: none !important;
+  content: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-mode .meld-line-cards.nehelenia-mirror-card-frame::after {
+    background: transparent !important;
+  }
+}
+
+/* ============================================================
+   NEHELENIA V6.5 — JOGO ESPELHADO SEM REFLOW VERTICAL
+   A moldura pertence somente às cartas. O bloco do jogo mantém a
+   geometria normal da mesa e Canastra/Limpa fica sempre abaixo.
+   ============================================================ */
+.boss-mode .meld-line.nehelenia-mirror-twin {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 90px !important;
+  min-height: 0 !important;
+  padding: 4px 6px 6px !important;
+  margin: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  isolation: auto !important;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-twin::before,
+.boss-mode .meld-line.nehelenia-mirror-twin::after {
+  display: none !important;
+  content: none !important;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-twin > .meld-line-cards {
+  /* Estado final: herda a altura real da mesa/card-readability.
+     Não travar em 85px, senão Canastra/Limpa sobe para dentro das cartas. */
+  margin: 0 !important;
+  transform: none !important;
+}
+
+.boss-mode .meld-line.nehelenia-mirror-twin > .meld-meta {
+  /* Usa exatamente o mesmo layout/meta de um jogo normal. */
+  transform: none !important;
+  visibility: visible !important;
+}
+
+/* Durante a divisão, só as cartas reais ficam invisíveis atrás dos ghosts.
+   O texto Canastra/Limpa e o espaço do jogo não somem nem mudam de altura. */
+.boss-mode .meld-line.nehelenia-mirror-split-underlay {
+  visibility: visible !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-split-underlay > .meld-line-cards {
+  visibility: hidden !important;
+}
+.boss-mode .meld-line.nehelenia-mirror-split-underlay > .meld-meta {
+  visibility: visible !important;
+}
+
+/* O ghost é apenas o bloco de cartas; jamais herda espaço de meta/padding. */
+.boss-mode .meld-line-cards.nehelenia-mirror-split-ghost {
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 768px), (max-height: 600px) {
+  .boss-mode .meld-line.nehelenia-mirror-twin {
+    min-width: 55px !important;
+    min-height: 0 !important;
+    padding: 2px !important;
+    margin: 0 !important;
+    border-radius: 4px !important;
+  }
+
+  /* Também no tablet: não sobrescreve altura nem posição do meta.
+     As medidas responsivas oficiais continuam comandando o jogo. */
+}
+
+/* Nehelenia V6.10 — Pesadelo Eterno: nenhuma etiqueta acompanha os reflexos.
+   Os nomes REFLEXO 1/2/3 denunciavam a identidade da carta original durante
+   o embaralhamento, pois a etiqueta se movia junto com o respectivo botão. */
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-label {
+  display: none !important;
+}
+
+/* ============================================================
+   NEHELENIA V6.11 — PESADELO ETERNO SEM MOLDURA/PNG NEM LABELS
+   Nesta habilidade ficam somente as cartas. O indicador ORIGINAL
+   inicial continua separado acima para a etapa de memorização.
+   ============================================================ */
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-label {
+  display: none !important;
+}
+
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame {
+  width: 52px !important;
+  height: 76px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame::before,
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame::after,
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-glass {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame .carta.mini {
+  width: 52px !important;
+  height: 76px !important;
+  margin: 0 !important;
+}
+
+/* O destaque de memorização não recria moldura ao redor da ORIGINAL. */
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-option.is-origin .nehelenia-shell-frame {
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+
+/* ============================================================
+   NEHELENIA V6.13 — PESADELO ALEATÓRIO + ESPELHOS DO HUD EM PNG
+   ============================================================ */
+
+/* Mantém o estado visual aprovado do Pesadelo: a moldura PNG continua nas
+   cartas, mas REFLEXO 1/2/3 não acompanha os tokens durante o embaralhamento. */
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-label {
+  display: none !important;
+}
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame {
+  width: 94px !important;
+  height: 167px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url('../assets/images/nehelenia-discard-mirror-frame.png') center / contain no-repeat !important;
+  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.44) !important;
+}
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame::before,
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame::after,
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-glass {
+  content: none !important;
+  display: none !important;
+}
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-frame .carta.mini {
+  width: 52px !important;
+  height: 76px !important;
+  margin: 0 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.58) !important;
+}
+.nehelenia-choice-stage.is-eternal-nightmare .nehelenia-shell-option.is-origin .nehelenia-shell-frame {
+  border: 0 !important;
+  background: url('../assets/images/nehelenia-discard-mirror-frame.png') center / contain no-repeat !important;
+  box-shadow:
+    0 9px 24px rgba(0, 0, 0, 0.44),
+    0 0 26px rgba(253, 230, 138, 0.52) !important;
+}
+
+/* Os cinco Espelhos dos Sonhos do HUD deixam de ser o oval CSS antigo e usam
+   a mesma arte oficial. Intacto = vidro fosco azul/lilás; tomado = vidro mais
+   escuro e uma trinca visível sobre a superfície. */
+body[data-boss-id='nehelenia'] .boss-bloom-flowers {
+  gap: 5px !important;
+  min-height: 54px !important;
+  padding: 2px 1px !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb {
+  position: relative !important;
+  width: 31px !important;
+  height: 52px !important;
+  flex: 0 0 31px !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  isolation: isolate;
+  transform-origin: 50% 82%;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::before {
+  content: '' !important;
+  position: absolute !important;
+  z-index: 3;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  left: 0 !important;
+  top: 0 !important;
+  transform: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url('../assets/images/nehelenia-discard-mirror-frame.png') center / contain no-repeat !important;
+  opacity: 0.82;
+  filter: saturate(0.7) brightness(0.88) hue-rotate(5deg) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-glass {
+  position: absolute !important;
+  z-index: 1;
+  inset: 10px 8px 11px !important;
+  border-radius: 45% 45% 38% 38% / 34% 34% 56% 56% !important;
+  background:
+    linear-gradient(118deg, transparent 0 31%, rgba(255,255,255,.22) 33% 39%, transparent 42%),
+    radial-gradient(circle at 38% 28%, rgba(224,231,255,.2), transparent 38%),
+    linear-gradient(160deg, rgba(96,165,250,.28), rgba(109,40,217,.22) 48%, rgba(8,15,40,.7)) !important;
+  box-shadow: inset 0 0 8px rgba(224,231,255,.2) !important;
+  opacity: 0.9;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::after {
+  content: '' !important;
+  position: absolute !important;
+  z-index: 4;
+  inset: 11px 8px 12px !important;
+  width: auto !important;
+  height: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  border: 0 !important;
+  border-radius: 42% !important;
+  background: none !important;
+  opacity: 0;
+  pointer-events: none;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb > b {
+  position: relative !important;
+  z-index: 5 !important;
+  transform: translateY(1px);
+  color: rgba(237, 233, 254, 0.72) !important;
+  font-size: 7px !important;
+  text-shadow: 0 1px 3px rgba(0,0,0,.95) !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken {
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  animation: neheleniaMirrorTakenPulse 2.2s ease-in-out infinite;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken::before {
+  opacity: 0.72;
+  filter: saturate(0.72) brightness(0.58) hue-rotate(300deg) drop-shadow(0 0 5px rgba(244,63,94,.38));
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken .boss-dream-mirror-glass {
+  background:
+    linear-gradient(118deg, transparent 0 31%, rgba(255,255,255,.12) 33% 39%, transparent 42%),
+    radial-gradient(circle at 48% 44%, rgba(244,63,94,.24), transparent 36%),
+    linear-gradient(160deg, rgba(88,28,135,.32), rgba(76,5,25,.5) 52%, rgba(7,4,18,.86)) !important;
+  opacity: 0.68;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken::after {
+  opacity: 0.95;
+  background:
+    radial-gradient(circle at 50% 47%, rgba(255,255,255,.95) 0 1px, transparent 1.8px),
+    linear-gradient(24deg, transparent 0 47%, rgba(253,164,175,.92) 48% 50%, transparent 51% 100%),
+    linear-gradient(112deg, transparent 0 48%, rgba(221,214,254,.82) 49% 50%, transparent 51% 100%),
+    linear-gradient(154deg, transparent 0 48%, rgba(244,114,182,.78) 49% 50%, transparent 51% 100%) !important;
+  filter: drop-shadow(0 0 2px rgba(244,114,182,.7));
+}
+
+/* ============================================================
+   NEHELENIA V6.14 — ESPELHOS DO HUD MAIORES
+   A PNG do HUD estava correta, mas 31x52 deixava os cinco espelhos pequenos.
+   Este ajuste afeta somente o medidor "Espelhos sob controle".
+   ============================================================ */
+body[data-boss-id='nehelenia'] .boss-bloom-flowers {
+  gap: 7px !important;
+  min-height: 78px !important;
+  padding: 3px 2px !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb {
+  width: 43px !important;
+  height: 74px !important;
+  flex: 0 0 43px !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-glass {
+  inset: 14px 10px 16px !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::after {
+  inset: 15px 10px 17px !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb > b {
+  font-size: 8px !important;
+  transform: translateY(1px) !important;
+}
+
+
+/* Capangas da Rainha Nehelenia: usam exatamente a mesma faixa estrutural das filhas. */
+body[data-boss-id='nehelenia'] .boss-daughter-strip {
+  margin-top: -5px;
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card {
+  position: relative;
+  border-color: rgba(167, 139, 250, 0.58);
+  background:
+    radial-gradient(circle at 50% 12%, rgba(96, 165, 250, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(19, 10, 43, 0.97), rgba(6, 5, 19, 0.99));
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px rgba(255, 255, 255, 0.055),
+    0 0 18px rgba(124, 58, 237, 0.16);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'] { grid-column: 1; }
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'] { grid-column: 2; }
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'] { grid-column: 3; }
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card img {
+  object-position: 50% 24%;
+  background: #080615;
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card b {
+  border-top-color: rgba(167, 139, 250, 0.32);
+  color: #ddd6fe;
+  background: rgba(20, 10, 47, 0.9);
+}
+
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card.is-idle {
+  opacity: 0.62;
+  filter: saturate(0.72) brightness(0.82);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card.is-idle .boss-daughter-state {
+  color: #8b86a5;
+}
+
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card.is-active {
+  border-color: rgba(196, 181, 253, 0.9);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 1px rgba(196, 181, 253, 0.12),
+    0 0 24px rgba(139, 92, 246, 0.26);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card.is-missing-art {
+  min-height: 145px;
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card.is-missing-art::before {
+  content: 'ARTE PENDENTE';
+  width: 100%;
+  height: 116px;
+  display: grid;
+  place-items: center;
+  color: rgba(221, 214, 254, 0.72);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(96, 165, 250, 0.16), transparent 32%),
+    linear-gradient(145deg, rgba(49, 30, 87, 0.9), rgba(6, 5, 19, 0.98));
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: 1px;
+}
+
+/* Marcações leves dos capangas — sem mudar a geometria normal dos jogos. */
+.boss-meld-nehelenia-attendant {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 2px 5px;
+  border: 1px solid rgba(167, 139, 250, 0.62);
+  border-radius: 999px;
+  color: #ddd6fe;
+  background: rgba(46, 16, 101, 0.72);
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.18);
+  font-size: 7px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.35px;
+  white-space: nowrap;
+}
+.boss-meld-nehelenia-tiger {
+  border-color: rgba(251, 191, 36, 0.72);
+  color: #fde68a;
+  background: rgba(92, 48, 6, 0.7);
+}
+.boss-meld-nehelenia-hawk {
+  border-color: rgba(125, 211, 252, 0.72);
+  color: #bae6fd;
+  background: rgba(7, 50, 74, 0.72);
+}
+.boss-meld-nehelenia-attendant.is-done {
+  opacity: 0.58;
+  text-decoration: line-through;
+}
+
+/* Fish Eye: marca apenas a carta-alvo, sem transformar a mão num minigame de espelho. */
+.boss-mode .carta.boss-card-nehelenia-fish-mark {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    inset 0 0 0 2px rgba(56, 189, 248, 0.78),
+    0 0 13px rgba(125, 211, 252, 0.48) !important;
+}
+.boss-mode .carta.boss-card-nehelenia-fish-mark::after {
+  content: 'FISH EYE';
+  position: absolute;
+  left: 50%;
+  bottom: -17px;
+  z-index: 7;
+  transform: translateX(-50%);
+  padding: 2px 5px;
+  border: 1px solid rgba(125, 211, 252, 0.72);
+  border-radius: 999px;
+  color: #e0f2fe;
+  background: rgba(7, 28, 52, 0.94);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.28);
+  font-size: 6px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.35px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ============================================================
+   NEHELENIA V7.5 — ASSINATURA VISUAL DOS CAPANGAS
+   Tiger = vermelho | Hawk = dourado | Fish = azul
+   Apenas apresentação: não altera regras nem geometria da mesa.
+   ============================================================ */
+
+/* O próprio retrato já ensina a cor de cada capanga. */
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'] {
+  border-color: rgba(248, 113, 113, 0.58);
+  box-shadow: 0 8px 20px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.05), 0 0 16px rgba(239,68,68,.16);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'] b {
+  color: #fecaca;
+  border-top-color: rgba(248, 113, 113, 0.34);
+  background: rgba(69, 10, 10, 0.9);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'].is-active {
+  border-color: rgba(248, 113, 113, 0.96);
+  box-shadow: 0 8px 20px rgba(0,0,0,.52), inset 0 0 0 1px rgba(254,202,202,.12), 0 0 28px rgba(239,68,68,.34);
+}
+
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'] {
+  border-color: rgba(250, 204, 21, 0.58);
+  box-shadow: 0 8px 20px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.05), 0 0 16px rgba(250,204,21,.15);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'] b {
+  color: #fef08a;
+  border-top-color: rgba(250, 204, 21, 0.34);
+  background: rgba(66, 32, 6, 0.9);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'].is-active {
+  border-color: rgba(253, 224, 71, 0.98);
+  box-shadow: 0 8px 20px rgba(0,0,0,.52), inset 0 0 0 1px rgba(254,240,138,.13), 0 0 28px rgba(250,204,21,.32);
+}
+
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'] {
+  border-color: rgba(56, 189, 248, 0.58);
+  box-shadow: 0 8px 20px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.05), 0 0 16px rgba(56,189,248,.16);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'] b {
+  color: #bae6fd;
+  border-top-color: rgba(56, 189, 248, 0.34);
+  background: rgba(7, 32, 54, 0.9);
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'].is-active {
+  border-color: rgba(125, 211, 252, 0.98);
+  box-shadow: 0 8px 20px rgba(0,0,0,.52), inset 0 0 0 1px rgba(186,230,253,.13), 0 0 28px rgba(56,189,248,.34);
+}
+
+/* TIGER'S EYE — o jogo inteiro recebe uma pressão vermelha e marcas de garra. */
+.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark {
+  position: relative;
+  isolation: isolate;
+  outline: 2px solid rgba(248, 113, 113, 0.9);
+  outline-offset: 4px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(127,29,29,.52), 0 0 18px rgba(239,68,68,.38);
+  animation: neheleniaTigerMeldPulse 1.8s ease-in-out infinite;
+}
+.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  z-index: 8;
+  border-radius: 10px;
+  pointer-events: none;
+  background:
+    linear-gradient(118deg, transparent 0 33%, rgba(254,202,202,.82) 34% 35%, rgba(239,68,68,.72) 36%, transparent 37% 48%, rgba(254,202,202,.72) 49% 50%, rgba(185,28,28,.68) 51%, transparent 52% 63%, rgba(248,113,113,.68) 64% 65%, transparent 66% 100%);
+  opacity: .52;
+  mask: linear-gradient(#000 0 0);
+}
+.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-tiger-claw::before {
+  opacity: .9;
+  filter: drop-shadow(0 0 4px rgba(239,68,68,.9));
+  animation: neheleniaTigerClawFlash 1.25s ease-in-out infinite;
+}
+.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-attendant-done {
+  animation: none;
+  outline-color: rgba(248,113,113,.36);
+  box-shadow: 0 0 8px rgba(239,68,68,.14);
+}
+.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-attendant-done::before { opacity: .18; }
+
+/* HAWK'S EYE — amarelo/dourado, como se um olho estivesse fixo naquela rota. */
+.boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark {
+  position: relative;
+  isolation: isolate;
+  outline: 2px solid rgba(250, 204, 21, 0.94);
+  outline-offset: 4px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(133,77,14,.46), 0 0 20px rgba(250,204,21,.34);
+  animation: neheleniaHawkMeldPulse 1.6s ease-in-out infinite;
+}
+.boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark::after {
+  content: '◉';
+  position: absolute;
+  top: -13px;
+  right: -10px;
+  z-index: 9;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(254,240,138,.92);
+  border-radius: 50%;
+  color: #fef08a;
+  background: rgba(66,32,6,.94);
+  box-shadow: 0 0 12px rgba(250,204,21,.58);
+  font-size: 11px;
+  font-weight: 1000;
+  pointer-events: none;
+  animation: neheleniaHawkEye 1.35s ease-in-out infinite;
+}
+
+/* Combo Tiger + Hawk: as duas assinaturas ficam visíveis ao mesmo tempo. */
+.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.boss-meld-nehelenia-hawk-mark {
+  outline-color: rgba(248,113,113,.92);
+  box-shadow:
+    0 0 0 2px rgba(239,68,68,.48),
+    0 0 0 5px rgba(250,204,21,.38),
+    0 0 24px rgba(239,68,68,.3),
+    0 0 34px rgba(250,204,21,.22);
+}
+
+/* Labels seguem a mesma linguagem cromática das marcas. */
+.boss-meld-nehelenia-tiger {
+  border-color: rgba(248, 113, 113, 0.82) !important;
+  color: #fecaca !important;
+  background: rgba(69, 10, 10, 0.84) !important;
+  box-shadow: 0 0 9px rgba(239, 68, 68, 0.26) !important;
+}
+.boss-meld-nehelenia-hawk {
+  border-color: rgba(250, 204, 21, 0.84) !important;
+  color: #fef08a !important;
+  background: rgba(66, 32, 6, 0.86) !important;
+  box-shadow: 0 0 9px rgba(250, 204, 21, 0.24) !important;
+}
+
+/* FISH EYE — azul vivo na carta-alvo; Reflexo Morto ganha aspecto rachado. */
+.boss-mode .carta.boss-card-nehelenia-fish-mark {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    inset 0 0 0 2px rgba(56,189,248,.96),
+    0 0 0 2px rgba(14,116,144,.28),
+    0 0 18px rgba(56,189,248,.58) !important;
+  animation: neheleniaFishCardPulse 1.65s ease-in-out infinite;
+}
+.boss-mode .carta.boss-card-nehelenia-fish-mark::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: -3px !important;
+  left: -3px !important;
+  bottom: -3px !important;
+  width: auto !important;
+  height: auto !important;
+  transform: none !important;
+  padding: 0 !important;
+  border: 1px solid rgba(125,211,252,.48) !important;
+  border-radius: inherit !important;
+  background: radial-gradient(circle at 50% 50%, transparent 52%, rgba(56,189,248,.12) 74%, rgba(125,211,252,.3) 100%) !important;
+  box-shadow: 0 0 14px rgba(56,189,248,.3) !important;
+  pointer-events: none;
+  animation: neheleniaFishRing 1.65s ease-in-out infinite;
+}
+.boss-mode .carta.boss-card-nehelenia-fish-dead {
+  filter: saturate(.78) brightness(.88);
+  box-shadow:
+    inset 0 0 0 2px rgba(14,165,233,.98),
+    inset 0 0 18px rgba(3,105,161,.32),
+    0 0 20px rgba(2,132,199,.62) !important;
+}
+.boss-mode .carta.boss-card-nehelenia-fish-dead::after {
+  background:
+    linear-gradient(61deg, transparent 0 45%, rgba(224,242,254,.78) 46% 47%, transparent 48% 100%),
+    linear-gradient(116deg, transparent 0 57%, rgba(56,189,248,.7) 58% 59%, transparent 60% 100%),
+    linear-gradient(20deg, transparent 0 67%, rgba(186,230,253,.62) 68% 69%, transparent 70% 100%),
+    rgba(3,105,161,.05) !important;
+}
+.boss-mode .boss-card-status-nehelenia-fish {
+  background: linear-gradient(90deg, rgba(3,105,161,.98), rgba(7,28,52,.98));
+  color: #e0f2fe;
+  border-color: rgba(125,211,252,.9);
+  box-shadow: 0 0 8px rgba(56,189,248,.38);
+}
+.boss-mode .boss-card-status-nehelenia-fish i { color: #7dd3fc; }
+.boss-mode .boss-card-status-nehelenia-fish.is-dead {
+  background: linear-gradient(90deg, rgba(7,89,133,.99), rgba(8,47,73,.99));
+  border-color: rgba(186,230,253,.92);
+}
+
+/* HAWK no lixo — o amarelo substitui o selo roxo genérico quando a origem é Hawk. */
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard .pile-card {
+  filter: drop-shadow(0 0 8px rgba(250,204,21,.72)) drop-shadow(0 0 14px rgba(161,98,7,.36));
+}
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard .discard-face {
+  box-shadow:
+    inset 0 0 0 2px rgba(250,204,21,.9),
+    0 0 0 1px rgba(133,77,14,.54),
+    0 0 18px rgba(250,204,21,.48) !important;
+  animation: neheleniaHawkDiscardPulse 1.55s ease-in-out infinite;
+}
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.is-hawk-guarded .discard-face {
+  filter: saturate(.84) brightness(.9);
+}
+.boss-mode .boss-card-status-nehelenia-hawk {
+  background: linear-gradient(90deg, rgba(113,63,18,.98), rgba(46,28,5,.98));
+  color: #fef08a;
+  border-color: rgba(250,204,21,.92);
+  box-shadow: 0 0 9px rgba(250,204,21,.34);
+}
+.boss-mode .boss-card-status-nehelenia-hawk i { color: #fde047; }
+.boss-mode .boss-discard-nehelenia-hawk-card {
+  position: relative;
+}
+
+@keyframes neheleniaTigerMeldPulse {
+  0%,100% { box-shadow: 0 0 0 1px rgba(127,29,29,.48), 0 0 13px rgba(239,68,68,.28); }
+  50% { box-shadow: 0 0 0 2px rgba(248,113,113,.52), 0 0 24px rgba(239,68,68,.52); }
+}
+@keyframes neheleniaTigerClawFlash {
+  0%,100% { opacity: .52; }
+  50% { opacity: .98; }
+}
+@keyframes neheleniaHawkMeldPulse {
+  0%,100% { box-shadow: 0 0 0 1px rgba(133,77,14,.4), 0 0 12px rgba(250,204,21,.24); }
+  50% { box-shadow: 0 0 0 2px rgba(250,204,21,.54), 0 0 24px rgba(250,204,21,.48); }
+}
+@keyframes neheleniaHawkEye {
+  0%,100% { transform: scale(.92); opacity: .72; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+@keyframes neheleniaFishCardPulse {
+  0%,100% { box-shadow: inset 0 0 0 2px rgba(56,189,248,.84), 0 0 12px rgba(56,189,248,.4); }
+  50% { box-shadow: inset 0 0 0 2px rgba(125,211,252,1), 0 0 22px rgba(56,189,248,.7); }
+}
+@keyframes neheleniaFishRing {
+  0%,100% { opacity: .56; }
+  50% { opacity: 1; }
+}
+@keyframes neheleniaHawkDiscardPulse {
+  0%,100% { box-shadow: inset 0 0 0 2px rgba(250,204,21,.72), 0 0 12px rgba(250,204,21,.32); }
+  50% { box-shadow: inset 0 0 0 2px rgba(254,240,138,1), 0 0 22px rgba(250,204,21,.62); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark,
+  .boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-tiger-claw::before,
+  .boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark,
+  .boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark::after,
+  .boss-mode .carta.boss-card-nehelenia-fish-mark,
+  .boss-mode .carta.boss-card-nehelenia-fish-mark::after,
+  body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard .discard-face {
+    animation: none !important;
+  }
+}
+
+/* Quando Hawk realmente bloqueia o lixo, não herdar o texto/visual genérico do Banqueiro. */
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.boss-locked {
+  opacity: .86;
+  filter: saturate(.9) brightness(.9);
+}
+body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.boss-locked::after {
+  content: '◉ Vigiado por Hawk\'s Eye';
+  color: #fef08a;
+  background: rgba(66,32,6,.9);
+  border: 1px solid rgba(250,204,21,.62);
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin-top: 4px;
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: .35px;
 }

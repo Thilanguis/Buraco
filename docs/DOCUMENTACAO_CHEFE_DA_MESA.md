@@ -2,14 +2,15 @@
 
 ## Status da documentação
 
-**Versão revisada contra o código atual — 28/09/2026.**
+**Versão revisada contra o código atual — 29/09/2026.**
 
 Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
 
 - **O Banqueiro**;
 - **A Dominadora**;
 - **A Matriarca Esmeralda**;
-- **Lady Dimitrescu**.
+- **Lady Dimitrescu**;
+- **Rainha Nehelenia**.
 
 Ela substitui as versões anteriores em que a Matriarca aparecia como planejada e em que as habilidades antigas da Dominadora e do Banqueiro ainda estavam descritas.
 
@@ -21,6 +22,7 @@ A rotação que vale no jogo é a registrada em:
 - `js/boss/bosses/dominatrix.js`;
 - `js/boss/bosses/matriarch.js`;
 - `js/boss/bosses/dimitrescu.js`;
+- `js/boss/bosses/nehelenia.js`;
 - validações e resolução em `js/boss/boss-engine.js`.
 
 O resumo enxuto e atualizado das habilidades ativas está em `docs/INVENTARIO_HABILIDADES_CHEFES.md`. O HUD da partida usa a mesma lista de definições do registro de chefes para exibir **Habilidades do chefe**, evitando manter uma segunda lista manual de nomes/fases na interface.
@@ -986,7 +988,7 @@ Jogador com pelo menos 2 Chicotes escolhe entre Chicote ou retirar carta válida
 
 ### Ordem Final
 
-Na Fase 3, a Dominadora marca **2 cartas da própria mão de cada cooperador**. As duas escolhas são simétricas e acontecem **logo após o anúncio da habilidade, antes de começar qualquer turno dos cooperadores**. A partida permanece bloqueada até ambos responderem; somente depois das duas decisões o fluxo entra na etapa de jogadores.
+Na Fase 3, a Dominadora marca **2 cartas da própria mão de cada cooperador**. As duas escolhas são simétricas e a partida permanece bloqueada até ambos responderem.
 
 Cada jogador vê exatamente quais são suas duas cartas marcadas e escolhe individualmente entre:
 
@@ -1936,15 +1938,15 @@ Em touch, tablet e `prefers-reduced-motion`:
 
 # 13. Comparação dos chefes
 
-| Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu |
-|---|---|---|---|---|
-| HP | 2500 | 2500 | 2000 | 2300 |
-| Perigo | Dívida coletiva | Chicotes individuais | Florescimento | Sede de Sangue |
-| Derrota especial | Dívida 100 | ambos com 4 Chicotes | 5 Flores | Sede 100 |
-| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção |
-| Recuperação da equipe | redução de Dívida | Resistência | poda por evolução | redução de Sede por canastra |
-| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle | Pólen | Daniela, Morto profanado e Portas do Castelo |
-| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim |
+| Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu | Rainha Nehelenia |
+|---|---|---|---|---|---|
+| HP | 2500 | 2500 | 2000 | 2300 | 2400 |
+| Perigo | Dívida coletiva | Chicotes individuais | Florescimento | Sede de Sangue | Espelho Negro |
+| Derrota especial | Dívida 100 | ambos com 4 Chicotes | 5 Flores | Sede 100 | 6 Fragmentos |
+| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, simetria e dano aprisionado |
+| Recuperação da equipe | redução de Dívida | Resistência | poda por evolução | redução de Sede por canastra | Limpa/Real/Ás-a-Ás quebram Fragmentos |
+| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo |
+| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim | Labirinto, Reflexo Invertido e Eclipse |
 
 ---
 
@@ -1992,3 +1994,137 @@ Validação manual recomendada:
 - reload durante animação;
 - Voltar após ação de chefe;
 - ataque final com Renascimento.
+
+
+---
+
+# 15. Rainha Nehelenia
+
+## 15.1 Identidade
+
+Nehelenia é uma chefe de **engano, reflexos e manipulação da própria mesa**. Ela não deve copiar a linguagem mecânica de cura, escudo ou dano armazenado dos outros chefes. O objetivo é fazer o jogador duvidar do que está vendo e obrigar a equipe a adaptar o próprio turno.
+
+O HUD textual permanece padronizado em amarelo, com `☐ / ☑ / ✕`. O espetáculo acontece na mesa.
+
+## 15.2 Vida e os 5 Espelhos dos Sonhos
+
+```text
+HP: 2400
+Espelhos tomados: ◇ ◇ ◇ ◇ ◇
+```
+
+Cada punição relevante pode entregar **1 Espelho dos Sonhos** a Nehelenia.
+
+- `0/5` a `4/5`: a batalha continua;
+- `3/5` ou mais: o HUD entra em pressão visual de **Mundo do Espelho**;
+- `5/5`: derrota imediata — Nehelenia fecha a equipe dentro do Mundo do Espelho.
+
+O recurso é coletivo, mas o motor registra qual jogador originou cada ganho para feedback e compatibilidade.
+
+Uma evolução que alcance **Canastra Limpa ou superior** recupera 1 Espelho, se existir algum tomado. A redução continua incremental por novo tier de canastra.
+
+## 15.3 Fases
+
+- Fase 1 — **Espelhos dos Sonhos**;
+- Fase 2 — **Circo da Lua Morta**;
+- Fase 3 — **Pesadelo Eterno**.
+
+## 15.4 Rotação ativa V6
+
+### Jogo Espelhado
+
+Nehelenia escolhe um jogo que o alvo consegue alimentar legalmente.
+
+Depois do anúncio:
+
+1. o jogo original recebe um clarão de espelho;
+2. o layout abre espaço;
+3. uma cópia completa nasce do jogo;
+4. os dois jogos cruzam/embaralham visualmente;
+5. ficam lado a lado, do mesmo tamanho dos jogos normais, marcados apenas como **REFLEXO I** e **REFLEXO II**.
+
+Nenhum lado recebe classe visual de verdadeiro/falso.
+
+O alvo seleciona exatamente 1 carta legal e toca em um dos reflexos:
+
+- **verdadeiro:** a carta entra normalmente no jogo real;
+- **falso:** o reflexo quebra, a carta vai para o **fundo do monte** e o jogador fica **Desorientado**;
+- **Desorientado:** não pode fazer novas baixadas naquele turno; ainda pode descartar e encerrar.
+
+Ignorar a ilusão até o fim do turno entrega +1 Espelho a Nehelenia.
+
+### Siga o Reflexo
+
+O primeiro cooperador define o padrão pelo **turno inteiro**, não pela primeira jogada.
+
+Exemplos:
+
+```text
+Biel baixa 3 cartas durante o turno.
+Padrão = 3.
+Luana precisa terminar o próprio turno tendo baixado exatamente 3.
+
+Biel baixa 0.
+Padrão = 0.
+Luana pode baixar cartas normalmente, mas se baixar qualquer quantidade acima de 0 falha.
+```
+
+Regras:
+
+- contam todas as cartas colocadas legalmente na mesa pelo primeiro jogador;
+- o padrão é fechado somente quando o turno dele termina;
+- o segundo jogador **não é bloqueado** por tentar passar do número;
+- ao fim do segundo turno, compara-se o total;
+- `segundo == padrão` = sucesso;
+- qualquer diferença, para mais ou para menos, = **+1 Espelho**.
+
+### Espelho do Lixo
+
+O topo real do lixo é duplicado em **dois reflexos visualmente idênticos**.
+
+- ambos mostram a mesma carta;
+- não existe `X`, rachadura seletiva, brilho diferente ou qualquer pista;
+- a resposta é deliberadamente **50/50**;
+- acerto mantém o lixo disponível;
+- erro sela o lixo durante a rodada.
+
+O bot também não recebe a resposta secreta: escolhe um dos dois reflexos de forma determinística, mas sem consultar `correctOption`.
+
+### Prisão no Espelho
+
+Só é elegível quando Nehelenia já tomou ao menos 1 Espelho e o parceiro possui uma jogada legal para um jogo existente.
+
+- alimentar o jogo refletido recupera 1 Espelho;
+- falhar mantém o Espelho com Nehelenia.
+
+### Pesadelo Eterno
+
+A habilidade usa um **shell game visual**:
+
+1. uma carta aparece sozinha como **ORIGINAL**;
+2. dois reflexos idênticos nascem da original;
+3. o rótulo `ORIGINAL` desaparece;
+4. os três espelhos cruzam várias vezes;
+5. somente depois do embaralhamento os três ficam clicáveis.
+
+Todos mostram a mesma carta e nenhum recebe `X` ou pista falsa automática. O desafio é acompanhar a posição da carta original durante a animação.
+
+- acerto: a ilusão quebra;
+- erro: +1 Espelho;
+- se isso alcançar `5/5`, o Mundo do Espelho encerra a batalha.
+
+## 15.5 Feedback visual
+
+- cinco pequenos espelhos ornamentados ficam visíveis no HUD;
+- espelhos tomados ficam rachados/avermelhados;
+- em `3/5` ou `4/5`, o retrato entra em pressão de Mundo do Espelho;
+- o Jogo Espelhado usa duas instâncias de tamanho normal dentro do `meld-container`;
+- a cópia nasce com clarão e os dois jogos cruzam antes de parar;
+- o Espelho do Lixo usa dois espelhos centrais idênticos;
+- o Pesadelo Eterno usa um palco central com ORIGINAL → dois reflexos → embaralhamento;
+- clones visuais nunca entram no estado real da canastra, não causam dano e não mudam a estrutura global dos jogos;
+- animações respeitam `prefers-reduced-motion`.
+
+## 15.6 Direção de design
+
+Novas habilidades da Nehelenia devem priorizar **enganação visual, memória, leitura da mesa e distorção da interface física do jogo**. Evitar cura, escudo, absorção de dano ou objetivos que sejam apenas versões renomeadas de outros chefes.
