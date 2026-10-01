@@ -811,6 +811,150 @@ function neheleniaStatusPresentation(gameState) {
   };
 }
 
+function buildBossRangeMeters(gameState, intent) {
+  if (!intent?.abilityId) return [];
+  const payload = intent.payload || {};
+  const boss = gameState.boss || {};
+
+  if (boss.id === 'dimitrescu' && intent.abilityId === 'blood_tithe') {
+    const phase = Number(intent.announcedPhase) || 1;
+    const medium = phase === 3 ? 6 : 4;
+    const heavy = phase === 3 ? 10 : 8;
+    const players = (gameState.players || []).map((player) => {
+      const cards = player.hand?.length || 0;
+      const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
+      return {
+        label: player.name || 'Jogador',
+        value: cards,
+        amount,
+        tone: cards >= 11 ? 'danger' : cards >= 8 ? 'warning' : 'safe',
+      };
+    });
+    const maxCards = Math.max(0, ...players.map((player) => player.value));
+    const projectedBlood = players.reduce((sum, player) => sum + player.amount, 0);
+    const maximum = Math.max(14, maxCards);
+    const worstTone = players.some((player) => player.tone === 'danger')
+      ? 'danger'
+      : players.some((player) => player.tone === 'warning')
+        ? 'warning'
+        : 'safe';
+    const playerSummary = players
+      .map((player) => `${player.label} ${player.value}`)
+      .join(' · ');
+
+    return [{
+      label: playerSummary || 'Cooperadores',
+      value: maxCards,
+      unit: 'cartas',
+      max: maximum,
+      tone: worstTone,
+      currentEffect: projectedBlood > 0 ? `+${projectedBlood} SEDE` : 'SEM TRIBUTO',
+      ariaLabel: [
+        ...players.map((player) => `${player.label}: ${player.value} cartas, ${player.amount > 0 ? `+${player.amount} Sede` : 'sem tributo'}`),
+        `Cobrança projetada: +${projectedBlood} Sede`,
+      ].join('. '),
+      markers: players.map((player, index) => ({
+        label: player.label,
+        value: player.value,
+        tone: player.tone,
+        index,
+      })),
+      segments: [
+        { from: 0, to: 7, label: '0–7', effect: 'sem efeito', tone: 'safe' },
+        { from: 8, to: 10, label: '8–10', effect: `+${medium} Sede`, tone: 'warning' },
+        { from: 11, to: null, label: '11+', effect: `+${heavy} Sede`, tone: 'danger' },
+      ],
+    }];
+  }
+
+  if (boss.id === 'matriarca_esmeralda' && intent.abilityId === 'harvest') {
+    const target = playerById(gameState, payload.targetPlayerId);
+    const cards = target?.hand?.length || 0;
+    return [{
+      label: target?.name || 'Alvo',
+      value: cards,
+      unit: cards === 1 ? 'carta' : 'cartas',
+      max: Math.max(14, cards),
+      tone: cards >= 11 ? 'danger' : cards >= 8 ? 'warning' : 'safe',
+      currentEffect: cards >= 11 ? '+1 FLOR · CURA 80 HP' : cards >= 8 ? 'CURA 50 HP' : 'SEM EFEITO',
+      segments: [
+        { from: 0, to: 7, label: '0–7', effect: 'sem efeito', tone: 'safe' },
+        { from: 8, to: 10, label: '8–10', effect: 'cura 50 HP', tone: 'warning' },
+        { from: 11, to: null, label: '11+', effect: '+1 Flor · cura 80 HP', tone: 'danger' },
+      ],
+    }];
+  }
+
+  if (boss.id === 'matriarca_esmeralda' && intent.abilityId === 'restorative_dew') {
+    const threat = natureThreatsForIntent(gameState, intent)[0];
+    const counted = new Set(threat?.countedCardIds || payload.countedCardIds || []).size;
+    const phase = threat?.announcedPhase || payload.announcedPhase || intent.announcedPhase || boss.phase || 1;
+    const healing = getRestorativeDewHealing(phase, counted);
+    return [{
+      label: 'Cartas novas na mesa',
+      value: counted,
+      unit: counted === 1 ? 'carta' : 'cartas',
+      max: Math.max(6, counted),
+      tone: counted >= 6 ? 'safe' : counted >= 2 ? 'warning' : 'danger',
+      currentEffect: healing > 0 ? `CURA ${healing} HP` : 'CURA ZERADA',
+      segments: [
+        { from: 0, to: 1, label: '0–1', effect: `cura ${getRestorativeDewHealing(phase, 0)} HP`, tone: 'danger' },
+        { from: 2, to: 3, label: '2–3', effect: `cura ${getRestorativeDewHealing(phase, 2)} HP`, tone: 'warning' },
+        { from: 4, to: 5, label: '4–5', effect: `cura ${getRestorativeDewHealing(phase, 4)} HP`, tone: 'warning' },
+        { from: 6, to: null, label: '6+', effect: 'cura 0', tone: 'safe' },
+      ],
+    }];
+  }
+
+  if (boss.id === 'banker' && intent.abilityId === 'compound_interest') {
+    const total = (gameState.players || []).reduce((sum, player) => sum + (player.hand?.length || 0), 0);
+    const safeMax = payload.safeMax ?? 7;
+    const warningMax = payload.warningMax ?? 13;
+    const phase3 = Number(intent.announcedPhase) === 3;
+    const safeDebt = payload.safeDebt ?? (phase3 ? 8 : 6);
+    const warningDebt = payload.warningDebt ?? (phase3 ? 12 : 10);
+    const dangerDebt = payload.dangerDebt ?? (phase3 ? 16 : 14);
+    const currentDebt = total <= safeMax ? safeDebt : total <= warningMax ? warningDebt : dangerDebt;
+    return [{
+      label: 'Equipe',
+      value: total,
+      unit: total === 1 ? 'carta' : 'cartas',
+      max: Math.max(warningMax + 5, total),
+      tone: total > warningMax ? 'danger' : total > safeMax ? 'warning' : 'safe',
+      currentEffect: `+${currentDebt} DÍVIDA`,
+      segments: [
+        { from: 0, to: safeMax, label: `0–${safeMax}`, effect: `+${safeDebt} Dívida`, tone: 'safe' },
+        { from: safeMax + 1, to: warningMax, label: `${safeMax + 1}–${warningMax}`, effect: `+${warningDebt} Dívida`, tone: 'warning' },
+        { from: warningMax + 1, to: null, label: `${warningMax + 1}+`, effect: `+${dangerDebt} Dívida`, tone: 'danger' },
+      ],
+    }];
+  }
+
+  if (boss.id === 'banker' && intent.abilityId === 'credit_limit') {
+    const limit = boss.creditLimit || payload;
+    const counted = new Set(limit.countedCardIds || []).size;
+    const allowance = Number(limit.allowance || payload.allowance) || 0;
+    const debtPerCard = Number(limit.debtPerCard || payload.debtPerCard) || 1;
+    const maxCharge = Number(limit.maxCharge || payload.maxCharge) || debtPerCard;
+    const chargedDebt = Number(limit.chargedDebt) || 0;
+    const maxExceededCards = Math.max(1, Math.ceil(maxCharge / debtPerCard));
+    return [{
+      label: 'Franquia compartilhada',
+      value: counted,
+      unit: counted === 1 ? 'carta' : 'cartas',
+      max: Math.max(allowance + maxExceededCards, counted),
+      tone: counted > allowance ? 'danger' : 'safe',
+      currentEffect: counted > allowance ? `+${chargedDebt} / +${maxCharge} DÍVIDA` : 'DENTRO DA FRANQUIA',
+      segments: [
+        { from: 0, to: allowance, label: `0–${allowance}`, effect: 'sem cobrança', tone: 'safe' },
+        { from: allowance + 1, to: null, label: `${allowance + 1}+`, effect: `+${debtPerCard}/carta · teto +${maxCharge}`, tone: 'danger' },
+      ],
+    }];
+  }
+
+  return [];
+}
+
 function compactAction(gameState, intent) {
   const payload = intent.payload || {};
   const target = playerName(gameState, payload.targetPlayerId);
@@ -852,33 +996,23 @@ function compactAction(gameState, intent) {
       const safeDebt = payload.safeDebt ?? (phase3 ? 8 : 6);
       const warningDebt = payload.warningDebt ?? (phase3 ? 12 : 10);
       const dangerDebt = payload.dangerDebt ?? (phase3 ? 16 : 14);
-      const band = total <= safeMax ? 'safe' : total <= warningMax ? 'warning' : 'danger';
+      const currentDebt = total <= safeMax ? safeDebt : total <= warningMax ? warningDebt : dangerDebt;
       return {
-        instruction: `${total} cartas nas mãos da equipe.`,
-        progress: [
-          `${band === 'safe' ? '☑' : '☐'} 0–${safeMax} → +${safeDebt} Dívida`,
-          `${band === 'warning' ? '☑' : '☐'} ${safeMax + 1}–${warningMax} → +${warningDebt} Dívida`,
-          `${band === 'danger' ? '☑' : '☐'} ${warningMax + 1}+ → +${dangerDebt} Dívida`,
-        ].join('\n'),
-        consequence: '',
+        instruction: 'A cobrança acompanha o total de cartas que ainda está nas mãos da equipe.',
+        progress: '',
+        consequence: `Faixa atual: +${currentDebt} Dívida`,
       };
     }
     case 'credit_limit': {
       const limit = gameState.boss?.creditLimit || payload;
       const counted = new Set(limit.countedCardIds || []).size;
       const allowance = limit.allowance || payload.allowance || 0;
-      const exceeded = Math.max(0, counted - allowance);
-      const debtPerCard = limit.debtPerCard || payload.debtPerCard || 1;
       const chargedDebt = Number(limit.chargedDebt) || 0;
       const maxCharge = limit.maxCharge || payload.maxCharge || 0;
       return {
-        instruction: 'Só contam cartas que saíram da mão.',
-        progress: [
-          `${exceeded ? '✕' : '☑'} Uso ${counted}/${allowance}${exceeded ? ` · ${exceeded} excedente${exceeded === 1 ? '' : 's'}` : ' · dentro da franquia'}`,
-          `☐ Excedente → +${debtPerCard} Dívida por carta`,
-          `☐ Cobrança ${chargedDebt}/${maxCharge} · teto +${maxCharge}`,
-        ].join('\n'),
-        consequence: '',
+        instruction: 'Só contam cartas que saíram da mão durante esta rodada.',
+        progress: '',
+        consequence: counted > allowance ? `Cobrança acumulada: +${chargedDebt} / teto +${maxCharge}` : 'Ainda dentro da franquia compartilhada',
       };
     }
     case 'discard_surcharge':
@@ -970,20 +1104,14 @@ function compactAction(gameState, intent) {
       const phase = Number(intent.announcedPhase) || 1;
       const medium = phase === 3 ? 6 : 4;
       const heavy = phase === 3 ? 10 : 8;
-      const rows = (gameState.players || []).map((player) => {
-        const cards = player.hand?.length || 0;
-        const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
-        const marker = amount ? '🩸' : '✓';
-        return `${marker} ${player.name}: ${cards} carta${cards === 1 ? '' : 's'} → ${amount ? `+${amount} Sede` : 'sem tributo'}`;
-      });
       const projected = (gameState.players || []).reduce((sum, player) => {
         const cards = player.hand?.length || 0;
         return sum + (cards >= 11 ? heavy : cards >= 8 ? medium : 0);
       }, 0);
       return {
-        instruction: 'No fim da rodada, Lady cobra CADA jogador separadamente pelas cartas que ainda restarem na própria mão.',
-        progress: rows.join('\n'),
-        consequence: `0–7 = 0 · 8–10 = +${medium} · 11+ = +${heavy} Sede por jogador · cobrança atual: +${projected}`,
+        instruction: 'No fim da rodada, Lady cobra cada jogador separadamente pelas cartas que ainda restarem na própria mão.',
+        progress: '',
+        consequence: `Cobrança projetada agora: +${projected} Sede`,
       };
     }
     case 'red_wine':
@@ -1020,7 +1148,7 @@ function compactAction(gameState, intent) {
       const counted = new Set(threat?.countedCardIds || payload.countedCardIds || []).size;
       const phase = threat?.announcedPhase || payload.announcedPhase || intent.announcedPhase || gameState.boss?.phase || 1;
       const healing = getRestorativeDewHealing(phase, counted);
-      return { instruction: 'Cada carta nova na mesa atravessa uma faixa e reduz a cura preparada.', progress: compactNatureProgress(gameState, intent), consequence: `Cura prevista: ${healing} HP` };
+      return { instruction: 'Cada carta nova colocada legalmente na mesa empurra a cura para uma faixa menor.', progress: '', consequence: `Cura prevista agora: ${healing} HP` };
     }
     case 'twin_vines':
       return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogo(s), cada um separadamente.`, progress: compactNatureProgress(gameState, intent), consequence: 'Cada raiz falha: +1 Flor, sem cura' };
@@ -1037,9 +1165,9 @@ function compactAction(gameState, intent) {
     }
     case 'harvest':
       return {
-        instruction: `${target}: termine o turno com 7 cartas ou menos.`,
-        progress: `${compactNatureProgress(gameState, intent)}\n• 0–7 ao final → sem efeito`,
-        consequence: '• 8–10 ao final → cura 60 HP\n• 11+ ao final → +1 Flor e cura 100 HP',
+        instruction: `${target}: reduza a mão antes do fim do turno.`,
+        progress: '',
+        consequence: 'A faixa final da mão define o resultado da Colheita',
       };
     case 'royal_bloom':
       return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos independentes.`, progress: compactNatureProgress(gameState, intent), consequence: 'Cada falha: +1 Flor, sem cura' };
@@ -1501,6 +1629,27 @@ function dimitrescuStatusPresentation(gameState) {
   if (boss?.id !== 'dimitrescu') return null;
   const clot = boss.crimsonClot;
   const event = flowResultEvent(gameState);
+
+  if (event?.type === 'bossAbility' && event.abilityId === 'blood_tithe') {
+    const bands = Array.isArray(event.bloodTitheBands) ? event.bloodTitheBands : [];
+    const progress = bands.map((entry) => {
+      const cards = Number(entry.cards) || 0;
+      const amount = Number(entry.amount) || 0;
+      const marker = amount > 0 ? '🩸' : '✓';
+      return `${marker} ${playerName(gameState, entry.playerId)} — ${cards} carta${cards === 1 ? '' : 's'} → ${amount > 0 ? `+${amount} Sede` : 'sem tributo'}`;
+    }).join('\n');
+
+    return {
+      category: RESULT_CATEGORY_BY_ABILITY.blood_tithe,
+      name: event.name || 'Tributo de Sangue',
+      speech: '',
+      description: '',
+      details: [...(event.presentation?.details || [])],
+      instruction: event.outcome || 'O Tributo de Sangue foi resolvido.',
+      progress,
+      consequence: `Sede atual: ${Number(boss.danger) || 0}/${Number(boss.maxDanger) || 100}`,
+    };
+  }
 
   if (clot?.status === 'active') {
     const maximum = Math.max(1, Number(clot.max) || 1);
@@ -1979,6 +2128,7 @@ export function buildBossActionPresentation(gameState) {
     instruction: compact.instruction,
     progress: compact.progress,
     consequence: compact.consequence,
+    rangeMeters: buildBossRangeMeters(gameState, intent),
   };
 }
 
@@ -2012,7 +2162,7 @@ export function buildBossFinalPresentation(gameState) {
   return {
     outcome: playersWon ? 'VITÓRIA' : 'DERROTA',
     bossName: definition?.name || 'Chefe da Mesa',
-    portrait: definition?.portrait || '',
+    portrait: definition?.phasePortraits?.[Math.max(1, Number(boss?.phase) || 1)] || definition?.portrait || '',
     reason: result?.detail || (playersWon ? 'O chefe foi derrotado.' : 'A equipe foi derrotada.'),
     speech: definition?.finalSpeeches?.[playersWon ? 'victory' : 'defeat'] || '',
     hp: `${Math.max(0, boss?.hp || 0)} / ${boss?.maxHp || 0}`,

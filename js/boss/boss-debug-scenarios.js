@@ -67,6 +67,7 @@ const SPECIAL_VARIANTS = Object.freeze({
   forced_swap: ['interactive', 'success', 'reload', 'undo', 'bot'],
   forced_choice: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
   emerald_cocoon: ['interactive', 'success', 'failure', 'external_cancel', 'reload'],
+  rebirth: ['interactive', 'reload'],
   restorative_dew: ['interactive', 'success', 'failure', 'reload', 'undo'],
   bela_hunt: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
   cassandra_feast: ['interactive', 'success', 'failure', 'reload', 'undo', 'bot'],
@@ -286,6 +287,14 @@ function configureAbilityState(state, abilityId) {
     ];
   }
   if (abilityId === 'emerald_cocoon') boss.emeraldCocoon = null;
+  if (abilityId === 'rebirth') {
+    boss.phase = 3;
+    boss.bloom = 1;
+    boss.danger = 1;
+    boss.hp = 180;
+    boss.rebirthUsed = false;
+    boss.result = null;
+  }
   if (abilityId === 'forced_choice') boss.chainsByPlayer = { 0: 0, 1: 0 };
   if (abilityId === 'red_wine') {
     boss.hp = Math.max(1, boss.maxHp - 320);

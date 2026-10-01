@@ -473,6 +473,7 @@ let bossResourceSoundScope = null;
 let bossPresentationTimer = null;
 let bossPresentationKey = '';
 let bossDamageReactionTimer = null;
+let dimitrescuPhasePortraitTimer = null;
 const locallyAnimatedBossVaultSoundEventIds = new Set();
 const locallyAnimatingBossVaultStates = new Map();
 const renderedBossMeldContributions = new Map();
@@ -495,6 +496,33 @@ function bossEventAddsResource(boss, event) {
 
 function bossEventHealsMatriarch(boss, event) {
   return boss?.id === 'matriarca_esmeralda' && event?.type === 'bossHeal' && Number(event.amount) > 0;
+}
+
+function bossEventIsMatriarchRebirth(boss, event) {
+  return boss?.id === 'matriarca_esmeralda' && event?.type === 'rebirth';
+}
+
+function bossEventIsDimitrescuPhaseChange(boss, event) {
+  return boss?.id === 'dimitrescu' && event?.type === 'phase' && [2, 3].includes(Number(event.phase));
+}
+
+function triggerDimitrescuPhasePortraitVisual() {
+  const portrait = document.querySelector('#bossHud .boss-portrait');
+  if (!portrait || document.body.dataset.bossId !== 'dimitrescu') return;
+
+  if (dimitrescuPhasePortraitTimer) {
+    clearTimeout(dimitrescuPhasePortraitTimer);
+    dimitrescuPhasePortraitTimer = null;
+  }
+
+  portrait.classList.remove('boss-dimitrescu-phase-shift');
+  void portrait.offsetWidth;
+  portrait.classList.add('boss-dimitrescu-phase-shift');
+
+  dimitrescuPhasePortraitTimer = setTimeout(() => {
+    dimitrescuPhasePortraitTimer = null;
+    portrait.classList.remove('boss-dimitrescu-phase-shift');
+  }, 1200);
 }
 
 function matriarchNatureSoundPairKey(event, suffix) {
@@ -548,6 +576,11 @@ function syncBossResourceSounds(boss) {
   const newEvents = events.filter((event) => event.actionId && !seenBossResourceSoundEventIds.has(event.actionId));
   newEvents.forEach((event) => seenBossResourceSoundEventIds.add(event.actionId));
   newEvents.filter((event) => boss.id === 'banker' && event.vaultSound === 'open').forEach((event) => void animateBossVaultOpen(event, { playSound: audioUnlocked }));
+
+  if (newEvents.some((event) => bossEventIsDimitrescuPhaseChange(boss, event))) {
+    triggerDimitrescuPhasePortraitVisual();
+  }
+
   if (!audioUnlocked) return;
 
   const pairedHealByKey = new Map(
@@ -565,6 +598,10 @@ function syncBossResourceSounds(boss) {
   const sequencedHealIds = new Set([...pairedHealByKey].filter(([key]) => pairedResourceKeys.has(key)).map(([, event]) => event.actionId));
 
   for (const event of newEvents) {
+    if (bossEventIsDimitrescuPhaseChange(boss, event)) {
+      const phaseSound = Number(event.phase) === 2 ? BOSS_SFX.dimitrescu?.phase2 : BOSS_SFX.dimitrescu?.phase3;
+      playSfxClone(phaseSound, { audioContext: audioCtx });
+    }
     if (boss.id === 'banker' && event.vaultSound === 'close') {
       if (!locallyAnimatedBossVaultSoundEventIds.has(event.actionId)) {
         playSfxClone(BOSS_SFX.banker.vaultClose, { audioContext: audioCtx });
@@ -616,6 +653,11 @@ function cancelGameAnimations() {
   if (bossDamageReactionTimer) {
     clearTimeout(bossDamageReactionTimer);
     bossDamageReactionTimer = null;
+  }
+  if (dimitrescuPhasePortraitTimer) {
+    clearTimeout(dimitrescuPhasePortraitTimer);
+    dimitrescuPhasePortraitTimer = null;
+    document.querySelector('#bossHud .boss-portrait')?.classList.remove('boss-dimitrescu-phase-shift');
   }
   bossPresentationKey = '';
   const gameSection = document.getElementById('gameSection');
@@ -5092,10 +5134,106 @@ function renderBossDetailFields(element, details) {
   });
 }
 
+function renderBossRangeMeters(anchor, meters = []) {
+  if (!anchor?.parentElement) return;
+  let panel = document.getElementById('bossRangeMeters');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'bossRangeMeters';
+    panel.className = 'boss-range-meters';
+    anchor.insertAdjacentElement('afterend', panel);
+  }
+
+  panel.replaceChildren();
+  if (!Array.isArray(meters) || !meters.length) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+
+  meters.forEach((meter) => {
+    const value = Math.max(0, Number(meter.value) || 0);
+    const maximum = Math.max(1, Number(meter.max) || value || 1);
+    const percent = Math.max(0, Math.min(100, (value / maximum) * 100));
+    const row = document.createElement('div');
+    row.className = `boss-range-meter tone-${meter.tone || 'neutral'}`;
+
+    const header = document.createElement('div');
+    header.className = 'boss-range-meter-head';
+    const name = document.createElement('strong');
+    name.textContent = meter.label || 'Faixa atual';
+    const current = document.createElement('span');
+    current.textContent = `${value} ${meter.unit || ''}${meter.currentEffect ? ` · ${meter.currentEffect}` : ''}`.trim();
+    header.append(name, current);
+
+    const track = document.createElement('div');
+    track.className = 'boss-range-meter-track';
+    track.setAttribute('role', 'progressbar');
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', String(maximum));
+    track.setAttribute('aria-valuenow', String(value));
+    track.setAttribute(
+      'aria-label',
+      meter.ariaLabel || `${meter.label || 'Faixa'}: ${value} ${meter.unit || ''}${meter.currentEffect ? `, ${meter.currentEffect}` : ''}`,
+    );
+
+    const segments = document.createElement('div');
+    segments.className = 'boss-range-meter-segments';
+    (meter.segments || []).forEach((segment) => {
+      const segmentEl = document.createElement('span');
+      const from = Math.max(0, Number(segment.from) || 0);
+      const finiteTo = segment.to == null ? maximum : Math.max(from, Number(segment.to) || from);
+      const weight = Math.max(1, Math.min(maximum, finiteTo) - Math.min(maximum, from) + 1);
+      segmentEl.className = `boss-range-meter-segment tone-${segment.tone || 'neutral'}`;
+      segmentEl.style.flexGrow = String(weight);
+      segments.appendChild(segmentEl);
+    });
+
+    const fill = document.createElement('i');
+    fill.className = 'boss-range-meter-fill';
+    fill.style.width = `${percent}%`;
+    track.append(segments, fill);
+
+    if (Array.isArray(meter.markers) && meter.markers.length) {
+      meter.markers.forEach((marker, markerIndex) => {
+        const markerValue = Math.max(0, Number(marker.value) || 0);
+        const markerPercent = Math.max(0, Math.min(100, (markerValue / maximum) * 100));
+        const markerEl = document.createElement('b');
+        markerEl.className = `boss-range-meter-marker tone-${marker.tone || 'neutral'} marker-${markerIndex % 2}`;
+        markerEl.style.left = `${markerPercent}%`;
+        markerEl.title = `${marker.label || 'Jogador'}: ${markerValue}`;
+        markerEl.setAttribute('aria-hidden', 'true');
+        track.appendChild(markerEl);
+      });
+    } else {
+      const pointer = document.createElement('b');
+      pointer.className = 'boss-range-meter-pointer';
+      pointer.style.left = `${percent}%`;
+      track.appendChild(pointer);
+    }
+
+    const legend = document.createElement('div');
+    legend.className = 'boss-range-meter-legend';
+    (meter.segments || []).forEach((segment) => {
+      const item = document.createElement('span');
+      item.className = `tone-${segment.tone || 'neutral'}`;
+      const range = document.createElement('b');
+      const effect = document.createElement('small');
+      range.textContent = segment.label || '';
+      effect.textContent = segment.effect || '';
+      item.append(range, effect);
+      legend.appendChild(item);
+    });
+
+    row.append(header, track, legend);
+    panel.appendChild(row);
+  });
+}
+
 const BOSS_GUIDE_CORE = Object.freeze({
   banker: 'A equipe acumula Dívida. Se chegar a 100, o Banqueiro vence imediatamente. Canastras Limpa, Real e Ás-a-Ás também reduzem a Dívida enquanto causam dano.',
   dominadora: 'Cada jogador acumula Chicotes. Com 3 fica Sob Controle; com 4 fica Dominado. Se os dois cooperadores chegarem a 4 ao mesmo tempo, a equipe perde.',
-  matriarca_esmeralda: 'Falhas alimentam o Florescimento. Ao chegar a 5 Flores, a Matriarca vence. Evoluções de canastra podem remover Flores e, na Fase 3, ela pode usar Renascimento.',
+  matriarca_esmeralda: 'Falhas alimentam o Florescimento. Ao chegar a 5 Flores, a Matriarca vence. Evoluções de canastra podem remover Flores e, na Fase 3, se cair a 0 HP com ao menos 1 Flor, ela consome 1 Flor e usa Renascimento para voltar com 300 HP.',
   dimitrescu:
     'Lady Dimitrescu tem 2300 HP e acumula Sede de Sangue. Se chegar a 100, ela vence; mas a própria Lady também gasta Sede para se regenerar. Canastras Limpa, Real e Ás-a-Ás reduzem a Sede em 4, 8 e 12. Bela caça cartas, Cassandra toma jogos e o Morto, e Daniela contamina o lixo.',
   nehelenia: 'Rainha Nehelenia engana a equipe pela própria mesa. Espelhos dos Sonhos roubados aumentam a pressão, mas não causam derrota automática; Canastra Limpa ou superior recupera um Espelho roubado.',
@@ -5608,10 +5746,89 @@ async function animateBossForcedSwap(feedback) {
   }, 4300);
 }
 
-function setBossPortrait(image, definition) {
+
+let matriarchRebirthVisualSequence = 0;
+let matriarchRebirthStartTimer = null;
+let matriarchRebirthEndTimer = null;
+let activeMatriarchRebirthEventId = '';
+let bossDeathVisualSequence = 0;
+let bossDeathResultTimer = null;
+
+function clearBossPortraitTerminalVisuals({ invalidateRebirth = true } = {}) {
+  const portrait = document.querySelector('#bossHud .boss-portrait');
+  if (invalidateRebirth) {
+    matriarchRebirthVisualSequence += 1;
+    activeMatriarchRebirthEventId = '';
+  }
+  bossDeathVisualSequence += 1;
+
+  if (matriarchRebirthStartTimer) {
+    clearTimeout(matriarchRebirthStartTimer);
+    matriarchRebirthStartTimer = null;
+  }
+  if (matriarchRebirthEndTimer) {
+    clearTimeout(matriarchRebirthEndTimer);
+    matriarchRebirthEndTimer = null;
+  }
+  if (bossDeathResultTimer) {
+    clearTimeout(bossDeathResultTimer);
+    bossDeathResultTimer = null;
+  }
+  if (!portrait) return;
+  portrait.classList.remove('boss-rebirth-burst', 'boss-death-fade');
+  portrait.querySelector('.boss-rebirth-ring')?.remove();
+}
+
+function bossHasActiveRebirthVisual(boss) {
+  if (!activeMatriarchRebirthEventId || boss?.id !== 'matriarca_esmeralda' || boss?.rebirthUsed !== true) return false;
+  return (boss.eventLog || []).some((event) => event?.type === 'rebirth' && event.actionId === activeMatriarchRebirthEventId);
+}
+
+function triggerMatriarchRebirthVisual(eventActionId = '') {
+  const portrait = document.querySelector('#bossHud .boss-portrait');
+  if (!portrait || document.body.dataset.bossId !== 'matriarca_esmeralda') return;
+
+  clearBossPortraitTerminalVisuals();
+  const sequence = matriarchRebirthVisualSequence;
+  activeMatriarchRebirthEventId = eventActionId || `local_rebirth_${sequence}`;
+  void portrait.offsetWidth;
+
+  // Primeiro ela realmente "morre": a cor some e o retrato fica cinza.
+  portrait.classList.add('boss-death-fade');
+
+  // Só depois do silêncio visual começa o Renascimento.
+  matriarchRebirthStartTimer = setTimeout(() => {
+    matriarchRebirthStartTimer = null;
+    if (sequence !== matriarchRebirthVisualSequence || !portrait.isConnected) return;
+
+    portrait.classList.remove('boss-death-fade');
+    void portrait.offsetWidth;
+
+    const ring = document.createElement('span');
+    ring.className = 'boss-rebirth-ring';
+    ring.setAttribute('aria-hidden', 'true');
+    portrait.appendChild(ring);
+    portrait.classList.add('boss-rebirth-burst');
+
+    // O áudio entra junto do estouro verde, não durante a "morte".
+    playSfxClone(BOSS_SFX.matriarca_esmeralda.rebirth, { audioContext: audioCtx });
+  }, 1800);
+
+  matriarchRebirthEndTimer = setTimeout(() => {
+    matriarchRebirthEndTimer = null;
+    if (sequence !== matriarchRebirthVisualSequence || !portrait.isConnected) return;
+    portrait.classList.remove('boss-rebirth-burst', 'boss-death-fade');
+    portrait.querySelector('.boss-rebirth-ring')?.remove();
+    activeMatriarchRebirthEventId = '';
+  }, 4400);
+}
+
+function setBossPortrait(image, definition, boss = null) {
   if (!image || !definition) return;
   const frame = image.closest('.boss-portrait');
-  const source = definition.portrait || 'assets/images/boss-banqueiro.png';
+  const fallbackSource = definition.portrait || 'assets/images/boss-banqueiro.png';
+  const phase = Math.max(1, Number(boss?.phase) || 1);
+  const source = definition.phasePortraits?.[phase] || fallbackSource;
   const fallbackLabel =
     String(definition.name || 'Chefe')
       .split(/\s+/)
@@ -5627,6 +5844,11 @@ function setBossPortrait(image, definition) {
   };
   image.onerror = () => {
     image.onerror = null;
+    if (source !== fallbackSource) {
+      image.dataset.portraitSource = fallbackSource;
+      image.src = fallbackSource;
+      return;
+    }
     image.style.display = 'none';
     frame?.classList.add('boss-portrait-fallback');
   };
@@ -6118,6 +6340,7 @@ function renderBossHud() {
   const bossMode = isCurrentBossMode();
   document.body.classList.toggle('boss-mode', bossMode);
   if (!bossMode) {
+    clearBossPortraitTerminalVisuals();
     document.body.removeAttribute('data-boss-id');
     if (hud) hud.style.display = 'none';
     if (resultSection) resultSection.style.display = 'none';
@@ -6126,6 +6349,12 @@ function renderBossHud() {
   }
 
   const boss = normalizeBossState(state);
+  const portraitHasTerminalVisual = !!document.querySelector('#bossHud .boss-portrait.boss-death-fade, #bossHud .boss-portrait.boss-rebirth-burst, #bossHud .boss-rebirth-ring');
+  const hasTerminalVisualTimer = !!(matriarchRebirthStartTimer || matriarchRebirthEndTimer || bossDeathResultTimer || activeMatriarchRebirthEventId);
+  const bossShouldLookAlive = Number(boss.hp) > 0 && !(state?.finished && boss.result?.victory);
+  if (bossShouldLookAlive && !bossHasActiveRebirthVisual(boss) && (portraitHasTerminalVisual || hasTerminalVisualTimer)) {
+    clearBossPortraitTerminalVisuals();
+  }
   const definition = getBossDefinition(boss.id);
   const isDominatrix = boss.id === 'dominadora';
   const isBanker = boss.id === 'banker';
@@ -6168,7 +6397,7 @@ function renderBossHud() {
   hud.classList.toggle('boss-spring-crown-buffed', springCrownBuffed);
   hud.dataset.springCrownStage = springCrownBuffed ? boss.springCrown.status : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
-  setBossPortrait(document.getElementById('bossPortraitImage'), definition);
+  setBossPortrait(document.getElementById('bossPortraitImage'), definition, boss);
   renderBossDaughterStrip(definition, boss);
   renderBossAbilityGuide(definition, boss);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
@@ -6271,55 +6500,12 @@ function renderBossHud() {
   const intentDescription = document.getElementById('bossIntentDescription');
   const intentProgress = document.getElementById('bossIntentProgress');
 
-  if (isDimitrescu && boss.currentIntent?.abilityId === 'blood_tithe' && flow?.stage !== 'result') {
-    const phase = Number(boss.currentIntent.announcedPhase) || 1;
-    const medium = phase === 3 ? 6 : 4;
-    const heavy = phase === 3 ? 10 : 8;
-    const players = (state.players || []).map((player) => {
-      const cards = player.hand?.length || 0;
-      const band = cards <= 7 ? 'safe' : cards <= 10 ? 'warning' : 'danger';
-      const amount = band === 'danger' ? heavy : band === 'warning' ? medium : 0;
-      return { name: player.name || 'Jogador', cards, band, amount };
-    });
-    const projected = players.reduce((sum, player) => sum + player.amount, 0);
-    const escapeRangeText = (value) =>
-      String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-    const badges = (band) =>
-      players
-        .filter((player) => player.band === band)
-        .map((player) => `<span class="boss-range-player ${band}">✓ ${escapeRangeText(player.name)} · ${player.cards}</span>`)
-        .join('');
-
-    intentDescription.className = 'boss-range-panel boss-blood-tithe-panel';
-    intentDescription.innerHTML = `
-      <span class="boss-range-hint">No fim da rodada, cada mão é cobrada separadamente.</span>
-      <span class="boss-range-rules">
-        <span class="boss-range-rule ${players.some((player) => player.band === 'safe') ? 'occupied safe' : ''}">
-          <b>0–7</b><span>Sem efeito</span><em>${badges('safe')}</em>
-        </span>
-        <span class="boss-range-rule ${players.some((player) => player.band === 'warning') ? 'occupied warning' : ''}">
-          <b>8–10</b><span>+${medium} Sede</span><em>${badges('warning')}</em>
-        </span>
-        <span class="boss-range-rule ${players.some((player) => player.band === 'danger') ? 'occupied danger' : ''}">
-          <b>11+</b><span>+${heavy} Sede</span><em>${badges('danger')}</em>
-        </span>
-      </span>
-      <span class="boss-range-total">Cobrança se a rodada acabasse agora: <b>+${projected} Sede</b></span>
-    `;
-    intentProgress.className = '';
-    intentProgress.textContent = '';
-  } else {
-    intentDescription.className = '';
-    intentDescription.textContent = actionPresentation.instruction;
-    intentProgress.className = '';
-    const intentProgressParts = [actionPresentation.progress, actionPresentation.consequence].filter(Boolean);
-    intentProgress.textContent = intentProgressParts.join(actionPresentation.progress?.includes('\n') ? '\n' : ' · ');
-  }
+  intentDescription.className = '';
+  intentDescription.textContent = actionPresentation.instruction;
+  renderBossRangeMeters(intentDescription, actionPresentation.rangeMeters);
+  intentProgress.className = '';
+  const intentProgressParts = [actionPresentation.progress, actionPresentation.consequence].filter(Boolean);
+  intentProgress.textContent = intentProgressParts.join(actionPresentation.progress?.includes('\n') ? '\n' : ' · ');
 
   renderBossDetailFields(document.getElementById('bossActionDetails'), actionPresentation.details);
 
@@ -6720,8 +6906,11 @@ function renderBossHud() {
     const dimitrescuIntent = boss.id === 'dimitrescu' ? boss.currentIntent : null;
     const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
     const danielaActive = (dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered) || danielaObjective?.status === 'active';
+    const castleLockdownActive = boss.id === 'dimitrescu' && dimitrescuIntent?.abilityId === 'castle_lockdown' && !state.finished;
     discardButton.classList.toggle('boss-daniela-discard', !!danielaActive);
-    if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
+    discardButton.classList.toggle('boss-castle-lockdown-discard', castleLockdownActive);
+    if (castleLockdownActive) discardButton.setAttribute('aria-label', 'Lixo bloqueado por Portas do Castelo');
+    else if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
     else if (danielaActive) discardButton.setAttribute('aria-label', 'Lixo cercado pelo Enxame de Daniela');
     else discardButton.removeAttribute('aria-label');
     discardButton.classList.toggle('boss-surcharge-discard', boss.id === 'banker' && boss.discardSurcharge?.status === 'active');
@@ -6802,6 +6991,9 @@ function renderBossHud() {
           portrait.classList.add(pulseClass);
           setTimeout(() => portrait.classList.remove(pulseClass), isCocoonBreak || isBloodClotBreak || isMirrorBreak ? 820 : 620);
         }
+      }
+      if (isRebirth && boss.id === 'matriarca_esmeralda') {
+        triggerMatriarchRebirthVisual(feedback.actionId);
       }
       if (
         !isChain &&
@@ -6906,6 +7098,32 @@ function renderBossHud() {
     });
   }
   scheduleBossTurnAdvance();
+}
+
+function presentBossResultAfterDeathFade() {
+  const boss = state?.boss;
+  if (!boss?.result?.victory) {
+    renderBossResult();
+    return;
+  }
+
+  const portrait = document.querySelector('#bossHud .boss-portrait');
+  if (!portrait) {
+    renderBossResult();
+    return;
+  }
+
+  clearBossPortraitTerminalVisuals();
+  bossDeathVisualSequence += 1;
+  const sequence = bossDeathVisualSequence;
+  void portrait.offsetWidth;
+  portrait.classList.add('boss-death-fade');
+
+  bossDeathResultTimer = setTimeout(() => {
+    bossDeathResultTimer = null;
+    if (sequence !== bossDeathVisualSequence || !state?.finished || !state?.boss?.result?.victory) return;
+    renderBossResult();
+  }, 1850);
 }
 
 function renderBossResult() {
@@ -7388,7 +7606,7 @@ function renderAll() {
   if (state.finished) {
     if (!resultPresented && !state.surrender?.active) {
       resultPresented = true;
-      if (isCurrentBossMode()) renderBossResult();
+      if (isCurrentBossMode()) presentBossResultAfterDeathFade();
       else renderScores(computeScores(), state.winnerTeamId);
     }
   } else {
@@ -11529,6 +11747,26 @@ if (isDebugMode) {
     validateBossLabSelection();
   }
 
+  function currentBossLabBossId() {
+    const activeBossId = state?.boss?.id;
+    if (activeBossId && bossDebugLabCatalog.some((entry) => entry.id === activeBossId)) return activeBossId;
+
+    const modeBossId = getBossDefinitionForMode(state?.mode)?.id;
+    if (modeBossId && bossDebugLabCatalog.some((entry) => entry.id === modeBossId)) return modeBossId;
+
+    return null;
+  }
+
+  function syncBossLabToCurrentBoss() {
+    const bossSelect = bossLabElement('debugBossLabBoss');
+    const currentBossId = currentBossLabBossId();
+    if (!bossSelect || !currentBossId || bossSelect.value === currentBossId) return false;
+
+    bossSelect.value = currentBossId;
+    syncBossLabBossControls();
+    return true;
+  }
+
   function syncBossLabBossControls() {
     const boss = bossDebugLabCatalog.find((entry) => entry.id === bossLabElement('debugBossLabBoss')?.value) || bossDebugLabCatalog[0];
     if (!boss) return;
@@ -11806,6 +12044,7 @@ if (isDebugMode) {
     setBossLabOptions(
       bossLabElement('debugBossLabBoss'),
       bossDebugLabCatalog.map((boss) => ({ id: boss.id, label: boss.name })),
+      currentBossLabBossId(),
     );
     syncBossLabBossControls();
     bossLabElement('debugBossLabBoss')?.addEventListener('change', syncBossLabBossControls);
@@ -11822,8 +12061,12 @@ if (isDebugMode) {
     bossLabElement('debugBossLabReset')?.addEventListener('click', resetBossLabScenario);
     bossLabElement('debugBossLabSweep')?.addEventListener('click', sweepBossLab);
     bossLabElement('debugBossLab')?.addEventListener('toggle', () => {
-      if (bossLabElement('debugBossLab')?.open) startBossLabReportTimer();
-      else stopBossLabReportTimer();
+      if (bossLabElement('debugBossLab')?.open) {
+        syncBossLabToCurrentBoss();
+        startBossLabReportTimer();
+      } else {
+        stopBossLabReportTimer();
+      }
     });
   }
 

@@ -1,10 +1,12 @@
 # Inventário atual de habilidades dos chefes
 
-**Atualizado em 29/09/2026 a partir da rotação ativa em `js/boss/bosses/*.js` e do motor `js/boss/boss-engine.js`.**
+**Atualizado em 01/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do catálogo do Laboratório de Chefes.**
 
 Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
 
 ## O Banqueiro
+
+**HP:** 2650.
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
@@ -20,6 +22,8 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 **Condição especial de derrota:** a equipe perde imediatamente se a Dívida coletiva chegar a 100.
 
 ## A Dominadora
+
+**HP:** 2600.
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
@@ -43,22 +47,24 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 
 ## A Matriarca Esmeralda
 
+**HP:** 2000. **Limite total de cura por rodada:** F1 100 / F2 150 / F3 200.
+
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
 | Semente Viva | 1, 2 e 3 | 5 | Marca uma carta que precisa ser usada legalmente no próximo turno para impedir o florescimento da ameaça. |
 | Raiz Faminta | 1, 2 e 3 | 5 | Marca um jogo que precisa receber uma carta legal antes do prazo. Se falhar, pode gerar uma única nova Raiz na rodada seguinte; a Raiz propagada não se propaga novamente. |
-| Orvalho Restaurador | 1, 2 e 3 | 3 | Prepara cura por faixas. Cartas novas baixadas legalmente reduzem a cura e progresso suficiente a zera. |
+| Orvalho Restaurador | 1, 2 e 3 | 3 | Cura por faixas: F1 = 100/65/30/0; F2 = 120/80/40/0; F3 = 150/100/50/0 para 0–1 / 2–3 / 4–5 / 6+ cartas novas. |
 | Trepadeiras Gêmeas | 2 e 3 | 4 | Marca mais de um jogo; cada objetivo precisa receber uma carta legal na rodada. |
 | Enxerto | 2 e 3 | 3 | Liga dois jogos e exige que ambos recebam uma carta legal na rodada. |
-| Pólen do Lixo | 2 e 3 | 3 | Contamina o topo do lixo. Se ele for retirado, a Matriarca recebe +1 Flor e cura até 40 HP. |
-| Colheita | 2 e 3 | 2 | Avalia a mão do alvo no fim do turno: 0–7 sem efeito; 8–10 cura 60 HP; 11+ gera +1 Flor e cura 100 HP. |
+| Pólen do Lixo | 2 e 3 | 3 | Contamina o topo do lixo. Se ele for retirado, a Matriarca recebe +1 Flor e cura até 30 HP. |
+| Colheita | 2 e 3 | 2 | Avalia a mão do alvo no fim do turno: 0–7 sem efeito; 8–10 cura 50 HP; 11+ gera +1 Flor e cura 80 HP. |
 | Florescimento Real | 3 | 4 | Combina objetivos naturais independentes; cada um precisa ser cumprido separadamente. |
 | Casulo Esmeralda | 3 | 3 | Cria um escudo de 180 pontos que absorve dano até ser rompido. |
 | Coroa da Primavera | 3 | 3 | Marca uma ameaça natural; se ela falhar, prepara uma Raiz Fortalecida que exige cooperação. |
 
 **Condição especial de derrota:** a equipe perde quando o Florescimento chega a 5 Flores.
 
-**Renascimento:** na Fase 3, se a Matriarca cair a 0 HP com pelo menos 3 Flores e ainda não tiver usado o efeito, ela consome 3 Flores e retorna uma vez.
+**Renascimento (passiva):** na Fase 3, se a Matriarca cair a 0 HP com pelo menos **1 Flor** e ainda não tiver usado o efeito, ela consome **1 Flor** e retorna com **300 HP** uma vez. Não entra no sorteio normal; aparece no DevTools com peso 0 para teste manual.
 ## Lady Dimitrescu
 
 **HP:** 2300. **Sede de Sangue:** 0–100. A Sede é tanto condição de derrota quanto recurso vampírico: algumas habilidades a acumulam e outras a consomem para sustentar Lady.
@@ -75,6 +81,8 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 | Coágulo Carmesim | 2 e 3 | 3 | Cria 180/260 de proteção. Romper reduz 6 de Sede; se sobreviver à rodada, metade da proteção restante vira cura. |
 | Portas do Castelo | 3 | 3 | Bloqueia o lixo durante toda a rodada. |
 | As Três Filhas | 3 | 5 | Cria objetivos independentes de Bela, Cassandra e Daniela; cada sucesso reduz 2 de Sede e cada falha adiciona 8. O HUD mostra os três objetivos separadamente. |
+
+**Transformação por fase:** o retrato principal acompanha a forma da Dimitrescu: Fase 1 usa `boss-dimitrescu.png`, Fase 2 usa `boss-dimitrescu-fase2.png` (semi-transformação) e Fase 3 usa `boss-dimitrescu-fase3.png` (forma dragão). Ao entrar nas Fases 2 e 3, a troca toca `transformacao-dimitrescu-fase2.mp3` ou `transformacao-dimitrescu-fase3.mp3`, respectivamente, e a fala de fase aparece no HUD.
 
 **Condição especial de derrota:** a equipe perde imediatamente quando a Sede chega a 100.
 
@@ -95,7 +103,16 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 | Espelho do Lixo | 2 e 3 | 4 | O topo do lixo aparece em **dois reflexos idênticos**. Não há pista de verdadeiro/falso: a escolha é 50/50. Errar sela o lixo durante a rodada. |
 | Prisão no Espelho | 2 e 3 | 3 | Com pelo menos 1 Espelho tomado, o parceiro pode alimentar o jogo refletido para recuperar 1 Espelho. |
 | Pesadelo Eterno | 3 | 5 | Uma carta ORIGINAL é mostrada, gera dois reflexos idênticos e os três são embaralhados visualmente. O alvo precisa acompanhar a original; errar adiciona +1 Espelho. |
+| Laço do Tigre | 1, 2 e 3 | 4 | Liga dois jogos; cada lado precisa ser alimentado. O lado ignorado mantém garras até ser rompido. |
+| Presa Marcada | 1, 2 e 3 | 3 | Marca um jogo; até resolvê-lo, o alvo não pode alimentar outro jogo existente. |
+| Olho do Falcão | 1, 2 e 3 | 3 | Exige descarte do naipe marcado; errar pode vigiar o topo e bloquear o lixo. |
+| Vigilância | 2 e 3 | 3 | O alvo não pode alimentar o jogo marcado naquele turno. |
+| Mão no Espelho | 1, 2 e 3 | 3 | Marca uma carta que precisa sair da mão; falhar cria Reflexo Morto, descartável mas não jogável. |
+| Reflexo Invertido | 2 e 3 | 3 | Impede abrir jogo novo até alimentar jogo existente; persiste até ser resolvido. |
 
 **Fases:** 1 = Espelhos dos Sonhos; 2 = Circo da Lua Morta; 3 = Pesadelo Eterno.
 
 **Apresentação:** o feedback textual continua no painel amarelo padrão (`☐ / ☑ / ✕`). As ilusões acontecem fisicamente na mesa: clonagem de jogos, espelhos centrais e embaralhamento visual. Nenhum reflexo falso recebe `X`, rótulo ou pista automática.
+
+
+**Auditoria de consistência:** todas as habilidades da rotação atual aparecem no jogo e no DevTools. `Renascimento` é passiva fora do sorteio normal, mas aparece no DevTools. `Interdito` é o único item mantido apenas como legado técnico documentado e permanece fora do jogo e do DevTools.

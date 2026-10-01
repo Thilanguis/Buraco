@@ -560,7 +560,7 @@ function eligibleExposureCards(gameState, player) {
 }
 
 const MATRIARCH_THREAT_LIMIT = Object.freeze({ 1: 1, 2: 2, 3: 3 });
-const MATRIARCH_HEAL_LIMIT = Object.freeze({ 1: 150, 2: 220, 3: 300 });
+const MATRIARCH_HEAL_LIMIT = Object.freeze({ 1: 100, 2: 150, 3: 200 });
 const MATRIARCH_THREAT_NAMES = Object.freeze({
   seed: 'Semente Viva',
   royal_seed: 'Semente Real',
@@ -1369,6 +1369,7 @@ function createPayload(gameState, abilityId) {
       return { objectives, targetCount: objectives.length };
     }
     if (abilityId === 'emerald_cocoon') return { amount: 180 };
+    if (abilityId === 'rebirth') return { reviveHp: 300, bloomCost: 1 };
     if (abilityId === 'spring_crown') {
       const threats = activeNatureThreats(boss);
       const markedThreat = chooseSeeded(threats, gameState, 419);
@@ -1508,6 +1509,7 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'graft') return payload.targets?.length === 2 && natureThreatSlots(gameState) > 0;
   if (abilityId === 'royal_bloom') return payload.objectives?.length > 0 && natureThreatSlots(gameState) > 0;
   if (abilityId === 'emerald_cocoon') return !gameState.boss?.emeraldCocoon;
+  if (abilityId === 'rebirth') return gameState.boss?.phase === 3 && !gameState.boss?.rebirthUsed;
   if (abilityId === 'spring_crown') {
     return activeNatureThreats(gameState.boss).some((threat) => threat.id === payload.markedThreatId);
   }
@@ -1922,7 +1924,7 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
 
     for (const threat of [...activeNatureThreats(boss)]) {
       if (['seed', 'royal_seed', 'root', 'twin_root', 'royal_root', 'graft'].includes(threat.type)) threat.healAmount = 0;
-      if (threat.type === 'pollen') threat.healAmount = 40;
+      if (threat.type === 'pollen') threat.healAmount = 30;
       if (threat.type === 'royal_pollen') threat.healAmount = 0;
       if (threat.type === 'dew') {
         threat.healAmount = Number(threat.healAmount) || ({ 1: 150, 2: 180, 3: 220 }[boss.phase] || 150);
@@ -2034,7 +2036,7 @@ export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId
   const boss = normalizeBossState(gameState);
   if (!boss || boss.defeated || boss.result || boss.pendingChoices.length) return null;
   const definition = getBossDefinition(boss.id);
-  const normalEntries = definition.abilities.filter((entry) => entry.phases.includes(boss.phase));
+  const normalEntries = definition.abilities.filter((entry) => !entry.debugOnly && entry.phases.includes(boss.phase));
   let candidates = [];
   let selectionSource = 'normal';
   const queuedDebugAbilityId = debug ? (forcedAbilityId || boss.debugForcedAbilityId || null) : null;
@@ -2348,9 +2350,9 @@ export function healMatriarch(gameState, requested, origin = 'Cura natural', eve
 
 function triggerMatriarchRebirth(gameState, sourceActionId) {
   const boss = gameState.boss;
-  if (boss.id !== 'matriarca_esmeralda' || boss.hp > 0 || boss.phase !== 3 || boss.bloom < 3 || boss.rebirthUsed || boss.result) return false;
+  if (boss.id !== 'matriarca_esmeralda' || boss.hp > 0 || boss.phase !== 3 || boss.bloom < 1 || boss.rebirthUsed || boss.result) return false;
   boss.rebirthUsed = true;
-  boss.bloom -= 3;
+  boss.bloom -= 1;
   boss.danger = boss.bloom;
   boss.hp = 300;
   boss.actionSequence += 1;
@@ -2359,7 +2361,7 @@ function triggerMatriarchRebirth(gameState, sourceActionId) {
     actionId: `rebirth_${sourceActionId || boss.actionSequence}`,
     hp: boss.hp,
     bloom: boss.bloom,
-    outcome: 'RENASCIMENTO - 300 HP. Tres Florescimentos foram consumidos.',
+    outcome: 'RENASCIMENTO - 300 HP. Uma Flor foi consumida.',
   });
   boss.lastBloomEventId = event.actionId;
   return true;
@@ -2689,7 +2691,7 @@ function resolveMatriarchPlayerDeadline(gameState, playerId) {
   ))) {
     if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type)) {
       const remainsInHand = !!player?.hand?.some((card) => card?.id === threat.cardId);
-      const pollenHeal = threat.type === 'pollen' ? 40 : 0;
+      const pollenHeal = threat.type === 'pollen' ? 30 : 0;
       events.push(remainsInHand
         ? failNatureThreat(gameState, threat, { bloom: 1, heal: pollenHeal, outcome: `${player?.name || 'O alvo'} terminou o turno com a carta marcada.` })
         : succeedNatureThreat(gameState, threat, `${player?.name || 'O alvo'} usou a carta marcada.`));
@@ -2697,8 +2699,8 @@ function resolveMatriarchPlayerDeadline(gameState, playerId) {
       const cards = player?.hand?.length || 0;
       threat.observedHandSize = cards;
       if (cards <= 7) events.push(succeedNatureThreat(gameState, threat, `Colheita: ${cards} cartas, sem cura.`));
-      else if (cards <= 10) events.push(failNatureThreat(gameState, threat, { bloom: 0, heal: 60, outcome: `Colheita: ${cards} cartas, cura de 60 HP.` }));
-      else events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 100, outcome: `Colheita: ${cards} cartas, +1 Flor e cura de 100 HP.` }));
+      else if (cards <= 10) events.push(failNatureThreat(gameState, threat, { bloom: 0, heal: 50, outcome: `Colheita: ${cards} cartas, cura de 50 HP.` }));
+      else events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 80, outcome: `Colheita: ${cards} cartas, +1 Flor e cura de 80 HP.` }));
     }
   }
   return events.filter(Boolean);
@@ -2743,7 +2745,7 @@ function resolveMatriarchRound(gameState) {
       if (holder || reachedTable) {
         events.push(failNatureThreat(gameState, threat, {
           bloom: threat.bloomAmount || 1,
-          heal: threat.type === 'pollen' ? 40 : 0,
+          heal: threat.type === 'pollen' ? 30 : 0,
           outcome: `${holder?.name || 'Um cooperador'} recolheu a carta contaminada do lixo.`,
         }));
       } else {
@@ -2858,7 +2860,7 @@ export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
     threat.triggeredCardId = threat.discardCardId;
     const event = failNatureThreat(gameState, threat, {
       bloom: threat.bloomAmount || 1,
-      heal: threat.type === 'pollen' ? 40 : 0,
+      heal: threat.type === 'pollen' ? 30 : 0,
       outcome: `${player?.name || 'O jogador'} pegou ${card ? `${card.rank}${card.suit}` : 'a carta'} contaminada do lixo.`,
     });
     if (event) resolved.push(event);
@@ -5364,7 +5366,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       outcome = threat ? 'O Enxerto ligou dois jogos; ambos precisam receber uma carta.' : 'O Enxerto nao encontrou dois jogos validos.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'discard_pollen') {
-      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'pollen', discardCardId: intent.payload.discardCardId, healAmount: 40, bloomAmount: 1, targetPlayerId: null });
+      const threat = addNatureThreat(gameState, { ...baseThreat, type: 'pollen', discardCardId: intent.payload.discardCardId, healAmount: 30, bloomAmount: 1, targetPlayerId: null });
       outcome = threat ? 'O topo do lixo foi contaminado pelo Polen.' : 'O Polen nao encontrou uma carta valida no lixo.';
       resultData = { threatIds: threat ? [threat.id] : [] };
     } else if (intent.abilityId === 'harvest') {
@@ -5393,6 +5395,13 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       boss.emeraldCocoon = { id: `cocoon_${intent.id}`, remaining: intent.payload.amount || 180, createdRound: boss.roundNumber, status: 'active' };
       outcome = 'O Casulo Esmeralda absorvera ate 180 de dano nesta rodada.';
       resultData = { cocoonId: boss.emeraldCocoon.id, remaining: boss.emeraldCocoon.remaining };
+    } else if (intent.abilityId === 'rebirth') {
+      boss.bloom = Math.max(1, Number(boss.bloom) || 0);
+      boss.danger = boss.bloom;
+      boss.rebirthUsed = false;
+      boss.hp = Math.min(Math.max(1, Number(boss.hp) || boss.maxHp), 180);
+      outcome = 'Renascimento preparado: a Matriarca esta com 1 Flor. Cause dano fatal para testar o retorno com 300 HP.';
+      resultData = { bloom: boss.bloom, hp: boss.hp, reviveHp: 300 };
     } else if (intent.abilityId === 'spring_crown') {
       const markedThreat = activeNatureThreats(boss).find((threat) => threat.id === intent.payload.markedThreatId);
       if (markedThreat) {

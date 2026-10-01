@@ -3365,9 +3365,7 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::afte
     linear-gradient(180deg, rgba(255, 72, 91, 0.98) 0%, #e71332 48%, rgba(142, 0, 22, 0.34) 88%, transparent 100%) 46% 0 / 1px 14px no-repeat,
     linear-gradient(180deg, rgba(247, 42, 67, 0.94) 0%, #cf0b29 50%, rgba(126, 0, 20, 0.3) 88%, transparent 100%) 68% 0 / 2px 10px no-repeat,
     linear-gradient(180deg, rgba(255, 61, 82, 0.92) 0%, #da102e 48%, rgba(133, 0, 21, 0.28) 88%, transparent 100%) 91% 0 / 1px 16px no-repeat;
-  filter:
-    drop-shadow(0 2px 1px rgba(0, 0, 0, 0.42))
-    drop-shadow(0 0 1px rgba(255, 38, 65, 0.2));
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.42)) drop-shadow(0 0 1px rgba(255, 38, 65, 0.2));
   transform-origin: 50% 0;
   animation: dimitrescuBloodDripField 4.2s ease-in-out infinite;
 }
@@ -3410,9 +3408,7 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track::after {
   background-repeat: no-repeat;
   background-position: center;
   background-size: 100% 100%;
-  filter:
-    drop-shadow(0 3px 3px rgba(0, 0, 0, 0.72))
-    drop-shadow(0 0 6px rgba(142, 20, 31, 0.38));
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.72)) drop-shadow(0 0 6px rgba(142, 20, 31, 0.38));
 }
 body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after {
   z-index: 2;
@@ -3614,7 +3610,12 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
 }
 
 .boss-mode .carta.boss-card-dimitrescu-hunt,
-.boss-mode .carta.boss-card-dimitrescu-blood-mark,
+.boss-mode .carta.boss-card-dimitrescu-blood-mark {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
 .boss-mode .carta.boss-card-cassandra-feast,
 .boss-mode .discard-face.boss-discard-dimitrescu-card,
 .boss-mode .morto-container .boss-dead-blood-layer {
@@ -3665,8 +3666,6 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   mix-blend-mode: multiply;
   filter: saturate(1.18) contrast(1.08);
 }
-.boss-mode .carta.boss-card-dimitrescu-hunt::after,
-.boss-mode .carta.boss-card-dimitrescu-blood-mark::after,
 .boss-mode .carta.boss-card-cassandra-feast::after,
 .boss-mode .discard-face.boss-discard-dimitrescu-card::after,
 .boss-mode .morto-container .boss-dead-blood-layer::after {
@@ -3980,8 +3979,6 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
 @media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse) {
   body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span,
   body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after,
-  .boss-mode .carta.boss-card-dimitrescu-hunt::after,
-  .boss-mode .carta.boss-card-dimitrescu-blood-mark::after,
   .boss-mode .discard-face.boss-discard-dimitrescu-card::after,
   body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-impact,
   body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
@@ -5740,20 +5737,22 @@ body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-seal-preview::befo
   width: 76px;
   height: 104px;
   transform: translate(-50%, -50%);
-  border: 3px double rgba(221, 214, 254, 0.9);
-  border-radius: 50% 50% 43% 43% / 40% 40% 60% 60%;
-  background:
-    linear-gradient(115deg, transparent 0 35%, rgba(255, 255, 255, 0.18) 36% 41%, transparent 43%), radial-gradient(circle at 38% 24%, rgba(224, 231, 255, 0.14), transparent 38%), linear-gradient(155deg, rgba(88, 28, 135, 0.16), rgba(7, 4, 18, 0.34));
-  box-shadow:
-    inset 0 0 0 3px rgba(9, 5, 20, 0.58),
-    inset 0 0 20px rgba(167, 139, 250, 0.18),
-    0 0 21px rgba(124, 58, 237, 0.42);
+
+  border: 0;
+  border-radius: 0;
+
+  background: url('../assets/images/nehelenia-discard-mirror-frame.png') center / contain no-repeat;
+
+  box-shadow: none;
+  filter: none;
+  opacity: 1;
+
   pointer-events: none;
 }
 
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed.boss-locked {
-  opacity: 0.76;
-  filter: saturate(0.74) brightness(0.82);
+  opacity: 1 !important;
+  filter: none !important;
 }
 
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed.boss-locked::after {
@@ -6007,7 +6006,6 @@ body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed.bos
   box-shadow: none !important;
 }
 
-
 /* ============================================================
    NEHELENIA V6.13 — PESADELO ALEATÓRIO + ESPELHOS DO HUD EM PNG
    ============================================================ */
@@ -6092,10 +6090,9 @@ body[data-boss-id='nehelenia'] .boss-dream-mirror-glass {
   inset: 10px 8px 11px !important;
   border-radius: 45% 45% 38% 38% / 34% 34% 56% 56% !important;
   background:
-    linear-gradient(118deg, transparent 0 31%, rgba(255,255,255,.22) 33% 39%, transparent 42%),
-    radial-gradient(circle at 38% 28%, rgba(224,231,255,.2), transparent 38%),
-    linear-gradient(160deg, rgba(96,165,250,.28), rgba(109,40,217,.22) 48%, rgba(8,15,40,.7)) !important;
-  box-shadow: inset 0 0 8px rgba(224,231,255,.2) !important;
+    linear-gradient(118deg, transparent 0 31%, rgba(255, 255, 255, 0.22) 33% 39%, transparent 42%), radial-gradient(circle at 38% 28%, rgba(224, 231, 255, 0.2), transparent 38%),
+    linear-gradient(160deg, rgba(96, 165, 250, 0.28), rgba(109, 40, 217, 0.22) 48%, rgba(8, 15, 40, 0.7)) !important;
+  box-shadow: inset 0 0 8px rgba(224, 231, 255, 0.2) !important;
   opacity: 0.9;
   mix-blend-mode: screen;
   pointer-events: none;
@@ -6122,7 +6119,7 @@ body[data-boss-id='nehelenia'] .boss-dream-mirror-orb > b {
   transform: translateY(1px);
   color: rgba(237, 233, 254, 0.72) !important;
   font-size: 7px !important;
-  text-shadow: 0 1px 3px rgba(0,0,0,.95) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95) !important;
 }
 body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken {
   border: 0 !important;
@@ -6132,23 +6129,20 @@ body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken {
 }
 body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken::before {
   opacity: 0.72;
-  filter: saturate(0.72) brightness(0.58) hue-rotate(300deg) drop-shadow(0 0 5px rgba(244,63,94,.38));
+  filter: saturate(0.72) brightness(0.58) hue-rotate(300deg) drop-shadow(0 0 5px rgba(244, 63, 94, 0.38));
 }
 body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken .boss-dream-mirror-glass {
   background:
-    linear-gradient(118deg, transparent 0 31%, rgba(255,255,255,.12) 33% 39%, transparent 42%),
-    radial-gradient(circle at 48% 44%, rgba(244,63,94,.24), transparent 36%),
-    linear-gradient(160deg, rgba(88,28,135,.32), rgba(76,5,25,.5) 52%, rgba(7,4,18,.86)) !important;
+    linear-gradient(118deg, transparent 0 31%, rgba(255, 255, 255, 0.12) 33% 39%, transparent 42%), radial-gradient(circle at 48% 44%, rgba(244, 63, 94, 0.24), transparent 36%),
+    linear-gradient(160deg, rgba(88, 28, 135, 0.32), rgba(76, 5, 25, 0.5) 52%, rgba(7, 4, 18, 0.86)) !important;
   opacity: 0.68;
 }
 body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken::after {
   opacity: 0.95;
   background:
-    radial-gradient(circle at 50% 47%, rgba(255,255,255,.95) 0 1px, transparent 1.8px),
-    linear-gradient(24deg, transparent 0 47%, rgba(253,164,175,.92) 48% 50%, transparent 51% 100%),
-    linear-gradient(112deg, transparent 0 48%, rgba(221,214,254,.82) 49% 50%, transparent 51% 100%),
-    linear-gradient(154deg, transparent 0 48%, rgba(244,114,182,.78) 49% 50%, transparent 51% 100%) !important;
-  filter: drop-shadow(0 0 2px rgba(244,114,182,.7));
+    radial-gradient(circle at 50% 47%, rgba(255, 255, 255, 0.95) 0 1px, transparent 1.8px), linear-gradient(24deg, transparent 0 47%, rgba(253, 164, 175, 0.92) 48% 50%, transparent 51% 100%),
+    linear-gradient(112deg, transparent 0 48%, rgba(221, 214, 254, 0.82) 49% 50%, transparent 51% 100%), linear-gradient(154deg, transparent 0 48%, rgba(244, 114, 182, 0.78) 49% 50%, transparent 51% 100%) !important;
+  filter: drop-shadow(0 0 2px rgba(244, 114, 182, 0.7));
 }
 
 /* ============================================================
@@ -6177,7 +6171,6 @@ body[data-boss-id='nehelenia'] .boss-dream-mirror-orb > b {
   transform: translateY(1px) !important;
 }
 
-
 /* Capangas da Rainha Nehelenia: usam exatamente a mesma faixa estrutural das filhas. */
 body[data-boss-id='nehelenia'] .boss-daughter-strip {
   margin-top: -5px;
@@ -6185,17 +6178,21 @@ body[data-boss-id='nehelenia'] .boss-daughter-strip {
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card {
   position: relative;
   border-color: rgba(167, 139, 250, 0.58);
-  background:
-    radial-gradient(circle at 50% 12%, rgba(96, 165, 250, 0.12), transparent 38%),
-    linear-gradient(180deg, rgba(19, 10, 43, 0.97), rgba(6, 5, 19, 0.99));
+  background: radial-gradient(circle at 50% 12%, rgba(96, 165, 250, 0.12), transparent 38%), linear-gradient(180deg, rgba(19, 10, 43, 0.97), rgba(6, 5, 19, 0.99));
   box-shadow:
     0 8px 20px rgba(0, 0, 0, 0.5),
     inset 0 1px rgba(255, 255, 255, 0.055),
     0 0 18px rgba(124, 58, 237, 0.16);
 }
-body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'] { grid-column: 1; }
-body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'] { grid-column: 2; }
-body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'] { grid-column: 3; }
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'] {
+  grid-column: 1;
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'] {
+  grid-column: 2;
+}
+body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'] {
+  grid-column: 3;
+}
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card img {
   object-position: 50% 24%;
   background: #080615;
@@ -6231,9 +6228,7 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card.is-missing-art::be
   display: grid;
   place-items: center;
   color: rgba(221, 214, 254, 0.72);
-  background:
-    radial-gradient(circle at 50% 42%, rgba(96, 165, 250, 0.16), transparent 32%),
-    linear-gradient(145deg, rgba(49, 30, 87, 0.9), rgba(6, 5, 19, 0.98));
+  background: radial-gradient(circle at 50% 42%, rgba(96, 165, 250, 0.16), transparent 32%), linear-gradient(145deg, rgba(49, 30, 87, 0.9), rgba(6, 5, 19, 0.98));
   font-size: 9px;
   font-weight: 1000;
   letter-spacing: 1px;
@@ -6309,7 +6304,10 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card.is-missing-art::be
 /* O próprio retrato já ensina a cor de cada capanga. */
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'] {
   border-color: rgba(248, 113, 113, 0.58);
-  box-shadow: 0 8px 20px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.05), 0 0 16px rgba(239,68,68,.16);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px rgba(255, 255, 255, 0.05),
+    0 0 16px rgba(239, 68, 68, 0.16);
 }
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'] b {
   color: #fecaca;
@@ -6318,12 +6316,18 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='ti
 }
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='tiger'].is-active {
   border-color: rgba(248, 113, 113, 0.96);
-  box-shadow: 0 8px 20px rgba(0,0,0,.52), inset 0 0 0 1px rgba(254,202,202,.12), 0 0 28px rgba(239,68,68,.34);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 1px rgba(254, 202, 202, 0.12),
+    0 0 28px rgba(239, 68, 68, 0.34);
 }
 
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'] {
   border-color: rgba(250, 204, 21, 0.58);
-  box-shadow: 0 8px 20px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.05), 0 0 16px rgba(250,204,21,.15);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px rgba(255, 255, 255, 0.05),
+    0 0 16px rgba(250, 204, 21, 0.15);
 }
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'] b {
   color: #fef08a;
@@ -6332,12 +6336,18 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='ha
 }
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='hawk'].is-active {
   border-color: rgba(253, 224, 71, 0.98);
-  box-shadow: 0 8px 20px rgba(0,0,0,.52), inset 0 0 0 1px rgba(254,240,138,.13), 0 0 28px rgba(250,204,21,.32);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 1px rgba(254, 240, 138, 0.13),
+    0 0 28px rgba(250, 204, 21, 0.32);
 }
 
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'] {
   border-color: rgba(56, 189, 248, 0.58);
-  box-shadow: 0 8px 20px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.05), 0 0 16px rgba(56,189,248,.16);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px rgba(255, 255, 255, 0.05),
+    0 0 16px rgba(56, 189, 248, 0.16);
 }
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'] b {
   color: #bae6fd;
@@ -6346,7 +6356,10 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
 }
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fish'].is-active {
   border-color: rgba(125, 211, 252, 0.98);
-  box-shadow: 0 8px 20px rgba(0,0,0,.52), inset 0 0 0 1px rgba(186,230,253,.13), 0 0 28px rgba(56,189,248,.34);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 1px rgba(186, 230, 253, 0.13),
+    0 0 28px rgba(56, 189, 248, 0.34);
 }
 
 /* TIGER'S EYE — o jogo inteiro recebe uma pressão vermelha e marcas de garra. */
@@ -6356,7 +6369,9 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   outline: 2px solid rgba(248, 113, 113, 0.9);
   outline-offset: 0;
   border-radius: 5px;
-  box-shadow: 0 0 0 1px rgba(127,29,29,.52), 0 0 18px rgba(239,68,68,.38);
+  box-shadow:
+    0 0 0 1px rgba(127, 29, 29, 0.52),
+    0 0 18px rgba(239, 68, 68, 0.38);
   animation: neheleniaTigerMeldPulse 1.8s ease-in-out infinite;
 }
 .boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark::before {
@@ -6366,22 +6381,34 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   z-index: 8;
   border-radius: 5px;
   pointer-events: none;
-  background:
-    linear-gradient(118deg, transparent 0 33%, rgba(254,202,202,.82) 34% 35%, rgba(239,68,68,.72) 36%, transparent 37% 48%, rgba(254,202,202,.72) 49% 50%, rgba(185,28,28,.68) 51%, transparent 52% 63%, rgba(248,113,113,.68) 64% 65%, transparent 66% 100%);
-  opacity: .52;
+  background: linear-gradient(
+    118deg,
+    transparent 0 33%,
+    rgba(254, 202, 202, 0.82) 34% 35%,
+    rgba(239, 68, 68, 0.72) 36%,
+    transparent 37% 48%,
+    rgba(254, 202, 202, 0.72) 49% 50%,
+    rgba(185, 28, 28, 0.68) 51%,
+    transparent 52% 63%,
+    rgba(248, 113, 113, 0.68) 64% 65%,
+    transparent 66% 100%
+  );
+  opacity: 0.52;
   mask: linear-gradient(#000 0 0);
 }
 .boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-tiger-claw::before {
-  opacity: .9;
-  filter: drop-shadow(0 0 4px rgba(239,68,68,.9));
+  opacity: 0.9;
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.9));
   animation: neheleniaTigerClawFlash 1.25s ease-in-out infinite;
 }
 .boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-attendant-done {
   animation: none;
-  outline-color: rgba(248,113,113,.36);
-  box-shadow: 0 0 8px rgba(239,68,68,.14);
+  outline-color: rgba(248, 113, 113, 0.36);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.14);
 }
-.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-attendant-done::before { opacity: .18; }
+.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-attendant-done::before {
+  opacity: 0.18;
+}
 
 /* HAWK'S EYE — amarelo/dourado, como se um olho estivesse fixo naquela rota. */
 .boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark {
@@ -6390,7 +6417,9 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   outline: 2px solid rgba(250, 204, 21, 0.94);
   outline-offset: 0;
   border-radius: 5px;
-  box-shadow: 0 0 0 1px rgba(133,77,14,.46), 0 0 20px rgba(250,204,21,.34);
+  box-shadow:
+    0 0 0 1px rgba(133, 77, 14, 0.46),
+    0 0 20px rgba(250, 204, 21, 0.34);
   animation: neheleniaHawkMeldPulse 1.6s ease-in-out infinite;
 }
 .boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark::after {
@@ -6403,11 +6432,11 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   height: 20px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(254,240,138,.92);
+  border: 1px solid rgba(254, 240, 138, 0.92);
   border-radius: 50%;
   color: #fef08a;
-  background: rgba(66,32,6,.94);
-  box-shadow: 0 0 12px rgba(250,204,21,.58);
+  background: rgba(66, 32, 6, 0.94);
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.58);
   font-size: 11px;
   font-weight: 1000;
   pointer-events: none;
@@ -6416,12 +6445,12 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
 
 /* Combo Tiger + Hawk: as duas assinaturas ficam visíveis ao mesmo tempo. */
 .boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.boss-meld-nehelenia-hawk-mark {
-  outline-color: rgba(248,113,113,.92);
+  outline-color: rgba(248, 113, 113, 0.92);
   box-shadow:
-    0 0 0 2px rgba(239,68,68,.48),
-    0 0 0 5px rgba(250,204,21,.38),
-    0 0 24px rgba(239,68,68,.3),
-    0 0 34px rgba(250,204,21,.22);
+    0 0 0 2px rgba(239, 68, 68, 0.48),
+    0 0 0 5px rgba(250, 204, 21, 0.38),
+    0 0 24px rgba(239, 68, 68, 0.3),
+    0 0 34px rgba(250, 204, 21, 0.22);
 }
 
 /* Labels seguem a mesma linguagem cromática das marcas. */
@@ -6443,9 +6472,9 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   position: relative;
   isolation: isolate;
   box-shadow:
-    inset 0 0 0 2px rgba(56,189,248,.96),
-    0 0 0 2px rgba(14,116,144,.28),
-    0 0 18px rgba(56,189,248,.58) !important;
+    inset 0 0 0 2px rgba(56, 189, 248, 0.96),
+    0 0 0 2px rgba(14, 116, 144, 0.28),
+    0 0 18px rgba(56, 189, 248, 0.58) !important;
   animation: neheleniaFishCardPulse 1.65s ease-in-out infinite;
 }
 .boss-mode .carta.boss-card-nehelenia-fish-mark::after {
@@ -6458,91 +6487,146 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   height: auto !important;
   transform: none !important;
   padding: 0 !important;
-  border: 1px solid rgba(125,211,252,.48) !important;
+  border: 1px solid rgba(125, 211, 252, 0.48) !important;
   border-radius: inherit !important;
-  background: radial-gradient(circle at 50% 50%, transparent 52%, rgba(56,189,248,.12) 74%, rgba(125,211,252,.3) 100%) !important;
-  box-shadow: 0 0 14px rgba(56,189,248,.3) !important;
+  background: radial-gradient(circle at 50% 50%, transparent 52%, rgba(56, 189, 248, 0.12) 74%, rgba(125, 211, 252, 0.3) 100%) !important;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.3) !important;
   pointer-events: none;
   animation: neheleniaFishRing 1.65s ease-in-out infinite;
 }
 .boss-mode .carta.boss-card-nehelenia-fish-dead {
-  filter: saturate(.78) brightness(.88);
+  filter: saturate(0.78) brightness(0.88);
   box-shadow:
-    inset 0 0 0 2px rgba(14,165,233,.98),
-    inset 0 0 18px rgba(3,105,161,.32),
-    0 0 20px rgba(2,132,199,.62) !important;
+    inset 0 0 0 2px rgba(14, 165, 233, 0.98),
+    inset 0 0 18px rgba(3, 105, 161, 0.32),
+    0 0 20px rgba(2, 132, 199, 0.62) !important;
 }
 .boss-mode .carta.boss-card-nehelenia-fish-dead::after {
   background:
-    linear-gradient(61deg, transparent 0 45%, rgba(224,242,254,.78) 46% 47%, transparent 48% 100%),
-    linear-gradient(116deg, transparent 0 57%, rgba(56,189,248,.7) 58% 59%, transparent 60% 100%),
-    linear-gradient(20deg, transparent 0 67%, rgba(186,230,253,.62) 68% 69%, transparent 70% 100%),
-    rgba(3,105,161,.05) !important;
+    linear-gradient(61deg, transparent 0 45%, rgba(224, 242, 254, 0.78) 46% 47%, transparent 48% 100%), linear-gradient(116deg, transparent 0 57%, rgba(56, 189, 248, 0.7) 58% 59%, transparent 60% 100%),
+    linear-gradient(20deg, transparent 0 67%, rgba(186, 230, 253, 0.62) 68% 69%, transparent 70% 100%), rgba(3, 105, 161, 0.05) !important;
 }
 .boss-mode .boss-card-status-nehelenia-fish {
-  background: linear-gradient(90deg, rgba(3,105,161,.98), rgba(7,28,52,.98));
+  background: linear-gradient(90deg, rgba(3, 105, 161, 0.98), rgba(7, 28, 52, 0.98));
   color: #e0f2fe;
-  border-color: rgba(125,211,252,.9);
-  box-shadow: 0 0 8px rgba(56,189,248,.38);
+  border-color: rgba(125, 211, 252, 0.9);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.38);
 }
-.boss-mode .boss-card-status-nehelenia-fish i { color: #7dd3fc; }
+.boss-mode .boss-card-status-nehelenia-fish i {
+  color: #7dd3fc;
+}
 .boss-mode .boss-card-status-nehelenia-fish.is-dead {
-  background: linear-gradient(90deg, rgba(7,89,133,.99), rgba(8,47,73,.99));
-  border-color: rgba(186,230,253,.92);
+  background: linear-gradient(90deg, rgba(7, 89, 133, 0.99), rgba(8, 47, 73, 0.99));
+  border-color: rgba(186, 230, 253, 0.92);
 }
 
 /* HAWK no lixo — o amarelo substitui o selo roxo genérico quando a origem é Hawk. */
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard .pile-card {
-  filter: drop-shadow(0 0 8px rgba(250,204,21,.72)) drop-shadow(0 0 14px rgba(161,98,7,.36));
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.72)) drop-shadow(0 0 14px rgba(161, 98, 7, 0.36));
 }
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard .discard-face {
   box-shadow:
-    inset 0 0 0 2px rgba(250,204,21,.9),
-    0 0 0 1px rgba(133,77,14,.54),
-    0 0 18px rgba(250,204,21,.48) !important;
+    inset 0 0 0 2px rgba(250, 204, 21, 0.9),
+    0 0 0 1px rgba(133, 77, 14, 0.54),
+    0 0 18px rgba(250, 204, 21, 0.48) !important;
   animation: neheleniaHawkDiscardPulse 1.55s ease-in-out infinite;
 }
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.is-hawk-guarded .discard-face {
-  filter: saturate(.84) brightness(.9);
+  filter: saturate(0.84) brightness(0.9);
 }
 .boss-mode .boss-card-status-nehelenia-hawk {
-  background: linear-gradient(90deg, rgba(113,63,18,.98), rgba(46,28,5,.98));
+  background: linear-gradient(90deg, rgba(113, 63, 18, 0.98), rgba(46, 28, 5, 0.98));
   color: #fef08a;
-  border-color: rgba(250,204,21,.92);
-  box-shadow: 0 0 9px rgba(250,204,21,.34);
+  border-color: rgba(250, 204, 21, 0.92);
+  box-shadow: 0 0 9px rgba(250, 204, 21, 0.34);
 }
-.boss-mode .boss-card-status-nehelenia-hawk i { color: #fde047; }
+.boss-mode .boss-card-status-nehelenia-hawk i {
+  color: #fde047;
+}
 .boss-mode .boss-discard-nehelenia-hawk-card {
   position: relative;
 }
 
 @keyframes neheleniaTigerMeldPulse {
-  0%,100% { box-shadow: 0 0 0 1px rgba(127,29,29,.48), 0 0 13px rgba(239,68,68,.28); }
-  50% { box-shadow: 0 0 0 2px rgba(248,113,113,.52), 0 0 24px rgba(239,68,68,.52); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(127, 29, 29, 0.48),
+      0 0 13px rgba(239, 68, 68, 0.28);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(248, 113, 113, 0.52),
+      0 0 24px rgba(239, 68, 68, 0.52);
+  }
 }
 @keyframes neheleniaTigerClawFlash {
-  0%,100% { opacity: .52; }
-  50% { opacity: .98; }
+  0%,
+  100% {
+    opacity: 0.52;
+  }
+  50% {
+    opacity: 0.98;
+  }
 }
 @keyframes neheleniaHawkMeldPulse {
-  0%,100% { box-shadow: 0 0 0 1px rgba(133,77,14,.4), 0 0 12px rgba(250,204,21,.24); }
-  50% { box-shadow: 0 0 0 2px rgba(250,204,21,.54), 0 0 24px rgba(250,204,21,.48); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(133, 77, 14, 0.4),
+      0 0 12px rgba(250, 204, 21, 0.24);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(250, 204, 21, 0.54),
+      0 0 24px rgba(250, 204, 21, 0.48);
+  }
 }
 @keyframes neheleniaHawkEye {
-  0%,100% { transform: scale(.92); opacity: .72; }
-  50% { transform: scale(1.08); opacity: 1; }
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.72;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
 }
 @keyframes neheleniaFishCardPulse {
-  0%,100% { box-shadow: inset 0 0 0 2px rgba(56,189,248,.84), 0 0 12px rgba(56,189,248,.4); }
-  50% { box-shadow: inset 0 0 0 2px rgba(125,211,252,1), 0 0 22px rgba(56,189,248,.7); }
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 2px rgba(56, 189, 248, 0.84),
+      0 0 12px rgba(56, 189, 248, 0.4);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px rgba(125, 211, 252, 1),
+      0 0 22px rgba(56, 189, 248, 0.7);
+  }
 }
 @keyframes neheleniaFishRing {
-  0%,100% { opacity: .56; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.56;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 @keyframes neheleniaHawkDiscardPulse {
-  0%,100% { box-shadow: inset 0 0 0 2px rgba(250,204,21,.72), 0 0 12px rgba(250,204,21,.32); }
-  50% { box-shadow: inset 0 0 0 2px rgba(254,240,138,1), 0 0 22px rgba(250,204,21,.62); }
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 2px rgba(250, 204, 21, 0.72),
+      0 0 12px rgba(250, 204, 21, 0.32);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px rgba(254, 240, 138, 1),
+      0 0 22px rgba(250, 204, 21, 0.62);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6559,22 +6643,21 @@ body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.is-ha
 
 /* Quando Hawk realmente bloqueia o lixo, não herdar o texto/visual genérico do Banqueiro. */
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.boss-locked {
-  opacity: .86;
-  filter: saturate(.9) brightness(.9);
+  opacity: 0.86;
+  filter: saturate(0.9) brightness(0.9);
 }
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.boss-locked::after {
-  content: '◉ Vigiado por Hawk\'s Eye';
+  content: "◉ Vigiado por Hawk's Eye";
   color: #fef08a;
-  background: rgba(66,32,6,.9);
-  border: 1px solid rgba(250,204,21,.62);
+  background: rgba(66, 32, 6, 0.9);
+  border: 1px solid rgba(250, 204, 21, 0.62);
   border-radius: 3px;
   padding: 2px 5px;
   margin-top: 4px;
   font-size: 7px;
   font-weight: 1000;
-  letter-spacing: .35px;
+  letter-spacing: 0.35px;
 }
-
 
 /* Dimitrescu — gotas independentes. Mantém o visual da V6 e só separa o relógio de cada gota. */
 body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after {
@@ -6590,9 +6673,7 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop {
   pointer-events: none;
   transform-origin: 50% 0;
   opacity: 0;
-  filter:
-    drop-shadow(0 2px 1px rgba(0, 0, 0, 0.42))
-    drop-shadow(0 0 1px rgba(255, 38, 65, 0.2));
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.42)) drop-shadow(0 0 1px rgba(255, 38, 65, 0.2));
 }
 
 body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-1 {
@@ -6626,7 +6707,8 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-4 
 
 /* A gota estica, SOLTA, cai e some. O retorno ao topo acontece 100% invisível. */
 @keyframes dimitrescuBloodDropFall {
-  0%, 12% {
+  0%,
+  12% {
     transform: translateY(0) scaleY(0.64);
     opacity: 0;
   }
@@ -6654,7 +6736,8 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-4 
     transform: translateY(12px) scaleY(0.84);
     opacity: 0;
   }
-  79%, 100% {
+  79%,
+  100% {
     transform: translateY(0) scaleY(0.64);
     opacity: 0;
   }
@@ -6663,3 +6746,699 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-4 
 body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0'] .dimitrescu-blood-drop {
   display: none;
 }
+
+/* Renascimento da Matriarca: a imagem apaga por um instante e explode em energia esmeralda. */
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst {
+  border-color: rgba(167, 243, 208, 1);
+  animation: matriarchRebirthFrame 2350ms cubic-bezier(0.16, 0.84, 0.22, 1) both;
+}
+
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst img {
+  animation: matriarchRebirthPortrait 2350ms cubic-bezier(0.16, 0.84, 0.22, 1) both !important;
+}
+
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst::before {
+  display: block !important;
+  z-index: 4;
+  inset: -2px;
+  opacity: 0;
+  transform: scale(0.5);
+  background: radial-gradient(circle at 50% 48%, rgba(236, 253, 245, 1) 0 5%, rgba(167, 243, 208, 0.98) 11%, rgba(52, 211, 153, 0.88) 28%, rgba(16, 185, 129, 0.42) 52%, rgba(6, 95, 70, 0.08) 72%, transparent 84%);
+  mix-blend-mode: screen;
+  filter: blur(2px);
+  animation: matriarchRebirthFlash 2350ms ease-out both !important;
+}
+
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst::after {
+  display: block !important;
+  z-index: 5;
+  inset: -12%;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 19% 76%, rgba(217, 249, 157, 0.95) 0 1.4px, transparent 2.7px), radial-gradient(circle at 31% 26%, rgba(167, 243, 208, 1) 0 1.6px, transparent 3px),
+    radial-gradient(circle at 48% 84%, rgba(253, 230, 138, 0.95) 0 1.4px, transparent 2.8px), radial-gradient(circle at 63% 20%, rgba(110, 231, 183, 1) 0 1.5px, transparent 3px),
+    radial-gradient(circle at 81% 68%, rgba(190, 242, 100, 0.95) 0 1.5px, transparent 3px),
+    conic-gradient(
+      from 8deg at 50% 50%,
+      transparent 0 8deg,
+      rgba(110, 231, 183, 0.22) 9deg 12deg,
+      transparent 13deg 40deg,
+      rgba(253, 230, 138, 0.17) 41deg 44deg,
+      transparent 45deg 82deg,
+      rgba(52, 211, 153, 0.22) 83deg 87deg,
+      transparent 88deg 132deg,
+      rgba(167, 243, 208, 0.2) 133deg 137deg,
+      transparent 138deg 180deg,
+      rgba(190, 242, 100, 0.16) 181deg 185deg,
+      transparent 186deg 228deg,
+      rgba(52, 211, 153, 0.22) 229deg 233deg,
+      transparent 234deg 276deg,
+      rgba(253, 230, 138, 0.16) 277deg 281deg,
+      transparent 282deg 326deg,
+      rgba(110, 231, 183, 0.22) 327deg 331deg,
+      transparent 332deg 360deg
+    );
+  mix-blend-mode: screen;
+  animation: matriarchRebirthParticles 2350ms ease-out both !important;
+}
+
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait .boss-rebirth-ring {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(209, 250, 229, 0.98);
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px rgba(236, 253, 245, 0.95),
+    0 0 18px rgba(52, 211, 153, 0.92),
+    inset 0 0 8px rgba(167, 243, 208, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.25);
+  animation: matriarchRebirthRing 2050ms cubic-bezier(0.12, 0.76, 0.2, 1) 180ms both;
+}
+
+@keyframes matriarchRebirthFrame {
+  0% {
+    box-shadow:
+      0 0 4px rgba(16, 185, 129, 0.08),
+      inset 0 0 24px rgba(0, 0, 0, 0.88);
+  }
+  18% {
+    box-shadow:
+      0 0 8px rgba(52, 211, 153, 0.25),
+      inset 0 0 28px rgba(0, 0, 0, 0.76);
+  }
+  34% {
+    box-shadow:
+      0 0 14px rgba(236, 253, 245, 0.92),
+      0 0 34px rgba(52, 211, 153, 0.9),
+      0 0 68px rgba(16, 185, 129, 0.65),
+      inset 0 0 18px rgba(167, 243, 208, 0.44);
+  }
+  58% {
+    box-shadow:
+      0 0 11px rgba(167, 243, 208, 0.7),
+      0 0 30px rgba(16, 185, 129, 0.56),
+      inset 0 0 12px rgba(52, 211, 153, 0.25);
+  }
+  100% {
+    box-shadow:
+      0 0 18px rgba(16, 185, 129, 0.25),
+      inset 0 0 0 1px rgba(253, 230, 138, 0.18);
+  }
+}
+
+@keyframes matriarchRebirthPortrait {
+  0% {
+    transform: translate3d(0, 0, 0) scale(var(--matriarch-portrait-scale));
+    filter: brightness(0.36) saturate(0.72) contrast(1.08);
+  }
+  15% {
+    transform: translate3d(0, 0.8%, 0) scale(calc(var(--matriarch-portrait-scale) - 0.018));
+    filter: brightness(0.22) saturate(0.68) contrast(1.12);
+  }
+  31% {
+    transform: translate3d(0, -0.6%, 0) scale(calc(var(--matriarch-portrait-scale) + 0.075));
+    filter: brightness(1.82) saturate(1.58) contrast(1.08) drop-shadow(0 0 10px rgba(167, 243, 208, 0.96));
+  }
+  48% {
+    transform: translate3d(-0.2%, -0.5%, 0) scale(calc(var(--matriarch-portrait-scale) + 0.038));
+    filter: brightness(1.28) saturate(1.34) drop-shadow(0 0 14px rgba(52, 211, 153, 0.78));
+  }
+  72% {
+    filter: brightness(1.1) saturate(1.16) drop-shadow(0 0 7px rgba(52, 211, 153, 0.44));
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(var(--matriarch-portrait-scale));
+    filter: brightness(1) saturate(1) contrast(1);
+  }
+}
+
+@keyframes matriarchRebirthFlash {
+  0%,
+  13% {
+    opacity: 0;
+    transform: scale(0.42);
+    filter: blur(8px);
+  }
+  28% {
+    opacity: 1;
+    transform: scale(0.96);
+    filter: blur(1px);
+  }
+  43% {
+    opacity: 0.76;
+    transform: scale(1.16);
+    filter: blur(4px);
+  }
+  72% {
+    opacity: 0.22;
+    transform: scale(1.34);
+    filter: blur(9px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.48);
+    filter: blur(13px);
+  }
+}
+
+@keyframes matriarchRebirthParticles {
+  0%,
+  18% {
+    opacity: 0;
+    transform: scale(0.72) rotate(-3deg);
+  }
+  32% {
+    opacity: 0.92;
+    transform: scale(0.98) rotate(0deg);
+  }
+  62% {
+    opacity: 0.48;
+    transform: scale(1.16) rotate(2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.34) rotate(4deg);
+  }
+}
+
+@keyframes matriarchRebirthRing {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  18% {
+    opacity: 1;
+  }
+  68% {
+    opacity: 0.72;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(4.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst {
+    animation: none !important;
+    box-shadow:
+      0 0 14px rgba(236, 253, 245, 0.86),
+      0 0 34px rgba(52, 211, 153, 0.72),
+      inset 0 0 14px rgba(167, 243, 208, 0.32);
+  }
+
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst img {
+    animation: none !important;
+    filter: brightness(1.18) saturate(1.22);
+  }
+
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst::before {
+    display: block !important;
+    animation: none !important;
+    opacity: 0.42;
+    transform: scale(1);
+    filter: none;
+  }
+
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst::after,
+  body[data-boss-id='matriarca_esmeralda'] .boss-portrait .boss-rebirth-ring {
+    display: none !important;
+  }
+}
+
+/* ==========================================================
+   MORTE VISUAL DOS CHEFES
+   Universal: quando o HP encerra a luta, o retrato perde vida
+   devagar antes da tela final. A Matriarca reaproveita o mesmo
+   estágio antes do Renascimento.
+   ========================================================== */
+.boss-portrait.boss-death-fade {
+  animation: bossPortraitDeathFade 1800ms cubic-bezier(0.42, 0, 0.72, 1) forwards !important;
+}
+
+.boss-portrait.boss-death-fade img {
+  animation-play-state: paused !important;
+}
+
+@keyframes bossPortraitDeathFade {
+  0% {
+    filter: grayscale(0) saturate(1) brightness(1) contrast(1);
+    opacity: 1;
+  }
+  28% {
+    filter: grayscale(0.28) saturate(0.76) brightness(0.9) contrast(1.03);
+    opacity: 0.98;
+  }
+  62% {
+    filter: grayscale(0.72) saturate(0.36) brightness(0.72) contrast(1.08);
+    opacity: 0.94;
+  }
+  100% {
+    filter: grayscale(1) saturate(0) brightness(0.52) contrast(1.12);
+    opacity: 0.9;
+  }
+}
+
+/* Se a equipe venceu, o retrato da tela final preserva o chefe já morto. */
+.boss-result-section[data-outcome='victory'] .boss-result-portrait {
+  filter: grayscale(1) saturate(0) brightness(0.58) contrast(1.08);
+}
+
+/* O Renascimento começa depois do cinza e recupera a cor mais lentamente. */
+body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst {
+  filter: grayscale(0) saturate(1) brightness(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-portrait.boss-death-fade {
+    animation: none !important;
+    filter: grayscale(1) saturate(0) brightness(0.58) contrast(1.08);
+  }
+}
+
+/* ==========================================================
+   FAIXAS VISUAIS DE HABILIDADE
+   Usadas quando um efeito muda conforme uma contagem entra
+   em faixas (cartas na mão, cartas jogadas, franquia etc.).
+   ========================================================== */
+.boss-intent .boss-range-meters {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0 1px;
+  min-width: 0;
+}
+
+.boss-intent .boss-range-meters[hidden] {
+  display: none;
+}
+
+.boss-range-meter {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  border-radius: 5px;
+  background: rgba(15, 10, 7, 0.42);
+}
+
+.boss-range-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.boss-range-meter-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 8px;
+  font-weight: 1000;
+  letter-spacing: 0.15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boss-range-meter-head span {
+  flex: 0 0 auto;
+  color: #fbbf24;
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.boss-range-meter.tone-safe .boss-range-meter-head span {
+  color: #86efac;
+}
+.boss-range-meter.tone-warning .boss-range-meter-head span {
+  color: #fde047;
+}
+.boss-range-meter.tone-danger .boss-range-meter-head span {
+  color: #fda4af;
+}
+
+.boss-range-meter-track {
+  position: relative;
+  height: 10px;
+  overflow: visible;
+  border: 1px solid rgba(251, 191, 36, 0.34);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.9);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.72);
+}
+
+.boss-range-meter-segments {
+  position: absolute;
+  inset: 1px;
+  display: flex;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.boss-range-meter-segment {
+  min-width: 3px;
+  background: rgba(148, 163, 184, 0.14);
+}
+.boss-range-meter-segment.tone-safe {
+  background: rgba(34, 197, 94, 0.2);
+}
+.boss-range-meter-segment.tone-warning {
+  background: rgba(250, 204, 21, 0.2);
+}
+.boss-range-meter-segment.tone-danger {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+.boss-range-meter-fill {
+  position: absolute;
+  z-index: 2;
+  left: 1px;
+  top: 1px;
+  bottom: 1px;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.42), rgba(251, 191, 36, 0.88));
+  box-shadow: 0 0 7px rgba(251, 191, 36, 0.26);
+  pointer-events: none;
+  transition: width 240ms ease;
+}
+.boss-range-meter.tone-safe .boss-range-meter-fill {
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.42), rgba(74, 222, 128, 0.92));
+  box-shadow: 0 0 7px rgba(74, 222, 128, 0.3);
+}
+.boss-range-meter.tone-warning .boss-range-meter-fill {
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.42), rgba(250, 204, 21, 0.95));
+  box-shadow: 0 0 7px rgba(250, 204, 21, 0.32);
+}
+.boss-range-meter.tone-danger .boss-range-meter-fill {
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.48), rgba(248, 113, 113, 0.96));
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.34);
+}
+
+.boss-range-meter-pointer {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  width: 4px;
+  height: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  background: #fff7ed;
+  box-shadow: 0 0 7px rgba(255, 255, 255, 0.72);
+  transform: translate(-50%, -50%);
+  transition: left 240ms ease;
+}
+
+.boss-range-meter-legend {
+  display: flex;
+  gap: 3px;
+  min-width: 0;
+}
+
+.boss-range-meter-legend > span {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 3px;
+  border-radius: 3px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.42);
+  font-size: 6px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.boss-range-meter-legend > span b {
+  color: #f8fafc;
+  font-size: 6px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+
+.boss-range-meter-legend > span small {
+  min-width: 0;
+  color: inherit;
+  font-size: 6px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.boss-range-meter-legend > span.tone-safe {
+  color: #bbf7d0;
+  background: rgba(20, 83, 45, 0.25);
+}
+.boss-range-meter-legend > span.tone-warning {
+  color: #fef08a;
+  background: rgba(113, 63, 18, 0.25);
+}
+.boss-range-meter-legend > span.tone-danger {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.24);
+}
+
+@media (max-width: 620px) {
+  .boss-range-meter {
+    padding: 5px;
+  }
+  .boss-range-meter-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .boss-range-meter-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .boss-range-meter-legend > span {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-range-meter-fill,
+  .boss-range-meter-pointer,
+  .boss-range-meter-marker {
+    transition: none !important;
+  }
+}
+
+/* Tributo de Sangue: dois jogadores compartilham a mesma régua. */
+.boss-range-meter-marker {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  width: 4px;
+  height: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  background: #fff7ed;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.66);
+  pointer-events: none;
+  transition: left 240ms ease;
+}
+
+.boss-range-meter-marker.marker-0 {
+  transform: translate(calc(-50% - 2px), -50%);
+}
+
+.boss-range-meter-marker.marker-1 {
+  transform: translate(calc(-50% + 2px), -50%);
+}
+
+.boss-range-meter-marker.tone-safe {
+  border-color: #bbf7d0;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.72);
+}
+
+.boss-range-meter-marker.tone-warning {
+  border-color: #fef3c7;
+  background: #facc15;
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.72);
+}
+
+.boss-range-meter-marker.tone-danger {
+  border-color: #fee2e2;
+  background: #fb7185;
+  box-shadow: 0 0 6px rgba(251, 113, 133, 0.74);
+}
+
+/* ==========================================================
+   LAYOUT VERTICAL DO MODO CHEFE
+   Aproveita o espaço entre o HUD e a mesa, sem reservar área
+   vazia para filhas/capangas quando eles não estão presentes.
+   ========================================================== */
+
+/* O layout normal da mesa reserva 70px antes dos jogos.
+   No modo chefe, o HUD já ocupa o topo e essa reserva vira vazio. */
+body.boss-mode #gameSection .board-melds {
+  margin-top: 8px;
+}
+
+/* Aproxima HUD, eventual faixa de capangas e área de jogo. */
+body.boss-mode .boss-hud {
+  margin-bottom: 6px;
+}
+
+body.boss-mode .boss-daughter-strip {
+  margin-top: 0;
+  margin-bottom: 6px;
+}
+
+/* Em telas com espaço vertical, usa parte do vazio recuperado para
+   mostrar mais da arte do chefe e estabilizar a altura do HUD entre
+   habilidades curtas e habilidades com régua/faixas. */
+@media (min-width: 901px) and (min-height: 650px) {
+  body.boss-mode .boss-hud {
+    min-height: 194px;
+    padding-top: 18px;
+    padding-bottom: 15px;
+  }
+
+  body.boss-mode .boss-portrait {
+    height: 144px;
+  }
+
+  /* A arte da Dimitrescu estava bem fechada no recorte.
+     Com o retrato mais alto, reduzimos levemente o zoom para revelar
+     mais da ilustração sem aumentar a largura do bloco de identidade. */
+  body[data-boss-id='dimitrescu'] .boss-portrait img {
+    object-position: 50% 29%;
+    transform: scale(1.05);
+    transform-origin: 50% 29%;
+  }
+}
+
+/* Em telas baixas, preserva o HUD compacto, mas ainda remove o
+   espaço morto grande entre chefe e jogos. */
+@media (max-height: 649px) and (min-width: 901px) {
+  body.boss-mode #gameSection .board-melds {
+    margin-top: 6px;
+  }
+
+  body.boss-mode .boss-hud {
+    margin-bottom: 4px;
+  }
+
+  body.boss-mode .boss-daughter-strip {
+    margin-bottom: 4px;
+  }
+}
+
+/* ============================================================
+   DIMITRESCU — PORTAS DO CASTELO
+   Overlay visual puro: não participa do layout da mesa.
+   ============================================================ */
+body[data-boss-id='dimitrescu'] #drawDiscardBtn.boss-castle-lockdown-discard {
+  position: relative;
+  overflow: visible;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Carta do lixo totalmente normal. */
+body[data-boss-id='dimitrescu'] #drawDiscardBtn.boss-castle-lockdown-discard .pile-card,
+body[data-boss-id='dimitrescu'] #drawDiscardBtn.boss-castle-lockdown-discard .discard-face {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Moldura absoluta: usa a geometria do frame de lixo já existente.
+   Fica atrás da carta (face = z-index 20) e atrás do contador (pile-info = 10),
+   então não cobre número/naipe nem LIXO (n). */
+body[data-boss-id='dimitrescu'] #drawDiscardBtn.boss-castle-lockdown-discard::before {
+  content: '';
+  position: absolute;
+  z-index: 34;
+
+  left: 50%;
+  width: 188px;
+  height: 220px;
+
+  transform: translate(-50%, -50%);
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: url('../assets/images/portas-castelo-lixo.png') center / contain no-repeat !important;
+
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+
+  pointer-events: none;
+}
+
+/* Não criar texto extra embaixo do lixo: ele alterava a altura do item
+   e fazia Monte/Lixo parecerem fora de posição. */
+body[data-boss-id='dimitrescu'] #drawDiscardBtn.boss-castle-lockdown-discard.boss-locked::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Enquanto Portas do Castelo está visível, o Monte não recebe aparência
+   fosca por estado de controle. Isso é SOMENTE visual: pointer-events
+   e regras de compra continuam sendo controlados pelo JS original. */
+body[data-boss-id='dimitrescu']:has(#drawDiscardBtn.boss-castle-lockdown-discard) #drawStockBtn {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+
+/* DIMITRESCU — transição visual de transformação entre fases.
+   A troca da imagem é persistente; esta animação só marca o momento da mudança. */
+body[data-boss-id='dimitrescu'] .boss-portrait.boss-dimitrescu-phase-shift {
+  animation: bossDimitrescuPhaseFrame 1150ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
+}
+
+body[data-boss-id='dimitrescu'] .boss-portrait.boss-dimitrescu-phase-shift img {
+  animation: bossDimitrescuPhasePortrait 1050ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
+}
+
+@keyframes bossDimitrescuPhaseFrame {
+  0% {
+    box-shadow: 0 0 23px rgba(239, 68, 68, 0.27), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  38% {
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.78), 0 0 36px rgba(185, 28, 28, 0.92), inset 0 0 18px rgba(127, 29, 29, 0.58);
+  }
+  100% {
+    box-shadow: 0 0 23px rgba(239, 68, 68, 0.27), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+}
+
+@keyframes bossDimitrescuPhasePortrait {
+  0% {
+    opacity: 0.18;
+    filter: contrast(1.35) saturate(0.55) brightness(1.55);
+  }
+  36% {
+    opacity: 1;
+    filter: contrast(1.18) saturate(1.3) brightness(1.18);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='dimitrescu'] .boss-portrait.boss-dimitrescu-phase-shift,
+  body[data-boss-id='dimitrescu'] .boss-portrait.boss-dimitrescu-phase-shift img {
+    animation: none !important;
+  }
+}
+

@@ -27,10 +27,13 @@ export const BOSS_SFX = Object.freeze({
   matriarca_esmeralda: Object.freeze({
     resource: createBossSfx('assets/sfx/habilidade-matriarca.mp3', 0.9, 2),
     heal: createBossSfx('assets/sfx/cura-matriarca.mp3', 0.9, 2),
+    rebirth: createBossSfx('assets/sfx/renascimento-matriarca.mp3', 0.9, 2),
     victory: createBossSfx('assets/sfx/fim-de-jogo-matriarca.mp3', 0.9, 2),
   }),
   dimitrescu: Object.freeze({
     blood: createBossSfx('assets/sfx/ganho-sangue-dimitresco.mp3', 0.92),
+    phase2: createBossSfx('assets/sfx/transformacao-dimitrescu-fase2.mp3', 0.95),
+    phase3: createBossSfx('assets/sfx/transformacao-dimitrescu-fase3.mp3', 0.95),
   }),
   nehelenia: Object.freeze({
     laugh: createBossSfx('assets/sfx/risada-nehelenia.mp3', 0.95),

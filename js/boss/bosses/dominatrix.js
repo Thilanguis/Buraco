@@ -8,7 +8,7 @@ export const dominatrixDefinition = Object.freeze({
   tableTheme: 'submissao',
   deckTheme: 'mythic',
   accent: '#ec4899',
-  maxHp: 2500,
+  maxHp: 2600,
   dangerType: 'chains',
   maxDanger: 4,
   phaseNames: Object.freeze({ 1: 'Marcação', 2: 'Controle', 3: 'Dominação Total' }),

@@ -13,6 +13,11 @@ export const dimitrescuDefinition = Object.freeze({
   mode: 'boss_dimitrescu',
   name: 'Lady Dimitrescu',
   portrait: 'assets/images/boss-dimitrescu.png',
+  phasePortraits: Object.freeze({
+    1: 'assets/images/boss-dimitrescu.png',
+    2: 'assets/images/boss-dimitrescu-fase2.png',
+    3: 'assets/images/boss-dimitrescu-fase3.png',
+  }),
   tableTheme: 'resident',
   deckTheme: 'resident',
   accent: '#b91c1c',
@@ -38,8 +43,8 @@ export const dimitrescuDefinition = Object.freeze({
   }),
   phaseTaunts: Object.freeze({
     1: 'Vocês entraram no meu castelo por vontade própria.',
-    2: 'Minhas filhas estavam famintas por companhia.',
-    3: 'Chega de brincar. O banquete começa agora.',
+    2: 'Vocês queriam conhecer a dona do castelo? Então olhem bem.',
+    3: 'Chega de elegância. Agora verão a verdadeira dona deste castelo.',
   }),
   damageReactions: Object.freeze([
     'Que falta de educação atacar a anfitriã.',

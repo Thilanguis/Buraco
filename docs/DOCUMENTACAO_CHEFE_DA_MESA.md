@@ -2,7 +2,7 @@
 
 ## Status da documentação
 
-**Versão revisada contra o código atual — 29/09/2026.**
+**Versão revisada contra o código atual — 01/10/2026.**
 
 Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
 
@@ -36,7 +36,6 @@ A auditoria funcional identificou comportamentos que também fazem parte da regr
 - Dívida máxima por Limite de Crédito encerra a partida imediatamente;
 - Limite de Crédito conta apenas cartas originadas da mão;
 - contribuições novas em jogo possuído causam dano individual normalmente;
-- ordens de evolução e Interdito exigem evolução realmente possível;
 - bot deve avaliar custo e benefício, não apenas evitar resultados letais.
 
 Uma partida manual simultânea em dois dispositivos reais continua recomendada para validar Firebase, animações e experiência em tablet.
@@ -291,7 +290,7 @@ Chefe de desgaste econômico, Dívida coletiva, precificação de jogadas e cont
 ## 4.2 Vida e derrota especial
 
 ```text
-HP: 2500
+HP: 2650
 Dívida: 0..100
 ```
 
@@ -638,7 +637,7 @@ Chefe de controle direto, ordens, Chicotes individuais e perda de eficiência.
 ## 5.2 Vida e Chicotes
 
 ```text
-HP: 2500
+HP: 2600
 Chicotes por jogador: 0..4
 ```
 
@@ -1069,9 +1068,9 @@ Florescimento: 0..5
 
 | Fase | Máximo por rodada |
 | ---- | ----------------: |
-| 1    |               150 |
-| 2    |               220 |
-| 3    |               300 |
+| 1    |               100 |
+| 2    |               150 |
+| 3    |               200 |
 
 O contador zera na virada efetiva da rodada.
 
@@ -1185,22 +1184,31 @@ fases: 1, 2 e 3
 
 A cura atual funciona por **faixas de progresso**, não por redução linear de 15 HP por carta.
 
-### Fases 1 e 2
+### Fase 1
 
 | Cartas novas colocadas legalmente | Cura prevista |
 | --------------------------------: | ------------: |
-| 0–1                               |        150 HP |
-| 2–3                               |        100 HP |
-| 4–5                               |         50 HP |
+| 0–1                               |        100 HP |
+| 2–3                               |         65 HP |
+| 4–5                               |         30 HP |
+| 6+                                |          0 HP |
+
+### Fase 2
+
+| Cartas novas colocadas legalmente | Cura prevista |
+| --------------------------------: | ------------: |
+| 0–1                               |        120 HP |
+| 2–3                               |         80 HP |
+| 4–5                               |         40 HP |
 | 6+                                |          0 HP |
 
 ### Fase 3
 
 | Cartas novas colocadas legalmente | Cura prevista |
 | --------------------------------: | ------------: |
-| 0–1                               |        180 HP |
-| 2–3                               |        120 HP |
-| 4–5                               |         60 HP |
+| 0–1                               |        150 HP |
+| 2–3                               |        100 HP |
+| 4–5                               |         50 HP |
 | 6+                                |          0 HP |
 
 Regras:
@@ -1272,7 +1280,7 @@ Ao retirar a carta contaminada:
 
 ```text
 +1 Flor
-cura 40 HP
+cura 30 HP
 ```
 
 Se topo mudar sem entrar em mão:
@@ -1296,8 +1304,8 @@ fases: 2 e 3
 | Cartas ao fim do turno | Efeito             |
 | ---------------------: | ------------------ |
 |                    0–7 | nada               |
-|                   8–10 | cura 60            |
-|                    11+ | cura 100 e +1 Flor |
+|                   8–10 | cura 50            |
+|                    11+ | cura 80 e +1 Flor  |
 
 Não bloqueia ações.
 
@@ -1385,19 +1393,21 @@ Não existem nesta versão:
 
 ## 6.17 Renascimento
 
-Uma vez por partida:
+Passiva, uma vez por partida:
 
-- Fase 3;
-- HP chega a zero;
-- pelo menos 3 Flores;
-- consome 3;
-- HP vira 300;
+- somente na Fase 3;
+- o HP precisa chegar a zero;
+- basta possuir pelo menos **1 Flor**;
+- consome **1 Flor**;
+- retorna com **300 HP**;
 - marca `rebirthUsed`;
 - continua a partida.
 
-Sem 3 Flores, derrota normal.
+Sem nenhuma Flor, a derrota ocorre normalmente.
 
-Funciona no ataque final.
+Funciona também durante o ataque final.
+
+No **Laboratório de Chefes / DevTools**, `Renascimento` aparece como passiva de teste (`peso 0`, somente Fase 3). Ele não entra no sorteio normal das habilidades; o cenário prepara **1 Flor** e HP baixo para permitir testar o disparo por dano fatal.
 
 ## 6.18 Habilidades e pesos
 
@@ -1479,6 +1489,20 @@ A Sede também pode cair ao cumprir objetivos das filhas, romper a Marca Carmesi
 | 1 | A Caçada | Bela caça cartas; Lady cobra sangue, marca vítimas e pode gastar Sede para se curar |
 | 2 | As Filhas | Cassandra passa a atacar jogos e o Morto; Daniela contamina o lixo; o Coágulo cria proteção |
 | 3 | Banquete Carmesim | as três filhas podem agir juntas e Lady combina bloqueio, cura e defesa vampírica |
+
+### Transformação visual por fase
+
+O retrato principal da Dimitrescu muda junto com a fase e permanece nessa forma até a próxima transição:
+
+- **Fase 1:** `assets/images/boss-dimitrescu.png` — forma humana atual;
+- **Fase 2:** `assets/images/boss-dimitrescu-fase2.png` — semi-transformação;
+- **Fase 3:** `assets/images/boss-dimitrescu-fase3.png` — forma dragão.
+
+Ao entrar na Fase 2, o sistema toca `assets/sfx/transformacao-dimitrescu-fase2.mp3` e apresenta a fala: **“Vocês queriam conhecer a dona do castelo? Então olhem bem.”**
+
+Ao entrar na Fase 3, toca `assets/sfx/transformacao-dimitrescu-fase3.mp3` e apresenta: **“Chega de elegância. Agora verão a verdadeira dona deste castelo.”**
+
+Os áudios são disparados pelo evento real de transição de fase e não repetem em reload. Se uma nova imagem ainda não estiver disponível, o retrato base `boss-dimitrescu.png` é usado como fallback.
 
 ## 7.4 Caçada de Bela
 
@@ -1642,7 +1666,7 @@ Os retratos preservam proporção com `object-fit: cover`: **184×116** no deskt
 
 A linguagem visual de sangue é aplicada ao **alvo real**, não à zona inteira: carta de Bela, carta da Marca Carmesim, jogo de Cassandra, carta contaminada de Daniela e Morto profanado. A barra de Sede usa bordô/vinho escuro com textura e gotas em CSS; animações pesadas ficam desativadas em touch e `prefers-reduced-motion`.
 
-O áudio `ganho-sangue-dimitresco.mp3` toca sempre que a Sede aumenta. A risada eventual da Dimitrescu continua reservada para uma implementação futura.
+O áudio `ganho-sangue-dimitresco.mp3` toca sempre que a Sede aumenta. As transições de Fase 2 e Fase 3 usam, respectivamente, `transformacao-dimitrescu-fase2.mp3` e `transformacao-dimitrescu-fase3.mp3`, sincronizados com a troca persistente do retrato. A risada eventual da Dimitrescu continua reservada para uma implementação futura.
 
 ## 7.15 Habilidades e pesos
 
@@ -1695,7 +1719,6 @@ Avalia:
 - custo de obedecer;
 - Chicotes em 3/3, 4/2, 4/3 e 4/4;
 - Etiqueta;
-- Interdito;
 - Posse coordenada;
 - Mãos Atadas compartilhada.
 
@@ -1724,6 +1747,10 @@ Prioriza:
 - evitar o lixo durante Daniela;
 - objetivos correspondentes em `As Três Filhas`;
 - urgência maior quando a Sede chega a 75 ou mais e quando o Coágulo está ativo.
+
+## 8.6 Nehelenia
+
+O bot usa somente a informação disponível ao humano e não consulta respostas secretas dos espelhos. Prioriza Jogo Espelhado, Siga o Reflexo, Prisão no Espelho, Presa Marcada, Olho do Falcão, Vigilância, Mão no Espelho e Reflexo Invertido conforme cada objetivo ativo.
 
 ---
 
@@ -1764,7 +1791,6 @@ Mostrar:
 - estado Normal, Sob Controle ou Dominado;
 - ordem ativa;
 - Etiqueta;
-- Interdito;
 - disponibilidade de Mãos Atadas;
 - contribuições de Posse.
 
@@ -1827,7 +1853,6 @@ Persistir:
 - financiadas;
 - ordens;
 - Etiqueta;
-- Interdito;
 - Mãos Atadas;
 - Posse e contribuições;
 - transbordamento;
@@ -1940,13 +1965,13 @@ Em touch, tablet e `prefers-reduced-motion`:
 
 | Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu | Rainha Nehelenia |
 |---|---|---|---|---|---|
-| HP | 2500 | 2500 | 2000 | 2300 | 2400 |
-| Perigo | Dívida coletiva | Chicotes individuais | Florescimento | Sede de Sangue | Espelho Negro |
-| Derrota especial | Dívida 100 | ambos com 4 Chicotes | 5 Flores | Sede 100 | 6 Fragmentos |
-| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, simetria e dano aprisionado |
-| Recuperação da equipe | redução de Dívida | Resistência | poda por evolução | redução de Sede por canastra | Limpa/Real/Ás-a-Ás quebram Fragmentos |
+| HP | 2650 | 2600 | 2000 | 2300 | 2400 |
+| Perigo | Dívida coletiva | Chicotes individuais | Florescimento | Sede de Sangue | Espelhos dos Sonhos |
+| Derrota especial | Dívida 100 | ambos com 4 Chicotes | 5 Flores | Sede 100 | 5 Espelhos |
+| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas |
+| Recuperação da equipe | redução de Dívida | Resistência | poda por evolução | redução de Sede por canastra | Limpa ou superior recupera 1 Espelho |
 | Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo |
-| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim | Labirinto, Reflexo Invertido e Eclipse |
+| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim | Jogo Espelhado, Laço do Tigre, Presa Marcada e Vigilância |
 
 ---
 
@@ -2029,7 +2054,7 @@ Uma evolução que alcance **Canastra Limpa ou superior** recupera 1 Espelho, se
 - Fase 2 — **Circo da Lua Morta**;
 - Fase 3 — **Pesadelo Eterno**.
 
-## 15.4 Rotação ativa V6
+## 15.4 Rotação ativa
 
 ### Jogo Espelhado
 
@@ -2113,9 +2138,34 @@ Todos mostram a mesma carta e nenhum recebe `X` ou pista falsa automática. O de
 - erro: +1 Espelho;
 - se isso alcançar `5/5`, o Mundo do Espelho encerra a batalha.
 
+### Laço do Tigre
+
+Tiger's Eye liga dois jogos. Cada lado precisa receber pelo menos 1 carta; se um lado for ignorado, as garras persistem e a próxima alimentação rompe o efeito sem dano individual das cartas usadas para romper.
+
+### Presa Marcada
+
+Tiger's Eye marca um jogo que o alvo consegue alimentar. Até resolver a Presa, esse jogador não pode alimentar outro jogo existente.
+
+### Olho do Falcão
+
+Hawk's Eye exige descarte do naipe marcado. Errar faz Hawk vigiar a carta do topo e bloqueia a retirada do lixo enquanto ela permanecer ali.
+
+### Vigilância
+
+Hawk's Eye impede o alvo de alimentar o jogo marcado naquele turno.
+
+### Mão no Espelho
+
+Fish Eye marca uma carta que precisa sair da mão por jogo ou descarte; se falhar, vira Reflexo Morto e só pode sair pelo descarte.
+
+### Reflexo Invertido
+
+Fish Eye impede abrir jogo novo até alimentar um jogo existente. O efeito persiste até ser resolvido.
+
 ## 15.5 Feedback visual
 
 - cinco pequenos espelhos ornamentados ficam visíveis no HUD;
+- Tiger's Eye, Hawk's Eye e Fish Eye aparecem em painéis próprios sob o HUD quando participam da luta;
 - espelhos tomados ficam rachados/avermelhados;
 - em `3/5` ou `4/5`, o retrato entra em pressão de Mundo do Espelho;
 - o Jogo Espelhado usa duas instâncias de tamanho normal dentro do `meld-container`;
