@@ -3326,13 +3326,14 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span {
     radial-gradient(circle, rgba(255, 226, 228, 0.18) 0 1.4px, transparent 2.2px) 7px 2px / 37px 13px repeat-x,
     radial-gradient(circle, rgba(255, 190, 196, 0.12) 0 1.8px, transparent 2.8px) 21px 7px / 53px 17px repeat-x,
     radial-gradient(ellipse, rgba(255, 238, 239, 0.1) 0 2px, transparent 3.4px) 4px 4px / 71px 19px repeat-x,
-    linear-gradient(180deg, #8f1a29 0%, #67101c 24%, #4b0712 59%, #250208 100%);
+    linear-gradient(180deg, #ff5a66 0%, #f2263d 22%, #d80d2a 55%, #8f0018 100%);
   box-shadow:
-    inset 0 2px 0 rgba(255, 226, 228, 0.12),
-    inset 0 -5px 6px rgba(12, 0, 3, 0.58),
-    inset -5px 0 8px rgba(28, 0, 6, 0.34),
-    0 0 11px rgba(116, 10, 25, 0.68);
-  filter: saturate(1.12) contrast(1.04);
+    inset 0 2px 0 rgba(255, 245, 246, 0.42),
+    inset 0 -5px 6px rgba(74, 0, 12, 0.46),
+    inset -5px 0 8px rgba(92, 0, 14, 0.28),
+    0 0 8px rgba(255, 37, 65, 0.92),
+    0 0 16px rgba(255, 20, 48, 0.48);
+  filter: saturate(1.42) brightness(1.15) contrast(1.08);
   animation:
     dimitrescuBloodFlow 6.4s linear infinite,
     dimitrescuBloodThrob 3.2s ease-in-out infinite;
@@ -3356,20 +3357,65 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::afte
   z-index: 2;
   left: 0;
   right: 0;
-  top: calc(100% - 2px);
+  top: calc(100% - 1px);
   height: 18px;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 50% 0%, #5f0a17 0 34%, transparent 39%) 2px 0 / 31px 12px repeat-x,
-    radial-gradient(ellipse at 50% 0%, #74101d 0 28%, transparent 34%) 17px 1px / 47px 16px repeat-x,
-    radial-gradient(circle, #47050e 0 2px, transparent 2.8px) 9px 7px / 59px 13px repeat-x,
-    radial-gradient(circle, #68101a 0 1.6px, transparent 2.4px) 28px 10px / 73px 16px repeat-x;
-  filter: drop-shadow(0 3px 1px rgba(0, 0, 0, 0.52)) drop-shadow(0 1px 2px rgba(88, 4, 18, 0.36));
+    linear-gradient(180deg, rgba(255, 60, 82, 0.96) 0%, #e51835 46%, rgba(157, 0, 25, 0.36) 86%, transparent 100%) 19% 0 / 2px 8px no-repeat,
+    linear-gradient(180deg, rgba(255, 72, 91, 0.98) 0%, #e71332 48%, rgba(142, 0, 22, 0.34) 88%, transparent 100%) 46% 0 / 1px 14px no-repeat,
+    linear-gradient(180deg, rgba(247, 42, 67, 0.94) 0%, #cf0b29 50%, rgba(126, 0, 20, 0.3) 88%, transparent 100%) 68% 0 / 2px 10px no-repeat,
+    linear-gradient(180deg, rgba(255, 61, 82, 0.92) 0%, #da102e 48%, rgba(133, 0, 21, 0.28) 88%, transparent 100%) 91% 0 / 1px 16px no-repeat;
+  filter:
+    drop-shadow(0 2px 1px rgba(0, 0, 0, 0.42))
+    drop-shadow(0 0 1px rgba(255, 38, 65, 0.2));
   transform-origin: 50% 0;
-  animation: dimitrescuBloodDripField 3.4s ease-in-out infinite;
+  animation: dimitrescuBloodDripField 4.2s ease-in-out infinite;
 }
 body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0']::after {
   display: none;
+}
+
+/* Moldura PNG da Sede de Sangue: o preenchimento continua funcional por baixo da arte. */
+body[data-boss-id='dimitrescu'] .boss-blood-meter {
+  padding-inline: 7px;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track {
+  position: relative;
+  isolation: isolate;
+  height: 18px;
+  margin: 13px 31px 6px 34px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(37, 2, 8, 0.96), rgba(10, 0, 3, 0.98));
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.86),
+    inset 0 0 10px rgba(97, 7, 19, 0.46);
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span {
+  z-index: 1;
+  height: 100%;
+  border-radius: 999px;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  left: -35px;
+  right: -32px;
+  top: 50%;
+  height: 48px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background-image: url('../assets/images/dimitrescu-blood-meter-frame.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  filter:
+    drop-shadow(0 3px 3px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 0 6px rgba(142, 20, 31, 0.38));
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after {
+  z-index: 2;
 }
 @keyframes dimitrescuBloodFlow {
   from {
@@ -3390,40 +3436,44 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0'
 @keyframes dimitrescuBloodThrob {
   0%,
   100% {
-    filter: saturate(1.08) brightness(0.96) contrast(1.04);
+    filter: saturate(1.35) brightness(1.08) contrast(1.06);
   }
   50% {
-    filter: saturate(1.2) brightness(1.08) contrast(1.08);
+    filter: saturate(1.55) brightness(1.22) contrast(1.1);
   }
 }
 @keyframes dimitrescuBloodDripField {
-  0%,
-  100% {
-    transform: scaleY(0.78) translateY(-1px);
-    opacity: 0.68;
-    background-position:
-      2px 0,
-      17px 1px,
-      9px 7px,
-      28px 10px;
+  0% {
+    transform: translateY(0) scaleY(0.68);
+    opacity: 0.52;
   }
-  45% {
-    transform: scaleY(1.06) translateY(1px);
-    opacity: 0.98;
-    background-position:
-      6px 0,
-      14px 1px,
-      13px 8px,
-      24px 11px;
+  44% {
+    transform: translateY(0) scaleY(1.02);
+    opacity: 0.86;
+  }
+  54% {
+    transform: translateY(0) scaleY(1.16);
+    opacity: 0.94;
+  }
+  62% {
+    transform: translateY(2px) scaleY(1.04);
+    opacity: 0.88;
   }
   72% {
-    transform: scaleY(0.92) translateY(0);
-    opacity: 0.84;
-    background-position:
-      4px 0,
-      20px 1px,
-      11px 6px,
-      31px 10px;
+    transform: translateY(6px) scaleY(0.96);
+    opacity: 0.66;
+  }
+  82% {
+    transform: translateY(11px) scaleY(0.86);
+    opacity: 0;
+  }
+  83% {
+    transform: translateY(0) scaleY(0.66);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scaleY(0.68);
+    opacity: 0.52;
   }
 }
 
@@ -3698,6 +3748,16 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
 .boss-mode .carta.boss-card-cassandra-feast::after {
   inset: 0 0 -20px 0;
   opacity: 0.96;
+}
+/* Banquete de Cassandra: a carta horizontal de fechamento continua presa à PRÓPRIA canastra.
+   O efeito de sangue acima usa position:relative nas cartas marcadas; sem esta exceção ele
+   sobrescreve o position:absolute de .canastra-fechada e joga a carta para o fluxo do jogo seguinte. */
+.boss-mode .carta.mini.canastra-fechada.boss-card-cassandra-feast {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: 0 !important;
+  transform: translate(-50%, -35%) rotate(90deg) !important;
 }
 .boss-mode #drawDiscardBtn.boss-daniela-discard .pile-card {
   box-shadow:
@@ -6294,17 +6354,17 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   position: relative;
   isolation: isolate;
   outline: 2px solid rgba(248, 113, 113, 0.9);
-  outline-offset: 4px;
-  border-radius: 8px;
+  outline-offset: 0;
+  border-radius: 5px;
   box-shadow: 0 0 0 1px rgba(127,29,29,.52), 0 0 18px rgba(239,68,68,.38);
   animation: neheleniaTigerMeldPulse 1.8s ease-in-out infinite;
 }
 .boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark::before {
   content: '';
   position: absolute;
-  inset: -5px;
+  inset: 0;
   z-index: 8;
-  border-radius: 10px;
+  border-radius: 5px;
   pointer-events: none;
   background:
     linear-gradient(118deg, transparent 0 33%, rgba(254,202,202,.82) 34% 35%, rgba(239,68,68,.72) 36%, transparent 37% 48%, rgba(254,202,202,.72) 49% 50%, rgba(185,28,28,.68) 51%, transparent 52% 63%, rgba(248,113,113,.68) 64% 65%, transparent 66% 100%);
@@ -6328,16 +6388,16 @@ body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card[data-attendant='fi
   position: relative;
   isolation: isolate;
   outline: 2px solid rgba(250, 204, 21, 0.94);
-  outline-offset: 4px;
-  border-radius: 8px;
+  outline-offset: 0;
+  border-radius: 5px;
   box-shadow: 0 0 0 1px rgba(133,77,14,.46), 0 0 20px rgba(250,204,21,.34);
   animation: neheleniaHawkMeldPulse 1.6s ease-in-out infinite;
 }
 .boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark::after {
   content: '◉';
   position: absolute;
-  top: -13px;
-  right: -10px;
+  top: -9px;
+  right: -7px;
   z-index: 9;
   width: 20px;
   height: 20px;
@@ -6513,4 +6573,93 @@ body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.boss-
   font-size: 7px;
   font-weight: 1000;
   letter-spacing: .35px;
+}
+
+
+/* Dimitrescu — gotas independentes. Mantém o visual da V6 e só separa o relógio de cada gota. */
+body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after {
+  content: none !important;
+  animation: none !important;
+}
+
+body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% - 1px);
+  display: block;
+  pointer-events: none;
+  transform-origin: 50% 0;
+  opacity: 0;
+  filter:
+    drop-shadow(0 2px 1px rgba(0, 0, 0, 0.42))
+    drop-shadow(0 0 1px rgba(255, 38, 65, 0.2));
+}
+
+body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-1 {
+  left: 19%;
+  width: 2px;
+  height: 8px;
+  background: linear-gradient(180deg, rgba(255, 60, 82, 0.96) 0%, #e51835 46%, rgba(157, 0, 25, 0.36) 86%, transparent 100%);
+  animation: dimitrescuBloodDropFall 5.1s ease-in-out -0.7s infinite;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-2 {
+  left: 46%;
+  width: 1px;
+  height: 14px;
+  background: linear-gradient(180deg, rgba(255, 72, 91, 0.98) 0%, #e71332 48%, rgba(142, 0, 22, 0.34) 88%, transparent 100%);
+  animation: dimitrescuBloodDropFall 6.35s ease-in-out -3.1s infinite;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-3 {
+  left: 68%;
+  width: 2px;
+  height: 10px;
+  background: linear-gradient(180deg, rgba(247, 42, 67, 0.94) 0%, #cf0b29 50%, rgba(126, 0, 20, 0.3) 88%, transparent 100%);
+  animation: dimitrescuBloodDropFall 4.65s ease-in-out -1.9s infinite;
+}
+body[data-boss-id='dimitrescu'] .boss-blood-meter .dimitrescu-blood-drop.drop-4 {
+  left: 91%;
+  width: 1px;
+  height: 16px;
+  background: linear-gradient(180deg, rgba(255, 61, 82, 0.92) 0%, #da102e 48%, rgba(133, 0, 21, 0.28) 88%, transparent 100%);
+  animation: dimitrescuBloodDropFall 7.15s ease-in-out -4.8s infinite;
+}
+
+/* A gota estica, SOLTA, cai e some. O retorno ao topo acontece 100% invisível. */
+@keyframes dimitrescuBloodDropFall {
+  0%, 12% {
+    transform: translateY(0) scaleY(0.64);
+    opacity: 0;
+  }
+  18% {
+    transform: translateY(0) scaleY(0.7);
+    opacity: 0.48;
+  }
+  43% {
+    transform: translateY(0) scaleY(1.02);
+    opacity: 0.86;
+  }
+  53% {
+    transform: translateY(0) scaleY(1.16);
+    opacity: 0.94;
+  }
+  61% {
+    transform: translateY(2px) scaleY(1.04);
+    opacity: 0.88;
+  }
+  70% {
+    transform: translateY(6px) scaleY(0.96);
+    opacity: 0.66;
+  }
+  78% {
+    transform: translateY(12px) scaleY(0.84);
+    opacity: 0;
+  }
+  79%, 100% {
+    transform: translateY(0) scaleY(0.64);
+    opacity: 0;
+  }
+}
+
+body[data-boss-id='dimitrescu'] .boss-blood-meter #bossDebtBar[style^='width: 0'] .dimitrescu-blood-drop {
+  display: none;
 }
