@@ -1221,9 +1221,23 @@ function createPayload(gameState, abilityId) {
     if (abilityId === 'follow_reflection') {
       const players = [...(gameState.players || [])];
       if (players.length < 2) return {};
-      const first = players[gameState.currentPlayer] || players[0];
-      const second = players.find((player) => player.id !== first.id) || players[1];
-      return { firstPlayerId: first.id, secondPlayerId: second.id, patternCount: null, firstPlayedCount: 0, patternLocked: false, secondPlayedCount: 0, cardsPlayedByPlayer: {}, resolved: false };
+      const boss = gameState.boss;
+      const preferredFirstId = boss.playersActedThisRound?.length === 0 ? boss.roundFirstPlayerId : null;
+      let firstIndex = preferredFirstId == null ? -1 : players.findIndex((player) => player.id === preferredFirstId);
+      if (firstIndex < 0) firstIndex = Math.max(0, Math.min(players.length - 1, Number(gameState.currentPlayer) || 0));
+      const first = players[firstIndex];
+      const second = players[(firstIndex + 1) % players.length];
+      return {
+        firstPlayerId: first.id,
+        secondPlayerId: second.id,
+        sequenceRound: boss.roundNumber,
+        patternCount: null,
+        firstPlayedCount: 0,
+        patternLocked: false,
+        secondPlayedCount: 0,
+        cardsPlayedByPlayer: {},
+        resolved: false,
+      };
     }
     if (abilityId === 'dream_theft') {
       const target = chooseSeeded(neheleniaIntactPlayers(gameState).filter((player) => player.hand?.length), gameState, 389);
@@ -1594,6 +1608,7 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     lastPropagationEventId: null,
     roundNumber: 1,
     playersActedThisRound: [],
+    roundFirstPlayerId: null,
     currentIntent: null,
     lastAbilityId: null,
     effects: [],
@@ -1695,6 +1710,7 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   boss.meldIdSequence ||= 0;
   boss.resolvedTurnIds ||= [];
   boss.playersActedThisRound ||= [];
+  boss.roundFirstPlayerId ??= gameState.players?.[gameState.currentPlayer]?.id ?? null;
   boss.phaseTransitions ||= [boss.phase || 1];
   boss.pendingPhase ??= null;
   boss.phaseTransitionId ??= null;
@@ -5689,6 +5705,11 @@ export function completeBossPlayerTurn(gameState, playerId) {
   }
   let phaseEvent = null;
   if (allPlayersActed) {
+    const completedIndex = gameState.players.findIndex((entry) => entry.id === playerId);
+    const nextRoundFirst = completedIndex >= 0 && gameState.players.length
+      ? gameState.players[(completedIndex + 1) % gameState.players.length]
+      : gameState.players?.[gameState.currentPlayer] || null;
+    boss.roundFirstPlayerId = nextRoundFirst?.id ?? null;
     boss.roundNumber += 1;
     boss.playersActedThisRound = [];
     if (boss.id === 'nehelenia') boss.neheleniaDiscardSealRound = 0;

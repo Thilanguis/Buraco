@@ -641,10 +641,16 @@ body[data-boss-id='dominadora'] .boss-round-summary #bossCurrentActor {
 }
 
 .boss-dialogue-presentation {
-  position: absolute;
-  left: 126px;
-  top: 8px;
-  width: clamp(235px, 31vw, 390px);
+  position: absolute !important;
+  left: var(--boss-dialogue-left, 126px) !important;
+  top: var(--boss-dialogue-top, 8px) !important;
+  width: var(--boss-dialogue-width, clamp(235px, 31vw, 390px)) !important;
+  max-width: calc(100% - 16px);
+  margin: 0 !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  align-self: auto !important;
+  justify-self: auto !important;
   display: grid;
   gap: 3px;
   padding: 10px 12px;
@@ -656,7 +662,7 @@ body[data-boss-id='dominadora'] .boss-round-summary #bossCurrentActor {
   transform: rotate(-0.35deg);
   animation: bossSpeechPop 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.25) both;
   pointer-events: none;
-  z-index: 9;
+  z-index: 70;
 }
 .boss-dialogue-presentation::before {
   content: '';
@@ -2042,9 +2048,7 @@ body[data-boss-id='matriarca_esmeralda'] .boss-ability-overview {
     transform-origin: 50% 20%;
   }
   .boss-dialogue-presentation {
-    left: 150px;
-    top: 8px;
-    width: min(390px, calc(100% - 166px));
+    max-width: calc(100% - 16px);
   }
   .boss-choice-panel {
     align-items: stretch;
@@ -2081,14 +2085,12 @@ body[data-boss-id='matriarca_esmeralda'] .boss-ability-overview {
     font-size: 16px;
   }
   .boss-dialogue-presentation {
-    left: 8px;
-    top: calc(100% + 7px);
-    width: calc(100% - 16px);
+    max-width: calc(100% - 12px);
   }
   .boss-dialogue-presentation::before {
-    left: 46px;
-    top: -10px;
-    transform: rotate(135deg);
+    left: -11px;
+    top: 19px;
+    transform: rotate(45deg);
   }
   .boss-result-section {
     padding: 10px;
@@ -3610,12 +3612,7 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
 }
 
 .boss-mode .carta.boss-card-dimitrescu-hunt,
-.boss-mode .carta.boss-card-dimitrescu-blood-mark {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-}
-
+.boss-mode .carta.boss-card-dimitrescu-blood-mark,
 .boss-mode .carta.boss-card-cassandra-feast,
 .boss-mode .discard-face.boss-discard-dimitrescu-card,
 .boss-mode .morto-container .boss-dead-blood-layer {
@@ -3666,6 +3663,8 @@ body[data-boss-id='dimitrescu'] .boss-daughter-card[data-daughter='daniela'] img
   mix-blend-mode: multiply;
   filter: saturate(1.18) contrast(1.08);
 }
+.boss-mode .carta.boss-card-dimitrescu-hunt::after,
+.boss-mode .carta.boss-card-dimitrescu-blood-mark::after,
 .boss-mode .carta.boss-card-cassandra-feast::after,
 .boss-mode .discard-face.boss-discard-dimitrescu-card::after,
 .boss-mode .morto-container .boss-dead-blood-layer::after {
@@ -3979,6 +3978,8 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
 @media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse) {
   body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span,
   body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track > span::after,
+  .boss-mode .carta.boss-card-dimitrescu-hunt::after,
+  .boss-mode .carta.boss-card-dimitrescu-blood-mark::after,
   .boss-mode .discard-face.boss-discard-dimitrescu-card::after,
   body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-impact,
   body[data-boss-id='dimitrescu'] .boss-portrait.boss-blood-clot-breaking {
@@ -6177,6 +6178,7 @@ body[data-boss-id='nehelenia'] .boss-daughter-strip {
 }
 body[data-boss-id='nehelenia'] .boss-nehelenia-attendant-card {
   position: relative;
+  grid-row: 1;
   border-color: rgba(167, 139, 250, 0.58);
   background: radial-gradient(circle at 50% 12%, rgba(96, 165, 250, 0.12), transparent 38%), linear-gradient(180deg, rgba(19, 10, 43, 0.97), rgba(6, 5, 19, 0.99));
   box-shadow:
@@ -7442,3 +7444,13 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-dimitrescu-phase-shift img {
   }
 }
 
+
+/* DIMITRESCU — estabiliza o hover das cartas marcadas na mão.
+   O sangue continua podendo "vazar" visualmente até 18px, mas deixa de
+   ampliar a área rolável horizontal do handContainer durante scale/rotate. */
+.boss-mode #handContainer .carta.boss-card-dimitrescu-hunt,
+.boss-mode #handContainer .carta.boss-card-dimitrescu-blood-mark {
+  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 18px;
+}

@@ -761,8 +761,8 @@ function neheleniaMirrorProgress(gameState, intent) {
     const first = locked ? Math.max(0, Number(payload.patternCount) || 0) : Math.max(0, Number(payload.firstPlayedCount) || 0);
     const second = Math.max(0, Number(payload.secondPlayedCount) || 0);
     return [
-      `${locked ? '☑' : '☐'} ${firstName} — ${locked ? `padrão fechado: ${first} carta${first === 1 ? '' : 's'}` : `${first} baixada${first === 1 ? '' : 's'} até agora · o turno inteiro define o padrão`}`,
-      `${locked && second === first ? '☑' : '☐'} ${secondName} — ${locked ? `${second}/${first} · pode jogar livremente, mas precisa terminar exatamente igual` : 'aguarda o fim do primeiro turno'}`,
+      `${locked ? '☑' : '☐'} 1º da rodada · ${firstName} — ${locked ? `padrão fechado: ${first} carta${first === 1 ? '' : 's'}` : `${first} baixada${first === 1 ? '' : 's'} até agora · o turno inteiro define o padrão`}`,
+      `${locked && second === first ? '☑' : '☐'} 2º da rodada · ${secondName} — ${locked ? `${second}/${first} · pode jogar livremente, mas precisa terminar exatamente igual` : 'aguarda o fim do primeiro turno'}`,
     ].join('\n');
   }
   if (intent.abilityId === 'mirror_prison') {
@@ -1237,7 +1237,7 @@ function compactAction(gameState, intent) {
     case 'mirrored_meld':
       return { instruction: `${playerName(gameState, payload.targetPlayerId)}: o mesmo jogo apareceu duas vezes. Selecione 1 carta e escolha qual reflexo é o verdadeiro.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Reflexo falso → carta ao fundo do monte + Desorientado · Ignorar até o fim do turno → Espelho dos Sonhos roubado' };
     case 'follow_reflection':
-      return { instruction: `Tudo o que ${playerName(gameState, payload.firstPlayerId)} baixar no turno vira o padrão. Depois, ${playerName(gameState, payload.secondPlayerId)} pode jogar livremente, mas precisa terminar com exatamente a mesma quantidade — inclusive 0.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Quantidade diferente no fim do segundo turno → +1 Espelho para Nehelenia' };
+      return { instruction: `1º turno desta rodada: ${playerName(gameState, payload.firstPlayerId)} define o padrão pelo turno inteiro. 2º turno: ${playerName(gameState, payload.secondPlayerId)} precisa terminar com a mesma quantidade — inclusive 0.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'A habilidade permanece ativa entre os dois turnos; Nehelenia não sorteia outra habilidade no meio · quantidade diferente no fim do segundo turno → +1 Espelho' };
     case 'dream_theft':
       return { instruction: `${target}: reconheça qual reflexo realmente existe na sua mão.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → seu Espelho dos Sonhos é roubado' };
     case 'discard_mirror':

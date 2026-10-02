@@ -5395,7 +5395,8 @@ function renderBossDaughterStrip(definition, boss) {
   // Dimitrescu e Nehelenia usam o mesmo comportamento de palco:
   // sem participante ativo, a faixa some e não ocupa espaço; quando a habilidade
   // chama alguém, renderiza somente o(s) participante(s) daquela habilidade.
-  const memberList = [...activeIds];
+  const rosterOrder = Object.keys(roster || {});
+  const memberList = [...activeIds].sort((a, b) => rosterOrder.indexOf(a) - rosterOrder.indexOf(b));
   const signature = `${definition.id}:${abilityId}:${memberList.map((id) => `${id}:${statusFor(id)}`).join(',')}`;
   if (strip.dataset.signature === signature) {
     strip.hidden = memberList.length === 0;
@@ -6334,6 +6335,26 @@ function scheduleNeheleniaMirroredMeldSplit(intent, teamId, meldIndex) {
   });
 }
 
+function positionBossDialogueOverlay(hud) {
+  const portrait = hud?.querySelector('.boss-portrait');
+  if (!hud || !portrait || hud.style.display === 'none') return;
+
+  const hudRect = hud.getBoundingClientRect();
+  const portraitRect = portrait.getBoundingClientRect();
+  if (!hudRect.width || !portraitRect.width || !portraitRect.height) return;
+
+  // A ponta do balão nasce dentro da região do rosto/retrato, mas o próprio
+  // painel continua sendo um overlay absoluto do HUD. Nada entra no grid.
+  const left = Math.max(8, portraitRect.left - hudRect.left + portraitRect.width * 0.58);
+  const top = Math.max(6, portraitRect.top - hudRect.top + portraitRect.height * 0.08);
+  const availableWidth = Math.max(178, hudRect.width - left - 12);
+  const width = Math.min(390, availableWidth);
+
+  hud.style.setProperty('--boss-dialogue-left', `${Math.round(left)}px`);
+  hud.style.setProperty('--boss-dialogue-top', `${Math.round(top)}px`);
+  hud.style.setProperty('--boss-dialogue-width', `${Math.round(width)}px`);
+}
+
 function renderBossHud() {
   const hud = document.getElementById('bossHud');
   const resultSection = document.getElementById('bossResultSection');
@@ -6398,6 +6419,7 @@ function renderBossHud() {
   hud.dataset.springCrownStage = springCrownBuffed ? boss.springCrown.status : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
   setBossPortrait(document.getElementById('bossPortraitImage'), definition, boss);
+  positionBossDialogueOverlay(hud);
   renderBossDaughterStrip(definition, boss);
   renderBossAbilityGuide(definition, boss);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
@@ -7286,9 +7308,9 @@ function renderAll() {
   const cardCount = currP && currP.hand ? currP.hand.length : 0; // 🔥 CORREÇÃO: Variável declarada corretamente no escopo de renderAll
 
   document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? `Sua Vez! (${cardCount})` : `Vez de ${pName} (${cardCount})`;
+  syncTurnScopedFeedback({ isMyTurnRightNow, currentName: pName });
 
   // Exibe o contador de cartas no chip de status do topo esquerdo
-  document.getElementById('currentPlayerLabel').textContent = isMyTurnRightNow ? `Sua Vez! (${cardCount})` : `Vez de ${pName} (${cardCount})`;
   const currentChip = document.querySelector('.current-player-chip');
   if (currentChip) currentChip.classList.toggle('is-my-turn', isMyTurnRightNow);
   document.getElementById('stockCount').textContent = state.stock.length;
@@ -9365,8 +9387,47 @@ function renderScores(scores, winner) {
   });
 }
 
-function showMessage(msg) {
-  document.getElementById('message').textContent = msg;
+let turnScopedMessage = null;
+
+function showMessage(msg, { turnScoped = false, playerIndex = null, turnNumber = null } = {}) {
+  const message = document.getElementById('message');
+  if (message) message.textContent = msg;
+  turnScopedMessage = turnScoped
+    ? {
+        playerIndex: playerIndex ?? state?.currentPlayer ?? null,
+        turnNumber: turnNumber ?? state?.turnNumber ?? null,
+      }
+    : null;
+}
+
+function showBotTurnMessage(msg) {
+  showMessage(msg, {
+    turnScoped: true,
+    playerIndex: state?.currentPlayer ?? null,
+    turnNumber: state?.turnNumber ?? null,
+  });
+}
+
+function syncTurnScopedFeedback({ isMyTurnRightNow = false, currentName = '' } = {}) {
+  if (!turnScopedMessage || !state) return;
+  const stale = turnScopedMessage.turnNumber !== state.turnNumber || turnScopedMessage.playerIndex !== state.currentPlayer;
+  if (!stale) return;
+
+  turnScopedMessage = null;
+  const message = document.getElementById('message');
+  if (!message) return;
+
+  if (isMyTurnRightNow) {
+    message.textContent = state.hasDrawnThisTurn
+      ? 'Sua vez: você já comprou. Jogue se quiser e descarte 1 carta para encerrar.'
+      : 'Sua vez: compre do Monte ou do Lixo.';
+    return;
+  }
+  if (isBossTurnActive(state)) {
+    message.textContent = `${getBossDefinition(state.boss?.id)?.name || 'O chefe'} está preparando a ação da rodada.`;
+    return;
+  }
+  message.textContent = currentName ? `Vez de ${currentName}.` : '';
 }
 
 async function playRemoteAction(a) {
@@ -9812,7 +9873,7 @@ const botEngine = {
   getState: () => state,
   isActive: () => !window.isClosingGame && !localExitPending && !!state,
   commitState: async () => commitState(),
-  showMessage: (msg) => showMessage(msg),
+  showMessage: (msg) => showBotTurnMessage(msg),
   computeTeamMeldScore: (team) => computeTeamMeldScore(team),
   isValidSequenceMeld: (cards) => isValidSequenceMeld(cards),
   canTeamTakeDeadNow: (teamId) => canTeamTakeDeadNow(teamId),

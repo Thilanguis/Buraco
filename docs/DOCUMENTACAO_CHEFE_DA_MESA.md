@@ -88,7 +88,9 @@ Durante a apresentação:
 
 ## 1.4 Diálogos e feedback
 
-O balão de quadrinho é reservado para:
+O balão de quadrinho é um **overlay flutuante ancorado ao retrato do chefe**. Ele nunca participa do grid nem aumenta a altura do HUD; abrir/fechar o diálogo não pode deslocar o cartão da habilidade, a mesa ou as pilhas.
+
+O balão é reservado para:
 
 - primeira habilidade;
 - habilidade atual;
@@ -1772,6 +1774,8 @@ Mostrar:
 
 O painel recolhível do HUD mostra **Habilidades do chefe**: condição especial, habilidades da rotação, fases em que cada uma pode aparecer e destaque da habilidade ativa. O registro técnico da batalha continua no estado para sincronização e diagnóstico, mas não ocupa mais esse painel.
 
+Na Nehelenia, capangas simultâneos usam a mesma faixa fixa de três posições da Dimitrescu e permanecem na **mesma linha** (Tiger, Hawk, Fish), mesmo quando efeitos persistentes fazem dois ou três aparecerem juntos.
+
 ## 9.2 Banqueiro
 
 Mostrar:
@@ -2096,6 +2100,8 @@ Luana pode baixar cartas normalmente, mas se baixar qualquer quantidade acima de
 
 Regras:
 
+- a ordem é travada pela sequência real da rodada: **1º jogador que vai agir = define**, **2º jogador que vai agir = copia**;
+- a habilidade permanece sendo a intenção atual durante os dois turnos; Nehelenia **não sorteia outra habilidade no meio**;
 - contam todas as cartas colocadas legalmente na mesa pelo primeiro jogador;
 - o padrão é fechado somente quando o turno dele termina;
 - o segundo jogador **não é bloqueado** por tentar passar do número;
