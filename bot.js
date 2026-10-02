@@ -655,6 +655,167 @@ export class BuracoBot {
   }
 
   // 🛡️ NOVO CÉREBRO: O bot agora sabe quando a própria jogada vai liberar a batida
+  static bossResourceRiskScore(current, max, delta = 0, sidePenalty = 0) {
+    const cap = Math.max(1, Number(max) || 1);
+    const before = Math.max(0, Math.min(cap, Number(current) || 0));
+    const applied = Math.max(0, Number(delta) || 0);
+    const after = Math.max(0, Math.min(cap, before + applied));
+    if (applied > 0 && after >= cap) return 1000;
+
+    const afterRatio = after / cap;
+    const deltaRatio = applied / cap;
+    return deltaRatio * 150 + Math.pow(afterRatio, 3) * 120 + Math.max(0, Number(sidePenalty) || 0);
+  }
+
+  static dominatrixRiskScore(state, playerId, addedChains = 1) {
+    const boss = state?.boss;
+    if (!boss || boss.id !== 'dominadora') return 0;
+    const players = state.players || [];
+    const ownBefore = Math.max(0, Number(boss.chainsByPlayer?.[playerId]) || 0);
+    const partner = players.find((player) => player.id !== playerId);
+    const partnerBefore = Math.max(0, Number(boss.chainsByPlayer?.[partner?.id]) || 0);
+    let ownAfter = ownBefore;
+    let partnerAfter = partnerBefore;
+    let remaining = Math.max(0, Number(addedChains) || 0);
+
+    while (remaining > 0) {
+      if (boss.phase === 3 && ownAfter >= 4 && partner) partnerAfter = Math.min(4, partnerAfter + 1);
+      else ownAfter = Math.min(4, ownAfter + 1);
+      remaining -= 1;
+    }
+
+    if (ownAfter >= 4 && partnerAfter >= 4) return 1000;
+    const ownPenalty = ownAfter >= 4 ? 112 : ownAfter >= 3 ? 74 : ownAfter * 18;
+    const partnerPenalty = partnerAfter >= 4 ? 88 : partnerAfter >= 3 ? 44 : partnerAfter * 8;
+    return ownPenalty + partnerPenalty;
+  }
+
+  static bossStrategicMeldKind(meld) {
+    const cards = (meld || []).filter(Boolean);
+    if (cards.length < 7) return 'simple';
+    if (this.isMeldDirty(cards)) return 'suja';
+    if (cards.length >= 14) return 'asas';
+    if (cards.length === 13) return 'real';
+    return 'limpa';
+  }
+
+  static bossMeldSacrificeCost(baseMeld, testMeld) {
+    const before = (baseMeld || []).filter(Boolean);
+    const after = (testMeld || []).filter(Boolean);
+    if (!before.length || this.isMeldDirty(before) || !this.isMeldDirty(after)) return 0;
+
+    const kind = this.bossStrategicMeldKind(before);
+    if (kind === 'asas') return 230;
+    if (kind === 'real') return 190;
+    if (kind === 'limpa') return 130;
+    // Mesmo antes de fechar canastra, uma sequência limpa longa tem valor futuro.
+    return 36 + Math.min(6, before.length) * 9;
+  }
+
+  static bossThreatScore(state, player, {
+    card = null,
+    meldIndex = null,
+    naturePriorities = null,
+    dominatrixPriorities = null,
+    dimitrescuPriorities = null,
+    neheleniaPriorities = null,
+    financedCardIds = [],
+    bankerAuditCardIds = [],
+    directObjective = false,
+  } = {}) {
+    const boss = state?.boss;
+    if (!boss || !state?.mode?.startsWith('boss_')) return 0;
+    const intent = boss.currentIntent;
+    const cardId = card?.id || null;
+
+    if (boss.id === 'banker') {
+      let debt = 0;
+      if (cardId && financedCardIds.includes(cardId)) {
+        const financed = (boss.effects || []).find((effect) => effect.id === 'financed_card' && effect.playerId === player.id && effect.cardId === cardId);
+        debt = Math.max(debt, Number(financed?.debtPerCard) || 0);
+      }
+      if (intent?.abilityId === 'suit_audit' && cardId && bankerAuditCardIds.includes(cardId)) {
+        const remaining = Math.max(1, (Number(intent.payload?.required) || 0) - (Number(intent.payload?.progress) || 0));
+        debt = Math.max(debt, (Number(intent.payload?.failureDelta) || 0) / remaining);
+      }
+      if (!debt && directObjective && intent?.abilityId === 'compound_interest') {
+        const totalCards = (state.players || []).reduce((sum, entry) => sum + (entry.hand?.length || 0), 0);
+        debt = totalCards >= 14 ? Number(intent.payload?.dangerDebt) || 14 : totalCards >= 8 ? Number(intent.payload?.warningDebt) || 10 : 0;
+      }
+      return this.bossResourceRiskScore(boss.danger, boss.maxDanger || 100, debt);
+    }
+
+    if (boss.id === 'matriarca_esmeralda') {
+      let bloom = 0;
+      let sidePenalty = 0;
+      const threats = (boss.natureThreats || []).filter((threat) => threat?.status === 'active');
+      for (const threat of threats) {
+        const matchesCard = cardId && threat.cardId === cardId && threat.targetPlayerId === player.id;
+        const matchesMeld = Number.isInteger(meldIndex) && (
+          threat.meldIndex === meldIndex || (threat.meldIndexes || []).includes(meldIndex)
+        );
+        const matchesHarvest = naturePriorities?.harvestActive && threat.type === 'harvest' && threat.targetPlayerId === player.id;
+        if (!matchesCard && !matchesMeld && !matchesHarvest) continue;
+        bloom = Math.max(bloom, Number(threat.bloomAmount) || (threat.type === 'graft' ? 2 : 1));
+        sidePenalty = Math.max(sidePenalty, (Number(threat.healAmount) || 0) / 5);
+      }
+      if (!bloom && directObjective) bloom = boss.bloom >= 4 ? 1 : 0;
+      return this.bossResourceRiskScore(boss.bloom, boss.maxDanger || 5, bloom, sidePenalty);
+    }
+
+    if (boss.id === 'dominadora') {
+      let chains = 0;
+      if (cardId && (dominatrixPriorities?.markedCardIds || []).includes(cardId)) chains = 1;
+      if (Number.isInteger(meldIndex) && (dominatrixPriorities?.meldIndexes || []).includes(meldIndex)) chains = 1;
+      if (!chains && directObjective && dominatrixPriorities?.urgent) chains = 1;
+      return chains ? this.dominatrixRiskScore(state, player.id, chains) : 0;
+    }
+
+    if (boss.id === 'dimitrescu') {
+      const phase = Number(intent?.announcedPhase || boss.phase || 1);
+      let blood = 0;
+      if (intent?.abilityId === 'bela_hunt' && cardId === intent.payload?.cardId && intent.payload?.targetPlayerId === player.id && !intent.payload?.used) {
+        blood = (phase === 3 ? 16 : 14) + 3;
+      } else if (intent?.abilityId === 'cassandra_feast' && Number.isInteger(meldIndex) && meldIndex === intent.payload?.meldIndex && !intent.payload?.fed) {
+        blood = (phase === 3 ? 18 : 16) + 4;
+      } else if (intent?.abilityId === 'crimson_brand' && cardId) {
+        const mark = (intent.payload?.marks || []).find((entry) => entry.status === 'active' && entry.playerId === player.id && entry.cardId === cardId);
+        if (mark) blood = (phase === 3 ? 9 : 7) + 2;
+      } else if (intent?.abilityId === 'three_daughters') {
+        const objectives = intent.payload?.objectives || [];
+        const bela = objectives.find((entry) => entry.type === 'bela' && entry.status === 'active' && entry.targetPlayerId === player.id && entry.cardId === cardId);
+        const cassandra = objectives.find((entry) => entry.type === 'cassandra' && entry.status === 'active' && Number.isInteger(meldIndex) && entry.meldIndex === meldIndex);
+        if (bela || cassandra) blood = 10; // +8 evitado e -2 conquistado.
+      }
+      if (!blood && directObjective && dimitrescuPriorities?.urgent) blood = boss.danger >= 85 ? 12 : 0;
+      return this.bossResourceRiskScore(boss.danger, boss.maxDanger || 100, blood);
+    }
+
+    if (boss.id === 'nehelenia') {
+      let mirrors = 0;
+      let sidePenalty = 0;
+      if (intent?.abilityId === 'mirrored_meld' && Number.isInteger(meldIndex) && meldIndex === intent.payload?.meldIndex && !intent.payload?.fed) mirrors = 1;
+      if (intent?.abilityId === 'follow_reflection' && neheleniaPriorities?.exactPlayCount != null) mirrors = 1;
+      if (intent?.abilityId === 'tiger_link' && Number.isInteger(meldIndex) && (neheleniaPriorities?.meldIndexes || []).includes(meldIndex)) sidePenalty = 48;
+      if (intent?.abilityId === 'tiger_prey' && Number.isInteger(meldIndex) && (neheleniaPriorities?.meldIndexes || []).includes(meldIndex)) sidePenalty = 58;
+      if (intent?.abilityId === 'fish_inverted' && Number.isInteger(meldIndex) && (neheleniaPriorities?.meldIndexes || []).includes(meldIndex)) sidePenalty = 64;
+      if (intent?.abilityId === 'fish_marked_card' && cardId && (neheleniaPriorities?.markedCardIds || []).includes(cardId)) sidePenalty = 52;
+      if (!mirrors && !sidePenalty && directObjective && neheleniaPriorities?.urgent) sidePenalty = 36;
+      return this.bossResourceRiskScore(boss.danger, boss.maxDanger || 5, mirrors, sidePenalty);
+    }
+
+    return 0;
+  }
+
+  static shouldSacrificeMeldForBoss(state, player, baseMeld, testMeld, context = {}) {
+    const sacrificeCost = this.bossMeldSacrificeCost(baseMeld, testMeld);
+    if (sacrificeCost <= 0) return true;
+    const threatScore = this.bossThreatScore(state, player, context);
+    // Derrota imediata / condição crítica sempre pode justificar o sacrifício.
+    if (threatScore >= 1000) return true;
+    return threatScore >= sacrificeCost;
+  }
+
   static canMeldSafely(me, team, cardsToUse, engine, pendingMeld = null, ctx = null) {
     const cardsLeft = me.hand.length - cardsToUse;
 
@@ -764,12 +925,18 @@ export class BuracoBot {
         .filter((effect) => effect.id === 'financed_card' && effect.playerId === me.id)
         .map((effect) => effect.cardId)
         .filter(Boolean);
+      const bankerAuditCardIds = s.boss?.id === 'banker'
+        && s.boss.currentIntent?.abilityId === 'suit_audit'
+        && (Number(s.boss.currentIntent.payload?.progress) || 0) < (Number(s.boss.currentIntent.payload?.required) || 0)
+        ? (me.hand || []).filter((card) => card?.id && !card.joker && card.suit === s.boss.currentIntent.payload?.suit).map((card) => card.id)
+        : [];
       const markedCards = new Set([
         ...(naturePriorities?.markedCardIds || []),
         ...(dominatrixPriorities?.markedCardIds || []),
         ...(dimitrescuPriorities?.markedCardIds || []),
         ...(neheleniaPriorities?.markedCardIds || []),
         ...financedCardIds,
+        ...bankerAuditCardIds,
       ]);
       const markedMelds = new Set([
         ...(naturePriorities?.meldIndexes || []),
@@ -777,9 +944,12 @@ export class BuracoBot {
         ...(dimitrescuPriorities?.meldIndexes || []),
         ...(neheleniaPriorities?.meldIndexes || []),
       ]);
+      const directMarkedCards = new Set(markedCards);
+      const directMarkedMelds = new Set(markedMelds);
       const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dimitrescuPriorities?.urgent || !!neheleniaPriorities?.urgent;
-      if (markedCards.size || markedMelds.size || priorityUrgent) {
-        if (priorityUrgent && !neheleniaPriorities?.strictMeldTargets) {
+      const flexibleBossObjective = neheleniaPriorities?.exactPlayCount != null || !!naturePriorities?.harvestActive;
+      if (markedCards.size || markedMelds.size || priorityUrgent || flexibleBossObjective) {
+        if ((priorityUrgent || flexibleBossObjective) && !neheleniaPriorities?.strictMeldTargets) {
           (team.melds || []).forEach((meld, index) => {
             if (meld?.length) markedMelds.add(index);
           });
@@ -789,28 +959,52 @@ export class BuracoBot {
         const meldIndexes = (team.melds || []).map((meld, index) => ({ meld, index })).sort((a, b) => Number(markedMelds.has(b.index)) - Number(markedMelds.has(a.index)));
 
         let priorityChecks = 0;
-        for (const { meld, index: meldIndex } of meldIndexes) {
-          if (engine.isMeldLocked?.(team.id, meldIndex)) continue;
-          for (const { card, index: handIndex } of cardIndexes) {
-            priorityChecks += 1;
-            if (priorityChecks % 48 === 0) await this.cooperativeYield(engine, signal);
-            if (!card || (!markedCards.has(card.id) && !markedMelds.has(meldIndex))) continue;
-            if (!withinNeheleniaPlayLimit(1) || !preservesNeheleniaDiscardSuit([card])) continue;
-            const testMeld = this.simulateMeld(meld, [card], engine);
-            if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
-            // Feed natural threats with a natural card first. Do not ruin a
-            // clean run for optional progress; allow a wildcard for a deadline.
-            const dirtiesClean = !this.isMeldDirty(meld) && this.isMeldDirty(testMeld);
-            if (naturePriorities && dirtiesClean && !markedCards.has(card.id)
-              && !naturePriorities.meldIndexes?.includes(meldIndex)) continue;
-            if (!engine.isValidSequenceMeld(testMeld) || !this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
-            this.assertActive(engine, signal);
-            const moved = await engine.executeMeldExtend(botIndex, meldIndex, [handIndex]);
-            if (moved !== false) {
-              madeMove = true;
-              await this.paceBetweenActions(engine, signal);
-              break;
+        // Primeiro procura uma solução que preserve a qualidade dos jogos. Só depois
+        // considera sujar algo, e nesse segundo passe o custo estratégico é comparado
+        // com o risco REAL do chefe (barra/Chicotes/efeito persistente).
+        for (const allowSacrifice of [false, true]) {
+          for (const { meld, index: meldIndex } of meldIndexes) {
+            if (engine.isMeldLocked?.(team.id, meldIndex)) continue;
+            for (const { card, index: handIndex } of cardIndexes) {
+              priorityChecks += 1;
+              if (priorityChecks % 48 === 0) await this.cooperativeYield(engine, signal);
+              if (!card || (!markedCards.has(card.id) && !markedMelds.has(meldIndex))) continue;
+              if (!withinNeheleniaPlayLimit(1) || !preservesNeheleniaDiscardSuit([card])) continue;
+              const testMeld = this.simulateMeld(meld, [card], engine);
+              if (!this.preservesDominationMeld(s, botIndex, meld, testMeld, engine)) continue;
+              const dirtiesClean = !this.isMeldDirty(meld) && this.isMeldDirty(testMeld);
+              if (dirtiesClean && !allowSacrifice) continue;
+
+              const directObjective = directMarkedCards.has(card.id)
+                || directMarkedMelds.has(meldIndex)
+                || flexibleBossObjective;
+              if (dirtiesClean) {
+                // Urgência genérica nunca autoriza destruir uma canastra sozinha.
+                // A jogada precisa realmente atender a obrigação atual e o risco
+                // precisa valer mais do que o patrimônio sacrificado.
+                if (!directObjective) continue;
+                if (!this.shouldSacrificeMeldForBoss(s, me, meld, testMeld, {
+                  card,
+                  meldIndex,
+                  naturePriorities,
+                  dominatrixPriorities,
+                  dimitrescuPriorities,
+                  neheleniaPriorities,
+                  financedCardIds,
+                  bankerAuditCardIds,
+                  directObjective,
+                })) continue;
+              }
+              if (!engine.isValidSequenceMeld(testMeld) || !this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
+              this.assertActive(engine, signal);
+              const moved = await engine.executeMeldExtend(botIndex, meldIndex, [handIndex]);
+              if (moved !== false) {
+                madeMove = true;
+                await this.paceBetweenActions(engine, signal);
+                break;
+              }
             }
+            if (madeMove) break;
           }
           if (madeMove) break;
         }
