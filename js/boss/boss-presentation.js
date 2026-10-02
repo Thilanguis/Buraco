@@ -970,44 +970,35 @@ function buildBossRangeMeters(gameState, intent) {
 
 
 const BOSS_HELP_ABILITY_IDS = new Set([
-  // Banqueiro
+  // Banqueiro — termos/escopo que nao cabem no HUD curto.
   'fixed_interest',
   'maintenance_fee',
-  'compound_interest',
   'credit_limit',
 
-  // Dominadora
+  // Dominadora — efeitos compartilhados, persistentes ou com estado especial.
+  'forced_choice',
   'possession',
   'hands_tied',
   'separation',
+  'absolute_control',
   'break_will',
   'final_order',
-  'interdict',
 
-  // Dimitrescu
-  'blood_tithe',
-  'crimson_brand',
+  // Dimitrescu — efeitos persistentes/condicionais.
   'cassandra_dead_feast',
   'crimson_clot',
-  'three_daughters',
 
-  // Matriarca
+  // Matriarca — propagacao, objetivos compostos e protecoes.
   'hungry_root',
-  'restorative_dew',
   'graft',
-  'discard_pollen',
-  'harvest',
   'royal_bloom',
   'emerald_cocoon',
   'spring_crown',
 
-  // Nehelenia / capangas
-  'false_image',
+  // Nehelenia / capangas — ilusoes, persistencia e termos proprios.
   'mirrored_meld',
   'follow_reflection',
-  'dream_theft',
   'discard_mirror',
-  'shattered_mirror',
   'mirror_prison',
   'eternal_nightmare',
   'tiger_link',
@@ -1024,78 +1015,68 @@ function bossAbilityHelpSupplement(gameState, intent) {
 
   switch (intent?.abilityId) {
     case 'fixed_interest':
-      return 'Cofre = uma carta aleatória fica apreendida. Resgatá-la substitui uma compra normal; se o resgate for adiado, o preço sobe a cada turno até chegar ao limite e virar obrigatório.';
+      return 'Cofre: 1 carta do titular fica apreendida. Resgatar substitui a compra normal. Se o titular comprar do Monte e adiar, o resgate sobe +2 por turno nas Fases 1–2 ou +3 na Fase 3, até o valor integral; ao chegar ao limite, o próximo resgate é obrigatório.';
     case 'maintenance_fee':
-      return 'FINANCIADA = carta extra comprada pela Tarifa. Cada carta financiada precisa entrar legalmente em algum jogo naquele turno; descartá-la ou terminar o turno ainda com ela cobra Dívida.';
+      return 'FINANCIADA é a carta extra criada pela Tarifa. Ela só quita a cobrança se entrar legalmente em um jogo naquele turno. Descartá-la ou terminar o turno ainda com ela na mão gera a cobrança uma única vez.';
     case 'credit_limit':
-      return 'A franquia é compartilhada pela equipe. Só as cartas usadas em jogos acima da franquia geram Dívida, até o teto mostrado na habilidade.';
+      return 'A franquia é compartilhada pela equipe e conta somente cartas que vieram da mão e permaneceram legalmente na mesa. Cartas trazidas pelo Lixo, reorganização e cartas que já estavam em jogo não entram na conta. Só o excedente gera Dívida, até o teto mostrado.';
+
+    case 'forced_choice':
+      return 'Se aceitar a ordem, ela vale para o próximo turno do alvo. A Dominadora só oferece uma ordem que pode ser cumprida naquele momento. Se uma mudança externa tornar a ordem impossível, ela é cancelada sem Chicote; se o próprio jogador gastar voluntariamente a forma de cumprir, conta como desobediência.';
     case 'possession':
-      return 'Enquanto o jogo estiver possuído, o dano dele fica suspenso. A Posse termina quando cada cooperador adiciona ao menos 1 carta ou quando o jogo evolui de categoria; então o dano suspenso volta a valer.';
+      return 'A Posse suspende somente o dano antigo do jogo marcado. Cartas novas ainda causam o dano individual normal. O jogo é libertado quando cada cooperador contribui ao menos 1 carta ou quando ele evolui de categoria; nesse momento, apenas o dano antigo suspenso volta a ser aplicado.';
     case 'hands_tied':
-      return 'O limite é da equipe inteira, não de cada jogador: depois que qualquer cooperador criar 1 jogo novo, os dois só podem alimentar jogos existentes até a rodada acabar.';
+      return 'O limite é da equipe inteira: existe apenas 1 jogo novo disponível na rodada. Assim que qualquer cooperador usar essa criação, os dois só podem alimentar jogos existentes até a rodada terminar.';
     case 'separation':
-      return 'Nesta rodada, depois que um jogador alimentar um jogo, o parceiro não pode alimentar esse mesmo jogo. Cada jogo fica, na prática, separado entre os cooperadores durante a rodada.';
+      return 'Nesta rodada, o primeiro cooperador que alimentar um jogo fica vinculado a ele: o parceiro não pode alimentar esse mesmo jogo. Os outros jogos continuam livres.';
+    case 'absolute_control':
+      return `Neste efeito, ${target} é tratado como Dominado durante o próximo turno: não pode pegar o Lixo nem criar jogo novo, mas pode comprar do Monte e alimentar jogos existentes.`;
     case 'break_will':
-      return 'A escolha acontece para um jogador que já esteja sob pressão de Chicotes: ele decide entre receber outro Chicote ou pagar a alternativa envolvendo uma canastra.';
-    case 'interdict':
-      return 'Interdito só reage quando o jogo marcado tenta subir de categoria, por exemplo Limpa → Real. Apenas adicionar cartas sem mudar a categoria não ativa a escolha.';
-    case 'blood_tithe':
-      return 'A cobrança é calculada separadamente para cada mão no fim da rodada. Uma mão pequena não compensa a mão grande do parceiro.';
-    case 'crimson_brand':
-      return 'Cada carta marcada é avaliada separadamente. Usá-la legalmente em jogo reduz a Sede; deixar a marca sobreviver até o fim da rodada aumenta a Sede.';
+      return 'Quebra de Vontade só escolhe um jogador que já tenha pelo menos 2 Chicotes. Ele decide entre receber outro Chicote ou aceitar a alternativa de retirar uma carta válida de canastra.';
+    case 'final_order':
+      return 'Cada cooperador decide separadamente: pode recusar e receber +1 Chicote agora, ou aceitar usar as 2 cartas marcadas em jogos no próximo turno. Se aceitar, 2/2 usadas = 0 Chicotes; 1/2 = +1; 0/2 = +2. Descartar carta marcada não cumpre a ordem.';
+
     case 'cassandra_dead_feast':
-      return 'A maldição fica presa ao próximo Morto. Ela só resolve quando esse Morto for tomado; uma Canastra Real ou Ás-a-Ás reduz a Sede da profanação e anula a cura.';
+      return 'A maldição permanece no próximo Morto até ele ser tomado. Normalmente isso aumenta a Sede e cura Lady. Se a equipe já tiver Canastra Real ou Ás-a-Ás quando conquistar o Morto, ele é purificado: a Sede sobe apenas +4 e a cura é anulada.';
     case 'crimson_clot':
-      return 'O Coágulo absorve dano antes da Lady. Romper toda a proteção reduz a Sede; se sobrar proteção no fim da rodada, metade do restante vira cura.';
-    case 'three_daughters':
-      return 'Bela, Cassandra e Daniela têm objetivos independentes no mesmo turno. Cumprir um não cancela os outros: cada sucesso e cada falha são cobrados separadamente.';
+      return 'O Coágulo recebe o dano antes de Lady. Romper toda a proteção reduz 6 de Sede. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
+
     case 'hungry_root':
-      return 'Se a Raiz não for alimentada, ela pode gerar uma única nova Raiz na rodada seguinte. Uma Raiz que nasceu dessa propagação não se propaga de novo.';
-    case 'restorative_dew':
-      return 'A cura da Matriarca é recalculada por faixas conforme novas cartas entram legalmente na mesa. Quanto mais cartas a equipe baixar, menor a cura; com 6 cartas ela zera.';
+      return 'Se a Raiz falhar, ela pode gerar uma única nova Raiz na rodada seguinte. Uma Raiz que nasceu dessa propagação não se propaga de novo.';
     case 'graft':
-      return 'Os dois jogos ligados são objetivos separados: cada um precisa receber pelo menos 1 carta legal nesta rodada.';
-    case 'discard_pollen':
-      return 'A carta contaminada é o topo específico do Lixo. Se ela for recolhida enquanto ainda estiver contaminada, a Matriarca ganha Flor e cura.';
-    case 'harvest':
-      return `A Colheita olha a quantidade de cartas na mão de ${target} somente no fim do turno desse jogador. A barra mostra em qual faixa ele terminaria se o turno acabasse agora.`;
+      return 'Os dois jogos ligados são objetivos separados. Cada um precisa receber ao menos 1 carta legal nesta rodada; alimentar apenas um lado ainda deixa o outro em falha.';
     case 'royal_bloom':
-      return 'Cada objetivo natural é resolvido separadamente. Uma falha não apaga os objetivos já cumpridos e cada falha acrescenta sua própria Flor.';
+      return 'Florescimento Real combina vários objetivos naturais, mas cada um é resolvido separadamente. Cumprir um objetivo não compensa outro que falhou; cada falha acrescenta a própria Flor.';
     case 'emerald_cocoon':
-      return 'Enquanto o Casulo estiver ativo, o dano comum vai primeiro para a proteção. Uma Canastra Limpa ou superior rompe o Casulo de uma vez.';
+      return 'O dano comum atinge primeiro os 180 pontos do Casulo; o excesso passa para o HP. Uma Canastra Limpa ou superior rompe o Casulo imediatamente. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
     case 'spring_crown':
-      return 'A Coroa escolhe uma ameaça natural específica. Só a falha daquela ameaça prepara a Raiz Fortalecida; a raiz criada pela Coroa não inicia outra propagação comum.';
+      return 'A Coroa acompanha uma ameaça natural da rodada. Se a sequência de falhas preparar uma Raiz Fortalecida, ela exige uma contribuição de cada cooperador. Essa Raiz não cria nova propagação automática.';
+
     case 'mirrored_meld':
-      return `${target} precisa usar exatamente 1 carta legal que encaixe no jogo refletido e escolher qual reflexo é o verdadeiro. Errar manda a carta ao fundo do monte e deixa o jogador Desorientado: depois disso, ele só pode descartar para encerrar o turno.`;
+      return `${target} precisa usar exatamente 1 carta legal no jogo espelhado e escolher qual reflexo é o verdadeiro. Errar manda a carta ao fundo do Monte e deixa o jogador Desorientado: ele não pode fazer novas baixadas naquele turno, apenas descartar. Se havia uma Presa Marcada antiga, ela volta a valer depois que o espelho for resolvido.`;
     case 'follow_reflection': {
       const first = playerName(gameState, payload.firstPlayerId);
       const second = playerName(gameState, payload.secondPlayerId);
-      return `${first} é o 1º jogador da rodada e define o padrão pela quantidade TOTAL de cartas baixadas no turno inteiro. ${second} pode jogar onde quiser, mas precisa terminar o próprio turno com exatamente a mesma quantidade. Zero também conta.`;
+      return `${first} define o padrão pela quantidade TOTAL de cartas baixadas no turno inteiro. ${second} precisa terminar o próprio turno com exatamente a mesma quantidade; zero também conta. O jogo não bloqueia uma quantidade diferente durante o turno: a comparação acontece somente no final.`;
     }
     case 'discard_mirror':
-      return 'Os dois reflexos do topo do Lixo são idênticos e não existe pista: é 50/50. Errar sela o Lixo para a rodada.';
+      return 'Os dois reflexos do topo do Lixo são visualmente idênticos e não existe pista escondida: a escolha é realmente 50/50. Errar sela o Lixo durante a rodada.';
     case 'mirror_prison':
-      return 'A Prisão só existe se Nehelenia já tiver roubado um Espelho dos Sonhos. O parceiro indicado precisa alimentar o jogo refletido para devolver 1 Espelho ao jogador preso.';
+      return 'A Prisão só pode aparecer quando Nehelenia já tomou pelo menos 1 Espelho dos Sonhos. O parceiro indicado precisa alimentar o jogo refletido para devolver 1 Espelho ao jogador preso.';
     case 'eternal_nightmare':
-      return 'A carta original é mostrada antes do embaralhamento. Depois surgem dois reflexos e os três se misturam; o alvo precisa acompanhar visualmente qual continua sendo a original.';
+      return 'Primeiro a carta ORIGINAL aparece sozinha. Depois surgem dois reflexos, o rótulo some e os três se embaralham. Nenhum deles recebe pista de verdadeiro ou falso: é preciso acompanhar visualmente a posição da original.';
     case 'tiger_link':
-      return 'Tiger liga dois jogos. Cada lado precisa receber ao menos 1 carta. Se apenas um lado for alimentado, as garras permanecem no lado faltante até ele receber uma carta em um turno futuro.';
+      return 'Tiger liga dois jogos e cada lado precisa receber ao menos 1 carta. Se um lado ficar sem alimentação, as garras permanecem nele até um turno futuro. A carta usada para romper essas garras não causa o dano individual normal.';
     case 'tiger_prey':
-      return `A Presa prende somente ${target}. Até esse jogador alimentar o jogo marcado, ele não pode alimentar outros jogos existentes. O parceiro continua livre, e a Presa atravessa rodadas até ser resolvida.`;
+      return `A Presa prende somente ${target}. Até esse jogador alimentar o jogo marcado, ele não pode alimentar outro jogo existente. O parceiro continua livre e a Presa atravessa rodadas até ser resolvida. Jogo Espelhado tem precedência temporária, mas não apaga a Presa.`;
     case 'hawk_suit':
-      return `Se ${target} descartar outro naipe, Hawk passa a vigiar exatamente essa carta. Enquanto ela continuar no topo, ninguém pode recolher o Lixo; um novo descarte tira essa carta do topo e encerra a vigilância.`;
+      return `Se ${target} descartar outro naipe, Hawk passa a vigiar exatamente a carta descartada. Enquanto ela continuar no topo do Lixo, ninguém pode recolher a pilha. Um novo descarte tira a carta vigiada do topo e encerra o bloqueio.`;
     case 'hawk_watch':
-      return `Vigilância vale somente para ${target}: o jogo marcado fica bloqueado para esse jogador durante o turno. O parceiro e os outros jogos continuam livres.`;
+      return `Vigilância vale somente para ${target} e somente sobre o jogo marcado durante esse turno. O parceiro e os outros jogos continuam livres.`;
     case 'fish_marked_card':
-      return 'Reflexo Morto = a carta marcada continua na mão, mas não pode mais entrar em jogo. Ela só é libertada quando for descartada.';
+      return 'Se a carta marcada continuar na mão no fim do prazo, ela vira Reflexo Morto: continua na mão, não pode entrar em jogo e só é libertada quando for descartada.';
     case 'fish_inverted':
-      return `Até ${target} alimentar um jogo já existente, esse jogador não pode abrir jogo novo. Se não resolver neste turno, a restrição continua nos próximos turnos.`;
-    case 'false_image':
-      return 'A carta real e o reflexo são visualmente iguais durante a escolha. O objetivo é identificar qual opção corresponde à carta verdadeira.';
-    case 'dream_theft':
-      return 'O alvo precisa reconhecer a própria carta real entre os reflexos. Errar permite que Nehelenia roube um Espelho dos Sonhos.';
-    case 'shattered_mirror':
-      return 'Aqui a lógica é invertida: entre os reflexos apresentados, o alvo precisa encontrar o único falso. Errar prende as cartas reais pelo próximo turno.';
+      return `A restrição fica somente em ${target}: antes de abrir jogo novo, esse jogador precisa alimentar um jogo existente. Se não resolver neste turno, o efeito continua nos próximos turnos até ser cumprido.`;
     default:
       return '';
   }
@@ -1106,9 +1087,7 @@ export function buildBossAbilityHelp(gameState) {
   const intent = gameState?.boss?.currentIntent;
   if (!intent || !BOSS_HELP_ABILITY_IDS.has(intent.abilityId)) return null;
 
-  const official = String(intent.description || '').trim();
-  const supplement = String(bossAbilityHelpSupplement(gameState, intent) || '').trim();
-  const text = [official, supplement].filter(Boolean).join('\n\n');
+  const text = String(bossAbilityHelpSupplement(gameState, intent) || '').trim();
   if (!text) return null;
 
   return {
@@ -1130,7 +1109,7 @@ function compactAction(gameState, intent) {
       const guaranteedDebt = payload.guaranteedDebt ?? payload.collateralAmount;
       const interestStep = payload.interestStep ?? (intent.announcedPhase === 3 ? 3 : 2);
       return {
-        instruction: `${holder}: escolha a cobrança.`,
+        instruction: `${holder}: pague agora ou use o Cofre.`,
         progress: [
           `Integral: +${fullDebt} Dívida`,
           `Cofre: +${guaranteedDebt} · 1 carta presa`,
@@ -1141,7 +1120,7 @@ function compactAction(gameState, intent) {
     }
     case 'maintenance_fee':
       return {
-        instruction: 'Use as cartas FINANCIADAS em jogo.',
+        instruction: 'Coloque as cartas FINANCIADAS em jogos.',
         progress: maintenanceFeeProgress(gameState, intent),
         consequence: `Não usar: +${payload.financedDebt ?? (intent.announcedPhase === 3 ? 7 : 5)} Dívida/carta`,
       };
@@ -1173,7 +1152,7 @@ function compactAction(gameState, intent) {
       const chargedDebt = Number(limit.chargedDebt) || 0;
       const maxCharge = limit.maxCharge || payload.maxCharge || 0;
       return {
-        instruction: `Uso da franquia: ${counted}/${allowance}.`,
+        instruction: `Cartas da mão usadas: ${counted}/${allowance} sem custo.`,
         progress: '',
         consequence: counted > allowance ? `+${chargedDebt} Dívida · teto +${maxCharge}` : 'Sem cobrança',
       };
@@ -1195,23 +1174,23 @@ function compactAction(gameState, intent) {
       };
     }
     case 'forced_choice':
-      return { instruction: `${target}: +1 Chicote OU aceite a ordem.`, progress: payload.order?.label || '', consequence: 'Escolha agora' };
+      return { instruction: `${target}: aceite a ordem ou receba +1 Chicote.`, progress: payload.order?.label || '', consequence: 'Escolha agora' };
     case 'forced_swap':
       return { instruction: 'Troca de 1 carta entre os cooperadores.', progress: '', consequence: 'Automático' };
     case 'possession': {
       const possession = (gameState.boss?.possessions || []).find((entry) => (payload.meldId ? entry.meldId === payload.meldId : entry.meldIndex === payload.meldIndex));
       return {
-        instruction: `Jogo ${Number(payload.meldIndex) + 1}: dano suspenso.`,
+        instruction: `Jogo ${Number(payload.meldIndex) + 1}: dano antigo suspenso.`,
         progress: `Contribuição: ${possession?.contributorPlayerIds?.length || 0}/${possession?.required || gameState.players?.length || 2}`,
-        consequence: 'Todos contribuem ou o jogo evolui',
+        consequence: 'Libera com os 2 jogadores ou evolução',
       };
     }
     case 'absolute_control':
-      return { instruction: `${target}: sem jogos novos.`, progress: '', consequence: 'Até fim do turno' };
+      return { instruction: `${target}: Dominado neste turno.`, progress: '', consequence: 'Sem Lixo · sem jogo novo' };
     case 'double_collar':
       return { instruction: '1 carta de cada jogador bloqueada.', progress: '', consequence: 'Nesta rodada' };
     case 'separation':
-      return { instruction: 'Cada jogo pertence a 1 jogador.', progress: '', consequence: 'Nesta rodada' };
+      return { instruction: 'Cada jogo pode ser alimentado por só 1 jogador.', progress: '', consequence: 'Nesta rodada' };
     case 'hands_tied': {
       const consumed = payload.teamMeldAvailable === false;
       const consumedBy = payload.consumedByPlayerId == null ? null : playerName(gameState, payload.consumedByPlayerId);
@@ -1238,9 +1217,9 @@ function compactAction(gameState, intent) {
       const orders = payload.orders || [];
       const lines = orders.map((order) => `☐ ${playerName(gameState, order.playerId)} — ${(order.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).join(' e ')}`);
       return {
-        instruction: '2 cartas marcadas por jogador.',
+        instruction: 'Use as 2 cartas marcadas em jogos.',
         progress: lines.join('\n'),
-        consequence: 'Recusar +1 · Falha +1/carta',
+        consequence: 'Recusar +1 · Aceitou: +1 por carta não usada',
       };
     }
     case 'iron_etiquette':
@@ -1272,7 +1251,7 @@ function compactAction(gameState, intent) {
         return sum + (cards >= 11 ? heavy : cards >= 8 ? medium : 0);
       }, 0);
       return {
-        instruction: 'Cada mão é cobrada separadamente.',
+        instruction: 'Reduza as duas mãos antes do fim da rodada.',
         progress: '',
         consequence: `Previsto: +${projected} Sede`,
       };
@@ -1280,7 +1259,7 @@ function compactAction(gameState, intent) {
     case 'red_wine':
       return { instruction: `Lady gasta ${payload.bloodCost || 15} Sede para curar.`, progress: `Sede ${gameState.boss?.danger || 0}/100`, consequence: `Cura até ${payload.healAmount || 0} HP` };
     case 'crimson_brand':
-      return { instruction: 'Use as cartas marcadas.', progress: crimsonBrandProgress(gameState, intent), consequence: `Sucesso -2 · Falha +${Number(intent.announcedPhase) === 3 ? 9 : 7} Sede` };
+      return { instruction: 'Use cada carta marcada em um jogo.', progress: crimsonBrandProgress(gameState, intent), consequence: `Sucesso -2 · Falha +${Number(intent.announcedPhase) === 3 ? 9 : 7} Sede` };
     case 'cassandra_dead_feast': {
       const curse = gameState.boss?.bloodiedDead;
       const active = curse?.status === 'active';
@@ -1300,7 +1279,7 @@ function compactAction(gameState, intent) {
       return { instruction: '🔒 Lixo fechado.', progress: '', consequence: 'Use o Monte' };
     case 'three_daughters': {
       const objectives = payload.objectives || [];
-      return { instruction: 'Cumpra os 3 objetivos.', progress: dimitrescuMultiObjectiveProgress(gameState, objectives), consequence: 'Cada um: sucesso -2 · falha +8 Sede' };
+      return { instruction: 'Cumpra os objetivos de Bela, Cassandra e Daniela.', progress: dimitrescuMultiObjectiveProgress(gameState, objectives), consequence: 'Cada um: sucesso -2 · falha +8 Sede' };
     }
     case 'living_seed':
       return { instruction: `${target}: use ${card}.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor' };
@@ -1333,7 +1312,7 @@ function compactAction(gameState, intent) {
         consequence: 'Mais cartas = efeito pior',
       };
     case 'royal_bloom':
-      return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos.`, progress: compactNatureProgress(gameState, intent), consequence: '+1 Flor por falha' };
+      return { instruction: 'Cumpra cada objetivo marcado.', progress: compactNatureProgress(gameState, intent), consequence: '+1 Flor por falha' };
     case 'emerald_cocoon': {
       const boss = gameState.boss;
       const cocoon = boss?.emeraldCocoon;
@@ -1398,31 +1377,31 @@ function compactAction(gameState, intent) {
     case 'false_image':
       return { instruction: `${target}: ache o reflexo real.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: carta presa 1 turno' };
     case 'mirrored_meld':
-      return { instruction: `${playerName(gameState, payload.targetPlayerId)}: escolha o jogo verdadeiro.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Erro: carta ao monte + Desorientado' };
+      return { instruction: `${playerName(gameState, payload.targetPlayerId)}: use 1 carta e escolha o jogo verdadeiro.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Erro: carta ao monte + Desorientado' };
     case 'follow_reflection':
-      return { instruction: `${playerName(gameState, payload.firstPlayerId)} define · ${playerName(gameState, payload.secondPlayerId)} copia.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Diferença: +1 Espelho' };
+      return { instruction: `${playerName(gameState, payload.firstPlayerId)} define a quantidade · ${playerName(gameState, payload.secondPlayerId)} iguala.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Diferença: +1 Espelho' };
     case 'dream_theft':
       return { instruction: `${target}: ache o reflexo real.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: perde o Espelho dos Sonhos' };
     case 'discard_mirror':
-      return { instruction: `${target}: escolha 1 reflexo do Lixo.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: Lixo selado na rodada' };
+      return { instruction: `${target}: escolha 1 dos 2 reflexos do Lixo.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: Lixo selado na rodada' };
     case 'shattered_mirror':
       return { instruction: `${target}: ache o único falso.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: 2 cartas presas 1 turno' };
     case 'mirror_prison':
       return { instruction: `${playerName(gameState, payload.rescuerPlayerId)}: alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: `Liberta ${playerName(gameState, payload.trappedPlayerId)}` };
     case 'eternal_nightmare':
-      return { instruction: `${target}: siga a carta original.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: +1 Espelho' };
+      return { instruction: `${target}: acompanhe a carta ORIGINAL.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: +1 Espelho' };
     case 'tiger_link':
       return { instruction: 'Alimente os 2 jogos ligados.', progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Falha: garras persistem no lado faltante' };
     case 'tiger_prey':
-      return { instruction: `${target}: alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: `Só ${target} fica preso à Presa` };
+      return { instruction: `${target}: primeiro alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Até lá: outros jogos bloqueados para o alvo' };
     case 'hawk_suit':
-      return { instruction: `${target}: descarte ${payload.suitLabel || payload.suit}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Outro naipe: Lixo vigiado' };
+      return { instruction: `${target}: descarte ${payload.suitLabel || payload.suit}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Errar: topo vigiado · Lixo bloqueado' };
     case 'hawk_watch':
-      return { instruction: `${target}: Jogo ${Number(payload.meldIndex) + 1} bloqueado.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Outros jogos livres' };
+      return { instruction: `${target}: não alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Parceiro e outros jogos livres' };
     case 'fish_marked_card':
-      return { instruction: `${target}: use ou descarte ${cardLabelAnywhere(gameState, payload.cardId)}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Falha: vira Reflexo Morto' };
+      return { instruction: `${target}: use ou descarte ${cardLabelAnywhere(gameState, payload.cardId)}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Falha: carta só poderá ser descartada' };
     case 'fish_inverted':
-      return { instruction: `${target}: alimente 1 jogo existente.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Até lá: sem jogo novo' };
+      return { instruction: `${target}: alimente 1 jogo existente antes de abrir outro.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Persiste até cumprir' };
     default:
       return { instruction: intent.description || 'Habilidade ativa.', progress: '', consequence: '' };
   }

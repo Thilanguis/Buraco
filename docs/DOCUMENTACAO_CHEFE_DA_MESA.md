@@ -1775,6 +1775,18 @@ Mostrar:
 
 O painel recolhível do HUD mostra **Habilidades do chefe**: condição especial, habilidades da rotação, fases em que cada uma pode aparecer e destaque da habilidade ativa. O registro técnico da batalha continua no estado para sincronização e diagnóstico, mas não ocupa mais esse painel.
 
+A leitura da **ação atual** segue uma hierarquia fixa:
+
+- o texto principal mostra somente o que o jogador precisa fazer **agora**;
+- a linha de progresso mostra alvo, contagem ou estado atual;
+- a consequência mostra de forma curta o sucesso/falha ou a punição relevante;
+- regras de escopo, duração, persistência, exceções e termos próprios do chefe ficam em um pequeno botão **`?`** ao fim da instrução;
+- o `?` abre um popover flutuante e nunca participa do layout do card;
+- habilidades autoexplicativas não recebem `?` apenas para repetir a descrição oficial;
+- o texto da ajuda é editorial e específico para a dúvida provável do jogador, não uma cópia integral de `intent.description`.
+
+Exemplos: **Marca Carmesim** já expõe as duas marcas e `Sucesso/Falha`, portanto não precisa de ajuda redundante; **Vigilância** recebe `?` porque é importante explicar que o bloqueio vale somente para o alvo, somente naquele jogo e naquele turno, mantendo parceiro e outros jogos livres.
+
 Na Nehelenia, capangas simultâneos usam a mesma faixa fixa de três posições da Dimitrescu e permanecem na **mesma linha** (Tiger, Hawk, Fish), mesmo quando efeitos persistentes fazem dois ou três aparecerem juntos.
 Cada card de capanga ativo também expõe contexto curto sem alterar a arte: **ALVO**, vínculo relevante (por exemplo `JOGO 3` ou `DESCARTE: PAUS`) e, quando o efeito sobrevive ao turno original, a marca **PERSISTENTE**. Isso permite distinguir simultaneamente, por exemplo, uma Presa Marcada antiga de Tiger sobre um jogador e uma nova ordem de Hawk sobre o parceiro.
 
