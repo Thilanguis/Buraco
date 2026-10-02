@@ -43,6 +43,10 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 
 **Chicotes:** com 3 o jogador fica **Sob Controle**; com 4 fica **Dominado**. A equipe perde se os dois cooperadores chegarem a 4 ao mesmo tempo.
 
+**Transbordamento:** se um jogador já estiver em **4 Chicotes** e receberia outro, o Chicote resvala para o parceiro em **qualquer fase**. Se ambos estiverem em 4, a derrota especial é confirmada.
+
+**Resistência:** cada nova evolução válida para **Canastra Limpa, Real ou Ás-a-Ás** remove **1 Chicote do jogador responsável**. Não há limite por jogador/rodada; o mesmo tier do mesmo jogo só conta uma vez.
+
 **Fora da rotação:** `Interdito` continua apenas como compatibilidade interna e não deve aparecer como habilidade ativa para o jogador.
 
 ## A Matriarca Esmeralda

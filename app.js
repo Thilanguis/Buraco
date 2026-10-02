@@ -481,6 +481,22 @@ let lastBossIntroSoundKey = null;
 let seenBossResourceSoundEventIds = null;
 let bossResourceSoundScope = null;
 let bossPresentationTimer = null;
+
+let bossResultFinishScheduled = false;
+
+function schedulePendingBossResultFinish() {
+  if (!isCurrentBossMode() || !state?.boss?.result || state.finished || bossResultFinishScheduled) return;
+  bossResultFinishScheduled = true;
+  queueMicrotask(async () => {
+    try {
+      if (isCurrentBossMode() && state?.boss?.result && !state.finished) {
+        await finishGame(state.boss.result.victory ? 0 : 1, { skipFinalStrike: true });
+      }
+    } finally {
+      bossResultFinishScheduled = false;
+    }
+  });
+}
 let bossPresentationKey = '';
 let bossDamageReactionTimer = null;
 let dimitrescuPhasePortraitTimer = null;
@@ -5607,6 +5623,10 @@ function scheduleBossTurnAdvance() {
     const currentFlow = state.boss?.bossFlow;
     if (!currentFlow || `${currentFlow.id}:${currentFlow.stage}:${currentFlow.endsAt}` !== key) return;
     const step = advanceBossTurn(state, Date.now());
+    if (state.boss?.result && !state.finished) {
+      await finishGame(state.boss.result.victory ? 0 : 1, { skipFinalStrike: true });
+      return;
+    }
     if (!step) {
       renderAll();
       return;
@@ -7388,6 +7408,7 @@ function renderBossResult() {
 
 function renderAll() {
   if (!state) return;
+  schedulePendingBossResultFinish();
   renderMatchDuration();
   renderDominationTools();
   // Only rendering sees the intermediate friend frame. Restore the persisted
@@ -8658,6 +8679,24 @@ function renderMelds() {
       const dimitrescuIntent = state.boss?.id === 'dimitrescu' ? state.boss.currentIntent : null;
       const cassandraObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'cassandra') : null;
       const stableMeldId = state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`];
+
+      // Escolha Forçada da Dominadora: ordens que apontam para um jogo
+      // precisam continuar visíveis na própria mesa enquanto estiverem ativas.
+      // A marca fica SOMENTE no bloco das cartas para não alterar a geometria
+      // nem englobar os textos Canastra/Limpa.
+      const dominatrixMeldOrder =
+        isCurrentBossMode() && state.boss?.id === 'dominadora'
+          ? (state.boss.activeOrders || []).find((order) => {
+              if (order.status !== 'active' || !['feed_specific_meld', 'evolve_specific_meld'].includes(order.type)) return false;
+              const targetPlayer = state.players.find((player) => player.id === order.targetPlayerId);
+              if (targetPlayer && Number(targetPlayer.teamId) !== Number(t.id)) return false;
+              if (order.meldId && stableMeldId && order.meldId === stableMeldId) return true;
+              // Fallback para saves/reloads em que o id estavel do jogo foi reconstruido.
+              // A ordem ainda guarda o indice original (Jogo 1, Jogo 2...), entao a UI
+              // deve continuar marcando esse mesmo jogo em vez de simplesmente sumir.
+              return Number(order.meldIndex) === Number(midx);
+            })
+          : null;
       const cassandraMarked =
         dimitrescuIntent?.abilityId === 'cassandra_feast'
           ? !dimitrescuIntent.payload?.fed && (dimitrescuIntent.payload?.meldId ? dimitrescuIntent.payload.meldId === stableMeldId : dimitrescuIntent.payload?.meldIndex === midx)
@@ -8690,6 +8729,10 @@ function renderMelds() {
 
       const row = document.createElement('div');
       row.className = 'meld-line-cards';
+      if (dominatrixMeldOrder) {
+        row.classList.add('boss-meld-dominatrix-order-mark');
+        row.dataset.dominatrixOrder = dominatrixMeldOrder.type;
+      }
       if (neheleniaMirrorLabel) {
         row.classList.add('nehelenia-mirror-card-frame');
         row.dataset.neheleniaMirror = neheleniaMirrorLabel;

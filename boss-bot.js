@@ -305,6 +305,15 @@ export class BossBuracoBot {
 
         if (!engine.shouldSkipMelds?.(me.id)) {
           await this.processMelds(botIndex, ctx, engine, signal);
+
+          // Rede de segurança exclusiva do modo Chefe: antes de descartar,
+          // tenta novamente qualquer extensao NATURAL legal nos jogos da equipe.
+          // Isso evita descartar uma carta como 9♣ quando A♣..8♣ ja esta na mesa.
+          await this.playImmediateNaturalExtensions(botIndex, ctx, engine, signal);
+
+          state = engine.getState();
+          if (!state || state.finished || state.currentPlayer !== botIndex) return;
+          me = state.players[botIndex];
         }
         await this.sleep(this.randomDelay(900, 1300), engine, signal);
       } catch (error) {
@@ -683,7 +692,7 @@ export class BossBuracoBot {
     let remaining = Math.max(0, Number(addedChains) || 0);
 
     while (remaining > 0) {
-      if (boss.phase === 3 && ownAfter >= 4 && partner) partnerAfter = Math.min(4, partnerAfter + 1);
+      if (ownAfter >= 4 && partner) partnerAfter = Math.min(4, partnerAfter + 1);
       else ownAfter = Math.min(4, ownAfter + 1);
       remaining -= 1;
     }
@@ -1335,6 +1344,68 @@ export class BossBuracoBot {
     }
   }
 
+  static async playImmediateNaturalExtensions(botIndex, ctx, engine, signal) {
+    let movedAny = false;
+    let safety = 0;
+
+    while (safety < 20) {
+      safety += 1;
+      this.assertActive(engine, signal);
+      const state = engine.getState();
+      if (!state || state.finished || state.currentPlayer !== botIndex) return movedAny;
+
+      const me = state.players?.[botIndex];
+      const team = me ? state.teams?.[me.teamId] : null;
+      if (!me || !team || engine.shouldSkipMelds?.(me.id)) return movedAny;
+
+      const neheleniaPriorities = engine.getNeheleniaPriorities?.(me.id);
+      const exactTarget = Number.isInteger(neheleniaPriorities?.exactPlayCount) ? neheleniaPriorities.exactPlayCount : null;
+      const exactPlayed = Math.max(0, Number(neheleniaPriorities?.exactPlayedCount) || 0);
+      if (exactTarget != null && exactPlayed >= exactTarget) return movedAny;
+
+      const requiredDiscardSuit = neheleniaPriorities?.discardSuit || null;
+      let movedThisPass = false;
+
+      for (let meldIndex = 0; meldIndex < (team.melds || []).length && !movedThisPass; meldIndex += 1) {
+        const meld = team.melds[meldIndex];
+        if (!meld || engine.isMeldLocked?.(team.id, meldIndex)) continue;
+
+        for (let handIndex = 0; handIndex < (me.hand || []).length; handIndex += 1) {
+          const card = me.hand[handIndex];
+          if (!card || card.joker || card.rank === '2') continue;
+
+          // Nao gasta a ultima carta exigida para descarte por uma habilidade.
+          if (requiredDiscardSuit && card.suit === requiredDiscardSuit) {
+            const alternatives = (me.hand || []).filter((other, index) => index !== handIndex
+              && other?.id
+              && !other.joker
+              && other.suit === requiredDiscardSuit
+              && other.id !== state.pickedDiscardCardId
+              && !engine.isCardBlocked?.(me.id, other.id, 'discard'));
+            if (!alternatives.length) continue;
+          }
+
+          const testMeld = this.simulateMeld(meld, [card], engine);
+          if (!engine.isValidSequenceMeld(testMeld)) continue;
+          if (!this.canMeldSafely(me, team, 1, engine, testMeld, ctx)) continue;
+
+          this.assertActive(engine, signal);
+          const moved = await engine.executeMeldExtend(botIndex, meldIndex, [handIndex]);
+          if (moved !== false) {
+            movedAny = true;
+            movedThisPass = true;
+            await this.paceBetweenActions(engine, signal);
+            break;
+          }
+        }
+      }
+
+      if (!movedThisPass) return movedAny;
+    }
+
+    return movedAny;
+  }
+
   static async processDiscard(botIndex, oppTeamId, engine, signal) {
     this.assertActive(engine, signal);
     const state = engine.getState();
@@ -1444,8 +1515,8 @@ export class BossBuracoBot {
 
             if (state.mode?.startsWith('boss_')) {
               if (!forcedSuitOnlyOption) {
-                danger += 3200;
-                if (myMeld.length < 7 && simulated.length >= 7) danger += 2800;
+                danger += 9000;
+                if (myMeld.length < 7 && simulated.length >= 7) danger += 4000;
               }
             } else {
               // Fora do modo Chefe, preserva exatamente a heurística histórica

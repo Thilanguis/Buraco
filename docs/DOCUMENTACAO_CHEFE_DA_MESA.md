@@ -685,8 +685,8 @@ Somente produção de qualidade remove Chicote.
 Regras:
 
 - remove apenas do jogador responsável;
-- no máximo um Chicote por jogador por rodada;
-- se vários tiers forem alcançados na mesma rodada, registrar todos, mas remover apenas uma;
+- cada nova evolução válida para **Limpa, Real ou Ás-a-Ás** remove **1 Chicote**;
+- múltiplas evoluções válidas no mesmo turno ou rodada podem remover múltiplos Chicotes;
 - cada tier conta uma única vez por `meldId`;
 - dano individual não ativa Resistência;
 - jogo possuído não ativa Resistência até ser libertado;
@@ -958,16 +958,17 @@ fases: 2 e 3
 - respeita limites;
 - aplica uma vez.
 
-## 5.15 Transbordamento na Fase 3
+## 5.15 Transbordamento de Chicotes
 
-Somente na Fase 3:
+Em qualquer fase:
 
-- alvo em 4 receberia Chicote;
-- o Chicote vai ao parceiro;
+- se um alvo já está em **4 Chicotes** e receberia outro Chicote, a punição transborda para o parceiro;
+- o parceiro recebe o Chicote se ainda estiver abaixo de 4;
 - não ultrapassa 4;
-- preserva origem;
+- preserva a origem da punição (Exposição, ordem, Etiqueta, Ordem Final etc.);
 - feedback identifica o transbordamento;
-- snapshot não duplica.
+- snapshot não duplica;
+- se os dois já estiverem em 4, vale a derrota especial da Dominadora.
 
 ## 5.16 Habilidades da Fase 3
 

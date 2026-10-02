@@ -1633,7 +1633,6 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     lastAbilityId: null,
     effects: [],
     chainsByPlayer: {},
-    chainReliefRoundByPlayer: {},
     choiceDrawnCardIdsByPlayer: {},
     pendingFinancedDrawsByPlayer: {},
     damagedCardIds: [],
@@ -1690,7 +1689,6 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   const boss = gameState.boss;
   boss.effects ||= [];
   boss.chainsByPlayer ||= {};
-  boss.chainReliefRoundByPlayer ||= {};
   boss.choiceDrawnCardIdsByPlayer ||= {};
   boss.pendingFinancedDrawsByPlayer ||= {};
   boss.damagedCardIds ||= [];
@@ -3116,17 +3114,20 @@ export function getBossDominatrixPriorities(gameState, playerId) {
   if (!player) return null;
 
   const priorityMeldIds = new Set();
+  const priorityMeldIndexes = new Set();
   (boss.possessions || []).forEach((possession) => {
     if (possession.teamId !== player.teamId) return;
-    if (!(possession.contributorPlayerIds || []).includes(playerId) && possession.meldId) {
-      priorityMeldIds.add(possession.meldId);
+    if (!(possession.contributorPlayerIds || []).includes(playerId)) {
+      if (possession.meldId) priorityMeldIds.add(possession.meldId);
+      if (Number.isInteger(possession.meldIndex)) priorityMeldIndexes.add(possession.meldIndex);
     }
   });
   (boss.activeOrders || [])
     .filter((order) => order.status === 'active' && order.targetPlayerId === playerId)
     .forEach((order) => {
-      if (['feed_specific_meld', 'evolve_specific_meld'].includes(order.type) && order.meldId) {
-        priorityMeldIds.add(order.meldId);
+      if (['feed_specific_meld', 'evolve_specific_meld'].includes(order.type)) {
+        if (order.meldId) priorityMeldIds.add(order.meldId);
+        if (Number.isInteger(order.meldIndex)) priorityMeldIndexes.add(order.meldIndex);
       }
     });
 
@@ -3281,7 +3282,9 @@ function changeChains(gameState, playerId, amount, reason = '') {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.id !== 'dominadora' || playerId == null || !amount) return 0;
   const before = boss.chainsByPlayer[playerId] || 0;
-  if (amount > 0 && boss.phase === 3 && before >= 4) {
+  if (amount > 0 && before >= 4) {
+    // Um jogador já Dominado não pode absorver outro Chicote. A punição
+    // transborda para o parceiro em qualquer fase, preservando a origem.
     const partner = (gameState.players || []).find((player) => player.id !== playerId);
     if (partner && (boss.chainsByPlayer[partner.id] || 0) < 4) {
       const overflowApplied = changeChains(gameState, partner.id, amount, `overflow:${reason}`);
@@ -4567,19 +4570,10 @@ export function applyBossMeldTransition(gameState, {
           tier,
           outcome: 'A desobediencia ao Interdito anulou a remocao de Chicote desta evolucao.',
         });
-      } else if (boss.chainReliefRoundByPlayer[playerId] !== boss.roundNumber) {
-        chainsRemoved = Math.abs(Math.min(0, changeChains(gameState, playerId, -1, 'resistance')));
-        if (chainsRemoved) boss.chainReliefRoundByPlayer[playerId] = boss.roundNumber;
       } else {
-        boss.actionSequence += 1;
-        recordEvent(boss, {
-          type: 'resistanceQualified',
-          actionId: `resistance_limit_${meldId}_${tier}_${boss.roundNumber}`,
-          playerId,
-          meldId,
-          tier,
-          outcome: 'A evolucao qualificou a Resistencia, mas o limite desta rodada ja foi usado.',
-        });
+        // Cada nova evolução válida de qualidade remove 1 Chicote.
+        // O tier histórico do próprio meld impede cobrar a mesma evolução duas vezes.
+        chainsRemoved = Math.abs(Math.min(0, changeChains(gameState, playerId, -1, 'resistance')));
       }
     }
   }
