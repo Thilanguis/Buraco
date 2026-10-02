@@ -21,8 +21,6 @@
 }
 
 .boss-hud {
-  width: calc(100% - 240px);
-  max-width: 1080px;
   min-height: 168px;
   margin: 6px auto 12px;
   display: grid;
@@ -3106,8 +3104,6 @@ body.boss-mode #gameSection > svg.boss-graft-links {
 
 /* Filhas de Lady Dimitrescu: faixa independente sob o HUD principal. */
 .boss-daughter-strip {
-  width: calc(100% - 240px);
-  max-width: 1080px;
   margin: -5px auto 12px;
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -6,6 +6,11 @@ import {
   applyBossCardDamageMechanics,
   applyBossMeldContributionMechanics,
   applyBossMeldMechanics,
+  applyBossPlayerTurnEndMechanics,
+  prepareBossRoundResolutionMechanics,
+  finalizeBossTurnResolutionMechanics,
+  advanceBossRoundMechanics,
+  confirmBossTurnDefeatMechanics,
   finalizeBossMeldCardDamageMechanics,
   finalizeBossMeldResolutionMechanics,
   finalizeBossMeldEventMechanics,
@@ -5348,159 +5353,51 @@ export function completeBossPlayerTurn(gameState, playerId) {
     cardsInHand: player?.hand?.length || 0,
   });
 
-  if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'follow_reflection') {
-    const payload = boss.currentIntent.payload || {};
-    if (payload.firstPlayerId === playerId && !payload.patternLocked) {
-      payload.patternCount = Math.max(0, Number(payload.firstPlayedCount) || 0);
-      payload.patternLocked = true;
-      boss.actionSequence += 1;
-      recordEvent(boss, {
-        type: 'reflectionPattern',
-        actionId: `follow_reflection_pattern_${boss.currentIntent.id}_${boss.actionSequence}`,
-        playerId,
-        patternCount: payload.patternCount,
-        outcome: `${player?.name || 'O primeiro jogador'} definiu o padrão: ${payload.patternCount} carta${payload.patternCount === 1 ? '' : 's'}.`,
-      });
-    }
-  }
+  const recordBossEvent = (payload) => recordEvent(boss, payload);
+  const turnMechanics = applyBossPlayerTurnEndMechanics(boss.id, {
+    boss,
+    gameState,
+    playerId,
+    player,
+    recordBossEvent,
+    deferVault: () => deferBossVault(gameState, playerId),
+    changeChains: (targetPlayerId, amount, reason = '') => changeChains(gameState, targetPlayerId, amount, reason),
+    finishOrder: (order, status, outcome, options = {}) => finishDominatrixOrder(gameState, order, status, outcome, options),
+    resolvePlayerDeadline: () => resolveMatriarchPlayerDeadline(gameState, playerId),
+  }) || {};
 
-  if (boss.id === 'banker') {
-    const financedCards = boss.effects.filter((effect) => effect.id === 'financed_card' && effect.playerId === playerId);
-    if (financedCards.length) {
-      const heldCardIds = new Set((player?.hand || []).map((card) => card?.id).filter(Boolean));
-      const discardedCardIds = new Set((gameState.discard || []).map((card) => card?.id).filter(Boolean));
-      const meldCardIds = new Set((gameState.teams?.[player?.teamId]?.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean)));
-      const usedInMeldCards = financedCards.filter((effect) => meldCardIds.has(effect.cardId));
-      // A Tarifa só é quitada quando a carta termina o turno em um jogo da equipe.
-      // Descartar a financiada não evita a cobrança; isso impede a solução trivial
-      // de comprar a carta extra e jogá-la imediatamente no lixo.
-      const chargedCards = financedCards.filter((effect) => !meldCardIds.has(effect.cardId));
-      const dangerDelta = chargedCards.reduce((total, effect) => total + (Number(effect.debtPerCard) || 0), 0);
-      boss.effects = boss.effects.filter((effect) => !(effect.id === 'financed_card' && effect.playerId === playerId));
-      boss.danger = clamp(boss.danger + dangerDelta, 0, boss.maxDanger);
-      boss.actionSequence += 1;
-      recordEvent(boss, {
-        type: 'financedCharge',
-        actionId: `financed_charge_${playerId}_${boss.actionSequence}`,
-        playerId,
-        sourceActionId: financedCards[0]?.sourceActionId || null,
-        financedCardIds: financedCards.map((effect) => effect.cardId),
-        usedInMeldCardIds: usedInMeldCards.map((effect) => effect.cardId),
-        heldCardIds: chargedCards.filter((effect) => heldCardIds.has(effect.cardId)).map((effect) => effect.cardId),
-        discardedCardIds: chargedCards.filter((effect) => discardedCardIds.has(effect.cardId)).map((effect) => effect.cardId),
-        chargedCardIds: chargedCards.map((effect) => effect.cardId),
-        dangerDelta,
-        danger: boss.danger,
-        dangerChangeLabel: dangerDelta ? `Tarifa de Manutenção: Dívida +${dangerDelta}` : '',
-        outcome: dangerDelta
-          ? `${chargedCards.length} Carta${chargedCards.length === 1 ? '' : 's'} Financiada${chargedCards.length === 1 ? '' : 's'} não entraram em jogo.`
-          : 'Todas as Cartas Financiadas foram usadas em jogo; nenhuma Dívida foi aplicada.',
-      });
-    }
-    deferBossVault(gameState, playerId);
-  }
-
-  if (boss.id === 'dominadora') {
-    const expiringExposures = boss.effects.filter((effect) => effect.id === 'choice_exposure' && effect.playerId === playerId && effect.expiresAfterTurn);
-    const exposedCardsHeld = expiringExposures.filter((effect) => player?.hand?.some((card) => card?.id === effect.cardId));
-    const finalOrderMarks = boss.effects.filter((effect) => effect.id === 'final_order_mark' && effect.playerId === playerId && effect.expiresAfterTurn);
-    const teamMeldCardIds = new Set((gameState.teams?.[player?.teamId]?.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean)));
-    const finalOrderUsed = finalOrderMarks.filter((effect) => teamMeldCardIds.has(effect.cardId));
-    const finalOrderMissed = finalOrderMarks.filter((effect) => !teamMeldCardIds.has(effect.cardId));
-    delete boss.choiceDrawnCardIdsByPlayer[playerId];
-    boss.effects = boss.effects.filter((effect) => !(effect.expiresAfterTurn && effect.playerId === playerId));
-    exposedCardsHeld.forEach((effect) => changeChains(gameState, playerId, 1, `forced_choice_exposure:${effect.cardId}`));
-    finalOrderMissed.forEach((effect) => changeChains(gameState, playerId, 1, `final_order:${effect.cardId}`));
-    if (finalOrderMarks.length) {
-      boss.actionSequence += 1;
-      recordEvent(boss, {
-        type: 'finalOrderResolved',
-        actionId: `final_order_${playerId}_${boss.actionSequence}`,
-        playerId,
-        usedCardIds: finalOrderUsed.map((effect) => effect.cardId),
-        missedCardIds: finalOrderMissed.map((effect) => effect.cardId),
-        chainsApplied: finalOrderMissed.length,
-        outcome: finalOrderMissed.length
-          ? `${finalOrderUsed.length}/2 cartas da Ordem Final entraram em jogo; +${finalOrderMissed.length} Chicote${finalOrderMissed.length === 1 ? '' : 's'}.`
-          : 'As 2 cartas da Ordem Final entraram em jogo; nenhum Chicote foi aplicado.',
-      });
-    }
-    for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active' && entry.targetPlayerId === playerId)) {
-      if (order.type === 'no_new_meld') {
-        finishDominatrixOrder(gameState, order, 'obeyed', 'O jogador encerrou o turno sem criar um jogo novo.');
-      } else if (order.type === 'reduce_hand') {
-        const obeyed = (player?.hand?.length || 0) <= Number(order.handLimit);
-        finishDominatrixOrder(
-          gameState,
-          order,
-          obeyed ? 'obeyed' : 'disobeyed',
-          obeyed ? `A mao terminou dentro do limite de ${order.handLimit}.` : `A mao terminou acima do limite de ${order.handLimit}.`,
-          { addChain: !obeyed },
-        );
-      } else {
-        finishDominatrixOrder(
-          gameState,
-          order,
-          'disobeyed',
-          'O turno terminou sem cumprir a ordem aceita.',
-          { addChain: true },
-        );
-      }
-    }
-  }
-
-  let natureEvents = [];
-  if (boss.id === 'matriarca_esmeralda') {
-    natureEvents = resolveMatriarchPlayerDeadline(gameState, playerId);
-  }
-
-
-
-  const allPlayersActed = gameState.players.every((player) => boss.playersActedThisRound.includes(player.id));
-  if (allPlayersActed && boss.id === 'dominadora') {
-    (boss.interdicts || []).filter((entry) => entry.status === 'active').forEach((interdict) => {
-      interdict.status = 'expired';
-      boss.actionSequence += 1;
-      const expired = recordEvent(boss, {
-        type: 'interdictExpired',
-        actionId: `interdict_expired_${interdict.id}_${boss.actionSequence}`,
-        interdictId: interdict.id,
-        outcome: 'O Interdito expirou sem uma tentativa de evolucao.',
-      });
-      interdict.resolvedEventId = expired.actionId;
+  const allPlayersActed = gameState.players.every((entry) => boss.playersActedThisRound.includes(entry.id));
+  if (allPlayersActed) {
+    prepareBossRoundResolutionMechanics(boss.id, {
+      boss,
+      gameState,
+      playerId,
+      player,
+      recordBossEvent,
     });
   }
-  if (allPlayersActed && boss.id === 'banker') {
-    if (boss.creditLimit?.status === 'active' && boss.creditLimit.round === boss.roundNumber) boss.creditLimit.status = 'expired';
-    if (boss.discardSurcharge?.status === 'active' && boss.discardSurcharge.createdRound === boss.roundNumber) boss.discardSurcharge.status = 'expired';
-  }
+
   const duration = boss.currentIntent?.duration || 'full_round';
   const targetTurnFinished = duration === 'target_turn' && boss.currentIntent?.payload?.targetPlayerId === playerId;
   const shouldResolve = targetTurnFinished || (duration !== 'until_released' && allPlayersActed);
   let event = null;
   if (shouldResolve) event = resolveIntent(gameState);
-  if (boss.id === 'nehelenia') {
-    const turnNumber = Number(gameState.turnNumber) || 0;
-    boss.effects = boss.effects.filter((effect) => {
-      if (effect.expiresAfterTurn && effect.playerId === playerId) {
-        const appliedTurn = Number(effect.appliedTurnNumber);
-        if (!Number.isFinite(appliedTurn) || appliedTurn < turnNumber) return false;
-      }
-      if (allPlayersActed && Number.isFinite(Number(effect.expiresAfterRound)) && Number(effect.expiresAfterRound) <= boss.roundNumber) return false;
-      return true;
-    });
-  }
-  if (allPlayersActed && boss.id === 'matriarca_esmeralda') {
-    natureEvents.push(...resolveMatriarchRound(gameState));
-    event ||= natureEvents.filter(Boolean).at(-1) || null;
-  }
-  if (allPlayersActed && boss.id === 'dimitrescu') {
-    const bloodEvents = resolveDimitrescuRoundEffects(gameState);
-    event ||= bloodEvents.at(-1) || null;
-  }
-  if (event) {
-    boss.resolvedRoundEventActionId = event.actionId;
-  }
+
+  const resolutionMechanics = finalizeBossTurnResolutionMechanics(boss.id, {
+    boss,
+    gameState,
+    playerId,
+    player,
+    allPlayersActed,
+    turnResult: turnMechanics,
+    event,
+    resolveNatureRound: () => resolveMatriarchRound(gameState),
+    resolveBloodRound: () => resolveDimitrescuRoundEffects(gameState),
+  }) || {};
+  event ||= resolutionMechanics.fallbackEvent || null;
+
+  if (event) boss.resolvedRoundEventActionId = event.actionId;
+
   let phaseEvent = null;
   if (allPlayersActed) {
     const completedIndex = gameState.players.findIndex((entry) => entry.id === playerId);
@@ -5510,18 +5407,25 @@ export function completeBossPlayerTurn(gameState, playerId) {
     boss.roundFirstPlayerId = nextRoundFirst?.id ?? null;
     boss.roundNumber += 1;
     boss.playersActedThisRound = [];
-    if (boss.id === 'nehelenia') boss.neheleniaDiscardSealRound = 0;
-    if (boss.id === 'matriarca_esmeralda') {
-      boss.natureHealingRound = boss.roundNumber;
-      boss.natureHealingThisRound = 0;
-      boss.propagationUsedThisRound = false;
-      createPendingRootPropagation(gameState);
-    }
+    advanceBossRoundMechanics(boss.id, {
+      boss,
+      gameState,
+      playerId,
+      player,
+      createPendingRootPropagation: () => createPendingRootPropagation(gameState),
+    });
     phaseEvent = activatePendingPhase(gameState);
   }
-  if (boss.id === 'banker') confirmBankerDebtDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
-  if (boss.id === 'dimitrescu') confirmDimitrescuBloodDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
-  if (boss.id === 'nehelenia') confirmNeheleniaMirrorDefeat(gameState, event?.actionId || `round_${boss.roundNumber}`);
+
+  confirmBossTurnDefeatMechanics(boss.id, {
+    boss,
+    gameState,
+    sourceActionId: event?.actionId || `round_${boss.roundNumber}`,
+    confirmBankerDefeat: (sourceActionId) => confirmBankerDebtDefeat(gameState, sourceActionId),
+    confirmDimitrescuDefeat: (sourceActionId) => confirmDimitrescuBloodDefeat(gameState, sourceActionId),
+    confirmNeheleniaDefeat: (sourceActionId) => confirmNeheleniaMirrorDefeat(gameState, sourceActionId),
+  });
+
   if (allPlayersActed && !boss.result) {
     const resultEvent = boss.eventLog.find((entry) => entry.actionId === boss.resolvedRoundEventActionId) || event;
     boss.resolvedRoundEventActionId = null;

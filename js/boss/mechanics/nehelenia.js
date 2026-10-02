@@ -195,4 +195,50 @@ export const neheleniaBossMechanics = Object.freeze({
     };
   },
 
+
+  onPlayerTurnEnd({ boss, playerId, player, recordBossEvent = null } = {}) {
+    if (!boss) return {};
+    if (boss.currentIntent?.abilityId === 'follow_reflection') {
+      const payload = boss.currentIntent.payload || {};
+      if (payload.firstPlayerId === playerId && !payload.patternLocked) {
+        payload.patternCount = Math.max(0, Number(payload.firstPlayedCount) || 0);
+        payload.patternLocked = true;
+        boss.actionSequence += 1;
+        recordBossEvent?.({
+          type: 'reflectionPattern',
+          actionId: `follow_reflection_pattern_${boss.currentIntent.id}_${boss.actionSequence}`,
+          playerId,
+          patternCount: payload.patternCount,
+          outcome: `${player?.name || 'O primeiro jogador'} definiu o padrão: ${payload.patternCount} carta${payload.patternCount === 1 ? '' : 's'}.`,
+        });
+      }
+    }
+    return {};
+  },
+
+  afterIntentResolve({ boss, gameState, playerId, allPlayersActed = false } = {}) {
+    if (!boss) return {};
+    const turnNumber = Number(gameState?.turnNumber) || 0;
+    boss.effects = (boss.effects || []).filter((effect) => {
+      if (effect.expiresAfterTurn && effect.playerId === playerId) {
+        const appliedTurn = Number(effect.appliedTurnNumber);
+        if (!Number.isFinite(appliedTurn) || appliedTurn < turnNumber) return false;
+      }
+      if (allPlayersActed && Number.isFinite(Number(effect.expiresAfterRound)) && Number(effect.expiresAfterRound) <= boss.roundNumber) return false;
+      return true;
+    });
+    return {};
+  },
+
+  afterRoundAdvance({ boss } = {}) {
+    if (boss) boss.neheleniaDiscardSealRound = 0;
+    return {};
+  },
+
+  confirmTurnDefeat({ confirmNeheleniaDefeat = null, sourceActionId = null } = {}) {
+    return typeof confirmNeheleniaDefeat === 'function'
+      ? { mirrorWorldEvent: confirmNeheleniaDefeat(sourceActionId) }
+      : {};
+  },
+
 });

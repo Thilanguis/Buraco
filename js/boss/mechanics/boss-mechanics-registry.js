@@ -39,3 +39,22 @@ export function finalizeBossMeldResolutionMechanics(bossId, context) {
 export function finalizeBossMeldEventMechanics(bossId, context) {
   return getBossMechanicsAdapter(bossId)?.afterMeldEvent?.(context) || null;
 }
+export function applyBossPlayerTurnEndMechanics(bossId, context) {
+  return getBossMechanicsAdapter(bossId)?.onPlayerTurnEnd?.(context) || null;
+}
+
+export function prepareBossRoundResolutionMechanics(bossId, context) {
+  return getBossMechanicsAdapter(bossId)?.beforeRoundResolve?.(context) || null;
+}
+
+export function finalizeBossTurnResolutionMechanics(bossId, context) {
+  return getBossMechanicsAdapter(bossId)?.afterIntentResolve?.(context) || null;
+}
+
+export function advanceBossRoundMechanics(bossId, context) {
+  return getBossMechanicsAdapter(bossId)?.afterRoundAdvance?.(context) || null;
+}
+
+export function confirmBossTurnDefeatMechanics(bossId, context) {
+  return getBossMechanicsAdapter(bossId)?.confirmTurnDefeat?.(context) || null;
+}

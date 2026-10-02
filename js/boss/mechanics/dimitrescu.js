@@ -60,4 +60,17 @@ export const dimitrescuBossMechanics = Object.freeze({
       },
     };
   },
+
+  afterIntentResolve({ allPlayersActed = false, resolveBloodRound = null } = {}) {
+    if (!allPlayersActed || typeof resolveBloodRound !== 'function') return {};
+    const bloodEvents = (resolveBloodRound() || []).filter(Boolean);
+    return { bloodEvents, fallbackEvent: bloodEvents.at(-1) || null };
+  },
+
+  confirmTurnDefeat({ confirmDimitrescuDefeat = null, sourceActionId = null } = {}) {
+    return typeof confirmDimitrescuDefeat === 'function'
+      ? { defeatEvent: confirmDimitrescuDefeat(sourceActionId) }
+      : {};
+  },
+
 });

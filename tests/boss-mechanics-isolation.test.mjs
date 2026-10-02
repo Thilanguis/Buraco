@@ -5,6 +5,11 @@ import {
   applyBossCardDamageMechanics,
   applyBossMeldContributionMechanics,
   applyBossMeldMechanics,
+  applyBossPlayerTurnEndMechanics,
+  prepareBossRoundResolutionMechanics,
+  finalizeBossTurnResolutionMechanics,
+  advanceBossRoundMechanics,
+  confirmBossTurnDefeatMechanics,
   finalizeBossMeldCardDamageMechanics,
   finalizeBossMeldResolutionMechanics,
   getBossMechanicsAdapter,
@@ -17,6 +22,13 @@ function transitionSource() {
   const start = engine.indexOf('export function applyBossMeldTransition');
   const end = engine.indexOf('\nexport function ', start + 1);
   assert.ok(start >= 0 && end > start, 'applyBossMeldTransition deve existir');
+  return engine.slice(start, end);
+}
+
+function playerTurnSource() {
+  const start = engine.indexOf('export function completeBossPlayerTurn');
+  const end = engine.indexOf('\nexport function ', start + 1);
+  assert.ok(start >= 0 && end > start, 'completeBossPlayerTurn deve existir');
   return engine.slice(start, end);
 }
 
@@ -561,3 +573,77 @@ test('applyBossMeldTransition fica agnostico aos cinco chefes', () => {
 test('modulo de mecanica do Banqueiro fica disponivel offline', () => {
   assert.match(sw, /js\/boss\/mechanics\/banker\.js/);
 });
+
+test('fim de turno do Banqueiro fica no adaptador e preserva Tarifa + expiracoes', () => {
+  const boss = {
+    id: 'banker', roundNumber: 3, danger: 10, maxDanger: 100, actionSequence: 4,
+    effects: [
+      { id: 'financed_card', playerId: 0, cardId: 'used', debtPerCard: 4, sourceActionId: 'fee' },
+      { id: 'financed_card', playerId: 0, cardId: 'held', debtPerCard: 4, sourceActionId: 'fee' },
+    ],
+    creditLimit: { status: 'active', round: 3 },
+    discardSurcharge: { status: 'active', createdRound: 3 },
+  };
+  const gameState = { discard: [], teams: [{ melds: [[{ id: 'used' }]] }] };
+  const player = { id: 0, teamId: 0, hand: [{ id: 'held' }] };
+  const events = [];
+  let deferred = 0;
+  applyBossPlayerTurnEndMechanics('banker', {
+    boss, gameState, playerId: 0, player,
+    recordBossEvent: (event) => { events.push(event); return event; },
+    deferVault: () => { deferred += 1; },
+  });
+  assert.equal(boss.danger, 14);
+  assert.equal(boss.effects.length, 0);
+  assert.deepEqual(events[0].usedInMeldCardIds, ['used']);
+  assert.deepEqual(events[0].chargedCardIds, ['held']);
+  assert.equal(deferred, 1);
+  prepareBossRoundResolutionMechanics('banker', { boss });
+  assert.equal(boss.creditLimit.status, 'expired');
+  assert.equal(boss.discardSurcharge.status, 'expired');
+});
+
+test('hooks de fechamento de rodada permanecem isolados por chefe', () => {
+  const matriarch = { id: 'matriarca_esmeralda', roundNumber: 6, natureHealingRound: 5, natureHealingThisRound: 90, propagationUsedThisRound: true };
+  let propagation = 0;
+  advanceBossRoundMechanics('matriarca_esmeralda', { boss: matriarch, createPendingRootPropagation: () => { propagation += 1; } });
+  assert.equal(matriarch.natureHealingRound, 6);
+  assert.equal(matriarch.natureHealingThisRound, 0);
+  assert.equal(matriarch.propagationUsedThisRound, false);
+  assert.equal(propagation, 1);
+
+  const nehelenia = { id: 'nehelenia', neheleniaDiscardSealRound: 5 };
+  advanceBossRoundMechanics('nehelenia', { boss: nehelenia });
+  assert.equal(nehelenia.neheleniaDiscardSealRound, 0);
+
+  const fallback = { actionId: 'blood_round' };
+  const dimResult = finalizeBossTurnResolutionMechanics('dimitrescu', { allPlayersActed: true, resolveBloodRound: () => [fallback] });
+  assert.equal(dimResult.fallbackEvent, fallback);
+});
+
+test('checagem de derrota de recurso e roteada pelo adaptador correto', () => {
+  let banker = 0;
+  let blood = 0;
+  let mirrors = 0;
+  confirmBossTurnDefeatMechanics('banker', { sourceActionId: 'x', confirmBankerDefeat: () => { banker += 1; } });
+  confirmBossTurnDefeatMechanics('dimitrescu', { sourceActionId: 'x', confirmDimitrescuDefeat: () => { blood += 1; } });
+  confirmBossTurnDefeatMechanics('nehelenia', { sourceActionId: 'x', confirmNeheleniaDefeat: () => { mirrors += 1; } });
+  confirmBossTurnDefeatMechanics('dominadora', { sourceActionId: 'x', confirmBankerDefeat: () => { banker += 100; } });
+  assert.deepEqual([banker, blood, mirrors], [1, 1, 1]);
+});
+
+test('completeBossPlayerTurn fica agnostico as regras especificas dos cinco chefes', () => {
+  const source = playerTurnSource();
+  assert.doesNotMatch(source, /boss\.id\s*===/);
+  for (const marker of [
+    'financed_card', 'choice_exposure', 'final_order_mark', 'follow_reflection',
+    'neheleniaDiscardSealRound', 'natureHealingRound', 'natureHealingThisRound',
+    'propagationUsedThisRound', 'creditLimit', 'discardSurcharge', 'interdicts',
+  ]) assert.doesNotMatch(source, new RegExp(marker));
+  assert.match(source, /applyBossPlayerTurnEndMechanics\(boss\.id/);
+  assert.match(source, /prepareBossRoundResolutionMechanics\(boss\.id/);
+  assert.match(source, /finalizeBossTurnResolutionMechanics\(boss\.id/);
+  assert.match(source, /advanceBossRoundMechanics\(boss\.id/);
+  assert.match(source, /confirmBossTurnDefeatMechanics\(boss\.id/);
+});
+

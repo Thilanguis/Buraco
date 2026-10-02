@@ -149,4 +149,71 @@ export const dominatrixBossMechanics = Object.freeze({
     return { chainsRemoved, resistanceSuppressedByInterdict };
   },
 
+
+  onPlayerTurnEnd({ boss, gameState, playerId, player, changeChains = null, finishOrder = null, recordBossEvent = null } = {}) {
+    if (!boss) return {};
+    const expiringExposures = (boss.effects || []).filter((effect) => effect.id === 'choice_exposure' && effect.playerId === playerId && effect.expiresAfterTurn);
+    const exposedCardsHeld = expiringExposures.filter((effect) => player?.hand?.some((card) => card?.id === effect.cardId));
+    const finalOrderMarks = (boss.effects || []).filter((effect) => effect.id === 'final_order_mark' && effect.playerId === playerId && effect.expiresAfterTurn);
+    const teamMeldCardIds = new Set((gameState?.teams?.[player?.teamId]?.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean)));
+    const finalOrderUsed = finalOrderMarks.filter((effect) => teamMeldCardIds.has(effect.cardId));
+    const finalOrderMissed = finalOrderMarks.filter((effect) => !teamMeldCardIds.has(effect.cardId));
+    if (boss.choiceDrawnCardIdsByPlayer) delete boss.choiceDrawnCardIdsByPlayer[playerId];
+    boss.effects = (boss.effects || []).filter((effect) => !(effect.expiresAfterTurn && effect.playerId === playerId));
+    exposedCardsHeld.forEach((effect) => changeChains?.(playerId, 1, `forced_choice_exposure:${effect.cardId}`));
+    finalOrderMissed.forEach((effect) => changeChains?.(playerId, 1, `final_order:${effect.cardId}`));
+    if (finalOrderMarks.length) {
+      boss.actionSequence += 1;
+      recordBossEvent?.({
+        type: 'finalOrderResolved',
+        actionId: `final_order_${playerId}_${boss.actionSequence}`,
+        playerId,
+        usedCardIds: finalOrderUsed.map((effect) => effect.cardId),
+        missedCardIds: finalOrderMissed.map((effect) => effect.cardId),
+        chainsApplied: finalOrderMissed.length,
+        outcome: finalOrderMissed.length
+          ? `${finalOrderUsed.length}/2 cartas da Ordem Final entraram em jogo; +${finalOrderMissed.length} Chicote${finalOrderMissed.length === 1 ? '' : 's'}.`
+          : 'As 2 cartas da Ordem Final entraram em jogo; nenhum Chicote foi aplicado.',
+      });
+    }
+
+    for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active' && entry.targetPlayerId === playerId)) {
+      if (order.type === 'no_new_meld') {
+        finishOrder?.(order, 'obeyed', 'O jogador encerrou o turno sem criar um jogo novo.');
+      } else if (order.type === 'reduce_hand') {
+        const obeyed = (player?.hand?.length || 0) <= Number(order.handLimit);
+        finishOrder?.(
+          order,
+          obeyed ? 'obeyed' : 'disobeyed',
+          obeyed ? `A mao terminou dentro do limite de ${order.handLimit}.` : `A mao terminou acima do limite de ${order.handLimit}.`,
+          { addChain: !obeyed },
+        );
+      } else {
+        finishOrder?.(
+          order,
+          'disobeyed',
+          'O turno terminou sem cumprir a ordem aceita.',
+          { addChain: true },
+        );
+      }
+    }
+    return {};
+  },
+
+  beforeRoundResolve({ boss, recordBossEvent = null } = {}) {
+    if (!boss) return {};
+    (boss.interdicts || []).filter((entry) => entry.status === 'active').forEach((interdict) => {
+      interdict.status = 'expired';
+      boss.actionSequence += 1;
+      const expired = recordBossEvent?.({
+        type: 'interdictExpired',
+        actionId: `interdict_expired_${interdict.id}_${boss.actionSequence}`,
+        interdictId: interdict.id,
+        outcome: 'O Interdito expirou sem uma tentativa de evolucao.',
+      });
+      interdict.resolvedEventId = expired?.actionId || null;
+    });
+    return {};
+  },
+
 });

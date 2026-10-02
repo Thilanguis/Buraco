@@ -96,4 +96,27 @@ export const matriarchBossMechanics = Object.freeze({
     };
   },
 
+
+  onPlayerTurnEnd({ resolvePlayerDeadline = null } = {}) {
+    const natureEvents = typeof resolvePlayerDeadline === 'function' ? resolvePlayerDeadline() || [] : [];
+    return { natureEvents: natureEvents.filter(Boolean) };
+  },
+
+  afterIntentResolve({ allPlayersActed = false, turnResult = null, resolveNatureRound = null } = {}) {
+    if (!allPlayersActed) return {};
+    const natureEvents = [...(turnResult?.natureEvents || [])];
+    if (typeof resolveNatureRound === 'function') natureEvents.push(...(resolveNatureRound() || []));
+    const filtered = natureEvents.filter(Boolean);
+    return { natureEvents: filtered, fallbackEvent: filtered.at(-1) || null };
+  },
+
+  afterRoundAdvance({ boss, createPendingRootPropagation = null } = {}) {
+    if (!boss) return {};
+    boss.natureHealingRound = boss.roundNumber;
+    boss.natureHealingThisRound = 0;
+    boss.propagationUsedThisRound = false;
+    createPendingRootPropagation?.();
+    return {};
+  },
+
 });

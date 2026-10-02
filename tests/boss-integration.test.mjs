@@ -6,7 +6,7 @@ import { normalizeVariantForMode } from '../js/boss/boss-registry.js';
 const [
   app, bot, html, serviceWorker, cardsCss, bossCss, gameCss, tableThemesCss,
   banker, dominatrix, matriarch, engine, bankerCss, dominatrixCss, matriarchCss,
-  dimitrescuCss, neheleniaCss, matriarchUi, uiRegistry, matriarchMechanics, mechanicsRegistry,
+  dimitrescuCss, neheleniaCss, matriarchUi, uiRegistry, matriarchMechanics, dominatrixMechanics, mechanicsRegistry,
 ] = await Promise.all([
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../bot.js', import.meta.url), 'utf8'),
@@ -28,6 +28,7 @@ const [
   readFile(new URL('../js/boss/ui/matriarch-ui.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/ui/boss-ui-registry.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/mechanics/matriarch.js', import.meta.url), 'utf8'),
+  readFile(new URL('../js/boss/mechanics/dominatrix.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/mechanics/boss-mechanics-registry.js', import.meta.url), 'utf8'),
 ]);
 
@@ -128,7 +129,7 @@ test('Escolha Forcada apresenta e anima os dois IDs recebidos', () => {
 test('destaque da escolha permanece vinculado ao jogador alvo', () => {
   assert.match(app, /choiceDrawnCardIdsByPlayer\?\.\[me\.id\]/);
   assert.match(engine, /choiceDrawnCardIdsByPlayer\[playerId\] = drawnCards\.map/);
-  assert.match(engine, /delete boss\.choiceDrawnCardIdsByPlayer\[playerId\]/);
+  assert.match(dominatrixMechanics, /delete boss\.choiceDrawnCardIdsByPlayer\[playerId\]/);
 });
 
 test('fluxos humanos e do bot chamam o motor do chefe fora do render', () => {
@@ -277,13 +278,21 @@ test('HUD mostra quatro Correntes, estado Sob Controle e Posses independentes', 
   assert.match(app, /Posse: jogo/);
 });
 
-test('HUD do chefe acompanha a largura responsiva da mesa', () => {
+test('HUD do chefe acompanha a largura responsiva da mesa por uma unica regua', () => {
   const hudRule = bossCss.match(/\.boss-hud \{[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(hudRule, /width:\s*calc\(100% - 240px\)/);
-  assert.match(hudRule, /max-width:\s*1080px/);
   assert.match(hudRule, /min-height:\s*168px/);
+  assert.doesNotMatch(hudRule, /width:|max-width:/, 'regra base nao deve competir com a regua responsiva final');
+  assert.match(bossCss, /--boss-stage-width:\s*min\(calc\(100% - 130px\), 1920px\)/);
+  assert.match(bossCss, /body\.boss-mode \.boss-hud,[\s\S]*?body\.boss-mode \.boss-daughter-strip,[\s\S]*?body\.boss-mode #gameSection \.board-melds \{[\s\S]*?width:\s*var\(--boss-stage-width\)/);
+  assert.match(bossCss, /@media \(max-width: 768px\)[\s\S]*?--boss-stage-width:\s*98%/);
+  assert.match(bossCss, /@media \(max-height: 600px\) and \(orientation: landscape\)[\s\S]*?--boss-stage-width:\s*calc\(100% - 90px\)/);
+  assert.doesNotMatch(bossCss, /calc\(100% - 240px\)|max-width:\s*1080px/);
   assert.match(bossCss, /\.boss-portrait \{[^}]*width:\s*184px;[^}]*height:\s*116px/);
   assert.match(bossCss, /@media \(max-width: 900px\)[\s\S]*?\.boss-portrait \{[\s\S]*?width:\s*134px;[\s\S]*?height:\s*86px/);
+});
+
+test('bootstrap da conta possui um unico id accountBoot', () => {
+  assert.equal((html.match(/id=\"accountBoot\"/g) || []).length, 1);
 });
 
 test('Tarifa identifica e anima separadamente as Cartas Financiadas em todos os fluxos', () => {
