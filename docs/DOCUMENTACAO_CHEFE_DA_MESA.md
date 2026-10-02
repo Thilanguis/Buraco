@@ -1775,6 +1775,7 @@ Mostrar:
 O painel recolhível do HUD mostra **Habilidades do chefe**: condição especial, habilidades da rotação, fases em que cada uma pode aparecer e destaque da habilidade ativa. O registro técnico da batalha continua no estado para sincronização e diagnóstico, mas não ocupa mais esse painel.
 
 Na Nehelenia, capangas simultâneos usam a mesma faixa fixa de três posições da Dimitrescu e permanecem na **mesma linha** (Tiger, Hawk, Fish), mesmo quando efeitos persistentes fazem dois ou três aparecerem juntos.
+Cada card de capanga ativo também expõe contexto curto sem alterar a arte: **ALVO**, vínculo relevante (por exemplo `JOGO 3` ou `DESCARTE: PAUS`) e, quando o efeito sobrevive ao turno original, a marca **PERSISTENTE**. Isso permite distinguir simultaneamente, por exemplo, uma Presa Marcada antiga de Tiger sobre um jogador e uma nova ordem de Hawk sobre o parceiro.
 
 ## 9.2 Banqueiro
 

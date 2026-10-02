@@ -5369,6 +5369,80 @@ function renderBossDaughterStrip(definition, boss) {
     });
   }
 
+  const neheleniaPlayerName = (playerId) => {
+    if (playerId == null) return '';
+    return state?.players?.find((player) => player.id === playerId)?.name || `Jogador ${Number(playerId) + 1}`;
+  };
+
+  const neheleniaIntentContext = (memberId) => {
+    if (!isNehelenia) return null;
+    const intent = boss.currentIntent;
+    if (!intent || !abilityMap?.[intent.abilityId]?.includes(memberId)) return null;
+    const payload = intent.payload || {};
+    const targetName = neheleniaPlayerName(payload.targetPlayerId);
+    if (intent.abilityId === 'tiger_prey') return { targetName, detail: Number.isInteger(payload.meldIndex) ? `JOGO ${payload.meldIndex + 1}` : 'PRESA MARCADA' };
+    if (intent.abilityId === 'tiger_link') {
+      const games = (payload.targets || []).map((target) => Number.isInteger(target?.meldIndex) ? target.meldIndex + 1 : null).filter(Boolean);
+      return { targetName: '', detail: games.length ? `JOGOS ${games.join(' + ')}` : '2 JOGOS LIGADOS' };
+    }
+    if (intent.abilityId === 'hawk_suit') return { targetName, detail: payload.suitLabel ? `DESCARTE: ${String(payload.suitLabel).toUpperCase()}` : 'DESCARTE MARCADO' };
+    if (intent.abilityId === 'hawk_watch') return { targetName, detail: Number.isInteger(payload.meldIndex) ? `JOGO ${payload.meldIndex + 1}` : 'JOGO VIGIADO' };
+    if (intent.abilityId === 'fish_marked_card') return { targetName, detail: 'CARTA MARCADA' };
+    if (intent.abilityId === 'fish_inverted') return { targetName, detail: 'ALIMENTE JOGO ABERTO' };
+    return targetName ? { targetName, detail: '' } : null;
+  };
+
+  const neheleniaPersistentContexts = (memberId) => {
+    if (!isNehelenia) return [];
+    return (boss.effects || []).filter((effect) => effect?.attendant === memberId).map((effect) => {
+      const targetName = neheleniaPlayerName(effect.playerId);
+      if (effect.id === 'nehelenia_tiger_prey') return { targetName, detail: Number.isInteger(effect.meldIndex) ? `JOGO ${effect.meldIndex + 1}` : 'PRESA MARCADA', persistent: true };
+      if (effect.id === 'nehelenia_tiger_claw') return { targetName: '', detail: Number.isInteger(effect.meldIndex) ? `GARRAS: JOGO ${effect.meldIndex + 1}` : 'GARRAS NO JOGO', persistent: true };
+      if (effect.id === 'nehelenia_hawk_guarded_discard') return { targetName, detail: 'LIXO VIGIADO', persistent: true };
+      if (effect.id === 'nehelenia_fish_dead_card') return { targetName, detail: 'REFLEXO MORTO', persistent: true };
+      if (effect.id === 'nehelenia_inverted_reflection') return { targetName, detail: 'JOGO ABERTO', persistent: true };
+      return targetName ? { targetName, detail: '', persistent: true } : null;
+    }).filter(Boolean);
+  };
+
+  const neheleniaAttendantContext = (memberId) => {
+    if (!isNehelenia) return { lines: [], signature: '' };
+    const current = neheleniaIntentContext(memberId);
+    const persistent = neheleniaPersistentContexts(memberId);
+    const lines = [];
+
+    if (current) {
+      const currentParts = [];
+      if (current.targetName) currentParts.push(current.targetName);
+      if (current.detail) currentParts.push(current.detail.replace(/^JOGO\s+/i, 'J').replace(/^DESCARTE:\s*/i, ''));
+      if (currentParts.length) lines.push({ text: currentParts.join(' · '), kind: 'current' });
+    }
+
+    const persistentLabels = persistent.map((entry) => {
+      const sameAsCurrent = !!current
+        && current.targetName === entry.targetName
+        && current.detail === entry.detail;
+      const parts = [];
+      if (entry.targetName) parts.push(entry.targetName);
+      if (entry.detail) parts.push(entry.detail.replace(/^JOGO\s+/i, 'J'));
+      return {
+        sameAsCurrent,
+        text: parts.join(' · ') || 'ATIVO',
+      };
+    });
+
+    const sameCurrent = persistentLabels.find((entry) => entry.sameAsCurrent);
+    const otherPersistent = persistentLabels.find((entry) => !entry.sameAsCurrent);
+    if (sameCurrent) lines.push({ text: 'PERSISTENTE', kind: 'persistent' });
+    else if (otherPersistent) lines.push({ text: `PERSISTENTE · ${otherPersistent.text}`, kind: 'persistent' });
+
+    const compact = lines.slice(0, 2);
+    return {
+      lines: compact,
+      signature: compact.map((line) => `${line.kind}:${line.text}`).join('|'),
+    };
+  };
+
   const statusFor = (memberId) => {
     const intent = boss.currentIntent;
     if (isDimitrescu) {
@@ -5397,7 +5471,8 @@ function renderBossDaughterStrip(definition, boss) {
   // chama alguém, renderiza somente o(s) participante(s) daquela habilidade.
   const rosterOrder = Object.keys(roster || {});
   const memberList = [...activeIds].sort((a, b) => rosterOrder.indexOf(a) - rosterOrder.indexOf(b));
-  const signature = `${definition.id}:${abilityId}:${memberList.map((id) => `${id}:${statusFor(id)}`).join(',')}`;
+  const contextByMember = new Map(memberList.map((id) => [id, neheleniaAttendantContext(id)]));
+  const signature = `${definition.id}:${abilityId}:${memberList.map((id) => `${id}:${statusFor(id)}:${contextByMember.get(id)?.signature || ''}`).join(',')}`;
   if (strip.dataset.signature === signature) {
     strip.hidden = memberList.length === 0;
     return;
@@ -5436,6 +5511,57 @@ function renderBossDaughterStrip(definition, boss) {
     stateBadge.className = 'boss-daughter-state';
     stateBadge.textContent = stateLabels[status] || 'ATIVO';
     card.append(image, name, stateBadge);
+
+    if (isNehelenia) {
+      const context = contextByMember.get(memberId);
+      if (context?.lines?.length) {
+        const contextBox = document.createElement('span');
+        contextBox.className = 'boss-attendant-context';
+        // CRÍTICO: apresentação 100% fora do fluxo. Mesmo se o CSS estiver
+        // desatualizado, esta label nunca pode alterar altura/alinhamento do card.
+        contextBox.style.cssText = [
+          'position:absolute',
+          'right:7px',
+          'top:25px',
+          'z-index:5',
+          'max-width:86px',
+          'display:flex',
+          'flex-direction:column',
+          'align-items:flex-end',
+          'gap:2px',
+          'pointer-events:none',
+        ].join(';');
+        context.lines.forEach((line) => {
+          line.text.split(/\s*·\s*/).filter(Boolean).forEach((part) => {
+            const badge = document.createElement('small');
+            badge.className = `boss-attendant-context-line is-${line.kind}`;
+            badge.textContent = part;
+            const persistent = line.kind === 'persistent';
+            badge.style.cssText = [
+              'max-width:86px',
+              'box-sizing:border-box',
+              'padding:2px 5px',
+              'overflow:hidden',
+              `border:1px solid ${persistent ? 'rgba(196,181,253,.72)' : 'rgba(255,255,255,.55)'}`,
+              'border-radius:999px',
+              `color:${persistent ? '#ede9fe' : '#fff'}`,
+              `background:${persistent ? 'rgba(46,16,101,.90)' : 'rgba(4,7,18,.90)'}`,
+              'box-shadow:0 2px 7px rgba(0,0,0,.45)',
+              'font-size:5px',
+              'font-weight:1000',
+              'line-height:1',
+              'letter-spacing:.15px',
+              'text-overflow:ellipsis',
+              'text-transform:uppercase',
+              'white-space:nowrap',
+            ].join(';');
+            contextBox.appendChild(badge);
+          });
+        });
+        card.appendChild(contextBox);
+        card.title = `${member.name} — ${context.lines.map((line) => line.text).join(' · ')}`;
+      }
+    }
     strip.appendChild(card);
   });
   strip.hidden = strip.childElementCount === 0;

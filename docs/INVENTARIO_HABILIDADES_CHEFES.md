@@ -105,6 +105,8 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 | Pesadelo Eterno | 3 | 5 | Uma carta ORIGINAL é mostrada, gera dois reflexos idênticos e os três são embaralhados visualmente. O alvo precisa acompanhar a original; errar adiciona +1 Espelho. |
 | Laço do Tigre | 1, 2 e 3 | 4 | Liga dois jogos; cada lado precisa ser alimentado. O lado ignorado mantém garras até ser rompido. |
 | Presa Marcada | 1, 2 e 3 | 3 | Marca um jogo; até resolvê-lo, o alvo não pode alimentar outro jogo existente. |
+
+**Leitura dos capangas no HUD:** quando Tiger, Hawk ou Fish estiverem ativos, o card mostra o **alvo** e o vínculo da habilidade. Efeitos que continuam após o turno recebem a marca **PERSISTENTE**, para que dois capangas simultâneos não pareçam estar afetando o mesmo jogador.
 | Olho do Falcão | 1, 2 e 3 | 3 | Exige descarte do naipe marcado; errar pode vigiar o topo e bloquear o lixo. |
 | Vigilância | 2 e 3 | 3 | O alvo não pode alimentar o jogo marcado naquele turno. |
 | Mão no Espelho | 1, 2 e 3 | 3 | Marca uma carta que precisa sair da mão; falhar cria Reflexo Morto, descartável mas não jogável. |
