@@ -120,8 +120,18 @@ import { FRIEND_MP3, friendNoticeSound, createFriendSoundQueue, waitForPlayingCa
 
 // Importa a IA do Bot
 import { BuracoBot } from './bot.js';
+import { BossBuracoBot } from './boss-bot.js';
 
 const COOPERATIVE_MENU_MODE = 'cooperative';
+
+function botControllerForState(gameState = state) {
+  return gameState?.mode?.startsWith('boss_') ? BossBuracoBot : BuracoBot;
+}
+
+function cancelPendingBotTurns() {
+  BuracoBot.cancelPendingTurns();
+  BossBuracoBot.cancelPendingTurns();
+}
 
 function getSelectedBossDefinition() {
   return getBossDefinition(document.getElementById('bossSelect')?.value || 'banker');
@@ -685,7 +695,7 @@ function invalidateGameSession({ stopMedia = true } = {}) {
   window.gameSessionId += 1;
   botTurnController.abort();
   botTurnController = new AbortController();
-  BuracoBot.cancelPendingTurns();
+  cancelPendingBotTurns();
 
   if (window.botPlayTimeoutId) {
     clearTimeout(window.botPlayTimeoutId);
@@ -707,7 +717,7 @@ function activateGameSession() {
   window.gameSessionId += 1;
   window.isClosingGame = false;
   localExitPending = false;
-  BuracoBot.cancelPendingTurns();
+  cancelPendingBotTurns();
   return window.gameSessionId;
 }
 
@@ -11013,7 +11023,7 @@ onSnapshot(gameRef, async (snap) => {
     if (!wasPaused) {
       botTurnController.abort();
       botTurnController = new AbortController();
-      BuracoBot.cancelPendingTurns();
+      cancelPendingBotTurns();
     }
     window.lastBotTurnPlayed = null;
     if (window.botPlayTimeoutId) clearTimeout(window.botPlayTimeoutId);
@@ -11211,9 +11221,10 @@ onSnapshot(gameRef, async (snap) => {
 
             window.lastBotTurnPlayed = state.turnNumber;
             const sessionEngine = createBotEngineForSession(scheduledSessionId, scheduledSignal);
+            const BotController = botControllerForState(state);
             const activeBotTurn = { turnNumber: scheduledTurn, sessionId: scheduledSessionId, promise: null };
             window.activeBotTurn = activeBotTurn;
-            activeBotTurn.promise = BuracoBot.playTurn(state, scheduledBotIndex, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId })
+            activeBotTurn.promise = BotController.playTurn(state, scheduledBotIndex, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId })
               .then(async () => {
                 // Blindagem: se a rotina do bot terminou sem passar o turno, não
                 // deixamos lastBotTurnPlayed congelar a partida para sempre.
@@ -11227,7 +11238,7 @@ onSnapshot(gameRef, async (snap) => {
                 }
               })
               .catch((err) => {
-                if (BuracoBot.isCancellationError(err)) return;
+                if (BotController.isCancellationError(err)) return;
                 console.error('Erro na Matrix:', err);
                 window.lastBotTurnPlayed = null;
               })
@@ -12020,7 +12031,7 @@ if (isDebugMode) {
       clearTimeout(window.botPlayTimeoutId);
       window.botPlayTimeoutId = null;
     }
-    BuracoBot.cancelPendingTurns();
+    cancelPendingBotTurns();
     stopTurnTimer();
     localUndoStack = [];
     selectedHandIndexes.clear();
@@ -12175,7 +12186,7 @@ if (isDebugMode) {
 
       const turnBefore = state.turnNumber || 0;
       const completedBotTurnsBefore = (state.boss?.eventLog || []).filter((event) => event.type === 'playerTurn' && event.playerId === botPlayer.id).length;
-      await BuracoBot.playTurn(state, botIndex, sessionEngine, { signal, sessionId });
+      await BossBuracoBot.playTurn(state, botIndex, sessionEngine, { signal, sessionId });
       const completedBotTurnsAfter = (state.boss?.eventLog || []).filter((event) => event.type === 'playerTurn' && event.playerId === botPlayer.id).length;
       const turnFinished = state.finished || (state.turnNumber || 0) > turnBefore || state.currentPlayer !== botIndex || completedBotTurnsAfter > completedBotTurnsBefore;
       if (!turnFinished && !resolvedChoice) {

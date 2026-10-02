@@ -2,7 +2,7 @@
 import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './js/game/domination-strategy.js';
 import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint } from './js/game/bot-planner.js';
 
-export class BuracoBot {
+export class BossBuracoBot {
   static _turnLocks = new Set();
   static _plannerWorker = null;
   static _plannerRequestId = 0;
@@ -166,8 +166,8 @@ export class BuracoBot {
     const signal = options.signal;
     this.assertActive(engine, signal);
     let state = engine.getState();
-    if (state?.mode?.startsWith('boss_')) {
-      console.error('[BOT] Execução recusada em modo Chefe; use BossBuracoBot.', state.mode);
+    if (!state?.mode?.startsWith('boss_')) {
+      console.error('[BOSS-BOT] Execução recusada fora de modo Chefe:', state?.mode);
       return false;
     }
     if (!state || !state.players || !state.players[botIndex] || !state.teams) {
