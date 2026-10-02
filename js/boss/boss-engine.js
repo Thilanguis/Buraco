@@ -905,6 +905,25 @@ function neheleniaSafeFeedablePairs(gameState) {
   return pairs;
 }
 
+function neheleniaMirroredMeldPairs(gameState) {
+  const boss = gameState.boss;
+  return neheleniaSafeFeedablePairs(gameState).filter((pair) => {
+    const player = (gameState.players || []).find((entry) => entry.id === pair.playerId);
+    const teamId = player?.teamId ?? 0;
+    const persistentlyLocked = (boss?.effects || []).some((effect) => (
+      effect.id === 'nehelenia_meld_lock'
+      && (effect.playerId == null || effect.playerId === pair.playerId)
+      && (effect.teamId == null || effect.teamId === teamId)
+      && neheleniaMeldTargetMatches(effect, pair.meldId, pair.meldIndex)
+    ));
+    if (persistentlyLocked) return false;
+
+    const prey = (boss?.effects || []).find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === pair.playerId);
+    if (prey && !neheleniaMeldTargetMatches(prey, pair.meldId, pair.meldIndex)) return false;
+    return true;
+  });
+}
+
 function neheleniaFeedableMeldTargets(gameState) {
   const byMeld = new Map();
   for (const pair of neheleniaSafeFeedablePairs(gameState)) {
@@ -1214,7 +1233,7 @@ function createPayload(gameState, abilityId) {
       return buildNeheleniaReflectionChoice(gameState, target, 373) || {};
     }
     if (abilityId === 'mirrored_meld') {
-      const pair = chooseSeeded(neheleniaFeedablePairs(gameState).filter((entry) => (gameState.players || []).find((player) => player.id === entry.playerId)?.hand?.length >= 3), gameState, 379);
+      const pair = chooseSeeded(neheleniaMirroredMeldPairs(gameState), gameState, 379);
       const realSlot = seededUnit(bossSeed(gameState, 381)) < 0.5 ? 'left' : 'right';
       return pair ? { targetPlayerId: pair.playerId, meldIndex: pair.meldIndex, meldId: pair.meldId, fed: false, resolved: false, failed: false, realSlot } : {};
     }
@@ -1474,7 +1493,8 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'false_image') {
     return payload.targetPlayerId != null && Array.isArray(payload.reflections) && payload.reflections.length === 3 && !!payload.correctOption;
   }
-  if (abilityId === 'mirrored_meld') return payload.targetPlayerId != null && !!payload.meldId;
+  if (abilityId === 'mirrored_meld') return payload.targetPlayerId != null && !!payload.meldId
+    && neheleniaMirroredMeldPairs(gameState).some((entry) => entry.playerId === payload.targetPlayerId && entry.meldId === payload.meldId);
   if (abilityId === 'follow_reflection') return payload.firstPlayerId != null && payload.secondPlayerId != null && payload.firstPlayerId !== payload.secondPlayerId;
   if (abilityId === 'dream_theft') {
     return payload.targetPlayerId != null && neheleniaMirrorStatus(gameState, payload.targetPlayerId) === 'intact' && !!payload.correctOption;
@@ -3446,6 +3466,9 @@ export function canBossUseMeld(gameState, playerId, meldIndex) {
       && neheleniaMeldTargetMatches(effect, meldId, meldIndex)
     ));
     if (persistentLock) return false;
+    if (intent?.abilityId === 'mirrored_meld' && !intent.payload?.resolved
+      && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex)
+      && intent.payload?.targetPlayerId !== playerId) return false;
     const currentPrey = intent?.abilityId === 'tiger_prey' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fed
       ? intent.payload : null;
     const persistentPrey = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId);
