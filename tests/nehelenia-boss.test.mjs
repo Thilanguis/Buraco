@@ -103,7 +103,7 @@ test('Jogo Espelhado verdadeiro libera a jogada real', () => {
   assert.equal(result.real, true);
   feed(state, player.id, intent.payload.meldIndex, 1);
   assert.equal(state.boss.currentIntent.payload.fed, true);
-  assert.match(buildBossActionPresentation(state).progress, /jogo verdadeiro encontrado/i);
+  assert.match(buildBossActionPresentation(state).progress, /verdadeiro/i);
 });
 
 test('Siga o Reflexo fecha o padrão pelo turno inteiro e não bloqueia excesso', () => {

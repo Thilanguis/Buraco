@@ -1,0 +1,86 @@
+/*  banker — estilos exclusivos. Regra: todo seletor deve permanecer escopado por body[data-boss-id='banker'].  */
+body[data-boss-id='banker'] .boss-hud {
+  border-color: rgba(34, 197, 94, 0.78);
+  background: linear-gradient(180deg, rgba(3, 24, 16, 0.98), rgba(3, 10, 13, 0.97));
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.52),
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(34, 197, 94, 0.13);
+}
+body[data-boss-id='banker'] .boss-hud::before,
+body[data-boss-id='banker'] .boss-hud::after {
+  border-color: #22c55e;
+}
+body[data-boss-id='banker'] .boss-phase {
+  border-color: rgba(34, 197, 94, 0.72);
+  color: #86efac;
+}
+body[data-boss-id='banker'] .boss-hud-kicker {
+  color: #4ade80;
+}
+body[data-boss-id='banker'] .boss-dialogue-presentation > span {
+  color: #15803d;
+}
+body[data-boss-id='banker'] .boss-ability-overview {
+  border-left-color: #22c55e;
+}
+body[data-boss-id='banker'] .boss-portrait {
+  position: relative;
+  isolation: isolate;
+  contain: paint;
+  border-color: rgba(74, 222, 128, 0.72);
+  box-shadow:
+    0 0 16px rgba(34, 197, 94, 0.2),
+    inset 0 0 0 1px rgba(250, 204, 21, 0.12);
+}
+body[data-boss-id='banker'] .boss-portrait img {
+  --banker-portrait-scale: 1.2;
+  position: relative;
+  z-index: 1;
+  object-position: 50% 29%;
+  transform: translate3d(0, 0, 0) scale(var(--banker-portrait-scale));
+  transform-origin: 50% 32%;
+  /* Keep the bitmap on a stable layer during long, card-heavy matches. */
+  will-change: auto;
+  animation: none;
+}
+body[data-boss-id='banker'] .boss-portrait::before,
+body[data-boss-id='banker'] .boss-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+body[data-boss-id='banker'] .boss-portrait::before {
+  z-index: 2;
+  background: radial-gradient(circle at 70% 58%, rgba(250, 204, 21, 0.22) 0 2%, transparent 11%), linear-gradient(108deg, transparent 22%, rgba(253, 224, 71, 0.2) 46%, rgba(74, 222, 128, 0.1) 55%, transparent 72%);
+  mix-blend-mode: screen;
+  opacity: 0.18;
+  transform: translate3d(-18%, 0, 0);
+  will-change: transform, opacity;
+  animation: bankerPortraitLight 7.6s ease-in-out infinite;
+}
+body[data-boss-id='banker'] .boss-portrait::after {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 10% 78%, rgba(253, 224, 71, 0.82) 0 1px, transparent 2px), radial-gradient(circle at 25% 43%, rgba(74, 222, 128, 0.6) 0 1px, transparent 2px),
+    radial-gradient(circle at 48% 83%, rgba(250, 204, 21, 0.7) 0 1.2px, transparent 2.4px), radial-gradient(circle at 73% 34%, rgba(134, 239, 172, 0.58) 0 1px, transparent 2px),
+    radial-gradient(circle at 90% 70%, rgba(253, 224, 71, 0.76) 0 1px, transparent 2px);
+  opacity: 0;
+  transform: translate3d(0, 11px, 0) scale(0.99);
+  will-change: transform, opacity;
+  animation: bankerPortraitParticles 12s linear infinite;
+}
+@media (max-width: 900px) {
+  body[data-boss-id='banker'] .boss-portrait img {
+    --banker-portrait-scale: 1.17;
+    object-position: 50% 27%;
+    transform-origin: 50% 30%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='banker'] .boss-portrait img {
+    animation: none !important;
+    transform: translate3d(0, 0, 0) scale(var(--banker-portrait-scale));
+  }
+}

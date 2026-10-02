@@ -3,7 +3,11 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { normalizeVariantForMode } from '../js/boss/boss-registry.js';
 
-const [app, bot, html, serviceWorker, cardsCss, bossCss, gameCss, tableThemesCss, banker, dominatrix, matriarch, engine] = await Promise.all([
+const [
+  app, bot, html, serviceWorker, cardsCss, bossCss, gameCss, tableThemesCss,
+  banker, dominatrix, matriarch, engine, bankerCss, dominatrixCss, matriarchCss,
+  dimitrescuCss, neheleniaCss, matriarchUi, uiRegistry, matriarchMechanics, mechanicsRegistry,
+] = await Promise.all([
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../bot.js', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
@@ -16,6 +20,15 @@ const [app, bot, html, serviceWorker, cardsCss, bossCss, gameCss, tableThemesCss
   readFile(new URL('../js/boss/bosses/dominatrix.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/bosses/matriarch.js', import.meta.url), 'utf8'),
   readFile(new URL('../js/boss/boss-engine.js', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/boss/banker.css', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/boss/dominatrix.css', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/boss/matriarch.css', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/boss/dimitrescu.css', import.meta.url), 'utf8'),
+  readFile(new URL('../styles/boss/nehelenia.css', import.meta.url), 'utf8'),
+  readFile(new URL('../js/boss/ui/matriarch-ui.js', import.meta.url), 'utf8'),
+  readFile(new URL('../js/boss/ui/boss-ui-registry.js', import.meta.url), 'utf8'),
+  readFile(new URL('../js/boss/mechanics/matriarch.js', import.meta.url), 'utf8'),
+  readFile(new URL('../js/boss/mechanics/boss-mechanics-registry.js', import.meta.url), 'utf8'),
 ]);
 
 test('menu e HUD expõem o modo Chefe da Mesa', () => {
@@ -48,7 +61,7 @@ test('cada chefe fixa sua identidade visual no menu cooperativo', () => {
   assert.match(app, /applyCooperativeBossPreset/);
   assert.match(app, /visualMenuBlock\.style\.display = cooperative \? 'none'/);
   assert.match(app, /moneyMenuBlock\.style\.display = cooperative \? 'none'/);
-  assert.match(bossCss, /data-boss-id='banker'.*boss-hud/);
+  assert.match(bankerCss, /body\[data-boss-id='banker'\] \.boss-hud/);
   assert.equal(normalizeVariantForMode('boss_banker', 'aberto'), 'fechado');
   assert.equal(normalizeVariantForMode('boss_dominadora', 'aberto'), 'fechado');
   assert.equal(normalizeVariantForMode('boss_matriarca', 'aberto'), 'fechado');
@@ -57,8 +70,8 @@ test('cada chefe fixa sua identidade visual no menu cooperativo', () => {
   assert.match(app, /newState\.variant = normalizeVariantForMode\(newState\.mode, newState\.variant\)/);
   assert.match(app, /variantSelect'\)\.value = 'fechado'/);
   assert.match(app, /variant: normalizeVariantForMode\(mode, document\.getElementById\('variantSelect'\)\.value\)/);
-  assert.match(app, /await startGame\(state\.mode, currentNames, state\.variant, currentPix\)/);
-  assert.match(app, /window\.voteRematch[\s\S]*?window\.debugRestartGame\(\)/);
+  assert.match(app, /await startGame\(state\.mode, currentNames, state\.variant, currentPix,[\s\S]*?accountIds/);
+  assert.match(app, /window\.voteRematch[\s\S]*?window\.debugRestartGame\(true\)/);
 });
 
 test('cartas compradas ficam destacadas sem substituir a face do baralho', () => {
@@ -75,8 +88,8 @@ test('bloqueios da Dominadora possuem estados visuais proprios e selecao reversi
   assert.match(bossCss, /\.boss-mode \.carta\.boss-card-locked \{/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-card-exposed \{/);
   assert.doesNotMatch(bossCss, /\.carta\.boss-card-locked::after/);
-  assert.match(app, /if \(!bossCardEffect && \(\(state\.boughtCardIds/);
-  const handClick = app.match(/div\.onclick = \(\) => \{[\s\S]*?container\.appendChild\(div\);/)?.[0] || '';
+  assert.match(app, /if \(!bossCardEffect && \(boughtCardIds\.has\(card\.id\) \|\| bossChoiceBoughtIds\.has\(card\.id\)\)\)/);
+  const handClick = app.match(/div\.onclick = \(\) => \{[\s\S]*?nextCards\.appendChild\(div\);/)?.[0] || '';
   assert.match(handClick, /selectedHandIndexes\.has\(idx\)[\s\S]*?selectedHandIndexes\.delete\(idx\)/);
   assert.doesNotMatch(handClick, /if \(bossCardLocked\)[\s\S]*?return/);
   assert.match(bossCss, /@media \(hover: none\), \(pointer: coarse\)[\s\S]*?\.carta:hover:not\(\.selected\)/);
@@ -92,7 +105,7 @@ test('Posse decora cada jogo sem cobrir cartas ou bloquear cliques', () => {
   assert.match(bossCss, /\.meld-line\.possessed-by-boss \{[^}]*isolation:\s*isolate/);
   assert.match(bossCss, /\.meld-line\.possessed-by-boss::before \{[\s\S]*?pointer-events:\s*none/);
   assert.match(bossCss, /\.meld-line\.possessed-by-boss::after \{[\s\S]*?POSSE — adicione 1 carta[\s\S]*?pointer-events:\s*none/);
-  assert.match(bossCss, /\.meld-line\.possessed-by-boss \.carta:last-child \{ z-index: 3; \}/);
+  assert.match(bossCss, /\.meld-line\.possessed-by-boss \.carta:last-child \{[\s\S]*?z-index:\s*3;/);
   assert.doesNotMatch(bossCss, /\.meld-line\.possessed-by-boss::after[^}]*inset:\s*0/);
   assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.meld-line\.possessed-by-boss/);
 });
@@ -105,7 +118,7 @@ test('escolha de comprar duas destaca exatamente as duas cartas recebidas', () =
 
 test('Escolha Forcada apresenta e anima os dois IDs recebidos', () => {
   assert.match(app, /const animateForcedChoiceDraw = async/);
-  assert.match(app, /event\.drawnCardIds\.slice\(0, 2\)\.map/);
+  assert.match(app, /event\.drawnCardIds[\s\S]*?\.slice\(0, 2\)[\s\S]*?\.map/);
   assert.match(app, /cardElById\(card\.id\)/);
   assert.match(app, /flyRectToRect\(card, fromRect, getRect\(toEl\), 'back'\)/);
   assert.match(app, /2 cartas adicionadas à sua mão\./);
@@ -130,7 +143,7 @@ test('fluxos humanos e do bot chamam o motor do chefe fora do render', () => {
   assert.match(app, /getBossCardBlockFeedback\(state/);
   assert.match(app, /canBossCreateMeld\(state/);
   assert.match(app, /canBossUseMeld\(state/);
-  assert.match(app, /isCurrentBossMode\(\)\) seats\.right = others\[0\]/);
+  assert.match(app, /opponentSeats\(state, myPlayerIndex, isCurrentBossMode\(\)\)/);
 });
 
 test('HUD usa a apresentacao da acao atual e mantem resultados no historico recolhido', () => {
@@ -186,9 +199,10 @@ test('HUD compacto remove marcas falsas de HP e mantem detalhes expansisveis', (
   assert.doesNotMatch(html, /id="bossStatusRail"|class="boss-round-card"/);
   assert.match(app, /bossBattleDetails'\);\s*if \(battleDetails\) battleDetails\.open = false/);
   assert.match(app, /bossActionType'\)\.textContent = actionPresentation\.category\.toUpperCase\(\)/);
-  assert.match(app, /bossIntentDescription'\)\.textContent = actionPresentation\.instruction/);
-  assert.match(app, /bossIntentProgress'\)\.textContent = \[actionPresentation\.progress, actionPresentation\.consequence\]/);
-  assert.doesNotMatch(app, /bossIntentProgress'\)\.textContent = actionPresentation\.details/);
+  assert.match(app, /intentDescription\.textContent = actionPresentation\.instruction/);
+  assert.match(app, /const intentProgressParts = \[actionPresentation\.progress, actionPresentation\.consequence\]\.filter\(Boolean\)/);
+  assert.match(app, /intentProgress\.textContent = intentProgressParts\.join/);
+  assert.doesNotMatch(app, /intentProgress\.textContent = actionPresentation\.details/);
 });
 
 test('HUD explica Dominado e anima Correntes e Divida a partir dos eventos reais', () => {
@@ -204,8 +218,8 @@ test('HUD explica Dominado e anima Correntes e Divida a partir dos eventos reais
   assert.match(app, /bossDangerMeter/);
   assert.match(bossCss, /\.boss-floating-number\.chain-up/);
   assert.match(bossCss, /\.boss-floating-number\.chain-down/);
-  assert.match(bossCss, /\.boss-floating-number\.debt-down,[\s\S]*?\.boss-floating-number\.debt-up \{ color: #22c55e; \}/);
-  assert.match(bossCss, /\.boss-floating-number\.chain-up,[\s\S]*?\.boss-floating-number\.chain-down \{ color: #ec4899; \}/);
+  assert.match(bossCss, /\.boss-floating-number\.debt-down,[\s\S]*?\.boss-floating-number\.debt-up\s*\{[\s\S]*?color:\s*#22c55e;/);
+  assert.match(bossCss, /\.boss-floating-number\.chain-up,[\s\S]*?\.boss-floating-number\.chain-down\s*\{[\s\S]*?color:\s*#ec4899;/);
   assert.match(bossCss, /\.boss-floating-number \{[^}]*animation: bossFloatDamage 2\.4s ease forwards;/);
   assert.match(app, /setTimeout\(\(\) => floating\.remove\(\), 2600\)/);
   assert.match(app, /duration: 6000, easing: 'cubic-bezier\(0\.2, 0\.8, 0\.2, 1\)'/);
@@ -220,11 +234,11 @@ test('Cofre fica junto ao jogador, permite juros e anima o resgate sem entrar no
   assert.doesNotMatch(detailsBlock, /bossLocalVaultSlot/);
   assert.match(app, /function renderBossVaultSlot\(root, player, isLocal = false\)/);
   assert.match(app, /GARANTIA NO COFRE/);
-  assert.match(app, /CARÊNCIA/);
-  assert.match(app, /COFRE ABERTO · CUSTO ATUAL/);
-  assert.match(app, /quote\?\.state === 'open'[\s\S]*?COFRE ABERTO[\s\S]*?: `CARÊNCIA/);
+  assert.match(app, /ABRE NO PRÓXIMO TURNO DO TITULAR/);
+  assert.match(app, /ABERTO · RESGATE/);
+  assert.match(app, /quote\?\.state === 'open'[\s\S]*?ABERTO · RESGATE[\s\S]*?: 'ABRE NO PRÓXIMO TURNO DO TITULAR'/);
   assert.match(app, /base \+\$\{quote\?\.baseDebt/);
-  assert.match(app, /juros \+\$\{quote\?\.interestDebt/);
+  assert.match(app, /\+\$\{interestStep\} por turno adiado/);
   assert.match(app, /atual \+\$\{quote\?\.currentDebt/);
   assert.match(app, /quote\?\.state === 'open'/);
   assert.match(app, /event\.vaultSound === 'close'/);
@@ -269,7 +283,7 @@ test('HUD do chefe acompanha a largura responsiva da mesa', () => {
   assert.match(hudRule, /max-width:\s*1080px/);
   assert.match(hudRule, /min-height:\s*168px/);
   assert.match(bossCss, /\.boss-portrait \{[^}]*width:\s*184px;[^}]*height:\s*116px/);
-  assert.match(bossCss, /@media \(max-width: 900px\)[\s\S]*?\.boss-portrait \{ width: 134px; height: 86px/);
+  assert.match(bossCss, /@media \(max-width: 900px\)[\s\S]*?\.boss-portrait \{[\s\S]*?width:\s*134px;[\s\S]*?height:\s*86px/);
 });
 
 test('Tarifa identifica e anima separadamente as Cartas Financiadas em todos os fluxos', () => {
@@ -294,7 +308,7 @@ test('Troca Forçada apresenta os dois voos e identifica a carta recebida', () =
   assert.match(app, /Promise\.all\([\s\S]*?flyRectToRect\(sent\.card, fromRect, toRect, 'front'\)/);
   assert.match(app, /bossSwapReceivedHighlights\.set/);
   assert.match(app, /Você recebeu \$\{mine\.cardLabel\} de/);
-  assert.match(app, /finally \{[\s\S]*?preview\.remove\(\)[\s\S]*?boss-swap-updating/);
+  assert.match(app, /finally \{[\s\S]*?previews\.forEach\(\(\{ preview \}\) => preview\.remove\(\)\)[\s\S]*?receivedCardElement\.style\.visibility = ''/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-swap-received/);
   assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?boss-swap-received/);
 });
@@ -320,20 +334,25 @@ test('primeira ordem usa o turno formal de seis segundos e trava controles', () 
 
 test('acoes humanas e cronometro consultam a trava obrigatoria de escolhas', () => {
   assert.match(app, /function ensureMyTurn\(\)[\s\S]*?canPerformCommonGameAction\(state\)/);
-  assert.match(app, /async function drawFromStock\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
-  assert.match(app, /async function drawFromDiscard\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
+  assert.match(app, /async function drawFromStock\(\) \{[\s\S]*?localActionGate\.run\(drawFromStockOnce\)/);
+  assert.match(app, /async function drawFromStockOnce\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
+  assert.match(app, /async function drawFromDiscard\(options = \{\}\) \{[\s\S]*?localActionGate\.run\(\(\) => drawFromDiscardOnce\(options\)\)/);
+  assert.match(app, /async function drawFromDiscardOnce\(options = \{\}\) \{\s*if \(!ensureMyTurn\(\)\) return/);
   assert.match(app, /async function makeMeldFromSelection[\s\S]*?if \(!ensureMyTurn\(\)\) return/);
-  assert.match(app, /async function discardSelectedCard\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
+  assert.match(app, /async function discardSelectedCard\(\) \{[\s\S]*?localActionGate\.run\(discardSelectedCardOnce\)/);
+  assert.match(app, /async function discardSelectedCardOnce\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
   assert.match(app, /window\.executeUndo = async \(\) => \{[\s\S]*?canRestoreUndoTransaction/);
   assert.match(app, /function passTurn\(\{ preserveUndo = false \} = \{\}\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
-  assert.match(app, /async function autoPlayTimeout\(\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
+  assert.match(app, /async function autoPlayTimeout\(\) \{[\s\S]*?localActionGate\.run\(autoPlayTimeoutOnce\)/);
+  assert.match(app, /async function autoPlayTimeoutOnce\(\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
   assert.match(app, /function resetTurnTimer\(\)[\s\S]*?hasPendingBossChoices\(state\)/);
   assert.match(app, /function startTurnTimerIfNeeded[\s\S]*?if \(!canPerformCommonGameAction\(state\)\)/);
 });
 
 test('turno formal do chefe pausa bot e cronometro ate o estagio dos jogadores', () => {
   assert.match(app, /!hasPendingBossChoices\(state\) && !isBossTurnActive\(state\)/);
-  assert.match(app, /if \(isBossTurnActive\(state\) \|\| hasPendingBossChoices\(state\)\) return/);
+  assert.match(app, /canPerformCommonGameAction\(state\) && !hasPendingBossChoices\(state\) && !isBossTurnActive\(state\)/);
+  assert.match(app, /!canPerformCommonGameAction\(state\) \|\| isBossTurnActive\(state\) \|\| hasPendingBossChoices\(state\)/);
   assert.match(app, /botTurnController\.abort\(\)/);
   assert.match(app, /bossPresentationKey = ''/);
 });
@@ -357,7 +376,7 @@ test('humano e bot validam descarte livre antes de mover cartas', () => {
 });
 
 test('service worker inclui os novos módulos sem trocar sua versão', () => {
-  assert.match(serviceWorker, /const CACHE_NAME = 'buraco-v123'/);
+  assert.match(serviceWorker, /const CACHE_NAME = 'buraco-v\d+'/);
   assert.match(serviceWorker, /js\/boss\/boss-engine\.js/);
   assert.match(serviceWorker, /js\/deck\.js/);
   assert.match(serviceWorker, /js\/boss\/boss-presentation\.js/);
@@ -365,34 +384,38 @@ test('service worker inclui os novos módulos sem trocar sua versão', () => {
   assert.match(serviceWorker, /assets\/images\/boss-banqueiro\.png/);
   assert.match(serviceWorker, /js\/boss\/bosses\/dominatrix\.js/);
   assert.match(serviceWorker, /assets\/images\/boss-dominadora\.png/);
+  assert.match(serviceWorker, /styles\/boss\/banker\.css/);
+  assert.match(serviceWorker, /styles\/boss\/matriarch\.css/);
+  assert.match(serviceWorker, /js\/boss\/mechanics\/boss-mechanics-registry\.js/);
 });
 
 test('Matriarca integra motor, HUD, ameacas, bot e feedback sem reutilizar estados de outros chefes', () => {
   for (const ability of ['living_seed', 'hungry_root', 'restorative_dew', 'twin_vines', 'graft', 'discard_pollen', 'harvest', 'royal_bloom', 'emerald_cocoon', 'spring_crown']) {
     assert.match(matriarch, new RegExp(`['"]${ability}['"]`));
-    assert.match(engine, new RegExp(`['"]${ability}['"]`));
   }
   assert.match(html, /id="bossBloomFlowers"/);
-  assert.match(app, /boss\.id === 'matriarca_esmeralda'/);
+  assert.match(engine, /applyBossMeldMechanics\(boss\.id/);
+  assert.match(mechanicsRegistry, /matriarchBossMechanics/);
+  assert.match(matriarchMechanics, /id: 'matriarca_esmeralda'/);
   assert.match(app, /boss-card-nature-seed/);
   assert.match(app, /boss-card-nature-pollen/);
-  assert.match(app, /rooted-by-matriarch/);
-  assert.match(app, /grafted-by-matriarch/);
-  assert.match(app, /matriarchBloomRemoved/);
+  assert.match(matriarchUi, /rooted-by-matriarch/);
+  assert.match(matriarchUi, /grafted-by-matriarch/);
+  assert.match(matriarchUi, /matriarchBloomRemoved/);
   assert.match(bot, /getNaturePriorities/);
   assert.match(bot, /naturePriorities/);
 });
 
 test('tema da Matriarca mantem cartas e fundo estaticos, com retrato leve e movimento reduzido', () => {
-  assert.match(bossCss, /body\[data-boss-id='matriarca_esmeralda'\] \.boss-hud/);
-  assert.match(bossCss, /\.boss-bloom-flower/);
+  assert.match(matriarchCss, /body\[data-boss-id='matriarca_esmeralda'\] \.boss-hud/);
+  assert.match(bossCss, /\.boss-bloom-flowers/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-card-nature-seed/);
   assert.match(bossCss, /\.boss-mode \.carta\.boss-card-nature-pollen/);
   assert.match(bossCss, /\.meld-line\.rooted-by-matriarch::before/);
-  assert.match(bossCss, /matriarchPortraitBreathing/);
-  assert.match(bossCss, /matriarchPortraitAura/);
-  assert.match(bossCss, /matriarchPortraitPollen/);
-  assert.match(bossCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?matriarca_esmeralda[\s\S]*?animation:\s*none\s*!important/);
+  assert.match(matriarchCss, /matriarchPortraitBreathing/);
+  assert.match(matriarchCss, /matriarchPortraitAura/);
+  assert.match(matriarchCss, /matriarchPortraitPollen/);
+  assert.match(matriarchCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?matriarca_esmeralda[\s\S]*?animation:\s*none\s*!important/);
   assert.match(cardsCss, /matriarca_esmeralda[^}]+animation:\s*none\s*!important/s);
   assert.match(gameCss, /matriarca_esmeralda[^}]+--table-light-animation:\s*none\s*!important/s);
   assert.match(gameCss, /matriarca_esmeralda[^}]+--table-flash-animation:\s*none\s*!important/s);
@@ -400,8 +423,8 @@ test('tema da Matriarca mantem cartas e fundo estaticos, com retrato leve e movi
 });
 
 test('marcador de Florescimento fica isolado dos outros chefes', () => {
-  assert.match(app, /state\.boss\?\.id === 'matriarca_esmeralda' && contribution\?\.matriarchBloomRemoved > 0/);
-  assert.match(app, /contributionChip\('bloom', contribution\.matriarchBloomRemoved/);
-  assert.doesNotMatch(app, /state\.boss\?\.id === 'banker'[^\n]*matriarchBloomRemoved/);
-  assert.doesNotMatch(app, /state\.boss\?\.id === 'dominadora'[^\n]*matriarchBloomRemoved/);
+  assert.match(matriarchUi, /const value = Number\(contribution\?\.matriarchBloomRemoved\) \|\| 0/);
+  assert.match(matriarchUi, /type: 'bloom'/);
+  assert.match(uiRegistry, /matriarchBossUi/);
+  assert.doesNotMatch(app, /state\.boss\?\.id === 'matriarca_esmeralda'[^\n]*matriarchBloomRemoved/);
 });

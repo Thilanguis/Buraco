@@ -86,6 +86,7 @@ import {
 } from './js/boss/boss-engine.js';
 import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } from './js/boss/boss-registry.js';
 import { buildBossActionPresentation, buildBossAbilityHelp, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
+import { getBossMeldContributionUi, getBossMeldUiModel } from './js/boss/ui/boss-ui-registry.js';
 import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
 import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
 import {
@@ -8523,6 +8524,23 @@ async function resolveNeheleniaMirrorVisualChoice(slot, teamId, meldIndex, mirro
   showMessage(`💥 Reflexo falso! ${card.rank}${card.suit} foi para o fundo do monte. Você ficou Desorientado: apenas descarte para encerrar.`);
 }
 
+function applyBossMeldUiSurface(element, classes = [], dataset = {}) {
+  if (!element) return;
+  for (const className of classes || []) {
+    if (className) element.classList.add(className);
+  }
+  for (const [key, value] of Object.entries(dataset || {})) {
+    if (value == null || value === '') delete element.dataset[key];
+    else element.dataset[key] = String(value);
+  }
+}
+
+function applyBossMeldCardDecoration(element, decoration, key = '') {
+  if (!element || !decoration) return;
+  applyBossMeldUiSurface(element, decoration.classes || []);
+  if (decoration.bloodProfile) applyDimitrescuBloodScatter(element, key, decoration.bloodProfile);
+}
+
 function renderMelds() {
   if (!discardChoiceIsCurrent()) pendingDiscardChoice = null;
   const m1 = document.getElementById('meldsP1');
@@ -8664,82 +8682,35 @@ function renderMelds() {
       div.classList.toggle('locked-by-boss', isBossMeldLocked(state, t.id, midx));
       const possessed = isBossMeldPossessed(state, t.id, midx);
       div.classList.toggle('possessed-by-boss', possessed);
-      const activeInterdict =
-        isCurrentBossMode() && state.boss?.id === 'dominadora'
-          ? (state.boss.interdicts || []).find(
-              (entry) => entry.status === 'active' && Number(entry.teamId ?? 0) === Number(t.id) && (Number(entry.meldIndex) === midx || (entry.meldId && entry.meldId === state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`])),
-            )
-          : null;
-      div.classList.toggle('interdicted-by-boss', !!activeInterdict);
-      const natureThreats = isCurrentBossMode() ? getBossMeldNatureThreats(state, t.id, midx) : [];
-      const rootThreat = natureThreats.find((threat) => ['root', 'twin_root', 'royal_root'].includes(threat.type));
-      const graftThreat = natureThreats.find((threat) => threat.type === 'graft');
-      div.classList.toggle('rooted-by-matriarch', !!rootThreat);
-      div.classList.toggle('grafted-by-matriarch', !!graftThreat);
-      const dimitrescuIntent = state.boss?.id === 'dimitrescu' ? state.boss.currentIntent : null;
-      const cassandraObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'cassandra') : null;
       const stableMeldId = state.boss?.meldIdsByPosition?.[`${t.id}:${midx}`];
+      const mInfo = classifyMeldForUi(meld);
+      const contribution = isCurrentBossMode() ? getBossMeldContribution(state, t.id, midx) : null;
+      const natureThreats = isCurrentBossMode() ? getBossMeldNatureThreats(state, t.id, midx) : [];
+      const bossMeldUi = isCurrentBossMode()
+        ? getBossMeldUiModel(state.boss?.id, {
+            boss: state.boss,
+            players: state.players,
+            teamId: t.id,
+            meldIndex: midx,
+            meldId: stableMeldId,
+            contributionMeldId: contribution?.meldId || null,
+            meldInfo: mInfo,
+            natureThreats,
+          })
+        : null;
 
-      // Escolha Forçada da Dominadora: ordens que apontam para um jogo
-      // precisam continuar visíveis na própria mesa enquanto estiverem ativas.
-      // A marca fica SOMENTE no bloco das cartas para não alterar a geometria
-      // nem englobar os textos Canastra/Limpa.
-      const dominatrixMeldOrder =
-        isCurrentBossMode() && state.boss?.id === 'dominadora'
-          ? (state.boss.activeOrders || []).find((order) => {
-              if (order.status !== 'active' || !['feed_specific_meld', 'evolve_specific_meld'].includes(order.type)) return false;
-              const targetPlayer = state.players.find((player) => player.id === order.targetPlayerId);
-              if (targetPlayer && Number(targetPlayer.teamId) !== Number(t.id)) return false;
-              if (order.meldId && stableMeldId && order.meldId === stableMeldId) return true;
-              // Fallback para saves/reloads em que o id estavel do jogo foi reconstruido.
-              // A ordem ainda guarda o indice original (Jogo 1, Jogo 2...), entao a UI
-              // deve continuar marcando esse mesmo jogo em vez de simplesmente sumir.
-              return Number(order.meldIndex) === Number(midx);
-            })
-          : null;
-      const cassandraMarked =
-        dimitrescuIntent?.abilityId === 'cassandra_feast'
-          ? !dimitrescuIntent.payload?.fed && (dimitrescuIntent.payload?.meldId ? dimitrescuIntent.payload.meldId === stableMeldId : dimitrescuIntent.payload?.meldIndex === midx)
-          : cassandraObjective?.status === 'active' && (cassandraObjective.meldId ? cassandraObjective.meldId === stableMeldId : cassandraObjective.meldIndex === midx);
-      div.classList.toggle('feasted-by-cassandra', !!cassandraMarked);
-      const neheleniaIntent = state.boss?.id === 'nehelenia' ? state.boss.currentIntent : null;
-      let neheleniaMirrorLabel = '';
-      let neheleniaMirrorChoice = false;
-      if (neheleniaIntent?.abilityId === 'mirrored_meld') {
-        const target = neheleniaIntent.payload;
-        if (target && ((target.meldId && stableMeldId && target.meldId === stableMeldId) || Number(target.meldIndex) === Number(midx))) {
-          neheleniaMirrorLabel = target.fed ? 'JOGO ESPELHADO · QUEBRADO' : 'JOGO ESPELHADO';
-          neheleniaMirrorChoice = !target.resolved;
-        }
-      } else if (neheleniaIntent?.abilityId === 'mirror_prison') {
-        const target = neheleniaIntent.payload;
-        if (target && ((target.meldId && stableMeldId && target.meldId === stableMeldId) || Number(target.meldIndex) === Number(midx)))
-          neheleniaMirrorLabel = `PRISÃO · LIBERTE ${state.players.find((player) => player.id === target.trappedPlayerId)?.name || 'PARCEIRO'}`;
-      }
+      applyBossMeldUiSurface(div, bossMeldUi?.divClasses, bossMeldUi?.divDataset);
+
+      const neheleniaMirror = bossMeldUi?.mirror || null;
+      const neheleniaMirrorLabel = neheleniaMirror?.label || '';
+      const neheleniaMirrorChoice = !!neheleniaMirror?.choice;
+      const neheleniaIntent = neheleniaMirror?.intent || null;
       const neheleniaMirrorAnimationKey = neheleniaMirrorChoice ? neheleniaMirrorMeldAnimationKey(neheleniaIntent, t.id, midx) : '';
       const neheleniaMirrorSplitComplete = !neheleniaMirrorChoice || locallyAnimatedNeheleniaMirrorMelds.has(neheleniaMirrorAnimationKey);
-      div.classList.toggle('mirrored-by-nehelenia', !!neheleniaMirrorLabel);
-      if (neheleniaMirrorLabel) div.dataset.neheleniaMirror = neheleniaMirrorLabel;
-      else delete div.dataset.neheleniaMirror;
-      if (graftThreat) {
-        const graftSideIndex = (graftThreat.meldIds || []).indexOf(graftThreat.matchedMeldId);
-        div.dataset.graftId = graftThreat.id;
-        div.dataset.graftSide = graftSideIndex === 1 ? 'B' : 'A';
-      }
 
       const row = document.createElement('div');
       row.className = 'meld-line-cards';
-      if (dominatrixMeldOrder) {
-        row.classList.add('boss-meld-dominatrix-order-mark');
-        row.dataset.dominatrixOrder = dominatrixMeldOrder.type;
-      }
-      if (neheleniaMirrorLabel) {
-        row.classList.add('nehelenia-mirror-card-frame');
-        row.dataset.neheleniaMirror = neheleniaMirrorLabel;
-        if (neheleniaMirrorLabel.startsWith('PRISÃO')) row.classList.add('is-prison');
-      }
-      const mInfo = classifyMeldForUi(meld);
-
+      applyBossMeldUiSurface(row, bossMeldUi?.rowClasses, bossMeldUi?.rowDataset);
       // Se for uma canastra Ás-a-Ás, injeta o visual BDSM de destaque
       if (mInfo && mInfo.kind === 'asas') {
         div.classList.add('canastra-asas-bdsm');
@@ -8776,10 +8747,7 @@ function renderMelds() {
           miniCard.style.zIndex = cardIndex;
           miniCard.setAttribute('aria-hidden', 'true');
         } else miniCard.innerHTML = cardFrontHTML(card);
-        if (cassandraMarked) {
-          miniCard.classList.add('boss-card-cassandra-feast');
-          applyDimitrescuBloodScatter(miniCard, card.id || `${midx}:${cardIndex}`, 'feast');
-        }
+        applyBossMeldCardDecoration(miniCard, bossMeldUi?.cardDecoration, card.id || `${midx}:${cardIndex}`);
 
         row.appendChild(miniCard);
       });
@@ -8799,10 +8767,7 @@ function renderMelds() {
           }
 
           closedCard.dataset.cardIndex = String(meld.length - 1);
-          if (cassandraMarked) {
-            closedCard.classList.add('boss-card-cassandra-feast');
-            applyDimitrescuBloodScatter(closedCard, lastCard.id || `${midx}:closed`, 'feast');
-          }
+          applyBossMeldCardDecoration(closedCard, bossMeldUi?.cardDecoration, lastCard.id || `${midx}:closed`);
 
           closedCard.innerHTML = cardFrontHTML(lastCard);
 
@@ -8823,7 +8788,6 @@ function renderMelds() {
 
       const meta = document.createElement('div');
       meta.className = 'meld-meta';
-      const contribution = isCurrentBossMode() ? getBossMeldContribution(state, t.id, midx) : null;
       const contributionChips = [];
       const contributionChip = (type, value, icon, title) => {
         const renderKey = `${gameId}:${state.boss?.id}:${contribution?.meldId}:${type}`;
@@ -8836,80 +8800,18 @@ function renderMelds() {
       if (contribution?.damageDone > 0) {
         contributionChips.push(contributionChip('damage', contribution.damageDone, '&#128165;', 'Dano causado por este jogo'));
       }
-      if (state.boss?.id === 'banker' && contribution?.bankerDebtRelief > 0) {
-        contributionChips.push(contributionChip('debt', contribution.bankerDebtRelief, '&#129689;', 'Divida reduzida por este jogo'));
-      }
-      if (state.boss?.id === 'dominadora' && contribution?.dominatrixChainsBroken > 0) {
-        contributionChips.push(contributionChip('chains', contribution.dominatrixChainsBroken, '&#9939;&#65039;', 'Chicotes removidos por este jogo'));
-      }
-      if (state.boss?.id === 'matriarca_esmeralda' && contribution?.matriarchBloomRemoved > 0) {
-        contributionChips.push(contributionChip('bloom', contribution.matriarchBloomRemoved, '&#127800;', 'Florescimentos removidos por este jogo'));
-      }
-      if (state.boss?.id === 'dimitrescu' && contribution?.dimitrescuBloodRelief > 0) {
-        contributionChips.push(contributionChip('blood', contribution.dimitrescuBloodRelief, '&#129656;', 'Sede de Sangue reduzida por este jogo'));
-      }
-      if (state.boss?.id === 'nehelenia' && contribution?.neheleniaMirrorRelief > 0) {
-        contributionChips.push(contributionChip('mirror', contribution.neheleniaMirrorRelief, '&#9671;', 'Espelhos dos Sonhos recuperados por este jogo'));
-      }
-      const natureLabels = [];
-      if (activeInterdict) {
-        const evolutionLabel = mInfo.kind === 'real' ? 'REAL → ÁS-A-ÁS' : 'LIMPA → REAL';
-        natureLabels.push(`<span class="boss-meld-interdict-seal">INTERDITO · ${evolutionLabel}</span>`);
-      }
-      if (rootThreat) natureLabels.push(`<span class="boss-meld-nature-seal">RAIZ ${rootThreat.progress || 0}/${rootThreat.required || 1}</span>`);
-      if (graftThreat) {
-        const fed = new Set(graftThreat.fedMeldIds || []);
-        const sideIndex = (graftThreat.meldIds || []).indexOf(graftThreat.matchedMeldId);
-        const sideLabel = sideIndex === 1 ? 'B' : 'A';
-        natureLabels.push(`<span class="boss-meld-nature-seal boss-meld-nature-graft">ENXERTO ${sideLabel} · ${fed.size}/${graftThreat.required || 2}</span>`);
-      }
-      if (state.boss?.id === 'nehelenia') {
-        const capangaIntent = state.boss.currentIntent;
-        const currentMeldId = contribution?.meldId || null;
-        const matchesTarget = (target) => !!target && (
-          (target.meldId && currentMeldId && target.meldId === currentMeldId)
-          || Number(target.meldIndex) === Number(midx)
+      const bossSpecificContribution = getBossMeldContributionUi(state.boss?.id, contribution);
+      if (bossSpecificContribution) {
+        contributionChips.push(
+          contributionChip(
+            bossSpecificContribution.type,
+            bossSpecificContribution.value,
+            bossSpecificContribution.icon,
+            bossSpecificContribution.title,
+          ),
         );
-        let tigerVisual = false;
-        let tigerDone = false;
-        let tigerClaw = false;
-        let hawkVisual = false;
-
-        if (capangaIntent?.abilityId === 'tiger_link') {
-          const linkedIndex = (capangaIntent.payload?.targets || []).findIndex(matchesTarget);
-          if (linkedIndex >= 0) {
-            const fed = new Set(capangaIntent.payload?.fedMeldIds || []).has(capangaIntent.payload.targets[linkedIndex].meldId);
-            tigerVisual = true;
-            tigerDone = fed;
-            natureLabels.push(`<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger${fed ? ' is-done' : ''}">LAÇO ${linkedIndex + 1}</span>`);
-          }
-        } else if (capangaIntent?.abilityId === 'tiger_prey' && matchesTarget(capangaIntent.payload)) {
-          tigerVisual = true;
-          tigerDone = !!capangaIntent.payload?.fed;
-          natureLabels.push(`<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger${capangaIntent.payload?.fed ? ' is-done' : ''}">PRESA MARCADA</span>`);
-        } else if (capangaIntent?.abilityId === 'hawk_watch' && matchesTarget(capangaIntent.payload)) {
-          hawkVisual = true;
-          natureLabels.push('<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-hawk">VIGILÂNCIA</span>');
-        }
-
-        const persistentTiger = (state.boss.effects || []).filter((effect) => effect.attendant === 'tiger' && matchesTarget(effect));
-        if (persistentTiger.some((effect) => effect.id === 'nehelenia_tiger_prey')) {
-          tigerVisual = true;
-          natureLabels.push('<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger">PRESA PERSISTENTE</span>');
-        }
-        if (persistentTiger.some((effect) => effect.id === 'nehelenia_tiger_claw')) {
-          tigerVisual = true;
-          tigerClaw = true;
-          natureLabels.push('<span class="boss-meld-nehelenia-attendant boss-meld-nehelenia-tiger">GARRAS · DANO SELADO</span>');
-        }
-
-        // A assinatura visual dos capangas envolve SOMENTE as cartas do jogo.
-        // O container externo inclui meta (Canastra/Limpa + selos), então não deve receber o contorno.
-        if (tigerVisual) row.classList.add('boss-meld-nehelenia-tiger-mark');
-        if (tigerDone) row.classList.add('is-attendant-done');
-        if (tigerClaw) row.classList.add('is-tiger-claw');
-        if (hawkVisual) row.classList.add('boss-meld-nehelenia-hawk-mark');
       }
+      const natureLabels = [...(bossMeldUi?.labels || [])];
       meta.innerHTML = `
               <span class="meld-meta-label">${mInfo.kind === 'asas' ? 'Ás-a-Ás' : `${mInfo.base}${mInfo.tag ? ` <span class="meld-tag ${mInfo.tag.cls}">${mInfo.tag.text}</span>` : ''}`}</span>
               ${contributionChips.length ? `<span class="boss-meld-contributions" data-meld-id="${contribution.meldId}">${contributionChips.join('')}</span>` : ''}

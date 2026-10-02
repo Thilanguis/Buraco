@@ -105,7 +105,7 @@ function establishMeldId(state, meldIndex = 0) {
   return getBossMeldContribution(state, 0, meldIndex).meldId;
 }
 
-test('Resistencia ignora suja, persiste tiers e limita uma remocao por jogador e rodada', () => {
+test('Resistencia ignora suja e cada novo tier valido remove um Chicote sem limite por rodada', () => {
   const state = bossGame();
   state.boss.chainsByPlayer[0] = 4;
 
@@ -115,15 +115,15 @@ test('Resistencia ignora suja, persiste tiers e limita uma remocao por jogador e
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'suja', newKind: 'limpa' });
   assert.equal(getBossChains(state, 0), 3);
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'real' });
-  assert.equal(getBossChains(state, 0), 3);
+  assert.equal(getBossChains(state, 0), 2);
   assert.equal(getBossMeldContribution(state, 0, 0).dominatrixResistanceTier, 2);
 
-  state.boss.roundNumber += 1;
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'real', newKind: 'asas' });
-  assert.equal(getBossChains(state, 0), 2);
+  assert.equal(getBossChains(state, 0), 1);
+  assert.equal(getBossMeldContribution(state, 0, 0).dominatrixResistanceTier, 3);
   const restored = JSON.parse(JSON.stringify(state));
   applyBossMeldTransition(restored, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'real', newKind: 'asas' });
-  assert.equal(getBossChains(restored, 0), 2);
+  assert.equal(getBossChains(restored, 0), 1);
 });
 
 test('Mãos Atadas usa uma criacao compartilhada e Voltar restaura o consumo', () => {
@@ -184,7 +184,7 @@ test('Posse exige coordenacao, pode ser libertada por tier e so entao ativa Resi
   assert.equal(getBossChains(state, 0), 1);
 });
 
-test('Corrente excedente transborda somente na Fase 3', () => {
+test('Corrente excedente transborda para o parceiro em qualquer fase', () => {
   const late = bossGame();
   late.boss.phase = 3;
   late.boss.phaseTransitions = [1, 2, 3];
@@ -201,8 +201,8 @@ test('Corrente excedente transborda somente na Fase 3', () => {
   early.boss.chainsByPlayer = { 0: 4, 1: 2 };
   early.boss.pendingChoices = [{ id: 'early-chain', playerId: 0, type: 'forced_choice', options: ['chain'] }];
   resolveBossChoice(early, 0, 'chain');
-  assert.deepEqual(early.boss.chainsByPlayer, { 0: 4, 1: 2 });
-  assert.equal(early.boss.eventLog.some((entry) => entry.type === 'chainOverflow'), false);
+  assert.deepEqual(early.boss.chainsByPlayer, { 0: 4, 1: 3 });
+  assert.equal(early.boss.eventLog.some((entry) => entry.type === 'chainOverflow'), true);
 });
 
 test('ordem aceita persiste, desobediencia cobra Corrente e impossibilidade externa cancela', () => {
@@ -606,12 +606,12 @@ test('Trepadeiras e Enxerto propagam sem cura e respeitam falhas independentes',
   assert.equal(getBossNatureThreats(graft).filter((entry) => entry.status === 'active' && entry.propagated).length, 0);
 });
 
-test('Polen normal cura 40, Polen Real nao cura e Colheita usa as faixas finais', () => {
+test('Polen normal cura 30, Polen Real nao cura e Colheita usa as faixas atuais', () => {
   const pollen = bossGame('matriarca_esmeralda');
   pollen.boss.hp = 1700;
-  pollen.boss.natureThreats = [{ id: 'pollen-normal', type: 'pollen', targetPlayerId: 0, deadlinePlayerId: 0, cardId: pollen.players[0].hand[0].id, status: 'active', bloomAmount: 1, healAmount: 40 }];
+  pollen.boss.natureThreats = [{ id: 'pollen-normal', type: 'pollen', targetPlayerId: 0, deadlinePlayerId: 0, cardId: pollen.players[0].hand[0].id, status: 'active', bloomAmount: 1, healAmount: 30 }];
   completeBossPlayerTurn(pollen, 0);
-  assert.equal(pollen.boss.hp, 1740);
+  assert.equal(pollen.boss.hp, 1730);
   assert.equal(pollen.boss.bloom, 1);
 
   const royal = bossGame('matriarca_esmeralda');
@@ -621,7 +621,7 @@ test('Polen normal cura 40, Polen Real nao cura e Colheita usa as faixas finais'
   assert.equal(royal.boss.hp, 1700);
   assert.equal(royal.boss.bloom, 1);
 
-  for (const [handSize, heal, bloom] of [[7, 0, 0], [9, 60, 0], [11, 100, 1]]) {
+  for (const [handSize, heal, bloom] of [[7, 0, 0], [9, 50, 0], [11, 80, 1]]) {
     const state = bossGame('matriarca_esmeralda');
     state.boss.phase = 2;
     state.boss.phaseTransitions = [1, 2];

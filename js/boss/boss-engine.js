@@ -2,6 +2,15 @@ import { getBossDefinition, getBossDefinitionForMode } from './boss-registry.js'
 import { BOSS_DAMAGE_BY_KIND, DEBT_REDUCTION_BY_KIND } from './bosses/banker.js';
 import { buildBossActionPresentation } from './boss-presentation.js';
 import { getRestorativeDewHealing } from './boss-balance.js';
+import {
+  applyBossCardDamageMechanics,
+  applyBossMeldContributionMechanics,
+  applyBossMeldMechanics,
+  finalizeBossMeldCardDamageMechanics,
+  finalizeBossMeldResolutionMechanics,
+  finalizeBossMeldEventMechanics,
+} from './mechanics/boss-mechanics-registry.js';
+import { quoteBankerCreditLimit } from './mechanics/banker.js';
 
 export { getRestorativeDewHealing } from './boss-balance.js';
 
@@ -3525,30 +3534,6 @@ function activeOrderForPlayer(boss, playerId, type = null) {
     && (!type || order.type === type)) || null;
 }
 
-function resolveOrdersFromMeldAction(gameState, playerId, meldId, isNewMeld, oldKind, newKind, cardsAdded = []) {
-  const boss = gameState.boss;
-  if (boss?.id !== 'dominadora' || playerId == null) return [];
-  const events = [];
-  for (const order of (boss.activeOrders || []).filter((entry) => entry.status === 'active' && entry.targetPlayerId === playerId)) {
-    if (order.type === 'discard_suit' && cardsAdded.some((card) => order.eligibleCardIds?.includes(card?.id))) {
-      order.ownOptionsConsumed = true;
-    }
-    if (order.type === 'no_new_meld' && isNewMeld) {
-      events.push(finishDominatrixOrder(gameState, order, 'disobeyed', 'A ordem proibia criar um jogo novo.', { addChain: true }));
-    } else if (order.type === 'feed_specific_meld') {
-      events.push(finishDominatrixOrder(
-        gameState,
-        order,
-        order.meldId === meldId ? 'obeyed' : 'disobeyed',
-        order.meldId === meldId ? 'O jogo ordenado foi alimentado primeiro.' : 'Outro jogo foi alimentado antes do jogo ordenado.',
-        { addChain: order.meldId !== meldId },
-      ));
-    } else if (order.type === 'evolve_specific_meld' && order.meldId === meldId && MELD_TIER[newKind] > MELD_TIER[oldKind]) {
-      events.push(finishDominatrixOrder(gameState, order, 'obeyed', 'O jogo ordenado evoluiu de tier.'));
-    }
-  }
-  return events.filter(Boolean);
-}
 
 export function notifyBossCardDiscarded(gameState, playerId, card) {
   const boss = normalizeBossState(gameState);
@@ -3639,38 +3624,7 @@ export function resolveBossInterdictAttempt(gameState, playerId, interdictId, de
 
 export function getBossCreditLimitQuote(gameState, cards = [], { creditEligibleCardIds = null, cardOriginsById = null } = {}) {
   const boss = normalizeBossState(gameState);
-  const limit = boss?.id === 'banker' ? boss.creditLimit : null;
-  if (!limit || limit.status !== 'active' || limit.round !== boss.roundNumber) return null;
-  const counted = new Set(limit.countedCardIds || []);
-  const eligible = Array.isArray(creditEligibleCardIds) ? new Set(creditEligibleCardIds.filter(Boolean)) : null;
-  const newCardIds = [...new Set((cards || []).map((card) => card?.id).filter((cardId) => {
-    if (!cardId || counted.has(cardId)) return false;
-    if (eligible && !eligible.has(cardId)) return false;
-    if (cardOriginsById && cardOriginsById[cardId] !== 'hand') return false;
-    return true;
-  }))];
-  const countBefore = counted.size;
-  const countAfter = countBefore + newCardIds.length;
-  const allowance = Math.max(0, Number(limit.allowance) || 0);
-  const debtPerCard = Math.max(0, Number(limit.debtPerCard) || 1);
-  const maxCharge = Math.max(0, Number(limit.maxCharge) || 0);
-  const chargedDebt = Math.max(0, Number(limit.chargedDebt) || 0);
-  const excessBefore = Math.max(0, countBefore - allowance);
-  const excessAfter = Math.max(0, countAfter - allowance);
-  const rawDebt = Math.max(0, excessAfter - excessBefore) * debtPerCard;
-  const debt = Math.max(0, Math.min(rawDebt, maxCharge - chargedDebt));
-  return {
-    round: boss.roundNumber,
-    allowance,
-    countBefore,
-    countAfter,
-    newCardIds,
-    excessCards: Math.max(0, excessAfter - excessBefore),
-    debt,
-    debtPerCard,
-    chargedDebt,
-    maxCharge,
-  };
+  return quoteBankerCreditLimit(boss, cards, { creditEligibleCardIds, cardOriginsById });
 }
 
 function confirmBankerDebtDefeat(gameState, sourceActionId = 'debt') {
@@ -4234,13 +4188,12 @@ export function applyBossMeldTransition(gameState, {
   const nextDebtValue = Math.max(previous.debtValue, DEBT_REDUCTION_BY_KIND[newKind] || 0);
   let canastraDamage = Math.max(0, nextDamageValue - previous.damageValue);
   let cardDamage = 0;
-  let debtReduction = boss.id === 'banker' ? Math.max(0, nextDebtValue - previous.debtValue) : 0;
-  let bloodReduction = boss.id === 'dimitrescu' ? Math.max(0, nextDebtValue - previous.debtValue) : 0;
+  let debtReduction = 0;
+  let bloodReduction = 0;
   let mirrorFragmentRelief = 0;
   let dreamBonusDamage = 0;
   let newMoonSuppressedDamage = 0;
   let tigerClawSuppressedDamage = 0;
-  let tigerClawEffect = null;
   let possessionProgressed = false;
   let possessionReleased = false;
   let possessionProgress = null;
@@ -4250,138 +4203,42 @@ export function applyBossMeldTransition(gameState, {
   let creditLimitDebt = 0;
   let creditLimitEventId = null;
   let orderEvents = [];
+  let breaksCocoon = false;
 
-  if (boss.id === 'dominadora') {
-    const intent = boss.currentIntent;
-    const possession = boss.possessions.find((entry) => entry.teamId === teamId
-      && (entry.meldId ? entry.meldId === meldId : entry.meldIndex === meldIndex));
-    if (possession) {
-      possession.progressCardIds ||= [];
-      possession.contributorPlayerIds ||= [];
-      const newProgressCards = cardsAdded.filter((card) => card?.id && !possession.progressCardIds.includes(card.id));
-      newProgressCards.forEach((card) => possession.progressCardIds.push(card.id));
-      possessionProgressed = newProgressCards.length > 0;
-      if (possessionProgressed && playerId != null && !possession.contributorPlayerIds.includes(playerId)) possession.contributorPlayerIds.push(playerId);
-      possession.progress = possession.contributorPlayerIds.length;
-      possession.required = Math.max(1, (gameState.players || []).length);
-      possessionProgress = possession.progress;
-      possessionQualifiedByTier = MELD_TIER[newKind] > Math.max(Number(possession.createdTier) || 0, MELD_TIER[oldKind] || 0);
-      if (possession.contributorPlayerIds.length >= possession.required || possessionQualifiedByTier) {
-        possessionReleased = true;
-        possessionReappliedDamage = Math.max(0, Number(possession.suppressedDamage) || 0);
-        possession.releasedEventId = `possession_release_${possession.id}_${boss.roundNumber}`;
-        boss.possessions = boss.possessions.filter((entry) => entry.id !== possession.id);
-      } else possessionSuppressesDamage = true;
-      if (possessionSuppressesDamage) canastraDamage = 0;
-    }
-    if (intent?.abilityId === 'hands_tied' && isNewMeld && playerId != null) {
-      intent.payload.teamMeldAvailable = false;
-      intent.payload.consumedByPlayerId = playerId;
-      intent.payload.consumedMeldId = meldId;
-    }
-    if (intent?.abilityId === 'separation' && playerId != null) {
-      intent.payload.meldOwners ||= {};
-      if (intent.payload.meldOwners[meldIndex] == null) intent.payload.meldOwners[meldIndex] = playerId;
-    }
-    orderEvents = resolveOrdersFromMeldAction(gameState, playerId, meldId, isNewMeld, oldKind, newKind, cardsAdded);
-  }
-
-  if (boss.id === 'dimitrescu') {
-    const intent = boss.currentIntent;
-    const addedIds = new Set(cardsAdded.map((card) => card?.id).filter(Boolean));
-    if (intent?.abilityId === 'bela_hunt' && intent.payload?.targetPlayerId === playerId && addedIds.has(intent.payload?.cardId)) {
-      intent.payload.used = true;
-    }
-    if (intent?.abilityId === 'cassandra_feast' && addedIds.size && (intent.payload?.meldId ? intent.payload.meldId === meldId : intent.payload?.meldIndex === meldIndex)) {
-      intent.payload.fed = true;
-    }
-    if (intent?.abilityId === 'crimson_brand') {
-      for (const mark of intent.payload?.marks || []) {
-        if (mark.status === 'active' && mark.playerId === playerId && addedIds.has(mark.cardId)) mark.status = 'success';
-      }
-    }
-    if (intent?.abilityId === 'three_daughters') {
-      const bela = dimitrescuObjective(intent, 'bela');
-      const cassandra = dimitrescuObjective(intent, 'cassandra');
-      if (bela?.status === 'active' && bela.targetPlayerId === playerId && addedIds.has(bela.cardId)) bela.status = 'success';
-      if (cassandra?.status === 'active' && addedIds.size && (cassandra.meldId ? cassandra.meldId === meldId : cassandra.meldIndex === meldIndex)) cassandra.status = 'success';
-    }
-  }
-
-  if (boss.id === 'nehelenia') {
-    const intent = boss.currentIntent;
-    const addedIds = new Set(cardsAdded.map((card) => card?.id).filter(Boolean));
-    const addedCount = addedIds.size;
-    if (intent?.abilityId === 'mirrored_meld' && intent.payload?.targetPlayerId === playerId && addedCount && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex)) {
-      intent.payload.fed = true;
-      intent.payload.resolved = true;
-      intent.payload.realChosen = false;
-      intent.payload.fedCardIds = [...new Set([...(intent.payload.fedCardIds || []), ...addedIds])];
-    }
-    if (intent?.abilityId === 'mirror_prison' && intent.payload?.rescuerPlayerId === playerId && addedCount && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex)) {
-      intent.payload.fed = true;
-      intent.payload.fedCardIds = [...new Set([...(intent.payload.fedCardIds || []), ...addedIds])];
-    }
-    if (intent?.abilityId === 'follow_reflection' && addedCount) {
-      intent.payload.cardsPlayedByPlayer ||= {};
-      intent.payload.cardsPlayedByPlayer[playerId] = (Number(intent.payload.cardsPlayedByPlayer[playerId]) || 0) + addedCount;
-      if (playerId === intent.payload.firstPlayerId) {
-        intent.payload.firstPlayedCount = (Number(intent.payload.firstPlayedCount) || 0) + addedCount;
-      } else if (playerId === intent.payload.secondPlayerId) {
-        intent.payload.secondPlayedCount = (Number(intent.payload.secondPlayedCount) || 0) + addedCount;
-      }
-    }
-    if (intent?.abilityId === 'tiger_link' && addedCount) {
-      intent.payload.fedMeldIds ||= [];
-      const target = (intent.payload.targets || []).find((entry) => neheleniaMeldTargetMatches(entry, meldId, meldIndex));
-      if (target?.meldId && !intent.payload.fedMeldIds.includes(target.meldId)) intent.payload.fedMeldIds.push(target.meldId);
-    }
-    if (intent?.abilityId === 'tiger_prey' && intent.payload?.targetPlayerId === playerId && addedCount
-      && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex)) intent.payload.fed = true;
-    if (addedCount && !isNewMeld) {
-      const persistentPrey = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId
-        && neheleniaMeldTargetMatches(effect, meldId, meldIndex));
-      if (persistentPrey) {
-        boss.effects = boss.effects.filter((effect) => effect !== persistentPrey);
-        boss.actionSequence += 1;
-        recordEvent(boss, {
-          type: 'neheleniaAttendantRelease',
-          actionId: `tiger_prey_release_${playerId}_${boss.actionSequence}`,
-          abilityId: 'tiger_prey',
-          attendant: 'tiger',
-          playerId,
-          meldId,
-          meldIndex,
-          outcome: `${gameState.players.find((player) => player.id === playerId)?.name || 'O alvo'} alimentou a Presa Marcada e saiu da mira de Tiger's Eye.`,
-        });
-      }
-      tigerClawEffect = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_claw'
-        && (effect.teamId == null || effect.teamId === teamId)
-        && neheleniaMeldTargetMatches(effect, meldId, meldIndex)) || null;
-      if (tigerClawEffect) boss.effects = boss.effects.filter((effect) => effect !== tigerClawEffect);
-    }
-    if (intent?.abilityId === 'fish_marked_card' && intent.payload?.targetPlayerId === playerId
-      && addedIds.has(intent.payload?.cardId)) intent.payload.used = true;
-    if (intent?.abilityId === 'fish_inverted' && intent.payload?.targetPlayerId === playerId && addedCount && !isNewMeld) {
-      intent.payload.fedExisting = true;
-    }
-    if (addedCount && !isNewMeld) {
-      const releasedInverted = boss.effects.filter((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId);
-      if (releasedInverted.length) {
-        boss.effects = boss.effects.filter((effect) => !(effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId));
-        boss.actionSequence += 1;
-        recordEvent(boss, {
-          type: 'neheleniaAttendantRelease',
-          actionId: `fish_inverted_release_${playerId}_${boss.actionSequence}`,
-          abilityId: 'fish_inverted',
-          attendant: 'fish',
-          playerId,
-          meldId,
-          meldIndex,
-          outcome: `${gameState.players.find((player) => player.id === playerId)?.name || 'O alvo'} alimentou um jogo existente e rompeu o Reflexo Invertido persistente.`,
-        });
-      }
-    }
+  const meldMechanics = applyBossMeldMechanics(boss.id, {
+    boss,
+    gameState,
+    teamId,
+    playerId,
+    meldId,
+    meldIndex,
+    oldKind,
+    newKind,
+    cardsAdded,
+    isNewMeld,
+    canastraDamage,
+    previousDangerReliefValue: previous.debtValue,
+    nextDangerReliefValue: nextDebtValue,
+    creditEligibleCardIds,
+    cardOriginsById,
+    finishOrder: (order, status, outcome, options) => finishDominatrixOrder(gameState, order, status, outcome, options),
+    recordBossEvent: (event) => recordEvent(boss, event),
+    succeedNatureThreat: (threat, outcome) => succeedNatureThreat(gameState, threat, outcome),
+  });
+  if (meldMechanics) {
+    if (Number.isFinite(meldMechanics.canastraDamage)) canastraDamage = meldMechanics.canastraDamage;
+    if (meldMechanics.possessionProgressed != null) possessionProgressed = !!meldMechanics.possessionProgressed;
+    if (meldMechanics.possessionReleased != null) possessionReleased = !!meldMechanics.possessionReleased;
+    if (meldMechanics.possessionProgress != null) possessionProgress = meldMechanics.possessionProgress;
+    if (meldMechanics.possessionSuppressesDamage != null) possessionSuppressesDamage = !!meldMechanics.possessionSuppressesDamage;
+    if (meldMechanics.possessionReappliedDamage != null) possessionReappliedDamage = Math.max(0, Number(meldMechanics.possessionReappliedDamage) || 0);
+    if (meldMechanics.possessionQualifiedByTier != null) possessionQualifiedByTier = !!meldMechanics.possessionQualifiedByTier;
+    if (Array.isArray(meldMechanics.orderEvents)) orderEvents = meldMechanics.orderEvents;
+    if (meldMechanics.breaksCocoon != null) breaksCocoon = !!meldMechanics.breaksCocoon;
+    if (meldMechanics.debtReduction != null) debtReduction = Math.max(0, Number(meldMechanics.debtReduction) || 0);
+    if (meldMechanics.bloodReduction != null) bloodReduction = Math.max(0, Number(meldMechanics.bloodReduction) || 0);
+    if (meldMechanics.creditLimitDebt != null) creditLimitDebt = Math.max(0, Number(meldMechanics.creditLimitDebt) || 0);
+    if (meldMechanics.creditLimitEventId != null) creditLimitEventId = meldMechanics.creditLimitEventId;
   }
 
   const accountedCardIds = new Set(boss.damagedCardIds || []);
@@ -4390,59 +4247,37 @@ export function applyBossMeldTransition(gameState, {
     accountedCardIds.add(card.id);
     boss.damagedCardIds.push(card.id);
     let individualDamage = bossCardDamage(card);
-    if (boss.id === 'nehelenia' && tigerClawEffect && individualDamage > 0) {
-      tigerClawSuppressedDamage += individualDamage;
-      individualDamage = 0;
-    }
-    if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'new_moon' && !card.joker && card.suit === boss.currentIntent.payload?.suit) {
-      const payload = boss.currentIntent.payload;
-      payload.countedCardIds ||= [];
-      if (!payload.countedCardIds.includes(card.id)) {
-        payload.countedCardIds.push(card.id);
-        payload.progress = Math.min(Number(payload.required) || 3, Math.max(0, Number(payload.progress) || 0) + 1);
-      }
-      if ((payload.countedCardIds || []).indexOf(card.id) < (Number(payload.required) || 3)) {
-        newMoonSuppressedDamage += individualDamage;
-        individualDamage = 0;
-      }
-    }
-    if (boss.id === 'nehelenia' && boss.currentIntent?.abilityId === 'dream_mirror'
-      && boss.currentIntent.payload?.targetPlayerId === playerId && boss.currentIntent.payload?.cardId === card.id
-      && individualDamage > 0) {
-      dreamBonusDamage += individualDamage;
-      boss.currentIntent.payload.bonusDamage = Math.max(Number(boss.currentIntent.payload.bonusDamage) || 0, individualDamage);
+    const cardMechanics = applyBossCardDamageMechanics(boss.id, {
+      boss,
+      gameState,
+      teamId,
+      playerId,
+      meldId,
+      meldIndex,
+      card,
+      damage: individualDamage,
+      cardDamageContext: meldMechanics?.cardDamageContext || null,
+    });
+    if (cardMechanics) {
+      if (Number.isFinite(cardMechanics.damage)) individualDamage = Math.max(0, cardMechanics.damage);
+      tigerClawSuppressedDamage += Math.max(0, Number(cardMechanics.tigerClawSuppressedDamage) || 0);
+      newMoonSuppressedDamage += Math.max(0, Number(cardMechanics.newMoonSuppressedDamage) || 0);
+      dreamBonusDamage += Math.max(0, Number(cardMechanics.dreamBonusDamage) || 0);
     }
     cardDamage += individualDamage;
   }
   cardDamage += dreamBonusDamage;
-  if (boss.id === 'nehelenia' && tigerClawEffect) {
-    boss.actionSequence += 1;
-    recordEvent(boss, {
-      type: 'neheleniaAttendantRelease',
-      actionId: `tiger_claw_release_${meldId || meldIndex}_${boss.actionSequence}`,
-      abilityId: 'tiger_link',
-      attendant: 'tiger',
-      playerId,
-      meldId,
-      meldIndex,
-      suppressedDamage: tigerClawSuppressedDamage,
-      outcome: `As garras de Tiger's Eye se romperam no Jogo ${Number(meldIndex) + 1}, mas engoliram ${tigerClawSuppressedDamage} de dano das cartas usadas para quebrá-las.`,
-    });
-  }
-  if (boss.id === 'banker' && boss.creditLimit?.status === 'active' && boss.creditLimit.round === boss.roundNumber) {
-    const limit = boss.creditLimit;
-    limit.countedCardIds ||= [];
-    limit.eventIds ||= [];
-    const quote = getBossCreditLimitQuote(gameState, cardsAdded, { creditEligibleCardIds, cardOriginsById });
-    quote?.newCardIds.forEach((cardId) => limit.countedCardIds.push(cardId));
-    creditLimitDebt = quote?.debt || 0;
-    limit.chargedDebt = Math.min(limit.maxCharge, (limit.chargedDebt || 0) + creditLimitDebt);
-    if (quote?.newCardIds.length) {
-      const eventId = `credit_limit_${limit.round}_${quote.newCardIds.slice().sort().join('_')}`;
-      if (!limit.eventIds.includes(eventId)) limit.eventIds.push(eventId);
-      creditLimitEventId = eventId;
-    }
-  }
+  finalizeBossMeldCardDamageMechanics(boss.id, {
+    boss,
+    gameState,
+    teamId,
+    playerId,
+    meldId,
+    meldIndex,
+    cardDamageContext: meldMechanics?.cardDamageContext || null,
+    tigerClawSuppressedDamage,
+    recordBossEvent: (event) => recordEvent(boss, event),
+  });
   const damage = canastraDamage + cardDamage + possessionReappliedDamage;
 
   boss.meldProgress[key] = {
@@ -4452,88 +4287,30 @@ export function applyBossMeldTransition(gameState, {
   };
   if (key !== legacyKey) delete boss.meldProgress[legacyKey];
 
-  if (boss.currentIntent?.abilityId === 'suit_audit') {
-    const suit = boss.currentIntent.payload.suit;
-    const countedCardIds = (boss.currentIntent.payload.countedCardIds ||= []);
-    const matchingCards = cardsAdded.filter((card) => card && card.id && !countedCardIds.includes(card.id) && !card.joker && card.suit === suit);
-    matchingCards.forEach((card) => countedCardIds.push(card.id));
-    const matching = matchingCards.length;
-    boss.currentIntent.payload.progress = clamp((boss.currentIntent.payload.progress || 0) + matching, 0, boss.currentIntent.payload.required);
-  }
 
   const contribution = ensureBossMeldContribution(boss, meldId);
   let bloomRemoved = 0;
-  if (boss.id === 'matriarca_esmeralda') {
-    const addedIds = new Set(cardsAdded.map((card) => card?.id).filter(Boolean));
-    for (const threat of [...activeNatureThreats(boss)]) {
-      if (['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type) && addedIds.has(threat.cardId)) {
-        succeedNatureThreat(gameState, threat, 'A carta marcada foi usada legalmente.');
-      } else if (['root', 'twin_root', 'royal_root'].includes(threat.type) && threat.meldId === meldId && addedIds.size) {
-        threat.progressCardIds ||= [];
-        addedIds.forEach((cardId) => {
-          if (!threat.progressCardIds.includes(cardId)) threat.progressCardIds.push(cardId);
-        });
-        if (threat.strengthened) {
-          threat.contributorPlayerIds ||= [];
-          if (playerId != null && !threat.contributorPlayerIds.includes(playerId)) threat.contributorPlayerIds.push(playerId);
-          const required = Math.max(1, Number(threat.requiredContributorCount) || Math.min(2, (gameState.players || []).length));
-          if (threat.contributorPlayerIds.length >= required) {
-            succeedNatureThreat(gameState, threat, `Cada cooperador alimentou a Raiz Fortalecida do jogo ${meldIndex + 1}.`);
-          }
-        } else {
-          succeedNatureThreat(gameState, threat, `O jogo ${meldIndex + 1} alimentou a raiz.`);
-        }
-      } else if (threat.type === 'graft' && threat.meldIds?.includes(meldId) && addedIds.size) {
-        threat.fedMeldIds ||= [];
-        if (!threat.fedMeldIds.includes(meldId)) threat.fedMeldIds.push(meldId);
-        if (new Set(threat.fedMeldIds).size >= 2) succeedNatureThreat(gameState, threat, 'Os dois lados do Enxerto foram alimentados.');
-      } else if (threat.type === 'dew' && addedIds.size) {
-        threat.countedCardIds ||= [];
-        addedIds.forEach((cardId) => {
-          if (!threat.countedCardIds.includes(cardId)) threat.countedCardIds.push(cardId);
-        });
-        if (boss.currentIntent?.abilityId === 'restorative_dew' && threat.sourceIntentId === boss.currentIntent.id) {
-          boss.currentIntent.payload ||= {};
-          boss.currentIntent.payload.countedCardIds = [...threat.countedCardIds];
-        }
-      }
-    }
-    if (contribution) {
-      const bloomTier = { simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 }[newKind] || 0;
-      const previousTier = Number(contribution.matriarchBloomTier) || 0;
-      const tierIncrease = Math.max(0, bloomTier - previousTier);
-      contribution.matriarchBloomTier = Math.max(previousTier, bloomTier);
-      if (tierIncrease && boss.bloom > 0) {
-        const bloomEvent = changeMatriarchBloom(gameState, -Math.min(tierIncrease, boss.bloom), `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}`, `meld_bloom_${meldId}_${bloomTier}`);
-        bloomRemoved = Math.abs(bloomEvent?.amount || 0);
-        contribution.matriarchBloomRemoved += bloomRemoved;
-      }
-    }
-  }
 
-  if (boss.id === 'nehelenia' && contribution) {
-    const mirrorTier = MELD_TIER[newKind] || 0;
-    const previousMirrorTier = Math.max(Number(contribution.neheleniaMirrorTier) || 0, MELD_TIER[oldKind] || 0);
-    const tierIncrease = Math.max(0, mirrorTier - previousMirrorTier);
-    contribution.neheleniaMirrorTier = Math.max(previousMirrorTier, mirrorTier);
-    contribution.neheleniaMirrorRelief = Math.max(0, Number(contribution.neheleniaMirrorRelief) || 0);
-    if (tierIncrease > 0 && mirrorTier >= 1 && boss.danger > 0) {
-      const reliefEvent = restoreNeheleniaDreamMirror(
-        gameState,
-        null,
-        `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}`,
-        `dream_mirror_relief_${meldId}_${mirrorTier}`,
-      );
-      mirrorFragmentRelief = Math.abs(reliefEvent?.dangerDelta || 0);
-      contribution.neheleniaMirrorRelief += mirrorFragmentRelief;
-    }
+  const contributionMechanics = applyBossMeldContributionMechanics(boss.id, {
+    boss,
+    gameState,
+    contribution,
+    oldKind,
+    newKind,
+    meldId,
+    meldIndex,
+    restoreDreamMirror: restoreNeheleniaDreamMirror,
+    changeBloom: (amount, origin, eventId) => changeMatriarchBloom(gameState, amount, origin, eventId),
+  });
+  if (contributionMechanics?.mirrorFragmentRelief != null) {
+    mirrorFragmentRelief = Math.max(0, Number(contributionMechanics.mirrorFragmentRelief) || 0);
+  }
+  if (contributionMechanics?.bloomRemoved != null) {
+    bloomRemoved = Math.max(0, Number(contributionMechanics.bloomRemoved) || 0);
   }
 
 
   if (damage <= 0 && debtReduction <= 0 && bloodReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length && mirrorFragmentRelief <= 0) return null;
-  const breaksCocoon = boss.id === 'matriarca_esmeralda'
-    && canastraDamage > 0
-    && ({ limpa: 1, real: 2, asas: 3 }[newKind] || 0) >= 1;
   const breaksMirrorEclipse = false;
   const damageResult = applyDamageToBoss(gameState, damage, {
     breaksCocoon,
@@ -4543,8 +4320,8 @@ export function applyBossMeldTransition(gameState, {
   const totalDangerRelief = debtReduction + bloodReduction;
   const dangerAfterRelief = clamp(boss.danger - totalDangerRelief, 0, boss.maxDanger);
   const appliedDangerReduction = Math.max(0, boss.danger - dangerAfterRelief);
-  const appliedDebtReduction = boss.id === 'banker' ? appliedDangerReduction : 0;
-  const appliedBloodReduction = boss.id === 'dimitrescu' ? appliedDangerReduction : 0;
+  const appliedDebtReduction = Math.min(debtReduction, appliedDangerReduction);
+  const appliedBloodReduction = Math.min(bloodReduction, Math.max(0, appliedDangerReduction - appliedDebtReduction));
   boss.danger = dangerAfterRelief;
   if (creditLimitDebt) boss.danger = clamp(boss.danger + creditLimitDebt, 0, boss.maxDanger);
   const appliedDamage = damageResult.hpDamage;
@@ -4554,35 +4331,31 @@ export function applyBossMeldTransition(gameState, {
   if (boss.hp === 0 && !damageResult.reborn) boss.defeated = true;
   let chainsRemoved = 0;
   let resistanceSuppressedByInterdict = false;
-  if (boss.id === 'dominadora' && playerId != null && (!possessionSuppressesDamage || possessionReleased)) {
-    const tier = MELD_TIER[newKind] || 0;
-    const previousResistanceTier = Number(contribution?.dominatrixResistanceTier) || 0;
-    if (contribution) contribution.dominatrixResistanceTier = Math.max(previousResistanceTier, tier);
-    if (tier > previousResistanceTier && tier > 0) {
-      if (suppressDominatrixResistance) {
-        resistanceSuppressedByInterdict = true;
-        boss.actionSequence += 1;
-        recordEvent(boss, {
-          type: 'resistanceSuppressed',
-          actionId: `resistance_interdict_${meldId}_${tier}_${boss.roundNumber}`,
-          playerId,
-          meldId,
-          tier,
-          outcome: 'A desobediencia ao Interdito anulou a remocao de Chicote desta evolucao.',
-        });
-      } else {
-        // Cada nova evolução válida de qualidade remove 1 Chicote.
-        // O tier histórico do próprio meld impede cobrar a mesma evolução duas vezes.
-        chainsRemoved = Math.abs(Math.min(0, changeChains(gameState, playerId, -1, 'resistance')));
-      }
-    }
-  }
+  const resolutionMechanics = finalizeBossMeldResolutionMechanics(boss.id, {
+    boss,
+    gameState,
+    playerId,
+    meldId,
+    meldIndex,
+    oldKind,
+    newKind,
+    contribution,
+    possessionSuppressesDamage,
+    possessionReleased,
+    suppressDominatrixResistance,
+    appliedDebtReduction,
+    appliedBloodReduction,
+    creditLimitDebt,
+    bloomRemoved,
+    mirrorFragmentRelief,
+    changeChains: (targetPlayerId, amount, reason) => changeChains(gameState, targetPlayerId, amount, reason),
+    recordBossEvent: (event) => recordEvent(boss, event),
+  });
+  if (resolutionMechanics?.chainsRemoved != null) chainsRemoved = Math.max(0, Number(resolutionMechanics.chainsRemoved) || 0);
+  if (resolutionMechanics?.resistanceSuppressedByInterdict != null) resistanceSuppressedByInterdict = !!resolutionMechanics.resistanceSuppressedByInterdict;
   if (contribution) {
     // Damage restored after breaking Possession was already credited before possession.
     contribution.damageDone += Math.min(appliedDamage, canastraDamage + cardDamage);
-    contribution.bankerDebtRelief += appliedDebtReduction;
-    contribution.dimitrescuBloodRelief += appliedBloodReduction;
-    contribution.dominatrixChainsBroken += chainsRemoved;
   }
   boss.actionSequence += 1;
   const pendingPhase = detectPendingPhase(gameState);
@@ -4608,7 +4381,7 @@ export function applyBossMeldTransition(gameState, {
     absorbedDamage: damageResult.absorbed,
     cocoonBroken: damageResult.cocoonBroken,
     bloodClotBroken: damageResult.bloodClotBroken,
-    bloodClotRemaining: boss.id === 'dimitrescu' && boss.crimsonClot?.status === 'active' ? Math.max(0, Number(boss.crimsonClot.remaining) || 0) : null,
+    bloodClotRemaining: resolutionMechanics?.eventFields?.bloodClotRemaining ?? null,
     reborn: damageResult.reborn,
     possessionProgress: possessionProgressed ? possessionProgress : null,
     possessionReleased,
@@ -4618,15 +4391,7 @@ export function applyBossMeldTransition(gameState, {
     newKind,
     hp: boss.hp,
     danger: boss.danger,
-    dangerChangeLabel: creditLimitDebt
-      ? `Limite de Credito: Divida +${creditLimitDebt}`
-      : debtReduction
-      ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Dívida -${appliedDebtReduction}`
-      : appliedBloodReduction
-        ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Sede -${appliedBloodReduction}`
-        : bloomRemoved
-          ? `Canastra ${newKind === 'asas' ? 'As-a-As' : newKind}: Florescimento -${bloomRemoved}`
-          : mirrorFragmentRelief ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Fragmento -${mirrorFragmentRelief}` : '',
+    dangerChangeLabel: resolutionMechanics?.dangerChangeLabel || '',
     pendingPhase,
   };
   const definition = getBossDefinition(boss.id);
@@ -4644,9 +4409,15 @@ export function applyBossMeldTransition(gameState, {
     event.reaction = { ...boss.damageReaction };
   }
   const damageEvent = recordEvent(boss, event);
-  if (creditLimitDebt > 0) {
-    damageEvent.defeatEvent = confirmBankerDebtDefeat(gameState, creditLimitEventId || damageEvent.actionId);
-  }
+  const eventMechanics = finalizeBossMeldEventMechanics(boss.id, {
+    boss,
+    gameState,
+    event: damageEvent,
+    creditLimitDebt,
+    creditLimitEventId,
+    confirmDangerDefeat: (sourceActionId) => confirmBankerDebtDefeat(gameState, sourceActionId),
+  });
+  if (eventMechanics?.defeatEvent) damageEvent.defeatEvent = eventMechanics.defeatEvent;
   if (possessionReleased) {
     boss.actionSequence += 1;
     damageEvent.possessionEvent = recordEvent(boss, {

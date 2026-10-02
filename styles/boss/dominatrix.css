@@ -1,0 +1,106 @@
+/*  dominadora — estilos exclusivos. Regra: todo seletor deve permanecer escopado por body[data-boss-id='dominadora'].  */
+body[data-boss-id='dominadora'] .boss-portrait {
+  position: relative;
+  isolation: isolate;
+  contain: paint;
+  border-color: rgba(244, 114, 182, 0.7);
+  box-shadow: 0 0 16px rgba(219, 39, 119, 0.25);
+}
+body[data-boss-id='dominadora'] .boss-portrait img {
+  --dominatrix-portrait-scale: 1.32;
+  position: relative;
+  z-index: 1;
+  object-position: 50% 22%;
+  transform: translate3d(0, 0, 0) scale(var(--dominatrix-portrait-scale));
+  transform-origin: 50% 22%;
+  will-change: transform;
+  animation: dominatrixPortraitBreathing 9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+body[data-boss-id='dominadora'] .boss-portrait::before,
+body[data-boss-id='dominadora'] .boss-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+body[data-boss-id='dominadora'] .boss-portrait::before {
+  z-index: 2;
+  background: radial-gradient(circle at 76% 23%, rgba(244, 114, 182, 0.26) 0 2%, transparent 10%), linear-gradient(112deg, transparent 24%, rgba(236, 72, 153, 0.18) 47%, transparent 69%);
+  mix-blend-mode: screen;
+  opacity: 0.22;
+  transform: translate3d(-16%, 0, 0);
+  will-change: transform, opacity;
+  animation: dominatrixPortraitLight 6.8s ease-in-out infinite;
+}
+body[data-boss-id='dominadora'] .boss-portrait::after {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 12% 82%, rgba(249, 168, 212, 0.8) 0 1px, transparent 2px), radial-gradient(circle at 28% 34%, rgba(216, 70, 239, 0.66) 0 1px, transparent 2px),
+    radial-gradient(circle at 53% 76%, rgba(244, 114, 182, 0.72) 0 1.2px, transparent 2.4px), radial-gradient(circle at 71% 47%, rgba(232, 121, 249, 0.62) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 68%, rgba(249, 168, 212, 0.74) 0 1px, transparent 2px);
+  opacity: 0;
+  transform: translate3d(0, 12px, 0) scale(0.98);
+  will-change: transform, opacity;
+  animation: dominatrixPortraitParticles 10.5s linear infinite;
+}
+body[data-boss-id='dominadora'] .boss-hud {
+  border-color: rgba(244, 114, 182, 0.78);
+  background: linear-gradient(180deg, rgba(35, 5, 24, 0.98), rgba(10, 6, 17, 0.97));
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.52),
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(219, 39, 119, 0.14);
+}
+body[data-boss-id='dominadora'] .boss-hud::before,
+body[data-boss-id='dominadora'] .boss-hud::after {
+  border-color: #ec4899;
+}
+body[data-boss-id='dominadora'] .boss-phase {
+  border-color: rgba(244, 114, 182, 0.72);
+  color: #f9a8d4;
+}
+body[data-boss-id='dominadora'] .boss-round-summary #bossCurrentActor {
+  color: #f9a8d4;
+}
+body[data-boss-id='dominadora'] .boss-dialogue-presentation > span {
+  color: #be185d;
+}
+body[data-boss-id='dominadora'] .boss-ability-overview {
+  border-left-color: #ec4899;
+}
+@media (max-width: 900px) {
+  body[data-boss-id='dominadora'] .boss-portrait img {
+    --dominatrix-portrait-scale: 1.27;
+    object-position: 50% 20%;
+    transform-origin: 50% 20%;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  body[data-boss-id='dominadora'] .boss-portrait img {
+    animation-duration: 13s;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  body[data-boss-id='dominadora'] .boss-portrait::before {
+    opacity: 0.14;
+    animation-duration: 10s;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  body[data-boss-id='dominadora'] .boss-portrait::after {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='dominadora'] .boss-portrait img {
+    animation: none !important;
+    transform: translate3d(0, 0, 0) scale(var(--dominatrix-portrait-scale));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id='dominadora'] .boss-portrait::before,
+  body[data-boss-id='dominadora'] .boss-portrait::after {
+    display: none;
+    animation: none !important;
+  }
+}
