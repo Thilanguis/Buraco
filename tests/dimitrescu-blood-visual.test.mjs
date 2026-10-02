@@ -34,3 +34,10 @@ test('molduras PNG da Dimitrescu usam caminho relativo correto após isolamento 
   assert.match(dimitrescuCss, /url\(['"]?\.\.\/\.\.\/assets\/images\/portas-castelo-lixo\.png/);
   assert.doesNotMatch(dimitrescuCss, /url\(['"]?\.\.\/assets\/images\/(?:dimitrescu-blood-meter-frame|portas-castelo-lixo)\.png/);
 });
+
+
+test('Marca Carmesim e Caçada não ampliam a área rolável vertical da mão', () => {
+  assert.match(coreBossCss, /#handContainer \.carta\.boss-card-dimitrescu-hunt,\s*\.boss-mode #handContainer \.carta\.boss-card-dimitrescu-blood-mark\s*\{[^}]*overflow:\s*clip;[^}]*overflow-clip-margin:\s*0;/s);
+  assert.match(coreBossCss, /#handContainer \.carta\.boss-card-dimitrescu-hunt::after,\s*\.boss-mode #handContainer \.carta\.boss-card-dimitrescu-blood-mark::after\s*\{[^}]*inset:\s*0;/s);
+  assert.doesNotMatch(coreBossCss, /#handContainer \.carta\.boss-card-dimitrescu-(?:hunt|blood-mark)[^{]*\{[^}]*overflow-clip-margin:\s*18px;/s);
+});

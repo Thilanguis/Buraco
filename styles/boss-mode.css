@@ -5987,14 +5987,19 @@ body.boss-mode .boss-daughter-strip {
 }
 
 
-/* DIMITRESCU — estabiliza o hover das cartas marcadas na mão.
-   O sangue continua podendo "vazar" visualmente até 18px, mas deixa de
-   ampliar a área rolável horizontal do handContainer durante scale/rotate. */
+/* DIMITRESCU — sangue contido dentro das cartas da mão.
+   O ::after geral desce 16px para criar escorrimento em jogos/lixo/morto.
+   Na mão isso aumenta a área rolável durante a Marca Carmesim/Caçada e pode
+   fazer nascer uma barra vertical. Mantemos a animação, mas confinada à carta. */
 .boss-mode #handContainer .carta.boss-card-dimitrescu-hunt,
 .boss-mode #handContainer .carta.boss-card-dimitrescu-blood-mark {
-  overflow: hidden;
   overflow: clip;
-  overflow-clip-margin: 18px;
+  overflow-clip-margin: 0;
+}
+
+.boss-mode #handContainer .carta.boss-card-dimitrescu-hunt::after,
+.boss-mode #handContainer .carta.boss-card-dimitrescu-blood-mark::after {
+  inset: 0;
 }
 
 /* ============================================================
