@@ -795,7 +795,7 @@ function bossUseMeldDeniedMessage(playerId, meldIndex) {
     const persistentPrey = state.boss.effects?.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId);
     const prey = currentPrey || persistentPrey;
     const preyMatches = prey && ((prey.meldId && meldId && prey.meldId === meldId) || Number(prey.meldIndex) === Number(meldIndex));
-    if (prey && !preyMatches) return "🐯 Presa Marcada: Tiger's Eye não deixa você alimentar outro jogo antes da presa.";
+    if (prey && !preyMatches) return `🐯 Presa Marcada: só você está preso ao Jogo ${Number(prey.meldIndex) + 1}. Alimente a Presa primeiro.`;
     const tigerLock = state.boss.effects?.some((effect) => effect.id === 'nehelenia_meld_lock'
       && (effect.playerId == null || effect.playerId === playerId)
       && ((effect.meldId && meldId && effect.meldId === meldId) || Number(effect.meldIndex) === Number(meldIndex)));

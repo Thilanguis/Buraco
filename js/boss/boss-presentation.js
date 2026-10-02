@@ -188,10 +188,11 @@ function objectiveProgress(currentValue, requiredValue, status = 'active', label
   const required = Math.max(1, Number(requiredValue) || 1);
   const current = Math.max(0, Math.min(required, Number(currentValue) || 0));
   const completed = status === 'success' || (status === 'active' && current >= required);
-  if (completed) return `✅ ${required}/${required} — ${labels.success || 'Concluído'}`;
-  if (status === 'failed') return `❌ ${current}/${required} — ${labels.failed || 'Falhou'}`;
-  if (status === 'cancelled') return `— ${current}/${required} — ${labels.cancelled || 'Cancelado'}`;
-  return `⬜ ${current}/${required} — ${labels.pending || 'Pendente'}`;
+  const suffix = (label) => label ? ` · ${label}` : '';
+  if (completed) return `✅ ${required}/${required}${suffix(labels.success)}`;
+  if (status === 'failed') return `❌ ${current}/${required}${suffix(labels.failed)}`;
+  if (status === 'cancelled') return `— ${current}/${required}${suffix(labels.cancelled)}`;
+  return `⬜ ${current}/${required}${suffix(labels.pending)}`;
 }
 
 function stateProgress(status = 'active', labels = {}) {
@@ -203,15 +204,15 @@ function stateProgress(status = 'active', labels = {}) {
 
 function groupedObjectiveProgress(threats = []) {
   const required = threats.length;
-  if (!required) return 'Aguardando objetivos';
+  if (!required) return 'Aguardando';
   const completed = threats.filter((threat) => threat.status === 'success').length;
   const active = threats.some((threat) => threat.status === 'active');
   const failed = threats.filter((threat) => threat.status === 'failed').length;
   const cancelled = threats.filter((threat) => threat.status === 'cancelled').length;
   if (active) return objectiveProgress(completed, required, 'active');
   if (completed === required) return objectiveProgress(completed, required, 'success');
-  if (failed) return `❌ ${completed}/${required} — ${failed} não concluído${failed === 1 ? '' : 's'}`;
-  if (cancelled) return `— ${completed}/${required} — ${cancelled} cancelado${cancelled === 1 ? '' : 's'}`;
+  if (failed) return `❌ ${completed}/${required}`;
+  if (cancelled) return `— ${completed}/${required}`;
   return objectiveProgress(completed, required, 'active');
 }
 
@@ -233,7 +234,7 @@ function royalBloomProgress(gameState, intent) {
     const result = threat.status === 'success' ? ' · concluído' : threat.status === 'failed' ? ` · falhou${threat.bloomApplied ? ` (+${threat.bloomApplied} Flor)` : ''}` : threat.status === 'cancelled' ? ' · cancelado sem efeito' : '';
     return `${marker} ${royalBloomObjectiveLabel(gameState, threat)}${result}`;
   });
-  return [`${completed}/${threats.length} concluídos`, ...lines].join('\n');
+  return lines.join('\n');
 }
 
 function dimitrescuDaughterObjectiveLabel(gameState, objective) {
@@ -251,7 +252,7 @@ function dimitrescuMultiObjectiveProgress(gameState, objectives = []) {
     const suffix = objective.status === 'success' ? ' · concluído' : objective.status === 'failed' ? ' · falhou' : '';
     return `${marker} ${dimitrescuDaughterObjectiveLabel(gameState, objective)}${suffix}`;
   });
-  return [`${done}/${objectives.length} concluídos`, ...lines].join('\n');
+  return lines.join('\n');
 }
 
 function crimsonBrandProgress(gameState, intent) {
@@ -261,9 +262,9 @@ function crimsonBrandProgress(gameState, intent) {
   const lines = marks.map((mark) => {
     const marker = mark.status === 'success' ? '☑' : mark.status === 'failed' ? '✕' : '☐';
     const result = mark.status === 'success' ? ' · removida' : mark.status === 'failed' ? ' · sangrou' : '';
-    return `${marker} ${playerName(gameState, mark.playerId)} — usar ${cardLabelAnywhere(gameState, mark.cardId)}${result}`;
+    return `${marker} ${playerName(gameState, mark.playerId)}: ${cardLabelAnywhere(gameState, mark.cardId)}${result}`;
   });
-  return [`${done}/${marks.length} marcas removidas`, ...lines].join('\n');
+  return lines.join('\n');
 }
 
 function compactNatureProgress(gameState, intent) {
@@ -300,7 +301,7 @@ function compactNatureProgress(gameState, intent) {
       const effects = [threat.bloomApplied ? `+${threat.bloomApplied} Flor` : '', threat.healApplied ? `cura ${threat.healApplied} HP` : ''].filter(Boolean).join(' · ');
       return `❌ CARTA CONTAMINADA RECOLHIDA${effects ? ` · ${effects}` : ''}`;
     }
-    return `☣️ CARTA CONTAMINADA: ${contaminatedCard} · não recolha a pilha`;
+    return `☣️ ${contaminatedCard} no Lixo`;
   }
   if (intent.abilityId === 'harvest') {
     const player = playerById(gameState, intent.payload?.targetPlayerId);
@@ -314,8 +315,8 @@ function compactNatureProgress(gameState, intent) {
       return `✕ ${targetName} — terminou com ${cards} cartas${result ? ` · ${result}` : ''}`;
     }
     if (threat?.status === 'cancelled') return `— ${targetName} — Colheita cancelada`;
-    if (cards <= 7) return `☑ ${targetName} — ${cards} carta${cards === 1 ? '' : 's'} na mão · meta atingida`;
-    return `☐ ${targetName} — ${cards} cartas na mão · descarte ${reductionNeeded}`;
+    if (cards <= 7) return `☑ ${targetName}: ${cards} cartas`;
+    return `☐ ${targetName}: ${cards} cartas · tire ${reductionNeeded}`;
   }
   if (intent.abilityId === 'restorative_dew') {
     const threat = threats[0];
@@ -369,6 +370,19 @@ function crownThreatObjective(gameState, threat) {
   return 'Cumprir a ameaca natural marcada.';
 }
 
+function crownThreatCompactObjective(gameState, threat) {
+  if (!threat) return 'Sem alvo válido';
+  if (['seed', 'royal_seed'].includes(threat.type)) return `${playerName(gameState, threat.targetPlayerId)}: use ${cardLabelAnywhere(gameState, threat.cardId)}`;
+  if (['pollen', 'royal_pollen'].includes(threat.type)) return `Não recolha ${cardLabelAnywhere(gameState, threat.discardCardId)}`;
+  if (['root', 'twin_root', 'royal_root'].includes(threat.type)) return threat.strengthened
+    ? `Cada jogador: Jogo ${Number(threat.meldIndex) + 1}`
+    : `Alimente o Jogo ${Number(threat.meldIndex) + 1}`;
+  if (threat.type === 'graft') return 'Alimente os 2 jogos';
+  if (threat.type === 'dew') return 'Baixe 6 cartas';
+  if (threat.type === 'harvest') return `${playerName(gameState, threat.targetPlayerId)}: até 7 cartas`;
+  return 'Cumpra o objetivo marcado';
+}
+
 function crownThreatProgress(threat) {
   if (!threat) return 'Cancelada sem punicao';
   if (threat.status === 'success') return 'Concluida · Coroa encerrada sem efeito extra';
@@ -392,12 +406,12 @@ function maintenanceFeeProgress(gameState, intent) {
   const lines = (gameState.players || []).flatMap((player) => {
     const playerCards = activeFinanced.filter((entry) => entry.playerId === player.id);
     if (playerCards.length) {
-      return playerCards.map((entry) => `☐ ${playerName(gameState, player.id)} — use ${cardLabelAnywhere(gameState, entry.cardId)} em jogo`);
+      return playerCards.map((entry) => `☐ ${playerName(gameState, player.id)}: ${cardLabelAnywhere(gameState, entry.cardId)}`);
     }
 
     const pendingDraw = boss.pendingFinancedDrawsByPlayer?.[player.id];
-    if (pendingDraw?.sourceActionId === intent.id) return [`☐ ${playerName(gameState, player.id)} — recebendo carta financiada`];
-    if (maintenance?.pendingPlayerIds?.includes(player.id)) return [`☐ ${playerName(gameState, player.id)} — aguarda a compra financiada`];
+    if (pendingDraw?.sourceActionId === intent.id) return [`☐ ${playerName(gameState, player.id)}: recebendo`];
+    if (maintenance?.pendingPlayerIds?.includes(player.id)) return [`☐ ${playerName(gameState, player.id)}: aguardando`];
 
     const resolved = [...(boss.eventLog || [])].reverse().find((event) => event.type === 'financedCharge'
       && event.round === boss.roundNumber
@@ -405,11 +419,11 @@ function maintenanceFeeProgress(gameState, intent) {
       && (!event.sourceActionId || event.sourceActionId === intent.id));
     if (resolved) {
       return [resolved.dangerDelta
-        ? `✕ ${playerName(gameState, player.id)} — +${resolved.dangerDelta} Dívida`
-        : `☑ ${playerName(gameState, player.id)} — financiada usada em jogo`];
+        ? `✕ ${playerName(gameState, player.id)}: +${resolved.dangerDelta} Dívida`
+        : `☑ ${playerName(gameState, player.id)}: quitada`];
     }
 
-    return [`☐ ${playerName(gameState, player.id)} — aguarda a compra financiada`];
+    return [`☐ ${playerName(gameState, player.id)}: aguardando`];
   });
   return lines.join('\n');
 }
@@ -750,9 +764,9 @@ function neheleniaMirrorProgress(gameState, intent) {
   const payload = intent?.payload || {};
   if (intent.abilityId === 'mirrored_meld') {
     const target = playerName(gameState, payload.targetPlayerId);
-    const marker = payload.fed ? '☑' : payload.failed ? '✕' : '☐';
-    const stateLabel = payload.fed ? 'jogo verdadeiro encontrado' : payload.failed ? 'reflexo falso · carta enviada ao fundo' : 'escolha REFLEXO I ou II com 1 carta';
-    return `${marker} ${target} — ${stateLabel}`;
+    if (payload.fed) return `☑ ${target}: verdadeiro`;
+    if (payload.failed) return `✕ ${target}: reflexo falso`;
+    return `☐ ${target}: escolha I ou II`;
   }
   if (intent.abilityId === 'follow_reflection') {
     const firstName = playerName(gameState, payload.firstPlayerId);
@@ -760,33 +774,32 @@ function neheleniaMirrorProgress(gameState, intent) {
     const locked = payload.patternLocked === true;
     const first = locked ? Math.max(0, Number(payload.patternCount) || 0) : Math.max(0, Number(payload.firstPlayedCount) || 0);
     const second = Math.max(0, Number(payload.secondPlayedCount) || 0);
-    return [
-      `${locked ? '☑' : '☐'} 1º da rodada · ${firstName} — ${locked ? `padrão fechado: ${first} carta${first === 1 ? '' : 's'}` : `${first} baixada${first === 1 ? '' : 's'} até agora · o turno inteiro define o padrão`}`,
-      `${locked && second === first ? '☑' : '☐'} 2º da rodada · ${secondName} — ${locked ? `${second}/${first} · pode jogar livremente, mas precisa terminar exatamente igual` : 'aguarda o fim do primeiro turno'}`,
-    ].join('\n');
+    return locked
+      ? `1º ${firstName}: padrão ${first}\n2º ${secondName}: ${second}/${first}`
+      : `1º ${firstName}: ${first} carta${first === 1 ? '' : 's'}\n2º ${secondName}: aguarda`;
   }
   if (intent.abilityId === 'mirror_prison') {
-    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.rescuerPlayerId)} — alimente o Jogo ${Number(payload.meldIndex) + 1} para libertar ${playerName(gameState, payload.trappedPlayerId)}`;
+    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.rescuerPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
   }
   if (intent.abilityId === 'tiger_link') {
     const fed = new Set(payload.fedMeldIds || []);
-    return (payload.targets || []).map((target, index) => `${fed.has(target.meldId) ? '☑' : '☐'} Laço ${index + 1} — Jogo ${Number(target.meldIndex) + 1}`).join('\n');
+    return (payload.targets || []).map((target) => `${fed.has(target.meldId) ? '☑' : '☐'} Jogo ${Number(target.meldIndex) + 1}`).join(' · ');
   }
   if (intent.abilityId === 'tiger_prey') {
-    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — alimente o Jogo ${Number(payload.meldIndex) + 1}`;
+    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
   }
   if (intent.abilityId === 'hawk_suit') {
-    return `${payload.discardedCorrectSuit ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — descarte ${payload.suitLabel || payload.suit}`;
+    return `${payload.discardedCorrectSuit ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: ${payload.suitLabel || payload.suit}`;
   }
   if (intent.abilityId === 'hawk_watch') {
-    return `👁 ${playerName(gameState, payload.targetPlayerId)} — Jogo ${Number(payload.meldIndex) + 1} bloqueado neste turno`;
+    return `👁 ${playerName(gameState, payload.targetPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
   }
   if (intent.abilityId === 'fish_marked_card') {
     const done = payload.used || payload.discarded;
-    return `${done ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — retire ${cardLabelAnywhere(gameState, payload.cardId)} da mão`;
+    return `${done ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: ${cardLabelAnywhere(gameState, payload.cardId)}`;
   }
   if (intent.abilityId === 'fish_inverted') {
-    return `${payload.fedExisting ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)} — alimente 1 jogo existente antes de abrir outro`;
+    return `${payload.fedExisting ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: jogo existente`;
   }
   return neheleniaDreamMirrorSummary(gameState);
 }
@@ -967,27 +980,27 @@ function compactAction(gameState, intent) {
       const guaranteedDebt = payload.guaranteedDebt ?? payload.collateralAmount;
       const interestStep = payload.interestStep ?? (intent.announcedPhase === 3 ? 3 : 2);
       return {
-        instruction: `${holder} escolhe no fim da rodada.`,
+        instruction: `${holder}: escolha a cobrança.`,
         progress: [
-          `☐ Integral → +${fullDebt} Dívida`,
-          `☐ Cofre → 1 carta presa · resgate +${guaranteedDebt}`,
-          `☐ Adiar → +${interestStep}/turno · máximo +${fullDebt}`,
+          `Integral: +${fullDebt} Dívida`,
+          `Cofre: +${guaranteedDebt} · 1 carta presa`,
+          `Adiar: +${interestStep}/turno`,
         ].join('\n'),
         consequence: '',
       };
     }
     case 'maintenance_fee':
       return {
-        instruction: `Cada cooperador recebe +${payload.extraDraw} carta${payload.extraDraw === 1 ? '' : 's'} FINANCIADA${payload.extraDraw === 1 ? '' : 'S'}.`,
+        instruction: 'Use as cartas FINANCIADAS em jogo.',
         progress: maintenanceFeeProgress(gameState, intent),
-        consequence: `Falha por carta: +${payload.financedDebt ?? (intent.announcedPhase === 3 ? 7 : 5)} Dívida · descartar não quita`,
+        consequence: `Não usar: +${payload.financedDebt ?? (intent.announcedPhase === 3 ? 7 : 5)} Dívida/carta`,
       };
     case 'credit_block':
-      return { instruction: 'O lixo esta bloqueado nesta rodada.', progress: compactBankerProgress(gameState, intent), consequence: 'Encerra na virada da rodada' };
+      return { instruction: '🔒 Lixo bloqueado.', progress: '', consequence: 'Até virar a rodada' };
     case 'suit_audit':
-      return { instruction: `Joguem ${payload.required} cartas de ${payload.suitLabel}.`, progress: compactBankerProgress(gameState, intent), consequence: `Sucesso → sem cobrança · Falha → +${payload.failureDelta} Dívida` };
+      return { instruction: `Baixe ${payload.required} de ${payload.suitLabel}.`, progress: compactBankerProgress(gameState, intent), consequence: `Falha: +${payload.failureDelta} Dívida` };
     case 'pledge':
-      return { instruction: `Jogo ${Number(payload.meldIndex) + 1} nao pode receber cartas.`, progress: compactBankerProgress(gameState, intent), consequence: 'Libera ao fim da cobranca' };
+      return { instruction: `🔒 Jogo ${Number(payload.meldIndex) + 1} bloqueado.`, progress: '', consequence: 'Até a cobrança' };
     case 'compound_interest': {
       const total = gameState.players?.reduce((sum, player) => sum + (player.hand?.length || 0), 0) || 0;
       const safeMax = payload.safeMax ?? 7;
@@ -998,9 +1011,9 @@ function compactAction(gameState, intent) {
       const dangerDebt = payload.dangerDebt ?? (phase3 ? 16 : 14);
       const currentDebt = total <= safeMax ? safeDebt : total <= warningMax ? warningDebt : dangerDebt;
       return {
-        instruction: 'A cobrança acompanha o total de cartas que ainda está nas mãos da equipe.',
+        instruction: `Equipe: ${total} cartas na mão.`,
         progress: '',
-        consequence: `Faixa atual: +${currentDebt} Dívida`,
+        consequence: `Agora: +${currentDebt} Dívida`,
       };
     }
     case 'credit_limit': {
@@ -1010,15 +1023,15 @@ function compactAction(gameState, intent) {
       const chargedDebt = Number(limit.chargedDebt) || 0;
       const maxCharge = limit.maxCharge || payload.maxCharge || 0;
       return {
-        instruction: 'Só contam cartas que saíram da mão durante esta rodada.',
+        instruction: `Uso da franquia: ${counted}/${allowance}.`,
         progress: '',
-        consequence: counted > allowance ? `Cobrança acumulada: +${chargedDebt} / teto +${maxCharge}` : 'Ainda dentro da franquia compartilhada',
+        consequence: counted > allowance ? `+${chargedDebt} Dívida · teto +${maxCharge}` : 'Sem cobrança',
       };
     }
     case 'discard_surcharge':
-      return { instruction: `Primeira retirada do lixo → +${payload.amount} Dívida.`, progress: compactBankerProgress(gameState, intent), consequence: 'Comprar do monte evita a cobrança' };
+      return { instruction: `1ª retirada do Lixo: +${payload.amount} Dívida.`, progress: '', consequence: 'Monte evita a cobrança' };
     case 'collar':
-      return { instruction: `${target} nao pode jogar nem descartar ${collarCards.join(' e ')} ate o fim do turno.`, progress: '', consequence: '' };
+      return { instruction: `${target}: ${collarCards.join(' e ')} bloqueada(s).`, progress: '', consequence: 'Até fim do turno' };
     case 'exposure': {
       const targetPlayer = playerById(gameState, payload.targetPlayerId);
       const completed = !targetPlayer?.hand?.some((entry) => entry.id === payload.cardId);
@@ -1026,80 +1039,80 @@ function compactAction(gameState, intent) {
       const exposedCard = card || 'a carta exposta';
 
       return {
-        instruction: completed ? `✅ ${target} usou ${exposedCard}.` : `${target} precisa usar ${exposedCard} neste turno.`,
-        progress: completed ? '✅ 1/1 — Concluído' : '⬜ 0/1 — Pendente',
-        consequence: completed ? 'Nenhum Chicote será aplicado' : 'Se permanecer na mão, recebe 1 Chicote',
+        instruction: completed ? `✅ ${target}: ${exposedCard} usada.` : `${target}: use ${exposedCard}.`,
+        progress: completed ? '✅ 1/1' : '⬜ 0/1',
+        consequence: completed ? 'Sem Chicote' : 'Falha: +1 Chicote',
       };
     }
     case 'forced_choice':
-      return { instruction: `${target} devera escolher agora entre receber 1 Chicote ou aceitar: ${payload.order?.label || 'uma ordem valida para o proximo turno'}.`, progress: '', consequence: 'A partida aguarda a decisao' };
+      return { instruction: `${target}: +1 Chicote OU aceite a ordem.`, progress: payload.order?.label || '', consequence: 'Escolha agora' };
     case 'forced_swap':
-      return { instruction: 'Uma carta de cada cooperador sera trocada depois deste anuncio.', progress: '', consequence: 'Controles bloqueados ate o resultado' };
+      return { instruction: 'Troca de 1 carta entre os cooperadores.', progress: '', consequence: 'Automático' };
     case 'possession': {
       const possession = (gameState.boss?.possessions || []).find((entry) => (payload.meldId ? entry.meldId === payload.meldId : entry.meldIndex === payload.meldIndex));
       return {
-        instruction: `Jogo ${Number(payload.meldIndex) + 1} mantem o dano suspenso. Cada cooperador deve contribuir, ou o jogo precisa evoluir.`,
-        progress: `${possession?.contributorPlayerIds?.length || 0}/${possession?.required || gameState.players?.length || 2}`,
-        consequence: 'Permanece ate coordenacao ou evolucao',
+        instruction: `Jogo ${Number(payload.meldIndex) + 1}: dano suspenso.`,
+        progress: `Contribuição: ${possession?.contributorPlayerIds?.length || 0}/${possession?.required || gameState.players?.length || 2}`,
+        consequence: 'Todos contribuem ou o jogo evolui',
       };
     }
     case 'absolute_control':
-      return { instruction: `${target} nao pode criar jogos novos.`, progress: '', consequence: 'Ate concluir o turno' };
+      return { instruction: `${target}: sem jogos novos.`, progress: '', consequence: 'Até fim do turno' };
     case 'double_collar':
-      return { instruction: 'Uma carta de cada cooperador esta presa.', progress: '', consequence: 'Dura a rodada completa' };
+      return { instruction: '1 carta de cada jogador bloqueada.', progress: '', consequence: 'Nesta rodada' };
     case 'separation':
-      return { instruction: 'Cada jogo so pode ser alimentado por um cooperador.', progress: '', consequence: 'Dura a rodada completa' };
+      return { instruction: 'Cada jogo pertence a 1 jogador.', progress: '', consequence: 'Nesta rodada' };
     case 'hands_tied': {
       const consumed = payload.teamMeldAvailable === false;
       const consumedBy = payload.consumedByPlayerId == null ? null : playerName(gameState, payload.consumedByPlayerId);
 
       if (consumed) {
         return {
-          instruction: `${consumedBy || 'A equipe'} criou o único jogo novo permitido nesta rodada.`,
-          progress: `✅ 1/1 — Jogo novo criado${consumedBy ? ` por ${consumedBy}` : ''}`,
-          consequence: 'Agora a equipe só pode alimentar jogos que já existem',
+          instruction: 'Limite de jogo novo já usado.',
+          progress: `✅ 1/1${consumedBy ? ` · ${consumedBy}` : ''}`,
+          consequence: 'Agora só jogos existentes',
         };
       }
 
       return {
-        instruction: 'A equipe pode criar somente um jogo novo nesta rodada.',
-        progress: '⬜ 0/1 — Jogo novo disponível',
-        consequence: 'Depois da criação, somente jogos existentes poderão ser alimentados',
+        instruction: 'Máx. 1 jogo novo nesta rodada.',
+        progress: '⬜ 0/1',
+        consequence: 'Depois: só jogos existentes',
       };
     }
     case 'favorite':
-      return { instruction: `${playerName(gameState, payload.protectedPlayerId)} sera protegida; ${playerName(gameState, payload.punishedPlayerId)} recebera 1 Chicote.`, progress: '', consequence: 'Aplicado depois deste anuncio' };
+      return { instruction: `${playerName(gameState, payload.protectedPlayerId)} protegida · ${playerName(gameState, payload.punishedPlayerId)} +1 Chicote.`, progress: '', consequence: '' };
     case 'break_will':
-      return { instruction: `Ao final da rodada, ${target} devera escolher sua punicao.`, progress: '', consequence: 'Chicote ou retirada de canastra' };
+      return { instruction: `${target}: escolha a punição no fim da rodada.`, progress: '', consequence: 'Chicote ou canastra' };
     case 'final_order': {
       const orders = payload.orders || [];
       const lines = orders.map((order) => `☐ ${playerName(gameState, order.playerId)} — ${(order.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).join(' e ')}`);
       return {
-        instruction: 'A Dominadora marcou 2 cartas da mao de cada cooperador. As escolhas acontecem agora, antes dos turnos.',
+        instruction: '2 cartas marcadas por jogador.',
         progress: lines.join('\n'),
-        consequence: 'Recusar: +1 Chicote · Aceitar: +1 Chicote por carta que nao entrar em jogo no proximo turno',
+        consequence: 'Recusar +1 · Falha +1/carta',
       };
     }
     case 'iron_etiquette':
       return {
-        instruction: `${target} deve encerrar o próximo turno descartando ${payload.suitLabel}.`,
-        progress: '⬜ 0/1 — Pendente',
-        consequence: 'Outro naipe enquanto houver opção válida: +1 Chicote',
+        instruction: `${target}: descarte ${payload.suitLabel}.`,
+        progress: '⬜ 0/1',
+        consequence: 'Outro naipe: +1 Chicote',
       };
     case 'interdict':
       return {
-        instruction: `O Jogo ${Number(payload.meldIndex) + 1} está marcado. Evoluir significa mudar a categoria da canastra, por exemplo de Limpa para Real — apenas adicionar uma carta e continuar Limpa não ativa o Interdito.`,
+        instruction: `Jogo ${Number(payload.meldIndex) + 1}: não evolua de categoria.`,
         progress: '',
-        consequence: 'Ao evoluir: obedecer cancela a tentativa; desobedecer conclui a evolução e aplica +1 Chicote',
+        consequence: 'Evoluir: cancelar ou +1 Chicote',
       };
     case 'bela_hunt': {
       const completed = payload.used === true;
-      return { instruction: completed ? `✅ ${target} usou ${card}.` : `${target} precisa usar ${card} neste turno.`, progress: completed ? '✅ Bela perdeu a presa' : '🩸 Bela está caçando', consequence: completed ? 'Sede -3' : `Falha: Sede +${Number(intent.announcedPhase) === 3 ? 16 : 14}` };
+      return { instruction: completed ? `✅ ${target}: ${card} usada.` : `${target}: use ${card}.`, progress: completed ? '✅ Resolvido' : '🩸 Caçando', consequence: completed ? 'Sede -3' : `Falha: +${Number(intent.announcedPhase) === 3 ? 16 : 14} Sede` };
     }
     case 'cassandra_feast':
-      return { instruction: `Alimente o Jogo ${Number(payload.meldIndex) + 1} nesta rodada.`, progress: payload.fed ? '✅ Cassandra ficou sem banquete' : '⬜ Jogo ainda não alimentado', consequence: payload.fed ? 'Sede -4' : `Falha: Sede +${Number(intent.announcedPhase) === 3 ? 18 : 16}` };
+      return { instruction: `Alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: payload.fed ? '✅ Resolvido' : '⬜ Pendente', consequence: payload.fed ? 'Sede -4' : `Falha: +${Number(intent.announcedPhase) === 3 ? 18 : 16} Sede` };
     case 'daniela_swarm':
-      return { instruction: 'Não recolha o lixo contaminado nesta rodada.', progress: payload.triggered ? '❌ Daniela encontrou sangue' : '☣️ Lixo contaminado', consequence: payload.triggered ? 'Sede já aumentou' : `Evitar: Sede -3 · Recolher: +${Number(intent.announcedPhase) === 3 ? 15 : 12}` };
+      return { instruction: '☣️ Não pegue o Lixo.', progress: payload.triggered ? '❌ Ativado' : '⬜ Seguro', consequence: payload.triggered ? 'Sede aumentou' : `Evitar -3 · Pegar +${Number(intent.announcedPhase) === 3 ? 15 : 12} Sede` };
     case 'blood_tithe': {
       const phase = Number(intent.announcedPhase) || 1;
       const medium = phase === 3 ? 6 : 4;
@@ -1109,68 +1122,68 @@ function compactAction(gameState, intent) {
         return sum + (cards >= 11 ? heavy : cards >= 8 ? medium : 0);
       }, 0);
       return {
-        instruction: 'No fim da rodada, Lady cobra cada jogador separadamente pelas cartas que ainda restarem na própria mão.',
+        instruction: 'Cada mão é cobrada separadamente.',
         progress: '',
-        consequence: `Cobrança projetada agora: +${projected} Sede`,
+        consequence: `Previsto: +${projected} Sede`,
       };
     }
     case 'red_wine':
-      return { instruction: `Lady Dimitrescu consome ${payload.bloodCost || 15} de Sede e recupera até ${payload.healAmount || 0} HP.`, progress: `Sede atual: ${gameState.boss?.danger || 0}/100`, consequence: 'A cura reduz a própria barra de Sede' };
+      return { instruction: `Lady gasta ${payload.bloodCost || 15} Sede para curar.`, progress: `Sede ${gameState.boss?.danger || 0}/100`, consequence: `Cura até ${payload.healAmount || 0} HP` };
     case 'crimson_brand':
-      return { instruction: 'Cada cooperador precisa usar legalmente a própria carta marcada nesta rodada.', progress: crimsonBrandProgress(gameState, intent), consequence: `Cada sucesso: Sede -2 · Cada falha: Sede +${Number(intent.announcedPhase) === 3 ? 9 : 7}` };
+      return { instruction: 'Use as cartas marcadas.', progress: crimsonBrandProgress(gameState, intent), consequence: `Sucesso -2 · Falha +${Number(intent.announcedPhase) === 3 ? 9 : 7} Sede` };
     case 'cassandra_dead_feast': {
       const curse = gameState.boss?.bloodiedDead;
       const active = curse?.status === 'active';
       return {
-        instruction: `Cassandra profanou o Morto ${Number(payload.deadIndex) + 1}.`,
+        instruction: `Morto ${Number(payload.deadIndex) + 1} amaldiçoado.`,
         progress: active ? '🩸 MALDIÇÃO ATIVA NO MORTO' : 'A profanação foi preparada',
-        consequence: `Tomar: +${payload.bloodAmount || 0} Sede e cura ${payload.healAmount || 0} HP · Real/Ás-a-Ás purifica`,
+        consequence: `Tomar: +${payload.bloodAmount || 0} Sede · cura ${payload.healAmount || 0} HP`,
       };
     }
     case 'crimson_clot': {
       const clot = gameState.boss?.crimsonClot;
       const remaining = clot?.status === 'active' ? Math.max(0, Number(clot.remaining) || 0) : 0;
       const maximum = Math.max(1, Number(clot?.max || payload.amount) || 1);
-      return { instruction: 'Rompa o Coágulo Carmesim antes do fim da rodada.', progress: clot?.status === 'active' ? `🩸 COÁGULO ${remaining}/${maximum}` : 'Coágulo preparado', consequence: 'Romper: Sede -6 · Sobreviver: 50% do restante vira cura' };
+      return { instruction: 'Quebre o Coágulo.', progress: clot?.status === 'active' ? `🩸 ${remaining}/${maximum}` : 'Preparado', consequence: 'Falha: 50% restante vira cura' };
     }
     case 'castle_lockdown':
-      return { instruction: 'O lixo está trancado nesta rodada.', progress: '🔒 Portas do Castelo fechadas', consequence: 'Compre apenas do monte' };
+      return { instruction: '🔒 Lixo fechado.', progress: '', consequence: 'Use o Monte' };
     case 'three_daughters': {
       const objectives = payload.objectives || [];
-      return { instruction: 'Cumpra os três objetivos independentes das filhas.', progress: dimitrescuMultiObjectiveProgress(gameState, objectives), consequence: 'Cada sucesso: Sede -2 · Cada falha: Sede +8' };
+      return { instruction: 'Cumpra os 3 objetivos.', progress: dimitrescuMultiObjectiveProgress(gameState, objectives), consequence: 'Cada um: sucesso -2 · falha +8 Sede' };
     }
     case 'living_seed':
-      return { instruction: `${target} precisa usar ${card} no proximo turno.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor, sem cura' };
+      return { instruction: `${target}: use ${card}.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor' };
     case 'hungry_root':
-      return { instruction: `Adicione uma carta legal ao jogo ${Number(payload.meldIndex) + 1}.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor e pode propagar uma Raiz' };
+      return { instruction: `Alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor' };
     case 'restorative_dew': {
       const threat = natureThreatsForIntent(gameState, intent)[0];
       const counted = new Set(threat?.countedCardIds || payload.countedCardIds || []).size;
       const phase = threat?.announcedPhase || payload.announcedPhase || intent.announcedPhase || gameState.boss?.phase || 1;
       const healing = getRestorativeDewHealing(phase, counted);
-      return { instruction: 'Cada carta nova colocada legalmente na mesa empurra a cura para uma faixa menor.', progress: '', consequence: `Cura prevista agora: ${healing} HP` };
+      return { instruction: 'Baixe cartas para reduzir a cura.', progress: '', consequence: `Cura prevista: ${healing} HP` };
     }
     case 'twin_vines':
-      return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogo(s), cada um separadamente.`, progress: compactNatureProgress(gameState, intent), consequence: 'Cada raiz falha: +1 Flor, sem cura' };
+      return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogos marcados.`, progress: compactNatureProgress(gameState, intent), consequence: 'Falha: +1 Flor por raiz' };
     case 'graft':
-      return { instruction: 'Adicione uma carta legal em cada um dos dois jogos ligados.', progress: compactNatureProgress(gameState, intent), consequence: '0 lados: +2 Flores e pode propagar · 1 lado: +1 Flor' };
+      return { instruction: 'Alimente os 2 jogos ligados.', progress: compactNatureProgress(gameState, intent), consequence: '0/2: +2 Flores · 1/2: +1' };
     case 'discard_pollen': {
       const threat = natureThreatsForIntent(gameState, intent)[0];
       const contaminatedCard = cardLabelAnywhere(gameState, threat?.discardCardId || payload.discardCardId);
       return {
-        instruction: `A carta ${contaminatedCard} foi contaminada. Não recolha a pilha enquanto ela estiver no lixo.`,
+        instruction: `☣️ Não recolha ${contaminatedCard}.`,
         progress: compactNatureProgress(gameState, intent),
-        consequence: 'Se essa carta vier junto na retirada: +1 Flor e cura de até 40 HP',
+        consequence: 'Se vier: +1 Flor · cura até 40 HP',
       };
     }
     case 'harvest':
       return {
-        instruction: `${target}: reduza a mão antes do fim do turno.`,
+        instruction: `${target}: termine com até 7 cartas.`,
         progress: '',
-        consequence: 'A faixa final da mão define o resultado da Colheita',
+        consequence: 'Mais cartas = efeito pior',
       };
     case 'royal_bloom':
-      return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos independentes.`, progress: compactNatureProgress(gameState, intent), consequence: 'Cada falha: +1 Flor, sem cura' };
+      return { instruction: `Cumpra ${payload.targetCount || payload.objectives?.length || 0} objetivos.`, progress: compactNatureProgress(gameState, intent), consequence: '+1 Flor por falha' };
     case 'emerald_cocoon': {
       const boss = gameState.boss;
       const cocoon = boss?.emeraldCocoon;
@@ -1197,9 +1210,9 @@ function compactAction(gameState, intent) {
             : '— Casulo encerrado';
 
       return {
-        instruction: 'Dano comum é absorvido pelo Casulo.',
+        instruction: 'Dano comum vai para o Casulo.',
         progress,
-        consequence: wasBroken ? 'A proteção não absorve mais dano' : 'Canastra limpa ou superior rompe e causa dano total',
+        consequence: wasBroken ? 'Proteção encerrada' : 'Canastra Limpa+ rompe',
       };
     }
     case 'spring_crown': {
@@ -1208,58 +1221,58 @@ function compactAction(gameState, intent) {
       const name = crownThreatName(gameState);
       const progress =
         crown?.status === 'root_prepared'
-          ? `${name} falhou · Raiz Fortalecida preparada`
+          ? `❌ ${name}`
           : crown?.status === 'root_active'
-            ? 'Raiz Fortalecida ativa · a Coroa permanece fortalecida'
+            ? '🌿 Raiz Fortalecida'
             : crown?.status === 'completed'
-              ? `${name} concluida · Coroa encerrada sem efeito extra`
+              ? `✅ ${name}`
               : crown?.status === 'cancelled'
-                ? `${name} cancelada · sem punicao`
+                ? `— ${name}`
                 : crownThreatProgress(threat);
       const consequence =
         crown?.status === 'root_active'
           ? 'Raiz Fortalecida ativa'
           : crown?.status === 'root_prepared'
-            ? 'Raiz Fortalecida preparada para a próxima rodada'
+            ? 'Próxima rodada: Raiz Fortalecida'
             : crown?.status === 'completed'
               ? 'Sem efeito extra'
               : crown?.status === 'cancelled'
                 ? 'Sem punição'
-                : 'Não cumprir: Raiz Fortalecida na próxima rodada';
+                : 'Falha: Raiz Fortalecida';
       return {
-        instruction: `A Coroa marcou: ${name}. ${crownThreatObjective(gameState, threat)}`,
+        instruction: `${name}: ${crownThreatCompactObjective(gameState, threat)}.`,
         progress,
         consequence,
       };
     }
     case 'false_image':
-      return { instruction: `${target}: descubra qual dos três reflexos realmente existe na sua mão.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → a carta verdadeira fica presa no espelho durante o próximo turno' };
+      return { instruction: `${target}: ache o reflexo real.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: carta presa 1 turno' };
     case 'mirrored_meld':
-      return { instruction: `${playerName(gameState, payload.targetPlayerId)}: o mesmo jogo apareceu duas vezes. Selecione 1 carta e escolha qual reflexo é o verdadeiro.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Reflexo falso → carta ao fundo do monte + Desorientado · Ignorar até o fim do turno → Espelho dos Sonhos roubado' };
+      return { instruction: `${playerName(gameState, payload.targetPlayerId)}: escolha o jogo verdadeiro.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Erro: carta ao monte + Desorientado' };
     case 'follow_reflection':
-      return { instruction: `1º turno desta rodada: ${playerName(gameState, payload.firstPlayerId)} define o padrão pelo turno inteiro. 2º turno: ${playerName(gameState, payload.secondPlayerId)} precisa terminar com a mesma quantidade — inclusive 0.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'A habilidade permanece ativa entre os dois turnos; Nehelenia não sorteia outra habilidade no meio · quantidade diferente no fim do segundo turno → +1 Espelho' };
+      return { instruction: `${playerName(gameState, payload.firstPlayerId)} define · ${playerName(gameState, payload.secondPlayerId)} copia.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Diferença: +1 Espelho' };
     case 'dream_theft':
-      return { instruction: `${target}: reconheça qual reflexo realmente existe na sua mão.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → seu Espelho dos Sonhos é roubado' };
+      return { instruction: `${target}: ache o reflexo real.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: perde o Espelho dos Sonhos' };
     case 'discard_mirror':
-      return { instruction: `${target}: o topo do lixo foi duplicado em dois reflexos idênticos. Escolha um deles — não há pista visual.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: '50/50 · erro → o lixo fica selado durante esta rodada' };
+      return { instruction: `${target}: escolha 1 reflexo do Lixo.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: Lixo selado na rodada' };
     case 'shattered_mirror':
-      return { instruction: `${target}: dois reflexos são cartas reais da sua mão; encontre o único fragmento falso.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → as duas cartas verdadeiras ficam presas no espelho durante o próximo turno' };
+      return { instruction: `${target}: ache o único falso.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: 2 cartas presas 1 turno' };
     case 'mirror_prison':
-      return { instruction: `${playerName(gameState, payload.rescuerPlayerId)} precisa alimentar o reflexo para libertar ${playerName(gameState, payload.trappedPlayerId)}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Sucesso → recupera o Espelho dos Sonhos roubado' };
+      return { instruction: `${playerName(gameState, payload.rescuerPlayerId)}: alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: `Liberta ${playerName(gameState, payload.trappedPlayerId)}` };
     case 'eternal_nightmare':
-      return { instruction: `${target}: observe a carta ORIGINAL gerar dois reflexos e acompanhe-a durante o embaralhamento.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro → +1 Espelho para Nehelenia · 5/5 encerra a batalha' };
+      return { instruction: `${target}: siga a carta original.`, progress: neheleniaDreamMirrorSummary(gameState), consequence: 'Erro: +1 Espelho' };
     case 'tiger_link':
-      return { instruction: "Tiger's Eye ligou dois jogos. Alimente os dois antes do fim da rodada.", progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Lado ignorado → as garras persistem; a próxima alimentação rompe o efeito, mas o dano individual dessas cartas é anulado' };
+      return { instruction: 'Alimente os 2 jogos ligados.', progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Falha: garras persistem no lado faltante' };
     case 'tiger_prey':
-      return { instruction: `${target}: Tiger's Eye marcou o Jogo ${Number(payload.meldIndex) + 1}. Alimente essa Presa.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Enquanto a Presa continuar ativa, você não pode alimentar outro jogo existente' };
+      return { instruction: `${target}: alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: `Só ${target} fica preso à Presa` };
     case 'hawk_suit':
-      return { instruction: `${target}: encerre o turno descartando ${payload.suitLabel || payload.suit}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Outro naipe → Hawk vigia a carta descartada; ninguém pode recolher o lixo enquanto ela estiver no topo' };
+      return { instruction: `${target}: descarte ${payload.suitLabel || payload.suit}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Outro naipe: Lixo vigiado' };
     case 'hawk_watch':
-      return { instruction: `${target}: Hawk's Eye está vigiando o Jogo ${Number(payload.meldIndex) + 1}. Você não pode alimentá-lo neste turno.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Os demais jogos continuam disponíveis' };
+      return { instruction: `${target}: Jogo ${Number(payload.meldIndex) + 1} bloqueado.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Outros jogos livres' };
     case 'fish_marked_card':
-      return { instruction: `${target}: Fish Eye marcou ${cardLabelAnywhere(gameState, payload.cardId)}. Use-a em jogo ou descarte-a neste turno.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Se continuar na mão → vira Reflexo Morto: não pode entrar em jogo e só sai pelo descarte' };
+      return { instruction: `${target}: use ou descarte ${cardLabelAnywhere(gameState, payload.cardId)}.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Falha: vira Reflexo Morto' };
     case 'fish_inverted':
-      return { instruction: `${target}: antes de abrir qualquer jogo novo, alimente 1 jogo que já existe.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Enquanto não alimentar um jogo existente, criar jogo novo fica bloqueado' };
+      return { instruction: `${target}: alimente 1 jogo existente.`, progress: neheleniaMirrorProgress(gameState, intent), consequence: 'Até lá: sem jogo novo' };
     default:
       return { instruction: intent.description || 'Habilidade ativa.', progress: '', consequence: '' };
   }
