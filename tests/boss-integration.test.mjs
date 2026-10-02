@@ -428,3 +428,15 @@ test('marcador de Florescimento fica isolado dos outros chefes', () => {
   assert.match(uiRegistry, /matriarchBossUi/);
   assert.doesNotMatch(app, /state\.boss\?\.id === 'matriarca_esmeralda'[^\n]*matriarchBloomRemoved/);
 });
+
+
+test('ajuda das habilidades usa interrogação compacta e popover flutuante sem alterar o layout', () => {
+  assert.match(
+    html,
+    /class="boss-intent-instruction-row"[\s\S]*?<small id="bossIntentDescription"><\/small>[\s\S]*?<button id="bossIntentHelpButton" class="boss-intent-help-button"[^>]*>\?<\/button>/,
+  );
+  assert.match(bossCss, /\.boss-intent-help-button\s*\{[\s\S]*?all:\s*unset;[\s\S]*?width:\s*17px;[\s\S]*?height:\s*17px;/);
+  assert.match(bossCss, /\.boss-intent-help-popover\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?z-index:\s*180;/);
+  assert.match(bossCss, /\.boss-intent-help-popover\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important;/);
+  assert.match(app, /const insertionAnchor = anchor\.closest\?\.\('\.boss-intent-instruction-row'\) \|\| anchor;/);
+});

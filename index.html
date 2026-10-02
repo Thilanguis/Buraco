@@ -711,15 +711,17 @@
             <div id="bossIntent" class="boss-intent">
               <span id="bossActionType">AÇÃO ATUAL</span>
               <strong id="bossIntentName">Preparando contrato...</strong>
-              <button id="bossIntentHelpButton" class="boss-intent-help-button" type="button" aria-label="Abrir ajuda da habilidade" aria-expanded="false" hidden>?</button>
-              <div id="bossIntentHelpPopover" class="boss-intent-help-popover" role="dialog" aria-modal="false" aria-hidden="true" hidden>
+              <div class="boss-intent-instruction-row">
+                <small id="bossIntentDescription"></small>
+                <button id="bossIntentHelpButton" class="boss-intent-help-button" type="button" aria-label="Explicar esta habilidade" aria-controls="bossIntentHelpPopover" aria-expanded="false" hidden>?</button>
+              </div>
+              <div id="bossIntentHelpPopover" class="boss-intent-help-popover" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="bossIntentHelpTitle" hidden>
                 <div class="boss-intent-help-head">
                   <b id="bossIntentHelpTitle">Ajuda da habilidade</b>
-                  <button id="bossIntentHelpClose" type="button" aria-label="Fechar ajuda">×</button>
+                  <button id="bossIntentHelpClose" class="boss-intent-help-close" type="button" aria-label="Fechar ajuda">×</button>
                 </div>
                 <p id="bossIntentHelpText"></p>
               </div>
-              <small id="bossIntentDescription"></small>
               <em id="bossIntentProgress"></em>
             </div>
             <div id="bossDialoguePresentation" class="boss-dialogue-presentation" style="display: none" aria-live="assertive">

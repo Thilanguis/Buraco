@@ -5163,12 +5163,15 @@ function renderBossDetailFields(element, details) {
 
 function renderBossRangeMeters(anchor, meters = []) {
   if (!anchor?.parentElement) return;
+  const insertionAnchor = anchor.closest?.('.boss-intent-instruction-row') || anchor;
   let panel = document.getElementById('bossRangeMeters');
   if (!panel) {
     panel = document.createElement('div');
     panel.id = 'bossRangeMeters';
     panel.className = 'boss-range-meters';
-    anchor.insertAdjacentElement('afterend', panel);
+    insertionAnchor.insertAdjacentElement('afterend', panel);
+  } else if (panel.previousElementSibling !== insertionAnchor) {
+    insertionAnchor.insertAdjacentElement('afterend', panel);
   }
 
   panel.replaceChildren();

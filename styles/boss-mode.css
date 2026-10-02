@@ -471,6 +471,8 @@
   border-radius: 5px;
   display: grid;
   gap: 5px;
+  position: relative;
+  overflow: visible;
   background: rgba(54, 20, 7, 0.3);
   box-shadow:
     inset 0 1px rgba(255, 255, 255, 0.05),
@@ -496,6 +498,148 @@
   font-size: 9px;
   font-style: normal;
   font-weight: 1000;
+  white-space: pre-line;
+}
+
+.boss-intent-instruction-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.boss-intent-instruction-row > small {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.boss-intent-help-button {
+  all: unset;
+  box-sizing: border-box;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  display: inline-grid;
+  place-items: center;
+  margin-top: -2px;
+  border: 1px solid rgba(251, 191, 36, 0.74);
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.9);
+  color: #fbbf24;
+  font: 1000 10px/1 Arial, sans-serif;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.boss-intent-help-button:hover,
+.boss-intent-help-button:focus-visible,
+.boss-intent-help-button[aria-expanded='true'] {
+  border-color: #fde68a;
+  background: rgba(120, 53, 15, 0.94);
+  color: #fff7ed;
+  transform: scale(1.06);
+}
+
+.boss-intent-help-button:focus-visible {
+  outline: 2px solid rgba(251, 191, 36, 0.48);
+  outline-offset: 2px;
+}
+
+.boss-intent-help-button[hidden] {
+  display: none !important;
+}
+
+.boss-intent-help-popover {
+  position: absolute;
+  z-index: 180;
+  right: 8px;
+  top: calc(100% + 7px);
+  width: min(330px, calc(100vw - 28px));
+  max-height: min(330px, 50vh);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 10px 11px 11px;
+  border: 1px solid rgba(251, 191, 36, 0.68);
+  border-radius: 7px;
+  background: rgba(8, 13, 23, 0.985);
+  color: #e5e7eb;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(15, 23, 42, 0.9),
+    0 0 24px rgba(245, 158, 11, 0.12);
+}
+
+.boss-intent-help-popover[hidden] {
+  display: none !important;
+}
+
+.boss-intent-help-popover::before {
+  content: '';
+  position: absolute;
+  right: 20px;
+  top: -6px;
+  width: 10px;
+  height: 10px;
+  border-left: 1px solid rgba(251, 191, 36, 0.68);
+  border-top: 1px solid rgba(251, 191, 36, 0.68);
+  background: rgba(8, 13, 23, 0.985);
+  transform: rotate(45deg);
+}
+
+.boss-intent-help-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.boss-intent-help-head b {
+  color: #fbbf24;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.boss-intent-help-close {
+  all: unset;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #94a3b8;
+  font: 900 15px/1 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.boss-intent-help-close:hover,
+.boss-intent-help-close:focus-visible {
+  background: rgba(148, 163, 184, 0.12);
+  color: #fff;
+}
+
+.boss-intent-help-close:focus-visible {
+  outline: 2px solid rgba(251, 191, 36, 0.4);
+  outline-offset: 1px;
+}
+
+.boss-intent-help-popover p {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: #dbe4f0;
+  font-size: 10px;
+  line-height: 1.48;
   white-space: pre-line;
 }
 
