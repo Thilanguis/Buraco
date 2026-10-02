@@ -3473,7 +3473,17 @@ export function canBossUseMeld(gameState, playerId, meldIndex) {
       ? intent.payload : null;
     const persistentPrey = boss.effects.find((effect) => effect.id === 'nehelenia_tiger_prey' && effect.playerId === playerId);
     const prey = currentPrey || persistentPrey;
-    if (prey && !neheleniaMeldTargetMatches(prey, meldId, meldIndex)) return false;
+    const mandatoryMirroredTarget = intent?.abilityId === 'mirrored_meld'
+      && !intent.payload?.resolved
+      && intent.payload?.targetPlayerId === playerId
+      && neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex);
+
+    // Jogo Espelhado é uma obrigação imediata do turno. Se um save antigo ou
+    // uma combinação de efeitos deixar a Presa Persistente apontando para
+    // outro jogo, o alvo pode alimentar SOMENTE o jogo espelhado para resolver
+    // a habilidade atual. A Presa não é removida: volta a restringir os demais
+    // jogos assim que o Jogo Espelhado terminar.
+    if (prey && !neheleniaMeldTargetMatches(prey, meldId, meldIndex) && !mandatoryMirroredTarget) return false;
     if (intent?.abilityId === 'hawk_watch' && intent.payload?.targetPlayerId === playerId) {
       return !neheleniaMeldTargetMatches(intent.payload, meldId, meldIndex);
     }

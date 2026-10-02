@@ -98,7 +98,7 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
-| Jogo Espelhado | 1, 2 e 3 | 5 | Um jogo real é clonado fisicamente na mesa em dois reflexos completos e idênticos. O alvo escolhe um deles com exatamente 1 carta legal. Acerto joga normalmente; erro manda a carta ao fundo do monte e deixa o jogador **Desorientado**, sem novas baixadas naquele turno. |
+| Jogo Espelhado | 1, 2 e 3 | 5 | Um jogo real é clonado fisicamente na mesa em dois reflexos completos e idênticos. O alvo escolhe um deles com exatamente 1 carta legal. Acerto joga normalmente; erro manda a carta ao fundo do monte e deixa o jogador **Desorientado**, sem novas baixadas naquele turno. Se houver **Presa Marcada** antiga em outro jogo, Jogo Espelhado tem precedência temporária; a Presa continua ativa depois. |
 | Siga o Reflexo | 1, 2 e 3 | 5 | A ordem é travada pela **sequência real da rodada**: o 1º jogador que vai agir define o padrão pelo turno inteiro; o 2º jogador que vai agir precisa terminar com exatamente a mesma quantidade, inclusive `0`. A habilidade permanece ativa entre os dois turnos e Nehelenia não sorteia outra habilidade no meio. Qualquer diferença adiciona +1 Espelho. |
 | Espelho do Lixo | 2 e 3 | 4 | O topo do lixo aparece em **dois reflexos idênticos**. Não há pista de verdadeiro/falso: a escolha é 50/50. Errar sela o lixo durante a rodada. |
 | Prisão no Espelho | 2 e 3 | 3 | Com pelo menos 1 Espelho tomado, o parceiro pode alimentar o jogo refletido para recuperar 1 Espelho. |

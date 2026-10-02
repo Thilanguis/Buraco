@@ -1758,9 +1758,6 @@ O bot usa somente a informação disponível ao humano e não consulta respostas
 
 # 9. HUD e identidade visual
 
-
-**Validação de jogabilidade:** o Jogo Espelhado só pode ser criado sobre um par jogador+jogo que possua pelo menos uma carta realmente legal para alimentar aquele jogo **e** ainda preserve um descarte legal. Restrições persistentes já ativas (como Presa Marcada ou bloqueio de jogo) também são respeitadas. Enquanto o alvo ainda não testou um dos reflexos, o parceiro não pode alterar o jogo espelhado; isso impede que a solução válida desapareça antes do turno do alvo.
-
 ## 9.1 HUD compacto
 
 Mostrar:
@@ -2085,6 +2082,8 @@ O alvo seleciona exatamente 1 carta legal e toca em um dos reflexos:
 - **Desorientado:** não pode fazer novas baixadas naquele turno; ainda pode descartar e encerrar.
 
 Ignorar a ilusão até o fim do turno entrega +1 Espelho a Nehelenia.
+
+Se o alvo já estiver sob **Presa Marcada** de Tiger em outro jogo, o **Jogo Espelhado** tem precedência temporária por ser a obrigação ativa do turno: o jogador pode alimentar somente o jogo espelhado até resolver a escolha. A Presa não é removida e volta a restringir os demais jogos imediatamente depois.
 
 ### Siga o Reflexo
 
