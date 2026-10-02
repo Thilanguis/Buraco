@@ -6000,3 +6000,69 @@ body.boss-mode .boss-daughter-strip {
   overflow: clip;
   overflow-clip-margin: 18px;
 }
+
+/* ============================================================
+   MODO CHEFE — RÉGUA HORIZONTAL BASEADA NA MESA NORMAL
+   Usa a mesma lógica já aprovada de .board-melds:
+   - desktop: 130px de margem total;
+   - tablet/celular: 98% da viewport;
+   - landscape baixo: 90px de margem total.
+   O teto é maior no Chefe porque HUD + mecânicas precisam de mais
+   largura útil do que a mesa normal, sem virar um layout ultrawide.
+   ============================================================ */
+body.boss-mode {
+  --boss-stage-width: min(calc(100% - 130px), 1920px);
+}
+
+body.boss-mode .boss-hud,
+body.boss-mode .boss-daughter-strip,
+body.boss-mode #gameSection .board-melds {
+  width: var(--boss-stage-width);
+  max-width: none;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Filhas da Dimitrescu e capangas da Nehelenia acompanham a régua nova:
+   os três slots dividem toda a largura útil, como já faziam antes do teto
+   antigo de 1080px. As artes continuam com seu recorte próprio; quem cresce
+   é o espaço estrutural de cada slot. */
+body.boss-mode .boss-daughter-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: stretch;
+}
+
+/* Mesma regra da mesa normal em tablet/celular. */
+@media (max-width: 768px), (max-height: 600px) {
+  body.boss-mode {
+    --boss-stage-width: 98%;
+  }
+}
+
+/* A regra mais específica do jogo normal para landscape baixo vence os 98%. */
+@media (max-height: 600px) and (orientation: landscape) {
+  body.boss-mode {
+    --boss-stage-width: calc(100% - 90px);
+  }
+}
+
+/* ============================================================
+   MODO CHEFE — RESERVA REAL DO TOPO
+   No jogo normal a board-top fixa 50px, embora o Morto tenha 60px;
+   a margem de 70px da mesa normal mascara esse vazamento. Como o HUD
+   do chefe vem logo depois do topo, a barra precisa acomodar seus
+   próprios filhos antes de liberar o fluxo para HUD/faixa/jogos.
+   ============================================================ */
+body.boss-mode .board-top {
+  height: auto;
+  min-height: 80px;
+}
+
+/* Em tablet/celular o Morto cai para ~44px; preservamos uma folga curta
+   sem desperdiçar a altura útil da tela. */
+@media (max-width: 768px), (max-height: 600px) {
+  body.boss-mode .board-top {
+    height: auto;
+    min-height: 60px;
+  }
+}

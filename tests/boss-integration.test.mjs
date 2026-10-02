@@ -440,3 +440,47 @@ test('ajuda das habilidades usa interrogação compacta e popover flutuante sem 
   assert.match(bossCss, /\.boss-intent-help-popover\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important;/);
   assert.match(app, /const insertionAnchor = anchor\.closest\?\.\('\.boss-intent-instruction-row'\) \|\| anchor;/);
 });
+
+test('modo Chefe usa a mesma base responsiva horizontal da mesa normal sem ficar preso em 1080px', () => {
+  assert.match(tableThemesCss, /\.board-melds\s*\{[\s\S]*?width:\s*calc\(100% - 130px\);[\s\S]*?max-width:\s*1200px;/);
+  assert.match(
+    bossCss,
+    /body\.boss-mode\s*\{[\s\S]*?--boss-stage-width:\s*min\(calc\(100% - 130px\),\s*1920px\);/,
+  );
+  assert.match(
+    bossCss,
+    /body\.boss-mode \.boss-hud,[\s\S]*?body\.boss-mode \.boss-daughter-strip,[\s\S]*?body\.boss-mode #gameSection \.board-melds\s*\{[\s\S]*?width:\s*var\(--boss-stage-width\);[\s\S]*?max-width:\s*none;/,
+  );
+  assert.match(
+    bossCss,
+    /@media \(max-width:\s*768px\), \(max-height:\s*600px\)[\s\S]*?--boss-stage-width:\s*98%;/,
+  );
+  assert.match(
+    bossCss,
+    /@media \(max-height:\s*600px\) and \(orientation:\s*landscape\)[\s\S]*?--boss-stage-width:\s*calc\(100% - 90px\);/,
+  );
+  assert.match(
+    bossCss,
+    /body\.boss-mode \.boss-daughter-strip\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);[\s\S]*?justify-content:\s*stretch;/,
+  );
+  assert.doesNotMatch(
+    bossCss,
+    /boss-daughter-strip[\s\S]{0,220}?minmax\(0,\s*360px\)/,
+  );
+  assert.match(neheleniaCss, /boss-nehelenia-attendant-card\[data-attendant='tiger'\][\s\S]*?grid-column:\s*1/);
+  assert.match(neheleniaCss, /boss-nehelenia-attendant-card\[data-attendant='hawk'\][\s\S]*?grid-column:\s*2/);
+  assert.match(neheleniaCss, /boss-nehelenia-attendant-card\[data-attendant='fish'\][\s\S]*?grid-column:\s*3/);
+});
+
+test('modo Chefe reserva o topo antes do HUD para status e Morto não sobreporem a batalha', () => {
+  assert.match(tableThemesCss, /\.board-top\s*\{[\s\S]*?height:\s*50px;/);
+  assert.match(tableThemesCss, /\.morto-area\s*\{[\s\S]*?height:\s*60px;/);
+  assert.match(
+    bossCss,
+    /body\.boss-mode \.board-top\s*\{[\s\S]*?height:\s*auto;[\s\S]*?min-height:\s*80px;/,
+  );
+  assert.match(
+    bossCss,
+    /@media \(max-width:\s*768px\), \(max-height:\s*600px\)[\s\S]*?body\.boss-mode \.board-top\s*\{[\s\S]*?min-height:\s*60px;/,
+  );
+});

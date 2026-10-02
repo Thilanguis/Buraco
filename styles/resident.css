@@ -20,6 +20,16 @@ body[data-table-theme='resident'] #gameSection > .table-preserved-art {
 .table-preserved-art .table-art-original {
   background-size: var(--preserved-size);
 }
+
+
+/* Em tablets/telas mais altas, preservar a arte inteira cria faixas desfocadas
+   acima/abaixo da mesa. Nesses formatos usamos o background base em `cover`,
+   que já existe em #gameSection, e removemos somente a camada auxiliar. */
+@media (any-pointer: coarse), (max-aspect-ratio: 8 / 5) {
+  body[data-table-theme='resident'] #gameSection > .table-preserved-art {
+    display: none !important;
+  }
+}
 .resident-card-art { display: none; }
 body[data-deck-theme='resident'] .resident-card-art {
   display: block;

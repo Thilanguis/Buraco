@@ -16,15 +16,22 @@ try {
   await page.goto('http://background.test/');
   for (const theme of ['lunar', 'wwe', 'resident']) {
     await page.evaluate(theme => { document.body.dataset.tableTheme = theme; }, theme);
-    for (const [width, height] of [[1920, 900], [1366, 768], [844, 390], [768, 1024]]) {
+    for (const [width, height] of [[1920, 900], [1366, 768], [1440, 960], [844, 390], [768, 1024]]) {
       await page.setViewportSize({ width, height });
       await page.waitForFunction(theme => theme === 'resident' ? document.querySelector('.table-preserved-art') : document.querySelector('#gameSection').style.backgroundSize.includes('px'), theme);
       // Allow ResizeObserver and pending image callbacks to settle.
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const result = await page.evaluate(async theme => {
         const image = new Image(); image.src = `/${theme}.webp`; await image.decode();
-        const size = theme === 'resident' ? document.querySelector('.table-preserved-art').style.getPropertyValue('--preserved-size') : document.querySelector('#gameSection').style.backgroundSize;
-        return { iw: image.naturalWidth, ih: image.naturalHeight, size: size.trim().split(' ').map(parseFloat) };
+        const preserved = document.querySelector('.table-preserved-art');
+        const size = theme === 'resident' ? preserved.style.getPropertyValue('--preserved-size') : document.querySelector('#gameSection').style.backgroundSize;
+        return {
+          iw: image.naturalWidth,
+          ih: image.naturalHeight,
+          size: size.trim().split(' ').map(parseFloat),
+          preservedDisplay: preserved ? getComputedStyle(preserved).display : null,
+          tableBackgroundSize: getComputedStyle(document.querySelector('#gameSection')).backgroundSize,
+        };
       }, theme);
       const cover = Math.max(width / result.iw, height / result.ih);
       if (theme === 'resident') {
@@ -33,6 +40,13 @@ try {
         assert.ok(Math.abs(result.size[0] - result.iw * scale) < .02);
         assert.ok(Math.abs(result.size[1] - result.ih * scale) < .02);
         assert.ok(Math.abs(result.size[0] / result.size[1] - result.iw / result.ih) < .001, 'no distortion');
+        const tallViewport = width / height <= 1.6;
+        if (tallViewport) {
+          assert.equal(result.preservedDisplay, 'none', 'Resident: sem faixas foscas em tablet/tela alta');
+          assert.equal(result.tableBackgroundSize, 'cover', 'Resident: usa cover quando a camada preservada fica oculta');
+        } else {
+          assert.notEqual(result.preservedDisplay, 'none', 'Resident: desktop largo preserva a composição completa');
+        }
         if (process.env.TABLE_ART_PREVIEW && width === 1920) await page.screenshot({ path: process.env.TABLE_ART_PREVIEW });
         continue;
       }
@@ -44,5 +58,5 @@ try {
   await page.evaluate(() => { document.body.dataset.tableTheme = 'feltro'; });
   await page.waitForFunction(() => document.querySelector('#gameSection').style.backgroundSize === '');
   assert.equal(await page.locator('.table-preserved-art').count(), 0);
-  console.log('PASS: 3 image themes × 4 viewports; reduced cropping, bounded compression, full coverage, reset on gradient theme.');
+  console.log('PASS: 3 image themes × 5 viewports; Resident uses cover on tall/tablet screens without blurred bands; reset on gradient theme.');
 } finally { await browser.close(); }
