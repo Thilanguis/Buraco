@@ -85,7 +85,7 @@ import {
   isValidBossSequence,
 } from './js/boss/boss-engine.js';
 import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } from './js/boss/boss-registry.js';
-import { buildBossActionPresentation, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
+import { buildBossActionPresentation, buildBossAbilityHelp, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
 import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
 import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
 import {
@@ -6491,6 +6491,65 @@ function positionBossDialogueOverlay(hud) {
   hud.style.setProperty('--boss-dialogue-width', `${Math.round(width)}px`);
 }
 
+
+function closeBossIntentHelp() {
+  const button = document.getElementById('bossIntentHelpButton');
+  const popover = document.getElementById('bossIntentHelpPopover');
+  if (!button || !popover) return;
+  popover.hidden = true;
+  popover.setAttribute('aria-hidden', 'true');
+  button.setAttribute('aria-expanded', 'false');
+}
+
+function syncBossIntentHelp(gameState) {
+  const button = document.getElementById('bossIntentHelpButton');
+  const popover = document.getElementById('bossIntentHelpPopover');
+  const title = document.getElementById('bossIntentHelpTitle');
+  const text = document.getElementById('bossIntentHelpText');
+  const close = document.getElementById('bossIntentHelpClose');
+  if (!button || !popover || !title || !text || !close) return;
+
+  const help = buildBossAbilityHelp(gameState);
+  button.hidden = !help;
+  if (!help) {
+    closeBossIntentHelp();
+    title.textContent = 'Ajuda da habilidade';
+    text.textContent = '';
+    return;
+  }
+
+  title.textContent = help.title;
+  text.textContent = help.text;
+
+  if (button.dataset.helpBound === '1') return;
+  button.dataset.helpBound = '1';
+
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const opening = popover.hidden;
+    popover.hidden = !opening;
+    popover.setAttribute('aria-hidden', opening ? 'false' : 'true');
+    button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  });
+
+  close.addEventListener('click', (event) => {
+    event.stopPropagation();
+    closeBossIntentHelp();
+    button.focus({ preventScroll: true });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (popover.hidden) return;
+    if (popover.contains(event.target) || button.contains(event.target)) return;
+    closeBossIntentHelp();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !popover.hidden) closeBossIntentHelp();
+  });
+}
+
+
 function renderBossHud() {
   const hud = document.getElementById('bossHud');
   const resultSection = document.getElementById('bossResultSection');
@@ -6652,6 +6711,7 @@ function renderBossHud() {
   renderBossVaultSlot(document.getElementById('bossLocalVaultSlot'), state.players[myPlayerIndex], true);
 
   const actionPresentation = buildBossActionPresentation(state);
+  syncBossIntentHelp(state);
   document.getElementById('bossActionType').textContent = actionPresentation.category.toUpperCase();
   document.getElementById('bossIntentName').textContent = actionPresentation.name;
 

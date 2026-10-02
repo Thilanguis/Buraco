@@ -230,7 +230,7 @@ function royalBloomProgress(gameState, intent) {
   if (!threats.length) return 'Objetivos sendo preparados';
   const completed = threats.filter((threat) => threat.status === 'success').length;
   const lines = threats.map((threat) => {
-    const marker = threat.status === 'success' ? '☑' : threat.status === 'failed' ? '✕' : threat.status === 'cancelled' ? '—' : '☐';
+    const marker = threat.status === 'success' ? '✅' : threat.status === 'failed' ? '✕' : threat.status === 'cancelled' ? '—' : '☐';
     const result = threat.status === 'success' ? ' · concluído' : threat.status === 'failed' ? ` · falhou${threat.bloomApplied ? ` (+${threat.bloomApplied} Flor)` : ''}` : threat.status === 'cancelled' ? ' · cancelado sem efeito' : '';
     return `${marker} ${royalBloomObjectiveLabel(gameState, threat)}${result}`;
   });
@@ -248,7 +248,7 @@ function dimitrescuMultiObjectiveProgress(gameState, objectives = []) {
   if (!objectives.length) return 'Objetivos sendo preparados';
   const done = objectives.filter((objective) => objective.status === 'success').length;
   const lines = objectives.map((objective) => {
-    const marker = objective.status === 'success' ? '☑' : objective.status === 'failed' ? '✕' : '☐';
+    const marker = objective.status === 'success' ? '✅' : objective.status === 'failed' ? '✕' : '☐';
     const suffix = objective.status === 'success' ? ' · concluído' : objective.status === 'failed' ? ' · falhou' : '';
     return `${marker} ${dimitrescuDaughterObjectiveLabel(gameState, objective)}${suffix}`;
   });
@@ -260,7 +260,7 @@ function crimsonBrandProgress(gameState, intent) {
   if (!marks.length) return 'Marcas sendo preparadas';
   const done = marks.filter((mark) => mark.status === 'success').length;
   const lines = marks.map((mark) => {
-    const marker = mark.status === 'success' ? '☑' : mark.status === 'failed' ? '✕' : '☐';
+    const marker = mark.status === 'success' ? '✅' : mark.status === 'failed' ? '✕' : '☐';
     const result = mark.status === 'success' ? ' · removida' : mark.status === 'failed' ? ' · sangrou' : '';
     return `${marker} ${playerName(gameState, mark.playerId)}: ${cardLabelAnywhere(gameState, mark.cardId)}${result}`;
   });
@@ -309,13 +309,13 @@ function compactNatureProgress(gameState, intent) {
     const cards = Number.isFinite(Number(threat?.observedHandSize)) ? Number(threat.observedHandSize) : player?.hand?.length || 0;
     const reductionNeeded = Math.max(0, cards - 7);
     const targetName = player?.name || playerName(gameState, intent.payload?.targetPlayerId) || 'Jogador';
-    if (threat?.status === 'success') return `☑ ${targetName} — terminou com ${cards} carta${cards === 1 ? '' : 's'} · meta cumprida`;
+    if (threat?.status === 'success') return `✅ ${targetName} — terminou com ${cards} carta${cards === 1 ? '' : 's'} · meta cumprida`;
     if (threat?.status === 'failed') {
       const result = [threat.bloomApplied ? `+${threat.bloomApplied} Flor` : '', threat.healApplied ? `cura ${threat.healApplied} HP` : ''].filter(Boolean).join(' · ');
       return `✕ ${targetName} — terminou com ${cards} cartas${result ? ` · ${result}` : ''}`;
     }
     if (threat?.status === 'cancelled') return `— ${targetName} — Colheita cancelada`;
-    if (cards <= 7) return `☑ ${targetName}: ${cards} cartas`;
+    if (cards <= 7) return `✅ ${targetName}: ${cards} cartas`;
     return `☐ ${targetName}: ${cards} cartas · tire ${reductionNeeded}`;
   }
   if (intent.abilityId === 'restorative_dew') {
@@ -420,7 +420,7 @@ function maintenanceFeeProgress(gameState, intent) {
     if (resolved) {
       return [resolved.dangerDelta
         ? `✕ ${playerName(gameState, player.id)}: +${resolved.dangerDelta} Dívida`
-        : `☑ ${playerName(gameState, player.id)}: quitada`];
+        : `✅ ${playerName(gameState, player.id)}: quitada`];
     }
 
     return [`☐ ${playerName(gameState, player.id)}: aguardando`];
@@ -747,7 +747,7 @@ function matriarchDetails(gameState, intent) {
 
 
 function neheleniaObjectiveMarker(status = 'active') {
-  return status === 'success' ? '☑' : status === 'failed' ? '✕' : status === 'cancelled' ? '—' : '☐';
+  return status === 'success' ? '✅' : status === 'failed' ? '✕' : status === 'cancelled' ? '—' : '☐';
 }
 
 function neheleniaDreamMirrorSummary(gameState) {
@@ -764,7 +764,7 @@ function neheleniaMirrorProgress(gameState, intent) {
   const payload = intent?.payload || {};
   if (intent.abilityId === 'mirrored_meld') {
     const target = playerName(gameState, payload.targetPlayerId);
-    if (payload.fed) return `☑ ${target}: verdadeiro`;
+    if (payload.fed) return `✅ ${target}: verdadeiro`;
     if (payload.failed) return `✕ ${target}: reflexo falso`;
     return `☐ ${target}: escolha I ou II`;
   }
@@ -779,27 +779,27 @@ function neheleniaMirrorProgress(gameState, intent) {
       : `1º ${firstName}: ${first} carta${first === 1 ? '' : 's'}\n2º ${secondName}: aguarda`;
   }
   if (intent.abilityId === 'mirror_prison') {
-    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.rescuerPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
+    return `${payload.fed ? '✅' : '☐'} ${playerName(gameState, payload.rescuerPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
   }
   if (intent.abilityId === 'tiger_link') {
     const fed = new Set(payload.fedMeldIds || []);
-    return (payload.targets || []).map((target) => `${fed.has(target.meldId) ? '☑' : '☐'} Jogo ${Number(target.meldIndex) + 1}`).join(' · ');
+    return (payload.targets || []).map((target) => `${fed.has(target.meldId) ? '✅' : '☐'} Jogo ${Number(target.meldIndex) + 1}`).join(' · ');
   }
   if (intent.abilityId === 'tiger_prey') {
-    return `${payload.fed ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
+    return `${payload.fed ? '✅' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
   }
   if (intent.abilityId === 'hawk_suit') {
-    return `${payload.discardedCorrectSuit ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: ${payload.suitLabel || payload.suit}`;
+    return `${payload.discardedCorrectSuit ? '✅' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: ${payload.suitLabel || payload.suit}`;
   }
   if (intent.abilityId === 'hawk_watch') {
     return `👁 ${playerName(gameState, payload.targetPlayerId)}: Jogo ${Number(payload.meldIndex) + 1}`;
   }
   if (intent.abilityId === 'fish_marked_card') {
     const done = payload.used || payload.discarded;
-    return `${done ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: ${cardLabelAnywhere(gameState, payload.cardId)}`;
+    return `${done ? '✅' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: ${cardLabelAnywhere(gameState, payload.cardId)}`;
   }
   if (intent.abilityId === 'fish_inverted') {
-    return `${payload.fedExisting ? '☑' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: jogo existente`;
+    return `${payload.fedExisting ? '✅' : '☐'} ${playerName(gameState, payload.targetPlayerId)}: jogo existente`;
   }
   return neheleniaDreamMirrorSummary(gameState);
 }
@@ -967,6 +967,156 @@ function buildBossRangeMeters(gameState, intent) {
 
   return [];
 }
+
+
+const BOSS_HELP_ABILITY_IDS = new Set([
+  // Banqueiro
+  'fixed_interest',
+  'maintenance_fee',
+  'compound_interest',
+  'credit_limit',
+
+  // Dominadora
+  'possession',
+  'hands_tied',
+  'separation',
+  'break_will',
+  'final_order',
+  'interdict',
+
+  // Dimitrescu
+  'blood_tithe',
+  'crimson_brand',
+  'cassandra_dead_feast',
+  'crimson_clot',
+  'three_daughters',
+
+  // Matriarca
+  'hungry_root',
+  'restorative_dew',
+  'graft',
+  'discard_pollen',
+  'harvest',
+  'royal_bloom',
+  'emerald_cocoon',
+  'spring_crown',
+
+  // Nehelenia / capangas
+  'false_image',
+  'mirrored_meld',
+  'follow_reflection',
+  'dream_theft',
+  'discard_mirror',
+  'shattered_mirror',
+  'mirror_prison',
+  'eternal_nightmare',
+  'tiger_link',
+  'tiger_prey',
+  'hawk_suit',
+  'hawk_watch',
+  'fish_marked_card',
+  'fish_inverted',
+]);
+
+function bossAbilityHelpSupplement(gameState, intent) {
+  const payload = intent?.payload || {};
+  const target = playerName(gameState, payload.targetPlayerId);
+
+  switch (intent?.abilityId) {
+    case 'fixed_interest':
+      return 'Cofre = uma carta aleatória fica apreendida. Resgatá-la substitui uma compra normal; se o resgate for adiado, o preço sobe a cada turno até chegar ao limite e virar obrigatório.';
+    case 'maintenance_fee':
+      return 'FINANCIADA = carta extra comprada pela Tarifa. Cada carta financiada precisa entrar legalmente em algum jogo naquele turno; descartá-la ou terminar o turno ainda com ela cobra Dívida.';
+    case 'credit_limit':
+      return 'A franquia é compartilhada pela equipe. Só as cartas usadas em jogos acima da franquia geram Dívida, até o teto mostrado na habilidade.';
+    case 'possession':
+      return 'Enquanto o jogo estiver possuído, o dano dele fica suspenso. A Posse termina quando cada cooperador adiciona ao menos 1 carta ou quando o jogo evolui de categoria; então o dano suspenso volta a valer.';
+    case 'hands_tied':
+      return 'O limite é da equipe inteira, não de cada jogador: depois que qualquer cooperador criar 1 jogo novo, os dois só podem alimentar jogos existentes até a rodada acabar.';
+    case 'separation':
+      return 'Nesta rodada, depois que um jogador alimentar um jogo, o parceiro não pode alimentar esse mesmo jogo. Cada jogo fica, na prática, separado entre os cooperadores durante a rodada.';
+    case 'break_will':
+      return 'A escolha acontece para um jogador que já esteja sob pressão de Chicotes: ele decide entre receber outro Chicote ou pagar a alternativa envolvendo uma canastra.';
+    case 'interdict':
+      return 'Interdito só reage quando o jogo marcado tenta subir de categoria, por exemplo Limpa → Real. Apenas adicionar cartas sem mudar a categoria não ativa a escolha.';
+    case 'blood_tithe':
+      return 'A cobrança é calculada separadamente para cada mão no fim da rodada. Uma mão pequena não compensa a mão grande do parceiro.';
+    case 'crimson_brand':
+      return 'Cada carta marcada é avaliada separadamente. Usá-la legalmente em jogo reduz a Sede; deixar a marca sobreviver até o fim da rodada aumenta a Sede.';
+    case 'cassandra_dead_feast':
+      return 'A maldição fica presa ao próximo Morto. Ela só resolve quando esse Morto for tomado; uma Canastra Real ou Ás-a-Ás reduz a Sede da profanação e anula a cura.';
+    case 'crimson_clot':
+      return 'O Coágulo absorve dano antes da Lady. Romper toda a proteção reduz a Sede; se sobrar proteção no fim da rodada, metade do restante vira cura.';
+    case 'three_daughters':
+      return 'Bela, Cassandra e Daniela têm objetivos independentes no mesmo turno. Cumprir um não cancela os outros: cada sucesso e cada falha são cobrados separadamente.';
+    case 'hungry_root':
+      return 'Se a Raiz não for alimentada, ela pode gerar uma única nova Raiz na rodada seguinte. Uma Raiz que nasceu dessa propagação não se propaga de novo.';
+    case 'restorative_dew':
+      return 'A cura da Matriarca é recalculada por faixas conforme novas cartas entram legalmente na mesa. Quanto mais cartas a equipe baixar, menor a cura; com 6 cartas ela zera.';
+    case 'graft':
+      return 'Os dois jogos ligados são objetivos separados: cada um precisa receber pelo menos 1 carta legal nesta rodada.';
+    case 'discard_pollen':
+      return 'A carta contaminada é o topo específico do Lixo. Se ela for recolhida enquanto ainda estiver contaminada, a Matriarca ganha Flor e cura.';
+    case 'harvest':
+      return `A Colheita olha a quantidade de cartas na mão de ${target} somente no fim do turno desse jogador. A barra mostra em qual faixa ele terminaria se o turno acabasse agora.`;
+    case 'royal_bloom':
+      return 'Cada objetivo natural é resolvido separadamente. Uma falha não apaga os objetivos já cumpridos e cada falha acrescenta sua própria Flor.';
+    case 'emerald_cocoon':
+      return 'Enquanto o Casulo estiver ativo, o dano comum vai primeiro para a proteção. Uma Canastra Limpa ou superior rompe o Casulo de uma vez.';
+    case 'spring_crown':
+      return 'A Coroa escolhe uma ameaça natural específica. Só a falha daquela ameaça prepara a Raiz Fortalecida; a raiz criada pela Coroa não inicia outra propagação comum.';
+    case 'mirrored_meld':
+      return `${target} precisa usar exatamente 1 carta legal que encaixe no jogo refletido e escolher qual reflexo é o verdadeiro. Errar manda a carta ao fundo do monte e deixa o jogador Desorientado: depois disso, ele só pode descartar para encerrar o turno.`;
+    case 'follow_reflection': {
+      const first = playerName(gameState, payload.firstPlayerId);
+      const second = playerName(gameState, payload.secondPlayerId);
+      return `${first} é o 1º jogador da rodada e define o padrão pela quantidade TOTAL de cartas baixadas no turno inteiro. ${second} pode jogar onde quiser, mas precisa terminar o próprio turno com exatamente a mesma quantidade. Zero também conta.`;
+    }
+    case 'discard_mirror':
+      return 'Os dois reflexos do topo do Lixo são idênticos e não existe pista: é 50/50. Errar sela o Lixo para a rodada.';
+    case 'mirror_prison':
+      return 'A Prisão só existe se Nehelenia já tiver roubado um Espelho dos Sonhos. O parceiro indicado precisa alimentar o jogo refletido para devolver 1 Espelho ao jogador preso.';
+    case 'eternal_nightmare':
+      return 'A carta original é mostrada antes do embaralhamento. Depois surgem dois reflexos e os três se misturam; o alvo precisa acompanhar visualmente qual continua sendo a original.';
+    case 'tiger_link':
+      return 'Tiger liga dois jogos. Cada lado precisa receber ao menos 1 carta. Se apenas um lado for alimentado, as garras permanecem no lado faltante até ele receber uma carta em um turno futuro.';
+    case 'tiger_prey':
+      return `A Presa prende somente ${target}. Até esse jogador alimentar o jogo marcado, ele não pode alimentar outros jogos existentes. O parceiro continua livre, e a Presa atravessa rodadas até ser resolvida.`;
+    case 'hawk_suit':
+      return `Se ${target} descartar outro naipe, Hawk passa a vigiar exatamente essa carta. Enquanto ela continuar no topo, ninguém pode recolher o Lixo; um novo descarte tira essa carta do topo e encerra a vigilância.`;
+    case 'hawk_watch':
+      return `Vigilância vale somente para ${target}: o jogo marcado fica bloqueado para esse jogador durante o turno. O parceiro e os outros jogos continuam livres.`;
+    case 'fish_marked_card':
+      return 'Reflexo Morto = a carta marcada continua na mão, mas não pode mais entrar em jogo. Ela só é libertada quando for descartada.';
+    case 'fish_inverted':
+      return `Até ${target} alimentar um jogo já existente, esse jogador não pode abrir jogo novo. Se não resolver neste turno, a restrição continua nos próximos turnos.`;
+    case 'false_image':
+      return 'A carta real e o reflexo são visualmente iguais durante a escolha. O objetivo é identificar qual opção corresponde à carta verdadeira.';
+    case 'dream_theft':
+      return 'O alvo precisa reconhecer a própria carta real entre os reflexos. Errar permite que Nehelenia roube um Espelho dos Sonhos.';
+    case 'shattered_mirror':
+      return 'Aqui a lógica é invertida: entre os reflexos apresentados, o alvo precisa encontrar o único falso. Errar prende as cartas reais pelo próximo turno.';
+    default:
+      return '';
+  }
+}
+
+export function buildBossAbilityHelp(gameState) {
+  if (gameState?.boss?.pendingChoices?.length) return null;
+  const intent = gameState?.boss?.currentIntent;
+  if (!intent || !BOSS_HELP_ABILITY_IDS.has(intent.abilityId)) return null;
+
+  const official = String(intent.description || '').trim();
+  const supplement = String(bossAbilityHelpSupplement(gameState, intent) || '').trim();
+  const text = [official, supplement].filter(Boolean).join('\n\n');
+  if (!text) return null;
+
+  return {
+    title: intent.name || 'Ajuda da habilidade',
+    text,
+  };
+}
+
 
 function compactAction(gameState, intent) {
   const payload = intent.payload || {};
@@ -1648,7 +1798,7 @@ function dimitrescuStatusPresentation(gameState) {
     const progress = bands.map((entry) => {
       const cards = Number(entry.cards) || 0;
       const amount = Number(entry.amount) || 0;
-      const marker = amount > 0 ? '🩸' : '✓';
+      const marker = amount > 0 ? '🩸' : '✅';
       return `${marker} ${playerName(gameState, entry.playerId)} — ${cards} carta${cards === 1 ? '' : 's'} → ${amount > 0 ? `+${amount} Sede` : 'sem tributo'}`;
     }).join('\n');
 
@@ -2020,7 +2170,7 @@ export function buildBossActionPresentation(gameState) {
     const finalOrderMarks = (gameState.boss?.effects || []).filter((effect) => effect.id === 'final_order_mark');
     if (finalOrderMarks.length) {
       const meldCardIds = new Set((gameState.teams || []).flatMap((team) => (team.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean))));
-      const lines = finalOrderMarks.map((effect) => `${meldCardIds.has(effect.cardId) ? '☑' : '☐'} ${playerName(gameState, effect.playerId)} — ${cardLabelAnywhere(gameState, effect.cardId)}${meldCardIds.has(effect.cardId) ? ' · usada em jogo' : ' · use em jogo'}`);
+      const lines = finalOrderMarks.map((effect) => `${meldCardIds.has(effect.cardId) ? '✅' : '☐'} ${playerName(gameState, effect.playerId)} — ${cardLabelAnywhere(gameState, effect.cardId)}${meldCardIds.has(effect.cardId) ? ' · usada em jogo' : ' · use em jogo'}`);
       return {
         category: 'Ordem aceita em vigor',
         name: 'Ordem Final',
