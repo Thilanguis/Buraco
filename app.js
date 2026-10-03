@@ -500,6 +500,8 @@ function schedulePendingBossResultFinish() {
   });
 }
 let bossPresentationKey = '';
+let bossArtSpotlightKey = '';
+let bossArtSpotlightTimer = null;
 let bossDamageReactionTimer = null;
 let dimitrescuPhasePortraitTimer = null;
 const locallyAnimatedBossVaultSoundEventIds = new Set();
@@ -688,6 +690,12 @@ function cancelGameAnimations() {
     document.querySelector('#bossHud .boss-portrait')?.classList.remove('boss-dimitrescu-phase-shift');
   }
   bossPresentationKey = '';
+  bossArtSpotlightKey = '';
+  if (bossArtSpotlightTimer) {
+    clearTimeout(bossArtSpotlightTimer);
+    bossArtSpotlightTimer = null;
+  }
+  document.getElementById('bossArtSpotlight')?.remove();
   const gameSection = document.getElementById('gameSection');
   (document.getAnimations?.() || []).forEach((animation) => {
     const target = animation.effect?.target;
@@ -5369,6 +5377,125 @@ function renderBossAbilityGuide(definition, boss) {
   root.appendChild(grid);
 }
 
+
+function bossArtSpotlightModel(definition, boss) {
+  const flow = boss?.bossFlow;
+  if (!definition || !boss || !flow || !['ability', 'phase'].includes(flow.stage)) return null;
+
+  const phase = Math.max(1, Number(boss.phase) || 1);
+  const bossPortrait = definition.phasePortraits?.[phase] || definition.portrait || '';
+  if (flow.stage === 'phase') {
+    return {
+      key: `${flow.id}:phase:${phase}`,
+      kicker: `FASE ${phase}`,
+      title: definition.name || 'Chefe da Mesa',
+      subtitle: getBossPhaseName(state),
+      artworks: bossPortrait ? [{ id: definition.id, name: definition.name || 'Chefe da Mesa', portrait: bossPortrait }] : [],
+    };
+  }
+
+  const intent = boss.currentIntent;
+  if (!intent?.abilityId) return null;
+  const ability = (definition.abilities || []).find((entry) => entry.id === intent.abilityId);
+  const roster = definition.daughters || definition.attendants || null;
+  const abilityRoster = definition.abilityDaughters || definition.abilityAttendants || null;
+  const memberIds = Array.isArray(abilityRoster?.[intent.abilityId]) ? abilityRoster[intent.abilityId] : [];
+  const artworks = memberIds
+    .map((id) => roster?.[id])
+    .filter((member) => member?.portrait)
+    .map((member) => ({ id: member.id, name: member.name, portrait: member.portrait }));
+
+  if (!artworks.length && bossPortrait) {
+    artworks.push({ id: definition.id, name: definition.name || 'Chefe da Mesa', portrait: bossPortrait });
+  }
+
+  const usesRosterArt = memberIds.length > 0 && artworks.length > 0;
+
+  return {
+    key: `${flow.id}:ability:${intent.id || intent.abilityId}`,
+    kicker: usesRosterArt ? '' : 'HABILIDADE DO CHEFE',
+    title: usesRosterArt && artworks.length === 1 ? artworks[0].name : (definition.name || 'Chefe da Mesa'),
+    subtitle: ability?.name || intent.abilityId,
+    artworks,
+    layout: usesRosterArt ? 'roster' : 'boss',
+  };
+}
+
+function showBossArtSpotlight(model) {
+  if (!model?.artworks?.length) return;
+  document.getElementById('bossArtSpotlight')?.remove();
+  if (bossArtSpotlightTimer) clearTimeout(bossArtSpotlightTimer);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bossArtSpotlight';
+  overlay.className = 'boss-art-spotlight';
+  overlay.dataset.count = String(Math.min(3, model.artworks.length));
+  overlay.dataset.layout = model.layout || 'boss';
+  overlay.setAttribute('aria-hidden', 'true');
+
+  const backdrop = document.createElement('span');
+  backdrop.className = 'boss-art-spotlight-backdrop';
+
+  const stage = document.createElement('div');
+  stage.className = 'boss-art-spotlight-stage';
+
+  const gallery = document.createElement('div');
+  gallery.className = 'boss-art-spotlight-gallery';
+
+  model.artworks.slice(0, 3).forEach((artwork) => {
+    const frame = document.createElement('figure');
+    frame.className = 'boss-art-spotlight-frame';
+    frame.dataset.artId = artwork.id || '';
+
+    const glow = document.createElement('span');
+    glow.className = 'boss-art-spotlight-blur';
+    glow.style.backgroundImage = `url("${artwork.portrait}")`;
+
+    const image = document.createElement('img');
+    image.src = artwork.portrait;
+    image.alt = '';
+    image.decoding = 'async';
+    image.addEventListener('error', () => frame.classList.add('is-missing-art'), { once: true });
+
+    const caption = document.createElement('figcaption');
+    caption.textContent = artwork.name || model.title;
+    frame.append(glow, image, caption);
+    gallery.appendChild(frame);
+  });
+
+  const copy = document.createElement('div');
+  copy.className = 'boss-art-spotlight-copy';
+  const title = document.createElement('strong');
+  title.textContent = model.title;
+  const subtitle = document.createElement('b');
+  subtitle.textContent = model.subtitle || '';
+  if (model.kicker) {
+    const kicker = document.createElement('span');
+    kicker.textContent = model.kicker;
+    copy.appendChild(kicker);
+  }
+  copy.append(title, subtitle);
+
+  stage.append(gallery, copy);
+  overlay.append(backdrop, stage);
+  document.body.appendChild(overlay);
+
+  requestAnimationFrame(() => overlay.classList.add('is-visible'));
+  bossArtSpotlightTimer = setTimeout(() => {
+    bossArtSpotlightTimer = null;
+    overlay.classList.add('is-leaving');
+    setTimeout(() => overlay.remove(), 260);
+  }, 1450);
+}
+
+function syncBossArtSpotlight(definition, boss) {
+  const model = bossArtSpotlightModel(definition, boss);
+  if (!model) return;
+  if (model.key === bossArtSpotlightKey) return;
+  bossArtSpotlightKey = model.key;
+  showBossArtSpotlight(model);
+}
+
 function renderBossDaughterStrip(definition, boss) {
   const strip = document.getElementById('bossDaughterStrip');
   if (!strip) return;
@@ -6716,6 +6843,7 @@ function renderBossHud() {
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
   setBossPortrait(document.getElementById('bossPortraitImage'), definition, boss);
   renderBossDaughterStrip(definition, boss);
+  syncBossArtSpotlight(definition, boss);
   renderBossAbilityGuide(definition, boss);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
   const legacyPhaseRule = document.getElementById('bossPhaseRule');

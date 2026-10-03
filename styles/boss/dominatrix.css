@@ -103,4 +103,4 @@ body[data-boss-id='dominadora'] .boss-ability-overview {
     display: none;
     animation: none !important;
   }
-}
+}\n\n/* HUD panorâmico 8:3 — preserva a respiração sutil sem recortar a nova arte. */\n@media (min-width: 1101px) {\n  body.boss-mode[data-boss-id='dominadora'] .boss-portrait img {\n    --dominatrix-portrait-scale: 1;\n    object-position: 50% 50%;\n    transform-origin: 50% 50%;\n  }\n}\n

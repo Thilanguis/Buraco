@@ -314,3 +314,14 @@ body[data-boss-id='dimitrescu'] .boss-portrait.boss-dimitrescu-phase-shift img {
     animation: none !important;
   }
 }
+
+/* Arte principal panorâmica do novo HUD. As novas imagens serão produzidas
+   em 8:3; removemos o zoom legado somente no desktop/layout novo. */
+@media (min-width: 1101px) {
+  body.boss-mode[data-boss-id='dimitrescu'] .boss-portrait img {
+    object-position: 50% 50%;
+    transform: none;
+    transform-origin: 50% 50%;
+  }
+}
+\n\n/* Ajuste cromático do chip de fase no HUD panorâmico da Dimitrescu. */\n@media (min-width: 1101px) {\n  body.boss-mode[data-boss-id='dimitrescu'] #bossPhase {\n    background: rgba(19, 4, 8, 0.72);\n  }\n}\n

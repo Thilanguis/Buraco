@@ -300,4 +300,4 @@ body[data-boss-id='matriarca_esmeralda'] .boss-portrait .boss-rebirth-ring {
 }
 body[data-boss-id='matriarca_esmeralda'] .boss-portrait.boss-rebirth-burst {
   filter: grayscale(0) saturate(1) brightness(1);
-}
+}\n\n/* HUD panorâmico 8:3 — preserva os efeitos da Matriarca sem o zoom legado. */\n@media (min-width: 1101px) {\n  body.boss-mode[data-boss-id='matriarca_esmeralda'] .boss-portrait img {\n    --matriarch-portrait-scale: 1;\n    object-position: 50% 50%;\n    transform-origin: 50% 50%;\n  }\n}\n

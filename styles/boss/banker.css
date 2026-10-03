@@ -83,4 +83,4 @@ body[data-boss-id='banker'] .boss-portrait::after {
     animation: none !important;
     transform: translate3d(0, 0, 0) scale(var(--banker-portrait-scale));
   }
-}
+}\n\n/* HUD panorâmico 8:3 — arte principal produzida já no enquadramento final. */\n@media (min-width: 1101px) {\n  body.boss-mode[data-boss-id='banker'] .boss-portrait img {\n    --banker-portrait-scale: 1;\n    object-position: 50% 50%;\n    transform: translate3d(0, 0, 0) scale(1);\n    transform-origin: 50% 50%;\n  }\n}\n

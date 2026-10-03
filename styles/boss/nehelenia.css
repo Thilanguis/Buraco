@@ -800,4 +800,4 @@ body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-hawk-discard.boss-
   font-size: 7px;
   font-weight: 1000;
   letter-spacing: 0.35px;
-}
+}\n\n/* HUD panorâmico 8:3 — usa a nova arte no enquadramento final. */\n@media (min-width: 1101px) {\n  body.boss-mode[data-boss-id='nehelenia'] .boss-portrait img {\n    object-position: 50% 50%;\n    transform: none;\n    transform-origin: 50% 50%;\n  }\n}\n
