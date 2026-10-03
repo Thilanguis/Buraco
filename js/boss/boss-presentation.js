@@ -297,7 +297,7 @@ export function buildBossActionPresentation(gameState) {
   return {
     category: flow?.stage === 'ability' ? `Turno d${feminineBoss ? 'a' : 'o'} ${definition?.name?.replace(/^(A|O) /, '') || 'Chefe'}` : getBossActionCategory(gameState.boss.id, intent.abilityId),
     name: intent.name,
-    speech: getBossPresentationSpeech(gameState.boss.id, intent.abilityId, { intent, collarCards }) || intent.name,
+    speech: getBossPresentationSpeech(gameState.boss.id, intent.abilityId, { gameState, intent, collarCards, helpers: { playerName } }) || intent.name,
     description: intent.description || '',
     details,
     instruction: compact.instruction,

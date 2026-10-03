@@ -1,15 +1,25 @@
 const SPEECHES = Object.freeze({
-  living_seed: 'Uma semente basta para tomar toda a sua mao.',
-  hungry_root: 'Alimentem as raizes, ou elas alimentarao a mim.',
-  restorative_dew: 'Cada hesitacao devolve vida ao meu jardim.',
-  twin_vines: 'Duas raizes. Voces nao poderao ignorar ambas.',
-  graft: 'Agora os seus jogos crescem ligados a minha vontade.',
-  discard_pollen: 'Ate o lixo carrega a minha primavera.',
-  harvest: 'Quero ver quanto peso suas maos conseguem sustentar.',
-  royal_bloom: 'Todo o jardim exige obediencia ao mesmo tempo.',
-  emerald_cocoon: 'Antes de me ferirem, terao de romper o casulo.',
-  spring_crown: 'Uma unica ameaca carregara o peso da minha coroa.',
+  living_seed: 'Eu só preciso de uma semente. O resto da mão fará o trabalho.',
+  hungry_root: 'Minhas raízes não pedem muito. Só o bastante para continuarem vivas.',
+  restorative_dew: 'Cada instante desperdiçado volta para mim em forma de vida.',
+  twin_vines: 'Uma raiz distrai. Duas ensinam respeito.',
+  graft: 'Agora seus jogos dividem o mesmo caule. Tentem cortar um sem ferir o outro.',
+  discard_pollen: 'Até aquilo que vocês jogam fora floresce para mim.',
+  harvest: 'Mãos pesadas fazem colheitas generosas.',
+  royal_bloom: 'O jardim inteiro despertou. Quero ver qual flor vocês deixam morrer.',
+  emerald_cocoon: 'Antes de tocar em mim, terão de atravessar o que eu cultivei.',
+  spring_crown: 'Uma ameaça será coroada. Escolham com cuidado o que deixam crescer.',
 });
+
+function dialogueTarget(context = {}) {
+  const gameState = context.gameState;
+  const targetPlayerId = context.intent?.payload?.targetPlayerId;
+  if (targetPlayerId == null) return '';
+  return context.helpers?.playerName?.(gameState, targetPlayerId)
+    || gameState?.players?.find((player) => player.id === targetPlayerId)?.name
+    || '';
+}
+
 
 const RESULT_CATEGORIES = Object.freeze({
   living_seed: 'Objetivo resolvido',
@@ -216,7 +226,11 @@ export const matriarchBossPresentation = Object.freeze({
     const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 5));
     return `${limit} Flores = derrota · Fase 3: 1 Renascimento com 300 HP ao consumir 1 Flor.`;
   },
-  speech(abilityId) { return SPEECHES[abilityId] || ''; },
+  speech(abilityId, context = {}) {
+    const target = dialogueTarget(context);
+    if (abilityId === 'living_seed' && target) return `Eu só preciso de uma semente, ${target}. O resto da sua mão fará o trabalho.`;
+    return SPEECHES[abilityId] || '';
+  },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },
   finalDanger(gameState) {

@@ -1,12 +1,12 @@
 const SPEECHES = Object.freeze({
-  fixed_interest: 'O prazo acabou. Agora paguem os juros.',
-  maintenance_fee: 'Nada e gratis na minha mesa.',
-  credit_block: 'Credito negado. O lixo ficou fora do alcance.',
-  suit_audit: 'Vamos conferir cada carta dessa conta.',
-  pledge: 'Este jogo agora esta sob penhora.',
-  compound_interest: 'Quanto mais cartas, maior sera a divida.',
-  credit_limit: 'O credito continua aberto. O excesso e que tem preco.',
-  discard_surcharge: 'O lixo tambem tem cotacao nesta mesa.',
+  fixed_interest: 'A conta venceu. Eu adoro quando os números começam a falar mais alto que vocês.',
+  maintenance_fee: 'Considerem isto uma pequena taxa por continuarem sentados à minha mesa.',
+  credit_block: 'Hoje, o lixo não aceita o crédito de vocês.',
+  suit_audit: 'Vamos ver se essa mão fecha com os meus livros.',
+  pledge: 'Esse jogo parece valioso. Vou mantê-lo como garantia.',
+  compound_interest: 'Guardem cartas à vontade. Juros adoram espaço para crescer.',
+  credit_limit: 'Crédito continua disponível. Bom senso, aparentemente, não.',
+  discard_surcharge: 'Até o descarte tem tarifa. Vocês realmente achavam que algo aqui era grátis?',
 });
 
 const RESULT_CATEGORIES = Object.freeze({

@@ -726,7 +726,9 @@
   font-size: 10px;
   line-height: 1.25;
 }
-.boss-dialogue-presentation b:empty {
+.boss-dialogue-presentation b:empty,
+.boss-dialogue-presentation strong:empty,
+.boss-dialogue-presentation small:empty {
   display: none;
 }
 .boss-dialogue-presentation small {

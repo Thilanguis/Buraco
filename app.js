@@ -6806,14 +6806,15 @@ function renderBossHud() {
   renderBossDetailFields(document.getElementById('bossActionDetails'), actionPresentation.details);
 
   const dialoguePanel = document.getElementById('bossDialoguePresentation');
-  const dialogueVisible = ['ability', 'phase', 'taunt'].includes(flow?.stage) && !hasPendingBossChoices(state);
+  const dialogueVisible = ['ability', 'taunt'].includes(flow?.stage) && !hasPendingBossChoices(state) && Boolean(actionPresentation.speech);
   dialoguePanel.style.display = dialogueVisible ? 'grid' : 'none';
   if (dialogueVisible) {
-    const objective = [actionPresentation.instruction !== actionPresentation.speech ? actionPresentation.instruction : '', actionPresentation.consequence].filter(Boolean).join(' · ') || `A Fase ${boss.phase} está ativa.`;
-    document.getElementById('bossDialogueType').textContent = flow.stage === 'ability' ? 'NOVA HABILIDADE' : 'O CHEFE DIZ';
-    document.getElementById('bossDialogueName').textContent = actionPresentation.name;
-    document.getElementById('bossDialogueSpeech').textContent = actionPresentation.speech ? `“${actionPresentation.speech}”` : '';
-    document.getElementById('bossDialogueConsequence').textContent = objective;
+    // O HUD da direita já explica regra, objetivo, progresso e consequência.
+    // Este balão existe só para dar voz/personagem ao chefe.
+    document.getElementById('bossDialogueType').textContent = (definition?.name || 'Chefe da Mesa').toUpperCase();
+    document.getElementById('bossDialogueName').textContent = '';
+    document.getElementById('bossDialogueSpeech').textContent = `“${actionPresentation.speech}”`;
+    document.getElementById('bossDialogueConsequence').textContent = '';
 
     // Posiciona já e confirma por mais dois frames: tablet/DevTools pode
     // recalcular fontes, quebras e escala depois do primeiro layout.

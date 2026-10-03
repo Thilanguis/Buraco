@@ -1,19 +1,29 @@
 const SPEECHES = Object.freeze({
-  false_image: 'Qual dessas imagens vocês ainda chamam de verdade?',
-  mirrored_meld: 'O jogo de vocês fica mais bonito dentro do meu espelho.',
-  follow_reflection: 'Repitam o reflexo. Se conseguirem lembrar qual veio primeiro.',
-  dream_theft: 'Um sonho tão frágil merece uma moldura melhor.',
-  discard_mirror: 'O lixo mostra exatamente o que vocês querem enxergar.',
-  shattered_mirror: 'Três fragmentos. Duas verdades. Uma mentira.',
-  mirror_prison: 'Um de vocês já está aqui dentro. Venham buscá-lo.',
-  eternal_nightmare: 'No meu pesadelo, a mentira sempre parece familiar.',
-  tiger_link: "Tiger's Eye: amarrem os jogos até eles rasgarem.",
-  tiger_prey: "Tiger's Eye já escolheu a presa. Não o façam esperar.",
-  hawk_suit: "Hawk's Eye viu até a carta que vocês pretendiam descartar.",
-  hawk_watch: "Hawk's Eye fechou os olhos de vocês para um caminho.",
-  fish_marked_card: 'Fish Eye quer ver quanto tempo vocês conseguem segurar essa carta.',
-  fish_inverted: 'Fish Eye prefere quando vocês começam pelo reflexo errado.',
+  false_image: 'A verdade é tão vulgar. Escolham algo mais bonito.',
+  mirrored_meld: 'Seu jogo fica muito mais interessante quando vocês já não sabem qual é o verdadeiro.',
+  follow_reflection: 'Um cria o reflexo. O outro prova que consegue imitá-lo.',
+  dream_theft: 'Esse sonho estava desperdiçado com vocês.',
+  discard_mirror: 'Até aquilo que vocês rejeitam ainda quer refletir minha beleza.',
+  shattered_mirror: 'Três fragmentos. Só um deles ainda se lembra do que era real.',
+  mirror_prison: 'Alguém ficou preso do lado bonito do espelho. Venham buscá-lo, se conseguirem.',
+  eternal_nightmare: 'No meu pesadelo, a mentira é sempre a coisa mais familiar.',
+  tiger_link: "Tiger's Eye já viu onde seus jogos se tocam. Agora eles vão sentir.",
+  tiger_prey: "Tiger's Eye não perde a mesma presa duas vezes.",
+  hawk_suit: "Hawk's Eye viu seu descarte antes mesmo de vocês decidirem.",
+  hawk_watch: "Hawk's Eye fechou uma das saídas. Eu adoraria ver vocês insistirem nela.",
+  fish_marked_card: 'Fish Eye escolheu uma carta. Vamos ver quanto tempo conseguem fingir que não perceberam.',
+  fish_inverted: 'Comecem pelo reflexo errado. Talvez, por acidente, encontrem o caminho certo.',
 });
+
+function dialogueTarget(context = {}) {
+  const gameState = context.gameState;
+  const targetPlayerId = context.intent?.payload?.targetPlayerId;
+  if (targetPlayerId == null) return '';
+  return context.helpers?.playerName?.(gameState, targetPlayerId)
+    || gameState?.players?.find((player) => player.id === targetPlayerId)?.name
+    || '';
+}
+
 
 const RESULT_CATEGORIES = Object.freeze({
   false_image: 'Ilusão resolvida',
@@ -109,7 +119,17 @@ export const neheleniaBossPresentation = Object.freeze({
     const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 5));
     return `${limit}/${limit} Espelhos = derrota · Limpa ou superior recupera 1 Espelho por novo tier.`;
   },
-  speech(abilityId) { return SPEECHES[abilityId] || ''; },
+  speech(abilityId, context = {}) {
+    const target = dialogueTarget(context);
+    if (abilityId === 'mirrored_meld' && target) return `${target}, seu jogo fica muito mais interessante quando você já não sabe qual é o verdadeiro.`;
+    if (abilityId === 'dream_theft' && target) return `${target}, esse sonho estava desperdiçado com você.`;
+    if (abilityId === 'tiger_prey' && target) return `${target}, Tiger's Eye não perde a mesma presa duas vezes.`;
+    if (abilityId === 'hawk_suit' && target) return `${target}, Hawk's Eye viu seu descarte antes mesmo de você decidir.`;
+    if (abilityId === 'hawk_watch' && target) return `${target}, Hawk's Eye fechou uma das saídas. Eu adoraria ver você insistir nela.`;
+    if (abilityId === 'fish_marked_card' && target) return `${target}, Fish Eye escolheu uma carta. Vamos ver quanto tempo você consegue fingir que não percebeu.`;
+    if (abilityId === 'fish_inverted' && target) return `${target}, comece pelo reflexo errado. Talvez, por acidente, encontre o caminho certo.`;
+    return SPEECHES[abilityId] || '';
+  },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },
   finalDanger(gameState) {

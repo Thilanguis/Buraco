@@ -1,15 +1,25 @@
 const SPEECHES = Object.freeze({
-  bela_hunt: 'Bela adora quando a presa tenta fugir.',
-  cassandra_feast: 'Cassandra escolheu onde vai servir o jantar.',
-  daniela_swarm: 'Daniela transformou o lixo em um enxame faminto.',
-  blood_tithe: 'Toda mão cheia me deve um tributo.',
-  red_wine: 'Um bom vinho melhora com sangue fresco.',
-  crimson_brand: 'Vou deixar a minha marca em cada uma de vocês.',
-  cassandra_dead_feast: 'Cassandra, prepare o banquete onde elas menos esperam.',
-  crimson_clot: 'Meu sangue sabe muito bem como fechar uma ferida.',
-  castle_lockdown: 'As portas estão trancadas. Ninguém sai para o lixo.',
-  three_daughters: 'Meninas, divirtam-se com nossos convidados.',
+  bela_hunt: 'Bela está entediada. Seja gentil e entretenha minha filha.',
+  cassandra_feast: 'Cassandra já escolheu onde servir o jantar. Não a façam esperar.',
+  daniela_swarm: 'Daniela encontrou algo no lixo. Ela sempre traz os brinquedos para dentro.',
+  blood_tithe: 'Uma casa cheia de convidados… e nenhum deles trouxe um presente para mim.',
+  red_wine: 'Ah… isso sim é uma safra digna da casa Dimitrescu.',
+  crimson_brand: 'Gosto de saber exatamente a quem cada gota pertence.',
+  cassandra_dead_feast: 'Cassandra, minha querida… guarde esse banquete para quando eles estiverem mais famintos.',
+  crimson_clot: 'Vocês realmente acharam que meu próprio sangue permitiria que eu caísse tão facilmente?',
+  castle_lockdown: 'As portas estão fechadas. Meus convidados só saem quando eu decidir.',
+  three_daughters: 'Meninas… nossos convidados começaram a ficar confortáveis demais.',
 });
+
+function dialogueTarget(context = {}) {
+  const gameState = context.gameState;
+  const targetPlayerId = context.intent?.payload?.targetPlayerId;
+  if (targetPlayerId == null) return '';
+  return context.helpers?.playerName?.(gameState, targetPlayerId)
+    || gameState?.players?.find((player) => player.id === targetPlayerId)?.name
+    || '';
+}
+
 
 const RESULT_CATEGORIES = Object.freeze({
   bela_hunt: 'Caçada resolvida',
@@ -43,7 +53,11 @@ export const dimitrescuBossPresentation = Object.freeze({
     const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 100));
     return `${limit} de Sede = derrota · Limpa/Real/Ás-a-Ás: −4/−8/−12 Sede.`;
   },
-  speech(abilityId) { return SPEECHES[abilityId] || ''; },
+  speech(abilityId, context = {}) {
+    const target = dialogueTarget(context);
+    if (abilityId === 'bela_hunt' && target) return `Bela está entediada. ${target}… seja gentil e entretenha minha filha.`;
+    return SPEECHES[abilityId] || '';
+  },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },
   finalDanger(gameState) {

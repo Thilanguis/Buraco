@@ -1,19 +1,29 @@
 const SPEECHES = Object.freeze({
-  collar: 'Duas das suas opcoes agora me pertencem.',
-  forced_choice: 'Escolha. Toda opcao cobra seu preco.',
-  exposure: 'Eu vejo exatamente onde sua mao e fraca.',
-  forced_swap: 'Seus planos ficariam melhores na mao errada.',
-  hands_tied: 'Tentem jogar com as maos atadas.',
-  possession: 'Este jogo responde a mim agora.',
-  favorite: 'Uma sera favorecida. A outra, castigada.',
-  double_collar: 'Duas coleiras. Nenhuma liberdade.',
-  separation: 'Cooperacao demais cria maus habitos.',
-  absolute_control: 'Neste turno, sua vontade e minha.',
-  break_will: 'Vamos descobrir quanto vale sua resistencia.',
-  final_order: 'Cada uma recebera exatamente o que merece.',
-  iron_etiquette: 'Ate o seu descarte obedecera a minha etiqueta.',
-  interdict: 'Este jogo evolui somente se eu permitir.',
+  collar: 'Suas escolhas ficaram menores. As minhas, não.',
+  forced_choice: 'Escolha. Quero ver qual arrependimento você prefere.',
+  exposure: 'Eu já vi exatamente onde você vai hesitar.',
+  forced_swap: 'Planos tão frágeis merecem donos melhores.',
+  hands_tied: 'Cooperação demais cria conforto. Vamos corrigir isso.',
+  possession: 'Esse jogo já não responde a vocês.',
+  favorite: 'Uma merece recompensa. A outra, disciplina.',
+  double_collar: 'Duas coleiras. Agora prestem atenção.',
+  separation: 'Vocês se escondem demais um atrás do outro. Acabou.',
+  absolute_control: 'Neste turno, sua vontade é apenas um detalhe.',
+  break_will: 'Vamos descobrir quanto de você sobra depois de uma ordem simples.',
+  final_order: 'Última ordem. Não me façam repeti-la.',
+  iron_etiquette: 'Até aquilo que vocês descartam deve saber se comportar.',
+  interdict: 'Esse jogo só cresce quando eu permitir.',
 });
+
+function dialogueTarget(context = {}) {
+  const gameState = context.gameState;
+  const targetPlayerId = context.intent?.payload?.targetPlayerId;
+  if (targetPlayerId == null) return '';
+  return context.helpers?.playerName?.(gameState, targetPlayerId)
+    || gameState?.players?.find((player) => player.id === targetPlayerId)?.name
+    || '';
+}
+
 
 const RESULT_CATEGORIES = Object.freeze({
   collar: 'Restricao encerrada',
@@ -53,8 +63,17 @@ export const dominatrixBossPresentation = Object.freeze({
   ruleSummary() {
     return '3 Chicotes = Sob Controle · 4 = Dominado · ambos em 4 = derrota.';
   },
-  speech(abilityId, { collarCards = [] } = {}) {
-    if (abilityId === 'collar' && collarCards.length === 1) return 'Uma das suas opcoes agora me pertence.';
+  speech(abilityId, context = {}) {
+    const target = dialogueTarget(context);
+    const collarCards = context.collarCards || [];
+    if (abilityId === 'collar') {
+      if (target && collarCards.length === 1) return `${target}, uma escolha a menos para você.`;
+      if (target) return `${target}, suas escolhas ficaram menores. As minhas, não.`;
+    }
+    if (abilityId === 'exposure' && target) return `${target}, eu já vi exatamente onde você vai hesitar.`;
+    if (abilityId === 'absolute_control' && target) return `${target}, neste turno sua vontade é apenas um detalhe.`;
+    if (abilityId === 'break_will' && target) return `${target}, vamos descobrir quanto de você sobra depois de uma ordem simples.`;
+    if (abilityId === 'iron_etiquette' && target) return `${target}, até aquilo que você descarta deve saber se comportar.`;
     return SPEECHES[abilityId] || '';
   },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
