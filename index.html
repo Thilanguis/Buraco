@@ -669,7 +669,17 @@
               <span class="boss-spring-crown" aria-hidden="true"></span>
               <div>
                 <span class="boss-hud-kicker">CHEFE DA MESA</span>
-                <strong id="bossName">O BANQUEIRO</strong>
+                <div class="boss-name-row">
+                  <strong id="bossName">O BANQUEIRO</strong>
+                  <button id="bossRuleHelpButton" class="boss-intent-help-button boss-rule-help-button" type="button" aria-label="Explicar a regra deste chefe" aria-controls="bossRule" aria-expanded="false" hidden>?</button>
+                  <aside id="bossRule" class="boss-intent-help-popover boss-rule-help-popover" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="bossRuleTitle" hidden>
+                    <div class="boss-intent-help-head">
+                      <b id="bossRuleTitle">Regra do chefe</b>
+                      <button id="bossRuleHelpClose" class="boss-intent-help-close" type="button" aria-label="Fechar regra">×</button>
+                    </div>
+                    <p id="bossRuleText"></p>
+                  </aside>
+                </div>
                 <span id="bossPhase" class="boss-phase">FASE 1</span>
                 <small id="bossPhaseRule" class="boss-phase-rule" hidden></small>
                 <aside id="bossPhaseProgress" class="boss-phase-progress" aria-label="Condições para a próxima fase">
@@ -694,10 +704,6 @@
                   <i>·</i>
                   <span id="bossCurrentActor">Agora: aguardando</span>
                 </div>
-                <aside id="bossRule" class="boss-rule" aria-label="Regra permanente do chefe">
-                  <span class="boss-rule-label"><i aria-hidden="true">◆</i> REGRA</span>
-                  <strong id="bossRuleText"></strong>
-                </aside>
               </div>
             </div>
             <div class="boss-vitals">

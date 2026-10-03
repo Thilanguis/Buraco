@@ -499,6 +499,43 @@
   white-space: pre-line;
 }
 
+.boss-name-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.boss-name-row > #bossName {
+  min-width: 0;
+}
+
+.boss-rule-help-button {
+  margin-top: 0;
+  transform: translateY(1px);
+}
+
+.boss-rule-help-button:hover,
+.boss-rule-help-button:focus-visible,
+.boss-rule-help-button[aria-expanded='true'] {
+  transform: translateY(1px) scale(1.06);
+}
+
+.boss-rule-help-popover {
+  left: 0;
+  right: auto;
+  top: calc(100% + 7px);
+  width: min(330px, calc(100vw - 28px));
+}
+
+.boss-rule-help-popover::before {
+  left: 18px;
+  right: auto;
+}
+
 .boss-intent-instruction-row {
   display: flex;
   align-items: flex-start;

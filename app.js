@@ -6545,6 +6545,62 @@ function closeBossIntentHelp() {
   button.setAttribute('aria-expanded', 'false');
 }
 
+function closeBossRuleHelp() {
+  const button = document.getElementById('bossRuleHelpButton');
+  const popover = document.getElementById('bossRule');
+  if (!button || !popover) return;
+  popover.hidden = true;
+  popover.setAttribute('aria-hidden', 'true');
+  button.setAttribute('aria-expanded', 'false');
+}
+
+function syncBossRuleHelp(gameState, definition = null) {
+  const button = document.getElementById('bossRuleHelpButton');
+  const popover = document.getElementById('bossRule');
+  const title = document.getElementById('bossRuleTitle');
+  const text = document.getElementById('bossRuleText');
+  const close = document.getElementById('bossRuleHelpClose');
+  if (!button || !popover || !title || !text || !close) return;
+
+  const ruleSummary = buildBossRuleSummary(gameState);
+  button.hidden = !ruleSummary;
+  text.textContent = ruleSummary;
+  title.textContent = definition?.name ? `Regra · ${definition.name}` : 'Regra do chefe';
+
+  if (!ruleSummary) {
+    closeBossRuleHelp();
+    return;
+  }
+
+  if (button.dataset.helpBound === '1') return;
+  button.dataset.helpBound = '1';
+
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const opening = popover.hidden;
+    if (opening) closeBossIntentHelp();
+    popover.hidden = !opening;
+    popover.setAttribute('aria-hidden', opening ? 'false' : 'true');
+    button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  });
+
+  close.addEventListener('click', (event) => {
+    event.stopPropagation();
+    closeBossRuleHelp();
+    button.focus({ preventScroll: true });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (popover.hidden) return;
+    if (popover.contains(event.target) || button.contains(event.target)) return;
+    closeBossRuleHelp();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !popover.hidden) closeBossRuleHelp();
+  });
+}
+
 function syncBossIntentHelp(gameState) {
   const button = document.getElementById('bossIntentHelpButton');
   const popover = document.getElementById('bossIntentHelpPopover');
@@ -6571,6 +6627,7 @@ function syncBossIntentHelp(gameState) {
   button.addEventListener('click', (event) => {
     event.stopPropagation();
     const opening = popover.hidden;
+    if (opening) closeBossRuleHelp();
     popover.hidden = !opening;
     popover.setAttribute('aria-hidden', opening ? 'false' : 'true');
     button.setAttribute('aria-expanded', opening ? 'true' : 'false');
@@ -6697,11 +6754,7 @@ function renderBossHud() {
   } else if (phaseProgressPanel) {
     phaseProgressPanel.hidden = true;
   }
-  const bossRuleText = document.getElementById('bossRuleText');
-  const bossRule = document.getElementById('bossRule');
-  const ruleSummary = buildBossRuleSummary(state);
-  if (bossRuleText) bossRuleText.textContent = ruleSummary;
-  if (bossRule) bossRule.hidden = !ruleSummary;
+  syncBossRuleHelp(state, definition);
   document.getElementById('bossHpText').textContent = `${boss.hp} / ${boss.maxHp}`;
   document.getElementById('bossHpBar').style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
   const cocoonMeter = document.getElementById('bossCocoonMeter');
