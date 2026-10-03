@@ -122,6 +122,66 @@ function phaseForProgress(gameState) {
   return 1;
 }
 
+export function getBossPhaseProgress(gameState) {
+  const boss = gameState?.boss;
+  if (!boss) return null;
+
+  const phase = Math.max(1, Number(boss.phase) || 1);
+  if (phase >= 3) {
+    return {
+      phase,
+      nextPhase: null,
+      final: true,
+      ready: false,
+      hp: null,
+      stock: null,
+      dead: null,
+      hpProgress: 1,
+    };
+  }
+
+  const threshold =
+    phase === 1
+      ? { nextPhase: 2, hpRatio: 0.7, stockCount: 40, deadTaken: 1, hpStartRatio: 1 }
+      : { nextPhase: 3, hpRatio: 0.35, stockCount: 18, deadTaken: 2, hpStartRatio: 0.7 };
+
+  const deadTaken = Math.max(0, Number(gameState.deadChunksTaken?.[0]) || 0);
+  const stockCount = Array.isArray(gameState.stock) ? gameState.stock.length : 0;
+  const hpRatio = boss.maxHp > 0 ? Math.max(0, boss.hp / boss.maxHp) : 1;
+  const hpPercent = Math.round(hpRatio * 100);
+  const hpTargetPercent = Math.round(threshold.hpRatio * 100);
+  const hpStartPercent = Math.round(threshold.hpStartRatio * 100);
+  const hpWindow = Math.max(1, hpStartPercent - hpTargetPercent);
+  const hpProgress = Math.max(0, Math.min(1, (hpStartPercent - hpPercent) / hpWindow));
+  const hpReady = hpRatio <= threshold.hpRatio;
+  const stockReady = stockCount <= threshold.stockCount;
+  const deadReady = deadTaken >= threshold.deadTaken;
+  const ready = Number(boss.pendingPhase) >= threshold.nextPhase || hpReady || stockReady || deadReady;
+
+  return {
+    phase,
+    nextPhase: threshold.nextPhase,
+    final: false,
+    ready,
+    hp: {
+      currentPercent: hpPercent,
+      targetPercent: hpTargetPercent,
+      ready: hpReady,
+    },
+    stock: {
+      current: stockCount,
+      target: threshold.stockCount,
+      ready: stockReady,
+    },
+    dead: {
+      current: deadTaken,
+      target: threshold.deadTaken,
+      ready: deadReady,
+    },
+    hpProgress,
+  };
+}
+
 function seededUnit(seed) {
   let value = Number(seed) || 1;
   value = (value ^ 0x6d2b79f5) >>> 0;

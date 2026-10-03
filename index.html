@@ -671,7 +671,22 @@
                 <span class="boss-hud-kicker">CHEFE DA MESA</span>
                 <strong id="bossName">O BANQUEIRO</strong>
                 <span id="bossPhase" class="boss-phase">FASE 1</span>
-                <small id="bossPhaseRule" class="boss-phase-rule">Sem mortos · monte acima de 40</small>
+                <small id="bossPhaseRule" class="boss-phase-rule" hidden></small>
+                <aside id="bossPhaseProgress" class="boss-phase-progress" aria-label="Condições para a próxima fase">
+                  <div class="boss-phase-progress-head">
+                    <div class="boss-phase-progress-title">
+                      <span>PRÓXIMA FASE</span>
+                      <small id="bossPhaseProgressHint">BASTA 1 GATILHO</small>
+                    </div>
+                    <strong id="bossPhaseProgressNext">FASE 2</strong>
+                  </div>
+                  <div class="boss-phase-progress-metrics" aria-label="Gatilhos de transição">
+                    <span id="bossPhaseProgressHp">HP 100% → ≤70%</span>
+                    <span id="bossPhaseProgressStock">MONTE 0 → ≤40</span>
+                    <span id="bossPhaseProgressDead">MORTO 0/1</span>
+                  </div>
+                  <div class="boss-phase-progress-bar" aria-hidden="true"><span id="bossPhaseProgressBar"></span></div>
+                </aside>
                 <div id="bossRoundSummary" class="boss-round-summary">
                   <span id="bossRoundNumber">Rodada 1</span>
                   <i>·</i>
@@ -679,6 +694,10 @@
                   <i>·</i>
                   <span id="bossCurrentActor">Agora: aguardando</span>
                 </div>
+                <aside id="bossRule" class="boss-rule" aria-label="Regra permanente do chefe">
+                  <span class="boss-rule-label"><i aria-hidden="true">◆</i> REGRA</span>
+                  <strong id="bossRuleText"></strong>
+                </aside>
               </div>
             </div>
             <div class="boss-vitals">

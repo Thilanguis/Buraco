@@ -524,7 +524,9 @@
   border-radius: 50%;
   background: rgba(15, 23, 42, 0.9);
   color: #fbbf24;
-  font: 1000 10px/1 Arial, sans-serif;
+  font:
+    1000 10px/1 Arial,
+    sans-serif;
   text-align: center;
   cursor: pointer;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
@@ -616,7 +618,9 @@
   place-items: center;
   border-radius: 50%;
   color: #94a3b8;
-  font: 900 15px/1 Arial, sans-serif;
+  font:
+    900 15px/1 Arial,
+    sans-serif;
   cursor: pointer;
 }
 
@@ -738,6 +742,56 @@
   font-weight: 900;
   font-style: italic;
   transform: rotate(0.35deg);
+}
+
+.boss-rule {
+  /* Faixa informativa no vazio inferior do HUD. Absoluta no desktop para
+     não participar do auto-placement do grid nem deslocar chefe/vitais/ação. */
+  position: absolute;
+  /* Alinha o início da regra com o bloco de textos ao lado do retrato. */
+  left: calc(22px + 184px + 16px);
+  top: 141px;
+  width: fit-content;
+  max-width: min(650px, 46%);
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 5px 9px;
+  border-left: 2px solid rgba(245, 158, 11, 0.5);
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.07), transparent 88%);
+  z-index: 4;
+}
+.boss-rule[hidden] {
+  display: none !important;
+}
+.boss-rule-label {
+  flex: 0 0 auto;
+  color: #fbbf24;
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: 0.75px;
+  white-space: nowrap;
+}
+.boss-rule-label i {
+  margin-right: 3px;
+  color: #f59e0b;
+  font-style: normal;
+  font-size: 6px;
+}
+.boss-rule strong {
+  min-width: 0;
+  color: #cbd5e1;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.28;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
 }
 
 .boss-battle-details {
@@ -1984,6 +2038,15 @@
   }
   .boss-intent {
     grid-column: 1 / -1;
+  }
+  .boss-rule {
+    position: static;
+    grid-column: 1 / -1;
+    align-self: auto;
+    justify-self: stretch;
+    width: auto;
+    max-width: none;
+    margin-top: -2px;
   }
   .boss-impact-card {
     grid-column: 1 / 2;
@@ -5955,19 +6018,25 @@ body.boss-mode .boss-daughter-strip {
    fosca por estado de controle. Isso é SOMENTE visual: pointer-events
    e regras de compra continuam sendo controlados pelo JS original. */
 
-
 /* DIMITRESCU — transição visual de transformação entre fases.
    A troca da imagem é persistente; esta animação só marca o momento da mudança. */
 
 @keyframes bossDimitrescuPhaseFrame {
   0% {
-    box-shadow: 0 0 23px rgba(239, 68, 68, 0.27), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 0 23px rgba(239, 68, 68, 0.27),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
   38% {
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.78), 0 0 36px rgba(185, 28, 28, 0.92), inset 0 0 18px rgba(127, 29, 29, 0.58);
+    box-shadow:
+      0 0 12px rgba(255, 255, 255, 0.78),
+      0 0 36px rgba(185, 28, 28, 0.92),
+      inset 0 0 18px rgba(127, 29, 29, 0.58);
   }
   100% {
-    box-shadow: 0 0 23px rgba(239, 68, 68, 0.27), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 0 23px rgba(239, 68, 68, 0.27),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -5985,7 +6054,6 @@ body.boss-mode .boss-daughter-strip {
     filter: none;
   }
 }
-
 
 /* DIMITRESCU — sangue contido dentro das cartas da mão.
    O ::after geral desce 16px para criar escorrimento em jogos/lixo/morto.
@@ -6065,5 +6133,481 @@ body.boss-mode .board-top {
   body.boss-mode .board-top {
     height: auto;
     min-height: 60px;
+  }
+}
+
+@media (max-width: 620px) {
+  .boss-rule {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 3px;
+  }
+}
+
+/* Tablet touch em landscape largo: a regra continua no bloco de identidade,
+   mas termina antes da coluna de HP/recurso. Em larguras <=1100px o breakpoint
+   responsivo acima já coloca a regra em uma linha própria de largura total. */
+@media (hover: none) and (pointer: coarse) and (min-width: 1101px) {
+  body.boss-mode .boss-rule {
+    width: 250px;
+    max-width: 250px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  body.boss-mode .boss-rule strong {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+}
+
+
+/* Próxima fase: painel compacto no bloco de identidade. A transição ocorre por
+   QUALQUER um dos gatilhos, então evitamos uma barra global que sugeriria
+   progresso combinado. */
+.boss-phase-progress {
+  position: relative;
+  width: min(100%, 365px);
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  box-sizing: border-box;
+  margin: 4px 0 3px;
+  padding: 6px 7px 7px;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  border-left-color: rgba(245, 158, 11, 0.58);
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.075), rgba(15, 23, 42, 0.16) 72%, transparent);
+}
+
+.boss-phase-progress[hidden] {
+  display: none !important;
+}
+
+.boss-phase-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.boss-phase-progress-title {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.boss-phase-progress-title > span {
+  color: #fbbf24;
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: 0.75px;
+  white-space: nowrap;
+}
+
+.boss-phase-progress-title > small {
+  color: #94a3b8;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+  white-space: nowrap;
+}
+
+.boss-phase-progress-head > strong {
+  flex: 0 0 auto;
+  color: #f8fafc;
+  font-size: 8px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+
+.boss-phase-progress-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.boss-phase-progress-metrics > span {
+  position: relative;
+  min-width: 0;
+  padding: 3px 5px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 3px;
+  background: rgba(2, 6, 23, 0.32);
+  color: #cbd5e1;
+  font-size: 6.5px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.boss-phase-progress-metrics > span.ready {
+  border-color: rgba(74, 222, 128, 0.42);
+  background: rgba(20, 83, 45, 0.22);
+  color: #86efac;
+}
+
+.boss-phase-progress-metrics > span.ready::before {
+  content: '✓ ';
+  color: #4ade80;
+}
+
+.boss-phase-progress.is-ready {
+  border-color: rgba(74, 222, 128, 0.24);
+  border-left-color: rgba(74, 222, 128, 0.66);
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.07), rgba(15, 23, 42, 0.16) 72%, transparent);
+}
+
+.boss-phase-progress.is-ready .boss-phase-progress-title > small,
+.boss-phase-progress.is-ready .boss-phase-progress-head > strong {
+  color: #86efac;
+}
+
+@media (max-width: 620px) {
+  .boss-phase-progress {
+    width: 100%;
+  }
+
+  .boss-phase-progress-title {
+    flex-wrap: wrap;
+    gap: 2px 5px;
+  }
+
+  .boss-phase-progress-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .boss-phase-progress-metrics > span {
+    text-align: left;
+  }
+}
+
+/* =========================================================
+   HUD DO CHEFE — identidade compacta (fase / turno / regra)
+   Mantém toda a informação da coluna esquerda no fluxo normal,
+   evitando qualquer sobreposição entre progresso e regra.
+   ========================================================= */
+body.boss-mode .boss-hud-heading > div {
+  align-content: center;
+  gap: 2px;
+}
+
+body.boss-mode .boss-phase-progress {
+  width: min(100%, 350px);
+  margin: 3px 0 1px;
+  padding: 4px 7px 4px 8px;
+  gap: 3px;
+  border: 0;
+  border-left: 2px solid rgba(245, 158, 11, 0.62);
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.018) 68%, transparent);
+}
+
+body.boss-mode .boss-phase-progress-head {
+  gap: 7px;
+}
+
+body.boss-mode .boss-phase-progress-title {
+  gap: 5px;
+}
+
+body.boss-mode .boss-phase-progress-title > span {
+  font-size: 7px;
+  letter-spacing: 0.7px;
+}
+
+body.boss-mode .boss-phase-progress-title > small {
+  color: #94a3b8;
+  font-size: 5.8px;
+  letter-spacing: 0.25px;
+}
+
+body.boss-mode .boss-phase-progress-head > strong {
+  margin-left: auto;
+  color: #fde68a;
+  font-size: 7px;
+  letter-spacing: 0.35px;
+}
+
+body.boss-mode .boss-phase-progress-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 9px;
+}
+
+body.boss-mode .boss-phase-progress-metrics > span {
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #b8c4d4;
+  font-size: 6.2px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+
+body.boss-mode .boss-phase-progress-metrics > span + span::before {
+  content: '•';
+  margin-right: 9px;
+  color: rgba(148, 163, 184, 0.55);
+}
+
+body.boss-mode .boss-phase-progress-metrics > span.ready {
+  border: 0;
+  background: transparent;
+  color: #86efac;
+}
+
+body.boss-mode .boss-phase-progress-metrics > span.ready::before {
+  content: '✓ ';
+  margin-right: 2px;
+  color: #4ade80;
+}
+
+body.boss-mode .boss-phase-progress-metrics > span.ready + span::before {
+  content: '•';
+  margin-right: 9px;
+  color: rgba(148, 163, 184, 0.55);
+}
+
+/* Progresso visual da fase: acompanha o avanço de HP até o gatilho da próxima fase. */
+body.boss-mode .boss-phase-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+}
+
+body.boss-mode .boss-phase-progress-bar > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d97706, #fbbf24);
+  box-shadow: 0 0 7px rgba(245, 158, 11, 0.45);
+  transition: width 0.35s ease;
+}
+
+body.boss-mode .boss-phase-progress.is-ready .boss-phase-progress-bar > span {
+  background: linear-gradient(90deg, #16a34a, #4ade80);
+  box-shadow: 0 0 7px rgba(74, 222, 128, 0.42);
+}
+
+body.boss-mode .boss-phase-progress.is-ready {
+  border-left-color: rgba(74, 222, 128, 0.72);
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.09), rgba(34, 197, 94, 0.018) 68%, transparent);
+}
+
+body.boss-mode .boss-round-summary {
+  margin-top: 1px;
+}
+
+body.boss-mode .boss-rule {
+  position: static;
+  left: auto;
+  top: auto;
+  width: min(100%, 350px);
+  max-width: 350px;
+  display: flex;
+  grid-template-columns: none;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 3px 0 0;
+  border: 0;
+  border-top: 1px solid rgba(245, 158, 11, 0.13);
+  border-radius: 0;
+  background: transparent;
+  z-index: auto;
+}
+
+body.boss-mode .boss-rule-label {
+  flex: 0 0 auto;
+  padding-top: 1px;
+  font-size: 6px;
+  letter-spacing: 0.55px;
+}
+
+body.boss-mode .boss-rule strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #b8c4d4;
+  font-size: 6.8px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+@media (hover: none) and (pointer: coarse) and (min-width: 1101px) {
+  body.boss-mode .boss-rule {
+    width: min(100%, 350px);
+    max-width: 350px;
+    display: flex;
+  }
+}
+
+@media (max-width: 900px) {
+  body.boss-mode .boss-phase-progress,
+  body.boss-mode .boss-rule {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 620px) {
+  body.boss-mode .boss-phase-progress-metrics {
+    gap: 2px 7px;
+  }
+
+  body.boss-mode .boss-phase-progress-metrics > span {
+    text-align: left;
+  }
+
+  body.boss-mode .boss-rule {
+    display: flex;
+    gap: 5px;
+  }
+}
+
+
+/* =========================================================
+   HUD DO CHEFE — tipografia fluida por largura da tela
+   Mantém a mesma hierarquia visual, mas evita texto minúsculo
+   em desktop largo e texto grande demais em telas menores.
+   ========================================================= */
+body.boss-mode {
+  --boss-fs-kicker: clamp(8px, 0.48vw, 10.5px);
+  --boss-fs-name: clamp(17px, 1vw, 21px);
+  --boss-fs-phase: clamp(8px, 0.48vw, 10px);
+  --boss-fs-meta: clamp(7px, 0.42vw, 9px);
+  --boss-fs-meter-label: clamp(7.5px, 0.44vw, 9.5px);
+  --boss-fs-meter-value: clamp(9px, 0.54vw, 11px);
+  --boss-fs-intent-kicker: clamp(7.5px, 0.45vw, 9.5px);
+  --boss-fs-intent-title: clamp(13px, 0.78vw, 16px);
+  --boss-fs-intent-copy: clamp(8px, 0.49vw, 10px);
+  --boss-fs-phase-title: clamp(6.8px, 0.41vw, 8.5px);
+  --boss-fs-phase-note: clamp(5.8px, 0.35vw, 7.2px);
+  --boss-fs-phase-target: clamp(6.6px, 0.40vw, 8.2px);
+  --boss-fs-rule-label: clamp(6.2px, 0.37vw, 7.6px);
+  --boss-fs-rule-copy: clamp(7px, 0.43vw, 8.8px);
+}
+
+body.boss-mode .boss-hud-kicker {
+  font-size: var(--boss-fs-kicker);
+}
+
+body.boss-mode .boss-hud-heading strong {
+  font-size: var(--boss-fs-name);
+}
+
+body.boss-mode .boss-phase {
+  font-size: var(--boss-fs-phase);
+}
+
+body.boss-mode .boss-phase-rule,
+body.boss-mode .boss-round-summary {
+  font-size: var(--boss-fs-meta);
+}
+
+body.boss-mode .boss-meter-label {
+  font-size: var(--boss-fs-meter-label);
+}
+
+body.boss-mode .boss-meter-label strong {
+  font-size: var(--boss-fs-meter-value);
+}
+
+body.boss-mode .boss-intent > span {
+  font-size: var(--boss-fs-intent-kicker);
+}
+
+body.boss-mode .boss-intent strong {
+  font-size: var(--boss-fs-intent-title);
+}
+
+body.boss-mode .boss-intent small,
+body.boss-mode .boss-intent em {
+  font-size: var(--boss-fs-intent-copy);
+}
+
+body.boss-mode .boss-phase-progress-title > span {
+  font-size: var(--boss-fs-phase-title);
+}
+
+body.boss-mode .boss-phase-progress-title > small {
+  font-size: var(--boss-fs-phase-note);
+}
+
+body.boss-mode .boss-phase-progress-head > strong,
+body.boss-mode .boss-phase-progress-metrics > span {
+  font-size: var(--boss-fs-phase-target);
+}
+
+body.boss-mode .boss-rule-label {
+  font-size: var(--boss-fs-rule-label);
+}
+
+body.boss-mode .boss-rule strong {
+  font-size: var(--boss-fs-rule-copy);
+  line-height: 1.3;
+}
+
+/* Em telas realmente largas, o HUD ganha um pequeno reforço extra de leitura. */
+@media (min-width: 1800px) {
+  body.boss-mode {
+    --boss-fs-kicker: 10.5px;
+    --boss-fs-name: 21px;
+    --boss-fs-phase: 10px;
+    --boss-fs-meta: 9px;
+    --boss-fs-meter-label: 9.5px;
+    --boss-fs-meter-value: 11px;
+    --boss-fs-intent-kicker: 9.5px;
+    --boss-fs-intent-title: 16px;
+    --boss-fs-intent-copy: 10px;
+    --boss-fs-phase-title: 8.5px;
+    --boss-fs-phase-note: 7.2px;
+    --boss-fs-phase-target: 8.2px;
+    --boss-fs-rule-label: 7.6px;
+    --boss-fs-rule-copy: 8.8px;
+  }
+}
+
+/* Tablet landscape: reduz só o necessário, sem voltar ao texto microscópico. */
+@media (hover: none) and (pointer: coarse) and (min-width: 900px) and (max-width: 1799px) {
+  body.boss-mode {
+    --boss-fs-kicker: clamp(8px, 0.62vw, 9px);
+    --boss-fs-name: clamp(17px, 1.28vw, 19px);
+    --boss-fs-phase: clamp(8px, 0.62vw, 9px);
+    --boss-fs-meta: clamp(7px, 0.54vw, 8.2px);
+    --boss-fs-meter-label: clamp(7.5px, 0.58vw, 8.7px);
+    --boss-fs-meter-value: clamp(9px, 0.68vw, 10.2px);
+    --boss-fs-intent-kicker: clamp(7.5px, 0.56vw, 8.7px);
+    --boss-fs-intent-title: clamp(13px, 0.98vw, 15px);
+    --boss-fs-intent-copy: clamp(8px, 0.62vw, 9.2px);
+    --boss-fs-phase-title: clamp(6.8px, 0.51vw, 7.8px);
+    --boss-fs-phase-note: clamp(5.8px, 0.44vw, 6.7px);
+    --boss-fs-phase-target: clamp(6.6px, 0.50vw, 7.7px);
+    --boss-fs-rule-label: clamp(6.2px, 0.47vw, 7.1px);
+    --boss-fs-rule-copy: clamp(7px, 0.54vw, 8.2px);
   }
 }

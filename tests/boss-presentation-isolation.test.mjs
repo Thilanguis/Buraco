@@ -5,6 +5,7 @@ import {
   buildBossCompactAction,
   buildBossPendingChoicePresentation,
   buildBossPresentationHelp,
+  buildBossRuleSummary,
   getBossActionCategory,
   getBossFinalDangerPresentation,
   getBossPresentationAdapter,
@@ -62,6 +63,15 @@ test('categorias de resultado permanecem disponiveis sem tabela global compartil
   assert.equal(getBossResultCategory('inexistente'), '');
 });
 
+test('regra permanente do HUD fica isolada por chefe', () => {
+  assert.equal(buildBossRuleSummary('banker', { boss: { maxDanger: 100 } }), '100 de Dívida = derrota imediata.');
+  assert.match(buildBossRuleSummary('dominadora', { boss: {} }), /3 Chicotes = Sob Controle/);
+  assert.match(buildBossRuleSummary('matriarca_esmeralda', { boss: { maxDanger: 5 } }), /5 Flores = derrota/);
+  assert.match(buildBossRuleSummary('dimitrescu', { boss: { maxDanger: 100 } }), /Limpa\/Real\/Ás-a-Ás: −4\/−8\/−12 Sede/);
+  assert.match(buildBossRuleSummary('nehelenia', { boss: { maxDanger: 5 } }), /5\/5 Espelhos = derrota/);
+  assert.equal(buildBossRuleSummary('inexistente', { boss: {} }), '');
+});
+
 test('resumo final do recurso fica isolado por chefe', () => {
   const common = { boss: { danger: 37, maxDanger: 100 }, players: [] };
   assert.deepEqual(getBossFinalDangerPresentation('banker', common), { label: 'Dívida final', value: '37 / 100' });
@@ -79,6 +89,7 @@ test('boss-presentation deixa de guardar tabelas e cadeia final dos cinco chefes
   assert.equal(presentation.includes("boss?.id === 'dominadora' ? 'Chicotes finais'"), false);
   assert.ok(presentation.includes('getBossPresentationSpeech'));
   assert.ok(presentation.includes('getBossFinalDangerPresentation'));
+  assert.ok(presentation.includes('buildBossRuleSummaryFromAdapter'));
 });
 
 test('modulos de apresentacao ficam no precache offline', () => {

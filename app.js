@@ -62,6 +62,7 @@ import {
   hasPendingBossChoices,
   canBossPerformCommonAction,
   getBossPhaseName,
+  getBossPhaseProgress,
   isBossCardBlocked,
   isBossDiscardBlocked,
   isBossMeldLocked,
@@ -85,7 +86,7 @@ import {
   isValidBossSequence,
 } from './js/boss/boss-engine.js';
 import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } from './js/boss/boss-registry.js';
-import { buildBossActionPresentation, buildBossAbilityHelp, buildBossFinalPresentation } from './js/boss/boss-presentation.js';
+import { buildBossActionPresentation, buildBossAbilityHelp, buildBossFinalPresentation, buildBossRuleSummary } from './js/boss/boss-presentation.js';
 import { getBossMeldContributionUi, getBossMeldUiModel } from './js/boss/ui/boss-ui-registry.js';
 import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
 import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
@@ -6497,22 +6498,41 @@ function scheduleNeheleniaMirroredMeldSplit(intent, teamId, meldIndex) {
 
 function positionBossDialogueOverlay(hud) {
   const portrait = hud?.querySelector('.boss-portrait');
-  if (!hud || !portrait || hud.style.display === 'none') return;
+  const dialoguePanel = hud?.querySelector('#bossDialoguePresentation');
+  if (!hud || !portrait || !dialoguePanel || hud.style.display === 'none') return;
 
-  const hudRect = hud.getBoundingClientRect();
-  const portraitRect = portrait.getBoundingClientRect();
-  if (!hudRect.width || !portraitRect.width || !portraitRect.height) return;
+  // Usa coordenadas de layout (offset*) em vez de getBoundingClientRect().
+  // Em tablet/DevTools a mesa pode estar escalada; misturar rects já escalados
+  // com top/left em CSS px fazia o balão cair para baixo do HUD.
+  let node = portrait;
+  let portraitLeft = 0;
+  let portraitTop = 0;
+  while (node && node !== hud) {
+    portraitLeft += Number(node.offsetLeft) || 0;
+    portraitTop += Number(node.offsetTop) || 0;
+    node = node.offsetParent;
+  }
+  if (node !== hud) return;
 
-  // A ponta do balão nasce dentro da região do rosto/retrato, mas o próprio
-  // painel continua sendo um overlay absoluto do HUD. Nada entra no grid.
-  const left = Math.max(8, portraitRect.left - hudRect.left + portraitRect.width * 0.58);
-  const top = Math.max(6, portraitRect.top - hudRect.top + portraitRect.height * 0.08);
-  const availableWidth = Math.max(178, hudRect.width - left - 12);
+  const portraitWidth = portrait.offsetWidth || 0;
+  const portraitHeight = portrait.offsetHeight || 0;
+  const hudWidth = hud.clientWidth || 0;
+  if (!hudWidth || !portraitWidth || !portraitHeight) return;
+
+  const left = Math.max(8, portraitLeft + portraitWidth * 0.58);
+  const top = Math.max(6, portraitTop + portraitHeight * 0.08);
+  const availableWidth = Math.max(178, hudWidth - left - 12);
   const width = Math.min(390, availableWidth);
+  const leftPx = `${Math.round(left)}px`;
+  const topPx = `${Math.round(top)}px`;
+  const widthPx = `${Math.round(width)}px`;
 
-  hud.style.setProperty('--boss-dialogue-left', `${Math.round(left)}px`);
-  hud.style.setProperty('--boss-dialogue-top', `${Math.round(top)}px`);
-  hud.style.setProperty('--boss-dialogue-width', `${Math.round(width)}px`);
+  hud.style.setProperty('--boss-dialogue-left', leftPx);
+  hud.style.setProperty('--boss-dialogue-top', topPx);
+  hud.style.setProperty('--boss-dialogue-width', widthPx);
+  dialoguePanel.style.setProperty('left', leftPx, 'important');
+  dialoguePanel.style.setProperty('top', topPx, 'important');
+  dialoguePanel.style.setProperty('width', widthPx, 'important');
 }
 
 
@@ -6638,16 +6658,50 @@ function renderBossHud() {
   hud.dataset.springCrownStage = springCrownBuffed ? boss.springCrown.status : '';
   document.getElementById('bossName').textContent = (definition?.name || 'CHEFE').toUpperCase();
   setBossPortrait(document.getElementById('bossPortraitImage'), definition, boss);
-  positionBossDialogueOverlay(hud);
   renderBossDaughterStrip(definition, boss);
   renderBossAbilityGuide(definition, boss);
   document.getElementById('bossPhase').textContent = `FASE ${boss.phase} · ${getBossPhaseName(state)}`;
-  const phaseRules = {
-    1: 'Próxima fase: primeiro morto, monte com 40 cartas ou HP em 70%.',
-    2: 'Próxima fase: segundo morto, monte com 18 cartas ou HP em 35%.',
-    3: 'Fase final.',
-  };
-  document.getElementById('bossPhaseRule').textContent = phaseRules[boss.phase];
+  const legacyPhaseRule = document.getElementById('bossPhaseRule');
+  if (legacyPhaseRule) legacyPhaseRule.hidden = true;
+
+  const phaseProgress = getBossPhaseProgress(state);
+  const phaseProgressPanel = document.getElementById('bossPhaseProgress');
+  const phaseProgressNext = document.getElementById('bossPhaseProgressNext');
+  const phaseProgressHint = document.getElementById('bossPhaseProgressHint');
+  const phaseProgressHp = document.getElementById('bossPhaseProgressHp');
+  const phaseProgressStock = document.getElementById('bossPhaseProgressStock');
+  const phaseProgressDead = document.getElementById('bossPhaseProgressDead');
+  const phaseProgressBar = document.getElementById('bossPhaseProgressBar');
+  if (phaseProgressPanel && phaseProgress) {
+    // Na fase final não existe próxima transição: esconder o bloco mantém o HUD limpo.
+    phaseProgressPanel.hidden = phaseProgress.final;
+    phaseProgressPanel.classList.toggle('is-ready', phaseProgress.ready);
+    if (!phaseProgress.final) {
+      if (phaseProgressNext) phaseProgressNext.textContent = `FASE ${phaseProgress.nextPhase}`;
+      if (phaseProgressHint) phaseProgressHint.textContent = phaseProgress.ready ? 'TRANSIÇÃO LIBERADA' : '1 GATILHO BASTA';
+      if (phaseProgressHp) {
+        phaseProgressHp.textContent = `HP ${phaseProgress.hp.currentPercent}% · ALVO ≤${phaseProgress.hp.targetPercent}%`;
+        phaseProgressHp.classList.toggle('ready', phaseProgress.hp.ready);
+      }
+      if (phaseProgressStock) {
+        phaseProgressStock.textContent = `MONTE ${phaseProgress.stock.current} · ALVO ≤${phaseProgress.stock.target}`;
+        phaseProgressStock.classList.toggle('ready', phaseProgress.stock.ready);
+      }
+      if (phaseProgressDead) {
+        const deadLabel = phaseProgress.dead.target === 1 ? 'MORTO' : 'MORTOS';
+        phaseProgressDead.textContent = `${deadLabel} ${Math.min(phaseProgress.dead.current, phaseProgress.dead.target)}/${phaseProgress.dead.target}`;
+        phaseProgressDead.classList.toggle('ready', phaseProgress.dead.ready);
+      }
+      if (phaseProgressBar) phaseProgressBar.style.width = `${Math.round(Math.max(0, Math.min(1, phaseProgress.hpProgress || 0)) * 100)}%`;
+    }
+  } else if (phaseProgressPanel) {
+    phaseProgressPanel.hidden = true;
+  }
+  const bossRuleText = document.getElementById('bossRuleText');
+  const bossRule = document.getElementById('bossRule');
+  const ruleSummary = buildBossRuleSummary(state);
+  if (bossRuleText) bossRuleText.textContent = ruleSummary;
+  if (bossRule) bossRule.hidden = !ruleSummary;
   document.getElementById('bossHpText').textContent = `${boss.hp} / ${boss.maxHp}`;
   document.getElementById('bossHpBar').style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
   const cocoonMeter = document.getElementById('bossCocoonMeter');
@@ -6760,6 +6814,17 @@ function renderBossHud() {
     document.getElementById('bossDialogueName').textContent = actionPresentation.name;
     document.getElementById('bossDialogueSpeech').textContent = actionPresentation.speech ? `“${actionPresentation.speech}”` : '';
     document.getElementById('bossDialogueConsequence').textContent = objective;
+
+    // Posiciona já e confirma por mais dois frames: tablet/DevTools pode
+    // recalcular fontes, quebras e escala depois do primeiro layout.
+    const syncDialoguePosition = () => {
+      if (dialoguePanel.style.display !== 'none' && hud.style.display !== 'none') positionBossDialogueOverlay(hud);
+    };
+    syncDialoguePosition();
+    requestAnimationFrame(() => {
+      syncDialoguePosition();
+      requestAnimationFrame(syncDialoguePosition);
+    });
   }
   document.querySelectorAll('#bossPhaseTrack [data-phase]').forEach((phaseNode) => {
     const phaseNumber = Number(phaseNode.dataset.phase);

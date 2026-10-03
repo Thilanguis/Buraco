@@ -6,6 +6,7 @@ import {
   buildBossPresentationHelp,
   buildBossPendingChoicePresentation,
   buildBossPresentationRangeMeters,
+  buildBossRuleSummary as buildBossRuleSummaryFromAdapter,
   buildBossStatusPresentation,
   getBossActionCategory,
   getBossFinalDangerPresentation,
@@ -101,6 +102,10 @@ function bossAbilityHelpSupplement(gameState, intent) {
     intent,
     helpers: { playerName },
   }) || '';
+}
+
+export function buildBossRuleSummary(gameState) {
+  return String(buildBossRuleSummaryFromAdapter(gameState?.boss?.id, gameState) || '').trim();
 }
 
 export function buildBossAbilityHelp(gameState) {

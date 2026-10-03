@@ -105,6 +105,10 @@ function mirrorProgress(gameState, intent, helpers) {
 export const neheleniaBossPresentation = Object.freeze({
   id: 'nehelenia',
   feminine: true,
+  ruleSummary(gameState) {
+    const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 5));
+    return `${limit}/${limit} Espelhos = derrota · Limpa ou superior recupera 1 Espelho por novo tier.`;
+  },
   speech(abilityId) { return SPEECHES[abilityId] || ''; },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },

@@ -39,6 +39,10 @@ const ACTION_CATEGORIES = Object.freeze({
 export const dimitrescuBossPresentation = Object.freeze({
   id: 'dimitrescu',
   feminine: true,
+  ruleSummary(gameState) {
+    const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 100));
+    return `${limit} de Sede = derrota · Limpa/Real/Ás-a-Ás: −4/−8/−12 Sede.`;
+  },
   speech(abilityId) { return SPEECHES[abilityId] || ''; },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },

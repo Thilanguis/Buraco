@@ -24,6 +24,10 @@ export function getBossPresentationSpeech(bossId, abilityId, context = {}) {
   return getBossPresentationAdapter(bossId)?.speech?.(abilityId, context) || '';
 }
 
+export function buildBossRuleSummary(bossId, gameState) {
+  return getBossPresentationAdapter(bossId)?.ruleSummary?.(gameState) || '';
+}
+
 export function getBossActionCategory(bossId, abilityId) {
   return getBossPresentationAdapter(bossId)?.actionCategory?.(abilityId) || 'Efeito no fim da rodada';
 }

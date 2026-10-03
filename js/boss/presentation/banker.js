@@ -32,6 +32,10 @@ const ACTION_CATEGORIES = Object.freeze({
 export const bankerBossPresentation = Object.freeze({
   id: 'banker',
   feminine: false,
+  ruleSummary(gameState) {
+    const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 100));
+    return `${limit} de Dívida = derrota imediata.`;
+  },
   speech(abilityId) { return SPEECHES[abilityId] || ''; },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },

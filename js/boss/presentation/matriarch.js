@@ -212,6 +212,10 @@ function crownThreatProgress(threat) {
 export const matriarchBossPresentation = Object.freeze({
   id: 'matriarca_esmeralda',
   feminine: true,
+  ruleSummary(gameState) {
+    const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 5));
+    return `${limit} Flores = derrota · Fase 3: 1 Renascimento com 300 HP ao consumir 1 Flor.`;
+  },
   speech(abilityId) { return SPEECHES[abilityId] || ''; },
   actionCategory(abilityId) { return ACTION_CATEGORIES[abilityId] || ''; },
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },

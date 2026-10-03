@@ -50,6 +50,9 @@ const ACTION_CATEGORIES = Object.freeze({
 export const dominatrixBossPresentation = Object.freeze({
   id: 'dominadora',
   feminine: true,
+  ruleSummary() {
+    return '3 Chicotes = Sob Controle · 4 = Dominado · ambos em 4 = derrota.';
+  },
   speech(abilityId, { collarCards = [] } = {}) {
     if (abilityId === 'collar' && collarCards.length === 1) return 'Uma das suas opcoes agora me pertence.';
     return SPEECHES[abilityId] || '';
