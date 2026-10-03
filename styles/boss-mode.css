@@ -7180,3 +7180,88 @@ body.boss-mode .boss-daughter-card.is-active > img {
     margin-top: 6px;
   }
 }
+
+/* ============================================================
+   HUD DE CHEFE — botão de habilidades estável dentro do HUD
+   No layout panorâmico o <details> deixa de participar do grid,
+   então o botão não muda de posição quando o conteúdo do chefe muda.
+   A lista abre como painel flutuante sem empurrar a mesa.
+   ============================================================ */
+@media (min-width: 1101px) {
+  body.boss-mode .boss-battle-details {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    z-index: 86;
+    width: max-content;
+    max-width: calc(100% - 24px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  body.boss-mode .boss-battle-details > summary {
+    position: relative;
+    z-index: 2;
+    margin: 0;
+    background: rgba(6, 12, 24, 0.82);
+    border-color: rgba(148, 163, 184, 0.34);
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.34);
+  }
+
+  body.boss-mode .boss-battle-details[open] {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  body.boss-mode .boss-battle-details[open] > summary {
+    background: rgba(15, 23, 42, 0.98);
+    border-color: rgba(226, 232, 240, 0.48);
+    color: #f8fafc;
+  }
+
+  body.boss-mode .boss-battle-details .boss-detail-content {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    width: min(820px, calc(100vw - 40px));
+    max-height: min(62vh, 560px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 10px;
+    border: 1px solid rgba(100, 116, 139, 0.4);
+    border-radius: 8px;
+    background: rgba(2, 6, 23, 0.985);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.56);
+  }
+}
+
+/* Quando uma mesa longa começa a pressionar o compositor do tablet, mantemos
+   os sinais de gameplay e pausamos só animações decorativas contínuas. */
+@media (any-pointer: coarse) {
+  body.game-performance-lite.boss-mode .boss-portrait img,
+  body.game-performance-lite.boss-mode .boss-portrait::before,
+  body.game-performance-lite.boss-mode .boss-portrait::after,
+  body.game-performance-lite.boss-mode .carta.boss-card-dimitrescu-hunt::after,
+  body.game-performance-lite.boss-mode .carta.boss-card-dimitrescu-blood-mark::after,
+  body.game-performance-lite.boss-mode .carta.boss-card-cassandra-feast::after,
+  body.game-performance-lite.boss-mode .discard-face.boss-discard-dimitrescu-card::after,
+  body.game-performance-lite.boss-mode .morto-container .boss-dead-blood-layer::after,
+  body.game-performance-lite.boss-mode .nehelenia-mirror-copy::before,
+  body.game-performance-lite.boss-mode .meld-line.nehelenia-mirror-twin::before,
+  body.game-performance-lite.boss-mode .nehelenia-shell-glass,
+  body.game-performance-lite.boss-mode .nehelenia-shell-option.is-origin .nehelenia-shell-frame,
+  body.game-performance-lite.boss-mode .meld-line.nehelenia-mirror-split-pending,
+  body.game-performance-lite.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark,
+  body.game-performance-lite.boss-mode .meld-line-cards.boss-meld-nehelenia-tiger-mark.is-tiger-claw::before,
+  body.game-performance-lite.boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark,
+  body.game-performance-lite.boss-mode .meld-line-cards.boss-meld-nehelenia-hawk-mark::after,
+  body.game-performance-lite.boss-mode .carta.boss-card-nehelenia-fish-mark,
+  body.game-performance-lite.boss-mode .carta.boss-card-nehelenia-fish-mark::after {
+    animation: none !important;
+  }
+}

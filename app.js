@@ -1061,16 +1061,50 @@ document.addEventListener('visibilitychange', () => {
 //Para economizar a bateria do celular, precisamos pausar os vídeos ao entrar no jogo e dar o play novamente apenas ao voltar para o lobby
 
 function toggleMenuVideos(play) {
+  const container = document.getElementById('videoContainer');
   const videos = [document.getElementById('bgVid1'), document.getElementById('bgVid2'), document.getElementById('bgVid3')];
+
+  // Durante a partida o vídeo não é apenas pausado: ele sai da árvore de
+  // composição. Em tablets isso evita manter três superfícies de vídeo +
+  // filtros atrás da mesa e também impede que um frame do menu apareça em
+  // caso de pressão no compositor/GPU.
+  if (container) container.style.display = play ? '' : 'none';
+  if (play) document.body.classList.remove('game-performance-lite');
+
   videos.forEach((vid) => {
     if (!vid) return;
     if (play) {
-      // Apenas o vídeo que estiver com a classe 'active' volta a rodar
+      // Apenas o vídeo que estiver com a classe 'active' volta a rodar.
       if (vid.classList.contains('active')) vid.play().catch(() => {});
     } else {
       vid.pause();
     }
   });
+}
+
+function syncAdaptiveGamePerformance() {
+  const body = document.body;
+  if (!state || !window.matchMedia?.('(any-pointer: coarse)').matches) {
+    body.classList.remove('game-performance-lite');
+    body.removeAttribute('data-render-weight');
+    return;
+  }
+
+  const handCards = (state.players || []).reduce((sum, player) => sum + (player.hand?.length || 0), 0);
+  const meldCards = (state.teams || []).reduce(
+    (sum, team) => sum + (team.melds || []).reduce((meldSum, meld) => meldSum + (meld?.length || 0), 0),
+    0,
+  );
+  // Monte/lixo desenham no máximo 16 camadas cada. Contar as camadas visuais,
+  // e não todas as cartas, aproxima melhor o custo real de composição.
+  const pileLayers = Math.min(16, Math.ceil((state.stock?.length || 0) / 3)) + Math.min(16, Math.ceil((state.discard?.length || 0) / 3));
+  const renderWeight = handCards + meldCards + pileLayers;
+  const wasLite = body.classList.contains('game-performance-lite');
+  // Histerese: entra quando a mesa fica pesada e só sai depois de aliviar bem,
+  // evitando ficar ligando/desligando efeitos a cada compra ou descarte.
+  const shouldLite = wasLite ? renderWeight >= 62 : renderWeight >= 76;
+  body.classList.toggle('game-performance-lite', shouldLite);
+  body.dataset.renderWeight = String(renderWeight);
 }
 
 window.getState = () => state;
@@ -7782,6 +7816,7 @@ function renderAll() {
     debugDeckThemeSelect.value = document.body.dataset.deckTheme;
   }
   syncMythicPhase();
+  syncAdaptiveGamePerformance();
 
   // Liga o visual FinDom se a partida estiver valendo PIX (para lógica de placar)
   if (state.isBetting) {
@@ -8830,7 +8865,10 @@ function renderMelds() {
   const m2 = document.getElementById('meldsP2');
   // Keep unchanged Domination melds (and seat clearances) mounted. Rebuilding
   // them on every hand/guest update restarts effects and invalidates geometry.
-  const stableMelds = state.mode === '1x1_dominacao';
+  // Mesas de chefe crescem bastante no fim da partida. Reusar jogos que não
+  // mudaram evita desmontar/recriar dezenas de cartas a cada clique, compra ou
+  // atualização do Firebase — exatamente o tipo de custo que degrada tablets.
+  const stableMelds = state.mode === '1x1_dominacao' || isBossMode(state.mode);
   if (!stableMelds) {
     m1.innerHTML = '';
     m2.innerHTML = '';

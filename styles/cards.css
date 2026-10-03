@@ -1647,3 +1647,19 @@ body[data-deck-theme] #handContainer .carta.just-bought {
   border-radius: 6px;
   cursor: pointer;
 }
+
+/* Modo adaptativo para tablets em partidas longas. A canastra continua com a
+   borda especial, porém o feixe não percorre a linha continuamente. */
+@media (any-pointer: coarse) {
+  body.game-performance-lite .meld-line.canastra-asas-bdsm .meld-line-cards {
+    animation: none !important;
+    filter: none !important;
+    background-position: 0 0, 50% 0 !important;
+  }
+
+  body.game-performance-lite #gameSection .opponent-card-back,
+  body.game-performance-lite #gameSection .morto-card-back,
+  body.game-performance-lite #gameSection .carta.back {
+    filter: none !important;
+  }
+}

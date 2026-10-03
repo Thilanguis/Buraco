@@ -900,3 +900,19 @@
   #dominationVisionHint.vision-alert-pulse { animation: none; color: #f4d479; }
   .vision-focus-overlay { display: none; }
 }
+
+/* Tablet: em mesa muito carregada, congela apenas os adornos contínuos da
+   Dominação. As cores/níveis continuam visíveis, mas sem repintar bordas e
+   brilhos grandes a cada frame. */
+@media (any-pointer: coarse) {
+  body.game-performance-lite #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0)::before,
+  body.game-performance-lite #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0)::after,
+  body.game-performance-lite .brasao-frame,
+  body.game-performance-lite .brasao-frame::before {
+    animation: none !important;
+  }
+
+  body.game-performance-lite #gameSection .board-melds .grow[class*='dom-nivel-']:not(.dom-nivel-0)::after {
+    filter: none !important;
+  }
+}
