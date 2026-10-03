@@ -13,5 +13,5 @@ try {
   gate.innerHTML = '<div class="account-card"><h1>Não foi possível abrir o jogo</h1><p>Confira sua conexão e tente novamente. Se persistir, confira a configuração do Firebase.</p><button type="button">Tentar novamente</button></div>';
   gate.querySelector('button').onclick = () => location.reload();
   document.body.append(gate);
-  console.error('Falha na inicialização:', error.code || error.name);
+  console.error('Falha na inicialização:', error);
 }
