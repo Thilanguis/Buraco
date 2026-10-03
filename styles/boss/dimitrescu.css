@@ -116,7 +116,7 @@ body[data-boss-id='dimitrescu'] .boss-blood-meter .boss-meter-track {
   position: relative;
   isolation: isolate;
   height: 18px;
-  margin: 13px 31px 6px 34px;
+  margin: 20px 31px 6px 34px;
   border: 0;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(37, 2, 8, 0.96), rgba(10, 0, 3, 0.98));
