@@ -75,3 +75,29 @@ Ao alterar uma regra estável:
 2. atualizar a documentação permanente correspondente;
 3. atualizar o inventário quando a mudança afetar habilidade, fase, peso ou efeito resumido;
 4. usar o handoff apenas para registrar o que ainda está pendente ou precisa ser retomado em outra sessão.
+
+
+## Regra obrigatória — auditoria de dependências antes de substituir/remover uma feature
+
+Toda alteração que remova, substitua, renomeie ou mude o gatilho de uma feature deve começar por uma **auditoria de tudo que está acoplado a ela** antes de qualquer edição.
+
+Verificar, no mínimo:
+- sons/SFX e música interrompida ou retomada pela feature;
+- animações, overlays, foco visual, vibração e feedback háptico;
+- botões, HUD, mensagens, dicas e acessibilidade (`aria-*`);
+- eventos persistidos, `lastAction`, estados salvos e compatibilidade com partidas antigas;
+- lógica de BOT/IA e timers/janelas de reação;
+- testes e cenários de DEVTOOLS;
+- Service Worker/cache e assets associados;
+- documentação e inventários relacionados;
+- imports, arquivos auxiliares e código que possa ficar órfão.
+
+**Regra de decisão:** se um comportamento acoplado não tiver destino óbvio na nova versão, **não removê-lo nem decidir sozinho**. Parar e avisar o Biel explicitamente, por exemplo: `Esta feature também dispara X/Y/Z. Ao substituí-la, você quer preservar, reaproveitar ou remover esses comportamentos?`
+
+Uma mudança só pode ser considerada pronta para aplicação depois de responder:
+1. o que esta feature fazia além da regra principal?;
+2. quais efeitos visuais/sonoros e integrações dependem dela?;
+3. o que será preservado, migrado ou removido?;
+4. existe alguma consequência não solicitada pelo Biel?;
+
+**Não interpretar “substituir a mecânica” como autorização automática para apagar apresentação, som, animação ou integrações que estavam atreladas à mecânica antiga.**

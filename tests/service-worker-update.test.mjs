@@ -26,6 +26,17 @@ test('checagem ignora cache HTTP e o fluxo oferece retry sem reload prematuro', 
 });
 
 test('service worker novo mantém skipWaiting e sobe a versão de cache', () => {
-  assert.match(worker, /CACHE_NAME = 'buraco-v255'/);
+  assert.match(worker, /CACHE_NAME = 'buraco-v258'/);
   assert.match(worker, /event\.data === 'skipWaiting'/);
+});
+
+
+test('apresentação de atualização preserva o contador antigo sem antecipar a ativação', () => {
+  const promptBlock = app.slice(app.indexOf('function showUpdatePrompt'), app.indexOf('const urlParams'));
+  assert.match(promptBlock, /Sincronizando Módulos/);
+  assert.match(promptBlock, /Compilando pacotes \(1\/\$\{steps\}\)/);
+  assert.match(promptBlock, /Compilando pacotes \(\$\{currentStep\}\/\$\{steps\}\)/);
+  assert.match(promptBlock, /Mesa pronta!/);
+  assert.match(promptBlock, /setTimeout\(requestAndWaitForActivation, 600\)/);
+  assert.doesNotMatch(promptBlock, /localStorage\.setItem\('buraco_current_version'/);
 });

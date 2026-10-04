@@ -17,7 +17,7 @@ import {
   sfxSteal,
   stopAllGameSfx,
 } from './js/audio.js';
-import { chooseDominationSearchCard } from './js/game/domination-search.js';
+import { applyDominationDecree, canUseDominationDecree, dominationDecreeUsed, isDominationDiscardDecreeActive } from './js/game/domination-decree.js';
 import { applyPauseVote, pauseBlocksPlay, stockIsExhausted, createActionGate } from './js/game/match-control.js';
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
 import { activeAccount } from './js/account-auth.js';
@@ -338,39 +338,34 @@ function showUpdatePrompt(worker, registration, totalAtts = 1, newVersion = null
   };
 
   const startProgressSequence = () => {
-    serviceWorkerActivationRequested = true;
     pendingServiceWorkerVersion = Number.isFinite(Number(newVersion)) ? Number(newVersion) : null;
+    const steps = Math.max(1, Number(totalAtts) || 1);
     overlay.innerHTML = `
-      <div class="score-card" style="max-width: 340px; text-align: center; padding: 30px 20px; border-color: #facc15;">
-        <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Aplicando atualização…</h2>
+      <div class="score-card" style="max-width: 320px; text-align: center; padding: 30px 20px; border-color: #facc15;">
+        <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Sincronizando Módulos...</h2>
         <div style="width: 100%; background: #1e293b; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(250, 204, 21, 0.2);">
-          <div id="update-progress-bar" style="width: 12%; height: 100%; background: #22c55e; box-shadow: 0 0 10px #22c55e; transition: width 0.22s ease;"></div>
+          <div id="update-progress-bar" style="width: 0%; height: 100%; background: #22c55e; box-shadow: 0 0 10px #22c55e; transition: width 0.1s linear;"></div>
         </div>
         <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: #94a3b8;">
-          <span id="update-status-text">Aguardando o novo módulo assumir o controle…</span>
-          <span id="update-percent" style="color: #4ade80; font-weight: bold;">12%</span>
+          <span id="update-status-text">Compilando pacotes (1/${steps})...</span>
+          <span id="update-percent" style="color: #4ade80; font-weight: bold;">0%</span>
         </div>
         <button id="btn-update-retry" type="button" class="custom-modal-btn" style="display:none; width:100%; margin-top:18px; background:#334155; color:#fff; padding:11px; border-radius:8px; font-weight:800; cursor:pointer; border:1px solid #64748b;">TENTAR NOVAMENTE</button>
       </div>`;
 
     clearInterval(serviceWorkerProgressTimer);
     clearTimeout(serviceWorkerActivationTimer);
-    let progress = 12;
-    serviceWorkerProgressTimer = setInterval(() => {
-      progress = Math.min(85, progress + 3);
-      const bar = document.getElementById('update-progress-bar');
-      const percentText = document.getElementById('update-percent');
-      if (bar) bar.style.width = `${progress}%`;
-      if (percentText) percentText.textContent = `${progress}%`;
-      if (progress >= 85) clearInterval(serviceWorkerProgressTimer);
-    }, 220);
+    let progress = 0;
+    let currentStep = 1;
+    const bar = document.getElementById('update-progress-bar');
+    const percentText = document.getElementById('update-percent');
+    const statusText = document.getElementById('update-status-text');
 
     const armTimeout = () => {
       clearTimeout(serviceWorkerActivationTimer);
       serviceWorkerActivationTimer = setTimeout(() => {
         if (serviceWorkerReloading) return;
         clearInterval(serviceWorkerProgressTimer);
-        const statusText = document.getElementById('update-status-text');
         const retry = document.getElementById('btn-update-retry');
         if (statusText) {
           statusText.textContent = 'O navegador ainda não ativou a nova versão.';
@@ -380,11 +375,16 @@ function showUpdatePrompt(worker, registration, totalAtts = 1, newVersion = null
       }, 8000);
     };
 
+    const requestAndWaitForActivation = () => {
+      serviceWorkerActivationRequested = true;
+      requestActivation();
+      armTimeout();
+    };
+
     const retry = document.getElementById('btn-update-retry');
     if (retry) {
       retry.onclick = () => {
         retry.style.display = 'none';
-        const statusText = document.getElementById('update-status-text');
         if (statusText) {
           statusText.textContent = 'Tentando ativar novamente…';
           statusText.style.color = '#94a3b8';
@@ -395,8 +395,38 @@ function showUpdatePrompt(worker, registration, totalAtts = 1, newVersion = null
       };
     }
 
-    requestActivation();
-    armTimeout();
+    serviceWorkerProgressTimer = setInterval(() => {
+      const stepTarget = (currentStep / steps) * 100;
+      progress += Math.floor(Math.random() * 8) + 4;
+      if (progress >= stepTarget) {
+        progress = stepTarget;
+        if (currentStep < steps) currentStep += 1;
+      }
+
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(serviceWorkerProgressTimer);
+        serviceWorkerProgressTimer = null;
+        if (statusText) {
+          statusText.textContent = 'Mesa pronta!';
+          statusText.style.color = '#4ade80';
+        }
+        if (bar) {
+          bar.style.width = '100%';
+          bar.style.background = '#facc15';
+          bar.style.boxShadow = '0 0 15px #facc15';
+        }
+        if (percentText) percentText.textContent = '100%';
+        // A apresentação antiga termina aqui; a correção nova permanece: só
+        // consideramos a versão aplicada depois do controllerchange real.
+        setTimeout(requestAndWaitForActivation, 600);
+        return;
+      }
+
+      if (bar) bar.style.width = `${progress}%`;
+      if (percentText) percentText.textContent = `${Math.round(progress)}%`;
+      if (statusText) statusText.textContent = `Compilando pacotes (${currentStep}/${steps})...`;
+    }, 80);
   };
 
   overlay.innerHTML = `
@@ -745,6 +775,7 @@ function invalidateGameSession({ stopMedia = true } = {}) {
   document.getElementById('dominationFriendPresentation')?.remove();
   window.isClosingGame = true;
   updateVisionAlert('', false);
+  updateDecreeAlert('', false);
   friendSoundQueue.cancel();
   friendNoticeTracker.reset();
   document.querySelectorAll('.friend-notice').forEach((notice) => {
@@ -2144,6 +2175,7 @@ const friendMeldRules = {
 
 const evaluateDominationVisionHint = createVisionHintEvaluator(friendMeldRules);
 const presentVisionFocus = createVisionFocus();
+const presentDecreeFocus = createVisionFocus(document, window, 'decreeBtn');
 const updateVisionAlert = createVisionAlert({
   busy: () => [sfxMyTurn, ...ALL_CANASTRA_SFX].some((audio) => !audio.paused && !audio.ended),
   valid: () => !window.isClosingGame && Boolean(evaluateDominationVisionHint(state, myPlayerIndex, canPerformCommonGameAction(state))),
@@ -2161,6 +2193,22 @@ const updateVisionAlert = createVisionAlert({
       sessionStorage.setItem('buraco-vision-alert', key);
     } catch {}
   },
+});
+
+const updateDecreeAlert = createVisionAlert({
+  // Se a UI estiver sincronizando/gravando no exato começo do turno, não
+  // consumimos o aviso. Esperamos o botão ficar realmente acionável.
+  busy: () => [sfxMyTurn, ...ALL_CANASTRA_SFX].some((audio) => !audio.paused && !audio.ended) || !canActivateDominationDecree(state, 1),
+  valid: () => !window.isClosingGame && Boolean(getDominationDecreeThreat(state)),
+  intro: (active) => {
+    presentDecreeFocus(active);
+    if (active) playDominationSearchSound();
+  },
+  pulse: (active) => ['decreeBtn', 'dominationDecreeHint'].forEach((id) => document.getElementById(id)?.classList.toggle('vision-alert-pulse', active)),
+  // Diferente da Visão, o alerta do Decreto é ligado ao descarte que abriu o
+  // turno. Um reload/sincronização no mesmo turno não deve fazê-lo desaparecer.
+  recalled: () => false,
+  remember: () => {},
 });
 
 function renderDominationVisionHint() {
@@ -2200,18 +2248,49 @@ function renderMatchDuration() {
   } else if (!matchDurationTimer) matchDurationTimer = setInterval(renderMatchDuration, 1000);
 }
 
-function canSearchDominationCard(gameState = state, actorId = myPlayerIndex) {
-  if (pauseBlocksPlay(gameState)) return false;
-  return (
-    dominationFeatureEnabled(gameState, 'search') &&
-    actorId === 1 &&
-    gameState.currentPlayer === 1 &&
-    !gameState.finished &&
-    !gameState.surrender?.active &&
-    !gameState.debugPaused &&
-    !gameState.dominatorSearchUsed &&
-    !isDominationFriendBusy(gameState)
-  );
+function canActivateDominationDecree(gameState = state, actorId = myPlayerIndex) {
+  return canUseDominationDecree(gameState, actorId)
+    && !isDominationFriendBusy(gameState)
+    && canPerformCommonGameAction(gameState)
+    && !friendOperationPending
+    && !committing;
+}
+
+function getDominationDecreeThreat(gameState = state) {
+  if (gameState?.mode !== '1x1_dominacao' || myPlayerIndex !== 1) return null;
+  if (!canUseDominationDecree(gameState, 1) || dominationDecreeUsed(gameState)) return null;
+  const lastAction = gameState.lastAction;
+  if (lastAction?.type !== 'discard' || Number(lastAction.playerId) !== 1) return null;
+  const slave = gameState.players?.[0];
+  if (!slave || slave.name?.toUpperCase().includes('BOT')) return null;
+  const top = gameState.discard?.at?.(-1);
+  if (!top) return null;
+  if (lastAction.card?.id && top.id && lastAction.card.id !== top.id) return null;
+  const hand = (slave.hand || []).filter(Boolean);
+  const team = gameState.teams?.find((entry) => entry.id === slave.teamId);
+  const melds = team?.melds || [];
+
+  // Alerta de risco deve ser barato: ele roda durante renderizações. Procura
+  // encaixe direto em jogo existente, extensão com 1 carta da mão ou um novo
+  // jogo de 3 cartas com o topo. A decisão exata do BOT continua sendo a
+  // autoridade final e dispara o alerta no momento em que ele decide comprar.
+  const fits = (cards) => cards.length >= 3 && isValidSequenceMeld(cards);
+  let useful = melds.some((meld) => fits([...meld, top]));
+  if (!useful) {
+    useful = melds.some((meld) => hand.some((card) => fits([...meld, card, top])));
+  }
+  if (!useful) {
+    for (let i = 0; i < hand.length - 1 && !useful; i += 1) {
+      for (let j = i + 1; j < hand.length; j += 1) {
+        if (fits([hand[i], hand[j], top])) {
+          useful = true;
+          break;
+        }
+      }
+    }
+  }
+  if (!useful) return null;
+  return { card: top, label: `${top.rank || ''}${top.suit || ''}`.trim() || 'A carta do topo' };
 }
 
 function renderDominationTools() {
@@ -2233,90 +2312,75 @@ function renderDominationTools() {
       select.dataset.options = key;
     }
   }
-  const button = document.getElementById('seekCardBtn');
+
+  const button = document.getElementById('decreeBtn');
+  const hint = document.getElementById('dominationDecreeHint');
+  const show = state.mode === '1x1_dominacao' && dominationFeatureEnabled(state, 'decree') && myPlayerIndex === 1 && !state.finished;
+  const active = show && isDominationDiscardDecreeActive(state, 0);
+  const available = show && canActivateDominationDecree(state, 1);
+  const used = dominationDecreeUsed(state);
+
   if (button) {
-    button.hidden = !dominationFeatureEnabled(state, 'search') || myPlayerIndex !== 1;
-    button.disabled = !canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying;
-    button.textContent = state.dominatorSearchUsed ? '✓ BUSCA UTILIZADA' : '🔎 CARTA';
+    button.hidden = !show;
+    button.disabled = !available;
+    button.textContent = active ? '🔒 LIXO BLOQUEADO' : used ? '✓ DECRETO USADO' : available ? '👑 BLOQUEAR LIXO' : '👑 MONTE OBRIGATÓRIO';
+    button.title = used
+      ? 'O Decreto do Dominador já foi usado nesta partida.'
+      : available
+        ? 'Use agora para bloquear o Lixo durante o turno atual do Escravo e obrigar a compra do Monte.'
+        : '1x por partida. Fica disponível durante o turno do Escravo, antes da compra, quando há cartas no Lixo.';
+    button.style.boxShadow = available ? '0 0 16px rgba(245, 158, 11, 0.8)' : 'none';
+    button.style.transform = available ? 'scale(1.04)' : '';
   }
-  const dialog = document.getElementById('cardSearchDialog');
-  if (dialog?.open && !canSearchDominationCard()) dialog.close();
+
+  const slaveIsBot = state.players?.[0]?.name?.toUpperCase().includes('BOT') === true;
+  const threat = show && !used && !slaveIsBot ? getDominationDecreeThreat(state) : null;
+  const message = threat
+    ? `⚠️ ${threat.label} que você descartou serve ao Escravo. Ele pode pegar o Lixo — bloqueie agora.`
+    : active
+      ? '🔒 Lixo bloqueado neste turno.'
+      : '';
+  if (hint) {
+    if (hint.textContent !== message) hint.textContent = message;
+    hint.hidden = !message;
+  }
+  const alertKey = threat ? `${gameId}:${state.turnNumber}:${threat.card.id || threat.label}` : '';
+  updateDecreeAlert(alertKey, Boolean(threat));
 }
 
-window.openDominationCardSearch = () => {
-  if (!canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying || document.querySelector('.fly-card')) return;
-  window.refreshDominationCardSearch();
-  document.getElementById('cardSearchDialog').showModal();
-  playDominationSearchSound();
-  syncTableAmbientMusic();
-};
-window.refreshDominationCardSearch = () => {
-  const auxiliary = document.getElementById('seekCardSource').value === 'auxiliary';
-  const stock = auxiliary ? state?.dominationFriendShared?.stock || [] : state?.stock || [];
-  const select = document.getElementById('seekCardChoice');
-  const choices = new Map();
-  // Aggregate duplicates and sort by face: do not disclose draw order.
-  for (const card of stock) {
-    const label = card.joker ? 'Coringa' : `${card.rank} ${card.suit}`;
-    const entry = choices.get(label) || { id: card.id, count: 0 };
-    entry.count++;
-    choices.set(label, entry);
-  }
-  select.replaceChildren(...[...choices].sort(([a], [b]) => a.localeCompare(b, 'pt-BR', { numeric: true })).map(([label, entry]) => new Option(`${label} (${entry.count} ${entry.count > 1 ? 'disponíveis' : 'disponível'})`, entry.id)));
-  document.getElementById('seekCardConfirm').disabled = !stock.length || !canSearchDominationCard();
-  document.getElementById('seekCardStatus').textContent = stock.length ? 'A carta escolhida vai para a mão do Dominador.' : 'Este monte está vazio ou ainda não foi criado. A habilidade não será gasta.';
-};
-window.takeDominationSearchCard = async () => {
-  if (!canSearchDominationCard() || !canPerformCommonGameAction() || committing || window.isStealModeActive || window.isMelding || window.isAutoPlaying || document.querySelector('.fly-card')) return;
-  const source = document.getElementById('seekCardSource').value;
-  const cardId = document.getElementById('seekCardChoice').value;
-  await performDominationSearch(source, cardId);
-};
+window.activateDominationDecree = () => performDominationDecree(myPlayerIndex);
 
-async function performDominationSearch(source, cardId, botCall = false) {
-  const actorId = botCall ? 1 : myPlayerIndex;
-  if (botCall && (myPlayerIndex !== friendHostIndex(state) || !state?.players?.[1]?.name?.toUpperCase().includes('BOT'))) return;
-  if (!canSearchDominationCard(state, actorId) || !canPerformCommonGameAction() || committing || friendOperationPending) return;
-  if (!['main', 'auxiliary'].includes(source) || !cardId) return;
+async function performDominationDecree(actorId) {
+  if (!canActivateDominationDecree(state, actorId)) return;
   const session = window.gameSessionId;
   const id = newActionId();
   friendOperationPending = true;
-  ignoreOwnActionId = id;
-  stopTurnTimer();
-  document.getElementById('cardSearchDialog').close();
+  renderAll();
   try {
     const saved = await saveFriendOperation((latest) => {
-      if (!canSearchDominationCard(latest, actorId)) return null;
-      const choice = botCall ? chooseDominationSearchCard(latest, friendMeldRules) : { source, cardId };
-      if (!choice) return null;
-      const stock = choice.source === 'auxiliary' ? latest.dominationFriendShared?.stock || [] : latest.stock;
-      const index = stock.findIndex((card) => card.id === choice.cardId);
-      if (index < 0) return null;
-      const [card] = stock.splice(index, 1);
-      latest.players[1].hand.push(card);
-      sortHand(latest.players[1].hand);
-      latest.boughtCardIds = [...new Set([...(latest.boughtCardIds || []), card.id])];
-      latest.dominatorSearchUsed = true;
-      latest.lastAction = { id, type: 'dominationSearch', playerId: 1, source: choice.source, card: packCard(card), ts: Date.now() };
+      if (!applyDominationDecree(latest, actorId)) return null;
+      latest.lastAction = {
+        id,
+        type: 'dominationDecree',
+        playerId: actorId,
+        targetPlayerId: 0,
+        turnNumber: latest.turnNumber,
+        ts: Date.now(),
+      };
       return true;
     });
     if (session !== window.gameSessionId || window.isClosingGame) return;
     if (!saved) {
-      showMessage('A carta não está mais disponível ou a vez mudou. A busca não foi gasta.');
+      showMessage('A janela do Decreto fechou antes da confirmação. O poder não foi gasto.');
       return;
     }
+    ignoreOwnActionId = id;
     localUndoStack = [];
-    selectedHandIndexes.clear();
-    selectedMeldTarget = null;
-    try {
-      await playRemoteAction(saved.state.lastAction);
-    } finally {
-      if (session === window.gameSessionId && !window.isClosingGame && (state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
-    }
-    showMessage(botCall ? '🔎 O Dominador procurou uma carta útil. A compra normal dele foi preservada.' : '🔎 Carta recebida! Sua compra normal do turno foi preservada.');
+    if ((state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
+    showMessage('🔒 Lixo bloqueado neste turno.');
   } catch (error) {
-    console.error('Busca de carta:', error);
-    showMessage('Não foi possível concluir a apresentação da busca. Confira sua mão antes de tentar novamente.');
+    console.error('Decreto do Dominador:', error);
+    showMessage('Não foi possível aplicar o Decreto. Tente novamente enquanto o Escravo ainda não comprou.');
   } finally {
     friendOperationPending = false;
     if (session === window.gameSessionId && !window.isClosingGame) {
@@ -2324,6 +2388,27 @@ async function performDominationSearch(source, cardId, botCall = false) {
       startTurnTimerIfNeeded();
     }
   }
+}
+
+async function waitForDominationDecreeReaction(botIndex) {
+  if (botIndex !== 0 || myPlayerIndex !== 1 || state?.players?.[1]?.name?.toUpperCase().includes('BOT')) return false;
+  if (!canActivateDominationDecree(state, 1)) return false;
+  const session = window.gameSessionId;
+  const turn = state.turnNumber;
+  const top = state.discard?.at?.(-1);
+  const label = top ? `${top.rank || ''}${top.suit || ''}`.trim() : 'A carta do topo';
+  showMessage(`⚠️ ${label} que você descartou serve ao Escravo BOT. Ele vai tentar pegar o Lixo — bloqueie agora.`);
+  renderDominationTools();
+  presentDecreeFocus(true);
+  playDominationSearchSound();
+  setTimeout(() => presentDecreeFocus(false), 1400);
+  if (navigator.vibrate) {
+    try { navigator.vibrate([120, 70, 120]); } catch {}
+  }
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  if (session !== window.gameSessionId || window.isClosingGame) return true;
+  if (!state || state.turnNumber !== turn || state.currentPlayer !== botIndex || state.hasDrawnThisTurn) return true;
+  return isDominationDiscardDecreeActive(state, botIndex);
 }
 
 async function performDominationDevOperation(operation) {
@@ -3229,7 +3314,7 @@ window.updateDominationFriendCapacity = updateDominationFriendCapacity;
 
 function readDominationMenuOptions() {
   return normalizeDominationOptions({
-    ...Object.fromEntries(['friend', 'plus', 'vision', 'search'].map((key) => [key, document.getElementById(`dominationOption_${key}`)?.checked !== false])),
+    ...Object.fromEntries(['friend', 'plus', 'vision', 'decree'].map((key) => [key, document.getElementById(`dominationOption_${key}`)?.checked !== false])),
     friendCapacity: document.getElementById('dominationFriendCapacity')?.value || 0,
   });
 }
@@ -3238,7 +3323,7 @@ function syncDominationMenuOptions(options) {
   const normalized = normalizeDominationOptions({ ...options, friendCapacity: options?.friendCapacity ?? 0 });
   const capacity = document.getElementById('dominationFriendCapacity');
   if (capacity) capacity.value = String(normalized.friendCapacity);
-  for (const key of ['friend', 'plus', 'vision', 'search']) {
+  for (const key of ['friend', 'plus', 'vision', 'decree']) {
     const enabled = normalized[key];
     const checkbox = document.getElementById(`dominationOption_${key}`);
     if (checkbox) checkbox.checked = enabled;
@@ -3370,7 +3455,8 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
     betBase,
     betPerPoint,
     dominatorUsedPower: false,
-    dominatorSearchUsed: false,
+    dominatorDecreeUsed: false,
+    dominatorDiscardBlockTurn: null,
     powerActiveThisTurn: false,
   };
   if (mode === '1x1_dominacao') {
@@ -3717,6 +3803,10 @@ async function drawFromDiscardOnce(options = {}) {
   if (!ensureMyTurn()) return;
   if (!state.hasDrawnThisTurn && isBossVaultDrawRequired(state, state.currentPlayer)) {
     showMessage('Cofre: resgate obrigatório. Monte e lixo estão bloqueados neste turno.');
+    return;
+  }
+  if (!state.hasDrawnThisTurn && isDominationDiscardDecreeActive(state, state.currentPlayer)) {
+    showMessage('👑 Monte Obrigatório: o Dominador bloqueou o Lixo neste turno. Compre do Monte.');
     return;
   }
   if (!state.hasDrawnThisTurn && isBossDiscardBlocked(state)) {
@@ -8128,7 +8218,7 @@ function renderAll() {
   document.getElementById('drawStockBtn').style.opacity = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && !vaultDrawRequired ? '1' : '0.5';
 
   // NOVO: Libera o clique no lixo tanto para comprar quanto para descartar
-  const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && !vaultDrawRequired && state.discard.length && !isBossDiscardBlocked(state);
+  const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && !vaultDrawRequired && state.discard.length && !isBossDiscardBlocked(state) && !isDominationDiscardDecreeActive(state, state.currentPlayer);
   const canDiscardToPile = myTurn && state.hasDrawnThisTurn && !bossControlsLocked;
   document.getElementById('drawDiscardBtn').style.pointerEvents = canDrawDiscard || canDiscardToPile ? 'auto' : 'none';
   document.getElementById('drawDiscardBtn').style.opacity = canDrawDiscard || canDiscardToPile ? '1' : '0.5';
@@ -10059,6 +10149,16 @@ async function playRemoteAction(a) {
     return;
   }
 
+  if (a.type === 'dominationDecree') {
+    if (myPlayerIndex === 0) {
+      showMessage('🔒 O Dominador bloqueou o Lixo. Compre do Monte.');
+      if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
+    } else if (myPlayerIndex === 1) {
+      showMessage('🔒 Lixo bloqueado neste turno.');
+    }
+    return;
+  }
+
   if (a.type === 'dominationSearch') {
     if (myPlayerIndex !== 1 || state.players[1]?.name?.toUpperCase().includes('BOT')) playDominationSearchSound();
     const source = document.querySelector(a.source === 'auxiliary' ? '#dominationFriendStock .opponent-card-back' : '#drawStockBtn .pile-card');
@@ -10328,10 +10428,6 @@ async function executeBotDominationPowers(engine, botIndex) {
   const eligible = () => engine.isActive() && state?.mode === '1x1_dominacao' && botIndex === 1 && state.currentPlayer === 1 && !state.finished && !state.debugPaused && !state.surrender?.active && state.players[1].name.toUpperCase().includes('BOT');
   if (!eligible()) return;
   if (shouldBotCallDominationFriend(state, friendMeldRules)) await performDominationFriendCall(1, true);
-  if (eligible() && canSearchDominationCard(state, 1) && canPerformCommonGameAction()) {
-    const choice = chooseDominationSearchCard(state, friendMeldRules);
-    if (choice) await performDominationSearch(choice.source, choice.cardId, true);
-  }
   if (!eligible() || state.hasDrawnThisTurn || !dominationFeatureEnabled(state, 'vision') || (state.dominatorUsedPower && !state.powerActiveThisTurn) || !state.players[0].hand.length) return;
   // Persist activation before stealing: a resumed turn can finish the remaining
   // purchase, but can never activate the once-per-match power a second time.
@@ -10396,7 +10492,7 @@ const botEngine = {
       return false;
     }
   },
-  isDiscardBlocked: () => isBossDiscardBlocked(state),
+  isDiscardBlocked: () => isBossDiscardBlocked(state) || isDominationDiscardDecreeActive(state, state.currentPlayer),
   isMeldLocked: (teamId, meldIndex) => isBossMeldLocked(state, teamId, meldIndex) || !canBossUseMeld(state, state.currentPlayer, meldIndex),
   isCardBlocked: (playerId, cardId, action = 'play') => isBossCardBlocked(state, playerId, cardId, action),
   canCreateMeld: (playerId) => canBossCreateMeld(state, playerId),
@@ -10692,10 +10788,13 @@ const botEngine = {
   },
 
   async executeDrawDiscard(botIndex) {
-    const s = this.getState();
+    let s = this.getState();
     if (!s) return false;
     if (s.hasDrawnThisTurn) return false;
-    if (isBossDiscardBlocked(s)) return false;
+    if (isBossDiscardBlocked(s) || isDominationDiscardDecreeActive(s, botIndex)) return false;
+    if (await waitForDominationDecreeReaction(botIndex)) return false;
+    s = this.getState();
+    if (!s || s.hasDrawnThisTurn || isDominationDiscardDecreeActive(s, botIndex)) return false;
     if (!Array.isArray(s.discard) || s.discard.length === 0) {
       console.warn('[BOT] executeDrawDiscard chamado com lixo vazio. Possível jogada duplicada.');
       return false;
@@ -10760,10 +10859,13 @@ const botEngine = {
   },
 
   async executeDrawDiscardFechado(botIndex, intent) {
-    const s = this.getState();
+    let s = this.getState();
     if (!s) return false;
     if (s.hasDrawnThisTurn) return false;
-    if (isBossDiscardBlocked(s)) return false;
+    if (isBossDiscardBlocked(s) || isDominationDiscardDecreeActive(s, botIndex)) return false;
+    if (await waitForDominationDecreeReaction(botIndex)) return false;
+    s = this.getState();
+    if (!s || s.hasDrawnThisTurn || isDominationDiscardDecreeActive(s, botIndex)) return false;
     if (!Array.isArray(s.discard) || s.discard.length === 0) {
       console.warn('[BOT] executeDrawDiscardFechado chamado com lixo vazio. Possível jogada duplicada.');
       return false;

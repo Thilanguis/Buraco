@@ -262,12 +262,11 @@ export class BuracoBot {
           const bossAllowsDiscard = !intent || typeof engine.shouldTakeBossDiscard !== 'function'
             || engine.shouldTakeBossDiscard(me.id, intent, naturePlan);
           if (intent && intent.wants && bossAllowsDiscard) {
-            engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
-
             this.assertActive(engine, signal);
             const usesClosedDiscard = state.variant === 'fechado' || state.mode?.startsWith('boss_');
             const drawOk = usesClosedDiscard ? await engine.executeDrawDiscardFechado(botIndex, intent) : await engine.executeDrawDiscard(botIndex);
             boughtFromDiscard = drawOk !== false;
+            if (boughtFromDiscard) engine.showMessage(`🤖 ${me.name} puxou o Lixo!`);
           }
         }
 

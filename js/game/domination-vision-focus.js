@@ -2,12 +2,12 @@ export const VISION_FOCUS_DURATION = 1400;
 
 // A hollow, soft light halo converges on the actual button rectangle.
 // No fullscreen blur or layout writes; corner geometry softens at arrival.
-export function createVisionFocus(doc = document, win = window) {
+export function createVisionFocus(doc = document, win = window, buttonId = 'powerBtn') {
   let cleanup = () => {};
   return active => {
     cleanup();
     if (!active || win.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const button = doc.getElementById('powerBtn');
+    const button = doc.getElementById(buttonId);
     if (!button || button.disabled || !button.getClientRects().length) return;
     const rect = button.getBoundingClientRect();
     const width = win.innerWidth, height = win.innerHeight;
