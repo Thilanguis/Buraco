@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v256';
+const CACHE_NAME = 'buraco-v264';
 const ASSETS = [
   './js/history-totals.js',
   './js/history-comparison.js',
@@ -101,6 +101,7 @@ const ASSETS = [
   './assets/images/dimitrescu-blood-meter-frame.png',
   './assets/images/portas-castelo-lixo.png',
   './assets/images/nehelenia-discard-mirror-frame.png',
+  './assets/images/domination-decree-lock.png',
   './assets/sfx/ganho-sangue-dimitresco.mp3',
   './manifest.json',
   './manifest.webmanifest',

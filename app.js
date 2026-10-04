@@ -17,7 +17,7 @@ import {
   sfxSteal,
   stopAllGameSfx,
 } from './js/audio.js';
-import { applyDominationDecree, canUseDominationDecree, dominationDecreeUsed, isDominationDiscardDecreeActive } from './js/game/domination-decree.js';
+import { applyDominationDecree, canUseDominationDecree, dominationDecreeUsed, isDominationDiscardDecreeActive, shouldShowDominationDecreeDiscardLock } from './js/game/domination-decree.js';
 import { applyPauseVote, pauseBlocksPlay, stockIsExhausted, createActionGate } from './js/game/match-control.js';
 import { db, deleteDoc, doc, onSnapshot, runTransaction, setDoc, updateDoc } from './js/firebase.js';
 import { activeAccount } from './js/account-auth.js';
@@ -624,13 +624,7 @@ function matriarchNatureSoundPairKey(event, suffix) {
   return actionId.endsWith(marker) ? actionId.slice(0, -marker.length) : '';
 }
 
-const NEHELENIA_WRONG_MIRROR_CHOICE_TYPES = new Set([
-  'false_image',
-  'dream_theft',
-  'discard_mirror',
-  'shattered_mirror',
-  'eternal_nightmare',
-]);
+const NEHELENIA_WRONG_MIRROR_CHOICE_TYPES = new Set(['false_image', 'dream_theft', 'discard_mirror', 'shattered_mirror', 'eternal_nightmare']);
 
 function playNeheleniaWrongMirrorLaugh(choice, selectedOption) {
   if (state?.boss?.id !== 'nehelenia' || !choice?.correctOption) return false;
@@ -764,7 +758,8 @@ function cancelGameAnimations() {
     const target = animation.effect?.target;
     if (target && (gameSection?.contains(target) || target.classList?.contains('dice-scene'))) animation.cancel();
   });
-  document.querySelectorAll('.fly-card, .impact-ring, .spark, .dice-scene, .boss-floating-number').forEach((element) => element.remove());
+  document.querySelectorAll('.fly-card, .impact-ring, .spark, .dice-scene, .boss-floating-number, .domination-decree-lock-flight, .domination-decree-lock-frame').forEach((element) => element.remove());
+  dominationDecreeLockAnimating = false;
 }
 
 function invalidateGameSession({ stopMedia = true } = {}) {
@@ -873,10 +868,8 @@ function confirmBossDiscardPickup() {
 
 function bossCreateMeldDeniedMessage(playerId) {
   const intent = state?.boss?.currentIntent;
-  const persistentInverted = state?.boss?.id === 'nehelenia'
-    && state.boss.effects?.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId);
-  if (state?.boss?.id === 'nehelenia'
-    && ((intent?.abilityId === 'fish_inverted' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fedExisting) || persistentInverted)) {
+  const persistentInverted = state?.boss?.id === 'nehelenia' && state.boss.effects?.some((effect) => effect.id === 'nehelenia_inverted_reflection' && effect.playerId === playerId);
+  if (state?.boss?.id === 'nehelenia' && ((intent?.abilityId === 'fish_inverted' && intent.payload?.targetPlayerId === playerId && !intent.payload?.fedExisting) || persistentInverted)) {
     return '🪞 Reflexo Invertido: alimente primeiro um jogo que já existe. O efeito só termina quando você fizer isso.';
   }
   return '⛓ Você não pode criar outro jogo durante esta ordem.';
@@ -885,8 +878,7 @@ function bossCreateMeldDeniedMessage(playerId) {
 function bossUseMeldDeniedMessage(playerId, meldIndex) {
   const intent = state?.boss?.currentIntent;
   if (state?.boss?.id === 'nehelenia') {
-    if (intent?.abilityId === 'hawk_watch' && intent.payload?.targetPlayerId === playerId
-      && (Number(intent.payload?.meldIndex) === Number(meldIndex))) {
+    if (intent?.abilityId === 'hawk_watch' && intent.payload?.targetPlayerId === playerId && Number(intent.payload?.meldIndex) === Number(meldIndex)) {
       return "👁 Vigilância de Hawk's Eye: este jogo está fora do seu alcance neste turno.";
     }
     const player = state.players?.find((entry) => entry.id === playerId);
@@ -896,9 +888,9 @@ function bossUseMeldDeniedMessage(playerId, meldIndex) {
     const prey = currentPrey || persistentPrey;
     const preyMatches = prey && ((prey.meldId && meldId && prey.meldId === meldId) || Number(prey.meldIndex) === Number(meldIndex));
     if (prey && !preyMatches) return `🐯 Presa Marcada: só você está preso ao Jogo ${Number(prey.meldIndex) + 1}. Alimente a Presa primeiro.`;
-    const tigerLock = state.boss.effects?.some((effect) => effect.id === 'nehelenia_meld_lock'
-      && (effect.playerId == null || effect.playerId === playerId)
-      && ((effect.meldId && meldId && effect.meldId === meldId) || Number(effect.meldIndex) === Number(meldIndex)));
+    const tigerLock = state.boss.effects?.some(
+      (effect) => effect.id === 'nehelenia_meld_lock' && (effect.playerId == null || effect.playerId === playerId) && ((effect.meldId && meldId && effect.meldId === meldId) || Number(effect.meldIndex) === Number(meldIndex)),
+    );
     if (tigerLock) return "🐯 As garras de Tiger's Eye mantêm este jogo bloqueado.";
   }
   return '⛓ Separação ativa: seu cooperador já usou este jogo na rodada.';
@@ -1155,10 +1147,7 @@ function syncAdaptiveGamePerformance() {
   }
 
   const handCards = (state.players || []).reduce((sum, player) => sum + (player.hand?.length || 0), 0);
-  const meldCards = (state.teams || []).reduce(
-    (sum, team) => sum + (team.melds || []).reduce((meldSum, meld) => meldSum + (meld?.length || 0), 0),
-    0,
-  );
+  const meldCards = (state.teams || []).reduce((sum, team) => sum + (team.melds || []).reduce((meldSum, meld) => meldSum + (meld?.length || 0), 0), 0);
   // Monte/lixo desenham no máximo 16 camadas cada. Contar as camadas visuais,
   // e não todas as cartas, aproxima melhor o custo real de composição.
   const pileLayers = Math.min(16, Math.ceil((state.stock?.length || 0) / 3)) + Math.min(16, Math.ceil((state.discard?.length || 0) / 3));
@@ -1320,10 +1309,16 @@ function pauseAmbientForDomination() {
 }
 
 function playDominationSearchSound() {
-  if (!audioUnlocked || window.isClosingGame || !sfxSearch.paused) return;
+  if (!audioUnlocked || window.isClosingGame) return;
   pauseAmbientForDomination();
-  sfxSearch.currentTime = 0;
-  sfxSearch.play().catch(() => syncTableAmbientMusic());
+  const sound = playSfxClone(sfxSearch, { audioContext: audioCtx });
+  if (!sound) {
+    syncTableAmbientMusic();
+    return;
+  }
+  const resumeAmbient = () => syncTableAmbientMusic();
+  sound.addEventListener('ended', resumeAmbient, { once: true });
+  sound.addEventListener('error', resumeAmbient, { once: true });
 }
 
 for (const sound of [sfxSearch, sfxSteal, ...Object.values(TABLE_ASAS_SFX)]) {
@@ -2200,16 +2195,141 @@ const updateDecreeAlert = createVisionAlert({
   // consumimos o aviso. Esperamos o botão ficar realmente acionável.
   busy: () => [sfxMyTurn, ...ALL_CANASTRA_SFX].some((audio) => !audio.paused && !audio.ended) || !canActivateDominationDecree(state, 1),
   valid: () => !window.isClosingGame && Boolean(getDominationDecreeThreat(state)),
-  intro: (active) => {
-    presentDecreeFocus(active);
-    if (active) playDominationSearchSound();
-  },
+  // O alerta apenas mostra/destaca o botão. Som e animação de execução
+  // acontecem somente depois do clique realmente aplicar o Decreto.
+  intro: presentDecreeFocus,
   pulse: (active) => ['decreeBtn', 'dominationDecreeHint'].forEach((id) => document.getElementById(id)?.classList.toggle('vision-alert-pulse', active)),
   // Diferente da Visão, o alerta do Decreto é ligado ao descarte que abriu o
   // turno. Um reload/sincronização no mesmo turno não deve fazê-lo desaparecer.
   recalled: () => false,
   remember: () => {},
 });
+
+const DOMINATION_DECREE_LOCK_ASSET = 'assets/images/domination-decree-lock.png';
+const DOMINATION_DECREE_LOCK_ASPECT = 971 / 1619;
+const DOMINATION_DECREE_LOCK_TARGET_SCALE = 1.6;
+let dominationDecreeLockAnimating = false;
+
+function dominationDecreeDiscardTarget() {
+  const face = document.getElementById('discardFace');
+  if (face && face.getClientRects().length) return face;
+  return document.querySelector('#drawDiscardBtn .pile-card');
+}
+
+function syncDominationDecreeDiscardLock(gameState = state, { settle = false } = {}) {
+  const pile = document.querySelector('#drawDiscardBtn .pile-card');
+  const target = dominationDecreeDiscardTarget();
+  const show = !window.isClosingGame && shouldShowDominationDecreeDiscardLock(gameState);
+
+  if (!pile || !target || !show || dominationDecreeLockAnimating) {
+    if (!show || dominationDecreeLockAnimating) pile?.querySelector('.domination-decree-lock-frame')?.remove();
+    return null;
+  }
+
+  let frame = pile.querySelector('.domination-decree-lock-frame');
+  if (!frame) {
+    frame = document.createElement('img');
+    frame.className = 'domination-decree-lock-frame';
+    frame.src = DOMINATION_DECREE_LOCK_ASSET;
+    frame.alt = '';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.draggable = false;
+    pile.appendChild(frame);
+  }
+
+  const pileRect = getRect(pile);
+  const targetRect = getRect(target);
+  if (pileRect.width && pileRect.height && targetRect.width && targetRect.height) {
+    const height = targetRect.height * DOMINATION_DECREE_LOCK_TARGET_SCALE;
+    const width = height * DOMINATION_DECREE_LOCK_ASPECT;
+    frame.style.left = `${targetRect.left - pileRect.left + targetRect.width / 2}px`;
+    frame.style.top = `${targetRect.top - pileRect.top + targetRect.height / 2}px`;
+    frame.style.width = `${width}px`;
+    frame.style.height = `${height}px`;
+  }
+
+  if (settle && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+    frame.classList.remove('is-settling');
+    void frame.offsetWidth;
+    frame.classList.add('is-settling');
+    setTimeout(() => frame?.classList.remove('is-settling'), 460);
+  }
+  return frame;
+}
+
+async function animateDominationDecreeLockToDiscard({ force = false, persist = true } = {}) {
+  if (!force && !shouldShowDominationDecreeDiscardLock(state)) {
+    syncDominationDecreeDiscardLock(state);
+    return;
+  }
+
+  const target = dominationDecreeDiscardTarget();
+  const stage = document.querySelector('#gameSection .board-middle') || document.querySelector('#gameSection .board');
+  if (!target || !stage) {
+    if (persist) syncDominationDecreeDiscardLock(state);
+    return;
+  }
+
+  const toRect = getRect(target);
+  const stageRect = getRect(stage);
+  if (!toRect.width || !toRect.height || !stageRect.width || !stageRect.height) {
+    if (persist) syncDominationDecreeDiscardLock(state);
+    return;
+  }
+
+  dominationDecreeLockAnimating = true;
+  document.querySelector('#drawDiscardBtn .domination-decree-lock-frame')?.remove();
+
+  const ghost = document.createElement('img');
+  ghost.className = 'domination-decree-lock-flight';
+  ghost.src = DOMINATION_DECREE_LOCK_ASSET;
+  ghost.alt = '';
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.draggable = false;
+
+  const stageCenterX = stageRect.left + stageRect.width / 2;
+  const stageCenterY = stageRect.top + stageRect.height / 2;
+  const startHeight = Math.max(toRect.height * 2.2, Math.min(240, Math.max(180, stageRect.height * 1.8)));
+  const startWidth = startHeight * DOMINATION_DECREE_LOCK_ASPECT;
+  const targetHeight = toRect.height * DOMINATION_DECREE_LOCK_TARGET_SCALE;
+  const endScale = targetHeight / startHeight;
+  const approachScale = 1 + (endScale - 1) * 0.68;
+  const targetCenterX = toRect.left + toRect.width / 2;
+  const targetCenterY = toRect.top + toRect.height / 2;
+  const dx = targetCenterX - stageCenterX;
+  const dy = targetCenterY - stageCenterY;
+
+  Object.assign(ghost.style, {
+    left: `${stageCenterX - startWidth / 2}px`,
+    top: `${stageCenterY - startHeight / 2}px`,
+    width: `${startWidth}px`,
+    height: `${startHeight}px`,
+  });
+  document.body.appendChild(ghost);
+
+  try {
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (!reducedMotion) {
+      const flight = ghost.animate(
+        [
+          { transform: 'translate3d(0,0,0) scale(1)', opacity: 0, filter: 'brightness(1.22) drop-shadow(0 0 24px rgba(244,114,182,.55))' },
+          { transform: 'translate3d(0,0,0) scale(1)', opacity: 1, filter: 'brightness(1.16) drop-shadow(0 0 24px rgba(244,114,182,.64))', offset: 0.16 },
+          { transform: 'translate3d(0,0,0) scale(1)', opacity: 1, filter: 'brightness(1.06) drop-shadow(0 0 18px rgba(168,85,247,.52))', offset: 0.34 },
+          { transform: `translate3d(${dx * 0.68}px,${dy * 0.62}px,0) scale(${approachScale})`, opacity: 0.98, filter: 'brightness(1) drop-shadow(0 0 14px rgba(126,34,206,.48))', offset: 0.76 },
+          { transform: `translate3d(${dx}px,${dy}px,0) scale(${endScale})`, opacity: 1, filter: 'drop-shadow(0 0 10px rgba(88,28,135,.42))' },
+        ],
+        { duration: 1120, easing: 'cubic-bezier(.2,.72,.16,1)', fill: 'forwards' },
+      );
+      await flight.finished.catch(() => {});
+    } else {
+      await waitForVisualDuration(80);
+    }
+  } finally {
+    ghost.remove();
+    dominationDecreeLockAnimating = false;
+    if (persist) syncDominationDecreeDiscardLock(state);
+  }
+}
 
 function renderDominationVisionHint() {
   const hint = document.getElementById('dominationVisionHint');
@@ -2249,11 +2369,7 @@ function renderMatchDuration() {
 }
 
 function canActivateDominationDecree(gameState = state, actorId = myPlayerIndex) {
-  return canUseDominationDecree(gameState, actorId)
-    && !isDominationFriendBusy(gameState)
-    && canPerformCommonGameAction(gameState)
-    && !friendOperationPending
-    && !committing;
+  return canUseDominationDecree(gameState, actorId) && !isDominationFriendBusy(gameState) && canPerformCommonGameAction(gameState) && !friendOperationPending && !committing;
 }
 
 function getDominationDecreeThreat(gameState = state) {
@@ -2335,17 +2451,14 @@ function renderDominationTools() {
 
   const slaveIsBot = state.players?.[0]?.name?.toUpperCase().includes('BOT') === true;
   const threat = show && !used && !slaveIsBot ? getDominationDecreeThreat(state) : null;
-  const message = threat
-    ? `⚠️ ${threat.label} que você descartou serve ao Escravo. Ele pode pegar o Lixo — bloqueie agora.`
-    : active
-      ? '🔒 Lixo bloqueado neste turno.'
-      : '';
+  const message = threat ? `⚠️ ${threat.label} que você descartou serve ao Escravo. Ele pode pegar o Lixo — bloqueie agora.` : active ? '🔒 Lixo bloqueado neste turno.' : '';
   if (hint) {
     if (hint.textContent !== message) hint.textContent = message;
     hint.hidden = !message;
   }
   const alertKey = threat ? `${gameId}:${state.turnNumber}:${threat.card.id || threat.label}` : '';
   updateDecreeAlert(alertKey, Boolean(threat));
+  syncDominationDecreeDiscardLock(state);
 }
 
 window.activateDominationDecree = () => performDominationDecree(myPlayerIndex);
@@ -2377,7 +2490,18 @@ async function performDominationDecree(actorId) {
     ignoreOwnActionId = id;
     localUndoStack = [];
     if ((state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
+    // Só depois da confirmação real do clique: executa feedback do Decreto.
+    presentDecreeFocus(true);
+    playDominationSearchSound();
+    const lockPresentation = animateDominationDecreeLockToDiscard();
+    setTimeout(() => presentDecreeFocus(false), 1400);
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate([180, 80, 180]);
+      } catch {}
+    }
     showMessage('🔒 Lixo bloqueado neste turno.');
+    await lockPresentation;
   } catch (error) {
     console.error('Decreto do Dominador:', error);
     showMessage('Não foi possível aplicar o Decreto. Tente novamente enquanto o Escravo ainda não comprou.');
@@ -2400,10 +2524,11 @@ async function waitForDominationDecreeReaction(botIndex) {
   showMessage(`⚠️ ${label} que você descartou serve ao Escravo BOT. Ele vai tentar pegar o Lixo — bloqueie agora.`);
   renderDominationTools();
   presentDecreeFocus(true);
-  playDominationSearchSound();
   setTimeout(() => presentDecreeFocus(false), 1400);
   if (navigator.vibrate) {
-    try { navigator.vibrate([120, 70, 120]); } catch {}
+    try {
+      navigator.vibrate([120, 70, 120]);
+    } catch {}
   }
   await new Promise((resolve) => setTimeout(resolve, 3000));
   if (session !== window.gameSessionId || window.isClosingGame) return true;
@@ -3812,10 +3937,10 @@ async function drawFromDiscardOnce(options = {}) {
   if (!state.hasDrawnThisTurn && isBossDiscardBlocked(state)) {
     const currentPlayerId = state.players?.[state.currentPlayer]?.id ?? state.currentPlayer;
     const topDiscardId = state.discard?.at?.(-1)?.id || null;
-    const hawkSeal = state.boss?.id === 'nehelenia' && (
-      state.boss.effects?.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === currentPlayerId)
-      || (topDiscardId && state.boss.effects?.some((effect) => effect.id === 'nehelenia_hawk_guarded_discard' && effect.cardId === topDiscardId))
-    );
+    const hawkSeal =
+      state.boss?.id === 'nehelenia' &&
+      (state.boss.effects?.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === currentPlayerId) ||
+        (topDiscardId && state.boss.effects?.some((effect) => effect.id === 'nehelenia_hawk_guarded_discard' && effect.cardId === topDiscardId)));
     showMessage(hawkSeal ? "👁 Hawk's Eye está vigiando o topo do lixo. Enquanto essa carta estiver ali, ninguém pode recolhê-lo." : '🔒 Bloqueio de Crédito: o lixo está indisponível nesta cobrança.');
     return;
   }
@@ -5390,10 +5515,7 @@ function renderBossRangeMeters(anchor, meters = []) {
     track.setAttribute('aria-valuemin', '0');
     track.setAttribute('aria-valuemax', String(maximum));
     track.setAttribute('aria-valuenow', String(value));
-    track.setAttribute(
-      'aria-label',
-      meter.ariaLabel || `${meter.label || 'Faixa'}: ${value} ${meter.unit || ''}${meter.currentEffect ? `, ${meter.currentEffect}` : ''}`,
-    );
+    track.setAttribute('aria-label', meter.ariaLabel || `${meter.label || 'Faixa'}: ${value} ${meter.unit || ''}${meter.currentEffect ? `, ${meter.currentEffect}` : ''}`);
 
     const segments = document.createElement('div');
     segments.className = 'boss-range-meter-segments';
@@ -5589,7 +5711,6 @@ function renderBossAbilityGuide(definition, boss) {
   root.appendChild(grid);
 }
 
-
 function bossArtSpotlightModel(definition, boss) {
   const flow = boss?.bossFlow;
   // O spotlight grande fica reservado apenas para mudança de fase.
@@ -5695,9 +5816,7 @@ function renderBossDaughterStrip(definition, boss) {
     return;
   }
 
-  const resultEvent = boss.bossFlow?.stage === 'result' && boss.bossFlow?.eventActionId
-    ? boss.eventLog?.find((entry) => entry.actionId === boss.bossFlow.eventActionId) || null
-    : null;
+  const resultEvent = boss.bossFlow?.stage === 'result' && boss.bossFlow?.eventActionId ? boss.eventLog?.find((entry) => entry.actionId === boss.bossFlow.eventActionId) || null : null;
   const abilityId = boss.currentIntent?.abilityId || resultEvent?.abilityId || '';
   const roster = isDimitrescu ? definition.daughters : definition.attendants;
   const abilityMap = isDimitrescu ? definition.abilityDaughters : definition.abilityAttendants;
@@ -5727,7 +5846,7 @@ function renderBossDaughterStrip(definition, boss) {
     const targetName = neheleniaPlayerName(payload.targetPlayerId);
     if (intent.abilityId === 'tiger_prey') return { targetName, detail: Number.isInteger(payload.meldIndex) ? `JOGO ${payload.meldIndex + 1}` : 'PRESA MARCADA' };
     if (intent.abilityId === 'tiger_link') {
-      const games = (payload.targets || []).map((target) => Number.isInteger(target?.meldIndex) ? target.meldIndex + 1 : null).filter(Boolean);
+      const games = (payload.targets || []).map((target) => (Number.isInteger(target?.meldIndex) ? target.meldIndex + 1 : null)).filter(Boolean);
       return { targetName: '', detail: games.length ? `JOGOS ${games.join(' + ')}` : '2 JOGOS LIGADOS' };
     }
     if (intent.abilityId === 'hawk_suit') return { targetName, detail: payload.suitLabel ? `DESCARTE: ${String(payload.suitLabel).toUpperCase()}` : 'DESCARTE MARCADO' };
@@ -5739,15 +5858,18 @@ function renderBossDaughterStrip(definition, boss) {
 
   const neheleniaPersistentContexts = (memberId) => {
     if (!isNehelenia) return [];
-    return (boss.effects || []).filter((effect) => effect?.attendant === memberId).map((effect) => {
-      const targetName = neheleniaPlayerName(effect.playerId);
-      if (effect.id === 'nehelenia_tiger_prey') return { targetName, detail: Number.isInteger(effect.meldIndex) ? `JOGO ${effect.meldIndex + 1}` : 'PRESA MARCADA', persistent: true };
-      if (effect.id === 'nehelenia_tiger_claw') return { targetName: '', detail: Number.isInteger(effect.meldIndex) ? `GARRAS: JOGO ${effect.meldIndex + 1}` : 'GARRAS NO JOGO', persistent: true };
-      if (effect.id === 'nehelenia_hawk_guarded_discard') return { targetName, detail: 'LIXO VIGIADO', persistent: true };
-      if (effect.id === 'nehelenia_fish_dead_card') return { targetName, detail: 'REFLEXO MORTO', persistent: true };
-      if (effect.id === 'nehelenia_inverted_reflection') return { targetName, detail: 'JOGO ABERTO', persistent: true };
-      return targetName ? { targetName, detail: '', persistent: true } : null;
-    }).filter(Boolean);
+    return (boss.effects || [])
+      .filter((effect) => effect?.attendant === memberId)
+      .map((effect) => {
+        const targetName = neheleniaPlayerName(effect.playerId);
+        if (effect.id === 'nehelenia_tiger_prey') return { targetName, detail: Number.isInteger(effect.meldIndex) ? `JOGO ${effect.meldIndex + 1}` : 'PRESA MARCADA', persistent: true };
+        if (effect.id === 'nehelenia_tiger_claw') return { targetName: '', detail: Number.isInteger(effect.meldIndex) ? `GARRAS: JOGO ${effect.meldIndex + 1}` : 'GARRAS NO JOGO', persistent: true };
+        if (effect.id === 'nehelenia_hawk_guarded_discard') return { targetName, detail: 'LIXO VIGIADO', persistent: true };
+        if (effect.id === 'nehelenia_fish_dead_card') return { targetName, detail: 'REFLEXO MORTO', persistent: true };
+        if (effect.id === 'nehelenia_inverted_reflection') return { targetName, detail: 'JOGO ABERTO', persistent: true };
+        return targetName ? { targetName, detail: '', persistent: true } : null;
+      })
+      .filter(Boolean);
   };
 
   const neheleniaAttendantContext = (memberId) => {
@@ -5764,9 +5886,7 @@ function renderBossDaughterStrip(definition, boss) {
     }
 
     const persistentLabels = persistent.map((entry) => {
-      const sameAsCurrent = !!current
-        && current.targetName === entry.targetName
-        && current.detail === entry.detail;
+      const sameAsCurrent = !!current && current.targetName === entry.targetName && current.detail === entry.detail;
       const parts = [];
       if (entry.targetName) parts.push(entry.targetName);
       if (entry.detail) parts.push(entry.detail.replace(/^JOGO\s+/i, 'J'));
@@ -5845,10 +5965,14 @@ function renderBossDaughterStrip(definition, boss) {
     const image = document.createElement('img');
     image.src = member.portrait;
     image.alt = '';
-    image.addEventListener('error', () => {
-      card.classList.add('is-missing-art');
-      image.remove();
-    }, { once: true });
+    image.addEventListener(
+      'error',
+      () => {
+        card.classList.add('is-missing-art');
+        image.remove();
+      },
+      { once: true },
+    );
 
     const name = document.createElement('b');
     name.textContent = member.name;
@@ -5864,44 +5988,36 @@ function renderBossDaughterStrip(definition, boss) {
         contextBox.className = 'boss-attendant-context';
         // CRÍTICO: apresentação 100% fora do fluxo. Mesmo se o CSS estiver
         // desatualizado, esta label nunca pode alterar altura/alinhamento do card.
-        contextBox.style.cssText = [
-          'position:absolute',
-          'right:7px',
-          'top:25px',
-          'z-index:5',
-          'max-width:86px',
-          'display:flex',
-          'flex-direction:column',
-          'align-items:flex-end',
-          'gap:2px',
-          'pointer-events:none',
-        ].join(';');
+        contextBox.style.cssText = ['position:absolute', 'right:7px', 'top:25px', 'z-index:5', 'max-width:86px', 'display:flex', 'flex-direction:column', 'align-items:flex-end', 'gap:2px', 'pointer-events:none'].join(';');
         context.lines.forEach((line) => {
-          line.text.split(/\s*·\s*/).filter(Boolean).forEach((part) => {
-            const badge = document.createElement('small');
-            badge.className = `boss-attendant-context-line is-${line.kind}`;
-            badge.textContent = part;
-            const persistent = line.kind === 'persistent';
-            badge.style.cssText = [
-              'max-width:86px',
-              'box-sizing:border-box',
-              'padding:2px 5px',
-              'overflow:hidden',
-              `border:1px solid ${persistent ? 'rgba(196,181,253,.72)' : 'rgba(255,255,255,.55)'}`,
-              'border-radius:999px',
-              `color:${persistent ? '#ede9fe' : '#fff'}`,
-              `background:${persistent ? 'rgba(46,16,101,.90)' : 'rgba(4,7,18,.90)'}`,
-              'box-shadow:0 2px 7px rgba(0,0,0,.45)',
-              'font-size:5px',
-              'font-weight:1000',
-              'line-height:1',
-              'letter-spacing:.15px',
-              'text-overflow:ellipsis',
-              'text-transform:uppercase',
-              'white-space:nowrap',
-            ].join(';');
-            contextBox.appendChild(badge);
-          });
+          line.text
+            .split(/\s*·\s*/)
+            .filter(Boolean)
+            .forEach((part) => {
+              const badge = document.createElement('small');
+              badge.className = `boss-attendant-context-line is-${line.kind}`;
+              badge.textContent = part;
+              const persistent = line.kind === 'persistent';
+              badge.style.cssText = [
+                'max-width:86px',
+                'box-sizing:border-box',
+                'padding:2px 5px',
+                'overflow:hidden',
+                `border:1px solid ${persistent ? 'rgba(196,181,253,.72)' : 'rgba(255,255,255,.55)'}`,
+                'border-radius:999px',
+                `color:${persistent ? '#ede9fe' : '#fff'}`,
+                `background:${persistent ? 'rgba(46,16,101,.90)' : 'rgba(4,7,18,.90)'}`,
+                'box-shadow:0 2px 7px rgba(0,0,0,.45)',
+                'font-size:5px',
+                'font-weight:1000',
+                'line-height:1',
+                'letter-spacing:.15px',
+                'text-overflow:ellipsis',
+                'text-transform:uppercase',
+                'white-space:nowrap',
+              ].join(';');
+              contextBox.appendChild(badge);
+            });
         });
         card.appendChild(contextBox);
         card.title = `${member.name} — ${context.lines.map((line) => line.text).join(' · ')}`;
@@ -6221,7 +6337,6 @@ async function animateBossForcedSwap(feedback) {
     renderHand();
   }, 4300);
 }
-
 
 let matriarchRebirthVisualSequence = 0;
 let matriarchRebirthStartTimer = null;
@@ -6849,7 +6964,6 @@ function positionBossDialogueOverlay(hud) {
   dialoguePanel.style.setProperty('width', widthPx, 'important');
 }
 
-
 function closeBossIntentHelp() {
   const button = document.getElementById('bossIntentHelpButton');
   const popover = document.getElementById('bossIntentHelpPopover');
@@ -6963,7 +7077,6 @@ function syncBossIntentHelp(gameState) {
     if (event.key === 'Escape' && !popover.hidden) closeBossIntentHelp();
   });
 }
-
 
 function renderBossHud() {
   const hud = document.getElementById('bossHud');
@@ -7126,11 +7239,7 @@ function renderBossHud() {
         const nextEffectAt = controlled ? 50 : 37.5;
         const nextEffectAmount = Math.max(0, Math.round((nextEffectAt - domination) * 10) / 10);
         const valueLabel = Number.isInteger(domination) ? String(domination) : domination.toFixed(1);
-        const status = dominated
-          ? 'DOMINADO · sem Lixo e sem jogo novo'
-          : controlled
-            ? `SOB CONTROLE · Dominado em ${nextEffectAmount}`
-            : `Sob Controle em ${nextEffectAmount}`;
+        const status = dominated ? 'DOMINADO · sem Lixo e sem jogo novo' : controlled ? `SOB CONTROLE · Dominado em ${nextEffectAmount}` : `Sob Controle em ${nextEffectAmount}`;
         return `<div class="boss-domination-player${dominated ? ' dominated' : controlled ? ' controlled' : ''}" data-player-id="${player.id}">
           <div class="boss-domination-head"><span>${escapeBossHudText(player.name)}</span><strong>${valueLabel} / 50</strong></div>
           <div class="boss-domination-track" role="meter" aria-label="Dominação de ${escapeBossHudText(player.name)}" aria-valuemin="0" aria-valuemax="50" aria-valuenow="${domination}">
@@ -7533,7 +7642,12 @@ function renderBossHud() {
         detail: `${entry.damage} de dano${entry.dangerChangeLabel ? ` · ${entry.dangerChangeLabel}` : ''}${entry.chainsRemoved ? ` · Dominação -${Math.round(entry.chainsRemoved * 12.5 * 10) / 10}` : ''}${entry.possessionProgress != null ? ` · Posse ${entry.possessionProgress}/2` : ''}`,
       };
     if (entry.type === 'bossAbility') return { icon: '💼', title: `${definition?.name || 'Chefe'} — ${entry.name || 'Habilidade'}`, detail: entry.outcome || 'Habilidade resolvida' };
-    if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Dominação aumentou' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${Math.round((entry.domination ?? entry.chains * 12.5) * 10) / 10}/50 · ${entry.dominationDelta > 0 ? '+' : ''}${entry.dominationDelta ?? Math.round(entry.amount * 12.5 * 10) / 10}` };
+    if (entry.type === 'chainChange')
+      return {
+        icon: '⛓',
+        title: entry.amount > 0 ? 'Dominação aumentou' : 'Resistência',
+        detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${Math.round((entry.domination ?? entry.chains * 12.5) * 10) / 10}/50 · ${entry.dominationDelta > 0 ? '+' : ''}${entry.dominationDelta ?? Math.round(entry.amount * 12.5 * 10) / 10}`,
+      };
     if (entry.type === 'chainOverflow') return { icon: '⛓', title: 'Dominação transferida', detail: entry.outcome || 'O excesso de Dominação passou para o parceiro.' };
     if (entry.type === 'dominatrixOrder') return { icon: '👑', title: 'Ordem da Dominadora', detail: entry.outcome || 'A ordem foi resolvida.' };
     if (entry.type === 'creditLimit') return { icon: '🪙', title: 'Limite de Crédito', detail: entry.outcome || `Dívida +${entry.debtAdded || 0}` };
@@ -8102,18 +8216,11 @@ function renderAll() {
   const danielaOnTop = danielaInDiscard && discardTop?.id === danielaCardId;
   const neheleniaDiscardMirror = state.boss?.id === 'nehelenia' && state.boss.currentIntent?.abilityId === 'discard_mirror' && !state.boss.currentIntent.payload?.resolved;
   const neheleniaCurrentPlayerId = state.players?.[state.currentPlayer]?.id ?? state.currentPlayer;
-  const neheleniaMirrorDiscardSealed = state.boss?.id === 'nehelenia' && (
-    Number(state.boss.neheleniaDiscardSealRound) === Number(state.boss.roundNumber)
-    || state.boss.effects?.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === neheleniaCurrentPlayerId)
-  );
-  const neheleniaHawkGuardedDiscard = state.boss?.id === 'nehelenia' && !!discardTop?.id
-    && state.boss.effects?.some((effect) => effect.id === 'nehelenia_hawk_guarded_discard' && effect.cardId === discardTop.id);
-  const hawkSuitIntent = state.boss?.id === 'nehelenia' && state.boss.currentIntent?.abilityId === 'hawk_suit'
-    ? state.boss.currentIntent
-    : null;
-  const neheleniaHawkDiscardDemand = !!hawkSuitIntent
-    && hawkSuitIntent.payload?.targetPlayerId === neheleniaCurrentPlayerId
-    && !hawkSuitIntent.payload?.resolved;
+  const neheleniaMirrorDiscardSealed =
+    state.boss?.id === 'nehelenia' && (Number(state.boss.neheleniaDiscardSealRound) === Number(state.boss.roundNumber) || state.boss.effects?.some((effect) => effect.id === 'nehelenia_discard_lock' && effect.playerId === neheleniaCurrentPlayerId));
+  const neheleniaHawkGuardedDiscard = state.boss?.id === 'nehelenia' && !!discardTop?.id && state.boss.effects?.some((effect) => effect.id === 'nehelenia_hawk_guarded_discard' && effect.cardId === discardTop.id);
+  const hawkSuitIntent = state.boss?.id === 'nehelenia' && state.boss.currentIntent?.abilityId === 'hawk_suit' ? state.boss.currentIntent : null;
+  const neheleniaHawkDiscardDemand = !!hawkSuitIntent && hawkSuitIntent.payload?.targetPlayerId === neheleniaCurrentPlayerId && !hawkSuitIntent.payload?.resolved;
   const discardButtonEl = document.getElementById('drawDiscardBtn');
   discardButtonEl?.classList.toggle('boss-pollen-discard', !!pollenThreat);
   discardButtonEl?.classList.toggle('boss-daniela-discard', danielaInDiscard);
@@ -8221,8 +8328,7 @@ function renderAll() {
   const canDrawDiscard = myTurn && !state.hasDrawnThisTurn && !bossControlsLocked && !vaultDrawRequired && state.discard.length && !isBossDiscardBlocked(state) && !isDominationDiscardDecreeActive(state, state.currentPlayer);
   const canDiscardToPile = myTurn && state.hasDrawnThisTurn && !bossControlsLocked;
   document.getElementById('drawDiscardBtn').style.pointerEvents = canDrawDiscard || canDiscardToPile ? 'auto' : 'none';
-  document.getElementById('drawDiscardBtn').style.opacity = canDrawDiscard || canDiscardToPile ? '1' : '0.5';
-
+  document.getElementById('drawDiscardBtn').style.opacity = shouldShowDominationDecreeDiscardLock(state) || canDrawDiscard || canDiscardToPile ? '1' : '0.5';
   const me = state.players[myPlayerIndex];
   const myTeamId = me ? me.teamId : null; // Protege o Team ID
 
@@ -9258,14 +9364,7 @@ function renderMelds() {
       }
       const bossSpecificContribution = getBossMeldContributionUi(state.boss?.id, contribution);
       if (bossSpecificContribution) {
-        contributionChips.push(
-          contributionChip(
-            bossSpecificContribution.type,
-            bossSpecificContribution.value,
-            bossSpecificContribution.icon,
-            bossSpecificContribution.title,
-          ),
-        );
+        contributionChips.push(contributionChip(bossSpecificContribution.type, bossSpecificContribution.value, bossSpecificContribution.icon, bossSpecificContribution.title));
       }
       const natureLabels = [...(bossMeldUi?.labels || [])];
       meta.innerHTML = `
@@ -10015,9 +10114,7 @@ function syncTurnScopedFeedback({ isMyTurnRightNow = false, currentName = '' } =
   if (!message) return;
 
   if (isMyTurnRightNow) {
-    message.textContent = state.hasDrawnThisTurn
-      ? 'Sua vez: você já comprou. Jogue se quiser e descarte 1 carta para encerrar.'
-      : 'Sua vez: compre do Monte ou do Lixo.';
+    message.textContent = state.hasDrawnThisTurn ? 'Sua vez: você já comprou. Jogue se quiser e descarte 1 carta para encerrar.' : 'Sua vez: compre do Monte ou do Lixo.';
     return;
   }
   if (isBossTurnActive(state)) {
@@ -10150,12 +10247,17 @@ async function playRemoteAction(a) {
   }
 
   if (a.type === 'dominationDecree') {
+    const lockPresentation = animateDominationDecreeLockToDiscard({ force: true, persist: false });
     if (myPlayerIndex === 0) {
       showMessage('🔒 O Dominador bloqueou o Lixo. Compre do Monte.');
       if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
     } else if (myPlayerIndex === 1) {
+      presentDecreeFocus(true);
+      playDominationSearchSound();
+      setTimeout(() => presentDecreeFocus(false), 1400);
       showMessage('🔒 Lixo bloqueado neste turno.');
     }
+    await lockPresentation;
     return;
   }
 
@@ -10525,9 +10627,7 @@ const botEngine = {
         option = choice.correctOption;
       }
     }
-    const dominatrixBotChoice = state.boss?.id === 'dominadora'
-      ? BossBuracoBot.chooseDominatrixPendingChoice(state, playerId, choice)
-      : null;
+    const dominatrixBotChoice = state.boss?.id === 'dominadora' ? BossBuracoBot.chooseDominatrixPendingChoice(state, playerId, choice) : null;
     if (dominatrixBotChoice && choice.options.includes(dominatrixBotChoice)) {
       option = dominatrixBotChoice;
     } else if (choice.options.includes('chain') && getBossChains(state, playerId) >= 2) {
@@ -12876,7 +12976,16 @@ window.debugRestartGame = async (fromRematch = false) => {
 
   // Inicia a nova partida no Firebase
   if (state.finished) await recoverFinishedHistory();
-  await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions), { test: !!state.historyTest || !fromRematch, accountIds: state.players.map((p) => p.accountUid || null) });
+  const restartedState = await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions), { test: !!state.historyTest || !fromRematch, accountIds: state.players.map((p) => p.accountUid || null) });
+
+  // O setDoc pode terminar antes de o snapshot da nova partida voltar. Adota o
+  // estado recém-criado imediatamente para não deixar UI/efeitos da partida
+  // anterior (como o Decreto no Lixo) visíveis durante essa janela.
+  if (restartedState) {
+    state = restartedState;
+    cancelGameAnimations();
+    renderAll();
+  }
 
   // Esconde o painel do DevTools para o jogador ver os dados rolarem
   window.toggleDebugPanel(keepDevToolsOpen);

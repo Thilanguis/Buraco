@@ -23,8 +23,19 @@ export function dominationDecreeUsed(state) {
 export function isDominationDiscardDecreeActive(state, playerId = currentPlayerId(state)) {
   return state?.mode === MODE
     && Number(playerId) === SLAVE_ID
-    && Number(state?.dominatorDiscardBlockTurn) === Number(state?.turnNumber)
+    && state?.dominatorDiscardBlockTurn != null
+    && Number(state.dominatorDiscardBlockTurn) === Number(state?.turnNumber)
     && state?.hasDrawnThisTurn !== true;
+}
+
+export function shouldShowDominationDecreeDiscardLock(state, playerId = currentPlayerId(state)) {
+  return state?.mode === MODE
+    && state?.finished !== true
+    && Number(playerId) === SLAVE_ID
+    && state?.dominatorDiscardBlockTurn != null
+    && Number(state.dominatorDiscardBlockTurn) === Number(state?.turnNumber)
+    && Array.isArray(state?.discard)
+    && state.discard.length > 0;
 }
 
 export function canUseDominationDecree(state, actorId = DOMINATOR_ID) {
