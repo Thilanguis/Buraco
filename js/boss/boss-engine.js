@@ -3520,24 +3520,53 @@ function changeChains(gameState, playerId, amount, reason = '') {
     return appliedHere + overflow;
   }
 
-  const after = clamp(before + requested, 0, 4);
+  // Resistance relief is cooperative just like offensive overflow: first remove
+  // Domination from the player who evolved the canastra, then spill any unused
+  // relief to the partner. This keeps Limpa/Real/As-a-As worth their full relief
+  // even when the acting player's bar is already empty.
+  const availableHere = Math.max(0, before);
+  const reliefRequested = Math.abs(requested);
+  const reliefHere = Math.min(reliefRequested, availableHere);
+  const after = clamp(before - reliefHere, 0, 4);
   boss.chainsByPlayer[playerId] = after;
-  dominatrixDefeatIfNeeded(gameState);
-  if (after !== before) {
-    const applied = after - before;
+  if (reliefHere > 0) {
     boss.actionSequence += 1;
     recordEvent(boss, {
       type: 'chainChange',
       actionId: `chain_${playerId}_${boss.actionSequence}`,
       playerId,
-      amount: applied,
-      dominationDelta: Math.round(applied * 12.5 * 10) / 10,
+      amount: -reliefHere,
+      dominationDelta: -Math.round(reliefHere * 12.5 * 10) / 10,
       domination: Math.round(after * 12.5 * 10) / 10,
       chains: after,
       reason,
     });
   }
-  return after - before;
+
+  let spillApplied = 0;
+  const reliefLeft = Math.max(0, reliefRequested - reliefHere);
+  if (reliefLeft > 0) {
+    const partner = (gameState.players || []).find((player) => player.id !== playerId);
+    if (partner && (Number(boss.chainsByPlayer[partner.id]) || 0) > 0) {
+      spillApplied = Math.abs(Math.min(0, changeChains(gameState, partner.id, -reliefLeft, `relief_overflow:${reason}`)));
+      if (spillApplied > 0) {
+        boss.actionSequence += 1;
+        recordEvent(boss, {
+          type: 'chainReliefOverflow',
+          actionId: `chain_relief_overflow_${playerId}_${partner.id}_${boss.actionSequence}`,
+          originalTargetPlayerId: playerId,
+          overflowTargetPlayerId: partner.id,
+          amount: -spillApplied,
+          dominationDelta: -Math.round(spillApplied * 12.5 * 10) / 10,
+          reason,
+          outcome: `A resistencia excedente aliviou a Dominação de ${partner.name || 'o parceiro'}.`,
+        });
+      }
+    }
+  }
+
+  dominatrixDefeatIfNeeded(gameState);
+  return -(reliefHere + spillApplied);
 }
 
 export function getBossChains(gameState, playerId) {
