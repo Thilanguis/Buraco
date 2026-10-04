@@ -16,7 +16,7 @@ import {
   simulateBossDebugReload,
   validateBossDebugScenario,
 } from '../js/boss/boss-debug-scenarios.js';
-import { advanceBossTurn, beginBossTurn, selectNextBossIntent } from '../js/boss/boss-engine.js';
+import { advanceBossTurn, beginBossTurn, resolveBossChoice, selectNextBossIntent } from '../js/boss/boss-engine.js';
 import { listBossDefinitions } from '../js/boss/boss-registry.js';
 
 const [appSource, htmlSource, bossCssSource] = await Promise.all([
@@ -62,14 +62,35 @@ test('painel existe no DevTools atual e o modulo so e importado dentro do modo d
   assert.doesNotMatch(htmlSource, />Executar falha</);
   assert.doesNotMatch(htmlSource, />Simular reload</);
   const debugBlock = appSource.slice(appSource.indexOf('if (isDebugMode) {'), appSource.indexOf('window.debugDraw5'));
-  assert.match(debugBlock, /import\('\.\/js\/boss\/boss-debug-scenarios\.js'\)/);
+  assert.match(debugBlock, /import\('\.\/js\/boss\/boss-debug-scenarios\.js(?:\?lab=[^']+)?'\)/);
   assert.match(appSource, /pauseAutomation/);
   assert.match(appSource, /isBossLabAutomationPaused/);
   assert.match(htmlSource, /class="boss-spring-crown"/);
   assert.match(bossCssSource, /boss-spring-crown-buffed[\s\S]*?boss-spring-crown/);
 });
 
-test('Ordem Final pode criar as duas escolhas pelo Laboratorio', () => {
+test('Quebra de Vontade do Laboratorio prepara Dominação e HP faltante suficientes', () => {
+  const prepared = build('dominadora', 'break_will', { variant: 'interactive' });
+  assert.equal(prepared.invariants.valid, true);
+  assert.ok(prepared.state.players.some((player) => Number(prepared.state.boss.chainsByPlayer?.[player.id] || 0) >= 2));
+  assert.ok(Number(prepared.state.boss.maxHp) - Number(prepared.state.boss.hp) >= 120);
+  assert.equal(prepared.invariants.eligibility?.eligible, true);
+});
+
+test('Ordem Final interativa prepara duas extensoes naturais por cooperador', () => {
+  const prepared = build('dominadora', 'final_order', { variant: 'interactive' });
+  assert.equal(prepared.invariants.valid, true);
+  for (const [playerId, meldIndex] of [[0, 0], [1, 1]]) {
+    const player = prepared.state.players.find((entry) => entry.id === playerId);
+    const meld = prepared.state.teams[0].melds[meldIndex];
+    const suit = meld[0].suit;
+    assert.equal(meld.some((card) => String(card.rank) === '3' && card.suit === suit), false);
+    assert.ok(player.hand.some((card) => String(card.rank) === '3' && card.suit === suit));
+    assert.ok(player.hand.some((card) => String(card.rank) === '10' && card.suit === suit));
+  }
+});
+
+test('Ordem Final do Laboratorio nasce elegivel e so revela cartas depois do aceite', () => {
   const prepared = build('dominadora', 'final_order', { variant: 'success' });
   beginBossTurn(prepared.state, { first: true, now: 1000, debug: true });
   while (prepared.state.boss.bossFlow?.stage !== 'players') {
@@ -80,8 +101,16 @@ test('Ordem Final pode criar as duas escolhas pelo Laboratorio', () => {
   const result = executeBossDebugScenarioVariant(prepared.state);
 
   assert.equal(result.executed, true);
-  assert.deepEqual(result.choiceTypes, ['final_order_draw', 'final_order_lock']);
+  assert.deepEqual(result.choiceTypes, ['final_order', 'final_order']);
   assert.deepEqual(prepared.state.boss.pendingChoices.map((choice) => choice.playerId), [0, 1]);
+  assert.ok(prepared.state.boss.pendingChoices.every((choice) => !(choice.cardIds || []).length));
+  assert.equal(prepared.state.boss.effects.some((effect) => effect.id === 'final_order_mark'), false);
+
+  const first = prepared.state.boss.pendingChoices.find((choice) => choice.playerId === 0);
+  const event = resolveBossChoice(prepared.state, first.playerId, 'obey');
+  assert.equal(event.choiceType, 'final_order');
+  assert.equal(event.markedCardIds.length, 2);
+  assert.equal(prepared.state.boss.effects.filter((effect) => effect.id === 'final_order_mark' && effect.playerId === 0).length, 2);
 });
 
 test('fase automatica usa a primeira fase elegivel e fase incompativel e rejeitada', () => {

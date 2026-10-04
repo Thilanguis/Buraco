@@ -1835,6 +1835,29 @@ test('extensao permite 2 natural do mesmo naipe mas nao transforma natural exist
   assert.equal(previewFriendExtension(low, cards(['6'], '♣', 'gap'), rules), null);
 });
 
+test('monte auxiliar vazio ainda revalida a jogada imediatamente antes de baixar', () => {
+  const state = invite();
+  state.teams[1].melds = [];
+  state.dominationFriends[0].hand = cards(['3', '4', '5'], '♣', 'guest');
+  state.dominationFriendShared.stock = [];
+  state.dominationFriendShared.discard = [];
+  let validations = 0;
+  const guardedRules = {
+    ...rules,
+    valid(meld) {
+      validations += 1;
+      return validations === 1 ? rules.valid(meld) : false;
+    },
+  };
+  assert.equal(queueDominationFriendTurn(state, 1), true);
+  state.currentPlayer = 0;
+  state.turnNumber++;
+  const result = executeDominationFriendTurn(state, state.dominationFriends[0].pendingTurnId, guardedRules);
+  assert.equal(result.plays.length, 0, 'plano que deixou de ser legal nao pode ser gravado na mesa');
+  assert.equal(state.teams[1].melds.length, 0);
+  assert.ok(validations >= 2, 'a legalidade deve ser conferida novamente no commit');
+});
+
 test('compra duas cartas auxiliares uma vez por turno, respeitando monte vazio ou incompleto', () => {
   for (const size of [0, 1, 2, 3]) {
     const state = invite();

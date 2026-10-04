@@ -6,7 +6,7 @@ export const neheleniaBossUi = Object.freeze({
   id: 'nehelenia',
   meldContribution(contribution) {
     const value = Number(contribution?.neheleniaMirrorRelief) || 0;
-    return value > 0 ? { type: 'mirror', value, icon: '&#9671;', title: 'Espelhos dos Sonhos recuperados por este jogo' } : null;
+    return value > 0 ? { type: 'mirror', value: Math.round(value * 20 * 10) / 10, icon: '&#9671;', title: 'Mundo do Espelho reduzido por este jogo' } : null;
   },
   meld({ boss, players = [], meldId, contributionMeldId = null, meldIndex } = {}) {
     const intent = boss?.currentIntent;

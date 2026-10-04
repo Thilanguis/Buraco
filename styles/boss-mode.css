@@ -7036,7 +7036,10 @@ body.boss-mode .boss-daughter-card.is-active > img {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px 18px;
     align-items: stretch;
-    min-height: 0;
+    /* Mesma reserva de altura que já protegia tablet/touch.
+       No desktop ela impede a mesa de subir por trás do retrato panorâmico,
+       inclusive durante o fade terminal do chefe. */
+    min-height: calc(clamp(188px, 14vw, 232px) + 18px);
     padding: 10px 12px 8px;
   }
 
@@ -7045,6 +7048,7 @@ body.boss-mode .boss-daughter-card.is-active > img {
     display: grid;
     align-self: stretch;
     min-width: 0;
+    min-height: clamp(188px, 14vw, 232px);
     overflow: visible;
     isolation: isolate;
   }
@@ -7264,4 +7268,209 @@ body.boss-mode .boss-daughter-card.is-active > img {
   body.game-performance-lite.boss-mode .carta.boss-card-nehelenia-fish-mark::after {
     animation: none !important;
   }
+}
+
+
+/* Balance 0–100: Chicotes/Espelhos continuam sendo marcos visuais, agora com preenchimento parcial. */
+body[data-boss-id='dominadora'] .boss-chain-link {
+  position: relative;
+  overflow: hidden;
+  background: rgba(31, 41, 55, 0.58);
+  opacity: 0.72;
+}
+body[data-boss-id='dominadora'] .boss-chain-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: var(--boss-chain-fill, 0%);
+  background: linear-gradient(90deg, rgba(219, 39, 119, 0.48), rgba(244, 114, 182, 0.9));
+  box-shadow: 0 0 8px rgba(244, 114, 182, 0.62);
+  transition: width 420ms ease;
+}
+body[data-boss-id='dominadora'] .boss-chain-link.partial {
+  border-color: rgba(244, 114, 182, 0.72);
+  opacity: 1;
+}
+body[data-boss-id='dominadora'] .boss-chain-link.active {
+  background: rgba(219, 39, 119, 0.22);
+}
+body[data-boss-id='dominadora'] .boss-domination-progress {
+  grid-column: 1 / -1;
+  color: rgba(251, 207, 232, 0.78);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  line-height: 1.1;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb {
+  --boss-mirror-fill: 0%;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 27px;
+  overflow: hidden;
+  border: 1px solid rgba(196, 181, 253, 0.45);
+  border-radius: 48% 48% 44% 44%;
+  background: rgba(30, 27, 75, 0.48);
+  color: rgba(221, 214, 254, 0.64);
+  isolation: isolate;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--boss-mirror-fill);
+  background: linear-gradient(0deg, rgba(124, 58, 237, 0.92), rgba(196, 181, 253, 0.62));
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.7);
+  transition: height 480ms cubic-bezier(.2,.75,.2,1);
+  z-index: -1;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.partial {
+  border-color: rgba(196, 181, 253, 0.82);
+  color: #f5f3ff;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken {
+  border-color: #c4b5fd;
+  color: #fff;
+  text-shadow: 0 0 6px rgba(255,255,255,.75);
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb .boss-dream-mirror-glass {
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: inherit;
+  pointer-events: none;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb b {
+  position: relative;
+  z-index: 1;
+  font-size: 8px;
+}
+
+/* Dominadora — escolha obrigatória no tablet largo.
+   O painel amarelo da coluna direita já explica a decisão; aqui ficam somente
+   os botões, ancorados dentro da mesma coluna para não abrir uma faixa sobre a mesa. */
+@media (min-width: 1101px) and (max-width: 1600px) {
+  body.boss-mode[data-boss-id='dominadora'] .boss-intent {
+    padding-bottom: 44px;
+  }
+
+  body.boss-mode[data-boss-id='dominadora'] .boss-choice-panel {
+    position: absolute;
+    z-index: 42;
+    right: 12px;
+    bottom: 9px;
+    width: calc((100% - 60px) / 3);
+    min-width: 0;
+    margin: 0;
+    padding: 4px;
+    border-color: rgba(244, 114, 182, 0.38);
+    background: rgba(80, 7, 45, 0.72);
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    box-sizing: border-box;
+  }
+
+  body.boss-mode[data-boss-id='dominadora'] .boss-choice-panel > span {
+    display: none;
+  }
+
+  body.boss-mode[data-boss-id='dominadora'] .boss-choice-panel > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.boss-mode[data-boss-id='dominadora'] .boss-choice-panel button {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 6px 4px;
+    font-size: 7px;
+    line-height: 1.15;
+    white-space: normal;
+  }
+}
+
+
+/* Dominadora — leitura principal por barra 0–50, dividida em quatro estágios. */
+body[data-boss-id='dominadora'] .boss-chain-status {
+  display: grid;
+  gap: 7px;
+}
+body[data-boss-id='dominadora'] .boss-domination-player {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: #fbcfe8;
+}
+body[data-boss-id='dominadora'] .boss-domination-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: 8px;
+  font-weight: 1000;
+  letter-spacing: 0.02em;
+}
+body[data-boss-id='dominadora'] .boss-domination-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body[data-boss-id='dominadora'] .boss-domination-head strong {
+  flex: 0 0 auto;
+  color: #fff;
+  font-size: 9px;
+}
+body[data-boss-id='dominadora'] .boss-domination-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(244, 114, 182, 0.5);
+  border-radius: 3px;
+  background: rgba(17, 8, 22, 0.88);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.45);
+}
+body[data-boss-id='dominadora'] .boss-domination-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, #9d174d, #db2777 62%, #f472b6);
+  box-shadow: 0 0 9px rgba(244, 114, 182, 0.6);
+  transition: width 420ms ease;
+}
+body[data-boss-id='dominadora'] .boss-domination-track > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+body[data-boss-id='dominadora'] .boss-domination-state {
+  color: rgba(251, 207, 232, 0.78);
+  font-size: 6.5px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+body[data-boss-id='dominadora'] .boss-domination-player.controlled .boss-domination-state {
+  color: #f9a8d4;
+}
+body[data-boss-id='dominadora'] .boss-domination-player.dominated .boss-domination-head,
+body[data-boss-id='dominadora'] .boss-domination-player.dominated .boss-domination-state {
+  color: #fb7185;
+}
+body[data-boss-id='dominadora'] .boss-domination-player.dominated .boss-domination-track {
+  border-color: rgba(251, 113, 133, 0.92);
+  box-shadow: 0 0 10px rgba(251, 113, 133, 0.4), inset 0 0 8px rgba(0, 0, 0, 0.45);
 }

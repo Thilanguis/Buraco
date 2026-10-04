@@ -181,6 +181,7 @@ export const neheleniaBossMechanics = Object.freeze({
         null,
         `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}`,
         `dream_mirror_relief_${meldId}_${mirrorTier}`,
+        0.2 * tierIncrease,
       );
       mirrorFragmentRelief = Math.abs(reliefEvent?.dangerDelta || 0);
       contribution.neheleniaMirrorRelief += mirrorFragmentRelief;
@@ -191,7 +192,7 @@ export const neheleniaBossMechanics = Object.freeze({
   afterMeldResolution({ mirrorFragmentRelief = 0, newKind = 'simple' } = {}) {
     const relief = Math.max(0, Number(mirrorFragmentRelief) || 0);
     return {
-      dangerChangeLabel: relief ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Fragmento -${relief}` : '',
+      dangerChangeLabel: relief ? `Canastra ${newKind === 'asas' ? 'Ás-a-Ás' : newKind}: Mundo do Espelho -${Math.round(relief * 20 * 10) / 10}` : '',
     };
   },
 

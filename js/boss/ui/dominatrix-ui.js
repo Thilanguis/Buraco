@@ -8,7 +8,7 @@ export const dominatrixBossUi = Object.freeze({
   id: 'dominadora',
   meldContribution(contribution) {
     const value = Number(contribution?.dominatrixChainsBroken) || 0;
-    return value > 0 ? { type: 'chains', value, icon: '&#9939;&#65039;', title: 'Chicotes removidos por este jogo' } : null;
+    return value > 0 ? { type: 'chains', value: Math.round(value * 12.5 * 10) / 10, icon: '&#9939;&#65039;', title: 'Dominação reduzida por este jogo' } : null;
   },
   meld({ boss, players = [], teamId, meldIndex, meldId, meldInfo } = {}) {
     const activeInterdict = (boss?.interdicts || []).find(

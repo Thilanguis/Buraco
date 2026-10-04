@@ -5305,10 +5305,10 @@ function renderBossRangeMeters(anchor, meters = []) {
 
 const BOSS_GUIDE_CORE = Object.freeze({
   banker: '100 de Dívida = derrota. Limpa, Real e Ás-a-Ás reduzem a Dívida.',
-  dominadora: '3 Chicotes = Sob Controle · 4 = Dominado · ambos em 4 = derrota.',
+  dominadora: 'Cada jogador tem uma barra de Dominação 0–50. Em 37,5 fica Sob Controle; em 50 fica Dominado. Os dois em 50 = derrota.',
   matriarca_esmeralda: '5 Flores = derrota. Na Fase 3, pode renascer 1 vez gastando 1 Flor.',
   dimitrescu: '100 de Sede = derrota. Limpa/Real/Ás-a-Ás reduzem a Sede em 4/8/12.',
-  nehelenia: '5/5 Espelhos = derrota. Limpa ou superior recupera 1 Espelho por novo tier.',
+  nehelenia: 'Mundo do Espelho 100/100 = derrota. Os 5 Espelhos enchem gradualmente; Limpa/Real/Ás-a-Ás reduzem 4/8/12.',
 });
 
 const BOSS_GUIDE_OVERRIDES = Object.freeze({
@@ -5322,20 +5322,20 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   credit_limit: 'Use cartas da mão dentro da franquia. Excedentes viram Dívida.',
   discard_surcharge: 'A primeira retirada do Lixo cobra Ágio. Comprar do Monte evita.',
 
-  // Dominadora — comandos curtos, sem transformar o guia em manual.
-  collar: 'Cartas do alvo ficam presas no turno: não jogam nem são descartadas.',
-  forced_choice: 'Aceite uma ordem ou receba 1 Chicote agora.',
-  exposure: 'Use a carta exposta neste turno ou receba 1 Chicote.',
-  forced_swap: 'Uma carta troca de mãos entre os cooperadores.',
-  hands_tied: 'A equipe só pode abrir 1 jogo novo nesta rodada.',
-  possession: 'Alimente com ambos ou evolua o jogo para libertar o dano suspenso.',
-  iron_etiquette: 'Descarte o naipe ordenado no próximo turno ou receba 1 Chicote.',
-  favorite: 'Uma jogadora é protegida; a outra recebe 1 Chicote.',
-  double_collar: 'Uma carta de cada jogador fica presa durante a rodada.',
-  separation: 'Cada jogo só pode ser alimentado por um cooperador nesta rodada.',
-  absolute_control: 'O alvo fica Dominado por 1 turno: sem Lixo e sem jogo novo.',
-  break_will: 'Com 2+ Chicotes: escolha +1 Chicote ou retirar carta de canastra.',
-  final_order: 'Aceite usar 2 cartas marcadas ou tome 1 Chicote. Cada falha custa +1.',
+  // Dominadora — texto de jogo curto; detalhes e exceções ficam no ?.
+  collar: 'Prende até 2 cartas úteis do alvo neste turno.',
+  forced_choice: 'Aceite a ordem ou sofra Dominação.',
+  exposure: 'Use a carta exposta neste turno.',
+  forced_swap: 'Troca 1 carta útil entre os cooperadores.',
+  hands_tied: 'Cada jogador fica preso ao primeiro jogo que tocar.',
+  possession: 'O dano do jogo fica suspenso até romper a Posse.',
+  iron_etiquette: 'Termine o turno descartando o naipe ordenado.',
+  favorite: 'Uma é poupada; a menos dominada recebe a punição.',
+  double_collar: 'Prende 1 carta útil de cada jogador.',
+  separation: 'Um jogo alimentado fica exclusivo daquele jogador na rodada.',
+  absolute_control: 'O alvo fica Dominado por 1 turno.',
+  break_will: 'Escolha entre Dominação ou curar a Dominadora.',
+  final_order: 'Aceite a Ordem às cegas ou sofra Dominação.',
 
   // Matriarca Esmeralda.
   living_seed: 'Use a carta marcada antes do prazo. Falha = +1 Flor.',
@@ -5363,12 +5363,12 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   three_daughters: 'Três objetivos simultâneos. Cada sucesso reduz Sede; cada falha aumenta.',
 
   // Rainha Nehelenia.
-  mirrored_meld: 'Use 1 carta e escolha o jogo verdadeiro. Errar = Desorientado.',
-  follow_reflection: 'O 1º define a quantidade; o 2º precisa igualar até o fim do turno.',
-  discard_mirror: 'Escolha entre 2 reflexos do Lixo. Errar sela o Lixo na rodada.',
-  mirror_prison: 'Alimente o jogo refletido para libertar o parceiro e recuperar 1 Espelho.',
-  eternal_nightmare: 'Memorize a original e siga-a no embaralhamento. Errar = +1 Espelho.',
-  tiger_link: 'Alimente os 2 jogos ligados. O lado ignorado fica preso pelas garras.',
+  mirrored_meld: 'Use 1 carta e escolha o jogo verdadeiro. Errar = +18 no Mundo do Espelho e Desorientado.',
+  follow_reflection: 'O 1º define a quantidade; o 2º precisa igualar. Falha = +16 no Mundo do Espelho.',
+  discard_mirror: 'Escolha entre 2 reflexos do Lixo. Errar = +16 no Mundo do Espelho e sela o Lixo.',
+  mirror_prison: 'Alimente o jogo refletido para libertar o parceiro e reduzir 8 do Mundo do Espelho.',
+  eternal_nightmare: 'Memorize a original e siga-a no embaralhamento. Errar = +24 no Mundo do Espelho.',
+  tiger_link: 'Alimente os 2 jogos ligados. Falha = +12 no Mundo do Espelho e garras persistentes.',
   tiger_prey: 'O alvo deve alimentar o jogo marcado antes dos outros jogos existentes.',
   hawk_suit: 'Descarte o naipe exigido. Errar faz Hawk vigiar o topo do Lixo.',
   hawk_watch: 'O alvo não pode alimentar o jogo marcado neste turno.',
@@ -5447,44 +5447,19 @@ function renderBossAbilityGuide(definition, boss) {
 
 function bossArtSpotlightModel(definition, boss) {
   const flow = boss?.bossFlow;
-  if (!definition || !boss || !flow || !['ability', 'phase'].includes(flow.stage)) return null;
+  // O spotlight grande fica reservado apenas para mudança de fase.
+  // Habilidades normais já são apresentadas no HUD/balão e não devem
+  // interromper a mesa com um overlay de retrato a cada rodada.
+  if (!definition || !boss || !flow || flow.stage !== 'phase') return null;
 
   const phase = Math.max(1, Number(boss.phase) || 1);
   const bossPortrait = definition.phasePortraits?.[phase] || definition.portrait || '';
-  if (flow.stage === 'phase') {
-    return {
-      key: `${flow.id}:phase:${phase}`,
-      kicker: `FASE ${phase}`,
-      title: definition.name || 'Chefe da Mesa',
-      subtitle: getBossPhaseName(state),
-      artworks: bossPortrait ? [{ id: definition.id, name: definition.name || 'Chefe da Mesa', portrait: bossPortrait }] : [],
-    };
-  }
-
-  const intent = boss.currentIntent;
-  if (!intent?.abilityId) return null;
-  const ability = (definition.abilities || []).find((entry) => entry.id === intent.abilityId);
-  const roster = definition.daughters || definition.attendants || null;
-  const abilityRoster = definition.abilityDaughters || definition.abilityAttendants || null;
-  const memberIds = Array.isArray(abilityRoster?.[intent.abilityId]) ? abilityRoster[intent.abilityId] : [];
-  const artworks = memberIds
-    .map((id) => roster?.[id])
-    .filter((member) => member?.portrait)
-    .map((member) => ({ id: member.id, name: member.name, portrait: member.portrait }));
-
-  if (!artworks.length && bossPortrait) {
-    artworks.push({ id: definition.id, name: definition.name || 'Chefe da Mesa', portrait: bossPortrait });
-  }
-
-  const usesRosterArt = memberIds.length > 0 && artworks.length > 0;
-
   return {
-    key: `${flow.id}:ability:${intent.id || intent.abilityId}`,
-    kicker: usesRosterArt ? '' : 'HABILIDADE DO CHEFE',
-    title: usesRosterArt && artworks.length === 1 ? artworks[0].name : (definition.name || 'Chefe da Mesa'),
-    subtitle: ability?.name || intent.abilityId,
-    artworks,
-    layout: usesRosterArt ? 'roster' : 'boss',
+    key: `${flow.id}:phase:${phase}`,
+    kicker: `FASE ${phase}`,
+    title: definition.name || 'Chefe da Mesa',
+    subtitle: getBossPhaseName(state),
+    artworks: bossPortrait ? [{ id: definition.id, name: definition.name || 'Chefe da Mesa', portrait: bossPortrait }] : [],
   };
 }
 
@@ -6998,21 +6973,32 @@ function renderBossHud() {
   if (isDominatrix) {
     chainStatus.innerHTML = state.players
       .map((player) => {
-        const chains = getBossChains(state, player.id);
-        const links = Array.from({ length: 4 }, (_, index) => `<i class="boss-chain-link${index < chains ? ' active' : ''}"></i>`).join('');
-        const dominated = chains >= 4;
-        const controlled = chains === 3;
-        const notice = dominated
-          ? '<small class="boss-dominated-notice"><strong>DOMINADO — 4 CORRENTES</strong><span>Não pode pegar o lixo nem criar jogos novos. Pode comprar do monte, alimentar jogos existentes e descartar.</span></small>'
+        const chains = Math.max(0, Math.min(4, Number(getBossChains(state, player.id)) || 0));
+        const domination = Math.round(chains * 12.5 * 10) / 10;
+        const fill = Math.max(0, Math.min(100, domination * 2));
+        const dominated = domination >= 50;
+        const controlled = domination >= 37.5 && !dominated;
+        const nextEffectAt = controlled ? 50 : 37.5;
+        const nextEffectAmount = Math.max(0, Math.round((nextEffectAt - domination) * 10) / 10);
+        const valueLabel = Number.isInteger(domination) ? String(domination) : domination.toFixed(1);
+        const status = dominated
+          ? 'DOMINADO · sem Lixo e sem jogo novo'
           : controlled
-            ? '<small class="boss-dominated-notice boss-controlled-notice"><strong>SOB CONTROLE — 3 CORRENTES</strong><span>Não pode criar jogos novos, mas pode alimentar jogos existentes.</span></small>'
-            : '';
-        return `<div class="boss-chain-player${dominated ? ' dominated' : ''}" data-player-id="${player.id}"><span>${player.name}</span><span class="boss-chain-links">${links}</span>${notice}</div>`;
+            ? `SOB CONTROLE · Dominado em ${nextEffectAmount}`
+            : `Sob Controle em ${nextEffectAmount}`;
+        return `<div class="boss-domination-player${dominated ? ' dominated' : controlled ? ' controlled' : ''}" data-player-id="${player.id}">
+          <div class="boss-domination-head"><span>${escapeBossHudText(player.name)}</span><strong>${valueLabel} / 50</strong></div>
+          <div class="boss-domination-track" role="meter" aria-label="Dominação de ${escapeBossHudText(player.name)}" aria-valuemin="0" aria-valuemax="50" aria-valuenow="${domination}">
+            <span class="boss-domination-fill" style="width:${fill}%"></span>
+            <i style="left:25%"></i><i style="left:50%"></i><i style="left:75%"></i>
+          </div>
+          <small class="boss-domination-state">${status}</small>
+        </div>`;
       })
       .join('');
   } else {
     document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : isNehelenia ? 'ESPELHOS SOB CONTROLE' : 'DÍVIDA COLETIVA';
-    document.getElementById('bossDebtText').textContent = isNehelenia ? `${boss.danger} / ${boss.maxDanger} ESPELHOS` : `${boss.danger} / ${boss.maxDanger}`;
+    document.getElementById('bossDebtText').textContent = isNehelenia ? `${Math.round((Number(boss.danger) || 0) * 20 * 10) / 10} / 100` : `${boss.danger} / ${boss.maxDanger}`;
     document.getElementById('bossDebtBar').style.width = `${Math.max(0, (boss.danger / boss.maxDanger) * 100)}%`;
     const bloomEventChanged = isMatriarch && boss.lastBloomEventId && boss.lastBloomEventId !== lastRenderedBossBloomEventId;
     const previousBloom = lastRenderedBossBloom;
@@ -7025,8 +7011,8 @@ function renderBossHud() {
         }).join('')
       : isNehelenia
         ? Array.from({ length: Math.max(1, Number(boss.maxDanger) || 5) }, (_, index) => {
-            const taken = index < (Number(boss.danger) || 0);
-            return `<i class="boss-dream-mirror-orb${taken ? ' taken' : ' intact'}" title="Espelho ${index + 1} de ${boss.maxDanger}"><span class="boss-dream-mirror-glass"></span><b>${index + 1}</b></i>`;
+            const fill = Math.round(Math.max(0, Math.min(1, (Number(boss.danger) || 0) - index)) * 100);
+            return `<i class="boss-dream-mirror-orb${fill >= 100 ? ' taken' : fill > 0 ? ' partial' : ' intact'}" style="--boss-mirror-fill:${fill}%" title="Espelho ${index + 1}: ${fill}%"><span class="boss-dream-mirror-glass"></span><b>${index + 1}</b></i>`;
           }).join('')
         : '';
     if (isMatriarch) {
@@ -7166,11 +7152,11 @@ function renderBossHud() {
   const pendingChoice = boss.pendingChoices?.[0] || null;
   const choiceLabels = {
     draw2: 'Comprar 2 cartas',
-    chain: 'Receber 1 Chicote',
+    chain: 'Aceitar Dominação',
     order: 'Aceitar a ordem',
     obey: 'Aceitar Ordem Final',
     lock_card: 'Prender 1 carta',
-    break_meld: 'Retirar carta da canastra',
+    break_meld: 'Permitir cura de 180 HP',
     full: 'Pagar valor integral',
     guarantee: 'Dar garantia',
   };
@@ -7224,18 +7210,13 @@ function renderBossHud() {
           : collateralChoice
             ? 'Clique em uma carta da sua mão e confirme a garantia.'
             : myChoice.type === 'final_order'
-              ? `Ordem Final: ${myChoice.cardIds
-                  ?.map((cardId) => {
-                    const marked = state.players[myPlayerIndex]?.hand?.find((card) => card.id === cardId);
-                    return marked ? `${marked.rank}${marked.suit}` : 'carta marcada';
-                  })
-                  .join(' e ')}. Aceite usar as duas em jogo no proximo turno ou receba 1 Chicote agora.`
+              ? 'Ordem Final: aceite às cegas ou receba Dominação +7.'
               : myChoice.type === 'final_order_draw'
-                ? 'Ordem Final: escolha entre comprar 2 cartas que ficarao presas no proximo turno ou receber 1 Chicote.'
+                ? 'Ordem Final: escolha pendente.'
                 : myChoice.type === 'final_order_lock'
-                  ? 'Ordem Final: escolha entre deixar 1 carta aleatoria da sua mao presa no proximo turno ou receber 1 Chicote.'
+                  ? 'Ordem Final: escolha pendente.'
                   : myChoice.type === 'forced_choice' && myChoice.order?.description
-                    ? `Escolha Forçada: receba 1 Chicote agora ou aceite a ordem: ${myChoice.order.description}`
+                    ? `Escolha Forçada: cumpra a ordem ou escolha Dominação.`
                     : 'A Dominadora exige uma escolha.';
     const actions = document.getElementById('bossChoiceActions');
 
@@ -7255,6 +7236,15 @@ function renderBossHud() {
       actions.innerHTML = myChoice.options
         .map((option) => {
           let label = myChoice.optionLabels?.[option] || choiceLabels[option] || option;
+          if (option === 'chain') {
+            if (myChoice.type === 'break_will') label = 'Dominação +8';
+            else if (myChoice.type === 'final_order') label = 'Dominação +7';
+            else if (myChoice.type === 'forced_choice') {
+              const phase = Number(myChoice.announcedPhase || state.boss?.phase || 1);
+              label = `Dominação +${phase === 3 ? 8 : phase === 2 ? 7 : 6}`;
+            } else label = 'Aceitar Dominação';
+          }
+          if (option === 'obey' && myChoice.type === 'final_order') label = 'Aceitar às cegas';
           if (option === 'full' && myChoice.type === 'fixed_interest_payment') {
             label = `Assumir +${myChoice.amount} Dívida`;
           } else if ((option === 'guarantee' || option.startsWith('guarantee:')) && myChoice.type === 'fixed_interest_payment') {
@@ -7316,7 +7306,7 @@ function renderBossHud() {
 
           showMessage(`2 cartas adicionadas à sua mão.${lockedMessage} Sua compra normal do turno continua sendo 1 carta.`);
         } else if (event.choiceType === 'final_order' && event.option === 'obey' && event.markedCardLabels?.length) {
-          showMessage(`Ordem Final aceita: use ${event.markedCardLabels.join(' e ')} em jogo no proximo turno. Cada carta nao usada causa 1 Chicote.`);
+          showMessage(`Ordem Final aceita: use ${event.markedCardLabels.join(' e ')} em jogo no proximo turno. Cada carta não usada causa Dominação +6.`);
         } else if (event.choiceType === 'final_order_lock' && event.lockedCardLabel) {
           showMessage(`Ordem Final: ${event.lockedCardLabel} ficou presa durante o proximo turno completo.`);
         }
@@ -7395,11 +7385,11 @@ function renderBossHud() {
       return {
         icon: '💥',
         title: kindLabels[entry.newKind] || 'Ataque da equipe',
-        detail: `${entry.damage} de dano${entry.dangerChangeLabel ? ` · ${entry.dangerChangeLabel}` : ''}${entry.chainsRemoved ? ` · ${entry.chainsRemoved} Chicote removido` : ''}${entry.possessionProgress != null ? ` · Posse ${entry.possessionProgress}/2` : ''}`,
+        detail: `${entry.damage} de dano${entry.dangerChangeLabel ? ` · ${entry.dangerChangeLabel}` : ''}${entry.chainsRemoved ? ` · Dominação -${Math.round(entry.chainsRemoved * 12.5 * 10) / 10}` : ''}${entry.possessionProgress != null ? ` · Posse ${entry.possessionProgress}/2` : ''}`,
       };
     if (entry.type === 'bossAbility') return { icon: '💼', title: `${definition?.name || 'Chefe'} — ${entry.name || 'Habilidade'}`, detail: entry.outcome || 'Habilidade resolvida' };
-    if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Chicote aplicado' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${entry.chains}/4 Chicotes` };
-    if (entry.type === 'chainOverflow') return { icon: '⛓', title: 'Chicote transferido', detail: entry.outcome || 'O excesso de Chicotes foi transferido ao parceiro.' };
+    if (entry.type === 'chainChange') return { icon: '⛓', title: entry.amount > 0 ? 'Dominação aumentou' : 'Resistência', detail: `${state.players.find((player) => player.id === entry.playerId)?.name || 'Jogador'}: ${Math.round((entry.domination ?? entry.chains * 12.5) * 10) / 10}/50 · ${entry.dominationDelta > 0 ? '+' : ''}${entry.dominationDelta ?? Math.round(entry.amount * 12.5 * 10) / 10}` };
+    if (entry.type === 'chainOverflow') return { icon: '⛓', title: 'Dominação transferida', detail: entry.outcome || 'O excesso de Dominação passou para o parceiro.' };
     if (entry.type === 'dominatrixOrder') return { icon: '👑', title: 'Ordem da Dominadora', detail: entry.outcome || 'A ordem foi resolvida.' };
     if (entry.type === 'creditLimit') return { icon: '🪙', title: 'Limite de Crédito', detail: entry.outcome || `Dívida +${entry.debtAdded || 0}` };
     if (entry.type === 'discardSurcharge') return { icon: '🪙', title: 'Sobretaxa do Lixo', detail: entry.outcome || `Dívida +${entry.amount || 0}` };
@@ -7609,7 +7599,7 @@ function renderBossHud() {
                                   : 'debt-down';
       floating.className = `boss-floating-number ${visualClass}`;
       floating.textContent = isChain
-        ? `${feedback.amount > 0 ? '+' : '−'}${Math.abs(feedback.amount)} Chicote`
+        ? `DOMINAÇÃO ${feedback.amount > 0 ? '+' : '−'}${Math.round(Math.abs(feedback.amount) * 12.5 * 10) / 10}`
         : isHeal
           ? `HP +${feedback.amount}`
           : isDimitrescuHeal
@@ -7636,9 +7626,9 @@ function renderBossHud() {
                                 ? { living_seed: 'SEMENTE CRIADA', hungry_root: 'RAIZ CRIADA', twin_vines: 'TREPADEIRAS CRIADAS', graft: 'ENXERTO CRIADO', discard_pollen: 'PÓLEN CRIADO', royal_bloom: 'FLORESCIMENTO REAL' }[feedback.abilityId] ||
                                   'AMEAÇA CRIADA'
                                 : feedback.dangerChangeLabel;
-      const chainPlayer = isChain ? [...document.querySelectorAll('#bossChainStatus .boss-chain-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId)) : null;
+      const chainPlayer = isChain ? [...document.querySelectorAll('#bossChainStatus .boss-domination-player')].find((element) => String(element.dataset.playerId) === String(feedback.playerId)) : null;
       const anchor = isChain
-        ? chainPlayer?.querySelector('.boss-chain-links')?.getBoundingClientRect()
+        ? chainPlayer?.querySelector('.boss-domination-track')?.getBoundingClientRect()
         : isHeal || isDimitrescuHeal || isRebirth
           ? document.getElementById('bossHpBar')?.parentElement?.getBoundingClientRect()
           : isCocoonBreak || isCocoonAbsorb || isBloodClotBreak || isBloodClotAbsorb || isMirrorStore || isMirrorBreak
@@ -10384,28 +10374,11 @@ const botEngine = {
         option = choice.correctOption;
       }
     }
-    if (choice.type === 'forced_choice' && choice.options.includes('chain') && choice.options.includes('order')) {
-      const ownChains = getBossChains(state, playerId);
-      const partnerChains = Math.max(0, ...(state.players || []).filter((entry) => entry.id !== playerId).map((entry) => getBossChains(state, entry.id)));
-      const practicalOrder = ['discard_suit', 'no_new_meld', 'feed_specific_meld'].includes(choice.order?.type);
-      option = choice.order && (ownChains >= 3 || partnerChains >= 3 || practicalOrder) ? 'order' : 'chain';
-    } else if (choice.type === 'final_order' && choice.options.includes('obey') && choice.options.includes('chain')) {
-      const ownChains = getBossChains(state, playerId);
-      const markedCards = (choice.cardIds || []).map((cardId) => player?.hand?.find((card) => card?.id === cardId)).filter(Boolean);
-      const team = state.teams?.[player?.teamId];
-      const canCreate = canBossCreateMeld(state, playerId);
-      const playableCount = markedCards.filter((marked) => {
-        if ((team?.melds || []).some((meld) => isValidSequenceMeld([...(meld || []), marked]))) return true;
-        if (!canCreate) return false;
-        const others = (player?.hand || []).filter((card) => card?.id && card.id !== marked.id);
-        for (let i = 0; i < others.length; i += 1) {
-          for (let j = i + 1; j < others.length; j += 1) {
-            if (isValidSequenceMeld([marked, others[i], others[j]])) return true;
-          }
-        }
-        return false;
-      }).length;
-      option = ownChains >= 3 || playableCount >= 1 ? 'obey' : 'chain';
+    const dominatrixBotChoice = state.boss?.id === 'dominadora'
+      ? BossBuracoBot.chooseDominatrixPendingChoice(state, playerId, choice)
+      : null;
+    if (dominatrixBotChoice && choice.options.includes(dominatrixBotChoice)) {
+      option = dominatrixBotChoice;
     } else if (choice.options.includes('chain') && getBossChains(state, playerId) >= 2) {
       option = choice.options.find((entry) => entry !== 'chain') || 'chain';
     }
@@ -12225,7 +12198,7 @@ if (isDebugMode) {
   let bossDebugLabReportTimerId = null;
 
   const loadBossDebugLabModule = () => {
-    bossDebugLabModulePromise ||= import('./js/boss/boss-debug-scenarios.js');
+    bossDebugLabModulePromise ||= import('./js/boss/boss-debug-scenarios.js?lab=20261004c');
     return bossDebugLabModulePromise;
   };
 
@@ -12697,9 +12670,20 @@ window.debugRestartGame = async (fromRematch = false) => {
   window.toggleDebugPanel(keepDevToolsOpen);
 };
 
+function replayDebugBossTerminalPresentation() {
+  if (!isDebugMode || !isCurrentBossMode() || !state?.finished || !state.boss?.result) return false;
+  resultPresented = false;
+  const resultSection = document.getElementById('bossResultSection');
+  if (resultSection) resultSection.style.display = 'none';
+  clearBossPortraitTerminalVisuals();
+  renderAll();
+  return true;
+}
+
 window.debugEndGame = async () => {
   if (!ensureMyTurn()) return;
   await finishGame(currentTeam().id);
+  replayDebugBossTerminalPresentation();
 };
 
 window.debugTogglePause = async () => {
@@ -12756,9 +12740,16 @@ window.debugMeld = async (type) => {
 
   // Passando o meldIdx corretamente no lugar do array "meld"
   let domReward = await processDominationReward(actor, 'simple', classifyMeldForUi(meld).kind, meldIdx);
-  await processBossMeldChange(actor, 'simple', classifyMeldForUi(meld).kind, meldIdx, meld, true);
+  const bossEvent = await processBossMeldChange(actor, 'simple', classifyMeldForUi(meld).kind, meldIdx, meld, true);
   showDebugBossDamageReaction();
-  if (state.finished) return;
+  if (bossEvent?.reborn && state?.boss?.id === 'matriarca_esmeralda' && !bossHasActiveRebirthVisual(state.boss)) {
+    renderAll();
+    triggerMatriarchRebirthVisual(bossEvent.actionId || 'debug_rebirth');
+  }
+  if (state.finished) {
+    replayDebugBossTerminalPresentation();
+    return;
+  }
 
   const friendDraw = domReward?.friendBonus ? playDominationFriendSharedDraw(domReward.friendBonus) : Promise.resolve();
   if (domReward && domReward.drawnCards && domReward.drawnCards.length > 0) {

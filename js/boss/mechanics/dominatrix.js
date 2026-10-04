@@ -81,10 +81,14 @@ export const dominatrixBossMechanics = Object.freeze({
       if (possessionSuppressesDamage) nextCanastraDamage = 0;
     }
 
-    if (intent?.abilityId === 'hands_tied' && isNewMeld && playerId != null) {
-      intent.payload.teamMeldAvailable = false;
-      intent.payload.consumedByPlayerId = playerId;
-      intent.payload.consumedMeldId = meldId;
+    if (intent?.abilityId === 'hands_tied' && playerId != null) {
+      intent.payload.playerMeldIds ||= {};
+      if (intent.payload.playerMeldIds[playerId] == null && meldId) intent.payload.playerMeldIds[playerId] = meldId;
+      if (isNewMeld) {
+        intent.payload.teamMeldAvailable = false;
+        intent.payload.consumedByPlayerId = playerId;
+        intent.payload.consumedMeldId = meldId;
+      }
     }
 
     if (intent?.abilityId === 'separation' && playerId != null) {
@@ -140,7 +144,7 @@ export const dominatrixBossMechanics = Object.freeze({
             outcome: 'A desobediencia ao Interdito anulou a remocao de Chicote desta evolucao.',
           });
         } else if (typeof changeChains === 'function') {
-          chainsRemoved = Math.abs(Math.min(0, changeChains(playerId, -1, 'resistance')));
+          chainsRemoved = Math.abs(Math.min(0, changeChains(playerId, -0.32 * (tier - previousResistanceTier), 'resistance')));
         }
       }
     }
@@ -160,8 +164,8 @@ export const dominatrixBossMechanics = Object.freeze({
     const finalOrderMissed = finalOrderMarks.filter((effect) => !teamMeldCardIds.has(effect.cardId));
     if (boss.choiceDrawnCardIdsByPlayer) delete boss.choiceDrawnCardIdsByPlayer[playerId];
     boss.effects = (boss.effects || []).filter((effect) => !(effect.expiresAfterTurn && effect.playerId === playerId));
-    exposedCardsHeld.forEach((effect) => changeChains?.(playerId, 1, `forced_choice_exposure:${effect.cardId}`));
-    finalOrderMissed.forEach((effect) => changeChains?.(playerId, 1, `final_order:${effect.cardId}`));
+    exposedCardsHeld.forEach((effect) => changeChains?.(playerId, 0.64, `forced_choice_exposure:${effect.cardId}`));
+    finalOrderMissed.forEach((effect) => changeChains?.(playerId, 0.48, `final_order:${effect.cardId}`));
     if (finalOrderMarks.length) {
       boss.actionSequence += 1;
       recordBossEvent?.({
@@ -170,10 +174,11 @@ export const dominatrixBossMechanics = Object.freeze({
         playerId,
         usedCardIds: finalOrderUsed.map((effect) => effect.cardId),
         missedCardIds: finalOrderMissed.map((effect) => effect.cardId),
-        chainsApplied: finalOrderMissed.length,
+        chainsApplied: finalOrderMissed.length * 0.48,
+        dominationApplied: finalOrderMissed.length * 6,
         outcome: finalOrderMissed.length
-          ? `${finalOrderUsed.length}/2 cartas da Ordem Final entraram em jogo; +${finalOrderMissed.length} Chicote${finalOrderMissed.length === 1 ? '' : 's'}.`
-          : 'As 2 cartas da Ordem Final entraram em jogo; nenhum Chicote foi aplicado.',
+          ? `${finalOrderUsed.length}/2 cartas da Ordem Final entraram em jogo; Dominação +${finalOrderMissed.length * 6}.`
+          : 'As 2 cartas da Ordem Final entraram em jogo; a Dominação não avançou.',
       });
     }
 

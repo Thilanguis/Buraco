@@ -680,27 +680,140 @@ export class BossBuracoBot {
     return deltaRatio * 150 + Math.pow(afterRatio, 3) * 120 + Math.max(0, Number(sidePenalty) || 0);
   }
 
-  static dominatrixRiskScore(state, playerId, addedChains = 1) {
+  static dominatrixPressureConfig(abilityId, phase = 1) {
+    const configs = {
+      forced_choice: {
+        1: { direct: 6, obey: 2, fail: 12 },
+        2: { direct: 7, obey: 3, fail: 14 },
+        3: { direct: 8, obey: 3, fail: 16 },
+      },
+      exposure: {
+        1: { success: 1, fail: 9 },
+        2: { success: 1, fail: 11 },
+        3: { success: 1, fail: 13 },
+      },
+      iron_etiquette: {
+        1: { obey: 2, fail: 10 },
+        2: { obey: 2, fail: 12 },
+        3: { obey: 3, fail: 14 },
+      },
+      final_order: { direct: 7, accept: 2, miss: 6 },
+      break_will: { direct: 8, heal: 180 },
+    };
+    const config = configs[abilityId];
+    if (!config) return {};
+    return config[phase] || config[3] || config;
+  }
+
+  // A Dominadora ainda guarda 0..4 internamente por compatibilidade, mas cada
+  // unidade equivale a 12,5 pontos da barra 0..50 mostrada ao jogador.
+  // O bot avalia a barra real e o transbordamento, não "Chicotes inteiros".
+  static dominatrixRiskScore(state, playerId, addedDominationPoints = 0) {
     const boss = state?.boss;
     if (!boss || boss.id !== 'dominadora') return 0;
     const players = state.players || [];
-    const ownBefore = Math.max(0, Number(boss.chainsByPlayer?.[playerId]) || 0);
     const partner = players.find((player) => player.id !== playerId);
-    const partnerBefore = Math.max(0, Number(boss.chainsByPlayer?.[partner?.id]) || 0);
-    let ownAfter = ownBefore;
-    let partnerAfter = partnerBefore;
-    let remaining = Math.max(0, Number(addedChains) || 0);
+    const ownBefore = Math.max(0, Math.min(50, (Number(boss.chainsByPlayer?.[playerId]) || 0) * 12.5));
+    const partnerBefore = Math.max(0, Math.min(50, (Number(boss.chainsByPlayer?.[partner?.id]) || 0) * 12.5));
+    const incoming = Math.max(0, Number(addedDominationPoints) || 0);
+    const ownAfter = Math.min(50, ownBefore + incoming);
+    const overflow = Math.max(0, ownBefore + incoming - 50);
+    const partnerAfter = Math.min(50, partnerBefore + overflow);
 
-    while (remaining > 0) {
-      if (ownAfter >= 4 && partner) partnerAfter = Math.min(4, partnerAfter + 1);
-      else ownAfter = Math.min(4, ownAfter + 1);
-      remaining -= 1;
+    if (ownAfter >= 50 && partnerAfter >= 50) return 1000;
+
+    const barRisk = (before, after, primary) => {
+      const delta = Math.max(0, after - before);
+      let score = (delta / 50) * 150 + Math.pow(after / 50, 3) * (primary ? 70 : 35);
+      const crossings = [
+        [12.5, primary ? 4 : 2],
+        [25, primary ? 10 : 5],
+        [37.5, primary ? 55 : 28], // Sob Controle
+        [50, primary ? 120 : 70], // Dominado
+      ];
+      for (const [threshold, bonus] of crossings) {
+        if (before < threshold && after >= threshold) score += bonus;
+      }
+      return score;
+    };
+
+    return barRisk(ownBefore, ownAfter, true) + barRisk(partnerBefore, partnerAfter, false);
+  }
+
+  static estimateDominatrixOrderSuccess(state, player, order) {
+    if (!player || !order?.type) return 0.5;
+    if (order.type === 'discard_suit') {
+      const eligible = new Set(order.eligibleCardIds || []);
+      const options = (player.hand || []).filter((card) => card?.id && eligible.has(card.id)).length;
+      return options >= 2 ? 0.9 : options === 1 ? 0.8 : 0.5;
+    }
+    if (order.type === 'evolve_specific_meld') {
+      const eligible = new Set(order.eligibleCardIds || []);
+      const options = (player.hand || []).filter((card) => card?.id && eligible.has(card.id)).length;
+      return options >= 2 ? 0.82 : options === 1 ? 0.68 : 0.5;
+    }
+    if (order.type === 'feed_specific_meld') return 0.86;
+    if (order.type === 'reduce_hand') {
+      const excess = Math.max(0, (player.hand?.length || 0) - (Number(order.handLimit) || 0));
+      return excess <= 1 ? 0.88 : excess === 2 ? 0.78 : 0.62;
+    }
+    return 0.65;
+  }
+
+  static chooseDominatrixPendingChoice(state, playerId, choice) {
+    if (state?.boss?.id !== 'dominadora' || !choice) return null;
+    const player = (state.players || []).find((entry) => entry.id === playerId);
+    if (!player) return null;
+    const phase = Math.max(1, Number(choice.announcedPhase || state.boss.phase || 1));
+
+    if (choice.type === 'forced_choice' && choice.options?.includes('chain') && choice.options?.includes('order')) {
+      const pressure = this.dominatrixPressureConfig('forced_choice', phase);
+      const directRisk = this.dominatrixRiskScore(state, playerId, pressure.direct);
+      if (!choice.order) return 'chain';
+      const successChance = this.estimateDominatrixOrderSuccess(state, player, choice.order);
+      const successRisk = this.dominatrixRiskScore(state, playerId, pressure.obey);
+      const failureRisk = this.dominatrixRiskScore(state, playerId, pressure.obey + pressure.fail);
+      const strategicCost = {
+        discard_suit: 3,
+        feed_specific_meld: 4,
+        reduce_hand: 6,
+        evolve_specific_meld: 9,
+      }[choice.order.type] || 5;
+      const orderRisk = successChance * successRisk + (1 - successChance) * failureRisk + strategicCost;
+      return orderRisk <= directRisk ? 'order' : 'chain';
     }
 
-    if (ownAfter >= 4 && partnerAfter >= 4) return 1000;
-    const ownPenalty = ownAfter >= 4 ? 112 : ownAfter >= 3 ? 74 : ownAfter * 18;
-    const partnerPenalty = partnerAfter >= 4 ? 88 : partnerAfter >= 3 ? 44 : partnerAfter * 8;
-    return ownPenalty + partnerPenalty;
+    if (choice.type === 'final_order' && choice.options?.includes('obey') && choice.options?.includes('chain')) {
+      const pressure = this.dominatrixPressureConfig('final_order', phase);
+      const directRisk = this.dominatrixRiskScore(state, playerId, pressure.direct);
+      const handSize = player.hand?.length || 0;
+      let missChance = handSize <= 6 ? 0.18 : handSize <= 9 ? 0.24 : handSize <= 12 ? 0.3 : 0.36;
+      const ownPoints = (Number(state.boss.chainsByPlayer?.[playerId]) || 0) * 12.5;
+      if (ownPoints >= 37.5) missChance += 0.05;
+      missChance = Math.min(0.5, missChance);
+      const p0 = Math.pow(1 - missChance, 2);
+      const p1 = 2 * missChance * (1 - missChance);
+      const p2 = Math.pow(missChance, 2);
+      const obeyRisk = p0 * this.dominatrixRiskScore(state, playerId, pressure.accept)
+        + p1 * this.dominatrixRiskScore(state, playerId, pressure.accept + pressure.miss)
+        + p2 * this.dominatrixRiskScore(state, playerId, pressure.accept + pressure.miss * 2);
+      return obeyRisk <= directRisk ? 'obey' : 'chain';
+    }
+
+    if (choice.type === 'break_will' && choice.options?.includes('chain') && choice.options?.includes('break_meld')) {
+      const pressure = this.dominatrixPressureConfig('break_will', phase);
+      const directRisk = this.dominatrixRiskScore(state, playerId, pressure.direct);
+      const boss = state.boss;
+      const actualHeal = Math.max(0, Math.min(pressure.heal, Number(boss.maxHp) - Number(boss.hp)));
+      const hpRatio = boss.maxHp > 0 ? Math.max(0, Number(boss.hp) / Number(boss.maxHp)) : 1;
+      let healCost = boss.maxHp > 0 ? (actualHeal / boss.maxHp) * 400 : actualHeal / 6;
+      if (hpRatio <= 0.15) healCost += 95;
+      else if (hpRatio <= 0.3) healCost += 55;
+      else if (hpRatio <= 0.5) healCost += 20;
+      return directRisk <= healCost ? 'chain' : 'break_meld';
+    }
+
+    return null;
   }
 
   static bossStrategicMeldKind(meld) {
@@ -777,11 +890,34 @@ export class BossBuracoBot {
     }
 
     if (boss.id === 'dominadora') {
-      let chains = 0;
-      if (cardId && (dominatrixPriorities?.markedCardIds || []).includes(cardId)) chains = 1;
-      if (Number.isInteger(meldIndex) && (dominatrixPriorities?.meldIndexes || []).includes(meldIndex)) chains = 1;
-      if (!chains && directObjective && dominatrixPriorities?.urgent) chains = 1;
-      return chains ? this.dominatrixRiskScore(state, player.id, chains) : 0;
+      const phase = Math.max(1, Number(intent?.announcedPhase || boss.phase || 1));
+      let dominationPoints = 0;
+      let sidePenalty = 0;
+      if (cardId) {
+        const finalOrderMarked = (boss.effects || []).some((effect) => effect.id === 'final_order_mark'
+          && effect.playerId === player.id && effect.cardId === cardId);
+        if (finalOrderMarked) dominationPoints = Math.max(dominationPoints, this.dominatrixPressureConfig('final_order').miss);
+        if (intent?.abilityId === 'exposure' && intent.payload?.targetPlayerId === player.id && intent.payload?.cardId === cardId) {
+          const pressure = this.dominatrixPressureConfig('exposure', phase);
+          dominationPoints = Math.max(dominationPoints, Math.max(0, pressure.fail - pressure.success));
+        }
+      }
+      if (Number.isInteger(meldIndex)) {
+        const activeOrder = (boss.activeOrders || []).find((order) => order?.status === 'active'
+          && order.targetPlayerId === player.id
+          && ['feed_specific_meld', 'evolve_specific_meld'].includes(order.type)
+          && Number(order.meldIndex) === Number(meldIndex));
+        if (activeOrder) {
+          const orderPressure = this.dominatrixPressureConfig(activeOrder.sourceAbilityId, Number(activeOrder.announcedPhase || phase));
+          dominationPoints = Math.max(dominationPoints, Number(orderPressure.fail) || 0);
+        } else if ((dominatrixPriorities?.meldIndexes || []).includes(meldIndex)) {
+          // Posse é controle puro: ainda vale priorizar libertar o jogo, mas não
+          // fingimos que ela causa Dominação direta.
+          sidePenalty = 46;
+        }
+      }
+      if (!dominationPoints && directObjective && dominatrixPriorities?.urgent) sidePenalty = Math.max(sidePenalty, 28);
+      return this.dominatrixRiskScore(state, player.id, dominationPoints) + sidePenalty;
     }
 
     if (boss.id === 'dimitrescu') {
@@ -959,7 +1095,7 @@ export class BossBuracoBot {
       ]);
       const directMarkedCards = new Set(markedCards);
       const directMarkedMelds = new Set(markedMelds);
-      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dimitrescuPriorities?.urgent || !!neheleniaPriorities?.urgent;
+      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dominatrixPriorities?.urgent || !!dimitrescuPriorities?.urgent || !!neheleniaPriorities?.urgent;
       const flexibleBossObjective = neheleniaPriorities?.exactPlayCount != null || !!naturePriorities?.harvestActive;
       if (markedCards.size || markedMelds.size || priorityUrgent || flexibleBossObjective) {
         if ((priorityUrgent || flexibleBossObjective) && !neheleniaPriorities?.strictMeldTargets) {

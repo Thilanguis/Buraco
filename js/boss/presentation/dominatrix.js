@@ -57,11 +57,22 @@ const ACTION_CATEGORIES = Object.freeze({
   interdict: 'Restricao ativa agora',
 });
 
+function dominatrixPressureText(phase = 1) {
+  const p = Number(phase) || 1;
+  return {
+    forcedChoice: p === 3 ? { direct: 8, obey: 3, fail: 16 } : p === 2 ? { direct: 7, obey: 3, fail: 14 } : { direct: 6, obey: 2, fail: 12 },
+    exposure: { success: 1, fail: p === 3 ? 13 : p === 2 ? 11 : 9 },
+    etiquette: { obey: p === 3 ? 3 : 2, fail: p === 3 ? 14 : p === 2 ? 12 : 10 },
+    finalOrder: { direct: 7, accept: 2, miss: 6 },
+    absoluteControl: 5,
+  };
+}
+
 export const dominatrixBossPresentation = Object.freeze({
   id: 'dominadora',
   feminine: true,
   ruleSummary() {
-    return '3 Chicotes = Sob Controle · 4 = Dominado · ambos em 4 = derrota.';
+    return 'Cada jogador tem uma barra de Dominação de 0 a 50, dividida em 4 partes. Em 37,5 fica Sob Controle; em 50 fica Dominado. Se os dois chegarem a 50, a equipe perde.';
   },
   speech(abilityId, context = {}) {
     const target = dialogueTarget(context);
@@ -81,79 +92,57 @@ export const dominatrixBossPresentation = Object.freeze({
   finalDanger(gameState) {
     const boss = gameState?.boss || {};
     const summary = (gameState?.players || []).map((player) => `${player.name}: ${Number(boss.chainsByPlayer?.[player.id] || 0)}/4`).join(' · ');
-    return { label: 'Chicotes finais', value: summary };
+    return { label: 'Dominação final', value: summary };
   },
 
-  details({ gameState, intent, helpers = {} } = {}) {
-    if (!intent) return [];
-    const { playerName = () => '', cardLabel = () => '', cardLabels = () => [], chains = () => 0, cardLabelAnywhere = () => 'carta marcada', detailFields = (entries) => entries } = helpers;
-    const payload = intent.payload || {};
-    const target = playerName(gameState, payload.targetPlayerId);
-    const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
-    const collarCards = cardLabels(gameState, payload.targetPlayerId, payload.cardIds || (payload.cardId ? [payload.cardId] : []));
-    const possession = (gameState?.boss?.possessions || []).find((entry) => (payload.meldId ? entry.meldId === payload.meldId : entry.meldIndex === payload.meldIndex));
-    const contributors = (possession?.contributorPlayerIds || []).map((playerId) => playerName(gameState, playerId));
-    switch (intent.abilityId) {
-      case 'collar': return detailFields([['Alvo', target], [collarCards.length > 1 ? 'Cartas' : 'Carta', collarCards.join(' e ')], ['Duracao', 'ate o fim do turno do alvo'], ['Restricao', 'nao pode jogar nem descartar']]);
-      case 'forced_choice': return detailFields([['Alvo', target], ['Resolucao', 'imediatamente apos o anuncio'], ['Escolha', `receber 1 Chicote ou aceitar: ${payload.order?.label || 'uma ordem valida para o proximo turno'}`]]);
-      case 'exposure': return detailFields([['Alvo', target], ['Carta', card], ['Duracao', 'ate o fim do turno do alvo'], ['Obrigacao', 'baixar ou adicionar a um jogo'], ['Falha', '1 Chicote se permanecer na mao']]);
-      case 'forced_swap': return detailFields([['Alvos', 'os dois cooperadores'], ['Cartas', 'uma carta de cada mao'], ['Efeito', 'a troca acontece depois deste anuncio']]);
-      case 'hands_tied': return detailFields([['Alvos', 'equipe inteira'], ['Duracao', 'rodada completa'], ['Criacao compartilhada', payload.teamMeldAvailable === false ? 'consumida' : 'disponivel'], ['Consumida por', playerName(gameState, payload.consumedByPlayerId)], ['Restricao', 'a equipe pode criar somente 1 jogo novo']]);
-      case 'possession': return detailFields([['Jogo', `#${Number(payload.meldIndex) + 1}`], ['Contribuicoes', contributors.length ? contributors.join(' e ') : 'nenhum cooperador'], ['Progresso', `${contributors.length}/${possession?.required || gameState?.players?.length || 2}`], ['Duracao', 'ate romper a Posse'], ['Restricao', 'o dano do jogo permanece suspenso'], ['Encerramento', 'uma contribuicao de cada jogador ou evolucao de tier']]);
-      case 'favorite': return detailFields([['Protegido', playerName(gameState, payload.protectedPlayerId)], ['Punido', playerName(gameState, payload.punishedPlayerId)], ['Chicotes do punido', `${chains(gameState, payload.punishedPlayerId)}/4`], ['Efeito', 'protecao e 1 Chicote depois deste anuncio']]);
-      case 'double_collar': return detailFields([['Alvos', (payload.lockedCards || []).map((entry) => `${playerName(gameState, entry.playerId)}: ${cardLabel(gameState, entry.playerId, entry.cardId)}`).join('; ')], ['Duracao', 'rodada completa'], ['Restricao', 'nao pode jogar nem descartar as cartas presas']]);
-      case 'separation': return detailFields([['Alvos', 'os dois cooperadores'], ['Duracao', 'rodada completa'], ['Restricao', 'cada jogo so pode ser alimentado por um cooperador']]);
-      case 'absolute_control': return detailFields([['Alvo', target], ['Duracao', 'turno do jogador alvo'], ['Restricao', 'nao pode criar jogos novos'], ['Encerramento', 'o alvo concluir o turno']]);
-      case 'break_will': return detailFields([['Alvo', target], ['Chicotes', `${chains(gameState, payload.targetPlayerId)}/4`], ['Resolucao', 'ao final da rodada'], ['Escolha', 'receber 1 Chicote ou retirar carta de canastra']]);
-      case 'final_order': {
-        const orders = payload.orders || [];
-        return detailFields([['Alvos', 'os dois cooperadores'], ['Cartas marcadas', orders.map((order) => `${playerName(gameState, order.playerId)}: ${(order.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).join(' e ')}`).join(' · ')], ['Resolucao', 'cada jogador decide agora, antes dos turnos dos cooperadores'], ['Escolha', 'aceitar a ordem ou receber 1 Chicote imediatamente'], ['Falha ao obedecer', '1 Chicote por carta marcada que nao entrar em jogo']]);
-      }
-      case 'iron_etiquette': return detailFields([['Alvo', target], ['Ordem', `descartar ${payload.suitLabel}`], ['Prazo', 'fim do proximo turno do alvo'], ['Desobediencia', '+1 Chicote']]);
-      case 'interdict': return detailFields([['Jogo', `#${Number(payload.meldIndex) + 1}`], ['Gatilho', 'primeira tentativa valida de evolucao'], ['Obedecer', 'cancelar somente a tentativa'], ['Desobedecer', 'evoluir e receber +1 Chicote'], ['Duracao', 'esta rodada']]);
-      default: return detailFields([['Duracao', 'rodada completa'], ['Efeito', intent.description || 'ordem ativa']]);
-    }
+  details({ intent } = {}) {
+    // A Dominadora usa HUD curto; regras completas ficam no botão "?".
+    return intent ? [] : [];
   },
 
   compactAction({ gameState, intent, helpers = {} } = {}) {
     if (!intent) return null;
-    const { playerName = () => '', playerById = () => null, cardLabel = () => '', cardLabels = () => [], cardLabelAnywhere = () => 'carta marcada' } = helpers;
+    const { playerName = () => '', playerById = () => null, cardLabel = () => '', cardLabels = () => [] } = helpers;
     const payload = intent.payload || {};
     const target = playerName(gameState, payload.targetPlayerId);
     const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
     const collarCards = cardLabels(gameState, payload.targetPlayerId, payload.cardIds || (payload.cardId ? [payload.cardId] : []));
     switch (intent.abilityId) {
-      case 'collar': return { instruction: `${target}: ${collarCards.join(' e ')} bloqueada(s).`, progress: '', consequence: 'Até fim do turno' };
+      case 'collar': return { instruction: `${target}: ${collarCards.join(' e ')} bloqueada(s).`, progress: '', consequence: 'Até o fim do turno' };
       case 'exposure': {
         const targetPlayer = playerById(gameState, payload.targetPlayerId);
         const completed = !targetPlayer?.hand?.some((entry) => entry.id === payload.cardId);
-        const exposedCard = card || 'a carta exposta';
-        return { instruction: completed ? `✅ ${target}: ${exposedCard} usada.` : `${target}: use ${exposedCard}.`, progress: completed ? '✅ 1/1' : '⬜ 0/1', consequence: completed ? 'Sem Chicote' : 'Falha: +1 Chicote' };
+        const pressure = dominatrixPressureText(intent.announcedPhase).exposure;
+        return {
+          instruction: completed ? `✅ ${target}: carta usada.` : `${target}: jogue ${card || 'a carta exposta'}.`,
+          progress: completed ? '✅ 1/1' : '⬜ 0/1',
+          consequence: completed ? `Dominação +${pressure.success}` : `Falha: +${pressure.fail}`,
+        };
       }
-      case 'forced_choice': return { instruction: `${target}: aceite a ordem ou receba +1 Chicote.`, progress: payload.order?.label || '', consequence: 'Escolha agora' };
-      case 'forced_swap': return { instruction: 'Troca de 1 carta entre os cooperadores.', progress: '', consequence: 'Automático' };
+      case 'forced_choice': {
+        const pressure = dominatrixPressureText(intent.announcedPhase).forcedChoice;
+        return { instruction: `Escolha: ordem ou +${pressure.direct} Dominação.`, progress: payload.order?.label || '', consequence: `Aceitar +${pressure.obey} · falhar +${pressure.fail}` };
+      }
+      case 'forced_swap': return { instruction: 'Troca forçada concluída.', progress: '', consequence: 'Cartas recebidas presas 1 turno' };
       case 'possession': {
         const possession = (gameState?.boss?.possessions || []).find((entry) => (payload.meldId ? entry.meldId === payload.meldId : entry.meldIndex === payload.meldIndex));
-        return { instruction: `Jogo ${Number(payload.meldIndex) + 1}: dano antigo suspenso.`, progress: `Contribuição: ${possession?.contributorPlayerIds?.length || 0}/${possession?.required || gameState?.players?.length || 2}`, consequence: 'Libera com os 2 jogadores ou evolução' };
+        return { instruction: `Libere o Jogo ${Number(payload.meldIndex) + 1}.`, progress: `${possession?.contributorPlayerIds?.length || 0}/${possession?.required || gameState?.players?.length || 2} jogadores`, consequence: 'Dano antigo suspenso' };
       }
-      case 'absolute_control': return { instruction: `${target}: Dominado neste turno.`, progress: '', consequence: 'Sem Lixo · sem jogo novo' };
+      case 'absolute_control': return { instruction: `${target}: Dominado por 1 turno.`, progress: '', consequence: '+5 Dominação' };
       case 'double_collar': return { instruction: '1 carta de cada jogador bloqueada.', progress: '', consequence: 'Nesta rodada' };
-      case 'separation': return { instruction: 'Cada jogo pode ser alimentado por só 1 jogador.', progress: '', consequence: 'Nesta rodada' };
-      case 'hands_tied': {
-        const consumed = payload.teamMeldAvailable === false;
-        const consumedBy = payload.consumedByPlayerId == null ? null : playerName(gameState, payload.consumedByPlayerId);
-        if (consumed) return { instruction: 'Limite de jogo novo já usado.', progress: `✅ 1/1${consumedBy ? ` · ${consumedBy}` : ''}`, consequence: 'Agora só jogos existentes' };
-        return { instruction: 'Máx. 1 jogo novo nesta rodada.', progress: '⬜ 0/1', consequence: 'Depois: só jogos existentes' };
-      }
-      case 'favorite': return { instruction: `${playerName(gameState, payload.protectedPlayerId)} protegida · ${playerName(gameState, payload.punishedPlayerId)} +1 Chicote.`, progress: '', consequence: '' };
-      case 'break_will': return { instruction: `${target}: escolha a punição no fim da rodada.`, progress: '', consequence: 'Chicote ou canastra' };
+      case 'separation': return { instruction: 'Cada jogo: só 1 jogador.', progress: '', consequence: 'Nesta rodada' };
+      case 'hands_tied': return { instruction: 'Cada jogador: use só 1 jogo.', progress: '', consequence: 'Equipe: 1 jogo novo' };
+      case 'favorite': return { instruction: `${playerName(gameState, payload.punishedPlayerId)}: +8 Dominação.`, progress: '', consequence: `${playerName(gameState, payload.protectedPlayerId)} poupada` };
+      case 'break_will': return { instruction: 'Escolha: +8 Dominação ou +180 HP para a chefe.', progress: '', consequence: '' };
       case 'final_order': {
-        const orders = payload.orders || [];
-        const lines = orders.map((order) => `☐ ${playerName(gameState, order.playerId)} — ${(order.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).join(' e ')}`);
-        return { instruction: 'Use as 2 cartas marcadas em jogos.', progress: lines.join('\n'), consequence: 'Recusar +1 · Aceitou: +1 por carta não usada' };
+        const pressure = dominatrixPressureText(intent.announcedPhase).finalOrder;
+        return { instruction: `Escolha: Ordem às cegas ou +${pressure.direct} Dominação.`, progress: '', consequence: `Aceitar +${pressure.accept} + risco` };
       }
-      case 'iron_etiquette': return { instruction: `${target}: descarte ${payload.suitLabel}.`, progress: '⬜ 0/1', consequence: 'Outro naipe: +1 Chicote' };
-      case 'interdict': return { instruction: `Jogo ${Number(payload.meldIndex) + 1}: não evolua de categoria.`, progress: '', consequence: 'Evoluir: cancelar ou +1 Chicote' };
+      case 'iron_etiquette': {
+        const pressure = dominatrixPressureText(intent.announcedPhase).etiquette;
+        return { instruction: `${target}: descarte ${payload.suitLabel}.`, progress: '⬜ 0/1', consequence: `Cumpre +${pressure.obey} · falha +${pressure.fail}` };
+      }
+      case 'interdict': return { instruction: `Jogo ${Number(payload.meldIndex) + 1}: não evolua.`, progress: '', consequence: 'Desobedecer: Dominação' };
       default: return null;
     }
   },
@@ -164,13 +153,22 @@ export const dominatrixBossPresentation = Object.freeze({
     const payload = intent.payload || {};
     const target = playerName(gameState, payload.targetPlayerId);
     switch (intent.abilityId) {
-      case 'forced_choice': return 'Se aceitar a ordem, ela vale para o próximo turno do alvo. A Dominadora só oferece uma ordem que pode ser cumprida naquele momento. Se uma mudança externa tornar a ordem impossível, ela é cancelada sem Chicote; se o próprio jogador gastar voluntariamente a forma de cumprir, conta como desobediência.';
+      case 'collar': return 'A Coleira prioriza cartas que realmente poderiam ser usadas. As cartas presas não podem ser jogadas nem descartadas até o fim do turno do alvo.';
+      case 'forced_choice': return 'A ordem sempre nasce de uma tarefa viável. Aceitar cobra Dominação menor imediatamente; falhar cobra a punição adicional da fase. Se a mesa tornar a ordem impossível sem culpa do alvo, ela é cancelada.';
+      case 'exposure': return `Usar a carta exposta ainda causa Dominação +1. Falhar causa +${dominatrixPressureText(intent.announcedPhase).exposure.fail}. A carta precisa entrar em jogo; simplesmente descartá-la não resolve a Exposição.`;
+      case 'forced_swap': return 'A troca prioriza cartas úteis/jogáveis. A carta recebida fica presa durante o próximo turno para a troca realmente alterar o plano dos dois jogadores.';
       case 'possession': return 'A Posse suspende somente o dano antigo do jogo marcado. Cartas novas ainda causam o dano individual normal. O jogo é libertado quando cada cooperador contribui ao menos 1 carta ou quando ele evolui de categoria; nesse momento, apenas o dano antigo suspenso volta a ser aplicado.';
-      case 'hands_tied': return 'O limite é da equipe inteira: existe apenas 1 jogo novo disponível na rodada. Assim que qualquer cooperador usar essa criação, os dois só podem alimentar jogos existentes até a rodada terminar.';
+      case 'hands_tied': return 'Cada cooperador fica vinculado ao primeiro jogo que alimentar ou criar naquela rodada e não pode tocar outro. A equipe inteira ainda compartilha somente 1 criação de jogo novo.';
       case 'separation': return 'Nesta rodada, o primeiro cooperador que alimentar um jogo fica vinculado a ele: o parceiro não pode alimentar esse mesmo jogo. Os outros jogos continuam livres.';
-      case 'absolute_control': return `Neste efeito, ${target} é tratado como Dominado durante o próximo turno: não pode pegar o Lixo nem criar jogo novo, mas pode comprar do Monte e alimentar jogos existentes.`;
-      case 'break_will': return 'Quebra de Vontade só escolhe um jogador que já tenha pelo menos 2 Chicotes. Ele decide entre receber outro Chicote ou aceitar a alternativa de retirar uma carta válida de canastra.';
-      case 'final_order': return 'Cada cooperador decide separadamente: pode recusar e receber +1 Chicote agora, ou aceitar usar as 2 cartas marcadas em jogos no próximo turno. Se aceitar, 2/2 usadas = 0 Chicotes; 1/2 = +1; 0/2 = +2. Descartar carta marcada não cumpre a ordem.';
+      case 'favorite': return 'A Dominadora mira o cooperador menos dominado para aproximar os dois da derrota. Na Fase 2 a Favorita recupera 2 de Dominação; na Fase 3 ela apenas é poupada. O outro recebe +8.';
+      case 'double_collar': return 'A Dupla Coleira prioriza 1 carta útil/jogável de cada cooperador. As duas ficam presas durante a rodada.';
+      case 'iron_etiquette': {
+        const pressure = dominatrixPressureText(intent.announcedPhase).etiquette;
+        return `O naipe é escolhido entre descartes legais e com poucas opções. Cumprir ainda custa Dominação +${pressure.obey}; falhar custa +${pressure.fail}.`;
+      }
+      case 'absolute_control': return `Neste efeito, ${target} é tratado como Dominado durante o próximo turno: não pode pegar o Lixo nem criar jogo novo, mas pode comprar do Monte e alimentar jogos existentes. Também recebe Dominação +5.`;
+      case 'break_will': return 'Quebra de Vontade só aparece se houver um jogador com 25+ de Dominação e a chefe puder recuperar ao menos 120 HP. Ela mira quem está mais dominado. A escolha é +8 de Dominação ou cura de até 180 HP.';
+      case 'final_order': return 'A escolha é às cegas. Ao aceitar, duas cartas jogáveis são sorteadas naquele momento e reveladas. Recusar custa Dominação +7; aceitar custa +2. Cada carta sorteada que não entrar em jogo acrescenta +6. Descartar não cumpre.';
       default: return null;
     }
   },
@@ -182,18 +180,26 @@ export const dominatrixBossPresentation = Object.freeze({
     const detailFields = helpers.detailFields || ((entries) => entries.filter(([, value]) => value !== '' && value != null).map(([label, value]) => `${label}: ${value}`));
     const target = playerName(gameState, choice.playerId);
     const names = { forced_choice: 'Escolha Forcada', break_will: 'Quebra de Vontade', final_order: 'Ordem Final', final_order_draw: 'Ordem Final', final_order_lock: 'Ordem Final' };
-    let instruction = `${target} precisa decidir antes de a partida continuar.`;
+    let instruction = `${target}: escolha agora.`;
     let progress = '';
-    let consequence = 'Acoes comuns bloqueadas';
-    let details = detailFields([['Alvo', target], ['Ordem oferecida', choice.order?.label], ['Estado', 'a partida permanece pausada ate a decisao']]);
+    let consequence = '';
+    let details = [];
     if (choice.type === 'final_order') {
-      const cards = (choice.cardIds || []).map((cardId) => cardLabelAnywhere(gameState, cardId)).filter(Boolean);
-      instruction = `${target}: ${cards.join(' e ')} foram marcadas. Aceite usar as duas em jogo no proximo turno ou receba 1 Chicote agora.`;
-      progress = `☐ 0/${cards.length || 2} — cada carta nao usada vale +1 Chicote`;
-      consequence = 'Obedecer pode resultar em 0, 1 ou 2 Chicotes';
-      details = detailFields([['Alvo', target], ['Cartas marcadas', cards.join(' e ')], ['Recusar', '+1 Chicote agora'], ['Aceitar', 'usar as 2 cartas em jogos no proximo turno'], ['Falha parcial', '+1 Chicote por carta nao usada']]);
-    } else if (choice.type === 'final_order_draw') instruction = `${target} escolhe entre comprar 2 cartas presas no proximo turno ou receber 1 Chicote.`;
-    else if (choice.type === 'final_order_lock') instruction = `${target} escolhe entre prender 1 carta aleatoria da propria mao no proximo turno ou receber 1 Chicote.`;
+      const pressure = dominatrixPressureText(choice.announcedPhase).finalOrder;
+      instruction = `${target}: Ordem às cegas ou +${pressure.direct} Dominação.`;
+      progress = `Aceitar +${pressure.accept}`;
+      consequence = `Falha: +${pressure.miss}/carta`;
+    } else if (choice.type === 'forced_choice') {
+      const pressure = dominatrixPressureText(choice.announcedPhase).forcedChoice;
+      instruction = `${target}: cumpra a ordem ou +${pressure.direct} Dominação.`;
+      progress = choice.order?.label || '';
+      consequence = `Aceitar +${pressure.obey} · falhar +${pressure.fail}`;
+    } else if (choice.type === 'break_will') {
+      instruction = `${target}: +8 Dominação ou +180 HP para a chefe.`;
+      progress = '';
+      consequence = '';
+    } else if (choice.type === 'final_order_draw') instruction = `${target} escolhe entre comprar 2 cartas presas no proximo turno ou receber Dominação.`;
+    else if (choice.type === 'final_order_lock') instruction = `${target} escolhe entre prender 1 carta aleatoria da propria mao no proximo turno ou receber Dominação.`;
     return { category: 'Escolha obrigatoria agora', name: names[choice.type] || 'Decisao obrigatoria', speech: '', description: '', details, instruction, progress, consequence };
   },
 
@@ -211,8 +217,9 @@ export const dominatrixBossPresentation = Object.freeze({
       const cardOnTable = (gameState.teams || []).flatMap((team) => team.melds || []).flat().find((entry) => entry.id === event.cardId);
       const exposedCard = cardInHands || cardOnTable;
       const label = exposedCard ? `${exposedCard.rank}${exposedCard.suit}` : 'a carta exposta';
-      if (event.exposureSuccess) return { category: 'Objetivo concluído', name: 'Exposição', speech: '', description: '', details: detailFields([['Alvo', target], ['Carta', label]]), instruction: `✅ ${target} usou ${label}.`, progress: '✅ 1/1 — Concluído', consequence: 'Nenhum Chicote aplicado' };
-      return { category: 'Objetivo não concluído', name: 'Exposição', speech: '', description: '', details: detailFields([['Alvo', target], ['Carta', label]]), instruction: `❌ ${target} terminou o turno sem usar ${label}.`, progress: '❌ 0/1 — Falhou', consequence: '+1 Chicote' };
+      const applied = Number(event.dominationApplied) || (event.exposureSuccess ? 1 : 9);
+      if (event.exposureSuccess) return { category: 'Objetivo concluído', name: 'Exposição', speech: '', description: '', details: detailFields([['Alvo', target], ['Carta', label]]), instruction: `✅ ${target} usou ${label}.`, progress: '✅ 1/1 — Concluído', consequence: `Dominação +${applied}` };
+      return { category: 'Objetivo não concluído', name: 'Exposição', speech: '', description: '', details: detailFields([['Alvo', target], ['Carta', label]]), instruction: `❌ ${target} terminou o turno sem usar ${label}.`, progress: '❌ 0/1 — Falhou', consequence: `Dominação +${applied}` };
     };
 
     const possession = () => {
@@ -240,11 +247,12 @@ export const dominatrixBossPresentation = Object.freeze({
       if (!order) return null;
       const target = playerName(gameState, order.targetPlayerId);
       const suit = order.suitLabel || order.suit || 'o naipe ordenado';
+      const pressure = dominatrixPressureText(order.announcedPhase || boss.phase).etiquette;
       const base = { category: order.status === 'active' ? 'Objetivo ativo' : 'Objetivo resolvido', name: 'Etiqueta de Ferro', speech: '', description: '', details: detailFields([['Alvo', target], ['Ordem', `descartar ${suit}`], ['Prazo', 'fim do turno do alvo']]) };
-      if (order.status === 'active') return { ...base, instruction: `${target} deve encerrar o turno descartando ${suit}.`, progress: '⬜ 0/1 — Pendente', consequence: 'Outro naipe enquanto houver opção válida: +1 Chicote' };
-      if (order.status === 'obeyed') return { ...base, instruction: `✅ ${target} cumpriu a Etiqueta de Ferro.`, progress: '✅ 1/1 — Concluído', consequence: 'Nenhum Chicote aplicado' };
-      if (order.status === 'disobeyed') return { ...base, instruction: `❌ ${target} desobedeceu à Etiqueta de Ferro.`, progress: '❌ 0/1 — Falhou', consequence: '+1 Chicote' };
-      return { ...base, instruction: 'A Etiqueta de Ferro foi cancelada porque o objetivo deixou de ser possível.', progress: 'Cancelado', consequence: 'Nenhum Chicote aplicado' };
+      if (order.status === 'active') return { ...base, instruction: `${target} deve encerrar o turno descartando ${suit}.`, progress: '⬜ 0/1 — Pendente', consequence: `Cumprir +${pressure.obey} · falhar +${pressure.fail}` };
+      if (order.status === 'obeyed') return { ...base, instruction: `✅ ${target} cumpriu a Etiqueta de Ferro.`, progress: '✅ 1/1 — Concluído', consequence: `Dominação +${pressure.obey}` };
+      if (order.status === 'disobeyed') return { ...base, instruction: `❌ ${target} desobedeceu à Etiqueta de Ferro.`, progress: '❌ 0/1 — Falhou', consequence: `Dominação +${pressure.fail}` };
+      return { ...base, instruction: 'A Etiqueta de Ferro foi cancelada porque o objetivo deixou de ser possível.', progress: 'Cancelado', consequence: 'Dominação não aumentou' };
     };
 
     const interdict = () => {
@@ -259,11 +267,11 @@ export const dominatrixBossPresentation = Object.freeze({
       if (!entry) return null;
       const gameNumber = Number(entry.meldIndex) + 1;
       const base = { category: entry.status === 'active' ? 'Restrição ativa agora' : 'Restrição resolvida', name: 'Interdito', speech: '', description: '', details: detailFields([['Jogo marcado', `#${gameNumber}`], ['Gatilho', 'mudar o tier da canastra'], ['Exemplo', 'Limpa → Real'], ['Prazo', 'fim da rodada']]) };
-      if (entry.status === 'active') return { ...base, instruction: `O Jogo ${gameNumber} está marcado. Apenas a jogada que transformar a canastra em um tier superior ativa a escolha; adicionar cartas e continuar no mesmo tipo não conta.`, progress: '', consequence: 'Obedecer: cancelar só a tentativa · Desobedecer: evoluir e terminar com +1 Chicote; esta evolução não concede Resistência' };
-      if (entry.status === 'obeyed') return { ...base, instruction: `✅ O Interdito do Jogo ${gameNumber} foi obedecido.`, progress: 'Evolução cancelada', consequence: 'A canastra não evoluiu e nenhum Chicote foi aplicado' };
-      if (entry.status === 'disobeyed') return { ...base, instruction: `❌ O Interdito do Jogo ${gameNumber} foi desobedecido.`, progress: 'Evolução concluída', consequence: '+1 Chicote aplicado · Resistência não foi concedida nesta evolução' };
-      if (entry.status === 'expired') return { ...base, instruction: `O Interdito do Jogo ${gameNumber} expirou sem tentativa de evolução.`, progress: 'Expirou sem ativar', consequence: 'Nenhum Chicote aplicado' };
-      return { ...base, instruction: `O Interdito do Jogo ${gameNumber} foi cancelado porque a evolução deixou de ser possível.`, progress: '— Cancelado', consequence: 'Nenhum Chicote aplicado' };
+      if (entry.status === 'active') return { ...base, instruction: `O Jogo ${gameNumber} está marcado. Apenas a jogada que transformar a canastra em um tier superior ativa a escolha; adicionar cartas e continuar no mesmo tipo não conta.`, progress: '', consequence: 'Obedecer: cancelar só a tentativa · Desobedecer: evoluir e terminar com Dominação; esta evolução não concede Resistência' };
+      if (entry.status === 'obeyed') return { ...base, instruction: `✅ O Interdito do Jogo ${gameNumber} foi obedecido.`, progress: 'Evolução cancelada', consequence: 'A canastra não evoluiu e nenhuma Dominação foi aplicada' };
+      if (entry.status === 'disobeyed') return { ...base, instruction: `❌ O Interdito do Jogo ${gameNumber} foi desobedecido.`, progress: 'Evolução concluída', consequence: 'Dominação aplicado · Resistência não foi concedida nesta evolução' };
+      if (entry.status === 'expired') return { ...base, instruction: `O Interdito do Jogo ${gameNumber} expirou sem tentativa de evolução.`, progress: 'Expirou sem ativar', consequence: 'Dominação não aumentou' };
+      return { ...base, instruction: `O Interdito do Jogo ${gameNumber} foi cancelado porque a evolução deixou de ser possível.`, progress: '— Cancelado', consequence: 'Dominação não aumentou' };
     };
 
     if (mode === 'result') {
@@ -287,10 +295,14 @@ export const dominatrixBossPresentation = Object.freeze({
         const cardLabelAnywhere = helpers.cardLabelAnywhere || (() => 'carta marcada');
         const meldCardIds = new Set((gameState.teams || []).flatMap((team) => (team.melds || []).flatMap((meld) => (meld || []).map((card) => card?.id).filter(Boolean))));
         const lines = finalOrderMarks.map((effect) => `${meldCardIds.has(effect.cardId) ? '✅' : '☐'} ${playerName(gameState, effect.playerId)} — ${cardLabelAnywhere(gameState, effect.cardId)}${meldCardIds.has(effect.cardId) ? ' · usada em jogo' : ' · use em jogo'}`);
-        return { category: 'Ordem aceita em vigor', name: 'Ordem Final', speech: '', description: '', details: [], instruction: 'As cartas marcadas precisam entrar em jogo até o fim do turno de cada jogador.', progress: lines.join('\n'), consequence: 'Cada carta marcada que não entrar em jogo: +1 Chicote' };
+        return { category: 'Ordem aceita em vigor', name: 'Ordem Final', speech: '', description: '', details: [], instruction: 'As cartas reveladas precisam entrar em jogo até o fim do turno de cada jogador.', progress: lines.join('\n'), consequence: `Cada carta não usada: Dominação +${dominatrixPressureText(3).finalOrder.miss}` };
       }
       const orders = (boss.activeOrders || []).filter((order) => order.status === 'active' && order.sourceAbilityId === 'forced_choice');
-      if (orders.length) return { category: 'Ordem aceita em vigor', name: 'Escolha Forçada', speech: '', description: '', details: [], instruction: orders.map((order) => `${playerName(gameState, order.targetPlayerId)}: ${order.description || order.label || order.type}`).join(' · '), progress: 'Prazo: fim do turno do jogador marcado', consequence: 'Descumprir: +1 Chicote' };
+      if (orders.length) {
+        const failValues = orders.map((order) => dominatrixPressureText(order.announcedPhase || boss.phase).forcedChoice.fail);
+        const failText = [...new Set(failValues)].join('/');
+        return { category: 'Ordem aceita em vigor', name: 'Escolha Forçada', speech: '', description: '', details: [], instruction: orders.map((order) => `${playerName(gameState, order.targetPlayerId)}: ${order.description || order.label || order.type}`).join(' · '), progress: 'Prazo: fim do turno do jogador marcado', consequence: `Falhar: Dominação +${failText}` };
+      }
       return null;
     }
     return null;

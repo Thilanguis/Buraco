@@ -30,22 +30,21 @@ export const dominatrixDefinition = Object.freeze({
     3: Object.freeze(['double_collar', 'separation', 'absolute_control', 'break_will', 'final_order']),
   }),
   abilities: Object.freeze([
-    ability('collar', 'Coleira', 5, [1, 2], () => 'Até duas cartas do jogador marcado ficarão presas durante o turno dele.'),
-    ability('forced_choice', 'Escolha Forçada', 5, [1, 2, 3], ({ phase = 1 }) => phase === 3
-      ? 'O jogador marcado escolherá entre receber 1 Chicote ou aceitar uma ordem sob Dominação Total.'
-      : 'O jogador marcado escolherá entre receber 1 Chicote ou aceitar uma ordem válida para o próximo turno.'),
-    ability('exposure', 'Exposição', 4, [1, 2, 3], () => 'Uma carta deverá ser usada antes do fim do turno ou causará 1 Chicote.'),
-    ability('forced_swap', 'Troca Forçada', 4, [2, 3], () => 'Uma carta será trocada entre as mãos dos cooperadores.'),
-    ability('hands_tied', 'Mãos Atadas', 4, [2, 3], () => 'A equipe inteira poderá criar somente 1 novo jogo nesta rodada.'),
-    ability('possession', 'Posse', 3, [2, 3], () => 'O dano de um jogo fica suspenso até ambos cooperarem ou o jogo evoluir.'),
-    ability('iron_etiquette', 'Etiqueta de Ferro', 4, [1, 2, 3], () => 'O alvo deverá encerrar o próximo turno descartando o naipe ordenado; falhar causa 1 Chicote.'),
-    ability('favorite', 'Favorita', 4, [2, 3], ({ phase = 2 }) => phase === 3
-      ? 'Na Dominação Total, a favorita não perde Chicote e o outro jogador recebe 1 Chicote.'
-      : 'Uma favorita será protegida, perdendo 1 Chicote, e o outro jogador receberá 1 Chicote.'),
-    ability('double_collar', 'Dupla Coleira', 5, [3], () => 'Uma carta de cada jogador ficará presa nesta rodada.'),
-    ability('separation', 'Separação', 4, [3], () => 'Os jogadores não poderão alimentar o mesmo jogo nesta rodada.'),
-    ability('absolute_control', 'Controle Absoluto', 4, [3], () => 'Um jogador ficará Dominado durante o próximo turno, sem poder abrir novos jogos e com golpe final reduzido.'),
-    ability('break_will', 'Quebra de Vontade', 4, [3], () => 'Um jogador com 2 Chicotes enfrentará uma escolha entre ganhar outro Chicote ou desmontar uma canastra.'),
-    ability('final_order', 'Ordem Final', 4, [3], () => 'Duas cartas da mão de cada cooperador são marcadas. Antes dos turnos, cada jogador escolhe entre receber 1 Chicote agora ou aceitar a ordem; cada carta marcada que não entrar em jogo no próximo turno causa 1 Chicote.'),
+    ability('collar', 'Coleira', 5, [1, 2], () => 'Prende até 2 cartas úteis do alvo neste turno.'),
+    ability('forced_choice', 'Escolha Forçada', 5, [1, 2, 3], ({ phase = 1 }) => {
+      const cfg = phase === 3 ? { direct: 8, obey: 3, fail: 16 } : phase === 2 ? { direct: 7, obey: 3, fail: 14 } : { direct: 6, obey: 2, fail: 12 };
+      return `Aceite a ordem ou sofra Dominação +${cfg.direct}.`;
+    }),
+    ability('exposure', 'Exposição', 4, [1, 2, 3], () => 'Use a carta exposta neste turno.'),
+    ability('forced_swap', 'Troca Forçada', 4, [2, 3], () => 'Troca 1 carta útil entre os cooperadores.'),
+    ability('hands_tied', 'Mãos Atadas', 4, [2, 3], () => 'Cada jogador fica preso ao primeiro jogo que tocar.'),
+    ability('possession', 'Posse', 3, [2, 3], () => 'O dano do jogo fica suspenso até romper a Posse.'),
+    ability('iron_etiquette', 'Etiqueta de Ferro', 4, [1, 2, 3], () => 'Termine o turno descartando o naipe ordenado.'),
+    ability('favorite', 'Favorita', 4, [2, 3], () => 'Uma é poupada; a menos dominada recebe a punição.'),
+    ability('double_collar', 'Dupla Coleira', 5, [3], () => 'Prende 1 carta útil de cada jogador.'),
+    ability('separation', 'Separação', 4, [3], () => 'Um jogo alimentado fica exclusivo daquele jogador na rodada.'),
+    ability('absolute_control', 'Controle Absoluto', 4, [3], () => 'O alvo fica Dominado por 1 turno.'),
+    ability('break_will', 'Quebra de Vontade', 4, [3], () => 'Escolha entre Dominação ou curar a Dominadora.'),
+    ability('final_order', 'Ordem Final', 4, [3], () => 'Aceite a Ordem às cegas ou sofra Dominação.'),
   ]),
 });

@@ -43,22 +43,22 @@ export const neheleniaDefinition = Object.freeze({
     defeat: 'Olhem outra vez. O pesadelo já escolheu vocês.',
   }),
   phaseIntroAbilities: Object.freeze({
-    2: Object.freeze(['discard_mirror', 'mirror_prison', 'mirrored_meld']),
+    2: Object.freeze(['discard_mirror', 'mirrored_meld', 'tiger_link']),
     3: Object.freeze(['eternal_nightmare', 'mirrored_meld', 'follow_reflection']),
   }),
   abilities: Object.freeze([
     ability('mirrored_meld', 'Jogo Espelhado', 5, [1, 2, 3], () =>
-      'Nehelenia clona um jogo real em dois reflexos idênticos na própria mesa. Escolher o falso envia a carta usada ao fundo do monte e deixa o jogador Desorientado.'),
+      'Nehelenia cria dois reflexos. Escolher o falso envia a carta ao fundo, deixa o jogador Desorientado e avança +18 no Mundo do Espelho.'),
     ability('follow_reflection', 'Siga o Reflexo', 5, [1, 2, 3], () =>
-      'Tudo o que o primeiro cooperador baixar durante o turno vira o padrão exato. O segundo pode jogar livremente, mas no fim precisa ter baixado exatamente a mesma quantidade, inclusive zero.'),
+      'O segundo cooperador precisa igualar a quantidade baixada pelo primeiro; falhar avança +16 no Mundo do Espelho.'),
     ability('discard_mirror', 'Espelho do Lixo', 4, [2, 3], () =>
-      'O topo do lixo aparece em dois reflexos idênticos. Não existe pista: é uma escolha 50/50. Errar sela o lixo naquela rodada.'),
-    ability('mirror_prison', 'Prisão no Espelho', 3, [2, 3], () =>
-      'Se Nehelenia já tomou ao menos um Espelho dos Sonhos, o parceiro pode alimentar um jogo refletido para recuperar 1 Espelho.'),
+      'O topo do lixo aparece em dois reflexos idênticos. Errar sela o lixo e avança +16 no Mundo do Espelho.'),
+    ability('mirror_prison', 'Prisão no Espelho', 0, [], () =>
+      'Mecânica de resgate: alimentar o jogo refletido reduz 8 do Mundo do Espelho. Não participa do sorteio ofensivo normal.'),
     ability('eternal_nightmare', 'Pesadelo Eterno', 5, [3], () =>
-      'Uma carta original gera dois reflexos. A original é mostrada antes do embaralhamento; depois, os três espelhos se misturam e o alvo precisa seguir a carta verdadeira.'),
+      'A original e dois reflexos se misturam. Errar avança +24 no Mundo do Espelho.'),
     ability('tiger_link', 'Laço do Tigre', 4, [1, 2, 3], () =>
-      "Tiger's Eye liga dois jogos da equipe. Cada lado precisa receber ao menos 1 carta. Se um lado for ignorado, as garras permanecem nele: a próxima alimentação rompe o efeito, mas as cartas usadas para quebrá-lo não causam dano individual."),
+      "Tiger's Eye liga dois jogos. Ignorar qualquer lado avança +12 no Mundo do Espelho e deixa as garras persistentes."),
     ability('tiger_prey', 'Presa Marcada', 3, [1, 2, 3], () =>
       "Tiger's Eye marca uma Presa que o alvo consegue alimentar. Enquanto ela não for alimentada, esse jogador não pode alimentar nenhum outro jogo existente; a marca persiste até ser resolvida."),
     ability('hawk_suit', 'Olho do Falcão', 3, [1, 2, 3], ({ suitLabel = 'o naipe marcado' }) =>

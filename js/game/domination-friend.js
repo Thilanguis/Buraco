@@ -407,6 +407,21 @@ function bestNewMeld(hand, melds, rules, farewell, turnsRemaining, requiredId = 
   return best;
 }
 
+function revalidateFriendPlan(team, chosen, rules) {
+  if (!chosen || !Number.isInteger(chosen.meldIndex) || !Array.isArray(chosen.added) || !chosen.added.length) return null;
+  const isNew = chosen.meldIndex === (team?.melds || []).length;
+  if (isNew) {
+    const prepared = rules.prepare(chosen.meld || chosen.added);
+    if (!rules.valid(prepared) || !friendDominationPlanAllowed(prepared, team.melds || [], rules)) return null;
+    return { ...chosen, meld: prepared };
+  }
+  const base = team?.melds?.[chosen.meldIndex];
+  if (!Array.isArray(base)) return null;
+  const prepared = previewFriendExtension(base, chosen.added, rules);
+  if (!prepared || !friendDominationPlanAllowed(prepared, team.melds || [], rules, chosen.meldIndex)) return null;
+  return { ...chosen, meld: prepared };
+}
+
 function chooseFriendDiscardPickup(state, friend, team, rules, farewell) {
   const shared = state.dominationFriendShared;
   const pile = shared.discard || [];
@@ -526,6 +541,11 @@ export function executeDominationFriendTurn(state, turnId, rules, { owner = 'loc
       const candidate = bestNewMeld(friend.hand, team.melds, rules, unload, friend.turnsRemaining);
       if (candidate) chosen = { ...candidate, meldIndex: team.melds.length };
     }
+    if (!chosen) break;
+    // Defensive commit barrier: the hand/table may have changed after planning
+    // (bonus draw, sync/reload or an empty auxiliary stock). Never write a meld
+    // unless the final state still passes the same official rules.
+    chosen = revalidateFriendPlan(team, chosen, rules);
     if (!chosen) break;
     const oldKind = rules.classify(team.melds[chosen.meldIndex] || []);
     const newKind = rules.classify(chosen.meld);

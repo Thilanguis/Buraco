@@ -265,7 +265,13 @@ function configureAbilityState(state, abilityId) {
     boss.natureHealingRound = boss.roundNumber;
     boss.natureHealingThisRound = 0;
   }
-  if (abilityId === 'break_will') boss.chainsByPlayer = { 0: 2, 1: 2 };
+  if (abilityId === 'break_will') {
+    boss.chainsByPlayer = { 0: 2, 1: 2 };
+    // Quebra de Vontade só é uma escolha real quando a cura alternativa
+    // pode recuperar pelo menos 120 HP. O Laboratório precisa preparar
+    // também esse pré-requisito, não apenas a Dominação dos jogadores.
+    boss.hp = Math.max(0, boss.maxHp - 180);
+  }
   if (abilityId === 'spring_crown') {
     boss.meldIdsByPosition = { '0:0': 'debug_meld_1', '0:1': 'debug_meld_2' };
     boss.meldIdsByCardId = {};
@@ -296,6 +302,42 @@ function configureAbilityState(state, abilityId) {
     boss.result = null;
   }
   if (abilityId === 'forced_choice') boss.chainsByPlayer = { 0: 0, 1: 0 };
+  if (abilityId === 'final_order') {
+    // Ordem Final exige DUAS cartas jogáveis individualmente por cooperador.
+    // No cenário-base, o jogo 3–9 deixa apenas o 10 como extensão natural segura;
+    // o 2 pode ser tratado como curinga e não garante uma segunda opção.
+    // Para o Laboratório, movemos o 3 de cada jogo-base para a mão do dono.
+    // O jogo vira 4–9 e a mão passa a ter 3 + 10 do mesmo naipe, duas extensões
+    // naturais independentes. Nenhuma delas é marcada antes do aceite.
+    boss.chainsByPlayer = { 0: 0, 1: 0 };
+    boss.effects = [];
+
+    const preparePlayableEdges = (playerId, meldIndex) => {
+      const player = state.players.find((entry) => entry.id === playerId);
+      const meld = state.teams?.[0]?.melds?.[meldIndex];
+      if (!player || !meld) throw new Error('Ordem Final: cenário-base incompleto no Laboratório.');
+
+      const suit = meld.find((card) => card && !card.joker)?.suit;
+      const threeIndex = meld.findIndex(
+        (card) => !card.joker && String(card.rank) === '3' && card.suit === suit,
+      );
+      if (threeIndex < 0) {
+        throw new Error(`Ordem Final: não foi possível preparar duas extensões para ${player.name}.`);
+      }
+
+      const [suitedThree] = meld.splice(threeIndex, 1);
+      player.hand.push(suitedThree);
+
+      if (!isValidBossSequence(meld)
+        || !isValidBossSequence([...meld, suitedThree])
+        || !player.hand.some((card) => !card.joker && String(card.rank) === '10' && card.suit === suit)) {
+        throw new Error(`Ordem Final: cenário preparado inválido para ${player.name}.`);
+      }
+    };
+
+    preparePlayableEdges(0, 0);
+    preparePlayableEdges(1, 1);
+  }
   if (abilityId === 'red_wine') {
     boss.hp = Math.max(1, boss.maxHp - 320);
     boss.danger = Math.max(20, Number(boss.danger) || 0);
@@ -424,12 +466,13 @@ function scenarioInstructions(ability, variant, eligibility, state) {
       'ALVO: os dois cooperadores',
       '',
       'COMO TESTAR:',
-      '1. Use BOT: executar sucesso para encerrar a rodada preparada e criar as duas escolhas.',
-      '2. Biel escolhe entre Comprar 2 cartas presas ou Receber 1 Chicote.',
-      '3. Depois, use novamente BOT: executar sucesso para a Luana resolver a escolha dela.',
+      '1. Prepare a habilidade e avance a apresentação até surgirem as duas escolhas.',
+      '2. Antes de aceitar, nenhuma carta deve estar marcada: a decisão é às cegas.',
+      '3. Ao aceitar, 2 cartas jogáveis aleatórias daquele jogador são sorteadas e marcadas.',
+      '4. Recusar aplica Dominação; aceitar aplica o custo inicial e cada carta sorteada não usada cobra a falha.',
       '',
       'ESPERADO:',
-      'A partida permanece bloqueada ate as duas escolhas terminarem. Se a opcao Prender 1 carta for escolhida, o HUD, a mao e o historico devem identificar exatamente qual carta ficou presa.',
+      'As duas escolhas são criadas sem revelar cartas antes da decisão. O sorteio e as marcas só aparecem depois do aceite.',
     ].join('\n');
   }
   const playerId = eligibility.payload?.targetPlayerId;
@@ -675,10 +718,10 @@ function executeMinimalSuccess(state, preferredPlayerId = null) {
   if (!intent) return { executed: false, reason: 'A habilidade nao gerou uma intencao ativa.' };
   if (intent.abilityId === 'final_order') {
     finishCurrentDebugRound(state);
-    const choices = state.boss?.pendingChoices || [];
+    const choices = (state.boss?.pendingChoices || []).filter((choice) => choice.type === 'final_order');
     return {
-      executed: choices.length === 2,
-      action: 'final_order_choices_created',
+      executed: choices.length === 2 && choices.every((choice) => !(choice.cardIds || []).length),
+      action: 'final_order_blind_choices_created',
       choiceTypes: choices.map((choice) => choice.type),
     };
   }

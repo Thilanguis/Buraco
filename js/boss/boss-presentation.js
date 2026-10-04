@@ -109,7 +109,7 @@ export function buildBossRuleSummary(gameState) {
 }
 
 export function buildBossAbilityHelp(gameState) {
-  if (gameState?.boss?.pendingChoices?.length) return null;
+  if (gameState?.boss?.pendingChoices?.length && gameState?.boss?.id !== 'dominadora') return null;
   const intent = gameState?.boss?.currentIntent;
   if (!intent) return null;
 

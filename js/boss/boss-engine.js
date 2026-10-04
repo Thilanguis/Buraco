@@ -219,10 +219,91 @@ function chooseCards(player, gameState, salt, count) {
   return selected;
 }
 
+const DOMINATRIX_PRESSURE = Object.freeze({
+  forced_choice: Object.freeze({
+    1: Object.freeze({ direct: 6, obey: 2, fail: 12 }),
+    2: Object.freeze({ direct: 7, obey: 3, fail: 14 }),
+    3: Object.freeze({ direct: 8, obey: 3, fail: 16 }),
+  }),
+  exposure: Object.freeze({
+    1: Object.freeze({ success: 1, fail: 9 }),
+    2: Object.freeze({ success: 1, fail: 11 }),
+    3: Object.freeze({ success: 1, fail: 13 }),
+  }),
+  iron_etiquette: Object.freeze({
+    1: Object.freeze({ obey: 2, fail: 10 }),
+    2: Object.freeze({ obey: 2, fail: 12 }),
+    3: Object.freeze({ obey: 3, fail: 14 }),
+  }),
+  final_order: Object.freeze({ direct: 7, accept: 2, miss: 6 }),
+  absolute_control: Object.freeze({ apply: 5 }),
+  break_will: Object.freeze({ direct: 8, heal: 180, minMeaningfulHeal: 120 }),
+});
+
+function dominatrixPressure(abilityId, phase = 1) {
+  const config = DOMINATRIX_PRESSURE[abilityId];
+  if (!config) return {};
+  return config[phase] || config[3] || config;
+}
+
+function dominationToChains(points) {
+  return (Number(points) || 0) / 12.5;
+}
+
+function dominatrixPlayableCards(gameState, player) {
+  return eligibleExposureCards(gameState, player);
+}
+
+function chooseDominatrixLockCards(player, gameState, salt, count) {
+  const selected = [];
+  const preferred = [...dominatrixPlayableCards(gameState, player)];
+  const fallback = (player?.hand || []).filter((card) => card?.id && !preferred.some((entry) => entry.id === card.id));
+  for (const pool of [preferred, fallback]) {
+    const available = [...pool];
+    while (available.length && selected.length < count) {
+      const candidates = available.filter((card) => canApplyDiscardLock(gameState, player, [...selected.map((entry) => entry.id), card.id]));
+      if (!candidates.length) break;
+      const card = chooseSeeded(candidates, gameState, salt + selected.length * 17);
+      selected.push(card);
+      available.splice(available.findIndex((entry) => entry.id === card.id), 1);
+    }
+  }
+  return selected;
+}
+
+function dominatrixDiscardSuitOrderCandidates(gameState, player) {
+  const legal = legalDiscardCards(gameState, player);
+  return SUITS.map((suit) => {
+    const matching = legal.filter((card) => !card.joker && card.suit === suit.value);
+    const alternatives = legal.filter((card) => card.joker || card.suit !== suit.value);
+    return { ...suit, matchingCount: matching.length, matchingCardIds: matching.map((card) => card.id), alternativeCount: alternatives.length };
+  }).filter((entry) => entry.matchingCount >= 1 && entry.alternativeCount >= 1)
+    .sort((a, b) => a.matchingCount - b.matchingCount || a.value.localeCompare(b.value));
+}
+
+function chooseDominatrixFavoriteTargets(gameState) {
+  const players = gameState.players || [];
+  if (players.length < 2) return { protectedPlayerId: null, punishedPlayerId: null };
+  const lowest = Math.min(...players.map((player) => Number(gameState.boss?.chainsByPlayer?.[player.id]) || 0));
+  const lagging = players.filter((player) => (Number(gameState.boss?.chainsByPlayer?.[player.id]) || 0) === lowest);
+  const punished = chooseSeeded(lagging, gameState, 73) || players[0];
+  const protectedPlayer = players.find((player) => player.id !== punished.id) || punished;
+  return { protectedPlayerId: protectedPlayer.id, punishedPlayerId: punished.id };
+}
+
+function chooseDominatrixBreakWillTarget(gameState) {
+  const eligible = (gameState.players || []).filter((player) => (Number(gameState.boss?.chainsByPlayer?.[player.id]) || 0) >= 2);
+  if (!eligible.length) return null;
+  const highest = Math.max(...eligible.map((player) => Number(gameState.boss?.chainsByPlayer?.[player.id]) || 0));
+  return chooseSeeded(eligible.filter((player) => (Number(gameState.boss?.chainsByPlayer?.[player.id]) || 0) === highest), gameState, 79);
+}
+
 function buildFinalOrderTargets(gameState) {
-  return (gameState.players || []).map((player, index) => ({
+  // Ordem Final é uma escolha às cegas: antes da decisão guardamos só quem deve decidir.
+  // As duas cartas são sorteadas apenas depois que o jogador aceita, evitando informação
+  // antecipada e mantendo o sorteio determinístico entre clientes/reload.
+  return (gameState.players || []).map((player) => ({
     playerId: player.id,
-    cardIds: chooseCards(player, gameState, 211 + index * 23, 2).map((card) => card.id),
   }));
 }
 
@@ -254,14 +335,13 @@ function buildDominatrixOrder(gameState, targetPlayer, salt = 0) {
     meldIndex,
     evolutionOptions: bossMeldEvolutionOptions(gameState, targetPlayer, meldIndex),
   })).filter(({ evolutionOptions }) => evolutionOptions.length > 0);
-  const suits = discardSuitOrderCandidates(gameState, targetPlayer);
+  const suits = dominatrixDiscardSuitOrderCandidates(gameState, targetPlayer);
   const candidates = [];
   if (feedable.length > 1) {
     const selected = chooseSeeded(feedable, gameState, 301 + salt);
     const label = `alimente o jogo ${selected.meldIndex + 1} antes de outro jogo`;
     candidates.push({ type: 'feed_specific_meld', meldIndex: selected.meldIndex, meldId: resolveBossMeldId(gameState, targetPlayer.teamId, selected.meldIndex, true), label, description: label });
   }
-  if ((targetPlayer.hand || []).length >= 3) candidates.push({ type: 'no_new_meld', label: 'nao crie um jogo novo no proximo turno', description: 'não crie um jogo novo no próximo turno' });
   if (evolvable.length) {
     const selected = chooseSeeded(evolvable, gameState, 307 + salt);
     const label = `tente evoluir o jogo ${selected.meldIndex + 1}`;
@@ -280,9 +360,17 @@ function buildDominatrixOrder(gameState, targetPlayer, salt = 0) {
     candidates.push({ type: 'reduce_hand', handLimit: limit, label, description: label });
   }
   if (suits.length) {
-    const selected = chooseSeeded(suits, gameState, 311 + salt);
-    const label = `descarte uma carta de ${selected.label}`;
-    candidates.push({ type: 'discard_suit', suit: selected.value, suitLabel: selected.label, label, description: label });
+    const fewestOptions = suits[0].matchingCount;
+    const selected = chooseSeeded(suits.filter((entry) => entry.matchingCount === fewestOptions), gameState, 311 + salt);
+    const label = `preserve e descarte uma carta de ${selected.label}`;
+    candidates.push({
+      type: 'discard_suit',
+      suit: selected.value,
+      suitLabel: selected.label,
+      eligibleCardIds: [...selected.matchingCardIds],
+      label,
+      description: label,
+    });
   }
   return chooseSeeded(candidates, gameState, 313 + salt);
 }
@@ -811,18 +899,21 @@ function confirmNeheleniaMirrorDefeat(gameState, sourceActionId = 'mirror') {
   });
 }
 
-function stealNeheleniaDreamMirror(gameState, playerId, origin = 'Nehelenia', actionKey = null) {
+function stealNeheleniaDreamMirror(gameState, playerId, origin = 'Nehelenia', actionKey = null, amount = 1) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.id !== 'nehelenia' || boss.result || playerId == null) return null;
   syncNeheleniaDreamMirrors(gameState);
   if (boss.danger >= boss.maxDanger) return confirmNeheleniaMirrorDefeat(gameState, actionKey || 'mirror');
 
   const before = boss.danger;
-  boss.dreamMirrorMarksByPlayer[playerId] = Math.max(0, Number(boss.dreamMirrorMarksByPlayer[playerId]) || 0) + 1;
+  const requested = Math.max(0, Number(amount) || 0);
+  boss.dreamMirrorMarksByPlayer[playerId] = Math.max(0, Number(boss.dreamMirrorMarksByPlayer[playerId]) || 0) + requested;
   syncNeheleniaDreamMirrors(gameState);
   const applied = boss.danger - before;
   if (applied <= 0) return null;
 
+  const progress = Math.round(applied * 20 * 10) / 10;
+  const totalProgress = Math.round(boss.danger * 20 * 10) / 10;
   boss.actionSequence += 1;
   const player = (gameState.players || []).find((entry) => entry.id === playerId);
   const event = recordEvent(boss, {
@@ -832,16 +923,18 @@ function stealNeheleniaDreamMirror(gameState, playerId, origin = 'Nehelenia', ac
     status: 'stolen',
     stack: Number(boss.dreamMirrorMarksByPlayer[playerId]) || 0,
     dangerDelta: applied,
+    mirrorProgressDelta: progress,
+    mirrorProgress: totalProgress,
     danger: boss.danger,
     origin,
-    dangerChangeLabel: `${origin}: Espelho +${applied}`,
-    outcome: `${origin}: Nehelenia tomou 1 Espelho dos Sonhos de ${player?.name || `Jogador ${Number(playerId) + 1}`} (${boss.danger}/${boss.maxDanger}).`,
+    dangerChangeLabel: `${origin}: Mundo do Espelho +${progress}`,
+    outcome: `${origin}: Mundo do Espelho +${progress} para ${player?.name || `Jogador ${Number(playerId) + 1}`} (${totalProgress}/100).`,
   });
   event.defeatEvent = confirmNeheleniaMirrorDefeat(gameState, event.actionId);
   return event;
 }
 
-function restoreNeheleniaDreamMirror(gameState, playerId = null, origin = 'Canastra Limpa', actionKey = null) {
+function restoreNeheleniaDreamMirror(gameState, playerId = null, origin = 'Canastra Limpa', actionKey = null, amount = 1) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.id !== 'nehelenia' || boss.result) return null;
   syncNeheleniaDreamMirrors(gameState);
@@ -853,11 +946,14 @@ function restoreNeheleniaDreamMirror(gameState, playerId = null, origin = 'Canas
   if (!target) return null;
 
   const before = boss.danger;
-  boss.dreamMirrorMarksByPlayer[target.id] = Math.max(0, (Number(boss.dreamMirrorMarksByPlayer[target.id]) || 0) - 1);
+  const requested = Math.max(0, Number(amount) || 0);
+  boss.dreamMirrorMarksByPlayer[target.id] = Math.max(0, (Number(boss.dreamMirrorMarksByPlayer[target.id]) || 0) - requested);
   syncNeheleniaDreamMirrors(gameState);
   const applied = boss.danger - before;
   if (applied >= 0) return null;
 
+  const progress = Math.round(Math.abs(applied) * 20 * 10) / 10;
+  const totalProgress = Math.round(boss.danger * 20 * 10) / 10;
   boss.mirrorWorldAnnounced = false;
   boss.actionSequence += 1;
   return recordEvent(boss, {
@@ -867,14 +963,15 @@ function restoreNeheleniaDreamMirror(gameState, playerId = null, origin = 'Canas
     status: (Number(boss.dreamMirrorMarksByPlayer[target.id]) || 0) > 0 ? 'stolen' : 'intact',
     stack: Number(boss.dreamMirrorMarksByPlayer[target.id]) || 0,
     dangerDelta: applied,
+    mirrorProgressDelta: -progress,
+    mirrorProgress: totalProgress,
     danger: boss.danger,
     origin,
-    dangerChangeLabel: `${origin}: Espelho -1`,
-    outcome: `${origin}: a equipe recuperou 1 Espelho dos Sonhos (${boss.danger}/${boss.maxDanger}).`,
+    dangerChangeLabel: `${origin}: Mundo do Espelho -${progress}`,
+    outcome: `${origin}: Mundo do Espelho -${progress} (${totalProgress}/100).`,
   });
 }
 
-// Compatibilidade com eventos/saves experimentais da V1/V2.
 function changeNeheleniaFragments(gameState, amount, origin = 'Espelho Negro', actionKey = null) {
   if (amount > 0) {
     const players = (gameState.players || []).filter((player) => player?.id != null);
@@ -1204,15 +1301,15 @@ function createPayload(gameState, abilityId) {
       const target = choosePlayer(gameState, 51, (player) => {
         if (!needsCard) return true;
         if (abilityId === 'exposure') return eligibleExposureCards(gameState, player).length > 0;
-        return player.hand?.some((card) => card?.id);
+        return chooseDominatrixLockCards(player, gameState, 53, 1).length > 0;
       });
       if (abilityId === 'collar') {
         const maxLocks = Math.max(0, Math.min(2, (target?.hand?.length || 0) - 1));
-        const cards = chooseCards(target, gameState, 53, maxLocks);
+        const cards = chooseDominatrixLockCards(target, gameState, 53, maxLocks);
         return { targetPlayerId: target?.id ?? null, cardId: cards[0]?.id ?? null, cardIds: cards.map((card) => card.id) };
       }
       const card = needsCard
-        ? chooseSeeded(abilityId === 'exposure' ? eligibleExposureCards(gameState, target) : (target?.hand || []).filter((entry) => entry?.id), gameState, 53)
+        ? chooseSeeded(eligibleExposureCards(gameState, target), gameState, 53)
         : null;
       const payload = { targetPlayerId: target?.id ?? null, cardId: card?.id ?? null };
       if (abilityId === 'forced_choice') payload.order = buildDominatrixOrder(gameState, target, 1);
@@ -1222,7 +1319,7 @@ function createPayload(gameState, abilityId) {
       return {
         lockedCards: (gameState.players || []).map((player, index) => ({
           playerId: player.id,
-          cardId: player.hand?.length > 1 ? chooseCard(player, gameState, 61 + index)?.id ?? null : null,
+          cardId: player.hand?.length > 1 ? chooseDominatrixLockCards(player, gameState, 61 + index, 1)[0]?.id ?? null : null,
         })),
       };
     }
@@ -1232,15 +1329,11 @@ function createPayload(gameState, abilityId) {
       const kind = boss.meldProgress?.[meldId]?.highestKind || 'simple';
       return { meldIndex, meldId, createdTier: MELD_TIER[kind] || 0, contributorPlayerIds: [] };
     }
-    if (abilityId === 'favorite') {
-      const protectedPlayer = choosePlayer(gameState, 73);
-      const punishedPlayer = (gameState.players || []).find((player) => player.id !== protectedPlayer?.id) || protectedPlayer;
-      return { protectedPlayerId: protectedPlayer?.id ?? null, punishedPlayerId: punishedPlayer?.id ?? null };
-    }
-    if (abilityId === 'hands_tied') return { teamMeldAvailable: true, consumedByPlayerId: null, consumedMeldId: null };
+    if (abilityId === 'favorite') return chooseDominatrixFavoriteTargets(gameState);
+    if (abilityId === 'hands_tied') return { teamMeldAvailable: true, consumedByPlayerId: null, consumedMeldId: null, playerMeldIds: {} };
     if (abilityId === 'separation') return { meldOwners: {} };
     if (abilityId === 'break_will') {
-      const target = choosePlayer(gameState, 79, (player) => (boss.chainsByPlayer?.[player.id] || 0) >= 2);
+      const target = chooseDominatrixBreakWillTarget(gameState);
       return { targetPlayerId: target?.id ?? null };
     }
     if (abilityId === 'final_order') {
@@ -1251,9 +1344,16 @@ function createPayload(gameState, abilityId) {
       };
     }
     if (abilityId === 'iron_etiquette') {
-      const candidates = (gameState.players || []).flatMap((player) => discardSuitOrderCandidates(gameState, player).map((suit) => ({ player, suit })));
-      const selected = chooseSeeded(candidates, gameState, 83);
-      return { targetPlayerId: selected?.player?.id ?? null, suit: selected?.suit?.value ?? null, suitLabel: selected?.suit?.label ?? '' };
+      const candidates = (gameState.players || []).flatMap((player) => dominatrixDiscardSuitOrderCandidates(gameState, player).map((suit) => ({ player, suit })));
+      if (!candidates.length) return {};
+      const fewestOptions = Math.min(...candidates.map((entry) => entry.suit.matchingCount));
+      const selected = chooseSeeded(candidates.filter((entry) => entry.suit.matchingCount === fewestOptions), gameState, 83);
+      return {
+        targetPlayerId: selected?.player?.id ?? null,
+        suit: selected?.suit?.value ?? null,
+        suitLabel: selected?.suit?.label ?? '',
+        eligibleCardIds: [...(selected?.suit?.matchingCardIds || [])],
+      };
     }
     if (abilityId === 'interdict') {
       const candidates = (gameState.teams?.[0]?.melds || []).map((meld, meldIndex) => ({
@@ -1504,8 +1604,14 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
     return !!target && eligibleExposureCards(gameState, target).some((card) => card.id === payload.cardId);
   }
   if (abilityId === 'forced_choice' || abilityId === 'absolute_control' || abilityId === 'break_will') {
-    return players.some((player) => player.id === payload.targetPlayerId)
-      && (abilityId !== 'forced_choice' || !!payload.order);
+    const targetExists = players.some((player) => player.id === payload.targetPlayerId);
+    if (!targetExists) return false;
+    if (abilityId === 'forced_choice') return !!payload.order;
+    if (abilityId === 'break_will') {
+      const missingHp = Math.max(0, Number(gameState.boss?.maxHp) - Number(gameState.boss?.hp));
+      return missingHp >= dominatrixPressure('break_will').minMeaningfulHeal;
+    }
+    return true;
   }
   if (abilityId === 'double_collar') {
     return payload.lockedCards?.length === players.length && payload.lockedCards.every((entry) => {
@@ -1523,7 +1629,7 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   }
   if (abilityId === 'iron_etiquette') {
     const target = players.find((player) => player.id === payload.targetPlayerId);
-    return !!target && discardSuitOrderCandidates(gameState, target).some((suit) => suit.value === payload.suit);
+    return !!target && dominatrixDiscardSuitOrderCandidates(gameState, target).some((suit) => suit.value === payload.suit);
   }
   if (abilityId === 'interdict') {
     return !!payload.meldId && Number.isInteger(payload.meldIndex)
@@ -1537,10 +1643,8 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
     return players.length >= 2
       && orders.length === players.length
       && orders.every((order) => {
-        const cardIds = [...new Set(order.cardIds || [])];
-        return cardIds.length === 2
-          && players.some((player) => player.id === order.playerId)
-          && cardIds.every((cardId) => playerHasCard(gameState, order.playerId, cardId));
+        const player = players.find((entry) => entry.id === order.playerId);
+        return !!player && dominatrixPlayableCards(gameState, player).length >= 2;
       });
   }
   if (abilityId === 'forced_swap' || abilityId === 'hands_tied' || abilityId === 'separation') {
@@ -2102,15 +2206,19 @@ function eligibleAbilityCandidates(gameState, entries, { avoidLast = false } = {
   if (boss.phase === 3 && boss.lastMaintenanceRound === boss.roundNumber) choices = choices.filter((entry) => entry.id !== 'maintenance_fee');
   if (!eligibleMeldIndexes(gameState).length) choices = choices.filter((entry) => entry.id !== 'pledge');
   if ((boss.possessions || []).length >= 2 || !eligibleMeldIndexes(gameState, { excludePossessed: true }).length) choices = choices.filter((entry) => entry.id !== 'possession');
-  if (!(gameState.players || []).some((player) => (boss.chainsByPlayer?.[player.id] || 0) >= 2)) choices = choices.filter((entry) => entry.id !== 'break_will');
+  if (!(gameState.players || []).some((player) => (boss.chainsByPlayer?.[player.id] || 0) >= 2)
+    || Math.max(0, Number(boss.maxHp) - Number(boss.hp)) < dominatrixPressure('break_will').minMeaningfulHeal) {
+    choices = choices.filter((entry) => entry.id !== 'break_will');
+  }
   const players = gameState.players || [];
   const allPlayersHaveCards = players.length > 0 && players.every((player) => player.hand?.some((card) => card?.id));
   const allPlayersHaveTwoCards = players.length > 0 && players.every((player) => (player.hand || []).filter((card) => card?.id).length >= 2);
+  const allPlayersHaveTwoPlayableCards = boss.id !== 'dominadora' || (players.length > 0 && players.every((player) => dominatrixPlayableCards(gameState, player).length >= 2));
   if (!players.length) choices = choices.filter((entry) => !['forced_choice', 'absolute_control', 'break_will'].includes(entry.id));
   if (!players.some((player) => player.hand?.some((card) => card?.id))) choices = choices.filter((entry) => entry.id !== 'collar');
   if (!players.some((player) => eligibleExposureCards(gameState, player).length)) choices = choices.filter((entry) => entry.id !== 'exposure');
   if (players.length < 2 || !allPlayersHaveCards) choices = choices.filter((entry) => !['forced_swap', 'double_collar'].includes(entry.id));
-  if (players.length < 2 || !allPlayersHaveTwoCards) choices = choices.filter((entry) => entry.id !== 'final_order');
+  if (players.length < 2 || !allPlayersHaveTwoCards || !allPlayersHaveTwoPlayableCards) choices = choices.filter((entry) => entry.id !== 'final_order');
   if (players.length < 2) choices = choices.filter((entry) => entry.id !== 'favorite');
   return choices
     .map((entry) => ({ entry, payload: createPayload(gameState, entry.id) }))
@@ -3015,6 +3123,7 @@ export function resolveNeheleniaMirroredMeldChoice(gameState, playerId, slot, ca
     expiresAfterTurn: true,
     appliedAtRound: boss.roundNumber,
   });
+  const mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Jogo Espelhado', `mirrored_meld_fake_progress_${intent.id}`, 0.9);
   boss.actionSequence += 1;
   const event = recordEvent(boss, {
     type: 'mirrorDeception',
@@ -3024,7 +3133,9 @@ export function resolveNeheleniaMirroredMeldChoice(gameState, playerId, slot, ca
     cardId: lostCard.id,
     fakeSlot: slot,
     realSlot: intent.payload.realSlot,
-    outcome: `${player.name || 'O jogador'} alimentou o reflexo falso: ${compactCardLabel(lostCard)} foi para o fundo do monte e não pode mais baixar cartas neste turno.`,
+    dangerDelta: mirrorEvent?.dangerDelta || 0,
+    mirrorEventId: mirrorEvent?.actionId || null,
+    outcome: `${player.name || 'O jogador'} alimentou o reflexo falso: ${compactCardLabel(lostCard)} foi para o fundo do monte, o turno ficou Desorientado e o Mundo do Espelho avançou.`,
   });
   return { allowed: true, real: false, event, lostCardId: lostCard.id };
 }
@@ -3209,18 +3320,26 @@ export function getBossDominatrixPriorities(gameState, playerId) {
     .map((meld, meldIndex) => ({ meldIndex, meldId: resolveBossMeldId(gameState, player.teamId, meldIndex, false) }))
     .filter(({ meldId, meldIndex }) => (meldId && priorityMeldIds.has(meldId)) || priorityMeldIndexes.has(meldIndex))
     .map(({ meldIndex }) => meldIndex);
+  const activeOrder = activeOrderForPlayer(boss, playerId);
   const discardOrder = activeOrderForPlayer(boss, playerId, 'discard_suit');
   const markedCardIds = (boss.effects || [])
     .filter((effect) => effect.id === 'final_order_mark' && effect.playerId === playerId)
     .map((effect) => effect.cardId)
     .filter((cardId) => player.hand?.some((card) => card?.id === cardId));
+  if (boss.currentIntent?.abilityId === 'exposure'
+    && boss.currentIntent.payload?.targetPlayerId === playerId
+    && player.hand?.some((card) => card?.id === boss.currentIntent.payload?.cardId)) {
+    markedCardIds.push(boss.currentIntent.payload.cardId);
+  }
   return {
     urgent: getBossChains(gameState, playerId) >= 3,
+    domination: Math.round(getBossChains(gameState, playerId) * 12.5 * 10) / 10,
     meldIndexes,
-    markedCardIds,
+    markedCardIds: [...new Set(markedCardIds)],
     discardSuit: discardOrder?.suit || null,
     discardSuitLabel: discardOrder?.suitLabel || null,
-    orderType: activeOrderForPlayer(boss, playerId)?.type || null,
+    orderType: activeOrder?.type || null,
+    handLimit: activeOrder?.type === 'reduce_hand' ? activeOrder.handLimit : null,
   };
 }
 
@@ -3355,40 +3474,65 @@ function dominatrixDefeatIfNeeded(gameState) {
 function changeChains(gameState, playerId, amount, reason = '') {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.id !== 'dominadora' || playerId == null || !amount) return 0;
-  const before = boss.chainsByPlayer[playerId] || 0;
-  if (amount > 0 && before >= 4) {
-    // Um jogador já Dominado não pode absorver outro Chicote. A punição
-    // transborda para o parceiro em qualquer fase, preservando a origem.
-    const partner = (gameState.players || []).find((player) => player.id !== playerId);
-    if (partner && (boss.chainsByPlayer[partner.id] || 0) < 4) {
-      const overflowApplied = changeChains(gameState, partner.id, amount, `overflow:${reason}`);
-      if (overflowApplied) {
-        boss.actionSequence += 1;
-        recordEvent(boss, {
-          type: 'chainOverflow',
-          actionId: `chain_overflow_${playerId}_${partner.id}_${boss.actionSequence}`,
-          originalTargetPlayerId: playerId,
-          overflowTargetPlayerId: partner.id,
-          amount: overflowApplied,
-          reason,
-          outcome: `O Chicote destinado ao alvo dominado transbordou para ${partner.name || 'o parceiro'}.`,
-        });
+  const before = Number(boss.chainsByPlayer[playerId]) || 0;
+  const requested = Number(amount) || 0;
+
+  if (requested > 0) {
+    const capacity = Math.max(0, 4 - before);
+    const appliedHere = Math.min(requested, capacity);
+    const after = clamp(before + appliedHere, 0, 4);
+    boss.chainsByPlayer[playerId] = after;
+    if (appliedHere > 0) {
+      boss.actionSequence += 1;
+      recordEvent(boss, {
+        type: 'chainChange',
+        actionId: `chain_${playerId}_${boss.actionSequence}`,
+        playerId,
+        amount: appliedHere,
+        dominationDelta: Math.round(appliedHere * 12.5 * 10) / 10,
+        domination: Math.round(after * 12.5 * 10) / 10,
+        chains: after,
+        reason,
+      });
+    }
+
+    const overflow = Math.max(0, requested - appliedHere);
+    if (overflow > 0) {
+      const partner = (gameState.players || []).find((player) => player.id !== playerId);
+      if (partner && (Number(boss.chainsByPlayer[partner.id]) || 0) < 4) {
+        const overflowApplied = changeChains(gameState, partner.id, overflow, `overflow:${reason}`);
+        if (overflowApplied) {
+          boss.actionSequence += 1;
+          recordEvent(boss, {
+            type: 'chainOverflow',
+            actionId: `chain_overflow_${playerId}_${partner.id}_${boss.actionSequence}`,
+            originalTargetPlayerId: playerId,
+            overflowTargetPlayerId: partner.id,
+            amount: overflowApplied,
+            dominationDelta: Math.round(overflowApplied * 12.5 * 10) / 10,
+            reason,
+            outcome: `O excesso de Dominação transbordou para ${partner.name || 'o parceiro'}.`,
+          });
+        }
       }
-      return overflowApplied;
     }
     dominatrixDefeatIfNeeded(gameState);
-    return 0;
+    return appliedHere + overflow;
   }
-  const after = clamp(before + amount, 0, 4);
+
+  const after = clamp(before + requested, 0, 4);
   boss.chainsByPlayer[playerId] = after;
   dominatrixDefeatIfNeeded(gameState);
   if (after !== before) {
+    const applied = after - before;
     boss.actionSequence += 1;
     recordEvent(boss, {
       type: 'chainChange',
       actionId: `chain_${playerId}_${boss.actionSequence}`,
       playerId,
-      amount: after - before,
+      amount: applied,
+      dominationDelta: Math.round(applied * 12.5 * 10) / 10,
+      domination: Math.round(after * 12.5 * 10) / 10,
       chains: after,
       reason,
     });
@@ -3507,7 +3651,6 @@ export function getBossCardEffect(gameState, playerId, cardId) {
   const intent = boss.currentIntent;
   if (intent?.abilityId === 'exposure' && intent.payload?.targetPlayerId === playerId && intent.payload?.cardId === cardId) return 'exposed';
   if (boss.effects.some((effect) => effect.id === 'choice_exposure' && effect.playerId === playerId && effect.cardId === cardId)) return 'exposed';
-  if (boss.pendingChoices.some((choice) => choice.type === 'final_order' && choice.playerId === playerId && choice.cardIds?.includes(cardId))) return 'final-order';
   if (boss.effects.some((effect) => effect.id === 'final_order_mark' && effect.playerId === playerId && effect.cardId === cardId)) return 'final-order';
   return isBossCardBlocked(gameState, playerId, cardId, 'play') ? 'locked' : null;
 }
@@ -3525,6 +3668,8 @@ export function canBossCreateMeld(gameState, playerId) {
   if ((boss.chainsByPlayer[playerId] || 0) >= 3 || isBossPlayerDominated(gameState, playerId)) return false;
   const intent = boss.currentIntent;
   if (intent?.abilityId !== 'hands_tied') return true;
+  const alreadyCommitted = intent.payload?.playerMeldIds?.[playerId];
+  if (alreadyCommitted) return false;
   return intent.payload?.teamMeldAvailable !== false;
 }
 
@@ -3568,6 +3713,13 @@ export function canBossUseMeld(gameState, playerId, meldIndex) {
   }
   if (boss.id !== 'dominadora') return true;
   const intent = boss.currentIntent;
+  if (intent?.abilityId === 'hands_tied') {
+    const player = (gameState.players || []).find((entry) => entry.id === playerId);
+    const teamId = player?.teamId ?? 0;
+    const meldId = resolveBossMeldId(gameState, teamId, meldIndex, false);
+    const committedMeldId = intent.payload?.playerMeldIds?.[playerId];
+    if (committedMeldId && committedMeldId !== meldId) return false;
+  }
   if (intent?.abilityId !== 'separation') return true;
   const owner = intent.payload?.meldOwners?.[meldIndex];
   return owner == null || owner === playerId;
@@ -3577,7 +3729,16 @@ function finishDominatrixOrder(gameState, order, status, outcome, { addChain = f
   const boss = gameState.boss;
   if (!order || order.status !== 'active') return null;
   order.status = status;
-  if (addChain) changeChains(gameState, order.targetPlayerId, 1, `${order.sourceAbilityId || 'order'}:${order.type}`);
+  const phase = Number(order.announcedPhase || boss.phase || 1);
+  let dominationApplied = 0;
+  if (status === 'obeyed' && ['forced_choice', 'iron_etiquette'].includes(order.sourceAbilityId) && !order.obedienceProgressPrepaid) {
+    const obeyPoints = dominatrixPressure(order.sourceAbilityId, phase).obey || 0;
+    dominationApplied = changeChains(gameState, order.targetPlayerId, dominationToChains(obeyPoints), `${order.sourceAbilityId}:${order.type}:obeyed`);
+  } else if (addChain) {
+    const failPoints = dominatrixPressure(order.sourceAbilityId, phase).fail;
+    const points = Number.isFinite(failPoints) ? failPoints : 12.5;
+    dominationApplied = changeChains(gameState, order.targetPlayerId, dominationToChains(points), `${order.sourceAbilityId || 'order'}:${order.type}`);
+  }
   boss.actionSequence += 1;
   const event = recordEvent(boss, {
     type: 'dominatrixOrder',
@@ -3586,7 +3747,8 @@ function finishDominatrixOrder(gameState, order, status, outcome, { addChain = f
     orderType: order.type,
     playerId: order.targetPlayerId,
     status,
-    chainApplied: !!addChain,
+    chainApplied: dominationApplied > 0,
+    dominationApplied: Math.round(Math.max(0, dominationApplied) * 12.5 * 10) / 10,
     outcome,
   });
   order.resolvedEventId = event.actionId;
@@ -3993,7 +4155,8 @@ export function resolveBossChoice(gameState, playerId, option) {
       if (correct) outcome = `${target?.name || 'O alvo'} reconheceu o topo verdadeiro; o lixo continua disponível.`;
       else {
         boss.neheleniaDiscardSealRound = boss.roundNumber;
-        outcome = `${target?.name || 'O alvo'} escolheu um reflexo falso; o lixo ficou selado nesta rodada.`;
+        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Espelho do Lixo', `discard_mirror_${choice.id}`, 0.8);
+        outcome = `${target?.name || 'O alvo'} escolheu um reflexo falso; o lixo ficou selado nesta rodada e o Mundo do Espelho avançou +${Math.round((mirrorEvent?.dangerDelta || 0) * 20 * 10) / 10}.`;
       }
     } else if (choice.type === 'shattered_mirror') {
       if (correct) outcome = `${target?.name || 'O alvo'} encontrou o fragmento falso.`;
@@ -4005,7 +4168,7 @@ export function resolveBossChoice(gameState, playerId, option) {
     } else if (choice.type === 'eternal_nightmare') {
       if (correct) outcome = `${target?.name || 'O alvo'} atravessou o Pesadelo Eterno sem perder o próprio reflexo.`;
       else {
-        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Pesadelo Eterno', `eternal_nightmare_${choice.id}`);
+        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Pesadelo Eterno', `eternal_nightmare_${choice.id}`, 1.2);
         outcome = mirrorEvent?.outcome || 'O Pesadelo Eterno venceu a escolha.';
       }
     } else return null;
@@ -4092,13 +4255,20 @@ export function resolveBossChoice(gameState, playerId, option) {
     }
   }
   else if (option === 'chain') {
-    changeChains(gameState, playerId, 1, choice.type);
-    outcome = '1 Chicote recebido.';
+    const phase = Number(choice.announcedPhase || boss.phase || 1);
+    const points = choice.type === 'break_will'
+      ? dominatrixPressure('break_will').direct
+      : choice.type === 'final_order'
+        ? dominatrixPressure('final_order').direct
+        : dominatrixPressure('forced_choice', phase).direct;
+    changeChains(gameState, playerId, dominationToChains(points), choice.type);
+    outcome = `Dominação +${points}.`;
   } else if (option === 'order' && choice.type === 'forced_choice' && choice.order?.type) {
     const order = {
       ...choice.order,
       id: `order_${choice.id}`,
       sourceAbilityId: 'forced_choice',
+      announcedPhase: Number(choice.announcedPhase || boss.phase || 1),
       targetPlayerId: playerId,
       createdRound: boss.roundNumber,
       deadlinePlayerId: playerId,
@@ -4110,27 +4280,42 @@ export function resolveBossChoice(gameState, playerId, option) {
           .map((card) => card.id)
         : [],
     };
+    order.obedienceProgressPrepaid = true;
     boss.activeOrders.push(order);
-    outcome = `Ordem aceita: ${order.label}.`;
+    const pressure = dominatrixPressure('forced_choice', order.announcedPhase);
+    changeChains(gameState, playerId, dominationToChains(pressure.obey), 'forced_choice:accepted');
+    outcome = `Ordem aceita: ${order.label}. Dominação +${pressure.obey}; falhar a ordem aumenta mais ${pressure.fail}.`;
   } else if (option === 'obey' && choice.type === 'final_order') {
     const player = gameState.players.find((entry) => entry.id === playerId);
-    const cardIds = [...new Set(choice.cardIds || [])];
-    markedCards = cardIds
-      .map((cardId) => player?.hand?.find((card) => card?.id === cardId))
-      .filter(Boolean);
-    if (markedCards.length !== 2) return null;
-    markedCards.forEach((card) => {
-      boss.effects.push({
-        id: 'final_order_mark',
-        source: 'final_order',
-        sourceChoiceId: choice.id,
-        playerId,
-        cardId: card.id,
-        expiresAfterTurn: true,
-        appliedAtRound: boss.roundNumber,
+    const playableCards = dominatrixPlayableCards(gameState, player);
+    markedCards = chooseCards(
+      { hand: playableCards },
+      gameState,
+      401 + Number(playerId || 0) * 29,
+      2,
+    );
+    if (markedCards.length !== 2) {
+      // O estado normalmente não chega aqui porque a habilidade só é elegível com
+      // duas cartas jogáveis. Se uma sincronização externa mudar a mão antes da decisão,
+      // cancela esta escolha sem cobrar uma punição impossível.
+      boss.pendingChoices = boss.pendingChoices.filter((entry) => entry.id !== choice.id);
+      outcome = 'A Ordem Final foi cancelada porque já não havia duas cartas jogáveis para sortear.';
+    } else {
+      const acceptPoints = dominatrixPressure('final_order').accept;
+      changeChains(gameState, playerId, dominationToChains(acceptPoints), 'final_order:accepted');
+      markedCards.forEach((card) => {
+        boss.effects.push({
+          id: 'final_order_mark',
+          source: 'final_order',
+          sourceChoiceId: choice.id,
+          playerId,
+          cardId: card.id,
+          expiresAfterTurn: true,
+          appliedAtRound: boss.roundNumber,
+        });
       });
-    });
-    outcome = `Ordem aceita: ${markedCards.map(compactCardLabel).join(' e ')} devem entrar em jogo no proximo turno. Cada carta nao usada aplica 1 Chicote.`;
+      outcome = `Ordem aceita: Dominação +${acceptPoints}. ${markedCards.map(compactCardLabel).join(' e ')} foram sorteadas e devem entrar em jogo no próximo turno; cada carta não usada aplica +${dominatrixPressure('final_order').miss}.`;
+    }
   } else if (option === 'lock_card') {
     const player = gameState.players.find((entry) => entry.id === playerId);
     const card = chooseSeeded((player?.hand || []).filter((entry) => entry?.id && canApplyDiscardLock(gameState, player, [entry.id])), gameState, 97);
@@ -4147,16 +4332,11 @@ export function resolveBossChoice(gameState, playerId, option) {
     });
     outcome = `${compactCardLabel(card)} ficou presa durante o proximo turno completo.`;
   } else if (option === 'break_meld') {
-    const melds = gameState.teams?.[0]?.melds || [];
-    const meld = melds.find((entry) => entry?.length >= 7);
-    const player = gameState.players.find((entry) => entry.id === playerId);
-    if (meld && player) {
-      player.hand.push(meld.pop());
-      outcome = '1 carta voltou de uma canastra para a mão.';
-    } else {
-      changeChains(gameState, playerId, 1, choice.type);
-      outcome = 'Sem canastra disponível: 1 Chicote recebido.';
-    }
+    const healed = Math.max(0, Math.min(dominatrixPressure('break_will').heal, boss.maxHp - boss.hp));
+    boss.hp = clamp(boss.hp + healed, 0, boss.maxHp);
+    outcome = healed
+      ? `A vontade cedeu: a Dominadora recuperou ${healed} HP.`
+      : 'A Dominadora já estava com HP máximo; a alternativa de cura não teve efeito.';
   } else return null;
   boss.pendingChoices = boss.pendingChoices.filter((entry) => entry.id !== choice.id);
   boss.actionSequence += 1;
@@ -4799,8 +4979,10 @@ function enqueueChoice(boss, playerId, type, options, data = {}) {
 function swapCooperatorCards(gameState) {
   const players = gameState.players || [];
   if (players.length < 2 || !players[0].hand?.length || !players[1].hand?.length) return null;
-  const firstCard = chooseCard(players[0], gameState, 101);
-  const secondCard = chooseCard(players[1], gameState, 103);
+  const firstPool = dominatrixPlayableCards(gameState, players[0]);
+  const secondPool = dominatrixPlayableCards(gameState, players[1]);
+  const firstCard = chooseSeeded(firstPool.length ? firstPool : players[0].hand.filter((card) => card?.id), gameState, 101);
+  const secondCard = chooseSeeded(secondPool.length ? secondPool : players[1].hand.filter((card) => card?.id), gameState, 103);
   const firstIndex = players[0].hand.findIndex((card) => card.id === firstCard?.id);
   const secondIndex = players[1].hand.findIndex((card) => card.id === secondCard?.id);
   if (firstIndex < 0 || secondIndex < 0) return null;
@@ -4851,29 +5033,51 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       const swap = swapCooperatorCards(gameState);
       const firstPlayer = gameState.players.find((player) => player.id === swap?.firstPlayerId);
       const secondPlayer = gameState.players.find((player) => player.id === swap?.secondPlayerId);
+      const lockedReceivedCardIds = [];
+      for (const received of swap?.receivedCards || []) {
+        const holder = gameState.players.find((player) => player.id === received.playerId);
+        if (!holder || !canApplyDiscardLock(gameState, holder, [received.cardId])) continue;
+        boss.effects.push({
+          id: 'choice_lock',
+          source: 'forced_swap',
+          playerId: received.playerId,
+          cardId: received.cardId,
+          expiresAfterTurn: true,
+          appliedAtRound: boss.roundNumber,
+        });
+        lockedReceivedCardIds.push(received.cardId);
+      }
       outcome = swap
-        ? `${firstPlayer?.name || 'O primeiro cooperador'} entregou ${swap.firstCardLabel} e recebeu ${swap.secondCardLabel}; ${secondPlayer?.name || 'o segundo cooperador'} fez a troca inversa.`
+        ? `${firstPlayer?.name || 'O primeiro cooperador'} e ${secondPlayer?.name || 'o segundo cooperador'} trocaram cartas úteis; ${lockedReceivedCardIds.length} carta(s) recebida(s) ficaram presas até o fim do próximo turno do novo dono.`
         : 'A troca falhou por falta de cartas.';
-      resultData = swap || {};
+      resultData = { ...(swap || {}), lockedReceivedCardIds };
     } else if (intent.abilityId === 'favorite') {
       const phase = Number(intent.announcedPhase || boss.phase || 1);
       const protectedPlayer = gameState.players.find((player) => player.id === intent.payload.protectedPlayerId);
       const punishedPlayer = gameState.players.find((player) => player.id === intent.payload.punishedPlayerId);
-      if (phase < 3) changeChains(gameState, intent.payload.protectedPlayerId, -1, 'favorite_protection');
-      changeChains(gameState, intent.payload.punishedPlayerId, 1, 'favorite_punishment');
+      if (phase < 3) changeChains(gameState, intent.payload.protectedPlayerId, -0.16, 'favorite_protection'); // -2
+      changeChains(gameState, intent.payload.punishedPlayerId, 0.64, 'favorite_punishment'); // +8
       outcome = phase >= 3
-        ? `${protectedPlayer?.name || 'A favorita'} foi poupada, mas nao perdeu Chicote; ${punishedPlayer?.name || 'o outro cooperador'} recebeu 1 Chicote.`
-        : `${protectedPlayer?.name || 'A favorita'} foi protegida e perdeu 1 Chicote; ${punishedPlayer?.name || 'o outro cooperador'} recebeu 1 Chicote.`;
+        ? `${protectedPlayer?.name || 'A favorita'} foi poupada; ${punishedPlayer?.name || 'o outro cooperador'} recebeu Dominação +8.`
+        : `${protectedPlayer?.name || 'A favorita'} recebeu Dominação -2; ${punishedPlayer?.name || 'o outro cooperador'} recebeu Dominação +8.`;
       resultData = { protectedPlayerId: intent.payload.protectedPlayerId, punishedPlayerId: intent.payload.punishedPlayerId };
     } else if (intent.abilityId === 'exposure') {
       const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);
       const remainsInHand = !!target?.hand?.some((card) => card?.id === intent.payload.cardId);
       const playedOnTable = (gameState.teams || []).some((team) => (team.melds || []).some((meld) => meld.some((card) => card?.id === intent.payload.cardId)));
       exposureSuccess = intent.payload.discardLockReleased ? playedOnTable : !remainsInHand;
-      if (!exposureSuccess) changeChains(gameState, intent.payload.targetPlayerId, 1, 'exposure_failed');
+      const pressure = dominatrixPressure('exposure', Number(intent.announcedPhase || boss.phase || 1));
+      const points = exposureSuccess ? pressure.success : pressure.fail;
+      changeChains(gameState, intent.payload.targetPlayerId, dominationToChains(points), exposureSuccess ? 'exposure_obeyed' : 'exposure_failed');
+      resultData = { dominationApplied: points };
       outcome = !exposureSuccess
-        ? `${target?.name || 'O jogador alvo'} não usou a carta exposta e recebeu 1 Chicote.`
-        : `${target?.name || 'O jogador alvo'} usou a carta exposta e evitou o Chicote.`;
+        ? `${target?.name || 'O jogador alvo'} não usou a carta exposta: Dominação +${pressure.fail}.`
+        : `${target?.name || 'O jogador alvo'} usou a carta exposta: Dominação +${pressure.success}.`;
+    } else if (intent.abilityId === 'absolute_control') {
+      const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);
+      const points = dominatrixPressure('absolute_control').apply;
+      changeChains(gameState, intent.payload.targetPlayerId, dominationToChains(points), 'absolute_control');
+      outcome = `${target?.name || 'O alvo'} ficou sob Controle Absoluto e recebeu Dominação +${points}.`;
     } else if (intent.abilityId === 'break_will') {
       enqueueChoice(boss, intent.payload.targetPlayerId, 'break_will', ['chain', 'break_meld']);
       outcome = 'A Quebra de Vontade aguarda uma decisão.';
@@ -4882,9 +5086,10 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         ? intent.payload.orders
         : buildFinalOrderTargets(gameState);
       orders.forEach((order) => enqueueChoice(boss, order.playerId, 'final_order', ['obey', 'chain'], {
-        cardIds: [...(order.cardIds || [])],
+        announcedPhase: intent.announcedPhase,
       }));
-      outcome = 'Cada cooperador recebeu duas cartas marcadas e precisa escolher entre obedecer ou receber 1 Chicote.';
+      const pressure = dominatrixPressure('final_order');
+      outcome = `Cada cooperador decide às cegas: recusar custa Dominação +${pressure.direct}; aceitar custa +${pressure.accept} e só então 2 cartas jogáveis aleatórias são sorteadas. Cada carta não usada acrescenta +${pressure.miss}.`;
     } else if (intent.abilityId === 'possession') {
       const alreadyPossessed = boss.possessions.some((entry) => entry.meldIndex === intent.payload.meldIndex);
       if (!alreadyPossessed && boss.possessions.length < 2 && eligibleMeldIndexes(gameState, { excludePossessed: true }).includes(intent.payload.meldIndex)) {
@@ -4917,15 +5122,18 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       boss.activeOrders.push({
         id: `etiquette_${intent.id}`,
         sourceAbilityId: 'iron_etiquette',
+        announcedPhase: Number(intent.announcedPhase || boss.phase || 1),
         type: 'discard_suit',
         targetPlayerId: intent.payload.targetPlayerId,
         suit: intent.payload.suit,
         suitLabel: intent.payload.suitLabel,
         createdRound: boss.roundNumber,
         deadlinePlayerId: intent.payload.targetPlayerId,
-        eligibleCardIds: legalDiscardCards(gameState, target)
-          .filter((card) => !card.joker && card.suit === intent.payload.suit)
-          .map((card) => card.id),
+        eligibleCardIds: intent.payload.eligibleCardIds?.length
+          ? [...intent.payload.eligibleCardIds]
+          : legalDiscardCards(gameState, target)
+            .filter((card) => !card.joker && card.suit === intent.payload.suit)
+            .map((card) => card.id),
         ownOptionsConsumed: false,
         status: 'active',
         resolvedEventId: null,
@@ -5067,7 +5275,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else if (intent.abilityId === 'mirrored_meld') {
       const success = !!payload.fed;
       let mirrorEvent = null;
-      if (!success && !payload.failed) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.targetPlayerId, 'Jogo Espelhado ignorado', `mirrored_meld_${intent.id}`);
+      if (!success && !payload.failed) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.targetPlayerId, 'Jogo Espelhado ignorado', `mirrored_meld_${intent.id}`, 0.9);
       outcome = success
         ? `${gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo'} encontrou o jogo verdadeiro e quebrou o reflexo.`
         : payload.failed
@@ -5079,7 +5287,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       const second = Math.max(0, Number(payload.secondPlayedCount) || 0);
       const success = second === first;
       let mirrorEvent = null;
-      if (!success) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.secondPlayerId, 'Siga o Reflexo', `follow_reflection_${intent.id}`);
+      if (!success) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.secondPlayerId, 'Siga o Reflexo', `follow_reflection_${intent.id}`, 0.8);
       const firstName = gameState.players.find((player) => player.id === payload.firstPlayerId)?.name || 'Primeiro jogador';
       const secondName = gameState.players.find((player) => player.id === payload.secondPlayerId)?.name || 'Segundo jogador';
       outcome = success
@@ -5089,7 +5297,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else if (intent.abilityId === 'mirror_prison') {
       const success = !!payload.fed;
       let mirrorEvent = null;
-      if (success) mirrorEvent = restoreNeheleniaDreamMirror(gameState, payload.trappedPlayerId, 'Prisão no Espelho', `mirror_prison_${intent.id}`);
+      if (success) mirrorEvent = restoreNeheleniaDreamMirror(gameState, payload.trappedPlayerId, 'Prisão no Espelho', `mirror_prison_${intent.id}`, 0.4);
       outcome = success
         ? mirrorEvent?.outcome || 'O parceiro alimentou o reflexo e abriu a Prisão no Espelho.'
         : 'A Prisão no Espelho resistiu; o Espelho dos Sonhos roubado continua com Nehelenia.';
@@ -5099,6 +5307,11 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       const targets = payload.targets || [];
       const missing = targets.filter((target) => !fed.has(target.meldId));
       const success = missing.length === 0;
+      let mirrorEvent = null;
+      if (!success) {
+        const mirrorTarget = [...(gameState.players || [])].sort((a, b) => (Number(boss.dreamMirrorMarksByPlayer?.[a.id]) || 0) - (Number(boss.dreamMirrorMarksByPlayer?.[b.id]) || 0))[0];
+        if (mirrorTarget) mirrorEvent = stealNeheleniaDreamMirror(gameState, mirrorTarget.id, 'Laço do Tigre', `tiger_link_${intent.id}`, 0.6);
+      }
       for (const target of missing) {
         const duplicate = boss.effects.some((effect) => effect.id === 'nehelenia_tiger_claw' && effect.meldId === target.meldId);
         if (!duplicate) boss.effects.push({
@@ -5114,7 +5327,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       outcome = success
         ? "Tiger's Eye perdeu o Laço: os dois jogos foram alimentados."
         : `Laço do Tigre: ${missing.length} lado${missing.length === 1 ? '' : 's'} ficou${missing.length === 1 ? '' : 'ram'} sob as garras. A próxima alimentação de cada lado rompe o efeito, mas essas cartas não causam dano individual.`;
-      resultData = { attendant: 'tiger', success, fedMeldIds: [...fed], missingMeldIds: missing.map((entry) => entry.meldId), persistentClaws: !success };
+      resultData = { attendant: 'tiger', success, fedMeldIds: [...fed], missingMeldIds: missing.map((entry) => entry.meldId), persistentClaws: !success, mirrorEventId: mirrorEvent?.actionId || null };
     } else if (intent.abilityId === 'tiger_prey') {
       const success = !!payload.fed;
       const targetName = gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo';
