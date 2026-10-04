@@ -1,4 +1,4 @@
-﻿# DOCUMENTAÇÃO — CHEFE DA MESA
+# DOCUMENTAÇÃO — CHEFE DA MESA
 
 
 ## Status da documentação
@@ -887,7 +887,7 @@ Somente produção de qualidade reduz Dominação.
 Regras:
 
 
-- reduz apenas do jogador responsável;
+- reduz primeiro do jogador responsável; se o alívio exceder a Dominação dele, o restante transborda para o parceiro;
 - evoluções sucessivas acrescentam **-4** por novo tier;
 - uma canastra que nasce diretamente Real recebe -8; Ás-a-Ás recebe -12;
 - cada tier conta uma única vez por `meldId`;

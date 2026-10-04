@@ -57,7 +57,7 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 **Transbordamento:** se um jogador já estiver em **50/50 de Dominação** e receber mais pressão, o excesso resvala para o parceiro em qualquer fase. Se ambos estiverem em 50, a derrota especial é confirmada.
 
 
-**Resistência:** Limpa reduz 4 pontos de Dominação, Real 8 no total e Ás-a-Ás 12 no total. Evoluções sucessivas acrescentam 4 por novo tier; o mesmo tier do mesmo jogo só conta uma vez.
+**Resistência:** Limpa reduz 4 pontos de Dominação, Real 8 no total e Ás-a-Ás 12 no total. Evoluções sucessivas acrescentam 4 por novo tier; o mesmo tier do mesmo jogo só conta uma vez. O alívio começa no jogador responsável e, se ele não tiver Dominação suficiente, o restante transborda para o parceiro.
 
 
 **Fora da rotação:** `Interdito` continua apenas como compatibilidade interna e não deve aparecer como habilidade ativa para o jogador.

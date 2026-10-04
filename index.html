@@ -564,9 +564,6 @@
             </select>
           </label>
 
-          <button onclick="window.debugInstantStart('boss_dimitrescu', 0)" style="font-size: 10px; padding: 7px; background: #7f1d1d; border: 1px solid rgba(248, 113, 113, 0.55); font-weight: 900">🩸 Iniciar Lady Dimitrescu</button>
-          <button onclick="window.debugInstantStart('boss_nehelenia', 0)" style="font-size: 10px; padding: 7px; background: #4c1d95; border: 1px solid rgba(196, 181, 253, 0.6); font-weight: 900">◇ Iniciar Rainha Nehelenia</button>
-
           <details id="debugBossLab" class="debug-boss-lab">
             <summary>Laboratorio de Chefes</summary>
             <div class="debug-boss-lab-body">
@@ -575,7 +572,7 @@
                 <select id="debugBossLabBoss"></select>
               </label>
               <label>
-                Fase
+                Fase da habilidade
                 <select id="debugBossLabPhase"></select>
               </label>
               <label>
@@ -583,26 +580,51 @@
                 <select id="debugBossLabAbility"></select>
               </label>
               <div id="debugBossLabTechnical" class="debug-boss-lab-technical"></div>
-              <label>
-                Cenario
-                <select id="debugBossLabVariant"></select>
-              </label>
-              <label>
+              <label id="debugBossLabTargetRow">
                 Alvo
                 <select id="debugBossLabTarget"></select>
               </label>
               <div id="debugBossLabError" class="debug-boss-lab-error" role="status"></div>
-              <button id="debugBossLabPrepare" type="button" class="debug-boss-lab-primary">Preparar e testar</button>
+              <button id="debugBossLabPrepare" type="button" class="debug-boss-lab-primary">Preparar habilidade</button>
+
+              <div id="debugBossLabResource" style="display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid rgba(250,204,21,.28);border-radius:8px;background:rgba(15,23,42,.55)">
+                <strong style="font-size:10px;color:#facc15;text-transform:uppercase">Recurso do chefe</strong>
+                <span id="debugBossLabResourceValue" style="font-size:10px;color:#e5e7eb">Prepare um chefe para ajustar.</span>
+                <label id="debugBossLabResourceTargetRow" hidden style="font-size:9px">
+                  Barra de Dominação
+                  <select id="debugBossLabResourceTarget">
+                    <option value="human">Biel</option>
+                    <option value="bot">BOT</option>
+                  </select>
+                </label>
+                <div class="debug-boss-lab-actions">
+                  <button id="debugBossLabResourceMinus" type="button">− passo</button>
+                  <button id="debugBossLabResourcePlus" type="button">+ passo</button>
+                  <button id="debugBossLabResourceNear" type="button">Quase cheio</button>
+                  <button id="debugBossLabResourceZero" type="button">Zerar</button>
+                </div>
+              </div>
+
               <div class="debug-boss-lab-actions">
-                <button type="button" data-boss-lab-variant="external_cancel">Executar cancelamento externo</button>
                 <button id="debugBossLabBotSuccess" type="button">BOT: executar sucesso</button>
                 <button id="debugBossLabBotFailure" type="button">BOT: executar falha</button>
-                <button id="debugBossLabUndo" type="button">Voltar</button>
-                <button id="debugBossLabReset" type="button">Resetar cenario</button>
               </div>
+
+              <details id="debugBossLabAdvanced">
+                <summary style="font-size:10px;cursor:pointer;color:#cbd5e1">Testes avancados</summary>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+                  <label>
+                    Cenario tecnico
+                    <select id="debugBossLabVariant"></select>
+                  </label>
+                  <div class="debug-boss-lab-actions">
+                    <button id="debugBossLabUndo" type="button">Voltar</button>
+                    <button id="debugBossLabReset" type="button">Resetar cenario</button>
+                  </div>
+                </div>
+              </details>
               <!-- <pre id="debugBossLabInstructions" class="debug-boss-lab-report">Selecione uma habilidade e prepare o cenario.</pre>
               <pre id="debugBossLabObserved" class="debug-boss-lab-report debug-boss-lab-observed"></pre> -->
-              <button id="debugBossLabSweep" type="button" class="debug-boss-lab-sweep">Testar todas as habilidades</button>
             </div>
           </details>
 

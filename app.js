@@ -12198,7 +12198,7 @@ if (isDebugMode) {
   let bossDebugLabReportTimerId = null;
 
   const loadBossDebugLabModule = () => {
-    bossDebugLabModulePromise ||= import('./js/boss/boss-debug-scenarios.js?lab=20261004c');
+    bossDebugLabModulePromise ||= import('./js/boss/boss-debug-scenarios.js?lab=20261004d');
     return bossDebugLabModulePromise;
   };
 
@@ -12236,6 +12236,9 @@ if (isDebugMode) {
     setBossLabOptions(phaseSelect, [{ id: 'auto', label: 'Automatica' }, ...[1, 2, 3].map((phase) => ({ id: phase, label: `Fase ${phase}`, disabled: !ability.phases.includes(phase) }))], previousPhase);
     setBossLabOptions(bossLabElement('debugBossLabVariant'), ability.variants, 'interactive');
     setBossLabOptions(bossLabElement('debugBossLabTarget'), ability.targets, 'auto');
+    const targetRow = bossLabElement('debugBossLabTargetRow');
+    const hasSelectableTarget = ability.targets.some((target) => !['auto', 'team'].includes(target.id));
+    if (targetRow) targetRow.hidden = !hasSelectableTarget;
     const technical = bossLabElement('debugBossLabTechnical');
     if (technical) technical.textContent = `${ability.id} - Fases ${ability.phases.join('/')} - peso ${ability.weight}`;
     document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => {
@@ -12272,6 +12275,7 @@ if (isDebugMode) {
       boss.abilities.map((ability) => ({ id: ability.id, label: `${ability.name} - Fases ${ability.phases.join('/')} - peso ${ability.weight}` })),
     );
     syncBossLabAbilityControls({ preservePhase: false });
+    refreshBossLabResourceControls().catch(console.error);
   }
 
   function validateBossLabSelection({ preserveError = false } = {}) {
@@ -12293,6 +12297,50 @@ if (isDebugMode) {
       target: bossLabElement('debugBossLabTarget')?.value || 'auto',
       ...overrides,
     };
+  }
+
+  function currentBossLabResourceTarget() {
+    return bossLabElement('debugBossLabResourceTarget')?.value || 'human';
+  }
+
+  async function refreshBossLabResourceControls() {
+    const value = bossLabElement('debugBossLabResourceValue');
+    const targetRow = bossLabElement('debugBossLabResourceTargetRow');
+    const selectedBossId = bossLabElement('debugBossLabBoss')?.value || null;
+    if (targetRow) targetRow.hidden = selectedBossId !== 'dominadora';
+    if (!value) return;
+
+    const module = await loadBossDebugLabModule();
+    const info = module.getBossDebugResourceState(state, {
+      bossId: selectedBossId,
+      target: currentBossLabResourceTarget(),
+    });
+    value.textContent = info.label;
+    const disabled = !info.available;
+    ['debugBossLabResourceMinus', 'debugBossLabResourcePlus', 'debugBossLabResourceNear', 'debugBossLabResourceZero'].forEach((id) => {
+      const button = bossLabElement(id);
+      if (button) button.disabled = disabled;
+    });
+  }
+
+  async function adjustBossLabResource(action) {
+    setBossLabError('');
+    try {
+      const module = await loadBossDebugLabModule();
+      const info = module.adjustBossDebugResource(state, {
+        bossId: bossLabElement('debugBossLabBoss')?.value || null,
+        action,
+        target: currentBossLabResourceTarget(),
+      });
+      renderAll();
+      await commitState();
+      await refreshBossLabObserved();
+      await refreshBossLabResourceControls();
+      showMessage(`Laboratorio: ${info.label}.`);
+    } catch (error) {
+      setBossLabError(error.message || String(error));
+      await refreshBossLabResourceControls();
+    }
   }
 
   async function refreshBossLabObserved() {
@@ -12360,6 +12408,7 @@ if (isDebugMode) {
     const details = bossLabElement('debugBossLab');
     if (details) details.open = true;
     await refreshBossLabObserved();
+    await refreshBossLabResourceControls();
     startBossLabReportTimer();
   }
 
@@ -12551,6 +12600,11 @@ if (isDebugMode) {
     document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => button.addEventListener('click', () => executeBossLabVariant(button.dataset.bossLabVariant)));
     bossLabElement('debugBossLabBotSuccess')?.addEventListener('click', () => executeBossLabBotAction('success').catch((error) => setBossLabError(error.message || String(error))));
     bossLabElement('debugBossLabBotFailure')?.addEventListener('click', () => executeBossLabBotAction('failure').catch((error) => setBossLabError(error.message || String(error))));
+    bossLabElement('debugBossLabResourceMinus')?.addEventListener('click', () => adjustBossLabResource('decrease'));
+    bossLabElement('debugBossLabResourcePlus')?.addEventListener('click', () => adjustBossLabResource('increase'));
+    bossLabElement('debugBossLabResourceNear')?.addEventListener('click', () => adjustBossLabResource('near'));
+    bossLabElement('debugBossLabResourceZero')?.addEventListener('click', () => adjustBossLabResource('zero'));
+    bossLabElement('debugBossLabResourceTarget')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
     bossLabElement('debugBossLabUndo')?.addEventListener('click', async () => {
       await window.executeUndo();
       await refreshBossLabObserved();
@@ -12560,6 +12614,7 @@ if (isDebugMode) {
     bossLabElement('debugBossLab')?.addEventListener('toggle', () => {
       if (bossLabElement('debugBossLab')?.open) {
         syncBossLabToCurrentBoss();
+        refreshBossLabResourceControls().catch(console.error);
         startBossLabReportTimer();
       } else {
         stopBossLabReportTimer();

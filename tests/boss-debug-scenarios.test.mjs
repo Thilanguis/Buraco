@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   bossDebugScenarioRegistry,
+  adjustBossDebugResource,
   applyBossDebugBotOutcome,
   buildBossDebugScenario,
   canContinueBossDebugScenario,
@@ -11,6 +12,7 @@ import {
   createBossDebugSnapshot,
   executeBossDebugScenarioVariant,
   getBossDebugCatalog,
+  getBossDebugResourceState,
   restoreBossDebugSnapshot,
   runBossDebugSweep,
   simulateBossDebugReload,
@@ -55,9 +57,14 @@ test('catalogo do laboratorio nasce do registro oficial e cobre todas as habilid
 });
 
 test('painel existe no DevTools atual e o modulo so e importado dentro do modo debug', () => {
-  for (const id of ['debugBossLab', 'debugBossLabBoss', 'debugBossLabPhase', 'debugBossLabAbility', 'debugBossLabVariant', 'debugBossLabTarget', 'debugBossLabPrepare', 'debugBossLabBotSuccess', 'debugBossLabBotFailure']) {
+  for (const id of ['debugBossLab', 'debugBossLabBoss', 'debugBossLabPhase', 'debugBossLabAbility', 'debugBossLabVariant', 'debugBossLabTarget', 'debugBossLabPrepare', 'debugBossLabBotSuccess', 'debugBossLabBotFailure', 'debugBossLabResourceValue', 'debugBossLabResourcePlus', 'debugBossLabResourceMinus', 'debugBossLabResourceNear', 'debugBossLabResourceZero']) {
     assert.match(htmlSource, new RegExp(`id="${id}"`));
   }
+  assert.match(htmlSource, /Fase da habilidade/);
+  assert.doesNotMatch(htmlSource, /Iniciar Lady Dimitrescu/);
+  assert.doesNotMatch(htmlSource, /Iniciar Rainha Nehelenia/);
+  assert.doesNotMatch(htmlSource, /Testar todas as habilidades/);
+  assert.doesNotMatch(htmlSource, /Executar cancelamento externo/);
   assert.doesNotMatch(htmlSource, />Executar sucesso</);
   assert.doesNotMatch(htmlSource, />Executar falha</);
   assert.doesNotMatch(htmlSource, />Simular reload</);
@@ -67,6 +74,34 @@ test('painel existe no DevTools atual e o modulo so e importado dentro do modo d
   assert.match(appSource, /isBossLabAutomationPaused/);
   assert.match(htmlSource, /class="boss-spring-crown"/);
   assert.match(bossCssSource, /boss-spring-crown-buffed[\s\S]*?boss-spring-crown/);
+});
+
+
+test('controle de recurso do laboratorio avanca os cinco chefes sem disparar derrota artificial', () => {
+  const banker = build('banker', 'fixed_interest').state;
+  adjustBossDebugResource(banker, { bossId: 'banker', action: 'zero' });
+  adjustBossDebugResource(banker, { bossId: 'banker', action: 'increase' });
+  assert.equal(banker.boss.danger, 10);
+  assert.match(getBossDebugResourceState(banker, { bossId: 'banker' }).label, /Dívida 10\/100/);
+
+  const dominatrix = build('dominadora', 'forced_choice').state;
+  adjustBossDebugResource(dominatrix, { bossId: 'dominadora', action: 'near', target: 'human' });
+  assert.equal(dominatrix.boss.chainsByPlayer[0], 3.6);
+  assert.match(getBossDebugResourceState(dominatrix, { bossId: 'dominadora', target: 'human' }).label, /45\/50/);
+
+  const matriarch = build('matriarca_esmeralda', 'living_seed').state;
+  adjustBossDebugResource(matriarch, { bossId: 'matriarca_esmeralda', action: 'near' });
+  assert.equal(matriarch.boss.bloom, 4);
+  assert.equal(matriarch.boss.danger, 4);
+
+  const dimitrescu = build('dimitrescu', 'bela_hunt').state;
+  adjustBossDebugResource(dimitrescu, { bossId: 'dimitrescu', action: 'near' });
+  assert.equal(dimitrescu.boss.danger, 90);
+
+  const nehelenia = build('nehelenia', 'mirrored_meld').state;
+  adjustBossDebugResource(nehelenia, { bossId: 'nehelenia', action: 'near' });
+  assert.equal(nehelenia.boss.danger, 4.5);
+  assert.match(getBossDebugResourceState(nehelenia, { bossId: 'nehelenia' }).label, /90\/100/);
 });
 
 test('Quebra de Vontade do Laboratorio prepara Dominação e HP faltante suficientes', () => {

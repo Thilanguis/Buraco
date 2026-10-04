@@ -578,6 +578,108 @@ export function getBossDebugCatalog() {
   }));
 }
 
+
+function clampBossDebugResource(value, min, max) {
+  return Math.max(min, Math.min(max, Number(value) || 0));
+}
+
+function bossDebugResourcePlayer(state, target = 'human') {
+  const players = state?.players || [];
+  if (target === 'bot') return players.find((player) => player?.name?.toUpperCase().includes('BOT')) || players[1] || players[0] || null;
+  return players.find((player) => !player?.name?.toUpperCase().includes('BOT')) || players[0] || null;
+}
+
+function formatBossDebugNumber(value) {
+  const rounded = Math.round((Number(value) || 0) * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',');
+}
+
+export function getBossDebugResourceState(state, { bossId = null, target = 'human' } = {}) {
+  const boss = normalizeBossState(state);
+  if (!boss || (bossId && boss.id !== bossId)) {
+    return { available: false, label: 'Prepare este chefe para ajustar o recurso.', targetable: false };
+  }
+
+  if (boss.id === 'dominadora') {
+    const players = state.players || [];
+    const values = players.map((player) => ({
+      playerId: player.id,
+      name: player.name || `Jogador ${Number(player.id) + 1}`,
+      value: Math.round((Number(boss.chainsByPlayer?.[player.id]) || 0) * 12.5 * 10) / 10,
+    }));
+    const selected = bossDebugResourcePlayer(state, target);
+    const selectedValue = selected ? Math.round((Number(boss.chainsByPlayer?.[selected.id]) || 0) * 12.5 * 10) / 10 : 0;
+    return {
+      available: true,
+      targetable: true,
+      step: 5,
+      selectedPlayerId: selected?.id ?? null,
+      label: `Dominação · ${values.map((entry) => `${entry.name}: ${formatBossDebugNumber(entry.value)}/50`).join(' · ')}`,
+      selectedLabel: selected ? `${selected.name}: ${formatBossDebugNumber(selectedValue)}/50` : '',
+    };
+  }
+
+  if (boss.id === 'matriarca_esmeralda') {
+    return { available: true, targetable: false, step: 1, label: `Flores ${formatBossDebugNumber(boss.bloom)}/5` };
+  }
+
+  if (boss.id === 'dimitrescu') {
+    return { available: true, targetable: false, step: 10, label: `Sede ${formatBossDebugNumber(boss.danger)}/100` };
+  }
+
+  if (boss.id === 'nehelenia') {
+    return { available: true, targetable: false, step: 10, label: `Mundo do Espelho ${formatBossDebugNumber((Number(boss.danger) || 0) * 20)}/100` };
+  }
+
+  return { available: true, targetable: false, step: 10, label: `Dívida ${formatBossDebugNumber(boss.danger)}/100` };
+}
+
+export function adjustBossDebugResource(state, { bossId = null, action = 'increase', target = 'human' } = {}) {
+  const boss = normalizeBossState(state);
+  if (!boss) throw new Error('Nenhum chefe ativo para ajustar.');
+  if (bossId && boss.id !== bossId) throw new Error('Prepare o chefe selecionado antes de ajustar o recurso.');
+  if (boss.result) throw new Error('A luta ja terminou. Prepare o cenario novamente para ajustar o recurso.');
+
+  const nextLinear = (current, step, nearMax) => {
+    if (action === 'zero') return 0;
+    if (action === 'near') return nearMax;
+    if (action === 'decrease') return clampBossDebugResource(current - step, 0, nearMax);
+    return clampBossDebugResource(current + step, 0, nearMax);
+  };
+
+  if (boss.id === 'dominadora') {
+    const player = bossDebugResourcePlayer(state, target);
+    if (!player) throw new Error('Nao ha jogador para receber Dominação no laboratorio.');
+    boss.chainsByPlayer ||= {};
+    const currentPoints = (Number(boss.chainsByPlayer[player.id]) || 0) * 12.5;
+    const nextPoints = nextLinear(currentPoints, 5, 45);
+    boss.chainsByPlayer[player.id] = nextPoints / 12.5;
+  } else if (boss.id === 'matriarca_esmeralda') {
+    boss.bloom = nextLinear(Number(boss.bloom) || 0, 1, 4);
+    boss.danger = boss.bloom;
+  } else if (boss.id === 'nehelenia') {
+    const player = bossDebugResourcePlayer(state, target) || state.players?.[0];
+    const nextProgress = nextLinear((Number(boss.danger) || 0) * 20, 10, 90);
+    boss.dreamMirrorMarksByPlayer ||= {};
+    for (const entry of state.players || []) boss.dreamMirrorMarksByPlayer[entry.id] = 0;
+    if (player) boss.dreamMirrorMarksByPlayer[player.id] = nextProgress / 20;
+    boss.dreamMirrorMarksMigrated = true;
+    normalizeBossState(state);
+  } else {
+    boss.danger = nextLinear(Number(boss.danger) || 0, 10, 90);
+  }
+
+  state.lastAction = {
+    id: `boss_debug_resource_${Date.now()}`,
+    type: 'bossDebugResource',
+    bossId: boss.id,
+    action,
+    target,
+    ts: Date.now(),
+  };
+  return getBossDebugResourceState(state, { bossId: boss.id, target });
+}
+
 export function canContinueBossDebugScenario(state, config = {}) {
   return state?.debugScenario?.active === true
     && state.debugScenario.bossId === config.bossId
