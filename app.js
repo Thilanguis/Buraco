@@ -4523,6 +4523,11 @@ async function processDominationReward(p, oldKind, newKind, meldIndex) {
 async function checkPostMeldStatus(player) {
   if (player.hand.length > 0) return null;
   const teamId = player.teamId;
+
+  // Se a última carta acabou de ir para a mesa, a mão precisa aparecer vazia
+  // durante o voo do Morto. O Morto só entra visualmente depois da animação.
+  if (state.players?.[myPlayerIndex]?.id === player.id) renderHand();
+
   const tookDead = takeDeadIfAvailableForPlayer(player);
 
   if (!tookDead) {
@@ -5149,6 +5154,10 @@ async function discardSelectedCardOnce() {
   // any render/await, not only when our Firebase snapshot comes back.
   selectedHandIndexes.clear();
   selectedMeldTarget = null;
+
+  // A carta já saiu da mão. Atualiza o DOM antes de qualquer animação do Morto,
+  // para ela não reaparecer enquanto o Morto está voando.
+  renderHand();
 
   let tookDead = null;
   if (p.hand.length === 0) tookDead = takeDeadIfAvailableForPlayer(p);
@@ -10124,6 +10133,20 @@ function syncTurnScopedFeedback({ isMyTurnRightNow = false, currentName = '' } =
   message.textContent = currentName ? `Vez de ${currentName}.` : '';
 }
 
+function renderRemoteHandEmptyBeforeDeadPickup(playerId) {
+  const id = String(playerId);
+  const root = ['opponentTop', 'opponentLeft', 'opponentRight']
+    .map((rootId) => document.getElementById(rootId))
+    .find((seat) => seat?.dataset?.playerId === id);
+  if (!root) return;
+
+  root.querySelector('.opponent-cards')?.replaceChildren();
+
+  const player = state?.players?.find((candidate) => String(candidate?.id) === id);
+  const label = root.querySelector('.opponent-label');
+  if (label && player) label.textContent = `${player.name} (0)`;
+}
+
 async function playRemoteAction(a) {
   if (!state || !a) return;
   if (a.type === 'friendTurn') return playFriendTurnPresentation(a);
@@ -10167,6 +10190,9 @@ async function playRemoteAction(a) {
   const animateRemoteDeadIfAny = async () => {
     await animateRemoteRecycleIfAny(); // Garante que a reposição aconteça ANTES do morto ou das compras voarem!
     if (a.tookDead) {
+      // O snapshot novo ainda não foi aplicado durante a apresentação remota.
+      // Esvazia só a mão visual antiga antes do voo do Morto.
+      renderRemoteHandEmptyBeforeDeadPickup(a.playerId);
       const fromEl = a.tookDead.deadIndex === 1 ? dead1El : dead0El;
       const fromR = fromEl ? getRect(fromEl) : null;
       if (fromR && handRect) {

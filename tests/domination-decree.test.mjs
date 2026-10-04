@@ -152,7 +152,7 @@ test('integração remove Busca da interface e bloqueia humano/BOT antes da cole
   assert.match(restartBlock, /const restartedState = await startGame/);
   assert.match(restartBlock, /state = restartedState;\s*cancelGameAnimations\(\);\s*renderAll\(\);/);
 
-  assert.match(worker, /CACHE_NAME = 'buraco-v264'/);
+  assert.match(worker, /CACHE_NAME = 'buraco-v265'/);
   assert.match(worker, /\.\/js\/game\/domination-decree\.js/);
   assert.doesNotMatch(worker, /\.\/js\/game\/domination-search\.js/);
 });

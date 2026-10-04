@@ -26,7 +26,7 @@ test('checagem ignora cache HTTP e o fluxo oferece retry sem reload prematuro', 
 });
 
 test('service worker novo mantém skipWaiting e sobe a versão de cache', () => {
-  assert.match(worker, /CACHE_NAME = 'buraco-v264'/);
+  assert.match(worker, /CACHE_NAME = 'buraco-v265'/);
   assert.match(worker, /event\.data === 'skipWaiting'/);
   assert.match(worker, /\.\/assets\/images\/domination-decree-lock\.png/);
 });
