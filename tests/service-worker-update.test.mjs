@@ -26,6 +26,6 @@ test('checagem ignora cache HTTP e o fluxo oferece retry sem reload prematuro', 
 });
 
 test('service worker novo mantém skipWaiting e sobe a versão de cache', () => {
-  assert.match(worker, /CACHE_NAME = 'buraco-v254'/);
+  assert.match(worker, /CACHE_NAME = 'buraco-v255'/);
   assert.match(worker, /event\.data === 'skipWaiting'/);
 });

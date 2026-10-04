@@ -452,7 +452,13 @@ function chooseFriendDiscardPickup(state, friend, team, rules, farewell) {
   // Do not recycle an unhelpful pile forever or peek at the auxiliary stock.
   // Extra dead weight is especially costly with little time left to unload it.
   const usable = best.added.filter((card) => discardedIds.has(card.id)).length;
-  const burden = (pile.length - usable) * (farewell ? 900 : 250);
+  // With an empty private stock there is no alternative two-card draw. In that
+  // state, do not charge the pile's dead-weight penalty against a genuinely
+  // better play; otherwise the friend can reject useful discard cards, draw
+  // nothing and progressively weaken her own hand. An unhelpful pile still
+  // fails the best-vs-baseline comparison and is left alone.
+  const burdenPerUnusedCard = shared.stock.length ? (farewell ? 900 : 250) : 0;
+  const burden = (pile.length - usable) * burdenPerUnusedCard;
   return best.value > baseline + burden ? best : null;
 }
 

@@ -1858,6 +1858,37 @@ test('monte auxiliar vazio ainda revalida a jogada imediatamente antes de baixar
   assert.ok(validations >= 2, 'a legalidade deve ser conferida novamente no commit');
 });
 
+test('monte particular vazio prioriza lixo util sem transformar lixo inutil em compra obrigatoria', () => {
+  for (const variant of ['aberto', 'fechado']) {
+    const useful = invite();
+    useful.variant = variant;
+    useful.dominationFriends[0].turnsRemaining = 3;
+    useful.dominationFriends[0].hand = cards(['3', '4'], '♣', `empty-stock-hand-${variant}`);
+    useful.dominationFriendShared.stock = [];
+    useful.dominationFriendShared.discard = [
+      ...cards(['K', 'K', 'K', 'K', 'K', 'K', 'K'], '♥', `deadweight-${variant}`),
+      ...cards(['5'], '♣', `useful-${variant}`),
+    ];
+    const result = friendTurn(useful);
+    assert.equal(result.steps[0]?.type, 'drawDiscard', `${variant}: deve usar lixo quando ele melhora a jogada e nao existe compra do monte`);
+    assert.equal(result.steps[1]?.type, 'meldNew', `${variant}: deve baixar o jogo criado pelo lixo`);
+    assert.ok(useful.teams[1].melds[0]?.some((card) => card.rank === '5' && card.suit === '♣'));
+    assert.equal(useful.dominationFriends[0].turnsRemaining, 2, 'monte vazio nao altera duracao da Amiga');
+    assert.equal(useful.dominationFriends[0].active, true, 'monte vazio nao despede a Amiga');
+
+    const useless = invite();
+    useless.variant = variant;
+    useless.dominationFriends[0].turnsRemaining = 3;
+    useless.dominationFriends[0].hand = cards(['3', '4'], '♣', `empty-stock-useless-hand-${variant}`);
+    useless.dominationFriendShared.stock = [];
+    useless.dominationFriendShared.discard = cards(['K', 'K', 'K'], '♥', `useless-${variant}`);
+    const uselessResult = friendTurn(useless);
+    assert.equal(uselessResult.steps.some((step) => step.type === 'drawDiscard'), false, `${variant}: lixo sem ganho continua ignorado`);
+    assert.equal(useless.dominationFriends[0].turnsRemaining, 2);
+    assert.equal(useless.dominationFriends[0].active, true);
+  }
+});
+
 test('compra duas cartas auxiliares uma vez por turno, respeitando monte vazio ou incompleto', () => {
   for (const size of [0, 1, 2, 3]) {
     const state = invite();
