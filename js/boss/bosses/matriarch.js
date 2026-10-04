@@ -38,6 +38,6 @@ export const matriarchDefinition = Object.freeze({
     ability('royal_bloom', 'Florescimento Real', 4, [3], ({ targetCount = 0 }) => `${targetCount} objetivo(s) naturais precisam ser cumpridos separadamente.`),
     ability('emerald_cocoon', 'Casulo Esmeralda', 3, [3], () => 'Um casulo de 180 pontos absorvera o dano ate ser rompido.'),
     ability('spring_crown', 'Coroa da Primavera', 3, [3], ({ markedThreatName = 'uma ameaca natural' }) => `A Coroa marca ${markedThreatName}; somente a falha dela prepara uma Raiz Fortalecida. A raiz criada pela propagação não inicia outra propagação comum.`),
-    Object.freeze({ id: 'rebirth', name: 'Renascimento', weight: 0, phases: Object.freeze([3]), debugOnly: true, describe: () => 'PASSIVA: uma vez por batalha, ao chegar a 0 HP na Fase 3 com pelo menos 1 Flor, consome 1 Flor e retorna com 300 HP.' }),
+    Object.freeze({ id: 'rebirth', name: 'Renascimento', weight: 0, phases: Object.freeze([3]), debugOnly: true, describe: () => 'PASSIVA F3: 0 HP + 1 Flor → volta com 300 HP (1x).' }),
   ]),
 });

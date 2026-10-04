@@ -4,7 +4,7 @@
 ## Status da documentação
 
 
-**Versão revisada contra o código atual — 01/10/2026.**
+**Versão revisada contra o código atual — 04/10/2026.**
 
 
 Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
@@ -148,6 +148,18 @@ Orvalho Restaurador: +60 HP
 
 
 Feedback de bloqueio deve sempre identificar o efeito correto. Uma Semente da Matriarca não pode mostrar mensagem temática da Dominadora.
+
+### Regra editorial do HUD de habilidades
+
+A caixa principal da habilidade é para leitura rápida durante a jogada. Ela deve mostrar apenas **o que fazer**, **o progresso** e **a consequência imediata**. Explicações longas, exceções e definições de termos ficam no botão **?** da habilidade.
+
+- não copiar a descrição completa da habilidade para o objetivo da rodada;
+- termos potencialmente ambíguos, como **Desorientado**, **Reflexo Morto**, **Cofre**, **FINANCIADA**, **Posse** e efeitos persistentes, precisam ser explicados no `?`;
+- o `?` deve preservar os números importantes da regra e explicar exceções relevantes;
+- referências concretas de carta no HUD, como `6♥`, `Q♦`, `8♣` ou `A♠`, recebem destaque maior e cor por naipe para leitura rápida;
+- o texto compacto não deve repetir no mesmo painel uma consequência que já está detalhada no `?`, salvo o número ou estado necessário para decidir a jogada.
+
+A suíte `boss-hud-copy-v1.test.mjs` protege esse orçamento de texto para todos os chefes ativos.
 
 
 ## 1.5 Evolução híbrida das fases
@@ -2579,7 +2591,7 @@ Em touch, tablet e `prefers-reduced-motion`:
 | Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu | Rainha Nehelenia |
 |---|---|---|---|---|---|
 | HP | 2650 | 2600 | 2000 | 2300 | 2400 |
-| Perigo | Dívida coletiva | Chicotes individuais | Florescimento | Sede de Sangue | Espelhos dos Sonhos |
+| Perigo | Dívida coletiva | Dominação individual | Florescimento | Sede de Sangue | Mundo do Espelho (0–100) |
 | Derrota especial | Dívida 100 | ambos com 4 Chicotes | 5 Flores | Sede 100 | 5 Espelhos |
 | Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas |
 | Recuperação da equipe | redução de Dívida | Dominação -4/-8/-12 | poda por evolução | redução de Sede por canastra | Mundo do Espelho -4/-8/-12 |
@@ -2660,27 +2672,36 @@ Nehelenia é uma chefe de **engano, reflexos e manipulação da própria mesa**.
 O HUD textual permanece padronizado em amarelo, com `☐ / ☑ / ✕`. O espetáculo acontece na mesa.
 
 
-## 15.2 Vida e os 5 Espelhos dos Sonhos
+## 15.2 Vida e Mundo do Espelho
 
 
 ```text
 HP: 2400
-Espelhos tomados: ◇ ◇ ◇ ◇ ◇
+Mundo do Espelho: 0..100
+Visual: 5 espelhos de 20 pontos cada, com preenchimento parcial
 ```
 
 
-Cada punição relevante pode entregar **1 Espelho dos Sonhos** a Nehelenia.
+O recurso é **coletivo**, mas o motor mantém a parcela atribuída a cada jogador para feedback e persistência. Os cinco espelhos do HUD são apenas a representação visual dessa régua contínua: cada um equivale a 20 pontos e pode aparecer parcialmente preenchido.
 
 
-- `0/5` a `4/5`: a batalha continua;
-- `3/5` ou mais: o HUD entra em pressão visual de **Mundo do Espelho**;
-- `5/5`: derrota imediata — Nehelenia fecha a equipe dentro do Mundo do Espelho.
+- `0–<60`: estado normal;
+- `60–<100`: o HUD entra em pressão visual de **Mundo do Espelho**;
+- `100/100`: derrota imediata — Nehelenia fecha a equipe dentro do reflexo.
 
 
-O recurso é coletivo, mas o motor registra qual jogador originou cada ganho para feedback e compatibilidade.
+As punições não entregam mais um Espelho inteiro por falha. Cada habilidade aplica sua própria pressão: Jogo Espelhado +18, Siga o Reflexo +16, Espelho do Lixo +16, Laço do Tigre +12 e Pesadelo Eterno +24.
 
 
-Uma evolução que alcance **Canastra Limpa ou superior** recupera 1 Espelho, se existir algum tomado. A redução continua incremental por novo tier de canastra.
+A recuperação por canastra segue a régua comum:
+
+- Canastra Limpa: `-4`;
+- Canastra Real: `-8` no total;
+- Ás-a-Ás: `-12` no total;
+- evoluções sucessivas acrescentam `-4` por novo tier válido.
+
+
+A Prisão no Espelho é uma mecânica de resgate fora do sorteio ofensivo e reduz `8` quando cumprida.
 
 
 ## 15.3 Fases
@@ -2721,7 +2742,7 @@ O alvo seleciona exatamente 1 carta legal e toca em um dos reflexos:
 - **Desorientado:** não pode fazer novas baixadas naquele turno; ainda pode descartar e encerrar.
 
 
-Ignorar a ilusão até o fim do turno entrega +1 Espelho a Nehelenia.
+Ignorar a ilusão até o fim do turno acrescenta **+18** ao Mundo do Espelho, assim como escolher o reflexo falso.
 
 
 Se o alvo já estiver sob **Presa Marcada** de Tiger em outro jogo, o **Jogo Espelhado** tem precedência temporária por ser a obrigação ativa do turno: o jogador pode alimentar somente o jogo espelhado até resolver a escolha. A Presa não é removida e volta a restringir os demais jogos imediatamente depois.
@@ -2758,7 +2779,7 @@ Regras:
 - o segundo jogador **não é bloqueado** por tentar passar do número;
 - ao fim do segundo turno, compara-se o total;
 - `segundo == padrão` = sucesso;
-- qualquer diferença, para mais ou para menos, = **+1 Espelho**.
+- qualquer diferença, para mais ou para menos, = **+16 no Mundo do Espelho**.
 
 
 ### Espelho do Lixo
@@ -2771,7 +2792,7 @@ O topo real do lixo é duplicado em **dois reflexos visualmente idênticos**.
 - não existe `X`, rachadura seletiva, brilho diferente ou qualquer pista;
 - a resposta é deliberadamente **50/50**;
 - acerto mantém o lixo disponível;
-- erro sela o lixo durante a rodada.
+- erro sela o lixo durante a rodada e acrescenta **+16 no Mundo do Espelho**.
 
 
 O bot também não recebe a resposta secreta: escolhe um dos dois reflexos de forma determinística, mas sem consultar `correctOption`.
@@ -2780,11 +2801,11 @@ O bot também não recebe a resposta secreta: escolhe um dos dois reflexos de fo
 ### Prisão no Espelho
 
 
-Só é elegível quando Nehelenia já tomou ao menos 1 Espelho e o parceiro possui uma jogada legal para um jogo existente.
+Só pode ser acionada quando o Mundo do Espelho está acima de 0 e o parceiro possui uma jogada legal para um jogo existente.
 
 
-- alimentar o jogo refletido recupera 1 Espelho;
-- falhar mantém o Espelho com Nehelenia.
+- alimentar o jogo refletido reduz **8 no Mundo do Espelho**;
+- falhar não concede esse resgate.
 
 
 ### Pesadelo Eterno
@@ -2804,14 +2825,14 @@ Todos mostram a mesma carta e nenhum recebe `X` ou pista falsa automática. O de
 
 
 - acerto: a ilusão quebra;
-- erro: +1 Espelho;
-- se isso alcançar `5/5`, o Mundo do Espelho encerra a batalha.
+- erro: **+24 no Mundo do Espelho**;
+- se isso alcançar `100/100`, o Mundo do Espelho encerra a batalha.
 
 
 ### Laço do Tigre
 
 
-Tiger's Eye liga dois jogos. Cada lado precisa receber pelo menos 1 carta; se um lado for ignorado, as garras persistem e a próxima alimentação rompe o efeito sem dano individual das cartas usadas para romper.
+Tiger's Eye liga dois jogos. Cada lado precisa receber pelo menos 1 carta; se algum lado for ignorado, o Mundo do Espelho avança **+12**, as garras persistem e a próxima alimentação rompe o efeito sem dano individual das cartas usadas para romper.
 
 
 ### Presa Marcada
@@ -2850,7 +2871,7 @@ Fish Eye impede abrir jogo novo até alimentar um jogo existente. O efeito persi
 - cinco pequenos espelhos ornamentados ficam visíveis no HUD;
 - Tiger's Eye, Hawk's Eye e Fish Eye aparecem em painéis próprios sob o HUD quando participam da luta;
 - espelhos tomados ficam rachados/avermelhados;
-- em `3/5` ou `4/5`, o retrato entra em pressão de Mundo do Espelho;
+- em `60/100` ou mais, o retrato entra em pressão de Mundo do Espelho;
 - o Jogo Espelhado usa duas instâncias de tamanho normal dentro do `meld-container`;
 - a cópia nasce com clarão e os dois jogos cruzam antes de parar;
 - o Espelho do Lixo usa dois espelhos centrais idênticos;
@@ -2900,6 +2921,8 @@ O estado continua compatível com 5 Espelhos, agora com preenchimento parcial. C
 
 
 Pressões de teste: Jogo Espelhado erro/ignorar +18; Siga o Reflexo falha +16; Espelho do Lixo erro +16; Laço do Tigre falha +12; Pesadelo Eterno erro +24. Prisão no Espelho saiu do sorteio ofensivo normal; quando acionada como resgate, reduz 8.
+
+**Revisão de 04/10/2026:** os valores foram mantidos após comparação com a Dominadora. A Nehelenia alterna habilidades de pressão e de controle, usa uma barra coletiva de 100 pontos e recupera 4/8/12 pelas canastras; a pressão mais forte, +24, fica restrita à Fase 3. Não foi aplicado buff/nerf nesta revisão.
 
 
 O HUD mostra o preenchimento parcial dos Chicotes/Espelhos e o progresso numérico para tornar o risco legível.

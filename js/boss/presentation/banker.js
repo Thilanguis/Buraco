@@ -144,7 +144,7 @@ export const bankerBossPresentation = Object.freeze({
         const fullDebt = payload.fullDebt ?? payload.amount;
         const guaranteedDebt = payload.guaranteedDebt ?? payload.collateralAmount;
         const interestStep = payload.interestStep ?? (intent.announcedPhase === 3 ? 3 : 2);
-        return { instruction: `${holder}: pague agora ou use o Cofre.`, progress: [`Integral: +${fullDebt} Dívida`, `Cofre: +${guaranteedDebt} · 1 carta presa`, `Adiar: +${interestStep}/turno`].join('\n'), consequence: '' };
+        return { instruction: `${holder}: escolha Integral ou Cofre.`, progress: `Integral +${fullDebt} · Cofre +${guaranteedDebt}`, consequence: `Adiar Cofre: +${interestStep}/turno` };
       }
       case 'maintenance_fee':
         return { instruction: 'Coloque as cartas FINANCIADAS em jogos.', progress: compactProgress(), consequence: `Não usar: +${payload.financedDebt ?? (intent.announcedPhase === 3 ? 7 : 5)} Dívida/carta` };
@@ -219,11 +219,21 @@ export const bankerBossPresentation = Object.freeze({
     if (!intent) return null;
     switch (intent.abilityId) {
       case 'fixed_interest':
-        return 'Cofre: 1 carta do titular fica apreendida. Resgatar substitui a compra normal. Se o titular comprar do Monte e adiar, o resgate sobe +2 por turno nas Fases 1–2 ou +3 na Fase 3, até o valor integral; ao chegar ao limite, o próximo resgate é obrigatório.';
+        return 'Integral cobra toda a Dívida imediatamente. Cofre reduz a cobrança inicial, mas prende 1 carta do titular; resgatar essa carta substitui a compra normal. Se o titular comprar do Monte e adiar, o resgate sobe +2 por turno nas Fases 1–2 ou +3 na Fase 3, até o valor integral; ao chegar ao limite, o próximo resgate é obrigatório.';
       case 'maintenance_fee':
         return 'FINANCIADA é a carta extra criada pela Tarifa. Ela só quita a cobrança se entrar legalmente em um jogo naquele turno. Descartá-la ou terminar o turno ainda com ela na mão gera a cobrança uma única vez.';
+      case 'credit_block':
+        return 'Enquanto o Bloqueio de Crédito estiver ativo, ninguém pode recolher o Lixo. A compra normal do Monte continua disponível e o bloqueio termina quando a rodada vira.';
+      case 'suit_audit':
+        return 'A equipe precisa baixar a quantidade indicada de cartas reais do naipe sorteado antes do fim da rodada. Coringas não contam e a mesma carta não pode contar duas vezes. Se o total não for atingido, a Dívida indicada é aplicada uma única vez.';
+      case 'pledge':
+        return 'O jogo marcado fica penhorado temporariamente: ele não pode receber cartas enquanto a Penhora estiver ativa. A restrição termina na próxima cobrança do Banqueiro.';
+      case 'compound_interest':
+        return 'Juros Compostos olha o total das duas mãos no fechamento da rodada. A cobrança usa a faixa mostrada no medidor; reduzir as mãos antes do fechamento pode diminuir a Dívida aplicada.';
       case 'credit_limit':
         return 'A franquia é compartilhada pela equipe e conta somente cartas que vieram da mão e permaneceram legalmente na mesa. Cartas trazidas pelo Lixo, reorganização e cartas que já estavam em jogo não entram na conta. Só o excedente gera Dívida, até o teto mostrado.';
+      case 'discard_surcharge':
+        return 'O Ágio cobra somente a primeira retirada válida do Lixo naquela rodada. Comprar do Monte evita a cobrança; tentativa cancelada, retirada inválida ou uma segunda retirada não cobram de novo.';
       default:
         return null;
     }
@@ -244,12 +254,12 @@ export const bankerBossPresentation = Object.freeze({
           ['Pagamento integral', `+${choice.amount} Dívida agora`],
           ['Com garantia', 'o Banqueiro apreende 1 carta aleatória'],
           ['Preço inicial do resgate', `+${choice.collateralAmount} Dívida`],
-          ['Juros', '+1 a cada turno em que comprar normalmente'],
+          ['Juros', `+${choice.interestStep || 2} a cada compra adiada`],
           ['Limite', `ao chegar a +${choice.amount}, o próximo resgate é obrigatório`],
         ]),
         instruction: `${target} escolhe como pagar o contrato.`,
         progress: `Integral agora: +${choice.amount} Dívida`,
-        consequence: `Cofre: carta aleatória; resgate começa em +${choice.collateralAmount} e sobe +1 por compra adiada`,
+        consequence: `Cofre: +${choice.collateralAmount} inicial · +${choice.interestStep || 2} por adiamento`,
       };
     }
     return {

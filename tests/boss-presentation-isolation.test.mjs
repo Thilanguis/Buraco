@@ -26,13 +26,13 @@ test('registry de apresentacao possui adaptador para os cinco chefes', () => {
   for (const id of bosses.filter((entry) => entry !== 'banker')) assert.equal(isBossPresentationFeminine(id), true);
 });
 
-test('falas permanecem equivalentes e Coleira singular continua especial', () => {
-  assert.equal(getBossPresentationSpeech('banker', 'fixed_interest'), 'O prazo acabou. Agora paguem os juros.');
-  assert.equal(getBossPresentationSpeech('dominadora', 'collar', { collarCards: ['A♠', 'K♠'] }), 'Duas das suas opcoes agora me pertencem.');
-  assert.equal(getBossPresentationSpeech('dominadora', 'collar', { collarCards: ['A♠'] }), 'Uma das suas opcoes agora me pertence.');
-  assert.equal(getBossPresentationSpeech('matriarca_esmeralda', 'living_seed'), 'Uma semente basta para tomar toda a sua mao.');
-  assert.equal(getBossPresentationSpeech('dimitrescu', 'crimson_brand'), 'Vou deixar a minha marca em cada uma de vocês.');
-  assert.equal(getBossPresentationSpeech('nehelenia', 'hawk_watch'), "Hawk's Eye fechou os olhos de vocês para um caminho.");
+test('falas permanecem isoladas nos adaptadores de cada chefe', () => {
+  assert.equal(getBossPresentationSpeech('banker', 'fixed_interest'), 'A conta venceu. Eu adoro quando os números começam a falar mais alto que vocês.');
+  assert.equal(getBossPresentationSpeech('dominadora', 'collar', { collarCards: ['A♠', 'K♠'] }), 'Suas escolhas ficaram menores. As minhas, não.');
+  assert.equal(getBossPresentationSpeech('dominadora', 'collar', { collarCards: ['A♠'] }), 'Suas escolhas ficaram menores. As minhas, não.');
+  assert.equal(getBossPresentationSpeech('matriarca_esmeralda', 'living_seed'), 'Eu só preciso de uma semente. O resto da mão fará o trabalho.');
+  assert.equal(getBossPresentationSpeech('dimitrescu', 'crimson_brand'), 'Gosto de saber exatamente a quem cada gota pertence.');
+  assert.equal(getBossPresentationSpeech('nehelenia', 'hawk_watch'), "Hawk's Eye fechou uma das saídas. Eu adoraria ver vocês insistirem nela.");
 });
 
 test('categorias de acao preservam a classificacao anterior por chefe', () => {
@@ -65,10 +65,10 @@ test('categorias de resultado permanecem disponiveis sem tabela global compartil
 
 test('regra permanente do HUD fica isolada por chefe', () => {
   assert.equal(buildBossRuleSummary('banker', { boss: { maxDanger: 100 } }), '100 de Dívida = derrota imediata.');
-  assert.match(buildBossRuleSummary('dominadora', { boss: {} }), /3 Chicotes = Sob Controle/);
+  assert.match(buildBossRuleSummary('dominadora', { boss: {} }), /37,5 fica Sob Controle.*50 fica Dominado/);
   assert.match(buildBossRuleSummary('matriarca_esmeralda', { boss: { maxDanger: 5 } }), /5 Flores = derrota/);
   assert.match(buildBossRuleSummary('dimitrescu', { boss: { maxDanger: 100 } }), /Limpa\/Real\/Ás-a-Ás: −4\/−8\/−12 Sede/);
-  assert.match(buildBossRuleSummary('nehelenia', { boss: { maxDanger: 5 } }), /5\/5 Espelhos = derrota/);
+  assert.match(buildBossRuleSummary('nehelenia', { boss: { maxDanger: 5 } }), /100\/100 = derrota.*novo tier de canastra reduz 4/);
   assert.equal(buildBossRuleSummary('inexistente', { boss: {} }), '');
 });
 
@@ -77,9 +77,9 @@ test('resumo final do recurso fica isolado por chefe', () => {
   assert.deepEqual(getBossFinalDangerPresentation('banker', common), { label: 'Dívida final', value: '37 / 100' });
   assert.deepEqual(getBossFinalDangerPresentation('dimitrescu', common), { label: 'Sede final', value: '37 / 100' });
   assert.deepEqual(getBossFinalDangerPresentation('matriarca_esmeralda', { boss: { danger: 3, maxDanger: 5 } }), { label: 'Florescimento final', value: '3 / 5' });
-  assert.deepEqual(getBossFinalDangerPresentation('nehelenia', { boss: { danger: 4, maxDanger: 5 } }), { label: 'Espelhos roubados', value: '4 / 5' });
+  assert.deepEqual(getBossFinalDangerPresentation('nehelenia', { boss: { danger: 4, maxDanger: 5 } }), { label: 'Mundo do Espelho', value: '80 / 100' });
   const dominatrix = { boss: { chainsByPlayer: { 0: 2, 1: 3 } }, players: [{ id: 0, name: 'Biel' }, { id: 1, name: 'BOT' }] };
-  assert.deepEqual(getBossFinalDangerPresentation('dominadora', dominatrix), { label: 'Chicotes finais', value: 'Biel: 2/4 · BOT: 3/4' });
+  assert.deepEqual(getBossFinalDangerPresentation('dominadora', dominatrix), { label: 'Dominação final', value: 'Biel: 25/50 · BOT: 37.5/50' });
 });
 
 test('boss-presentation deixa de guardar tabelas e cadeia final dos cinco chefes', () => {
@@ -130,11 +130,12 @@ test('escolhas pendentes ficam no modulo do chefe correto', () => {
 
 test('arquivo compartilhado nao volta a conhecer habilidades ou IDs especificos dos chefes', () => {
   for (const token of [
-    "'banker'", "'dominadora'", "'matriarca_esmeralda'", "'dimitrescu'", "'nehelenia'",
+    "'banker'", "'matriarca_esmeralda'", "'dimitrescu'", "'nehelenia'",
     "case 'fixed_interest'", "case 'collar'", "case 'living_seed'", "case 'bela_hunt'", "case 'false_image'",
     'BOSS_HELP_ABILITY_IDS', 'final_order_mark', 'fixed_interest_payment', 'eternal_nightmare',
   ]) assert.equal(presentation.includes(token), false, `${token} deve permanecer fora do coordenador compartilhado`);
   assert.ok(presentation.includes('buildBossCompactAction'));
   assert.ok(presentation.includes('buildBossPendingChoicePresentation'));
   assert.ok(presentation.includes('buildBossStatusPresentation'));
+  assert.match(presentation, /boss\?\.id !== 'dominadora'/, 'a exceção de escolha pendente da Dominadora continua explícita e isolada');
 });

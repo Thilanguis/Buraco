@@ -116,11 +116,11 @@ export const dimitrescuBossPresentation = Object.freeze({
     };
     const multiProgress = (objectives = []) => {
       if (!objectives.length) return 'Objetivos sendo preparados';
+      const daughterName = (objective) => objective?.type === 'bela' ? 'Bela' : objective?.type === 'cassandra' ? 'Cassandra' : objective?.type === 'daniela' ? 'Daniela' : 'Objetivo';
       return objectives.map((objective) => {
         const marker = objective.status === 'success' ? '✅' : objective.status === 'failed' ? '✕' : '☐';
-        const suffix = objective.status === 'success' ? ' · concluído' : objective.status === 'failed' ? ' · falhou' : '';
-        return `${marker} ${daughterLabel(objective)}${suffix}`;
-      }).join('\n');
+        return `${marker} ${daughterName(objective)}`;
+      }).join(' · ');
     };
     const brandProgress = () => {
       const marks = payload.marks || [];
@@ -148,12 +148,12 @@ export const dimitrescuBossPresentation = Object.freeze({
         }, 0);
         return { instruction: 'Reduza as duas mãos antes do fim da rodada.', progress: '', consequence: `Previsto: +${projected} Sede` };
       }
-      case 'red_wine': return { instruction: `Lady gasta ${payload.bloodCost || 15} Sede para curar.`, progress: `Sede ${gameState?.boss?.danger || 0}/100`, consequence: `Cura até ${payload.healAmount || 0} HP` };
+      case 'red_wine': return { instruction: `Troca ${payload.bloodCost || 15} Sede por cura.`, progress: `Sede ${gameState?.boss?.danger || 0}/100`, consequence: `Até +${payload.healAmount || 0} HP` };
       case 'crimson_brand': return { instruction: 'Use cada carta marcada em um jogo.', progress: brandProgress(), consequence: `Sucesso -2 · Falha +${Number(intent.announcedPhase) === 3 ? 9 : 7} Sede` };
       case 'cassandra_dead_feast': {
         const curse = gameState?.boss?.bloodiedDead;
         const active = curse?.status === 'active';
-        return { instruction: `Morto ${Number(payload.deadIndex) + 1} amaldiçoado.`, progress: active ? '🩸 MALDIÇÃO ATIVA NO MORTO' : 'A profanação foi preparada', consequence: `Tomar: +${payload.bloodAmount || 0} Sede · cura ${payload.healAmount || 0} HP` };
+        return { instruction: `Morto ${Number(payload.deadIndex) + 1} amaldiçoado.`, progress: active ? '🩸 Maldição ativa' : 'Preparado', consequence: `Tomar: +${payload.bloodAmount || 0} Sede · +${payload.healAmount || 0} HP` };
       }
       case 'crimson_clot': {
         const clot = gameState?.boss?.crimsonClot;
@@ -162,7 +162,7 @@ export const dimitrescuBossPresentation = Object.freeze({
         return { instruction: 'Quebre o Coágulo.', progress: clot?.status === 'active' ? `🩸 ${remaining}/${maximum}` : 'Preparado', consequence: 'Falha: 50% restante vira cura' };
       }
       case 'castle_lockdown': return { instruction: '🔒 Lixo fechado.', progress: '', consequence: 'Use o Monte' };
-      case 'three_daughters': return { instruction: 'Cumpra os objetivos de Bela, Cassandra e Daniela.', progress: multiProgress(payload.objectives || []), consequence: 'Cada um: sucesso -2 · falha +8 Sede' };
+      case 'three_daughters': return { instruction: 'Cumpra os 3 objetivos das Filhas.', progress: multiProgress(payload.objectives || []), consequence: 'Cada uma: -2 no sucesso · +8 na falha' };
       default: return null;
     }
   },
@@ -189,11 +189,42 @@ export const dimitrescuBossPresentation = Object.freeze({
     ] }];
   },
 
-  help({ intent } = {}) {
+  help({ gameState, intent, helpers = {} } = {}) {
     if (!intent) return null;
-    if (intent.abilityId === 'cassandra_dead_feast') return 'A maldição permanece no próximo Morto até ele ser tomado. Normalmente isso aumenta a Sede e cura Lady. Se a equipe já tiver Canastra Real ou Ás-a-Ás quando conquistar o Morto, ele é purificado: a Sede sobe apenas +4 e a cura é anulada.';
-    if (intent.abilityId === 'crimson_clot') return 'O Coágulo recebe o dano antes de Lady. Romper toda a proteção reduz 6 de Sede. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
-    return null;
+    const { playerName = () => '', cardLabelAnywhere = () => 'carta marcada' } = helpers;
+    const payload = intent.payload || {};
+    const phase = Number(intent.announcedPhase) || 1;
+    switch (intent.abilityId) {
+      case 'bela_hunt':
+        return `Bela marcou ${cardLabelAnywhere(gameState, payload.cardId)} de ${playerName(gameState, payload.targetPlayerId)}. A carta precisa entrar legalmente em um jogo até o fim do turno do alvo. Sucesso reduz 3 de Sede; falha acrescenta ${phase === 3 ? 16 : 14}. Descartar a carta não cumpre a Caçada.`;
+      case 'blood_tithe':
+        return `No fim da rodada, cada mão é avaliada separadamente. Nesta fase: 0–7 cartas não cobram; 8–10 acrescentam ${phase === 3 ? 6 : 4} de Sede por jogador; 11+ acrescentam ${phase === 3 ? 10 : 8}. O medidor mostra a cobrança projetada.`;
+      case 'red_wine':
+        return `Vinho Carmesim só entra quando Lady está ferida e possui Sede suficiente. Ela consome ${payload.bloodCost || 15} de Sede para recuperar até ${payload.healAmount || 0} HP; a cura nunca ultrapassa o HP que falta.`;
+      case 'crimson_brand':
+        return `Cada cooperador recebe uma carta marcada. Cada marca é resolvida separadamente: colocar a carta legalmente em um jogo reduz 2 de Sede; deixar a carta sem uso até o prazo acrescenta ${phase === 3 ? 9 : 7}.`;
+      case 'cassandra_feast':
+        return `Cassandra marcou o Jogo ${Number(payload.meldIndex) + 1}. Ele precisa receber ao menos 1 carta legal antes do fim da rodada. Sucesso reduz 4 de Sede; falha acrescenta ${phase === 3 ? 18 : 16}.`;
+      case 'daniela_swarm':
+        return `Daniela contaminou ${cardLabelAnywhere(gameState, payload.discardCardId)} no Lixo. Evitar recolher essa carta durante a rodada reduz 3 de Sede. Recolhê-la acrescenta ${phase === 3 ? 15 : 12}.`;
+      case 'cassandra_dead_feast':
+        return 'A maldição permanece no próximo Morto até ele ser tomado. Normalmente isso aumenta a Sede e cura Lady. Se a equipe já tiver Canastra Real ou Ás-a-Ás quando conquistar o Morto, ele é purificado: a Sede sobe apenas +4 e a cura é anulada.';
+      case 'crimson_clot':
+        return 'O Coágulo recebe o dano antes de Lady. Romper toda a proteção reduz 6 de Sede. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
+      case 'castle_lockdown':
+        return 'Portas do Castelo bloqueia o Lixo durante a rodada inteira. Os jogadores continuam podendo comprar normalmente do Monte; não existe punição extra por usar o Monte.';
+      case 'three_daughters': {
+        const objectiveLabel = (objective) => {
+          if (objective?.type === 'bela') return `Bela: ${playerName(gameState, objective.targetPlayerId)} usa ${cardLabelAnywhere(gameState, objective.cardId)}`;
+          if (objective?.type === 'cassandra') return `Cassandra: alimentar o Jogo ${Number(objective.meldIndex) + 1}`;
+          if (objective?.type === 'daniela') return `Daniela: não recolher ${cardLabelAnywhere(gameState, objective.discardCardId)} do Lixo`;
+          return 'objetivo pendente';
+        };
+        return `As três Filhas criam objetivos independentes: ${(payload.objectives || []).map(objectiveLabel).join(' · ')}. Cada sucesso reduz 2 de Sede e cada falha acrescenta 8; cumprir uma Filha não compensa a falha de outra.`;
+      }
+      default:
+        return null;
+    }
   },
 
   status({ gameState, helpers = {} } = {}) {

@@ -66,7 +66,7 @@ function feed(state, playerId, meldIndex, count = 1) {
   return picked;
 }
 
-test('Nehelenia V6 usa cinco Espelhos e rotação de mesa/ilusão', () => {
+test('Nehelenia usa Mundo do Espelho contínuo sobre cinco espelhos visuais e rotação de mesa/ilusão', () => {
   const definition = getBossDefinition('nehelenia');
   assert.equal(definition.maxHp, 2400);
   assert.equal(definition.maxDanger, 5);
@@ -74,7 +74,7 @@ test('Nehelenia V6 usa cinco Espelhos e rotação de mesa/ilusão', () => {
     'mirrored_meld', 'follow_reflection', 'discard_mirror', 'mirror_prison', 'eternal_nightmare',
     'tiger_link', 'tiger_prey', 'hawk_suit', 'hawk_watch', 'fish_marked_card', 'fish_inverted',
   ]);
-  assert.deepEqual(definition.abilities.map((ability) => ability.weight), [5, 5, 4, 3, 5, 4, 3, 3, 3, 3, 3]);
+  assert.deepEqual(definition.abilities.map((ability) => ability.weight), [5, 5, 4, 0, 5, 4, 3, 3, 3, 3, 3]);
   assert.equal(definition.attendants.tiger.portrait, 'assets/images/nehelenia-tigers-eye.png');
   assert.equal(definition.attendants.hawk.portrait, 'assets/images/nehelenia-hawks-eye.png');
   assert.equal(definition.attendants.fish.portrait, 'assets/images/nehelenia-fish-eye.png');
@@ -130,7 +130,7 @@ test('Siga o Reflexo considera zero um padrão válido e pune se o segundo baixa
   feed(state, 1, 1, 1);
   state.turnNumber += 1;
   completeBossPlayerTurn(state, 1);
-  assert.equal(state.boss.danger, 1);
+  assert.equal(state.boss.danger, 0.8, 'falhar em Siga o Reflexo acrescenta 16/100');
 });
 
 test('Espelho do Lixo cria dois reflexos idênticos com escolha 50/50', () => {
@@ -152,26 +152,26 @@ test('Pesadelo Eterno gera original + dois reflexos idênticos para embaralhamen
   assert.ok(intent.payload.correctOption);
 });
 
-test('quinto Espelho encerra a batalha e Canastra Limpa recupera um antes disso', () => {
+test('Mundo do Espelho chega a 100 e Canastra Limpa recupera 4 antes disso', () => {
   const state = game();
   state.boss.dreamMirrorMarksMigrated = true;
   state.boss.dreamMirrorMarksByPlayer = { 0: 2, 1: 2 };
-  state.boss.danger = 4;
+  state.boss.danger = 4; // 80/100
 
   const clean = card('clean-extra', '8', '♣');
   state.teams[0].melds[0].push(clean);
   const relief = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [clean] });
-  assert.equal(state.boss.danger, 3);
-  assert.equal(relief.mirrorFragmentRelief, 1);
+  assert.ok(Math.abs(state.boss.danger - 3.8) < 1e-9, 'Limpa deve reduzir 4/100');
+  assert.ok(Math.abs(relief.mirrorFragmentRelief - 0.2) < 1e-9);
 
-  // Recoloca a pressão em 4 e força uma falha de Siga o Reflexo para chegar a 5.
-  state.boss.dreamMirrorMarksByPlayer = { 0: 2, 1: 2 };
-  state.boss.danger = 4;
+  // 84/100 + falha de Siga o Reflexo (+16) = 100/100.
+  state.boss.dreamMirrorMarksByPlayer = { 0: 2.1, 1: 2.1 };
+  state.boss.danger = 4.2;
   state.boss.result = null;
   state.boss.currentIntent = null;
   state.boss.playersActedThisRound = [];
   const intent = selectNextBossIntent(state, { debug: true, forcedAbilityId: 'follow_reflection' });
-  completeBossPlayerTurn(state, intent.payload.firstPlayerId); // padrão 0
+  completeBossPlayerTurn(state, intent.payload.firstPlayerId);
   const second = intent.payload.secondPlayerId;
   const secondMeld = second === 1 ? 1 : 0;
   feed(state, second, secondMeld, 1);

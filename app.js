@@ -239,143 +239,176 @@ document.addEventListener(
   { once: true },
 );
 
+let pendingServiceWorkerVersion = null;
+let serviceWorkerReloading = false;
+let serviceWorkerActivationRequested = false;
+let serviceWorkerProgressTimer = null;
+let serviceWorkerActivationTimer = null;
+
 if ('serviceWorker' in navigator) {
   onPageLoad(() => {
-    // Substitua o bloco do navigator.serviceWorker.register (linhas 3435 a 3470) por este:
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (serviceWorkerReloading || !serviceWorkerActivationRequested) return;
+      serviceWorkerReloading = true;
+      clearInterval(serviceWorkerProgressTimer);
+      clearTimeout(serviceWorkerActivationTimer);
+
+      if (Number.isFinite(pendingServiceWorkerVersion)) {
+        localStorage.setItem('buraco_current_version', String(pendingServiceWorkerVersion));
+      }
+
+      const bar = document.getElementById('update-progress-bar');
+      const percentText = document.getElementById('update-percent');
+      const statusText = document.getElementById('update-status-text');
+      if (bar) bar.style.width = '100%';
+      if (percentText) percentText.textContent = '100%';
+      if (statusText) {
+        statusText.textContent = 'Atualização aplicada. Reabrindo a mesa…';
+        statusText.style.color = '#4ade80';
+      }
+
+      setTimeout(() => window.location.reload(), 180);
+    });
 
     navigator.serviceWorker
       .register('service-worker.js')
       .then(async (reg) => {
-        let totalAtts = 1;
-        let newVersionNum = 93;
-        let oldVersionNum = parseInt(localStorage.getItem('buraco_current_version') || '93', 10);
+        let newVersionNum = null;
+        const storedVersion = Number.parseInt(localStorage.getItem('buraco_current_version') || '', 10);
+        const oldVersionNum = Number.isFinite(storedVersion) ? storedVersion : null;
 
         try {
-          const response = await fetch('service-worker.js');
+          const response = await fetch(`service-worker.js?version_check=${Date.now()}`, { cache: 'no-store' });
           const text = await response.text();
           const match = text.match(/CACHE_NAME\s*=\s*['"`]buraco-v(\d+)['"`]/);
-          if (match) {
-            newVersionNum = parseInt(match[1], 10);
-            if (newVersionNum > oldVersionNum) {
-              totalAtts = newVersionNum - oldVersionNum;
-            }
-          }
+          if (match) newVersionNum = Number.parseInt(match[1], 10);
         } catch (err) {
-          console.error('[SW] Erro ao calcular salto de versões:', err);
+          console.error('[SW] Erro ao consultar a versão atual:', err);
         }
 
-        // 🛡️ TRAVA: Só abre a modal se a versão do servidor for maior que a do localStorage
+        const shouldPrompt = oldVersionNum == null || (newVersionNum != null && newVersionNum > oldVersionNum);
+        const totalAtts = oldVersionNum != null && newVersionNum != null ? Math.max(1, newVersionNum - oldVersionNum) : 1;
+
         const applyWorker = (worker) => {
           if (!worker) return;
-          if (newVersionNum > oldVersionNum) showUpdatePrompt(worker, totalAtts, newVersionNum);
-          else worker.postMessage('skipWaiting');
+          if (shouldPrompt) {
+            showUpdatePrompt(worker, reg, totalAtts, newVersionNum);
+          } else {
+            serviceWorkerActivationRequested = true;
+            worker.postMessage('skipWaiting');
+          }
         };
 
         if (reg.waiting) applyWorker(reg.waiting);
 
-        reg.onupdatefound = () => {
+        reg.addEventListener('updatefound', () => {
           const installingWorker = reg.installing;
           if (!installingWorker) return;
-          installingWorker.onstatechange = () => {
+          installingWorker.addEventListener('statechange', () => {
             if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) applyWorker(installingWorker);
-          };
-        };
+          });
+        });
+
+        // DevTools costuma manter a aba viva por muito tempo; força uma checagem
+        // real no servidor em vez de depender somente da verificação periódica.
+        reg.update().catch((err) => console.error('[SW] Erro ao forçar verificação de atualização:', err));
       })
       .catch((err) => console.log('SW erro:', err));
-
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
-    });
   });
 }
 
-function showUpdatePrompt(worker, totalAtts = 1, newVersion = 93) {
+function showUpdatePrompt(worker, registration, totalAtts = 1, newVersion = null) {
+  if (document.getElementById('sw-update-overlay')) return;
+
   const overlay = document.createElement('div');
+  overlay.id = 'sw-update-overlay';
   overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(5, 5, 5, 0.95); z-index: 100000; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
   document.body.appendChild(overlay);
 
+  const requestActivation = () => {
+    const candidate = registration?.waiting || registration?.installing || worker;
+    if (!candidate) return false;
+    try {
+      candidate.postMessage('skipWaiting');
+      return true;
+    } catch (err) {
+      console.error('[SW] Erro ao solicitar ativação:', err);
+      return false;
+    }
+  };
+
   const startProgressSequence = () => {
+    serviceWorkerActivationRequested = true;
+    pendingServiceWorkerVersion = Number.isFinite(Number(newVersion)) ? Number(newVersion) : null;
     overlay.innerHTML = `
-                    <div class="score-card" style="max-width: 320px; text-align: center; padding: 30px 20px; border-color: #facc15;">
-                      <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Sincronizando Módulos...</h2>
+      <div class="score-card" style="max-width: 340px; text-align: center; padding: 30px 20px; border-color: #facc15;">
+        <h2 style="margin: 0 0 16px 0; color: #facc15; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Aplicando atualização…</h2>
+        <div style="width: 100%; background: #1e293b; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(250, 204, 21, 0.2);">
+          <div id="update-progress-bar" style="width: 12%; height: 100%; background: #22c55e; box-shadow: 0 0 10px #22c55e; transition: width 0.22s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: #94a3b8;">
+          <span id="update-status-text">Aguardando o novo módulo assumir o controle…</span>
+          <span id="update-percent" style="color: #4ade80; font-weight: bold;">12%</span>
+        </div>
+        <button id="btn-update-retry" type="button" class="custom-modal-btn" style="display:none; width:100%; margin-top:18px; background:#334155; color:#fff; padding:11px; border-radius:8px; font-weight:800; cursor:pointer; border:1px solid #64748b;">TENTAR NOVAMENTE</button>
+      </div>`;
 
-                      <div style="width: 100%; background: #1e293b; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(250, 204, 21, 0.2);">
-                        <div id="update-progress-bar" style="width: 0%; height: 100%; background: #22c55e; box-shadow: 0 0 10px #22c55e; transition: width 0.1s linear;"></div>
-                      </div>
+    clearInterval(serviceWorkerProgressTimer);
+    clearTimeout(serviceWorkerActivationTimer);
+    let progress = 12;
+    serviceWorkerProgressTimer = setInterval(() => {
+      progress = Math.min(85, progress + 3);
+      const bar = document.getElementById('update-progress-bar');
+      const percentText = document.getElementById('update-percent');
+      if (bar) bar.style.width = `${progress}%`;
+      if (percentText) percentText.textContent = `${progress}%`;
+      if (progress >= 85) clearInterval(serviceWorkerProgressTimer);
+    }, 220);
 
-                      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8;">
-                        <span id="update-status-text">Compilando pacotes (1/${totalAtts})...</span>
-                        <span id="update-percent" style="color: #4ade80; font-weight: bold;">0%</span>
-                      </div>
-                    </div>
-                  `;
-
-    let progress = 0;
-    let currentStep = 1;
-    const bar = document.getElementById('update-progress-bar');
-    const percentText = document.getElementById('update-percent');
-    const statusText = document.getElementById('update-status-text');
-
-    const interval = setInterval(() => {
-      // Calcula o teto de progresso visual para a etapa atual (Ex: se total for 3, etapa 1 para em 33%)
-      let stepTarget = (currentStep / totalAtts) * 100;
-      progress += Math.floor(Math.random() * 8) + 4;
-
-      if (progress >= stepTarget) {
-        progress = stepTarget;
-        if (currentStep < totalAtts) {
-          currentStep++;
+    const armTimeout = () => {
+      clearTimeout(serviceWorkerActivationTimer);
+      serviceWorkerActivationTimer = setTimeout(() => {
+        if (serviceWorkerReloading) return;
+        clearInterval(serviceWorkerProgressTimer);
+        const statusText = document.getElementById('update-status-text');
+        const retry = document.getElementById('btn-update-retry');
+        if (statusText) {
+          statusText.textContent = 'O navegador ainda não ativou a nova versão.';
+          statusText.style.color = '#fbbf24';
         }
-      }
+        if (retry) retry.style.display = 'block';
+      }, 8000);
+    };
 
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        statusText.textContent = 'Mesa pronta!';
-        statusText.style.color = '#4ade80';
-        bar.style.width = '100%';
-        bar.style.background = '#facc15';
-        bar.style.boxShadow = '0 0 15px #facc15';
-        percentText.textContent = '100%';
+    const retry = document.getElementById('btn-update-retry');
+    if (retry) {
+      retry.onclick = () => {
+        retry.style.display = 'none';
+        const statusText = document.getElementById('update-status-text');
+        if (statusText) {
+          statusText.textContent = 'Tentando ativar novamente…';
+          statusText.style.color = '#94a3b8';
+        }
+        requestActivation();
+        registration?.update?.().catch((err) => console.error('[SW] Erro ao repetir verificação:', err));
+        armTimeout();
+      };
+    }
 
-        // Salva a versão atualizada com sucesso para a próxima checagem bater certo
-        localStorage.setItem('buraco_current_version', newVersion);
-
-        setTimeout(() => {
-          if (worker) {
-            try {
-              worker.postMessage('skipWaiting');
-            } catch (err) {
-              console.error('[SW] Erro ao enviar skipWaiting:', err);
-            }
-          }
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }, 600);
-      } else {
-        bar.style.width = progress + '%';
-        percentText.textContent = Math.round(progress) + '%';
-        statusText.textContent = `Compilando pacotes (${currentStep}/${totalAtts})...`;
-      }
-    }, 80);
+    requestActivation();
+    armTimeout();
   };
 
   overlay.innerHTML = `
-              <div class="score-card" style="max-width: 380px; text-align: center; padding: 30px 20px; border-color: #facc15;">
-                <div style="font-size: 2.5rem; margin-bottom: 12px; text-shadow: 0 0 15px rgba(250, 204, 21, 0.4);">✨</div>
-                <h2 style="margin: 0 0 10px 0; color: #facc15; font-size: 22px; text-transform: uppercase; letter-spacing: 1px;">Atualização Pronta</h2>
-                <p style="color: #94a3b8; font-size: 12px; margin-bottom: 24px; line-height: 1.5;">Uma nova versão do Buraco Findom foi detectada (${totalAtts} modificação(ões) pendente(s)). Deseja aplicar as melhorias agora?</p>
-                <div style="display: flex; gap: 10px; width: 100%;">
-                  <button class="custom-modal-btn" id="btn-update-later" style="flex: 1; background: #334155; color: #fff; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none;">DEPOIS</button>
-                  <button class="custom-modal-btn" id="btn-update-now" style="flex: 1; background: linear-gradient(135deg, #b45309 0%, #78350f 100%); color: #facc15; border: 1px solid #facc15; padding: 12px; border-radius: 8px; font-weight: 900; cursor: pointer; letter-spacing: 1px;">ATUALIZAR</button>
-                </div>
-              </div>
-            `;
+    <div class="score-card" style="max-width: 380px; text-align: center; padding: 30px 20px; border-color: #facc15;">
+      <div style="font-size: 2.5rem; margin-bottom: 12px; text-shadow: 0 0 15px rgba(250, 204, 21, 0.4);">✨</div>
+      <h2 style="margin: 0 0 10px 0; color: #facc15; font-size: 22px; text-transform: uppercase; letter-spacing: 1px;">Atualização Pronta</h2>
+      <p style="color: #94a3b8; font-size: 12px; margin-bottom: 24px; line-height: 1.5;">Uma nova versão do Buraco Findom foi detectada (${Math.max(1, Number(totalAtts) || 1)} modificação(ões) pendente(s)). Deseja aplicar as melhorias agora?</p>
+      <div style="display: flex; gap: 10px; width: 100%;">
+        <button class="custom-modal-btn" id="btn-update-later" style="flex: 1; background: #334155; color: #fff; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none;">DEPOIS</button>
+        <button class="custom-modal-btn" id="btn-update-now" style="flex: 1; background: linear-gradient(135deg, #b45309 0%, #78350f 100%); color: #facc15; border: 1px solid #facc15; padding: 12px; border-radius: 8px; font-weight: 900; cursor: pointer; letter-spacing: 1px;">ATUALIZAR</button>
+      </div>
+    </div>`;
 
   document.getElementById('btn-update-later').onclick = () => overlay.remove();
   document.getElementById('btn-update-now').onclick = () => startProgressSequence();
@@ -5185,6 +5218,28 @@ function setBackClassIfChanged(el, wantedClass, baseClass = null) {
   return true;
 }
 
+function renderBossHudRichText(element, value) {
+  if (!element) return;
+  const text = String(value ?? '');
+  const pattern = /(10|[2-9AJQK])([♠♦♣♥])/g;
+  const fragment = document.createDocumentFragment();
+  let cursor = 0;
+  let match;
+
+  while ((match = pattern.exec(text))) {
+    if (match.index > cursor) fragment.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+    const token = document.createElement('span');
+    token.className = `boss-card-ref ${match[2] === '♥' || match[2] === '♦' ? 'suit-red' : 'suit-dark'}`;
+    token.setAttribute('aria-label', `${match[1]} ${match[2]}`);
+    token.textContent = `${match[1]}${match[2]}`;
+    fragment.appendChild(token);
+    cursor = pattern.lastIndex;
+  }
+
+  if (cursor < text.length) fragment.appendChild(document.createTextNode(text.slice(cursor)));
+  element.replaceChildren(fragment);
+}
+
 function renderBossDetailFields(element, details) {
   if (!element) return;
   element.replaceChildren();
@@ -6788,7 +6843,7 @@ function syncBossIntentHelp(gameState) {
   }
 
   title.textContent = help.title;
-  text.textContent = help.text;
+  renderBossHudRichText(text, help.text);
 
   if (button.dataset.helpBound === '1') return;
   button.dataset.helpBound = '1';
@@ -6997,7 +7052,7 @@ function renderBossHud() {
       })
       .join('');
   } else {
-    document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : isNehelenia ? 'ESPELHOS SOB CONTROLE' : 'DÍVIDA COLETIVA';
+    document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : isNehelenia ? 'MUNDO DO ESPELHO' : 'DÍVIDA COLETIVA';
     document.getElementById('bossDebtText').textContent = isNehelenia ? `${Math.round((Number(boss.danger) || 0) * 20 * 10) / 10} / 100` : `${boss.danger} / ${boss.maxDanger}`;
     document.getElementById('bossDebtBar').style.width = `${Math.max(0, (boss.danger / boss.maxDanger) * 100)}%`;
     const bloomEventChanged = isMatriarch && boss.lastBloomEventId && boss.lastBloomEventId !== lastRenderedBossBloomEventId;
@@ -7031,11 +7086,11 @@ function renderBossHud() {
   const intentProgress = document.getElementById('bossIntentProgress');
 
   intentDescription.className = '';
-  intentDescription.textContent = actionPresentation.instruction;
+  renderBossHudRichText(intentDescription, actionPresentation.instruction);
   renderBossRangeMeters(intentDescription, actionPresentation.rangeMeters);
   intentProgress.className = '';
   const intentProgressParts = [actionPresentation.progress, actionPresentation.consequence].filter(Boolean);
-  intentProgress.textContent = intentProgressParts.join(actionPresentation.progress?.includes('\n') ? '\n' : ' · ');
+  renderBossHudRichText(intentProgress, intentProgressParts.join(actionPresentation.progress?.includes('\n') ? '\n' : ' · '));
 
   renderBossDetailFields(document.getElementById('bossActionDetails'), actionPresentation.details);
 

@@ -105,7 +105,7 @@ function establishMeldId(state, meldIndex = 0) {
   return getBossMeldContribution(state, 0, meldIndex).meldId;
 }
 
-test('Resistencia ignora suja e cada novo tier valido remove um Chicote sem limite por rodada', () => {
+test('Resistência ignora suja e cada novo tier válido remove 4 pontos de Dominação sem limite por rodada', () => {
   const state = bossGame();
   state.boss.chainsByPlayer[0] = 4;
 
@@ -113,17 +113,17 @@ test('Resistencia ignora suja e cada novo tier valido remove um Chicote sem limi
   assert.equal(getBossChains(state, 0), 4);
 
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'suja', newKind: 'limpa' });
-  assert.equal(getBossChains(state, 0), 3);
+  assert.ok(Math.abs(getBossChains(state, 0) - 3.68) < 1e-9);
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'real' });
-  assert.equal(getBossChains(state, 0), 2);
+  assert.ok(Math.abs(getBossChains(state, 0) - 3.36) < 1e-9);
   assert.equal(getBossMeldContribution(state, 0, 0).dominatrixResistanceTier, 2);
 
   applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'real', newKind: 'asas' });
-  assert.equal(getBossChains(state, 0), 1);
+  assert.ok(Math.abs(getBossChains(state, 0) - 3.04) < 1e-9);
   assert.equal(getBossMeldContribution(state, 0, 0).dominatrixResistanceTier, 3);
   const restored = JSON.parse(JSON.stringify(state));
   applyBossMeldTransition(restored, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'real', newKind: 'asas' });
-  assert.equal(getBossChains(restored, 0), 1);
+  assert.ok(Math.abs(getBossChains(restored, 0) - 3.04) < 1e-9);
 });
 
 test('Mãos Atadas usa uma criacao compartilhada e Voltar restaura o consumo', () => {
@@ -181,10 +181,10 @@ test('Posse exige coordenacao, pode ser libertada por tier e so entao ativa Resi
   });
   assert.equal(released.possessionReleased, true);
   assert.equal(state.boss.possessions.length, 0);
-  assert.equal(getBossChains(state, 0), 1);
+  assert.ok(Math.abs(getBossChains(state, 0) - 1.68) < 1e-9);
 });
 
-test('Corrente excedente transborda para o parceiro em qualquer fase', () => {
+test('Dominação excedente transborda para o parceiro em qualquer fase', () => {
   const late = bossGame();
   late.boss.phase = 3;
   late.boss.phaseTransitions = [1, 2, 3];
@@ -192,7 +192,7 @@ test('Corrente excedente transborda para o parceiro em qualquer fase', () => {
   late.boss.pendingChoices = [{ id: 'late-chain', playerId: 0, type: 'forced_choice', options: ['chain'] }];
   resolveBossChoice(late, 0, 'chain');
   assert.equal(getBossChains(late, 0), 4);
-  assert.equal(getBossChains(late, 1), 3);
+  assert.ok(Math.abs(getBossChains(late, 1) - 2.64) < 1e-9, 'F3: +8 pontos transbordam para o parceiro');
   assert.ok(late.boss.eventLog.some((entry) => entry.type === 'chainOverflow'));
 
   const early = bossGame();
@@ -201,7 +201,8 @@ test('Corrente excedente transborda para o parceiro em qualquer fase', () => {
   early.boss.chainsByPlayer = { 0: 4, 1: 2 };
   early.boss.pendingChoices = [{ id: 'early-chain', playerId: 0, type: 'forced_choice', options: ['chain'] }];
   resolveBossChoice(early, 0, 'chain');
-  assert.deepEqual(early.boss.chainsByPlayer, { 0: 4, 1: 3 });
+  assert.ok(Math.abs(early.boss.chainsByPlayer[0] - 4) < 1e-9);
+  assert.ok(Math.abs(early.boss.chainsByPlayer[1] - 2.56) < 1e-9, 'F2: +7 pontos transbordam para o parceiro');
   assert.equal(early.boss.eventLog.some((entry) => entry.type === 'chainOverflow'), true);
 });
 
@@ -215,7 +216,7 @@ test('ordem aceita persiste, desobediencia cobra Corrente e impossibilidade exte
     status: 'active',
   }];
   applyBossMeldTransition(disobeyed, { teamId: 0, playerId: 0, meldIndex: 2, isNewMeld: true, cardsAdded: [] });
-  assert.equal(getBossChains(disobeyed, 0), 1);
+  assert.ok(Math.abs(getBossChains(disobeyed, 0) - 0.96) < 1e-9, 'falha F1 acrescenta 12/50');
   assert.equal(disobeyed.boss.activeOrders[0].status, 'disobeyed');
 
   const cancelled = bossGame();
@@ -254,7 +255,7 @@ test('Etiqueta de Ferro ativa antes do turno dos jogadores e pune descarte de ou
 
   const events = notifyBossCardDiscarded(state, 0, state.players[0].hand[2]);
   assert.equal(events.at(-1)?.status, 'disobeyed');
-  assert.equal(getBossChains(state, 0), 1);
+  assert.ok(Math.abs(getBossChains(state, 0) - 0.8) < 1e-9, 'falha F1 acrescenta 10/50');
 });
 
 test('Etiqueta de Ferro usa naipe e diferencia obediencia, desobediencia e cancelamento externo', () => {
@@ -286,12 +287,12 @@ test('Etiqueta de Ferro usa naipe e diferencia obediencia, desobediencia e cance
   const obeyed = makeOrderState();
   notifyBossCardDiscarded(obeyed, 0, obeyed.players[0].hand[0]);
   assert.equal(obeyed.boss.activeOrders[0].status, 'obeyed');
-  assert.equal(getBossChains(obeyed, 0), 0);
+  assert.ok(Math.abs(getBossChains(obeyed, 0) - 0.16) < 1e-9, 'cumprir F1 ainda custa 2/50');
 
   const disobeyed = makeOrderState();
   notifyBossCardDiscarded(disobeyed, 0, disobeyed.players[0].hand[2]);
   assert.equal(disobeyed.boss.activeOrders[0].status, 'disobeyed');
-  assert.equal(getBossChains(disobeyed, 0), 1);
+  assert.ok(Math.abs(getBossChains(disobeyed, 0) - 0.8) < 1e-9, 'falhar F1 custa 10/50');
 
   const cancelled = makeOrderState();
   cancelled.players[0].hand = cancelled.players[0].hand.filter((card) => card.suit !== '♥');

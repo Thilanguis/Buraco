@@ -7474,3 +7474,25 @@ body[data-boss-id='dominadora'] .boss-domination-player.dominated .boss-dominati
   border-color: rgba(251, 113, 133, 0.92);
   box-shadow: 0 0 10px rgba(251, 113, 133, 0.4), inset 0 0 8px rgba(0, 0, 0, 0.45);
 }
+
+/* Referências de cartas dentro do objetivo do chefe: maiores e legíveis sem
+   transformar o HUD em uma segunda carta. Vermelhos seguem ♥/♦; ♠/♣ usam
+   azul-gelo para manter contraste no painel escuro. */
+.boss-card-ref {
+  display: inline-block;
+  margin: 0 1px;
+  font-size: 1.18em;
+  line-height: 0.95;
+  font-weight: 1000;
+  letter-spacing: 0.02em;
+  vertical-align: -0.03em;
+  text-shadow: 0 0 6px currentColor;
+}
+
+.boss-card-ref.suit-red {
+  color: #fb7185;
+}
+
+.boss-card-ref.suit-dark {
+  color: #bfdbfe;
+}

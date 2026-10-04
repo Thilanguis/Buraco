@@ -81,7 +81,7 @@ test('Dominadora usa barras 0-50 com quatro cortes em vez de Chicotes fracionari
 
 test('HUD da Dominadora fica curto e o detalhe continua no ponto de ajuda', () => {
   assert.match(dominatrixPresentationSource, /details\(\{ intent \} = \{\}\) \{[\s\S]*?return intent \? \[\] : \[\];/);
-  assert.match(dominatrixPresentationSource, /Escolha: Ordem às cegas ou \+\$\{pressure\.direct\} Dominação/);
+  assert.match(dominatrixPresentationSource, /Ordem às cegas ou \+\$\{pressure\.direct\} Dominação/);
   assert.match(dominatrixPresentationSource, /Escolha: \+8 Dominação ou \+180 HP para a chefe/);
   assert.match(bossPresentationSource, /pendingChoices\?\.length && gameState\?\.boss\?\.id !== 'dominadora'/);
 });

@@ -100,7 +100,7 @@ function bossAbilityHelpSupplement(gameState, intent) {
   return buildBossPresentationHelp(gameState?.boss?.id, {
     gameState,
     intent,
-    helpers: { playerName },
+    helpers: { playerById, playerName, cardLabel, cardLabelAnywhere, getRestorativeDewHealing },
   }) || '';
 }
 

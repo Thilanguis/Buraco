@@ -324,7 +324,7 @@ export const matriarchBossPresentation = Object.freeze({
         const name = crownThreatName(gameState);
         const progress = crown?.status === 'root_prepared' ? `❌ ${name}` : crown?.status === 'root_active' ? '🌿 Raiz Fortalecida' : crown?.status === 'completed' ? `✅ ${name}` : crown?.status === 'cancelled' ? `— ${name}` : crownThreatProgress(threat);
         const consequence = crown?.status === 'root_active' ? 'Raiz Fortalecida ativa' : crown?.status === 'root_prepared' ? 'Próxima rodada: Raiz Fortalecida' : crown?.status === 'completed' ? 'Sem efeito extra' : crown?.status === 'cancelled' ? 'Sem punição' : 'Falha: Raiz Fortalecida';
-        return { instruction: `${name}: ${crownThreatCompactObjective(gameState, threat, helpers)}.`, progress, consequence };
+        return { instruction: `Cumpra a ameaça coroada: ${name}.`, progress, consequence };
       }
       default: return null;
     }
@@ -351,14 +351,38 @@ export const matriarchBossPresentation = Object.freeze({
     return null;
   },
 
-  help({ intent } = {}) {
+  help(context = {}) {
+    const { gameState, intent } = context;
     if (!intent) return null;
-    if (intent.abilityId === 'hungry_root') return 'Se a Raiz falhar, ela pode gerar uma única nova Raiz na rodada seguinte. Uma Raiz que nasceu dessa propagação não se propaga de novo.';
-    if (intent.abilityId === 'graft') return 'Os dois jogos ligados são objetivos separados. Cada um precisa receber ao menos 1 carta legal nesta rodada; alimentar apenas um lado ainda deixa o outro em falha.';
-    if (intent.abilityId === 'royal_bloom') return 'Florescimento Real combina vários objetivos naturais, mas cada um é resolvido separadamente. Cumprir um objetivo não compensa outro que falhou; cada falha acrescenta a própria Flor.';
-    if (intent.abilityId === 'emerald_cocoon') return 'O dano comum atinge primeiro os 180 pontos do Casulo; o excesso passa para o HP. Uma Canastra Limpa ou superior rompe o Casulo imediatamente. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
-    if (intent.abilityId === 'spring_crown') return 'A Coroa acompanha uma ameaça natural da rodada. Se a sequência de falhas preparar uma Raiz Fortalecida, ela exige uma contribuição de cada cooperador. Essa Raiz não cria nova propagação automática.';
-    return null;
+    const helpers = helpersFor(context);
+    switch (intent.abilityId) {
+      case 'living_seed':
+        return 'A carta marcada precisa entrar legalmente em um jogo antes do fim do próximo turno do alvo. Se isso não acontecer, a Semente floresce e acrescenta 1 Flor. Descartar a carta não cumpre o objetivo.';
+      case 'hungry_root':
+        return 'O jogo marcado precisa receber ao menos 1 carta legal antes do fim da rodada. Se a Raiz falhar, ela acrescenta 1 Flor e pode gerar uma única nova Raiz na rodada seguinte. Uma Raiz que nasceu dessa propagação não se propaga de novo.';
+      case 'restorative_dew':
+        return 'Cada carta nova colocada legalmente na mesa reduz a cura prevista do Orvalho por faixas. O medidor mostra a faixa atual; com 6 ou mais cartas novas, a cura cai a zero.';
+      case 'twin_vines':
+        return 'Os jogos marcados são objetivos separados: cada um precisa receber ao menos 1 carta legal nesta rodada. Uma raiz que ficar sem alimentação falha individualmente e acrescenta sua Flor.';
+      case 'graft':
+        return 'Os dois jogos ligados são objetivos separados. Cada um precisa receber ao menos 1 carta legal nesta rodada; alimentar apenas um lado ainda deixa o outro em falha.';
+      case 'discard_pollen':
+        return 'A carta contaminada é o topo atual do Lixo. Se alguém recolher esse topo enquanto o Pólen estiver ativo, a Matriarca ganha 1 Flor e cura; comprar do Monte ou deixar o topo passar evita o gatilho.';
+      case 'harvest':
+        return 'A Colheita olha a quantidade de cartas na mão do alvo no fim do turno. 0–7 não gera efeito; 8–10 cura 50 HP; 11 ou mais acrescenta 1 Flor e cura 80 HP.';
+      case 'royal_bloom':
+        return 'Florescimento Real combina vários objetivos naturais, mas cada um é resolvido separadamente. Cumprir um objetivo não compensa outro que falhou; cada falha acrescenta a própria Flor.';
+      case 'emerald_cocoon':
+        return 'O dano comum atinge primeiro os 180 pontos do Casulo; o excesso passa para o HP. Uma Canastra Limpa ou superior rompe o Casulo imediatamente. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
+      case 'spring_crown': {
+        const threat = springCrownMarkedThreat(gameState);
+        const name = crownThreatName(gameState);
+        const objective = crownThreatObjective(gameState, threat, helpers);
+        return `A Coroa marcou ${name}. Objetivo atual: ${objective}. Se essa ameaça falhar, uma Raiz Fortalecida é preparada para a próxima rodada e exige uma contribuição de cada cooperador. Essa Raiz não cria nova propagação automática.`;
+      }
+      default:
+        return null;
+    }
   },
 
   status(context = {}) {

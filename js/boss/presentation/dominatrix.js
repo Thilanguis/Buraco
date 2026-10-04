@@ -91,7 +91,10 @@ export const dominatrixBossPresentation = Object.freeze({
   resultCategory(abilityId) { return RESULT_CATEGORIES[abilityId] || ''; },
   finalDanger(gameState) {
     const boss = gameState?.boss || {};
-    const summary = (gameState?.players || []).map((player) => `${player.name}: ${Number(boss.chainsByPlayer?.[player.id] || 0)}/4`).join(' · ');
+    const summary = (gameState?.players || []).map((player) => {
+      const domination = Math.round((Number(boss.chainsByPlayer?.[player.id]) || 0) * 12.5 * 10) / 10;
+      return `${player.name}: ${domination}/50`;
+    }).join(' · ');
     return { label: 'Dominação final', value: summary };
   },
 
@@ -136,7 +139,7 @@ export const dominatrixBossPresentation = Object.freeze({
       case 'break_will': return { instruction: 'Escolha: +8 Dominação ou +180 HP para a chefe.', progress: '', consequence: '' };
       case 'final_order': {
         const pressure = dominatrixPressureText(intent.announcedPhase).finalOrder;
-        return { instruction: `Escolha: Ordem às cegas ou +${pressure.direct} Dominação.`, progress: '', consequence: `Aceitar +${pressure.accept} + risco` };
+        return { instruction: `Ordem às cegas ou +${pressure.direct} Dominação.`, progress: '', consequence: `Aceitar +${pressure.accept} · cartas só depois` };
       }
       case 'iron_etiquette': {
         const pressure = dominatrixPressureText(intent.announcedPhase).etiquette;

@@ -1,10 +1,15 @@
-﻿# Inventário atual de habilidades dos chefes
+# Inventário atual de habilidades dos chefes
 
 
-**Atualizado em 01/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do catálogo do Laboratório de Chefes.**
+**Atualizado em 04/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do catálogo do Laboratório de Chefes.**
 
 
 Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
+
+
+### Regra de apresentação no HUD
+
+O painel principal mostra somente objetivo, progresso e consequência curta. A explicação completa, termos ambíguos e exceções ficam no botão **?**. Referências de carta como `6♥` e `Q♣` recebem destaque maior e cor por naipe. Essa regra vale para **todos os chefes**, não apenas para a Nehelenia.
 
 
 ## O Banqueiro
@@ -126,33 +131,31 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 ## Rainha Nehelenia
 
 
-**HP:** 2400. **Espelhos dos Sonhos:** Nehelenia pode tomar até **5 Espelhos**. Cada falha relevante adiciona 1; chegar a **5/5** causa derrota imediata pelo **Mundo do Espelho**. Uma Canastra Limpa ou superior recupera 1 Espelho ao atingir um novo tier válido.
+**HP:** 2400. **Mundo do Espelho:** 0–100. O HUD mantém **5 espelhos ornamentados**, cada um representando 20 pontos e aceitando preenchimento parcial. Chegar a **100/100** causa derrota imediata.
 
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
-| Jogo Espelhado | 1, 2 e 3 | 5 | Um jogo real é clonado fisicamente na mesa em dois reflexos completos e idênticos. O alvo escolhe um deles com exatamente 1 carta legal. Acerto joga normalmente; erro manda a carta ao fundo do monte e deixa o jogador **Desorientado**, sem novas baixadas naquele turno. Se houver **Presa Marcada** antiga em outro jogo, Jogo Espelhado tem precedência temporária; a Presa continua ativa depois. |
-| Siga o Reflexo | 1, 2 e 3 | 5 | A ordem é travada pela **sequência real da rodada**: o 1º jogador que vai agir define o padrão pelo turno inteiro; o 2º jogador que vai agir precisa terminar com exatamente a mesma quantidade, inclusive `0`. A habilidade permanece ativa entre os dois turnos e Nehelenia não sorteia outra habilidade no meio. Qualquer diferença adiciona +1 Espelho. |
-| Espelho do Lixo | 2 e 3 | 4 | O topo do lixo aparece em **dois reflexos idênticos**. Não há pista de verdadeiro/falso: a escolha é 50/50. Errar sela o lixo durante a rodada. |
-| Prisão no Espelho | 2 e 3 | 3 | Com pelo menos 1 Espelho tomado, o parceiro pode alimentar o jogo refletido para recuperar 1 Espelho. |
-| Pesadelo Eterno | 3 | 5 | Uma carta ORIGINAL é mostrada, gera dois reflexos idênticos e os três são embaralhados visualmente. O alvo precisa acompanhar a original; errar adiciona +1 Espelho. |
-| Laço do Tigre | 1, 2 e 3 | 4 | Liga dois jogos; cada lado precisa ser alimentado. O lado ignorado mantém garras até ser rompido. |
-| Presa Marcada | 1, 2 e 3 | 3 | Marca um jogo; até resolvê-lo, o alvo não pode alimentar outro jogo existente. |
+| Jogo Espelhado | 1, 2 e 3 | 5 | Duplica fisicamente um jogo em dois reflexos idênticos. O alvo usa exatamente 1 carta legal em um reflexo. Errar ou ignorar envia a carta ao fundo do Monte, deixa o jogador **Desorientado** e acrescenta **+18** ao Mundo do Espelho. |
+| Siga o Reflexo | 1, 2 e 3 | 5 | O primeiro cooperador define, pelo turno inteiro, quantas cartas baixou; o segundo precisa terminar com a mesma quantidade, inclusive 0. Diferença acrescenta **+16**. |
+| Espelho do Lixo | 2 e 3 | 4 | Mostra dois reflexos idênticos do topo do Lixo, sem pista escondida. Errar acrescenta **+16** e sela o Lixo durante a rodada. |
+| Prisão no Espelho | — | 0 | Mecânica de resgate fora do sorteio ofensivo. Quando acionada, alimentar o jogo refletido reduz **8** do Mundo do Espelho. |
+| Pesadelo Eterno | 3 | 5 | Mostra a ORIGINAL, cria dois reflexos e embaralha os três. Errar acrescenta **+24**. |
+| Laço do Tigre | 1, 2 e 3 | 4 | Liga dois jogos; cada lado precisa receber carta. Falhar acrescenta **+12** e deixa garras persistentes no lado ignorado. |
+| Presa Marcada | 1, 2 e 3 | 3 | Marca um jogo; até resolvê-lo, o alvo não pode alimentar outro jogo existente. É controle puro, sem avanço direto do recurso. |
+| Olho do Falcão | 1, 2 e 3 | 3 | Exige descarte do naipe marcado; errar faz Hawk vigiar o topo e bloqueia o Lixo enquanto aquela carta permanecer no topo. |
+| Vigilância | 2 e 3 | 3 | O alvo não pode alimentar o jogo marcado naquele turno; parceiro e outros jogos continuam livres. |
+| Mão no Espelho | 1, 2 e 3 | 3 | Marca uma carta que precisa sair da mão por jogo ou descarte; falhar cria **Reflexo Morto**, descartável mas não jogável. |
+| Reflexo Invertido | 2 e 3 | 3 | Impede abrir jogo novo até o alvo alimentar um jogo existente; persiste até ser resolvido. |
 
 
-**Leitura dos capangas no HUD:** quando Tiger, Hawk ou Fish estiverem ativos, o card mostra o **alvo** e o vínculo da habilidade. Efeitos que continuam após o turno recebem a marca **PERSISTENTE**, para que dois capangas simultâneos não pareçam estar afetando o mesmo jogador.
-| Olho do Falcão | 1, 2 e 3 | 3 | Exige descarte do naipe marcado; errar pode vigiar o topo e bloquear o lixo. |
-| Vigilância | 2 e 3 | 3 | O alvo não pode alimentar o jogo marcado naquele turno. |
-| Mão no Espelho | 1, 2 e 3 | 3 | Marca uma carta que precisa sair da mão; falhar cria Reflexo Morto, descartável mas não jogável. |
-| Reflexo Invertido | 2 e 3 | 3 | Impede abrir jogo novo até alimentar jogo existente; persiste até ser resolvido. |
+**Alívio por canastra:** Limpa reduz 4 pontos; Real reduz 8 no total; Ás-a-Ás reduz 12 no total. Evoluções sucessivas acrescentam 4 por novo tier válido. O HUD mostra o valor real em 0–100 e o preenchimento parcial dos cinco espelhos.
 
 
-**Fases:** 1 = Espelhos dos Sonhos; 2 = Circo da Lua Morta; 3 = Pesadelo Eterno.
+**Pressão visual:** a partir de 60/100 o HUD entra no estado visual de Mundo do Espelho, sem criar uma regra de derrota antecipada. A derrota especial acontece somente em 100/100.
 
 
-**Apresentação:** o feedback textual continua no painel amarelo padrão (`☐ / ☑ / ✕`). As ilusões acontecem fisicamente na mesa: clonagem de jogos, espelhos centrais e embaralhamento visual. Nenhum reflexo falso recebe `X`, rótulo ou pista automática.
-
-
+**Apresentação:** o painel principal deve mostrar apenas objetivo, progresso e consequência curta. Termos e regras extensas — como **Desorientado**, precedência da Presa Marcada, Reflexo Morto e o shell game do Pesadelo — ficam no botão `?`. As ilusões continuam acontecendo fisicamente na mesa, sem marcar automaticamente verdadeiro/falso.
 
 
 **Auditoria de consistência:** todas as habilidades da rotação atual aparecem no jogo e no DevTools. `Renascimento` é passiva fora do sorteio normal, mas aparece no DevTools. `Interdito` é o único item mantido apenas como legado técnico documentado e permanece fora do jogo e do DevTools.
@@ -161,31 +164,3 @@ Este arquivo lista apenas habilidades que realmente participam da rotação atua
 
 
 ---
-
-
-## Revisão experimental de pressão — 2026-10-03
-
-
-### A Dominadora
-- forced_choice: Dominação +6 direto; aceitar ordem +2; falha acrescenta +14.
-- exposure: falha +8.
-- iron_etiquette: sucesso +2; falha +10.
-- favorite: F2 -2 na favorita/+8 no parceiro; F3 +8 no parceiro.
-- absolute_control: +4 e mantém o controle temporário.
-- break_will: +8 ou cura de até 180 HP; não remove carta de canastra.
-- final_order: recusar +6; aceitar = +6 por carta marcada não usada.
-- controles puros continuam sem progresso especial direto.
-
-
-### Rainha Nehelenia
-- mirrored_meld: erro/ignorar = Mundo do Espelho +18.
-- follow_reflection: falha = +16.
-- discard_mirror: erro = +16 e sela o lixo.
-- tiger_link: falha = +12.
-- eternal_nightmare: erro = +24.
-- mirror_prison: peso 0/fases vazias no pool ofensivo; resgate reduz 8 quando acionado.
-- demais capangas/efeitos continuam prioritariamente como controle.
-
-
-### Resistência por canastra
-Régua comum do experimento: Limpa -4, Real -8 total, Ás-a-Ás -12 total.
