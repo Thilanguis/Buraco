@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
 import {
   applyDominationDecree,
   canUseDominationDecree,
@@ -71,6 +72,24 @@ test('saves antigos migram sem ganhar um segundo poder', () => {
   assert.equal(dominationDecreeUsed(state({ dominatorSearchUsed: true })), true);
 });
 
+
+
+test('IA do Dominador gasta o Decreto só em ameaça relevante e reage a intenção real de Lixo', async () => {
+  const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
+  const start = app.indexOf('function shouldBotUseDominationDecree(');
+  assert.ok(start >= 0, 'heurística do BOT Dominador deve existir');
+  const end = app.indexOf('\n}', start) + 2;
+  assert.ok(end > start);
+  const code = app.slice(start, end);
+  const context = vm.createContext({ evaluateDominationDecreeThreat: () => null });
+  vm.runInContext(`${code}; this.shouldBotUseDominationDecree = shouldBotUseDominationDecree;`, context);
+  const botState = { players: [{ name: 'Humano' }, { name: 'BOT Rebeca' }] };
+  assert.equal(context.shouldBotUseDominationDecree(botState, { score: 3 }), false, 'ameaça fraca deve preservar o poder 1x/partida');
+  assert.equal(context.shouldBotUseDominationDecree(botState, { score: 4 }), true, 'ameaça forte deve ser bloqueada');
+  assert.equal(context.shouldBotUseDominationDecree(botState, { score: 2 }, { actualDiscardIntent: true }), true, 'intenção real de pegar o Lixo aumenta a urgência');
+  assert.equal(context.shouldBotUseDominationDecree({ players: [{ name: 'Humano' }, { name: 'Gabriel' }] }, { score: 9 }), false, 'heurística automática só pertence ao Dominador BOT');
+});
+
 test('integração remove Busca da interface e bloqueia humano/BOT antes da coleta', async () => {
   const [app, index, friend, bot, worker, focus, dominationCss] = await Promise.all([
     readFile(new URL('../app.js', import.meta.url), 'utf8'),
@@ -93,6 +112,16 @@ test('integração remove Busca da interface e bloqueia humano/BOT antes da cole
   assert.match(app, /recalled: \(\) => false/);
   assert.match(app, /!canActivateDominationDecree\(state, 1\)/);
   assert.match(app, /show && !used && !slaveIsBot/);
+  assert.match(app, /function evaluateDominationDecreeThreat/);
+  assert.match(app, /function shouldBotUseDominationDecree/);
+  assert.match(app, /function scheduleBotDominationDecree/);
+  assert.match(app, /performDominationDecree\(1, true\)/);
+  const botDecreeAiBlock = app.slice(app.indexOf('function shouldBotUseDominationDecree'), app.indexOf('function renderDominationTools'));
+  assert.match(botDecreeAiBlock, /score >= 4/);
+  assert.match(botDecreeAiBlock, /actualDiscardIntent \? 2 : 0/);
+  assert.match(botDecreeAiBlock, /myPlayerIndex === hostIndex/);
+  assert.match(botDecreeAiBlock, /!slaveIsBot/);
+  assert.match(botDecreeAiBlock, /}, 700\);/);
   const alertBlock = app.slice(app.indexOf('const updateDecreeAlert = createVisionAlert'), app.indexOf('function renderDominationVisionHint'));
   assert.match(alertBlock, /intro: presentDecreeFocus/);
   assert.doesNotMatch(alertBlock, /playDominationSearchSound/);
@@ -100,6 +129,14 @@ test('integração remove Busca da interface e bloqueia humano/BOT antes da cole
   const botReactionBlock = app.slice(app.indexOf('async function waitForDominationDecreeReaction'), app.indexOf('async function performDominationDevOperation'));
   assert.match(botReactionBlock, /presentDecreeFocus\(true\)/);
   assert.doesNotMatch(botReactionBlock, /playDominationSearchSound/);
+  const pendingWait = botReactionBlock.indexOf('while (');
+  const pendingGate = botReactionBlock.indexOf('friendOperationPending', pendingWait);
+  const blockedDecision = botReactionBlock.lastIndexOf('return isDominationDiscardDecreeActive');
+  assert.ok(pendingWait >= 0 && pendingGate > pendingWait && blockedDecision > pendingGate, 'BOT deve esperar a operação do Decreto terminar antes de continuar');
+  assert.match(botReactionBlock, /navigator\.userActivation\.hasBeenActive/);
+  assert.match(botReactionBlock, /const dominatorIsBot/);
+  assert.match(botReactionBlock, /actualDiscardIntent: true/);
+  assert.match(botReactionBlock, /await performDominationDecree\(1, true\)/);
 
   const decreeClickBlock = app.slice(app.indexOf('async function performDominationDecree'), app.indexOf('async function waitForDominationDecreeReaction'));
   const savedGuard = decreeClickBlock.indexOf('if (!saved)');
@@ -152,7 +189,7 @@ test('integração remove Busca da interface e bloqueia humano/BOT antes da cole
   assert.match(restartBlock, /const restartedState = await startGame/);
   assert.match(restartBlock, /state = restartedState;\s*cancelGameAnimations\(\);\s*renderAll\(\);/);
 
-  assert.match(worker, /CACHE_NAME = 'buraco-v265'/);
+  assert.match(worker, /CACHE_NAME = 'buraco-v269'/);
   assert.match(worker, /\.\/js\/game\/domination-decree\.js/);
   assert.doesNotMatch(worker, /\.\/js\/game\/domination-search\.js/);
 });

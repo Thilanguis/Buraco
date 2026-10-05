@@ -771,6 +771,7 @@ function invalidateGameSession({ stopMedia = true } = {}) {
   window.isClosingGame = true;
   updateVisionAlert('', false);
   updateDecreeAlert('', false);
+  clearBotDominationDecreeSchedule();
   friendSoundQueue.cancel();
   friendNoticeTracker.reset();
   document.querySelectorAll('.friend-notice').forEach((notice) => {
@@ -2372,13 +2373,13 @@ function canActivateDominationDecree(gameState = state, actorId = myPlayerIndex)
   return canUseDominationDecree(gameState, actorId) && !isDominationFriendBusy(gameState) && canPerformCommonGameAction(gameState) && !friendOperationPending && !committing;
 }
 
-function getDominationDecreeThreat(gameState = state) {
-  if (gameState?.mode !== '1x1_dominacao' || myPlayerIndex !== 1) return null;
+function evaluateDominationDecreeThreat(gameState = state) {
+  if (gameState?.mode !== '1x1_dominacao') return null;
   if (!canUseDominationDecree(gameState, 1) || dominationDecreeUsed(gameState)) return null;
   const lastAction = gameState.lastAction;
   if (lastAction?.type !== 'discard' || Number(lastAction.playerId) !== 1) return null;
   const slave = gameState.players?.[0];
-  if (!slave || slave.name?.toUpperCase().includes('BOT')) return null;
+  if (!slave) return null;
   const top = gameState.discard?.at?.(-1);
   if (!top) return null;
   if (lastAction.card?.id && top.id && lastAction.card.id !== top.id) return null;
@@ -2386,27 +2387,119 @@ function getDominationDecreeThreat(gameState = state) {
   const team = gameState.teams?.find((entry) => entry.id === slave.teamId);
   const melds = team?.melds || [];
 
-  // Alerta de risco deve ser barato: ele roda durante renderizações. Procura
-  // encaixe direto em jogo existente, extensão com 1 carta da mão ou um novo
-  // jogo de 3 cartas com o topo. A decisão exata do BOT continua sendo a
-  // autoridade final e dispara o alerta no momento em que ele decide comprar.
+  // A mesma leitura serve ao alerta humano e à IA do Dominador. Além de dizer
+  // se a carta serve, classificamos a força da oportunidade para a IA não
+  // gastar o poder 1x/partida numa ameaça pequena logo no começo.
   const fits = (cards) => cards.length >= 3 && isValidSequenceMeld(cards);
-  let useful = melds.some((meld) => fits([...meld, top]));
-  if (!useful) {
-    useful = melds.some((meld) => hand.some((card) => fits([...meld, card, top])));
-  }
-  if (!useful) {
-    for (let i = 0; i < hand.length - 1 && !useful; i += 1) {
+  let kind = '';
+  let baseScore = 0;
+  if (melds.some((meld) => fits([...meld, top]))) {
+    kind = 'direct';
+    baseScore = 4;
+  } else if (melds.some((meld) => hand.some((card) => fits([...meld, card, top])))) {
+    kind = 'bridge';
+    baseScore = 3;
+  } else {
+    outer: for (let i = 0; i < hand.length - 1; i += 1) {
       for (let j = i + 1; j < hand.length; j += 1) {
         if (fits([hand[i], hand[j], top])) {
-          useful = true;
-          break;
+          kind = 'new';
+          baseScore = 2;
+          break outer;
         }
       }
     }
   }
-  if (!useful) return null;
-  return { card: top, label: `${top.rank || ''}${top.suit || ''}`.trim() || 'A carta do topo' };
+  if (!baseScore) return null;
+
+  const pileSize = gameState.discard.length;
+  const handSize = hand.length;
+  const tookDead = Number(gameState.deadChunksTaken?.[slave.teamId] || 0) > 0;
+  let score = baseScore;
+  if (pileSize >= 6) score += 2;
+  else if (pileSize >= 3) score += 1;
+  if (handSize <= 3) score += 3;
+  else if (handSize <= 5) score += 2;
+  else if (handSize <= 7) score += 1;
+  if (tookDead) score += 1;
+  if (top.joker || top.rank === '2') score += 1;
+
+  return {
+    card: top,
+    label: `${top.rank || ''}${top.suit || ''}`.trim() || 'A carta do topo',
+    kind,
+    score,
+    pileSize,
+    handSize,
+    tookDead,
+  };
+}
+
+function getDominationDecreeThreat(gameState = state) {
+  if (myPlayerIndex !== 1) return null;
+  const slave = gameState?.players?.[0];
+  if (!slave || slave.name?.toUpperCase().includes('BOT')) return null;
+  return evaluateDominationDecreeThreat(gameState);
+}
+
+function shouldBotUseDominationDecree(gameState = state, threat = evaluateDominationDecreeThreat(gameState), { actualDiscardIntent = false } = {}) {
+  if (!threat || gameState?.players?.[1]?.name?.toUpperCase().includes('BOT') !== true) return false;
+  // Se o Escravo BOT já decidiu pegar o Lixo, isso é uma confirmação extra de
+  // valor. Contra humano, a IA decide no começo do turno pela ameaça visível.
+  const score = threat.score + (actualDiscardIntent ? 2 : 0);
+  return score >= 4;
+}
+
+let botDominationDecreeTimeoutId = null;
+let botDominationDecreeScheduleKey = '';
+
+function clearBotDominationDecreeSchedule() {
+  if (botDominationDecreeTimeoutId) clearTimeout(botDominationDecreeTimeoutId);
+  botDominationDecreeTimeoutId = null;
+  botDominationDecreeScheduleKey = '';
+}
+
+function scheduleBotDominationDecree() {
+  const dominatorIsBot = state?.players?.[1]?.name?.toUpperCase().includes('BOT') === true;
+  const slaveIsBot = state?.players?.[0]?.name?.toUpperCase().includes('BOT') === true;
+  const hostIndex = friendHostIndex(state);
+  const threat = !slaveIsBot ? evaluateDominationDecreeThreat(state) : null;
+  const eligible = dominatorIsBot
+    && !slaveIsBot
+    && myPlayerIndex === hostIndex
+    && !window.isClosingGame
+    && !friendPlayback
+    && !state?.finished
+    && state.currentPlayer === 0
+    && shouldBotUseDominationDecree(state, threat);
+
+  if (!eligible) {
+    clearBotDominationDecreeSchedule();
+    return;
+  }
+
+  const key = `${state.friendGameId || window.gameSessionId}:${state.turnNumber}:${threat.card.id || threat.label}`;
+  if (botDominationDecreeScheduleKey === key) return;
+  if (botDominationDecreeTimeoutId) clearTimeout(botDominationDecreeTimeoutId);
+  botDominationDecreeScheduleKey = key;
+  const session = window.gameSessionId;
+  const turn = state.turnNumber;
+
+  botDominationDecreeTimeoutId = setTimeout(async () => {
+    botDominationDecreeTimeoutId = null;
+    if (session !== window.gameSessionId || window.isClosingGame || !state || state.turnNumber !== turn || state.currentPlayer !== 0 || state.hasDrawnThisTurn) return;
+    const liveThreat = evaluateDominationDecreeThreat(state);
+    if (!shouldBotUseDominationDecree(state, liveThreat)) return;
+
+    // Pequenas gravações/animações no começo do turno não fazem a IA perder a
+    // janela. Ela espera brevemente, mas nunca bloqueia depois que o Escravo já comprou.
+    for (let tries = 0; tries < 20 && !canActivateDominationDecree(state, 1); tries += 1) {
+      if (session !== window.gameSessionId || window.isClosingGame || !state || state.turnNumber !== turn || state.currentPlayer !== 0 || state.hasDrawnThisTurn) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (!canActivateDominationDecree(state, 1)) return;
+    await performDominationDecree(1, true);
+  }, 700);
 }
 
 function renderDominationTools() {
@@ -2439,7 +2532,7 @@ function renderDominationTools() {
   if (button) {
     button.hidden = !show;
     button.disabled = !available;
-    button.textContent = active ? '🔒 LIXO BLOQUEADO' : used ? '✓ DECRETO USADO' : available ? '👑 BLOQUEAR LIXO' : '👑 MONTE OBRIGATÓRIO';
+    button.textContent = active ? '🔒 LIXO BLOQUEADO' : used ? '✓ DECRETO USADO' : available ? '🔒 BLOQUEAR LIXO' : '🔒 BLOQUEAR LIXO';
     button.title = used
       ? 'O Decreto do Dominador já foi usado nesta partida.'
       : available
@@ -2459,12 +2552,14 @@ function renderDominationTools() {
   const alertKey = threat ? `${gameId}:${state.turnNumber}:${threat.card.id || threat.label}` : '';
   updateDecreeAlert(alertKey, Boolean(threat));
   syncDominationDecreeDiscardLock(state);
+  scheduleBotDominationDecree();
 }
 
 window.activateDominationDecree = () => performDominationDecree(myPlayerIndex);
 
-async function performDominationDecree(actorId) {
-  if (!canActivateDominationDecree(state, actorId)) return;
+async function performDominationDecree(actorId, botCall = false) {
+  if (botCall && (Number(actorId) !== 1 || myPlayerIndex !== friendHostIndex(state) || state?.players?.[1]?.name?.toUpperCase().includes('BOT') !== true)) return false;
+  if (!canActivateDominationDecree(state, actorId)) return false;
   const session = window.gameSessionId;
   const id = newActionId();
   friendOperationPending = true;
@@ -2482,10 +2577,10 @@ async function performDominationDecree(actorId) {
       };
       return true;
     });
-    if (session !== window.gameSessionId || window.isClosingGame) return;
+    if (session !== window.gameSessionId || window.isClosingGame) return false;
     if (!saved) {
       showMessage('A janela do Decreto fechou antes da confirmação. O poder não foi gasto.');
-      return;
+      return false;
     }
     ignoreOwnActionId = id;
     localUndoStack = [];
@@ -2495,16 +2590,18 @@ async function performDominationDecree(actorId) {
     playDominationSearchSound();
     const lockPresentation = animateDominationDecreeLockToDiscard();
     setTimeout(() => presentDecreeFocus(false), 1400);
-    if (navigator.vibrate) {
+    if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) {
       try {
         navigator.vibrate([180, 80, 180]);
       } catch {}
     }
-    showMessage('🔒 Lixo bloqueado neste turno.');
+    showMessage(botCall ? `🤖 ${state.players?.[1]?.name || 'Dominador BOT'} usou o Decreto: Lixo bloqueado neste turno.` : '🔒 Lixo bloqueado neste turno.');
     await lockPresentation;
+    return true;
   } catch (error) {
     console.error('Decreto do Dominador:', error);
     showMessage('Não foi possível aplicar o Decreto. Tente novamente enquanto o Escravo ainda não comprou.');
+    return false;
   } finally {
     friendOperationPending = false;
     if (session === window.gameSessionId && !window.isClosingGame) {
@@ -2515,22 +2612,70 @@ async function performDominationDecree(actorId) {
 }
 
 async function waitForDominationDecreeReaction(botIndex) {
-  if (botIndex !== 0 || myPlayerIndex !== 1 || state?.players?.[1]?.name?.toUpperCase().includes('BOT')) return false;
-  if (!canActivateDominationDecree(state, 1)) return false;
+  if (botIndex !== 0) return false;
+  const dominatorIsBot = state?.players?.[1]?.name?.toUpperCase().includes('BOT') === true;
   const session = window.gameSessionId;
-  const turn = state.turnNumber;
-  const top = state.discard?.at?.(-1);
+  const turn = state?.turnNumber;
+  const top = state?.discard?.at?.(-1);
+
+  if (dominatorIsBot) {
+    if (myPlayerIndex !== friendHostIndex(state) || !canActivateDominationDecree(state, 1)) return false;
+    const baseThreat = evaluateDominationDecreeThreat(state);
+    const threat = baseThreat || (top ? {
+      card: top,
+      label: `${top.rank || ''}${top.suit || ''}`.trim() || 'A carta do topo',
+      kind: 'actual',
+      score: 2,
+      pileSize: state.discard.length,
+      handSize: state.players?.[0]?.hand?.length || 0,
+      tookDead: Number(state.deadChunksTaken?.[state.players?.[0]?.teamId] || 0) > 0,
+    } : null);
+    if (!shouldBotUseDominationDecree(state, threat, { actualDiscardIntent: true })) return false;
+    await performDominationDecree(1, true);
+    while (
+      friendOperationPending
+      && session === window.gameSessionId
+      && !window.isClosingGame
+      && state
+      && state.turnNumber === turn
+      && state.currentPlayer === botIndex
+      && !state.hasDrawnThisTurn
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return session !== window.gameSessionId || window.isClosingGame || !state || state.turnNumber !== turn || state.currentPlayer !== botIndex || state.hasDrawnThisTurn
+      ? true
+      : isDominationDiscardDecreeActive(state, botIndex);
+  }
+
+  if (myPlayerIndex !== 1 || !canActivateDominationDecree(state, 1)) return false;
   const label = top ? `${top.rank || ''}${top.suit || ''}`.trim() : 'A carta do topo';
   showMessage(`⚠️ ${label} que você descartou serve ao Escravo BOT. Ele vai tentar pegar o Lixo — bloqueie agora.`);
   renderDominationTools();
   presentDecreeFocus(true);
   setTimeout(() => presentDecreeFocus(false), 1400);
-  if (navigator.vibrate) {
+  if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) {
     try {
       navigator.vibrate([120, 70, 120]);
     } catch {}
   }
   await new Promise((resolve) => setTimeout(resolve, 3000));
+
+  // Se o Dominador clicou perto do fim da janela, a transação/animação do
+  // Decreto ainda pode estar concluindo. O BOT não pode avançar enquanto
+  // canPerformCommonGameAction() continuaria bloqueado por essa operação.
+  while (
+    friendOperationPending
+    && session === window.gameSessionId
+    && !window.isClosingGame
+    && state
+    && state.turnNumber === turn
+    && state.currentPlayer === botIndex
+    && !state.hasDrawnThisTurn
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
   if (session !== window.gameSessionId || window.isClosingGame) return true;
   if (!state || state.turnNumber !== turn || state.currentPlayer !== botIndex || state.hasDrawnThisTurn) return true;
   return isDominationDiscardDecreeActive(state, botIndex);
@@ -10135,9 +10280,7 @@ function syncTurnScopedFeedback({ isMyTurnRightNow = false, currentName = '' } =
 
 function renderRemoteHandEmptyBeforeDeadPickup(playerId) {
   const id = String(playerId);
-  const root = ['opponentTop', 'opponentLeft', 'opponentRight']
-    .map((rootId) => document.getElementById(rootId))
-    .find((seat) => seat?.dataset?.playerId === id);
+  const root = ['opponentTop', 'opponentLeft', 'opponentRight'].map((rootId) => document.getElementById(rootId)).find((seat) => seat?.dataset?.playerId === id);
   if (!root) return;
 
   root.querySelector('.opponent-cards')?.replaceChildren();
@@ -13002,7 +13145,10 @@ window.debugRestartGame = async (fromRematch = false) => {
 
   // Inicia a nova partida no Firebase
   if (state.finished) await recoverFinishedHistory();
-  const restartedState = await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions), { test: !!state.historyTest || !fromRematch, accountIds: state.players.map((p) => p.accountUid || null) });
+  const restartedState = await startGame(state.mode, currentNames, state.variant, currentPix, normalizeDominationOptions(state.dominationOptions), {
+    test: !!state.historyTest || !fromRematch,
+    accountIds: state.players.map((p) => p.accountUid || null),
+  });
 
   // O setDoc pode terminar antes de o snapshot da nova partida voltar. Adota o
   // estado recém-criado imediatamente para não deixar UI/efeitos da partida
