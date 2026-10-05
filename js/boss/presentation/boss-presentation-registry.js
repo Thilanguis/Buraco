@@ -3,6 +3,7 @@ import { dominatrixBossPresentation } from './dominatrix.js';
 import { matriarchBossPresentation } from './matriarch.js';
 import { dimitrescuBossPresentation } from './dimitrescu.js';
 import { neheleniaBossPresentation } from './nehelenia.js';
+import { nemesisBossPresentation } from './nemesis.js';
 
 const BOSS_PRESENTATION_REGISTRY = Object.freeze({
   [bankerBossPresentation.id]: bankerBossPresentation,
@@ -10,6 +11,7 @@ const BOSS_PRESENTATION_REGISTRY = Object.freeze({
   [matriarchBossPresentation.id]: matriarchBossPresentation,
   [dimitrescuBossPresentation.id]: dimitrescuBossPresentation,
   [neheleniaBossPresentation.id]: neheleniaBossPresentation,
+  [nemesisBossPresentation.id]: nemesisBossPresentation,
 });
 
 export function getBossPresentationAdapter(bossId) {

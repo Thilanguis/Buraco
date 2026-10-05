@@ -3,6 +3,7 @@ import { dominatrixBossMechanics } from './dominatrix.js';
 import { neheleniaBossMechanics } from './nehelenia.js';
 import { matriarchBossMechanics } from './matriarch.js';
 import { bankerBossMechanics } from './banker.js';
+import { nemesisBossMechanics } from './nemesis.js';
 
 const BOSS_MECHANICS_REGISTRY = Object.freeze({
   [dimitrescuBossMechanics.id]: dimitrescuBossMechanics,
@@ -10,6 +11,7 @@ const BOSS_MECHANICS_REGISTRY = Object.freeze({
   [neheleniaBossMechanics.id]: neheleniaBossMechanics,
   [matriarchBossMechanics.id]: matriarchBossMechanics,
   [bankerBossMechanics.id]: bankerBossMechanics,
+  [nemesisBossMechanics.id]: nemesisBossMechanics,
 });
 
 export function getBossMechanicsAdapter(bossId) {

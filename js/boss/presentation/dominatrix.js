@@ -160,7 +160,7 @@ export const dominatrixBossPresentation = Object.freeze({
       case 'forced_choice': return 'A ordem sempre nasce de uma tarefa viável. Aceitar cobra Dominação menor imediatamente; falhar cobra a punição adicional da fase. Se a mesa tornar a ordem impossível sem culpa do alvo, ela é cancelada.';
       case 'exposure': return `Usar a carta exposta ainda causa Dominação +1. Falhar causa +${dominatrixPressureText(intent.announcedPhase).exposure.fail}. A carta precisa entrar em jogo; simplesmente descartá-la não resolve a Exposição.`;
       case 'forced_swap': return 'A troca prioriza cartas úteis/jogáveis. A carta recebida fica presa durante o próximo turno para a troca realmente alterar o plano dos dois jogadores.';
-      case 'possession': return 'A Posse suspende somente o dano antigo do jogo marcado. Cartas novas ainda causam o dano individual normal. O jogo é libertado quando cada cooperador contribui ao menos 1 carta ou quando ele evolui de categoria; nesse momento, apenas o dano antigo suspenso volta a ser aplicado.';
+      case 'possession': return 'Dano antigo do jogo fica suspenso; cartas novas causam dano normal. Para libertar: cada cooperador adiciona 1 carta OU o jogo evolui de categoria. Só o dano antigo suspenso é reaplicado.';
       case 'hands_tied': return 'Cada cooperador fica vinculado ao primeiro jogo que alimentar ou criar naquela rodada e não pode tocar outro. A equipe inteira ainda compartilha somente 1 criação de jogo novo.';
       case 'separation': return 'Nesta rodada, o primeiro cooperador que alimentar um jogo fica vinculado a ele: o parceiro não pode alimentar esse mesmo jogo. Os outros jogos continuam livres.';
       case 'favorite': return 'A Dominadora mira o cooperador menos dominado para aproximar os dois da derrota. Na Fase 2 a Favorita recupera 2 de Dominação; na Fase 3 ela apenas é poupada. O outro recebe +8.';
@@ -171,7 +171,7 @@ export const dominatrixBossPresentation = Object.freeze({
       }
       case 'absolute_control': return `Neste efeito, ${target} é tratado como Dominado durante o próximo turno: não pode pegar o Lixo nem criar jogo novo, mas pode comprar do Monte e alimentar jogos existentes. Também recebe Dominação +5.`;
       case 'break_will': return 'Quebra de Vontade só aparece se houver um jogador com 25+ de Dominação e a chefe puder recuperar ao menos 120 HP. Ela mira quem está mais dominado. A escolha é +8 de Dominação ou cura de até 180 HP.';
-      case 'final_order': return 'A escolha é às cegas. Ao aceitar, duas cartas jogáveis são sorteadas naquele momento e reveladas. Recusar custa Dominação +7; aceitar custa +2. Cada carta sorteada que não entrar em jogo acrescenta +6. Descartar não cumpre.';
+      case 'final_order': return 'Escolha às cegas: recusar +7 Dominação; aceitar +2 e revela 2 cartas jogáveis sorteadas. Use-as em jogos. Cada carta não usada: +6. Descartar não cumpre.';
       default: return null;
     }
   },

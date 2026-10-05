@@ -6,8 +6,12 @@
 
 Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
 
+**Regra permanente:** cumprir objetivos não reduz a condição especial do chefe; evita a punição. Sucessos não descontam falhas de outros objetivos. Alívio por canastra e gastos próprios do chefe por vantagem permanecem. Nenhum valor de falha, peso, HP ou fase foi rebalanceado. Correções auditadas em `REVISAO_OBJETIVOS_CHEFES.md`.
+
 
 ### Regra de apresentação no HUD
+
+Ajuda oficial abre junto ao próprio `?`, com ponteiro e ajuste ao viewport. Textos usam blocos curtos sem eliminar prazos/exceções. Marcações de jogos envolvem só as cartas, nunca Canastra/Limpa. No Nemesis, Horda/Ômega e duração ficam no painel amarelo; alvo/retorno ↩ ficam na arte principal, sem faixas soltas em volta dos zumbis.
 
 O painel principal mostra somente objetivo, progresso e consequência curta. A explicação completa, termos ambíguos e exceções ficam no botão **?**. Referências de carta como `6♥` e `Q♣` recebem destaque maior e cor por naipe. Essa regra vale para **todos os chefes**, não apenas para a Nehelenia.
 
@@ -100,16 +104,16 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
-| Caçada de Bela | 1, 2 e 3 | 5 | Bela marca uma carta exata. Usá-la legalmente reduz 3 de Sede; falhar adiciona 14 nas Fases 1–2 ou 16 na Fase 3. |
+| Caçada de Bela | 1, 2 e 3 | 5 | Bela marca uma carta exata. Usá-la legalmente evita a punição; falhar adiciona 14 nas Fases 1–2 ou 16 na Fase 3. |
 | Tributo de Sangue | 1, 2 e 3 | 4 | Avalia as duas mãos no fim da rodada. 8–10 cartas adicionam 4 de Sede por jogador (6 na Fase 3); 11+ adicionam 8 (10 na Fase 3). |
 | Vinho Carmesim | 1, 2 e 3 | 2 | Com ferimentos e Sede suficiente, consome 15 de Sede para curar até 140/200/260 HP conforme a fase. |
-| Marca Carmesim | 1, 2 e 3 | 4 | Marca uma carta jogável de cada cooperador. Cada sucesso remove 2 de Sede; cada falha adiciona 7 nas Fases 1–2 ou 9 na Fase 3. |
-| Banquete de Cassandra | 2 e 3 | 5 | Marca um jogo. Alimentá-lo reduz 4 de Sede; falhar adiciona 16 na Fase 2 ou 18 na Fase 3. |
+| Marca Carmesim | 1, 2 e 3 | 4 | Marca uma carta jogável de cada cooperador. Cada sucesso evita sua punição; cada falha adiciona 7 nas Fases 1–2 ou 9 na Fase 3. |
+| Banquete de Cassandra | 2 e 3 | 5 | Marca um jogo. Alimentá-lo evita a punição; falhar adiciona 16 na Fase 2 ou 18 na Fase 3. |
 | Banquete dos Mortos | 2 e 3 | 3 | Profana o próximo Morto. Tomá-lo adiciona 12/16 de Sede e cura 90/130 HP. Uma Canastra Real ou Ás-a-Ás purifica: +4 de Sede e nenhuma cura. |
-| Enxame de Daniela | 2 e 3 | 4 | Contamina uma carta do lixo. Evitá-la reduz 3 de Sede; recolhê-la adiciona 12 na Fase 2 ou 15 na Fase 3. |
-| Coágulo Carmesim | 2 e 3 | 3 | Cria 180/260 de proteção. Romper reduz 6 de Sede; se sobreviver à rodada, metade da proteção restante vira cura. |
+| Enxame de Daniela | 2 e 3 | 4 | Contamina uma carta do lixo. Evitá-la não altera a Sede; recolhê-la adiciona 12 na Fase 2 ou 15 na Fase 3. |
+| Coágulo Carmesim | 2 e 3 | 3 | Cria 180/260 de proteção. Romper evita a cura, sem alterar a Sede; se sobreviver à rodada, metade da proteção restante vira cura. |
 | Portas do Castelo | 3 | 3 | Bloqueia o lixo durante toda a rodada. |
-| As Três Filhas | 3 | 5 | Cria objetivos independentes de Bela, Cassandra e Daniela; cada sucesso reduz 2 de Sede e cada falha adiciona 8. O HUD mostra os três objetivos separadamente. |
+| As Três Filhas | 3 | 5 | Cria objetivos independentes de Bela, Cassandra e Daniela; cada sucesso evita sua punição e cada falha adiciona 8. O HUD mostra os três objetivos separadamente. |
 
 
 **Transformação por fase:** o retrato principal acompanha a forma da Dimitrescu: Fase 1 usa `boss-dimitrescu.png`, Fase 2 usa `boss-dimitrescu-fase2.png` (semi-transformação) e Fase 3 usa `boss-dimitrescu-fase3.png` (forma dragão). Ao entrar nas Fases 2 e 3, a troca toca `transformacao-dimitrescu-fase2.mp3` ou `transformacao-dimitrescu-fase3.mp3`, respectivamente, e a fala de fase aparece no HUD.
@@ -157,6 +161,36 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Apresentação:** o painel principal deve mostrar apenas objetivo, progresso e consequência curta. Termos e regras extensas — como **Desorientado**, precedência da Presa Marcada, Reflexo Morto e o shell game do Pesadelo — ficam no botão `?`. As ilusões continuam acontecendo fisicamente na mesa, sem marcar automaticamente verdadeiro/falso.
 
+
+## Nemesis
+
+**HP:** 2600. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos F1/F2/F3: **1/2/3**. Aparecer como ameaça ≠ persistir ≠ cadáver.
+
+| Habilidade (`id`) | Fases | Peso | Funcionamento atual |
+|---|---|---:|---|
+| Invasão da Horda (`horde_invasion`) | 1/2/3 | 4 | Ausente/repelido tenta entrar com objetivo solucionável. Agarrador: carta sai no turno por jogo/descarte. Infectado: equipe contribui 2 cartas na rodada. Devorador: alimenta 2 jogos existentes distintos na rodada. Sucesso repele; falha deixa persistente com HP cheio e sem Infecção extra. Respeita teto e evita repetição imediata havendo alternativa. |
+| Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | Contribuir com 1+ carta para jogo no turno; falha base +8/+10/+12 Infecção. |
+| Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | 1 das 2 marcadas sai por jogo/descarte legal; falha base +8/+10/+12. |
+| Zona Contaminada (`contaminated_zone`) | 1/2/3 | 3 | Exige retirada legal comprovada do Lixo Fechado e sem bloqueio. +6 por retirada no turno; coexiste com Agarrador persistente. |
+| Comando da Horda (`horde_command`) | 1/2/3 | 3 | Só reforça persistente vivo, não traz zumbis: até fim da próxima rodada, Agarrador +1 carta presa; Infectado +2/falha; Devorador +30 cura. |
+| Lança-Foguetes (`rocket_launcher`) | 2/3 | 4 | Cada carta nova no jogo marcado por ID custa +10/+12 nesta rodada; cartas juntas somam o custo, sem proibir a jogada. |
+| Regeneração Parasita (`parasite_regeneration`) | 2/3 | 2 | Cura até 100 HP no persistente vivo ferido com menor HP percentual. |
+| Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Somente cadáver: 50% HP, 1x/fase, respeitando teto. Na F3 volta Mutado. Repelido não é morto. |
+| Barragem de Tentáculos (`tentacle_barrage`) | 3 | 4 | 2 das 3 marcadas saem legalmente no turno; falha base +16. |
+| Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Contribuição + saída de segunda carta indicada; duas/uma/nenhuma cumpridas: base +0/+8/+16. |
+| Surto Ômega (`omega_outbreak`) | 3 | 3 | Até fim da próxima rodada: somente falhas recebem +2/+4/+6 conforme Infecção <50/50–74/75–99. |
+
+**Lifecycle:** `absent → entering → repelled` no sucesso; `absent/repelled → entering → persistent → corpse` após falha e morte real. Repelido pode tentar entrar novamente. Somente persistente vivo tem passiva/seleção de dano. Saves antigos vivos/mortos migram sem reset de HP ou da batalha.
+
+**Zumbis persistentes:** Agarrador 350 HP, prende 1/2 cartas do Lixo (normal/Mutado) para jogo, não descarte; Infectado 300 HP, +2/+4 por falha positiva; Devorador 400 HP, cura 40/70 uma vez por turno ao contribuir 3+ cartas ao mesmo jogo. Horda soma seus bônus. Morte remove a passiva imediatamente, mantém cadáver e não alivia Infecção. F3 muta persistentes vivos, novas persistências e reanimados; não é habilidade sorteável. A falha de entrada do Infectado não recebe seu bônus retroativamente.
+
+**Dano e alívio:** alvo escolhido antes da jogada entre Nemesis e zumbis vivos, inclusive no ataque final; não há transbordamento. Limpa/Real/Ás-a-Ás aliviam −4/−8/−12 no total incremental por jogo, mesmo atacando zumbi. Dano direto ao Nemesis troca S.T.A.R.S.; dano em zumbi não.
+
+**Elegibilidade:** objetivos têm solução legal conjunta antes de anunciar; S.T.A.R.S. possui fallback para o parceiro. Horda exige persistente vivo, Regeneração exige persistente ferido, Reanimação exige cadáver/carga/espaço, Impacto exige jogo alimentável. Onze habilidades, soma de pesos 39, no catálogo real do Laboratório.
+
+**HUD:** em faixa separada abaixo do HUD principal, cards full-bleed reutilizam o padrão de filhas/capangas, com nome integrado e chips INVADINDO, ATIVO, MUTADO, REFORÇADO e CADÁVER quando aplicáveis. Entrada mostra INVADINDO; objetivo fica no painel de Invasão, sem texto redundante. Seleção pelo próprio card; `?` interno abre o popover oficial com os números das passivas. Repelido some; ausente sem espaço permanente. Retratos fornecidos em `nemesis-agarrador.png`, `nemesis-infectado.png` e `nemesis-devorador.png`, originais preservados, cobrem o card sem distorção. S.T.A.R.S. fica sobre a arte principal com ajuda oficial. SFX canônico `ganho-infeccao-nemesis.mp3` toca só por delta positivo real, uma vez por evento; não por reload/redução/+0. Animações breves respeitam redução de movimento.
+
+**Derrota por causa:** Infecção Total só com `max_infection`; ataque final insuficiente: Nemesis sobreviveu; exaustão: Recursos esgotados.
 
 **Auditoria de consistência:** todas as habilidades da rotação atual aparecem no jogo e no DevTools. `Renascimento` é passiva fora do sorteio normal, mas aparece no DevTools. `Interdito` é o único item mantido apenas como legado técnico documentado e permanece fora do jogo e do DevTools.
 

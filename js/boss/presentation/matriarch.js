@@ -359,7 +359,7 @@ export const matriarchBossPresentation = Object.freeze({
       case 'living_seed':
         return 'A carta marcada precisa entrar legalmente em um jogo antes do fim do próximo turno do alvo. Se isso não acontecer, a Semente floresce e acrescenta 1 Flor. Descartar a carta não cumpre o objetivo.';
       case 'hungry_root':
-        return 'O jogo marcado precisa receber ao menos 1 carta legal antes do fim da rodada. Se a Raiz falhar, ela acrescenta 1 Flor e pode gerar uma única nova Raiz na rodada seguinte. Uma Raiz que nasceu dessa propagação não se propaga de novo.';
+        return 'Adicione 1 carta legal ao jogo nesta rodada. Falha: +1 Flor e pode nascer outra Raiz na próxima rodada. A Raiz propagada não se propaga de novo.';
       case 'restorative_dew':
         return 'Cada carta nova colocada legalmente na mesa reduz a cura prevista do Orvalho por faixas. O medidor mostra a faixa atual; com 6 ou mais cartas novas, a cura cai a zero.';
       case 'twin_vines':
@@ -373,12 +373,12 @@ export const matriarchBossPresentation = Object.freeze({
       case 'royal_bloom':
         return 'Florescimento Real combina vários objetivos naturais, mas cada um é resolvido separadamente. Cumprir um objetivo não compensa outro que falhou; cada falha acrescenta a própria Flor.';
       case 'emerald_cocoon':
-        return 'O dano comum atinge primeiro os 180 pontos do Casulo; o excesso passa para o HP. Uma Canastra Limpa ou superior rompe o Casulo imediatamente. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
+        return 'Casulo absorve 180 de dano; o excesso atinge o HP. Limpa ou superior rompe imediatamente. Se sobreviver à rodada, metade da proteção restante vira cura.';
       case 'spring_crown': {
         const threat = springCrownMarkedThreat(gameState);
         const name = crownThreatName(gameState);
         const objective = crownThreatObjective(gameState, threat, helpers);
-        return `A Coroa marcou ${name}. Objetivo atual: ${objective}. Se essa ameaça falhar, uma Raiz Fortalecida é preparada para a próxima rodada e exige uma contribuição de cada cooperador. Essa Raiz não cria nova propagação automática.`;
+        return `Coroa: ${name}. Faça: ${objective}. Falha: Raiz Fortalecida na próxima rodada; cada cooperador precisa contribuir. Essa Raiz não se propaga de novo.`;
       }
       default:
         return null;

@@ -14,8 +14,10 @@ import {
   finalizeBossMeldCardDamageMechanics,
   finalizeBossMeldResolutionMechanics,
   finalizeBossMeldEventMechanics,
+  getBossMechanicsAdapter,
 } from './mechanics/boss-mechanics-registry.js';
 import { quoteBankerCreditLimit } from './mechanics/banker.js';
+import { isCombatEntityAlive } from './boss-combat.js';
 
 export { getRestorativeDewHealing } from './boss-balance.js';
 
@@ -33,6 +35,43 @@ export const BOSS_MODE_DOMINATRIX = 'boss_dominadora';
 export const BOSS_MODE_MATRIARCH = 'boss_matriarca';
 export const BOSS_MODE_DIMITRESCU = 'boss_dimitrescu';
 export const BOSS_MODE_NEHELENIA = 'boss_nehelenia';
+export const BOSS_MODE_NEMESIS = 'boss_nemesis';
+
+function bossMechanicsContext(gameState) {
+  const boss = gameState.boss;
+  return { gameState, boss, helpers: {
+    validSequence: isValidBossSequence,
+    discardBlocked: (playerId) => isBossDiscardBlocked({ ...gameState, currentPlayer: gameState.players.findIndex((player) => player.id === playerId) }),
+    blocked: (playerId, cardId, action) => isCardBlockedByBossState(boss, playerId, cardId, action),
+    meldId: (teamId, index) => resolveBossMeldId(gameState, teamId, index, true),
+    pickIndex: (length) => length ? Math.floor(seededUnit(bossSeed(gameState, 173)) * length) % length : 0,
+    canLeaveHand: (player, moves) => {
+      const playedIds = new Set(moves.flatMap((move) => move.cardIds));
+      if (player.hand.length - playedIds.size > 1) return true;
+      const taken = gameState.deadChunksTaken?.[player.teamId] || 0;
+      const maximum = gameState.deadChunksMax?.[player.teamId] ?? 1;
+      if (taken < maximum && gameState.deadPiles?.some((pile) => pile?.length)) return true;
+      const melds = gameState.teams?.[player.teamId]?.melds || [];
+      const hasGood = (meld) => ['limpa', 'real', 'asas'].includes(classifyBossMeldKind(meld));
+      if (melds.some(hasGood)) return true;
+      return moves.some((move) => hasGood([...(move.meldIndex == null ? [] : melds[move.meldIndex]), ...player.hand.filter((card) => move.cardIds.includes(card.id))]));
+    },
+  } };
+}
+
+export function getBossCombatPriorities(gameState, playerId) {
+  const boss = normalizeBossState(gameState);
+  return boss ? getBossMechanicsAdapter(boss.id)?.botPriorities?.({ ...bossMechanicsContext(gameState), playerId }) || null : null;
+}
+
+export function setBossDamageTarget(gameState, playerId, targetId) {
+  const boss = normalizeBossState(gameState);
+  if (!boss?.combatEntities || boss.result || isBossTurnActive(gameState)) return false;
+  if (gameState.players[gameState.currentPlayer]?.id !== playerId) return false;
+  if (targetId !== 'boss' && !boss.combatEntities.some((entry) => entry.id === targetId && isCombatEntityAlive(entry))) return false;
+  boss.combatTargetsByPlayer[playerId] = targetId;
+  return true;
+}
 
 export function isBossMode(stateOrMode) {
   const mode = typeof stateOrMode === 'string' ? stateOrMode : stateOrMode?.mode;
@@ -657,6 +696,8 @@ function cardHasSafeLegalPlay(gameState, player, card) {
 
 function isCardBlockedByBossState(boss, playerId, cardId, action = 'play') {
   if (!boss || !cardId) return false;
+  const adapterBlock = getBossMechanicsAdapter(boss.id)?.isCardBlocked?.(boss, playerId, cardId, action);
+  if (adapterBlock != null) return adapterBlock;
   if (boss.id === 'matriarca_esmeralda') {
     if (action !== 'discard') return false;
     return activeNatureThreats(boss).some((threat) => (
@@ -1263,6 +1304,8 @@ function healDimitrescu(gameState, requested, origin = 'Regeneração Vampírica
 
 function createPayload(gameState, abilityId) {
   const boss = gameState.boss;
+  const adapter = getBossMechanicsAdapter(boss.id);
+  if (adapter?.buildPayload) return adapter.buildPayload(bossMechanicsContext(gameState), abilityId);
   if (abilityId === 'fixed_interest') return weightedContract(gameState);
   if (abilityId === 'maintenance_fee') return {
     extraDraw: boss.phase === 3 ? 2 : 1,
@@ -1607,6 +1650,8 @@ function createPayload(gameState, abilityId) {
 }
 
 function hasValidAbilityPayload(gameState, abilityId, payload) {
+  const adapter = getBossMechanicsAdapter(gameState.boss.id);
+  if (adapter?.validPayload) return adapter.validPayload(bossMechanicsContext(gameState), abilityId, payload);
   const players = gameState.players || [];
   if (abilityId === 'collar') {
     const cardIds = [...new Set(payload.cardIds || (payload.cardId ? [payload.cardId] : []))];
@@ -1868,6 +1913,7 @@ export function createBossState(id = 'banker', seed = Date.now()) {
       finalStrike: 0,
       finalDebt: 0,
     },
+    ...(getBossMechanicsAdapter(id)?.createState?.() || {}),
   };
 }
 
@@ -2212,6 +2258,7 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
     boss.phaseTransitions = [boss.phase];
   }
   boss.phase ||= 1;
+  getBossMechanicsAdapter(boss.id)?.normalize?.({ boss, gameState });
   return boss;
 }
 
@@ -2323,7 +2370,7 @@ export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId
     name: entry.name,
     description: entry.describe(context),
     payload,
-    duration: ABILITY_DURATION[entry.id] || 'full_round',
+    duration: payload.duration || entry.duration || ABILITY_DURATION[entry.id] || 'full_round',
     announcedPhase: boss.phase,
     activatedRound: boss.roundNumber,
     announcedAtSequence: boss.actionSequence,
@@ -2336,6 +2383,7 @@ export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId
   if (entry.id === 'fixed_interest' && payload.holderPlayerId != null) {
     boss.lastFixedInterestHolderPlayerId = payload.holderPlayerId;
   }
+  getBossMechanicsAdapter(boss.id)?.announceIntent?.({ ...bossMechanicsContext(gameState), intent: boss.currentIntent });
   return boss.currentIntent;
 }
 
@@ -2430,6 +2478,7 @@ export function advanceBossTurn(gameState, now = Date.now()) {
   if (flow.stage !== 'pending' && flow.stage !== 'players' && now < flow.endsAt) return null;
   if (flow.stage === 'ability') {
     const announcedIntent = boss.currentIntent;
+    getBossMechanicsAdapter(boss.id)?.activateIntent?.({ boss, gameState, intent: announcedIntent });
     activateAnnouncedBankerRoundEffect(gameState, announcedIntent);
     const matriarchActivation = boss.id === 'matriarca_esmeralda' && MATRIARCH_ABILITIES.has(announcedIntent?.abilityId);
     const dominatrixPersistentActivation = boss.id === 'dominadora'
@@ -2603,8 +2652,10 @@ function triggerMatriarchRebirth(gameState, sourceActionId) {
   return true;
 }
 
-function applyDamageToBoss(gameState, damage, { breaksCocoon = false, breaksMirrorEclipse = false, sourceActionId = '' } = {}) {
+function applyDamageToBoss(gameState, damage, { breaksCocoon = false, breaksMirrorEclipse = false, sourceActionId = '', playerId = null } = {}) {
   const boss = gameState.boss;
+  const combatDamage = getBossMechanicsAdapter(boss.id)?.applyDamage?.({ boss, gameState, damage, playerId, sourceActionId });
+  if (combatDamage) return combatDamage;
   let remaining = Math.max(0, Number(damage) || 0);
   let absorbed = 0;
   let cocoonBroken = false;
@@ -2690,7 +2741,6 @@ function applyDamageToBoss(gameState, damage, { breaksCocoon = false, breaksMirr
       if (boss.crimsonClot.remaining <= 0) {
         boss.crimsonClot.status = 'broken';
         bloodClotBroken = true;
-        changeDimitrescuBlood(gameState, -6, 'Coágulo rompido', `crimson_clot_broken_${boss.crimsonClot.id || sourceActionId}`);
       }
     }
   }
@@ -3044,6 +3094,8 @@ export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
   // resolve against the pre-existing serialized effect before target cleanup.
   const boss = gameState?.boss;
   if (!boss) return [];
+  const discardAdapter = getBossMechanicsAdapter(boss.id);
+  if (discardAdapter?.onDiscardTaken) return discardAdapter.onDiscardTaken({ boss, gameState, playerId, takenCards, recordBossEvent: (event) => recordEvent(boss, event) });
   const takenIds = new Set(takenCards.map((card) => card?.id).filter(Boolean));
   const resolved = [];
   if (boss.id === 'nehelenia') {
@@ -3609,6 +3661,8 @@ export function isBossCardBlocked(gameState, playerId, cardId, action = 'play') 
 export function getBossCardBlockFeedback(gameState, playerId, cardId, action = 'discard') {
   const boss = normalizeBossState(gameState);
   if (!boss || !cardId || !isCardBlockedByBossState(boss, playerId, cardId, action)) return null;
+  const adapterFeedback = getBossMechanicsAdapter(boss.id)?.cardBlockFeedback?.({ boss, gameState, playerId, cardId, action });
+  if (adapterFeedback) return adapterFeedback;
 
   const natureThreat = activeNatureThreats(boss).find((threat) => (
     threat.targetPlayerId === playerId && threat.cardId === cardId
@@ -3675,6 +3729,8 @@ export function validateBossClosedDiscardSelection(gameState, playerId, selected
 export function getBossCardEffect(gameState, playerId, cardId) {
   const boss = normalizeBossState(gameState);
   if (!boss || !cardId) return null;
+  const adapter = getBossMechanicsAdapter(boss.id);
+  if (adapter?.cardEffect) return adapter.cardEffect({ boss, gameState, playerId, cardId });
   if (boss.id === 'matriarca_esmeralda') {
     const threat = activeNatureThreats(boss).find((entry) => entry.targetPlayerId === playerId && entry.cardId === cardId);
     if (!threat) return null;
@@ -3815,6 +3871,8 @@ function activeOrderForPlayer(boss, playerId, type = null) {
 export function notifyBossCardDiscarded(gameState, playerId, card) {
   const boss = normalizeBossState(gameState);
   if (!boss || !card?.id) return [];
+  const discardAdapter = getBossMechanicsAdapter(boss.id);
+  if (discardAdapter?.onCardDiscarded) return discardAdapter.onCardDiscarded({ boss, gameState, playerId, card });
   if (boss.id === 'nehelenia') {
     const events = [];
     const intent = boss.currentIntent;
@@ -4006,6 +4064,8 @@ function botPileCardValue(card) {
 export function shouldBossBotTakeDiscard(gameState, playerId, { intent = null, naturePlan = null } = {}) {
   const boss = normalizeBossState(gameState);
   if (!intent?.wants) return false;
+  const adapterDecision = getBossMechanicsAdapter(boss?.id)?.shouldTakeDiscard?.({ boss, gameState, playerId, intent });
+  if (adapterDecision != null) return adapterDecision;
   const surcharge = boss?.id === 'banker' ? getBossDiscardSurcharge(gameState) : null;
   if (boss?.id === 'dimitrescu') {
     const dimitrescuPlan = getBossDimitrescuPriorities(gameState, playerId);
@@ -4448,6 +4508,7 @@ function activatePendingPhase(gameState) {
   if (nextPhase === boss.phase) return null;
   boss.currentIntent = null;
   boss.phase = nextPhase;
+  getBossMechanicsAdapter(boss.id)?.normalize?.({ boss, gameState });
   if (!boss.phaseTransitions.includes(nextPhase)) boss.phaseTransitions.push(nextPhase);
   boss.actionSequence += 1;
   boss.phaseTransitionId = `phase_${nextPhase}_${boss.actionSequence}`;
@@ -4485,6 +4546,7 @@ export function applyBossMeldTransition(gameState, {
   let cardDamage = 0;
   let debtReduction = 0;
   let bloodReduction = 0;
+  let resourceReduction = 0;
   let mirrorFragmentRelief = 0;
   let dreamBonusDamage = 0;
   let newMoonSuppressedDamage = 0;
@@ -4532,6 +4594,7 @@ export function applyBossMeldTransition(gameState, {
     if (meldMechanics.breaksCocoon != null) breaksCocoon = !!meldMechanics.breaksCocoon;
     if (meldMechanics.debtReduction != null) debtReduction = Math.max(0, Number(meldMechanics.debtReduction) || 0);
     if (meldMechanics.bloodReduction != null) bloodReduction = Math.max(0, Number(meldMechanics.bloodReduction) || 0);
+    if (meldMechanics.resourceReduction != null) resourceReduction = Math.max(0, Number(meldMechanics.resourceReduction) || 0);
     if (meldMechanics.creditLimitDebt != null) creditLimitDebt = Math.max(0, Number(meldMechanics.creditLimitDebt) || 0);
     if (meldMechanics.creditLimitEventId != null) creditLimitEventId = meldMechanics.creditLimitEventId;
   }
@@ -4605,18 +4668,20 @@ export function applyBossMeldTransition(gameState, {
   }
 
 
-  if (damage <= 0 && debtReduction <= 0 && bloodReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length && mirrorFragmentRelief <= 0) return null;
+  if (damage <= 0 && debtReduction <= 0 && bloodReduction <= 0 && resourceReduction <= 0 && !possessionProgressed && bloomRemoved <= 0 && creditLimitDebt <= 0 && !orderEvents.length && mirrorFragmentRelief <= 0) return null;
   const breaksMirrorEclipse = false;
   const damageResult = applyDamageToBoss(gameState, damage, {
+    playerId,
     breaksCocoon,
     breaksMirrorEclipse,
     sourceActionId: `meld_${key}_${boss.actionSequence + 1}`,
   });
-  const totalDangerRelief = debtReduction + bloodReduction;
+  const totalDangerRelief = debtReduction + bloodReduction + resourceReduction;
   const dangerAfterRelief = clamp(boss.danger - totalDangerRelief, 0, boss.maxDanger);
   const appliedDangerReduction = Math.max(0, boss.danger - dangerAfterRelief);
   const appliedDebtReduction = Math.min(debtReduction, appliedDangerReduction);
   const appliedBloodReduction = Math.min(bloodReduction, Math.max(0, appliedDangerReduction - appliedDebtReduction));
+  const appliedResourceReduction = Math.min(resourceReduction, Math.max(0, appliedDangerReduction - appliedDebtReduction - appliedBloodReduction));
   boss.danger = dangerAfterRelief;
   if (creditLimitDebt) boss.danger = clamp(boss.danger + creditLimitDebt, 0, boss.maxDanger);
   const appliedDamage = damageResult.hpDamage;
@@ -4640,6 +4705,7 @@ export function applyBossMeldTransition(gameState, {
     suppressDominatrixResistance,
     appliedDebtReduction,
     appliedBloodReduction,
+    appliedResourceReduction,
     creditLimitDebt,
     bloomRemoved,
     mirrorFragmentRelief,
@@ -4663,6 +4729,9 @@ export function applyBossMeldTransition(gameState, {
     possessionReappliedDamage,
     debtReduction,
     bloodReduction: appliedBloodReduction,
+    resourceReduction: appliedResourceReduction,
+    targetId: damageResult.targetId || 'boss',
+    appliedDamage,
     creditLimitDebt,
     chainsRemoved,
     resistanceSuppressedByInterdict,
@@ -5071,8 +5140,11 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
   let outcome = '';
   let exposureSuccess = null;
   let resultData = {};
-
-  if (boss.id === 'dominadora') {
+  const adapterResult = getBossMechanicsAdapter(boss.id)?.resolveIntent?.({ boss, gameState, intent });
+  if (adapterResult) {
+    outcome = adapterResult.outcome;
+    resultData = adapterResult.resultData || {};
+  } else if (boss.id === 'dominadora') {
     if (intent.abilityId === 'forced_choice') {
       enqueueChoice(boss, intent.payload.targetPlayerId, 'forced_choice', ['chain', 'order'], {
         announcedPhase: intent.announcedPhase,
@@ -5209,23 +5281,23 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     if (intent.abilityId === 'bela_hunt') {
       const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);
       const success = intent.payload.used === true;
-      dangerDelta = success ? -3 : (phase === 3 ? 16 : 14);
+      dangerDelta = success ? 0 : (phase === 3 ? 16 : 14);
       outcome = success
-        ? `${target?.name || 'O alvo'} escapou da Caçada de Bela: Sede -3.`
+        ? `${target?.name || 'O alvo'} escapou da Caçada de Bela: sem punição.`
         : `${target?.name || 'O alvo'} não usou a carta marcada: Sede +${dangerDelta}.`;
       resultData = { daughter: 'bela', success };
     } else if (intent.abilityId === 'cassandra_feast') {
       const success = intent.payload.fed === true;
-      dangerDelta = success ? -4 : (phase === 3 ? 18 : 16);
+      dangerDelta = success ? 0 : (phase === 3 ? 18 : 16);
       outcome = success
-        ? `O jogo marcado foi alimentado e Cassandra perdeu o banquete: Sede -4.`
+        ? `O jogo marcado foi alimentado e Cassandra perdeu o banquete: sem punição.`
         : `O jogo marcado ficou sem alimento: Sede +${dangerDelta}.`;
       resultData = { daughter: 'cassandra', success, meldIndex: intent.payload.meldIndex };
     } else if (intent.abilityId === 'daniela_swarm') {
       const success = !intent.payload.triggered;
-      if (success) dangerDelta = -3;
+      if (success) dangerDelta = 0;
       outcome = success
-        ? 'Ninguém tocou no lixo contaminado de Daniela: Sede -3.'
+        ? 'Ninguém tocou no lixo contaminado de Daniela: sem punição.'
         : 'O Enxame de Daniela já bebeu sangue quando o lixo foi recolhido.';
       resultData = { daughter: 'daniela', success, triggeredByPlayerId: intent.payload.triggeredByPlayerId ?? null };
     } else if (intent.abilityId === 'blood_tithe') {
@@ -5246,7 +5318,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       });
       const successes = marks.filter((mark) => mark.status === 'success').length;
       const failures = marks.filter((mark) => mark.status === 'failed').length;
-      dangerDelta = failures * (phase === 3 ? 9 : 7) - successes * 2;
+      dangerDelta = failures * (phase === 3 ? 9 : 7);
       outcome = `Marca Carmesim: ${successes} removida${successes === 1 ? '' : 's'}, ${failures} ainda sangrando${dangerDelta ? ` · Sede ${dangerDelta > 0 ? '+' : ''}${dangerDelta}` : ''}.`;
       resultData = { crimsonMarks: marks.map((mark) => ({ ...mark })), successes, failures };
     } else if (intent.abilityId === 'red_wine') {
@@ -5282,7 +5354,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         remaining: amount,
         status: 'active',
       };
-      outcome = `Coágulo Carmesim formado com ${amount} de proteção. Rompê-lo reduz a Sede em 6; se sobreviver, vira cura.`;
+      outcome = `Coágulo Carmesim formado com ${amount} de proteção. Rompê-lo evita a cura; se sobreviver, vira cura.`;
       resultData = { bloodClotAmount: amount };
     } else if (intent.abilityId === 'castle_lockdown') {
       outcome = 'As Portas do Castelo se abriram novamente; o lixo volta a ficar disponível.';
@@ -5295,7 +5367,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       });
       const successes = objectives.filter((objective) => objective.status === 'success').length;
       const failures = objectives.filter((objective) => objective.status === 'failed').length;
-      dangerDelta = failures * 8 - successes * 2;
+      dangerDelta = failures * 8;
       outcome = `As Três Filhas encerraram a caçada: ${successes} objetivo${successes === 1 ? '' : 's'} cumprido${successes === 1 ? '' : 's'}, ${failures} falho${failures === 1 ? '' : 's'}${dangerDelta ? ` · Sede ${dangerDelta > 0 ? '+' : ''}${dangerDelta}` : ''}.`;
       resultData = { daughter: 'all', successes, failures, objectives: objectives.map((objective) => ({ ...objective })) };
     } else {
@@ -5610,7 +5682,9 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     outcome = 'Bloqueio de Crédito encerrado.';
   } else if (intent.abilityId === 'suit_audit') {
     const success = (intent.payload.progress || 0) >= intent.payload.required;
-    dangerDelta = success ? (intent.payload.successDelta ?? 0) : (intent.payload.failureDelta ?? (intent.announcedPhase === 3 ? 16 : 12));
+    // Objective success only avoids punishment, including legacy snapshot payloads.
+    dangerDelta = success ? 0 : (intent.payload.failureDelta ?? (intent.announcedPhase === 3 ? 16 : 12));
+    resultData = { success };
     outcome = success ? 'Auditoria concluída: sem cobrança.' : `Auditoria falhou: Dívida +${dangerDelta}.`;
   } else if (intent.abilityId === 'pledge') {
     outcome = 'A Penhora foi liberada.';
@@ -5783,7 +5857,7 @@ export function applyBossFinalStrike(gameState, projectedTeamScore, playerId = g
   if (!boss || boss.result) return null;
   const baseDamage = 500 + Math.max(0, Math.floor((Number(projectedTeamScore) || 0) * 0.25));
   const damage = boss.id === 'dominadora' && isBossPlayerDominated(gameState, playerId) ? Math.floor(baseDamage * 0.65) : baseDamage;
-  const damageResult = applyDamageToBoss(gameState, damage, { breaksCocoon: true, sourceActionId: `final_${boss.actionSequence + 1}` });
+  const damageResult = applyDamageToBoss(gameState, damage, { breaksCocoon: true, sourceActionId: `final_${boss.actionSequence + 1}`, playerId });
   boss.stats.totalDamage += damage;
   boss.stats.finalStrike = damage;
   boss.stats.largestAttack = Math.max(boss.stats.largestAttack, damage);
@@ -5804,10 +5878,12 @@ export function applyBossFinalStrike(gameState, projectedTeamScore, playerId = g
           : boss.id === 'nehelenia'
             ? 'Pesadelo Eterno'
             : 'Execução da Dívida';
-    boss.result = { victory: false, reason: 'insufficient_final_strike', title: survivalTitle, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP.` };
+    boss.result = { victory: false, reason: 'insufficient_final_strike', title: getBossDefinition(boss.id)?.defeatTitles?.insufficient_final_strike || getBossDefinition(boss.id)?.defeatTitle || survivalTitle, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP.` };
   }
   return recordEvent(boss, {
     type: 'finalStrike',
+    targetId: damageResult.targetId || 'boss',
+    appliedDamage: damageResult.hpDamage,
     actionId: `final_${boss.actionSequence}`,
     damage,
     absorbedDamage: damageResult.absorbed,
@@ -5828,7 +5904,7 @@ export function applyBossResourceDefeat(gameState) {
       : boss.id === 'dimitrescu' ? 'Banquete Carmesim'
         : boss.id === 'nehelenia' ? 'Pesadelo Eterno'
           : 'Cobrança sem fim';
-  boss.result = { victory: false, reason: 'resources_exhausted', title, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP quando os recursos acabaram.` };
+  boss.result = { victory: false, reason: 'resources_exhausted', title: getBossDefinition(boss.id)?.defeatTitles?.resources_exhausted || getBossDefinition(boss.id)?.defeatTitle || title, detail: `${getBossDefinition(boss.id)?.name || 'O chefe'} sobreviveu com ${boss.hp} HP quando os recursos acabaram.` };
   boss.actionSequence += 1;
   return recordEvent(boss, { type: 'bossDefeat', actionId: `resources_${boss.actionSequence}`, reason: boss.result.reason });
 }

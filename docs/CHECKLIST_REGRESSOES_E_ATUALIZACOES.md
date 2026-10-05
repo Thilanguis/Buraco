@@ -644,3 +644,26 @@ O repositório atual já tem testes explicitamente voltados a regressões, inclu
 - `HANDOFF_...md`: contexto recente, pendências e decisões ainda em transição.
 
 Este checklist deve ser tratado como **documentação permanente de manutenção**, não como histórico de conversa.
+
+## 21. Regra permanente: objetivo cumprido não alivia a condição do chefe
+
+- Vale para Dívida, Dominação, Flores, Sede, Mundo do Espelho e Infecção.
+- Cumprir objetivo evita sua punição; nunca concede delta negativo na condição especial.
+- Objetivos independentes: sucesso em um não desconta a punição da falha de outro.
+- Preservar alívio por canastras (Limpa / Real / Ás-a-Ás), incluindo Flores.
+- Não confundir com gasto do próprio chefe por vantagem: Vinho Carmesim e Renascimento continuam funcionando. Favorita é escolha automática do chefe, não recompensa por cumprir objetivo.
+- Não alterar custos positivos de escolha/obediência já aprovados nem valores de falha ao corrigir recompensas negativas.
+- Auditar engine, adapters, BOT, Laboratório, snapshots legados, HUD/ajuda, definições e documentos; não basta trocar o texto.
+- Rodar `tests/boss-objective-resource-rule.test.mjs`, testes de alívio, chefes e suíte ampla. Comparar falhas com baseline e registrar testes bloqueados.
+- Helpers do Nemesis ficam em faixa externa abaixo do HUD, como Filhas/Capangas. Validar altura do HUD, chips INVADINDO/ATIVO e ajuda contida nos cinco viewports.
+
+Revisão de 05/10/2026: fonte de verdade exclusivamente local por instrução expressa; sem operações no Google Drive. Detalhes em `REVISAO_OBJETIVOS_CHEFES.md`.
+
+## 22. Ajudas ancoradas e marcações de jogos
+
+- Todo `?` abre o popover oficial perto do próprio botão, com ponteiro; testar chefe, habilidade, S.T.A.R.S., alvo e zumbis.
+- Ajustar posição para viewport, scroll e resize; evitar cortes pelo HUD/card. Escape, fechar e clique fora continuam funcionando.
+- Textos em blocos curtos, específicos da habilidade. Não anexar regras genéricas irrelevantes nem remover números, prazos ou exceções essenciais.
+- Horda/Ômega e duração ficam no painel amarelo. Alvo do dano integrado à arte, sem faixas soltas acima/abaixo dos zumbis.
+- Moldura de chefe envolve somente `.meld-line-cards`. Canastra/Limpa, pontuação e contribuições ficam fora. Padronizar Penhora, Posse, Interdito, Raiz, Enxerto, Banquete, Impacto e Espelho, mantendo os efeitos especiais já restritos às cartas.
+- Regressões: `boss-ui-readability.test.mjs` e `nemesis-ui.browser.mjs` (cinco viewports, oito famílias de marcação). Não mudar mecânicas para corrigir apresentação.

@@ -53,6 +53,8 @@ import {
   getBossDominatrixPriorities,
   getBossDimitrescuPriorities,
   getBossNeheleniaPriorities,
+  getBossCombatPriorities,
+  setBossDamageTarget,
   getBossNaturePriorities,
   getBossNatureThreatSummaries,
   getBossDiscardSurcharge,
@@ -87,7 +89,8 @@ import {
 } from './js/boss/boss-engine.js';
 import { getBossDefinition, getBossDefinitionForMode, normalizeVariantForMode } from './js/boss/boss-registry.js';
 import { buildBossActionPresentation, buildBossAbilityHelp, buildBossFinalPresentation, buildBossRuleSummary } from './js/boss/boss-presentation.js';
-import { getBossMeldContributionUi, getBossMeldUiModel } from './js/boss/ui/boss-ui-registry.js';
+import { getBossPresentationAdapter } from './js/boss/presentation/boss-presentation-registry.js';
+import { getBossMeldContributionUi, getBossMeldUiModel, getBossUiAdapter } from './js/boss/ui/boss-ui-registry.js';
 import { canRestoreUndoTransaction, createUndoTransaction, restoreUndoTransaction } from './js/game/undo-transaction.js';
 import { enumerateWildcardOptions } from './js/game/wildcard-choice.js';
 import {
@@ -584,7 +587,7 @@ function bossEventAddsResource(boss, event) {
   if (boss.id === 'dominadora') return event.type === 'chainChange' && Number(event.amount) > 0;
   if (boss.id === 'matriarca_esmeralda') return event.type === 'bloomChange' && Number(event.amount) > 0;
   if (boss.id === 'dimitrescu') return Number(event.dangerDelta) > 0 || (event.type === 'bloodChange' && Number(event.amount) > 0);
-  return false;
+  return getBossPresentationAdapter(boss.id)?.resourceSoundEvent?.(event) === true;
 }
 
 function bossEventHealsMatriarch(boss, event) {
@@ -660,8 +663,11 @@ function syncBossResourceSounds(boss) {
     return;
   }
 
-  const newEvents = events.filter((event) => event.actionId && !seenBossResourceSoundEventIds.has(event.actionId));
-  newEvents.forEach((event) => seenBossResourceSoundEventIds.add(event.actionId));
+  const newEvents = events.filter((event) => {
+    if (!event.actionId || seenBossResourceSoundEventIds.has(event.actionId)) return false;
+    seenBossResourceSoundEventIds.add(event.actionId);
+    return true;
+  });
   newEvents.filter((event) => boss.id === 'banker' && event.vaultSound === 'open').forEach((event) => void animateBossVaultOpen(event, { playSound: audioUnlocked }));
 
   if (newEvents.some((event) => bossEventIsDimitrescuPhaseChange(boss, event))) {
@@ -922,6 +928,8 @@ function processBossDeadReward() {
 
 function confirmBossFinalStrike() {
   if (!isCurrentBossMode()) return true;
+  const warning = getBossUiAdapter(state.boss?.id)?.finalStrikeWarning?.({ gameState: state, playerId: currentPlayer()?.id });
+  if (warning) return window.confirm(warning);
   const name = getBossDefinition(state.boss?.id)?.name || 'o chefe';
   return window.confirm(`Finalizar o ataque contra ${name}?\n\nCaso sobreviva, a equipe perderá a batalha.`);
 }
@@ -5772,16 +5780,16 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   rebirth: 'Fase 3: ao cair a 0 HP, gasta 1 Flor e volta com 300 HP. Uma vez.',
 
   // Lady Dimitrescu.
-  bela_hunt: 'Use a carta caçada no turno. Sucesso reduz Sede; falha aumenta.',
+  bela_hunt: 'Use a carta caçada no turno. Sucesso evita punição; falha aumenta Sede.',
   blood_tithe: 'Mãos grandes pagam Sede no fim da rodada. Mais cartas = mais tributo.',
   red_wine: 'Lady troca Sede por HP quando está ferida.',
-  crimson_brand: 'Use as cartas marcadas em jogos. Cumprir reduz Sede; falhar aumenta.',
-  cassandra_feast: 'Alimente o jogo marcado nesta rodada. Cumprir reduz Sede; falhar aumenta.',
+  crimson_brand: 'Use as cartas marcadas em jogos. Cumprir evita punição; falhar aumenta Sede.',
+  cassandra_feast: 'Alimente o jogo marcado nesta rodada. Cumprir evita punição; falhar aumenta Sede.',
   cassandra_dead_feast: 'O próximo Morto alimenta e cura Lady. Real/Ás-a-Ás enfraquece a maldição.',
-  daniela_swarm: 'Não pegue o Lixo contaminado. Evitar reduz Sede; pegar aumenta.',
-  crimson_clot: 'Dano vai primeiro ao Coágulo. Romper reduz Sede; sobrar vira cura.',
+  daniela_swarm: 'Não pegue o Lixo contaminado. Evitar não altera Sede; pegar aumenta.',
+  crimson_clot: 'Dano vai primeiro ao Coágulo. Romper evita a cura; sobrar vira cura.',
   castle_lockdown: 'Lixo fechado por 1 rodada. Só o Monte fica disponível.',
-  three_daughters: 'Três objetivos simultâneos. Cada sucesso reduz Sede; cada falha aumenta.',
+  three_daughters: 'Três objetivos simultâneos. Sucesso evita punição; cada falha aumenta Sede.',
 
   // Rainha Nehelenia.
   mirrored_meld: 'Use 1 carta e escolha o jogo verdadeiro. Errar = +18 no Mundo do Espelho e Desorientado.',
@@ -7122,9 +7130,41 @@ function closeBossIntentHelp() {
   const button = document.getElementById('bossIntentHelpButton');
   const popover = document.getElementById('bossIntentHelpPopover');
   if (!button || !popover) return;
+  popover._extraTrigger?.setAttribute('aria-expanded', 'false');
+  popover._extraTrigger = null;
   popover.hidden = true;
   popover.setAttribute('aria-hidden', 'true');
   button.setAttribute('aria-expanded', 'false');
+}
+
+function positionBossHelpPopover(trigger, popover) {
+  if (!trigger?.isConnected || popover.hidden) return;
+  // Portal avoids clipping by the HUD/card and anchors every help to its own ?.
+  if (popover.parentElement !== document.body) document.body.append(popover);
+  popover.classList.add('boss-help-anchored');
+  popover._anchorTrigger = trigger;
+  const r = trigger.getBoundingClientRect();
+  const w = popover.offsetWidth, h = popover.offsetHeight, gap = 10, edge = 10;
+  let side = 'right', x = r.right + gap, y = r.top + r.height / 2 - h / 2;
+  if (x + w > window.innerWidth - edge) {
+    if (r.left - gap - w >= edge) { side = 'left'; x = r.left - gap - w; }
+    else { side = r.bottom + gap + h <= window.innerHeight - edge ? 'below' : 'above'; x = r.left + r.width / 2 - w / 2; y = side === 'below' ? r.bottom + gap : r.top - gap - h; }
+  }
+  x = Math.max(edge, Math.min(x, window.innerWidth - w - edge));
+  y = Math.max(edge, Math.min(y, window.innerHeight - h - edge));
+  popover.style.left = `${x}px`; popover.style.top = `${y}px`;
+  popover.dataset.anchorSide = side;
+  const vertical = side === 'right' || side === 'left';
+  popover.style.setProperty('--help-arrow', `${Math.max(12, Math.min(vertical ? r.top + r.height / 2 - y : r.left + r.width / 2 - x, (vertical ? h : w) - 12))}px`);
+  if (!window._bossHelpAnchorBound) {
+    window._bossHelpAnchorBound = true;
+    const reposition = () => document.querySelectorAll('.boss-help-anchored:not([hidden])').forEach(node => {
+      if (!node._anchorTrigger?.isConnected) { node.hidden = true; node.setAttribute('aria-hidden', 'true'); return; }
+      positionBossHelpPopover(node._anchorTrigger, node);
+    });
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+  }
 }
 
 function closeBossRuleHelp() {
@@ -7164,6 +7204,7 @@ function syncBossRuleHelp(gameState, definition = null) {
     popover.hidden = !opening;
     popover.setAttribute('aria-hidden', opening ? 'false' : 'true');
     button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (opening) positionBossHelpPopover(button, popover);
   });
 
   close.addEventListener('click', (event) => {
@@ -7191,6 +7232,9 @@ function syncBossIntentHelp(gameState) {
   const close = document.getElementById('bossIntentHelpClose');
   if (!button || !popover || !title || !text || !close) return;
 
+  // Combat help shares the official floating popover, not a second component.
+  if (!popover.hidden && popover._extraTrigger?.isConnected) return;
+
   const help = buildBossAbilityHelp(gameState);
   button.hidden = !help;
   if (!help) {
@@ -7208,22 +7252,25 @@ function syncBossIntentHelp(gameState) {
 
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    const opening = popover.hidden;
-    if (opening) closeBossRuleHelp();
+    const opening = popover.hidden || !!popover._extraTrigger;
+    closeBossIntentHelp();
+    if (opening) { syncBossIntentHelp(state); closeBossRuleHelp(); }
     popover.hidden = !opening;
     popover.setAttribute('aria-hidden', opening ? 'false' : 'true');
     button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (opening) positionBossHelpPopover(button, popover);
   });
 
   close.addEventListener('click', (event) => {
     event.stopPropagation();
+    const trigger = popover._extraTrigger || button;
     closeBossIntentHelp();
-    button.focus({ preventScroll: true });
+    trigger.focus({ preventScroll: true });
   });
 
   document.addEventListener('click', (event) => {
     if (popover.hidden) return;
-    if (popover.contains(event.target) || button.contains(event.target)) return;
+    if (popover.contains(event.target) || button.contains(event.target) || popover._extraTrigger?.contains(event.target)) return;
     closeBossIntentHelp();
   });
 
@@ -7232,12 +7279,119 @@ function syncBossIntentHelp(gameState) {
   });
 }
 
+function createBossCombatHelp(label, title, text) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'boss-intent-help-button boss-combat-help';
+  button.textContent = '?'; button.setAttribute('aria-label', label);
+  button.setAttribute('aria-controls', 'bossIntentHelpPopover'); button.setAttribute('aria-expanded', 'false');
+  button.onclick = (event) => {
+    event.stopPropagation();
+    const popover = document.getElementById('bossIntentHelpPopover');
+    const opening = popover.hidden || popover._extraTrigger !== button;
+    closeBossIntentHelp(); closeBossRuleHelp();
+    if (!opening) return;
+    document.getElementById('bossIntentHelpTitle').textContent = title;
+    document.getElementById('bossIntentHelpText').textContent = text;
+    popover._extraTrigger = button;
+    popover.hidden = false; popover.setAttribute('aria-hidden', 'false');
+    button.setAttribute('aria-expanded', 'true');
+    positionBossHelpPopover(button, popover);
+  };
+  return button;
+}
+
+function renderBossCombatPanel(hud, boss) {
+  let panel = document.getElementById('bossCombatPanel');
+  const model = getBossUiAdapter(boss.id)?.combatHud?.({ gameState: state, playerId: state.players[myPlayerIndex]?.id });
+  if (!model) { if (panel) panel.hidden = true; if (document.getElementById('bossIntentHelpPopover')?._extraTrigger) closeBossIntentHelp(); document.getElementById('nemesisStarsOverlay')?.remove(); hud.querySelector('.boss-combat-targets')?.remove(); document.getElementById('nemesisEffectSummary')?.remove(); hud.querySelector('.boss-portrait')?.setAttribute('aria-hidden', 'true'); return; }
+  if (!panel) { panel = document.createElement('section'); panel.id = 'bossCombatPanel'; panel.className = 'boss-combat-panel'; }
+  // Helpers occupy their own strip below the HUD, just like daughters/attendants.
+  if (panel.previousElementSibling !== hud) hud.insertAdjacentElement('afterend', panel);
+  panel.hidden = false;
+  const disabled = state.currentPlayer !== myPlayerIndex || isBossTurnActive(state) || !!boss.result || pauseBlocksPlay(state);
+  const fingerprint = JSON.stringify([model, disabled, state.players[myPlayerIndex]?.id]);
+  if (panel.dataset.fingerprint === fingerprint) return;
+  panel.dataset.fingerprint = fingerprint;
+  const sessionChanged = panel.dataset.combatSession !== String(model.sessionKey);
+  const initialRender = !panel._combatSeenEvents || sessionChanged;
+  if (initialRender) panel._combatSeenEvents = new Set();
+  panel.dataset.combatSession = String(model.sessionKey);
+  if (document.getElementById('bossIntentHelpPopover')?._extraTrigger) closeBossIntentHelp();
+  panel.replaceChildren();
+  document.getElementById('nemesisStarsOverlay')?.remove();
+  hud.querySelector('.boss-combat-targets')?.remove();
+  const starsOverlay = document.createElement('span'); starsOverlay.id = 'nemesisStarsOverlay';
+  starsOverlay.className = 'nemesis-stars-overlay';
+  const starsLabel = document.createElement('span'); starsLabel.textContent = `🎯 S.T.A.R.S. — ${model.stars.toLocaleUpperCase('pt-BR')}`;
+  starsOverlay.append(starsLabel, createBossCombatHelp('Explicar alvo S.T.A.R.S.', 'Alvo S.T.A.R.S.', 'Prioridade ofensiva: este jogador.\nQuem causar dano direto ao Nemesis assume S.T.A.R.S.\nDano causado aos zumbis não altera o alvo.'));
+  const mainPortrait = hud.querySelector('.boss-portrait');
+  mainPortrait.removeAttribute('aria-hidden'); mainPortrait.append(starsOverlay);
+  const selectTarget = async (id) => {
+    if (disabled || committing || state.finished || window.isClosingGame || !canPerformCommonGameAction() || !setBossDamageTarget(state, state.players[myPlayerIndex].id, id)) return;
+    renderBossCombatPanel(hud, state.boss);
+    await commitState();
+  };
+  let effects = document.getElementById('nemesisEffectSummary');
+  if (!effects) { effects = document.createElement('small'); effects.id = 'nemesisEffectSummary'; document.getElementById('bossIntentProgress').insertAdjacentElement('afterend', effects); }
+  effects.textContent = model.effects; effects.hidden = !model.effects;
+  const entities = document.createElement('div'); entities.className = 'boss-combat-entities';
+  for (const entity of model.entities) {
+    const item = document.createElement('article'); item.dataset.entityId = entity.id;
+    item.className = `boss-daughter-card boss-combat-entity is-${entity.status}${entity.mutated ? ' is-mutated' : ''}${entity.reinforced ? ' is-reinforced' : ''}`;
+    const newVisualEvent = entity.visualEventId && !panel._combatSeenEvents.has(entity.visualEventId);
+    if (entity.visualEventId) panel._combatSeenEvents.add(entity.visualEventId);
+    if (newVisualEvent && !initialRender && entity.status !== 'repelled') item.classList.add('is-transitioning');
+    if (entity.portrait) { const portrait = document.createElement('img'); portrait.src = entity.portrait; portrait.alt = entity.name; portrait.className = 'boss-combat-portrait'; item.append(portrait); }
+    const content = document.createElement('div'); content.className = 'boss-combat-content';
+    const label = document.createElement('b'); label.textContent = entity.name.toLocaleUpperCase('pt-BR'); item.append(label);
+    const chips = document.createElement('span'); chips.className = 'boss-combat-chips';
+    for (const text of entity.status === 'corpse' ? ['CADÁVER'] : entity.status === 'entering' ? ['INVADINDO'] : entity.selectable ? ['ATIVO', ...(entity.mutated ? ['MUTADO'] : []), ...(entity.reinforced ? ['REFORÇADO'] : [])] : []) {
+      const chip = document.createElement('small'); chip.className = 'boss-daughter-state'; chip.textContent = text; chips.append(chip);
+    }
+    item.append(chips);
+    if (entity.selectable) {
+      const hp = document.createElement('span'); hp.textContent = `${entity.hp}/${entity.maxHp} HP`;
+      const meter = document.createElement('meter'); meter.min = 0; meter.max = entity.maxHp; meter.value = entity.hp; meter.setAttribute('aria-label', `HP de ${entity.name}`);
+      content.append(hp, meter);
+      const target = document.createElement('button'); target.type = 'button'; target.className = 'boss-combat-card-target'; target.textContent = entity.name;
+      target.setAttribute('aria-label', `Selecionar ${entity.name} como alvo`); target.setAttribute('aria-pressed', String(entity.id === model.target));
+      target.disabled = disabled; target.onclick = () => selectTarget(entity.id); item.append(target);
+      item.classList.toggle('is-selected', entity.id === model.target);
+    }
+    if (entity.selectable) item.append(content);
+    if (entity.help) {
+      item.append(createBossCombatHelp(`Passiva de ${entity.name}`, entity.name, entity.help));
+    }
+    if (entity.status === 'repelled') { item.classList.add('is-withdrawing'); item.addEventListener('animationend', () => item.remove(), { once: true }); }
+    entities.append(item);
+  }
+  panel.append(entities);
+  if (!model.choices.length) return;
+  const targets = document.createElement('div'); targets.className = 'boss-combat-targets';
+  const hint = document.createElement('span'); hint.textContent = 'ALVO'; targets.append(hint);
+  for (const choice of model.choices) {
+    const button = document.createElement('button'); button.type = 'button';
+    const targetName = model.entities.find(entity => entity.id === model.target)?.name;
+    button.textContent = targetName ? `↩ ${targetName}` : choice.name;
+    button.setAttribute('aria-label', 'Redirecionar dano para Nemesis');
+    button.setAttribute('aria-pressed', String(choice.id === model.target));
+    button.disabled = disabled || model.target === 'boss';
+    button.onclick = () => selectTarget(choice.id);
+    targets.append(button);
+  }
+  targets.append(createBossCombatHelp('Explicar alvo do dano', 'Alvo do dano', 'Toque num zumbi ATIVO para atacá-lo. O botão ↩ na arte do Nemesis volta o alvo para o chefe.\nEscolha antes de jogar; vale para o ataque final. Dano excedente não passa para outro alvo.'));
+  mainPortrait.append(targets);
+}
+
 function renderBossHud() {
   const hud = document.getElementById('bossHud');
   const resultSection = document.getElementById('bossResultSection');
   const bossMode = isCurrentBossMode();
   document.body.classList.toggle('boss-mode', bossMode);
   if (!bossMode) {
+    closeBossIntentHelp(); closeBossRuleHelp();
+    const combatPanel = document.getElementById('bossCombatPanel');
+    if (combatPanel) combatPanel.hidden = true;
     clearBossPortraitTerminalVisuals();
     document.body.removeAttribute('data-boss-id');
     if (hud) hud.style.display = 'none';
@@ -7254,6 +7408,7 @@ function renderBossHud() {
     clearBossPortraitTerminalVisuals();
   }
   const definition = getBossDefinition(boss.id);
+  renderBossCombatPanel(hud, boss);
   const isDominatrix = boss.id === 'dominadora';
   const isBanker = boss.id === 'banker';
   const isMatriarch = boss.id === 'matriarca_esmeralda';
@@ -7405,7 +7560,7 @@ function renderBossHud() {
       })
       .join('');
   } else {
-    document.getElementById('bossDangerLabel').textContent = isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : isNehelenia ? 'MUNDO DO ESPELHO' : 'DÍVIDA COLETIVA';
+    document.getElementById('bossDangerLabel').textContent = definition?.dangerLabel || (isMatriarch ? 'FLORESCIMENTO' : isDimitrescu ? 'SEDE DE SANGUE' : isNehelenia ? 'MUNDO DO ESPELHO' : 'DÍVIDA COLETIVA');
     document.getElementById('bossDebtText').textContent = isNehelenia ? `${Math.round((Number(boss.danger) || 0) * 20 * 10) / 10} / 100` : `${boss.danger} / ${boss.maxDanger}`;
     document.getElementById('bossDebtBar').style.width = `${Math.max(0, (boss.danger / boss.maxDanger) * 100)}%`;
     const bloomEventChanged = isMatriarch && boss.lastBloomEventId && boss.lastBloomEventId !== lastRenderedBossBloomEventId;
@@ -7858,6 +8013,8 @@ function renderBossHud() {
 
   const discardButton = document.getElementById('drawDiscardBtn');
   if (discardButton) {
+    const nemesisContaminated = !!getBossUiAdapter(boss.id)?.discard?.({ gameState: state });
+    discardButton.classList.toggle('boss-nemesis-contaminated-discard', nemesisContaminated);
     discardButton.classList.toggle('boss-locked', isBossDiscardBlocked(state) && !state.hasDrawnThisTurn);
     const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
     const pollenActive = (boss.natureThreats || []).some((threat) => threat.status === 'active' && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId));
@@ -7868,7 +8025,8 @@ function renderBossHud() {
     const castleLockdownActive = boss.id === 'dimitrescu' && dimitrescuIntent?.abilityId === 'castle_lockdown' && !state.finished;
     discardButton.classList.toggle('boss-daniela-discard', !!danielaActive);
     discardButton.classList.toggle('boss-castle-lockdown-discard', castleLockdownActive);
-    if (castleLockdownActive) discardButton.setAttribute('aria-label', 'Lixo bloqueado por Portas do Castelo');
+    if (nemesisContaminated) discardButton.setAttribute('aria-label', 'Lixo contaminado pelo Nemesis: +6 Infecção por retirada');
+    else if (castleLockdownActive) discardButton.setAttribute('aria-label', 'Lixo bloqueado por Portas do Castelo');
     else if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
     else if (danielaActive) discardButton.setAttribute('aria-label', 'Lixo cercado pelo Enxame de Daniela');
     else discardButton.removeAttribute('aria-label');
@@ -8028,7 +8186,7 @@ function renderBossHud() {
                     : isRebirth
                       ? 'RENASCIMENTO +300 HP'
                       : isBloodClotBreak
-                        ? `COÁGULO ROMPIDO · SEDE -6`
+                        ? `COÁGULO ROMPIDO · CURA EVITADA`
                         : isBloodClotAbsorb
                           ? `COÁGULO ABSORVEU ${feedback.absorbedDamage}`
                           : isCocoonBreak
@@ -8376,6 +8534,8 @@ function renderAll() {
   const hawkSuitIntent = state.boss?.id === 'nehelenia' && state.boss.currentIntent?.abilityId === 'hawk_suit' ? state.boss.currentIntent : null;
   const neheleniaHawkDiscardDemand = !!hawkSuitIntent && hawkSuitIntent.payload?.targetPlayerId === neheleniaCurrentPlayerId && !hawkSuitIntent.payload?.resolved;
   const discardButtonEl = document.getElementById('drawDiscardBtn');
+  const nemesisContaminated = !!getBossUiAdapter(state.boss?.id)?.discard?.({ gameState: state });
+  discardButtonEl?.classList.toggle('boss-nemesis-contaminated-discard', nemesisContaminated);
   discardButtonEl?.classList.toggle('boss-pollen-discard', !!pollenThreat);
   discardButtonEl?.classList.toggle('boss-daniela-discard', danielaInDiscard);
   discardButtonEl?.classList.toggle('boss-surcharge-discard', state.boss?.id === 'banker' && state.boss.discardSurcharge?.status === 'active');
@@ -8400,7 +8560,9 @@ function renderAll() {
     discardFace.style.zIndex = 20;
 
     const hawkSuitLabel = hawkSuitIntent?.payload?.suit || hawkSuitIntent?.payload?.suitLabel || '';
-    const discardBossStatus = pollenThreat
+    const discardBossStatus = nemesisContaminated
+      ? '<span class="boss-card-status boss-card-status-nemesis-contamination" aria-hidden="true"><i>☣</i><b>CONTAMINADO</b></span>'
+      : pollenThreat
       ? '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>'
       : danielaOnTop
         ? '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-daniela" aria-hidden="true"><i>🩸</i><b>DANIELA</b></span>'
@@ -8751,6 +8913,13 @@ function renderHand() {
     }
 
     const bossCardEffect = getBossCardEffect(state, me.id, card.id);
+    const adapterCard = getBossUiAdapter(state.boss?.id)?.card?.(bossCardEffect);
+    if (adapterCard) {
+      div.classList.add(...adapterCard.classes);
+      div.title = adapterCard.title;
+      const status = document.createElement('span'); status.className = 'boss-combat-card-label'; status.textContent = adapterCard.label;
+      div.append(status);
+    }
     const bossDiscardFeedback = getBossCardBlockFeedback(state, me.id, card.id, 'discard');
     const bossCardLocked = bossCardEffect === 'locked';
 
@@ -9248,6 +9417,28 @@ function applyBossMeldUiSurface(element, classes = [], dataset = {}) {
   }
 }
 
+function applyBossMeldEffectFrame(div, row) {
+  const effects = [
+    ['locked-by-boss', 'PENHORA', '#fbbf24'],
+    ['possessed-by-boss', 'POSSE', '#f472b6'],
+    ['interdicted-by-boss', 'INTERDITO', '#f472b6'],
+    ['rooted-by-matriarch', 'RAIZ', '#34d399'],
+    ['grafted-by-matriarch', 'ENXERTO', '#fde68a'],
+    ['feasted-by-cassandra', 'BANQUETE', '#fb7185'],
+    ['nemesis-impact-zone', 'ZONA DE IMPACTO', '#e86938'],
+    ['mirrored-by-nehelenia', 'ESPELHO', '#c4b5fd'],
+  ].filter(([className]) => div.classList.contains(className));
+  if (!effects.length) return;
+  div.classList.add('boss-meld-marked');
+  row.classList.add('boss-meld-effect-frame');
+  row.style.setProperty('--boss-effect-color', effects[0][2]);
+  // Nehelenia already provides a contextual badge on the card row.
+  if (row.classList.contains('nehelenia-mirror-card-frame')) return;
+  const badge = document.createElement('span'); badge.className = 'boss-meld-effect-badge';
+  badge.textContent = effects.map(([, label]) => label).join(' · ');
+  row.append(badge);
+}
+
 function applyBossMeldCardDecoration(element, decoration, key = '') {
   if (!element || !decoration) return;
   applyBossMeldUiSurface(element, decoration.classes || []);
@@ -9427,6 +9618,7 @@ function renderMelds() {
       const row = document.createElement('div');
       row.className = 'meld-line-cards';
       applyBossMeldUiSurface(row, bossMeldUi?.rowClasses, bossMeldUi?.rowDataset);
+      applyBossMeldEffectFrame(div, row);
       // Se for uma canastra Ás-a-Ás, injeta o visual BDSM de destaque
       if (mInfo && mInfo.kind === 'asas') {
         div.classList.add('canastra-asas-bdsm');
@@ -10772,6 +10964,7 @@ const botEngine = {
   getDominatrixPriorities: (playerId) => getBossDominatrixPriorities(state, playerId),
   getDimitrescuPriorities: (playerId) => getBossDimitrescuPriorities(state, playerId),
   getNeheleniaPriorities: (playerId) => getBossNeheleniaPriorities(state, playerId),
+  getCombatPriorities: (playerId) => getBossCombatPriorities(state, playerId),
   shouldTakeBossDiscard: (playerId, intent, naturePlan) => shouldBossBotTakeDiscard(state, playerId, { intent, naturePlan }),
   async executeDominationPowers(botIndex) {
     await executeBotDominationPowers(this, botIndex);
@@ -10822,6 +11015,8 @@ const botEngine = {
     const s = this.getState();
     const me = s?.players?.[botIndex];
     if (!s || !me) return false;
+    const combatPlan = getBossCombatPriorities(s, me.id);
+    if (combatPlan?.avoidMeldIndexes?.includes(meldIndex) && combatPlan.infection + combatPlan.impactCost >= 100) return false;
     const quote = getBossCreditLimitQuote(s, cards, {
       creditEligibleCardIds: options.creditEligibleCardIds ?? null,
     });

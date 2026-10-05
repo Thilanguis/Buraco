@@ -672,6 +672,18 @@
   outline-offset: 1px;
 }
 
+.boss-help-anchored {
+  position: fixed !important; z-index: 10000 !important; right: auto !important;
+  width: min(310px, calc(100vw - 20px)); max-height: calc(100vh - 20px);
+  overflow: visible !important; box-sizing: border-box;
+}
+.boss-help-anchored p { max-height: min(290px, calc(100vh - 85px)); overflow: auto; }
+.boss-help-anchored::before { right: auto; top: auto; left: auto; bottom: auto; }
+.boss-help-anchored[data-anchor-side='right']::before { left: -6px; top: calc(var(--help-arrow) - 5px); transform: rotate(-45deg); }
+.boss-help-anchored[data-anchor-side='left']::before { right: -6px; top: calc(var(--help-arrow) - 5px); transform: rotate(135deg); }
+.boss-help-anchored[data-anchor-side='below']::before { left: calc(var(--help-arrow) - 5px); top: -6px; transform: rotate(45deg); }
+.boss-help-anchored[data-anchor-side='above']::before { left: calc(var(--help-arrow) - 5px); bottom: -6px; transform: rotate(225deg); }
+
 .boss-intent-help-popover p {
   position: relative;
   z-index: 1;
@@ -7495,4 +7507,28 @@ body[data-boss-id='dominadora'] .boss-domination-player.dominated .boss-dominati
 
 .boss-card-ref.suit-dark {
   color: #bfdbfe;
+}
+
+/* All boss effects frame the card row, never the Canastra/Limpa metadata. */
+body.boss-mode .meld-line.boss-meld-marked {
+  outline: none !important; border-color: transparent !important;
+  background: transparent !important; box-shadow: none !important;
+  opacity: 1 !important; filter: none !important;
+}
+body.boss-mode .meld-line.boss-meld-marked::before,
+body.boss-mode .meld-line.boss-meld-marked::after {
+  content: none !important; display: none !important;
+}
+body.boss-mode .meld-line-cards.boss-meld-effect-frame {
+  position: relative; overflow: visible; border-radius: 5px;
+  outline: 1px solid var(--boss-effect-color); outline-offset: 3px;
+}
+body.boss-mode .locked-by-boss > .meld-line-cards { filter: saturate(.55); opacity: .72; }
+body.boss-mode .meld-line.boss-meld-marked > .meld-meta { margin-top: 8px; }
+.boss-meld-effect-badge {
+  position: absolute; top: 3px; right: 3px; z-index: 35;
+  padding: 2px 4px; max-width: calc(100% - 6px); box-sizing: border-box;
+  border: 1px solid var(--boss-effect-color); border-radius: 3px;
+  color: var(--boss-effect-color); background: rgba(8,13,23,.92);
+  font-size: 7px; font-weight: 900; line-height: 1.2; pointer-events: none;
 }

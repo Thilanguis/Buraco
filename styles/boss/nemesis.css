@@ -1,0 +1,192 @@
+﻿body[data-boss-id="nemesis"] #bossDebtBar { background: #9bba43; }
+.boss-combat-panel { display: none; }
+body[data-boss-id="nemesis"] .boss-combat-panel { width: var(--boss-stage-width); margin: 6px auto 0; position: relative; z-index: 31; display: grid; gap: 7px; color: #ede6cf; }
+body[data-boss-id="nemesis"] .boss-combat-panel[hidden] { display: none; }
+body[data-boss-id="nemesis"] .boss-combat-head { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; flex-wrap: wrap; }
+body[data-boss-id="nemesis"] .boss-combat-entities { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+body[data-boss-id="nemesis"] .boss-combat-entities:empty { display: none; }
+/* Reuse the approved daughter/attendant art, name gradient and status chips. */
+body[data-boss-id="nemesis"] .boss-combat-entity { box-sizing: border-box; width: 100%; min-width: 0; min-height: 110px; height: auto; aspect-ratio: 8 / 3; padding: 0; border-color: #655840; font-size: 10px; }
+body[data-boss-id="nemesis"] .boss-combat-entity > .boss-combat-portrait { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: cover; object-position: center; background: none; }
+body[data-boss-id="nemesis"] .boss-combat-entity > b { padding-right: 27px; padding-left: 4px; }
+body[data-boss-id="nemesis"] .boss-combat-content { position: absolute; bottom: 29px; left: 7px; right: 7px; z-index: 3; display: grid; gap: 2px; text-shadow: 0 1px 3px #000; pointer-events: none; }
+body[data-boss-id="nemesis"] .boss-combat-chips { position: absolute; top: 7px; right: 7px; z-index: 4; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; pointer-events: none; }
+body[data-boss-id="nemesis"] .boss-combat-chips .boss-daughter-state { position: static; max-width: none; }
+body[data-boss-id="nemesis"] .boss-combat-entity.is-corpse { opacity: .6; border-color: #555; }
+body[data-boss-id="nemesis"] .boss-combat-entity.is-corpse .boss-combat-portrait { filter: grayscale(1); }
+body[data-boss-id="nemesis"] .boss-combat-entity.is-entering { border-color: #e8b654; }
+body[data-boss-id="nemesis"] .boss-combat-entity.is-selected { border-color: #ffd38a; box-shadow: 0 0 0 1px #ffd38a, inset 0 0 15px #a454252e; }
+body[data-boss-id="nemesis"] .boss-combat-card-target { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; font-size: 0; border-radius: inherit; }
+body[data-boss-id="nemesis"] .boss-combat-card-target:focus-visible { opacity: 1; background: transparent; outline: 2px solid #ffe19f; }
+body[data-boss-id="nemesis"] .boss-combat-entity > .boss-combat-help { position: absolute; bottom: 7px; right: 7px; z-index: 5; margin: 0; }
+body[data-boss-id="nemesis"] .boss-portrait { position: relative; }
+body[data-boss-id="nemesis"] .nemesis-stars-overlay { position: absolute; top: 5px; right: 5px; z-index: 5; display: flex; align-items: center; gap: 3px; box-sizing: border-box; max-width: calc(100% - 10px); padding: 3px 4px; border-radius: 4px; background: rgba(8, 13, 23, .8); color: #fef3c7; font-size: 8px; font-weight: 800; }
+body[data-boss-id="nemesis"] .nemesis-stars-overlay > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-boss-id="nemesis"] .nemesis-stars-overlay .boss-combat-help { margin: 0; }
+body[data-boss-id="nemesis"] .boss-combat-entity.is-transitioning { animation: nemesisThreatArrives 550ms ease-out both; }
+body[data-boss-id="nemesis"] .boss-combat-entity.is-withdrawing { pointer-events: none; animation: nemesisThreatWithdraws 700ms ease-in both; }
+@keyframes nemesisThreatArrives { from { opacity: .35; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
+@keyframes nemesisThreatWithdraws { to { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse) {
+  body[data-boss-id="nemesis"] .boss-combat-entity.is-transitioning { animation: none; }
+  body[data-boss-id="nemesis"] .boss-combat-entity.is-withdrawing { animation-duration: 90ms; }
+  @keyframes nemesisThreatWithdraws { to { opacity: 0; } }
+}
+body[data-boss-id="nemesis"] .boss-combat-entity.is-mutated { border-color: #b76f32; }
+body[data-boss-id="nemesis"] .boss-combat-entity meter { width: 100%; height: 9px; }
+body[data-boss-id="nemesis"] .boss-combat-targets { position: absolute; bottom: 8px; right: 8px; z-index: 6; display: flex; align-items: center; gap: 3px; max-width: calc(100% - 10px); padding: 2px 3px; border-radius: 5px; background: rgba(8,13,23,.88); color: #ede6cf; font-size: 8px; }
+body[data-boss-id="nemesis"] .boss-combat-targets button:not(.boss-combat-help) { width: auto; margin: 0; padding: 3px 5px; min-height: 22px; color: #e7e7d5; background: #1e251c; border: 1px solid #627241; border-radius: 4px; font-size: 9px; }
+body[data-boss-id="nemesis"] .boss-combat-targets button[aria-pressed="true"] { background: #5b291f; border-color: #f0c46c; }
+body[data-boss-id="nemesis"] #nemesisEffectSummary { display: block; color: #fbbf24; font-size: 9px; font-weight: 800; margin-top: 3px; }
+body[data-boss-id="nemesis"] #nemesisEffectSummary[hidden] { display: none; }
+body[data-boss-id="nemesis"] .carta.nemesis-grabbed { box-shadow: inset 0 0 0 3px #717c49; }
+body[data-boss-id="nemesis"] .carta.nemesis-marked { box-shadow: inset 0 0 0 3px #d77647; }
+body[data-boss-id="nemesis"] .boss-combat-card-label { position: absolute; bottom: 3px; left: 3px; background: #182213; color: #f4e4b6; font-size: 8px; padding: 2px 3px; border-radius: 2px; z-index: 3; }
+@media (max-width: 650px) { body[data-boss-id="nemesis"] .boss-combat-entity { min-height: 100px; font-size: 9px; } body[data-boss-id="nemesis"] .boss-combat-targets { bottom: 4px; right: 4px; } }
+
+
+/* Infecção — medidor biomecânico exclusivo do Nemesis. */
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-label {
+  color: #a8c97a;
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-label > span:first-child {
+  color: #c9ee86;
+  letter-spacing: .65px;
+  text-shadow: 0 0 8px rgba(113, 208, 45, .28);
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-label strong {
+  color: #efffd2;
+  text-shadow: 0 0 7px rgba(126, 255, 64, .22);
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track {
+  position: relative;
+  isolation: isolate;
+  height: 18px;
+  margin: 20px 31px 6px 34px;
+  overflow: visible;
+  border: 0;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 22% 50%, rgba(118, 176, 40, .18) 0 2px, transparent 3px),
+    radial-gradient(circle at 74% 44%, rgba(79, 130, 24, .20) 0 2px, transparent 3px),
+    linear-gradient(180deg, rgba(15, 28, 8, .98), rgba(4, 9, 3, .99));
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, .86),
+    inset 0 0 12px rgba(81, 147, 32, .28),
+    0 0 0 1px rgba(35, 68, 19, .72);
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track > span {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, #d8ff65 0%, #91d83f 24%, #4fae27 58%, #1f651a 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(244, 255, 202, .48),
+    inset 0 -5px 7px rgba(20, 73, 15, .48),
+    inset -5px 0 9px rgba(23, 73, 15, .28),
+    0 0 8px rgba(132, 224, 55, .82),
+    0 0 17px rgba(87, 184, 35, .34);
+  filter: saturate(1.28) brightness(1.08) contrast(1.04);
+  animation: nemesisInfectionPulse 3.6s ease-in-out infinite;
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track > span::before {
+  content: '';
+  position: absolute;
+  inset: -18px 0 -2px;
+  pointer-events: none;
+  opacity: .82;
+  background:
+    radial-gradient(circle, rgba(235, 255, 181, .78) 0 1px, rgba(188, 255, 105, .36) 1.3px 2.2px, transparent 2.7px) 3px 23px / 29px 22px repeat,
+    radial-gradient(circle, rgba(217, 255, 157, .62) 0 1.6px, rgba(126, 225, 59, .24) 2px 3px, transparent 3.5px) 15px 31px / 43px 29px repeat,
+    radial-gradient(circle, rgba(244, 255, 211, .48) 0 2px, rgba(139, 235, 74, .18) 2.4px 3.7px, transparent 4.2px) 28px 40px / 67px 38px repeat;
+  filter: drop-shadow(0 0 2px rgba(191, 255, 107, .38));
+  animation: nemesisInfectionBubbles 4.4s linear infinite;
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track > span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(105deg, transparent 0 16%, rgba(243, 255, 210, .18) 23%, transparent 31% 58%, rgba(226, 255, 185, .10) 66%, transparent 76% 100%),
+    radial-gradient(ellipse at 50% 0%, rgba(244, 255, 220, .26), transparent 58%);
+  mix-blend-mode: screen;
+  animation: nemesisInfectionShimmer 3.1s ease-in-out infinite;
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  left: -35px;
+  right: -32px;
+  top: 50%;
+  height: 48px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background-image: url('../../assets/images/nemesis-infection-meter-frame.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  filter:
+    drop-shadow(0 3px 3px rgba(0, 0, 0, .74))
+    drop-shadow(0 0 7px rgba(85, 180, 37, .32));
+}
+body[data-boss-id="nemesis"] .boss-debt-meter .dimitrescu-blood-drop {
+  display: none !important;
+}
+body[data-boss-id="nemesis"] .boss-debt-meter #bossDebtBar[style^='width: 0']::before,
+body[data-boss-id="nemesis"] .boss-debt-meter #bossDebtBar[style^='width: 0']::after {
+  display: none;
+}
+
+
+@keyframes nemesisInfectionBubbles {
+  0% {
+    background-position: 3px 28px, 15px 38px, 28px 48px;
+  }
+  50% {
+    background-position: 8px 8px, 9px 12px, 34px 18px;
+  }
+  100% {
+    background-position: 13px -12px, 3px -14px, 40px -12px;
+  }
+}
+@keyframes nemesisInfectionPulse {
+  0%, 100% { filter: saturate(1.24) brightness(1.04) contrast(1.04); }
+  50% { filter: saturate(1.4) brightness(1.16) contrast(1.06); }
+}
+@keyframes nemesisInfectionShimmer {
+  0%, 100% { opacity: .55; transform: translateX(-2%); }
+  50% { opacity: .92; transform: translateX(2%); }
+}
+
+
+@media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse) {
+  body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track > span,
+  body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track > span::before,
+  body[data-boss-id="nemesis"] .boss-debt-meter .boss-meter-track > span::after {
+    animation: none !important;
+  }
+}
+.boss-mode #drawDiscardBtn.boss-nemesis-contaminated-discard .pile-card,
+.boss-mode #drawDiscardBtn.boss-nemesis-contaminated-discard .discard-face {
+  box-shadow: 0 0 0 2px #e86938, 0 0 16px rgba(232, 105, 56, .5) !important;
+}
+.boss-mode #drawDiscardBtn.boss-nemesis-contaminated-discard::after {
+  content: '☣ +6 INFECÇÃO / RETIRADA';
+  display: block;
+  margin-top: 3px;
+  color: #ffb68f;
+  font-size: 8px;
+  font-weight: 1000;
+  text-align: center;
+}
+.boss-card-status-nemesis-contamination {
+  background: rgba(88, 30, 8, .94);
+  border-color: #e86938;
+  color: #ffd0b4;
+}

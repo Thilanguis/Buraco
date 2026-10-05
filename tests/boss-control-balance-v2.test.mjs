@@ -28,10 +28,10 @@ test('Canastra Real direta reduz 8 pontos de Dominação', () => {
   assert.equal(delta, -0.64); // 0.64 Chicote fracionário × 12,5 = 8 pontos
 });
 
-test('Nehelenia tira Prisão do pool ofensivo e Real direta reduz 8 pontos', () => {
+test('Nehelenia inclui Prisão condicional no pool normal e Real direta reduz 8 pontos', () => {
   const prison = neheleniaDefinition.abilities.find((a) => a.id === 'mirror_prison');
-  assert.equal(prison.weight, 0);
-  assert.deepEqual(prison.phases, []);
+  assert.equal(prison.weight, 2);
+  assert.deepEqual(prison.phases, [1, 2, 3]);
 
   let reliefAmount = 0;
   neheleniaBossMechanics.onMeldContribution({

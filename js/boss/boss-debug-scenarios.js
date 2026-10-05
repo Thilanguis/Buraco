@@ -1,6 +1,7 @@
 import { createDeck } from '../deck.js';
 import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, getBossAbilityPhases, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
 import { getBossDefinition, listBossDefinitions } from './boss-registry.js';
+import { getBossMechanicsAdapter } from './mechanics/boss-mechanics-registry.js';
 
 const SUITS = Object.freeze(['\u2660', '\u2666', '\u2663', '\u2665']);
 const RANKS = Object.freeze(['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']);
@@ -22,6 +23,10 @@ const VARIANTS = Object.freeze({
   reload: { id: 'reload', label: 'Reload com efeito pendente' },
   undo: { id: 'undo', label: 'Voltar apos a acao' },
   bot: { id: 'bot', label: 'Bot como responsavel' },
+  reentry: { id: 'reentry', label: 'Repelido pode voltar' },
+  avoid_repeat: { id: 'avoid_repeat', label: 'Evitar repetir repelido' },
+  phase_cap: { id: 'phase_cap', label: 'Teto de persistentes da fase preenchido' },
+  persistent_corpse: { id: 'persistent_corpse', label: 'Persistente e cadáver / reload' },
 });
 
 const OBJECTIVE_ABILITIES = new Set([
@@ -93,15 +98,18 @@ const SPECIAL_VARIANTS = Object.freeze({
 });
 
 function variantsForAbility(abilityId) {
-  const explicit = SPECIAL_VARIANTS[abilityId];
+  const metadata = listBossDefinitions().flatMap((definition) => definition.abilities).find((entry) => entry.id === abilityId)?.debug;
+  const explicit = metadata?.variants || SPECIAL_VARIANTS[abilityId];
   const ids = explicit || ['interactive', 'success', 'failure', ...(OBJECTIVE_ABILITIES.has(abilityId) ? ['external_cancel'] : []), 'reload', 'undo', 'bot'];
-  const withFallback = NO_TARGET_ABILITIES.has(abilityId) && !ids.includes('no_target') ? [...ids, 'no_target'] : ids;
+  const withFallback = (metadata?.noTarget || NO_TARGET_ABILITIES.has(abilityId)) && !ids.includes('no_target') ? [...ids, 'no_target'] : ids;
   return withFallback.map((id) => VARIANTS[id]).filter(Boolean);
 }
 
 function targetsForAbility(abilityId) {
+  const metadata = listBossDefinitions().flatMap((definition) => definition.abilities).find((entry) => entry.id === abilityId)?.debug;
   const targets = [{ id: 'auto', label: 'Automatico' }];
-  if (TARGETED_PLAYER_ABILITIES.has(abilityId)) {
+  if (metadata?.targets) targets.push(...metadata.targets);
+  if (metadata?.targetPlayer || TARGETED_PLAYER_ABILITIES.has(abilityId)) {
     targets.push({ id: 'human', label: 'Jogador humano' }, { id: 'bot', label: 'Bot' });
   }
   if (TARGETED_MELD_ABILITIES.has(abilityId)) {
@@ -409,7 +417,7 @@ function scenarioExpected(state, abilityId, variant) {
   };
   if (variant === 'failure' && state.boss?.id === 'matriarca_esmeralda') expected.threatStatus = 'failed';
   if (variant === 'external_cancel') expected.threatStatus = 'cancelled';
-  if (variant === 'no_target') {
+  if (variant === 'no_target' || variant === 'phase_cap' || (variant === 'persistent_corpse' && state.boss.phase === 1)) {
     expected.forcedAbilityRejected = abilityId;
     expected.fallbackSelected = true;
   }
@@ -417,6 +425,7 @@ function scenarioExpected(state, abilityId, variant) {
 }
 
 function payloadMatchesTarget(payload, target) {
+  if (target.startsWith('zombie_')) return payload?.entityId === target.slice(7);
   if (!target || target === 'auto' || target === 'team') return true;
   if (target === 'human' || target === 'bot') {
     const expectedId = target === 'human' ? 0 : 1;
@@ -459,6 +468,7 @@ function findSeedForTarget(state, abilityId, target) {
 }
 
 function scenarioInstructions(ability, variant, eligibility, state) {
+  if (!eligibility.eligible) return [`HABILIDADE: ${ability.name}`, `FASE: ${state.boss.phase}`, '', 'COMO TESTAR:', variant === 'phase_cap' ? 'O teto de persistentes da fase está cheio. Execute para confirmar a rejeição da Invasão e o fallback legal.' : 'O cenário não oferece alvo elegível. Execute para confirmar a rejeição e o fallback legal.', '', 'ESPERADO:', 'Outra habilidade elegível é anunciada; nenhuma entrada/reanimação é forçada fora das regras.'].join('\n');
   if (ability.id === 'final_order') {
     return [
       'HABILIDADE: Ordem Final',
@@ -486,6 +496,9 @@ function scenarioInstructions(ability, variant, eligibility, state) {
       undo: 'Execute uma acao legal e use Voltar para restaurar o snapshot transacional.',
       bot: 'O bot e o responsavel pelo alvo ou pela proxima acao automatizavel.',
       no_target: 'A habilidade solicitada nao possui alvo; execute para confirmar a rejeicao e o fallback legal.',
+      reentry: 'O Agarrador está repelido, não morto: execute para confirmar uma nova entrada com objetivo real.',
+      avoid_repeat: 'O Agarrador foi o último repelido. A entrada deve escolher outra ameaça elegível.',
+      persistent_corpse: 'Confira os estados distintos de persistente/cadáver e recarregue para verificar sua preservação.',
     }[variant] || 'Siga o HUD e interaja normalmente com a habilidade pelo motor real.';
   return [`HABILIDADE: ${ability.name}`, `FASE: ${state.boss.phase}`, `ALVO: ${target}`, '', 'COMO TESTAR:', variantHint, '', 'ESPERADO:', ability.describe({ phase: state.boss.phase, ...(eligibility.payload || {}) })].join('\n');
 }
@@ -495,10 +508,10 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
   let phase = resolveBossDebugPhase(definition.id, ability.id, options.phase);
   if (variant === 'no_target' && options.phase === 'auto' && definition.id === 'dominadora' && ability.phases.includes(2)) phase = 2;
   const requestedTarget = options.target || (variant === 'bot' ? 'bot' : 'auto');
-  const target = definition.id === 'nehelenia' && variant === 'interactive'
+  const target = ability.debug?.fixedTargetsByVariant?.[variant] || (definition.id === 'nehelenia' && variant === 'interactive'
     && requestedTarget === 'auto' && NEHELENIA_ATTENDANT_PLAYER_ABILITIES.has(ability.id)
     ? 'human'
-    : requestedTarget;
+    : requestedTarget);
   if (!variantsForAbility(ability.id).some((entry) => entry.id === variant)) {
     throw new Error(`${ability.name} nao oferece a variante ${variant}.`);
   }
@@ -518,6 +531,7 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
   state.boss.bossFlow = null;
   configureAbilityState(state, ability.id);
   configureVariantState(state, ability.id, variant);
+  getBossMechanicsAdapter(definition.id)?.configureDebugState?.(state, ability.id, variant, target);
   if (['discard_mirror', 'mirrored_meld', 'eternal_nightmare'].includes(ability.id) && variant === 'interactive') {
     // No Laboratório, cada preparação interativa precisa nascer com uma seed nova.
     // Isso evita que Espelho do Lixo, Jogo Espelhado ou Pesadelo Eterno repitam
@@ -527,10 +541,11 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
   }
 
   const eligibility = findSeedForTarget(state, ability.id, target);
-  if (variant !== 'no_target' && !eligibility.eligible) throw new Error(eligibility.reason);
-  if (variant === 'no_target' && eligibility.eligible) throw new Error(`${ability.name} ainda encontrou um alvo no cenario sem alvo.`);
+  const expectsNoTarget = variant === 'no_target' || variant === 'phase_cap' || (variant === 'persistent_corpse' && phase === 1);
+  if (!expectsNoTarget && !eligibility.eligible) throw new Error(eligibility.reason);
+  if (expectsNoTarget && eligibility.eligible) throw new Error(`${ability.name} ainda encontrou um alvo no cenario sem alvo.`);
   queueDebugBossAbility(state, ability.id);
-  if (variant === 'no_target') state.boss.debugFallbackOnIneligible = true;
+  if (expectsNoTarget) state.boss.debugFallbackOnIneligible = true;
   state.debugScenario = {
     version: 1,
     active: true,
@@ -554,7 +569,7 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
     state,
     phase,
     targetPlayerId: eligibility.payload?.targetPlayerId ?? null,
-    expectedIntent: variant === 'no_target' ? null : { abilityId: ability.id, payload: clone(eligibility.payload) },
+    expectedIntent: expectsNoTarget ? null : { abilityId: ability.id, payload: clone(eligibility.payload) },
     expected: clone(state.debugScenario.expected),
     instructions: scenarioInstructions(ability, variant, eligibility, state),
     invariants: validation,
@@ -631,7 +646,8 @@ export function getBossDebugResourceState(state, { bossId = null, target = 'huma
     return { available: true, targetable: false, step: 10, label: `Mundo do Espelho ${formatBossDebugNumber((Number(boss.danger) || 0) * 20)}/100` };
   }
 
-  return { available: true, targetable: false, step: 10, label: `Dívida ${formatBossDebugNumber(boss.danger)}/100` };
+  const resourceLabel = getBossDefinition(boss.id)?.dangerLabel || 'Dívida';
+  return { available: true, targetable: false, step: 10, label: `${resourceLabel} ${formatBossDebugNumber(boss.danger)}/100` };
 }
 
 export function adjustBossDebugResource(state, { bossId = null, action = 'increase', target = 'human' } = {}) {
@@ -748,7 +764,7 @@ export function validateBossDebugScenario(state, { bossId, abilityId, phase, var
   if (abilityId && !errors.length) {
     eligibility = inspectBossAbilityEligibility(state, abilityId, { debug: true });
     if (variant === 'no_target' && eligibility.eligible) errors.push(`${abilityId} encontrou alvo quando deveria usar fallback.`);
-    if (variant !== 'no_target' && !eligibility.eligible) errors.push(eligibility.reason);
+    if (variant !== 'no_target' && variant !== 'phase_cap' && !(variant === 'persistent_corpse' && state.boss.phase === 1) && !eligibility.eligible) errors.push(eligibility.reason);
   }
   return {
     valid: errors.length === 0,
@@ -818,6 +834,31 @@ function addCardToLegalMeld(state, playerId, preferredCardId = null, preferredMe
 
 function executeMinimalSuccess(state, preferredPlayerId = null) {
   const intent = state.boss?.currentIntent;
+  const adapter = getBossMechanicsAdapter(state.boss?.id);
+  if (adapter?.debugSuccessPlan) {
+    const plan = adapter.debugSuccessPlan(state);
+    const playerId = intent?.payload.targetPlayerId ?? preferredPlayerId ?? state.players[state.currentPlayer].id;
+    const plans = plan.teamPlans || [{ ...plan, playerId }];
+    for (const memberPlan of plans) {
+      const player = state.players.find((entry) => entry.id === memberPlan.playerId);
+      const playerId = player.id;
+      for (const move of memberPlan.moves) {
+        const cards = move.cardIds.map((id) => player.hand.find((card) => card.id === id));
+        if (cards.some((card) => !card)) return { executed: false, reason: 'A solução perdeu cartas.' };
+        const meldIndex = move.meldIndex ?? state.teams[0].melds.length;
+        const meld = move.meldIndex == null ? [] : state.teams[0].melds[meldIndex];
+        if (!isValidBossSequence([...meld, ...cards])) return { executed: false, reason: 'A solução deixou de ser legal.' };
+        player.hand = player.hand.filter((card) => !move.cardIds.includes(card.id));
+        if (move.meldIndex == null) state.teams[0].melds.push(cards); else meld.push(...cards);
+        applyBossMeldTransition(state, { teamId: 0, playerId, meldIndex, cardsAdded: cards, oldKind: 'simple', newKind: 'simple', isNewMeld: move.meldIndex == null });
+      }
+      if (memberPlan.discardCardId) {
+        const card = player.hand.find((entry) => entry.id === memberPlan.discardCardId);
+        if (card) { player.hand = player.hand.filter((entry) => entry.id !== card.id); state.discard.push(card); notifyBossCardDiscarded(state, playerId, card); }
+      }
+    }
+    return { executed: true, action: 'adapter_legal_solution', playerId, moves: plan.moves };
+  }
   if (!intent) return { executed: false, reason: 'A habilidade nao gerou uma intencao ativa.' };
   if (intent.abilityId === 'final_order') {
     finishCurrentDebugRound(state);
@@ -1120,7 +1161,7 @@ export function executeBossDebugScenarioVariant(state) {
     result = { executed: true, action: 'deadline_advanced' };
   } else if (scenario.variant === 'external_cancel') {
     result = invalidateCurrentTarget(state);
-  } else if (scenario.variant === 'no_target') {
+  } else if (scenario.expected?.fallbackSelected) {
     const requestedAbilityId = scenario.abilityId;
     const selectedAbilityId = state.boss?.currentIntent?.abilityId || state.boss?.lastAbilityId || null;
     result = {

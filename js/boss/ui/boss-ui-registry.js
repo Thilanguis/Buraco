@@ -3,6 +3,7 @@ import { dominatrixBossUi } from './dominatrix-ui.js';
 import { matriarchBossUi } from './matriarch-ui.js';
 import { dimitrescuBossUi } from './dimitrescu-ui.js';
 import { neheleniaBossUi } from './nehelenia-ui.js';
+import { nemesisBossUi } from './nemesis-ui.js';
 
 const BOSS_UI_REGISTRY = Object.freeze({
   [bankerBossUi.id]: bankerBossUi,
@@ -10,6 +11,7 @@ const BOSS_UI_REGISTRY = Object.freeze({
   [matriarchBossUi.id]: matriarchBossUi,
   [dimitrescuBossUi.id]: dimitrescuBossUi,
   [neheleniaBossUi.id]: neheleniaBossUi,
+  [nemesisBossUi.id]: nemesisBossUi,
 });
 
 export function getBossUiAdapter(bossId) {

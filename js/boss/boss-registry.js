@@ -3,6 +3,7 @@ import { dominatrixDefinition } from './bosses/dominatrix.js';
 import { matriarchDefinition } from './bosses/matriarch.js';
 import { dimitrescuDefinition } from './bosses/dimitrescu.js';
 import { neheleniaDefinition } from './bosses/nehelenia.js';
+import { nemesisDefinition } from './bosses/nemesis.js';
 
 const BOSS_REGISTRY = Object.freeze({
   [bankerDefinition.id]: bankerDefinition,
@@ -10,6 +11,7 @@ const BOSS_REGISTRY = Object.freeze({
   [matriarchDefinition.id]: matriarchDefinition,
   [dimitrescuDefinition.id]: dimitrescuDefinition,
   [neheleniaDefinition.id]: neheleniaDefinition,
+  [nemesisDefinition.id]: nemesisDefinition,
 });
 
 export function getBossDefinition(id) {

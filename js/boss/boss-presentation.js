@@ -105,7 +105,7 @@ function bossAbilityHelpSupplement(gameState, intent) {
 }
 
 export function buildBossRuleSummary(gameState) {
-  return String(buildBossRuleSummaryFromAdapter(gameState?.boss?.id, gameState) || '').trim();
+  return String(buildBossRuleSummaryFromAdapter(gameState?.boss?.id, gameState) || '').trim().replace(/\. (?=[A-ZÁÉÍÓÚÂÊÔÃÕ])/g, '.\n');
 }
 
 export function buildBossAbilityHelp(gameState) {
@@ -118,7 +118,8 @@ export function buildBossAbilityHelp(gameState) {
 
   return {
     title: intent.name || 'Ajuda da habilidade',
-    text,
+    // Short reading blocks, without truncating rules, deadlines or exceptions.
+    text: text.replace(/\. (?=[A-ZÁÉÍÓÚÂÊÔÃÕ])/g, '.\n'),
   };
 }
 

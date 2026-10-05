@@ -14,6 +14,9 @@ function createBossSfx(src, volume = 0.9, systemGain = 1) {
 }
 
 export const BOSS_SFX = Object.freeze({
+  nemesis: Object.freeze({
+    resource: createBossSfx('assets/sfx/ganho-infeccao-nemesis.mp3'),
+  }),
   banker: Object.freeze({
     resource: createBossSfx('assets/sfx/habilidade-banqueiro.mp3'),
     vaultClose: createBossSfx('assets/audio/cofre-fechando.mp3'),

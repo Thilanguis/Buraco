@@ -219,13 +219,13 @@ export const bankerBossPresentation = Object.freeze({
     if (!intent) return null;
     switch (intent.abilityId) {
       case 'fixed_interest':
-        return 'Integral cobra toda a Dívida imediatamente. Cofre reduz a cobrança inicial, mas prende 1 carta do titular; resgatar essa carta substitui a compra normal. Se o titular comprar do Monte e adiar, o resgate sobe +2 por turno nas Fases 1–2 ou +3 na Fase 3, até o valor integral; ao chegar ao limite, o próximo resgate é obrigatório.';
+        return 'Integral: paga toda a Dívida agora. Cofre: paga menos, mas prende 1 carta; resgatá-la substitui a compra normal. Adiar comprando do Monte: resgate +2/turno nas Fases 1–2, +3 na Fase 3. No teto integral, resgate obrigatório.';
       case 'maintenance_fee':
         return 'FINANCIADA é a carta extra criada pela Tarifa. Ela só quita a cobrança se entrar legalmente em um jogo naquele turno. Descartá-la ou terminar o turno ainda com ela na mão gera a cobrança uma única vez.';
       case 'credit_block':
         return 'Enquanto o Bloqueio de Crédito estiver ativo, ninguém pode recolher o Lixo. A compra normal do Monte continua disponível e o bloqueio termina quando a rodada vira.';
       case 'suit_audit':
-        return 'A equipe precisa baixar a quantidade indicada de cartas reais do naipe sorteado antes do fim da rodada. Coringas não contam e a mesma carta não pode contar duas vezes. Se o total não for atingido, a Dívida indicada é aplicada uma única vez.';
+        return 'Equipe: baixe o total indicado do naipe sorteado nesta rodada. Coringas e cartas repetidas não contam. Falha: cobra a Dívida indicada uma única vez. Sucesso: sem cobrança.';
       case 'pledge':
         return 'O jogo marcado fica penhorado temporariamente: ele não pode receber cartas enquanto a Penhora estiver ativa. A restrição termina na próxima cobrança do Banqueiro.';
       case 'compound_interest':
@@ -286,7 +286,8 @@ export const bankerBossPresentation = Object.freeze({
     if (event.abilityId === 'suit_audit') {
       const current = Number(progressMatch?.[1]) || 0;
       const required = Number(progressMatch?.[2]) || 1;
-      const success = Number(event.dangerDelta) < 0;
+      // Current successes have +0; old snapshots may still contain negative deltas.
+      const success = event.success ?? (Number(event.dangerDelta) <= 0);
       progress = objectiveProgress(success ? required : current, required, success ? 'success' : 'failed');
       category = success ? 'Objetivo concluído' : 'Objetivo não concluído';
     } else if (event.abilityId === 'maintenance_fee') {

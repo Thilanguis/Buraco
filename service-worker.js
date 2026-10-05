@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v270';
+const CACHE_NAME = 'buraco-v272';
 const ASSETS = [
   './js/history-totals.js',
   './js/history-comparison.js',
@@ -51,6 +51,18 @@ const ASSETS = [
   './js/game/opponent-seats.js',
   './js/game/domination-friend-sound.js',
   './js/boss/boss-engine.js',
+  './js/boss/boss-combat.js',
+  './js/boss/bosses/nemesis.js',
+  './js/boss/mechanics/nemesis.js',
+  './js/boss/presentation/nemesis.js',
+  './js/boss/ui/nemesis-ui.js',
+  './styles/boss/nemesis.css',
+  './assets/images/boss-nemesis.png',
+  './assets/images/nemesis-agarrador.png',
+  './assets/images/nemesis-infectado.png',
+  './assets/images/nemesis-devorador.png',
+  './assets/sfx/ganho-infeccao-nemesis.mp3',
+  './assets/images/nemesis-infection-meter-frame.png',
   './js/boss/boss-presentation.js',
   './js/boss/presentation/boss-presentation-registry.js',
   './js/boss/presentation/banker.js',

@@ -1051,6 +1051,18 @@ export class BossBuracoBot {
       const dominatrixPriorities = engine.getDominatrixPriorities?.(me.id);
       const dimitrescuPriorities = engine.getDimitrescuPriorities?.(me.id);
       const neheleniaPriorities = engine.getNeheleniaPriorities?.(me.id);
+      const combatPriorities = engine.getCombatPriorities?.(me.id);
+      const combatMove = combatPriorities?.plan?.moves?.[0];
+      if (combatMove) {
+        const indexes = combatMove.cardIds.map((id) => me.hand.findIndex((card) => card.id === id));
+        const pendingMeld = combatMove.meldIndex == null ? indexes.map((index) => me.hand[index]) : [...(team.melds[combatMove.meldIndex] || []), ...indexes.map((index) => me.hand[index])];
+        if (indexes.every((index) => index >= 0) && this.canMeldSafely(me, team, indexes.length, engine, pendingMeld, ctx)) {
+          const moved = combatMove.meldIndex == null
+            ? await engine.executeMeldNew(botIndex, indexes)
+            : await engine.executeMeldExtend(botIndex, combatMove.meldIndex, indexes);
+          if (moved !== false) { madeMove = true; await this.paceBetweenActions(engine, signal); continue; }
+        }
+      }
       const exactPlayTarget = Number.isInteger(neheleniaPriorities?.exactPlayCount) ? neheleniaPriorities.exactPlayCount : null;
       const exactAlreadyPlayed = Math.max(0, Number(neheleniaPriorities?.exactPlayedCount) || 0);
       const exactRemaining = exactPlayTarget == null ? null : Math.max(0, exactPlayTarget - exactAlreadyPlayed);
@@ -1084,6 +1096,7 @@ export class BossBuracoBot {
         ...(dominatrixPriorities?.markedCardIds || []),
         ...(dimitrescuPriorities?.markedCardIds || []),
         ...(neheleniaPriorities?.markedCardIds || []),
+        ...(combatPriorities?.markedCardIds || []),
         ...financedCardIds,
         ...bankerAuditCardIds,
       ]);
@@ -1095,7 +1108,7 @@ export class BossBuracoBot {
       ]);
       const directMarkedCards = new Set(markedCards);
       const directMarkedMelds = new Set(markedMelds);
-      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dominatrixPriorities?.urgent || !!dimitrescuPriorities?.urgent || !!neheleniaPriorities?.urgent;
+      const priorityUrgent = !!naturePriorities?.urgent || !!naturePriorities?.harvestActive || !!dominatrixPriorities?.urgent || !!dimitrescuPriorities?.urgent || !!neheleniaPriorities?.urgent || !!combatPriorities?.urgent;
       const flexibleBossObjective = neheleniaPriorities?.exactPlayCount != null || !!naturePriorities?.harvestActive;
       if (markedCards.size || markedMelds.size || priorityUrgent || flexibleBossObjective) {
         if ((priorityUrgent || flexibleBossObjective) && !neheleniaPriorities?.strictMeldTargets) {
@@ -1574,7 +1587,8 @@ export class BossBuracoBot {
     const neheleniaPriorities = engine.getNeheleniaPriorities?.(me.id);
     const orderedSuit = dominatrixPriorities?.discardSuit || neheleniaPriorities?.discardSuit || null;
     const neheleniaMarkedCardIds = new Set(neheleniaPriorities?.markedCardIds || []);
-    const neheleniaPreferredDiscardCardIds = new Set(neheleniaPriorities?.preferredDiscardCardIds || []);
+    const combatPriorities = engine.getCombatPriorities?.(me.id);
+    const neheleniaPreferredDiscardCardIds = new Set([...(neheleniaPriorities?.preferredDiscardCardIds || []), ...(combatPriorities?.preferredDiscardCardIds || [])]);
     const financedCardIds = new Set((state.boss?.id === 'banker' ? (state.boss.effects || []) : [])
       .filter((effect) => effect.id === 'financed_card' && effect.playerId === me.id)
       .map((effect) => effect.cardId)
@@ -1595,6 +1609,7 @@ export class BossBuracoBot {
       // preservá-la para uma jogada e só a descarta como último recurso.
       if (financedCardIds.has(c.id)) danger += 5000;
       if (finalOrderCardIds.has(c.id)) danger += 5000;
+      if (combatPriorities?.preferredDiscardCardIds?.includes(c.id)) danger -= 7000;
       if (neheleniaMarkedCardIds.has(c.id)) {
         // Mão no Espelho aceita jogar OU descartar a carta marcada. Se o BOT
         // não conseguiu usá-la em jogo, o descarte é a saída correta.

@@ -6,6 +6,8 @@
 
 **Versão revisada contra o código atual — 05/10/2026.**
 
+**Regra permanente de objetivos:** cumprir uma habilidade nunca reduz Dívida, Dominação, Flores, Sede, Mundo do Espelho ou Infecção. O sucesso evita sua punição; a falha mantém a punição aprovada. Sucessos parciais não descontam falhas de outros objetivos. Canastras continuam concedendo todo o alívio aprovado. Gastos do próprio chefe por cura/renascimento são outra categoria e permanecem. Custos positivos de escolhas/obediência não foram rebalanceados nesta revisão. Auditoria detalhada: `REVISAO_OBJETIVOS_CHEFES.md`.
+
 
 Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
 
@@ -14,7 +16,8 @@ Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as 
 - **A Dominadora**;
 - **A Matriarca Esmeralda**;
 - **Lady Dimitrescu**;
-- **Rainha Nehelenia**.
+- **Rainha Nehelenia**;
+- **Nemesis**.
 
 
 Ela substitui as versões anteriores em que a Matriarca aparecia como planejada e em que as habilidades antigas da Dominadora e do Banqueiro ainda estavam descritas.
@@ -31,6 +34,7 @@ A rotação que vale no jogo é a registrada em:
 - `js/boss/bosses/matriarch.js`;
 - `js/boss/bosses/dimitrescu.js`;
 - `js/boss/bosses/nehelenia.js`;
+- `js/boss/bosses/nemesis.js` e seus adapters em `mechanics/`, `presentation/` e `ui/`;
 - validações e resolução em `js/boss/boss-engine.js`.
 
 
@@ -2003,7 +2007,7 @@ fases: 1, 2 e 3
 Bela marca **uma carta exata** de um cooperador; somente essa carta recebe a mancha de sangue da Caçada.
 
 
-- usar a carta legalmente até o fim do turno: **Sede -3**;
+- usar a carta legalmente até o fim do turno: **Sem punição**;
 - falhar nas Fases 1–2: **Sede +14**;
 - falhar na Fase 3: **Sede +16**.
 
@@ -2062,7 +2066,7 @@ fases: 1, 2 e 3
 Lady marca uma carta jogável de **cada cooperador**. O HUD usa o mesmo padrão amarelo de objetivos múltiplos já adotado pelos outros chefes e mostra cada marca separadamente.
 
 
-- cada carta marcada usada legalmente: **Sede -2**;
+- cada carta marcada usada legalmente: **Sem punição**;
 - cada marca que sobreviver à rodada: **Sede +7** nas Fases 1–2 ou **+9** na Fase 3.
 
 
@@ -2082,7 +2086,7 @@ fases: 2 e 3
 Cassandra marca um jogo existente e ele recebe uma moldura/mancha própria de sangue.
 
 
-- alimentar o jogo na rodada: **Sede -4**;
+- alimentar o jogo na rodada: **Sem punição**;
 - falhar na Fase 2: **Sede +16**;
 - falhar na Fase 3: **Sede +18**.
 
@@ -2121,7 +2125,7 @@ fases: 2 e 3
 Daniela contamina **uma carta real do lixo**. A pilha e a própria carta-alvo recebem sangue visual quando ela está no topo.
 
 
-- evitar o lixo durante a rodada: **Sede -3**;
+- evitar o lixo durante a rodada: **Sem punição**;
 - retirar o lixo na Fase 2: **Sede +12**;
 - retirar o lixo na Fase 3: **Sede +15**.
 
@@ -2142,7 +2146,7 @@ Lady solidifica o sangue em uma proteção própria, distinta do Casulo da Matri
 - Fase 2: **180** de proteção;
 - Fase 3: **260** de proteção;
 - o dano atinge primeiro o Coágulo;
-- romper o Coágulo: **Sede -6**;
+- romper o Coágulo: **evita a cura sem alterar a Sede**;
 - se ele sobreviver até o fim da rodada, **50% da proteção restante vira cura**.
 
 
@@ -2186,7 +2190,7 @@ O HUD lista cada objetivo numa linha separada com o padrão de feedback amarelo 
 No fechamento:
 
 
-- cada objetivo cumprido: **Sede -2**;
+- cada objetivo cumprido: **Sem punição**;
 - cada objetivo falho: **Sede +8**.
 
 
@@ -2945,3 +2949,79 @@ O cenário de DevTools da Dominadora foi alinhado à versão atual da Ordem Fina
 Esgotar `dominationFriendShared.stock` NÃO muda a estratégia para um modo permissivo. A amiga continua jogando com a mão restante e só usa a política de despedida quando `turnsRemaining === 1` ou no endgame público já previsto.
 
 Foi adicionada uma barreira defensiva imediatamente antes de gravar qualquer jogo da amiga na mesa. O plano calculado é revalidado contra as regras oficiais naquele instante; se uma extensão ou novo jogo não continuar legal, ele é descartado e não é aplicado. Essa proteção não altera os heurísticos aprovados de compra, prioridade, descarte ou formação de canastras.
+
+---
+
+# 16. Nemesis (05/10/2026)
+
+## 16.1 Regra funcional
+
+Nemesis começa com **2600 HP** e **Infecção 0/100**. Usa os gatilhos e o fluxo de fases compartilhados do modo Chefe, sem progressão paralela. Chegar a **100 de Infecção encerra a batalha imediatamente**, inclusive por pegar o Lixo ou alimentar uma Zona de Impacto. Uma redução posterior na mesma ação não desfaz uma derrota já confirmada.
+
+A partida começa **sem zumbis ativos**. Os três zumbis só tentam entrar pela **Invasão da Horda**. Aparecer como ameaça não significa persistir: durante a entrada não há passiva nem alvo de dano. A falha deixa o zumbi persistente com HP máximo; sucesso o repele, sem Infecção extra e sem produzir cadáver.
+
+Estados serializados: `absent` (fora da mesa), `entering` (objetivo de entrada), `persistent` (combatente vivo/debuff), `repelled` (expulso, pode voltar) e `corpse` (morto depois de persistir). **Repelido não é cadáver.** Saves antigos `alive`/`dead` migram para `persistent`/`corpse`, preservando HP, seleção, S.T.A.R.S., bônus e cargas. Não se reinicia a luta existente.
+
+Teto de persistentes vivos: **F1 = 1, F2 = 2, F3 = 3**, compartilhado por Invasão e Reanimação. Saves antigos acima do teto não perdem combatentes; novas entradas ficam bloqueadas até haver espaço.
+
+Passivas somente de persistentes vivos:
+
+| Zumbi | HP máximo | Passiva vivo | Mutado na F3 |
+|---|---:|---|---|
+| Agarrador | 350 | Ao pegar o Lixo, prende 1 carta adquirida na mão: não pode entrar em jogo nesse turno, mas pode ser descartada. | Prende 2 cartas. |
+| Infectado | 300 | Cada falha que normalmente gera Infecção recebe +2, uma vez por evento. | +4 por falha. |
+| Devorador | 400 | Na primeira contribuição de 3+ cartas ao mesmo jogo por turno, Nemesis cura até 40 HP. | Cura até 70 HP. |
+
+No Buraco Fechado, o topo do Lixo utilizado obrigatoriamente na jogada de compra não fica Agarrado: a passiva seleciona as cartas restantes efetivamente adquiridas para a mão. Se houver menos cartas elegíveis, prende apenas as disponíveis. As travas terminam no fim do turno do dono; matar o Agarrador desativa imediatamente também as travas ainda registradas.
+
+Ao morrer, o zumbi perde sua passiva imediatamente, fica como cadáver no estado e deixa de aparecer nas escolhas de ataque. **Não há transbordamento de dano nem alívio de Infecção pela morte**. Cadáveres continuam visíveis para a Reanimação Viral.
+
+## 16.2 Direcionamento de dano e S.T.A.R.S.
+
+O painel permite selecionar **antes da jogada** Nemesis ou qualquer zumbi persistente vivo. O próprio card do zumbi seleciona o alvo e destaca a seleção; na arte principal, ALVO mostra o destino atual e o botão ↩ retorna ao Nemesis. Sem linha complementar abaixo dos zumbis. Entrando, repelido, ausente e cadáver não aceitam ataques. A seleção permanece até ser alterada; se o alvo morreu, a próxima ação usa Nemesis. Quando não há persistente vivo, não existe escolha adicional.
+
+Todos os ataques reutilizam os valores do motor atual, inclusive dano individual, evolução de canastra e ataque final. O excesso de um ataque em zumbi é perdido. O ataque final também respeita o alvo selecionado; uma confirmação específica alerta que atacar um zumbi pode deixar Nemesis vivo e causar derrota.
+
+A redução de Infecção é independente do alvo: **Limpa −4, Real −8 e Ás-a-Ás −12 no total por jogo**. Evoluir entre tiers acrescenta apenas a diferença; repetir snapshot/ação não reaplica o alívio. Simples e Suja não aliviam.
+
+Quem causa dano efetivo diretamente ao Nemesis vira **ALVO S.T.A.R.S.**. O marcador persiste entre turnos, rodadas e reload. Dano em zumbi não altera o marcador. Objetivos ofensivos priorizam esse cooperador, mas usam o parceiro se não houver solução legal real para o alvo preferido.
+
+Na entrada da F3, todos os persistentes vivos ficam Mutados. Quem persistir por falha na entrada ou for reanimado na F3 já entra Mutado. Ausentes/repelidos não guardam mutação ativa. Mutação é consequência da fase, não habilidade sorteável.
+
+## 16.3 Habilidades e números
+
+Pesos são relativos às habilidades elegíveis da fase, não percentuais fixos. Soma dos onze pesos-base: **39**. Valores sujeitos a balanceamento após partidas reais.
+
+| Habilidade (`id`) | Fases | Peso | Funcionamento |
+|---|---|---:|---|
+| Invasão da Horda (`horde_invasion`) | 1/2/3 | 4 | Escolhe ausente/repelido com solução legal e espaço no teto. Agarrador: carta marcada sai por jogo/descarte no turno do alvo. Infectado: equipe contribui 2 cartas na rodada. Devorador: equipe alimenta 2 jogos existentes diferentes na rodada. Sucesso repele; falha deixa persistente com HP cheio, sem penalidade extra. Evita o último repelido se houver outra entrada válida. |
+| Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | Alvo contribui com ao menos 1 carta para um jogo antes de encerrar seu turno. Falha base +8/+10/+12. |
+| Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | Marca 2 cartas; ao menos 1 precisa sair por jogo ou descarte legal no turno do alvo. Falha base +8/+10/+12. |
+| Zona Contaminada (`contaminated_zone`) | 1/2/3 | 3 | Só entra com retirada legal comprovada do Lixo Fechado, respeitando bloqueios e condições de Morto/batida. Pegar custa +6; Agarrador persistente também age. Não é falha e não recebe seus bônus. |
+| Comando da Horda (`horde_command`) | 1/2/3 | 3 | Reforça apenas persistente vivo: Agarrador prende +1; Infectado cobra +2 por falha; Devorador cura +30. Soma à versão normal/Mutada. Não coloca zumbis na mesa. |
+| Lança-Foguetes (`rocket_launcher`) | 2/3 | 4 | Marca por ID estável um jogo válido e alimentável. Cada carta nova nele custa +10/+12 durante a rodada; três cartas juntas custam +30/+36. Cartas já contabilizadas não cobram novamente. A ação não é proibida. |
+| Regeneração Parasita (`parasite_regeneration`) | 2/3 | 2 | Cura até 100 HP do persistente vivo e ferido com menor percentual de HP. Não cura outras etapas do lifecycle. |
+| Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Revive somente cadáver com 50% do HP máximo. Uma utilização por fase e espaço no teto 1/2/3. Repelido nunca é alvo. |
+| Barragem de Tentáculos (`tentacle_barrage`) | 3 | 4 | Marca 3 cartas; 2 precisam sair legalmente no mesmo turno. Falha base +16. |
+| Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Duas exigências: contribuir para um jogo e resolver uma segunda carta indicada, distinta da primeira contribuição. Duas/uma/nenhuma cumpridas: base +0/+8/+16. |
+| Surto Ômega (`omega_outbreak`) | 3 | 3 | Só falhas reais recebem +2 abaixo de 50, +4 entre 50–74 ou +6 entre 75–99, usando a Infecção no instante da falha. Ativar não gera Infecção. |
+
+**Prazos:** objetivos e Zona Contaminada valem até o fim do turno do alvo; Impacto até o fim da rodada atual; Regeneração/Reanimação são imediatas antes dos jogadores. Horda e Ômega valem **até o fim da rodada seguinte à ativação**, para poderem afetar uma habilidade futura. O HUD informa a rodada de expiração. Os bônus de Infectado, Horda e Ômega somam apenas em falhas com penalidade positiva, uma vez por evento.
+
+## 16.4 Elegibilidade, BOT e persistência
+
+O adapter constrói uma solução com o validador oficial de sequência, cartas livres, descarte legal restante e condições de Morto/batida antes de persistir o intent. Barragem e Extermínio precisam de solução conjunta, não de duas alternativas incompatíveis. Não sorteia primeiro para tentar remediar um objetivo impossível depois.
+
+O BOT usa esses planos para contribuir/resolver cartas marcadas, respeita Agarradas e a proteção existente de batida segura. Evita retirada contaminada letal e alimentar Impacto que leve a 100; avalia alvos por HP do chefe, Infecção, possibilidade de matar, pressão do Infectado e cura acumulada do Devorador. Não ataca simplesmente o menor HP.
+
+`boss-combat.js` é uma abstração pequena para criar, normalizar, ferir, curar e reviver entidades serializáveis. Regras específicas permanecem no adapter do Nemesis. Estado novo fica dentro de `boss`, seguindo o save, snapshot, undo e sincronização existentes: HP/status/mutação/revives, seleção de ataque por jogador, S.T.A.R.S., cartas Agarradas, bônus com expiração, Zona de Impacto, quota por fase e guards de eventos. Não há timer exclusivo do Nemesis.
+
+O Laboratório deriva suas onze habilidades da definição e usa o motor real. A Invasão permite escolher cada zumbi, sucesso/falha, BOT, reload/undo, reentrada, proteção contra repetição, teto da fase e persistente/cadáver. Comando sem persistente, Regeneração e Reanimação também possuem fixtures de elegibilidade/fallback.
+
+HUD: cards em faixa própria abaixo do HUD principal, sem aumentar sua altura; ausentes não ocupam espaço; entrando mostra arte/nome, com objetivo apenas no painel de Invasão da Horda. Cards reutilizam o padrão full-bleed das filhas/capangas e chips oficiais INVADINDO, ATIVO, MUTADO, REFORÇADO e CADÁVER quando aplicáveis. Persistentes têm HP/barra e seleção pelo card. O `?` pequeno, completamente interno, abre o popover oficial compartilhado e explica valores normais/Mutados/reforçados. S.T.A.R.S. aparece sobre a região direita da arte principal, sem linha extra, e sua ajuda explica prioridade e troca por dano direto ao Nemesis (nunca aos zumbis). Repelidos têm retirada breve e somem; cadáveres ficam sem barra. Animações são pontuais por evento, sem replay em reload e com `prefers-reduced-motion`. Os retratos fornecidos foram conectados por entidade em `nemesis-agarrador.png`, `nemesis-infectado.png` e `nemesis-devorador.png`; seus arquivos originais são preservados, com apresentação 8:3 e `cover` natural sem distorção. Usa-se o retrato existente do Nemesis em `assets/images/boss-nemesis.png` e a moldura de Infecção existente, sem alterar sua barra.
+
+Som de ganho: `assets/sfx/ganho-infeccao-nemesis.mp3`, registrado na infraestrutura central de áudio e no precache. Toca somente quando `changeNemesisInfection()` produz delta aplicado positivo, pelo evento de apresentação correspondente, sem reprodução dentro da função de estado. Bônus do Infectado/Horda/Ômega fazem parte do mesmo delta e não têm sons separados. Deduplicação por `actionId` impede replay de render/snapshot/Firebase/undo; eventos iniciais de reload, redução e +0 ficam silenciosos. Eventos lógicos distintos podem tocar separadamente.
+
+Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados. O único teste antigo ajustado é a expectativa obsoleta da Prisão no Espelho, não sua regra atual.
+
+Teste manual simultâneo em dois clientes reais ainda é necessário para confirmar o transporte Firebase, o layout completo da mesa e o balanceamento. A matriz automatizada e os resultados estão em `docs/NEMESIS_IMPLEMENTACAO.md`.
