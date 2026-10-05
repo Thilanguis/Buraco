@@ -54,6 +54,18 @@ Registro de migração. Documenta uma operação específica de recuperação/im
 ### `correcao-historico-tempo-real.md`
 Registro de uma correção específica no histórico em tempo real e de decisões tomadas naquela alteração. Também é principalmente histórico técnico.
 
+### `CHECKLIST_REGRESSOES_E_ATUALIZACOES.md`
+Checklist permanente de prevenção de regressões. Deve ser consultado **antes de alterações em regra, UI, animação, BOT, sincronização, reinício, Service Worker ou assets**.
+
+Registra erros reais já ocorridos e a verificação obrigatória correspondente, incluindo:
+- auditoria de dependências antes de substituir uma feature;
+- diferença entre alerta, execução e estado persistente;
+- sincronização local/remota;
+- cuidados com estados nullable/turno 0;
+- timers e estados `pending` antes de devolver controle ao BOT;
+- matriz de regressão da Dominação/Decreto;
+- prevenção de regressões visuais, de layout e de atualização/SW.
+
 ## Handoffs
 
 Handoffs como `HANDOFF_...md` servem para transportar contexto entre chats/sessões. Podem ser arquivados fora de `docs` ou em uma área explicitamente marcada como arquivo temporário, mas **não devem ser tratados como documentação oficial do sistema**.
@@ -70,11 +82,14 @@ Quando algo deixa de ser contexto temporário e vira regra do produto, mover a i
 
 ## Manutenção recomendada
 
+Antes de qualquer patch relevante, **ler `CHECKLIST_REGRESSOES_E_ATUALIZACOES.md`** e aplicar somente as verificações pertinentes ao escopo.
+
 Ao alterar uma regra estável:
 1. alterar o código e os testes;
 2. atualizar a documentação permanente correspondente;
 3. atualizar o inventário quando a mudança afetar habilidade, fase, peso ou efeito resumido;
-4. usar o handoff apenas para registrar o que ainda está pendente ou precisa ser retomado em outra sessão.
+4. atualizar o checklist se surgir uma nova classe de regressão que mereça prevenção permanente;
+5. usar o handoff apenas para registrar o que ainda está pendente ou precisa ser retomado em outra sessão.
 
 
 ## Regra obrigatória — auditoria de dependências antes de substituir/remover uma feature
