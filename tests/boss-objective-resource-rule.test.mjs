@@ -5,12 +5,14 @@ import { createBossState, applyBossMeldTransition } from '../js/boss/boss-engine
 import { buildBossAbilityHelp, buildBossActionPresentation } from '../js/boss/boss-presentation.js';
 import { nemesisBossMechanics } from '../js/boss/mechanics/nemesis.js';
 import { bankerBossPresentation } from '../js/boss/presentation/banker.js';
+import { buildBossDebugScenario, getBossDebugCatalog } from '../js/boss/boss-debug-scenarios.js';
+import { selectNextBossIntent, normalizeBossState, getBossChains } from '../js/boss/boss-engine.js';
 
 // Exercise real state transitions without adding production exports for tests.
 const url = new URL('../js/boss/boss-engine.js', import.meta.url);
 const source = (await readFile(url, 'utf8')).replace(/from '(\.\/[^']+)'/g,
   (_, path) => `from '${new URL(path, url).href}'`);
-const { resolveIntent, applyDamageToBoss, succeedNatureThreat } = await import(`data:text/javascript;base64,${Buffer.from(`${source}\nexport { resolveIntent, applyDamageToBoss, succeedNatureThreat };`).toString('base64')}`);
+const { resolveIntent, applyDamageToBoss, succeedNatureThreat, chooseDominatrixFavoriteTargets } = await import(`data:text/javascript;base64,${Buffer.from(`${source}\nexport { resolveIntent, applyDamageToBoss, succeedNatureThreat, chooseDominatrixFavoriteTargets };`).toString('base64')}`);
 
 function game(abilityId, payload, phase = 2, bossId = 'dimitrescu') {
   const boss = createBossState(bossId, 4242);
@@ -20,6 +22,72 @@ function game(abilityId, payload, phase = 2, bossId = 'dimitrescu') {
     deadChunksTaken: [0, 0], deadPiles: [[], []],
     players: [{ id: 0, name: 'Biel', teamId: 0, hand: [] }, { id: 1, name: 'Luana', teamId: 0, hand: [] }],
     teams: [{ id: 0, playerIndexes: [0, 1], melds: [[]] }, { id: 1, playerIndexes: [], melds: [] }], boss };
+}
+
+for (const phase of [2, 3]) {
+  for (const chains of [{ 0: 2, 1: 1 }, { 0: 1, 1: 2 }]) {
+    test(`Favorita F${phase} ${JSON.stringify(chains)}: poupa sem recuperação, pune menor +8 e não duplica no snapshot`, () => {
+      let state = game('favorite', {}, phase, 'dominadora');
+      state.boss.chainsByPlayer = { ...chains };
+      const targets = chooseDominatrixFavoriteTargets(state);
+      assert.equal(chains[targets.punishedPlayerId], 1);
+      state.boss.currentIntent.payload = targets;
+      const protectedBefore = getBossChains(state, targets.protectedPlayerId);
+      const punishedBefore = getBossChains(state, targets.punishedPlayerId);
+      resolveIntent(state);
+      assert.equal(getBossChains(state, targets.protectedPlayerId), protectedBefore);
+      assert.ok(Math.abs((getBossChains(state, targets.punishedPlayerId) - punishedBefore) * 12.5 - 8) < 1e-8);
+      const after = { ...state.boss.chainsByPlayer };
+      state = JSON.parse(JSON.stringify(state)); normalizeBossState(state);
+      resolveIntent(state);
+      assert.deepEqual(state.boss.chainsByPlayer, after);
+    });
+  }
+}
+test('Dominadora: recuperação por canastras mantém valores e idempotência', () => {
+  const state = game('favorite', {}, 2, 'dominadora'); state.boss.currentIntent = null;
+  state.boss.chainsByPlayer = { 0: 2, 1: 1 };
+  for (const [oldKind, newKind] of [['simple', 'limpa'], ['limpa', 'real'], ['real', 'asas']]) {
+    const before = getBossChains(state, 0);
+    applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind, newKind, cardsAdded: [] });
+    assert.ok(Math.abs((before - getBossChains(state, 0)) * 12.5 - 4) < 1e-8);
+    const after = getBossChains(state, 0);
+    applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: newKind, newKind, cardsAdded: [] });
+    assert.equal(getBossChains(state, 0), after);
+  }
+});
+test('Renascimento preserva o gasto interno aprovado de uma Flor', () => {
+  const state = game('rebirth', {}, 3, 'matriarca_esmeralda');
+  state.boss.currentIntent = null; state.boss.hp = 10;
+  state.boss.bloom = 2; state.boss.danger = 2;
+  applyDamageToBoss(state, 20, { sourceActionId: 'approved-rebirth' });
+  assert.equal(state.boss.bloom, 1); assert.equal(state.boss.hp, 300);
+});
+
+// Every current/future registered active ability is covered; only named,
+// approved internal resource spends are exempt. No canastra is played here.
+for (const boss of getBossDebugCatalog()) for (const ability of boss.abilities) {
+  if (['rebirth', 'red_wine'].includes(ability.id)) continue;
+  for (const phase of ability.phases) test(`Regra global: ${boss.id}/${ability.id} F${phase} não recupera recurso ao resolver`, () => {
+    const { state } = buildBossDebugScenario(null, { bossId: boss.id, abilityId: ability.id, phase });
+    selectNextBossIntent(state, { debug: true });
+    assert.equal(state.boss.currentIntent?.abilityId, ability.id, 'test must resolve the requested ability, not a fallback');
+    if (boss.id === 'dominadora') state.boss.chainsByPlayer = { 0: 1, 1: 2 };
+    else if (boss.id === 'matriarca_esmeralda') { state.boss.bloom = 2; state.boss.danger = 2; }
+    else if (boss.id === 'nehelenia') {
+      state.boss.dreamMirrorMarksMigrated = true;
+      state.boss.dreamMirrorMarksByPlayer = { 0: 1, 1: 1 }; state.boss.danger = 2;
+    } else state.boss.danger = 40;
+    normalizeBossState(state);
+    const before = { danger: state.boss.danger, bloom: state.boss.bloom, chains: { ...state.boss.chainsByPlayer } };
+    resolveIntent(state);
+    if (boss.id === 'dominadora') {
+      for (const player of state.players) assert.ok(getBossChains(state, player.id) >= (before.chains[player.id] || 0), ability.id);
+    } else {
+      assert.ok(state.boss.danger >= before.danger, ability.id);
+      if (boss.id === 'matriarca_esmeralda') assert.ok(state.boss.bloom >= before.bloom, ability.id);
+    }
+  });
 }
 
 for (const phase of [1, 2, 3]) {

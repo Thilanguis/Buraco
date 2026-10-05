@@ -5,7 +5,7 @@ const SPEECHES = Object.freeze({
   forced_swap: 'Planos tão frágeis merecem donos melhores.',
   hands_tied: 'Cooperação demais cria conforto. Vamos corrigir isso.',
   possession: 'Esse jogo já não responde a vocês.',
-  favorite: 'Uma merece recompensa. A outra, disciplina.',
+  favorite: 'Uma será poupada. A outra, disciplinada.',
   double_collar: 'Duas coleiras. Agora prestem atenção.',
   separation: 'Vocês se escondem demais um atrás do outro. Acabou.',
   absolute_control: 'Neste turno, sua vontade é apenas um detalhe.',
@@ -163,7 +163,7 @@ export const dominatrixBossPresentation = Object.freeze({
       case 'possession': return 'Dano antigo do jogo fica suspenso; cartas novas causam dano normal. Para libertar: cada cooperador adiciona 1 carta OU o jogo evolui de categoria. Só o dano antigo suspenso é reaplicado.';
       case 'hands_tied': return 'Cada cooperador fica vinculado ao primeiro jogo que alimentar ou criar naquela rodada e não pode tocar outro. A equipe inteira ainda compartilha somente 1 criação de jogo novo.';
       case 'separation': return 'Nesta rodada, o primeiro cooperador que alimentar um jogo fica vinculado a ele: o parceiro não pode alimentar esse mesmo jogo. Os outros jogos continuam livres.';
-      case 'favorite': return 'A Dominadora mira o cooperador menos dominado para aproximar os dois da derrota. Na Fase 2 a Favorita recupera 2 de Dominação; na Fase 3 ela apenas é poupada. O outro recebe +8.';
+      case 'favorite': return 'Nas Fases 2 e 3, o cooperador menos dominado recebe +8 Dominação. A protegida fica inalterada: ser poupada não recupera Dominação.';
       case 'double_collar': return 'A Dupla Coleira prioriza 1 carta útil/jogável de cada cooperador. As duas ficam presas durante a rodada.';
       case 'iron_etiquette': {
         const pressure = dominatrixPressureText(intent.announcedPhase).etiquette;

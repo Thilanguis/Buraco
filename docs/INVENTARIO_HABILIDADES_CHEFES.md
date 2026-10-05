@@ -52,7 +52,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 | Mãos Atadas | 2 e 3 | 4 | Cada jogador fica vinculado ao primeiro jogo que tocar na rodada; a equipe ainda compartilha no máximo 1 criação de jogo novo. |
 | Posse | 2 e 3 | 3 | Suspende o dano antigo de um jogo até os dois contribuírem ou ele evoluir; cartas novas ainda causam dano individual normal. |
 | Etiqueta de Ferro | 1, 2 e 3 | 4 | Ordena um naipe legal e escasso para o descarte. Cumprir custa +2/+2/+3; falhar custa +10/+12/+14. |
-| Favorita | 2 e 3 | 4 | Prioriza punir o cooperador menos dominado. F2: favorita -2 e outro +8; F3: favorita poupada e outro +8. |
+| Favorita | 2 e 3 | 4 | Pune o cooperador menos dominado com +8. F2/F3: protegida inalterada (0), sem recuperação. |
 | Dupla Coleira | 3 | 5 | Prende uma carta útil/jogável de cada cooperador durante a rodada. |
 | Separação | 3 | 4 | Depois que um jogador alimenta um jogo, o parceiro não pode tocar naquele mesmo jogo na rodada. |
 | Controle Absoluto | 3 | 4 | Trata o alvo como Dominado por 1 turno e aplica Dominação +5. |

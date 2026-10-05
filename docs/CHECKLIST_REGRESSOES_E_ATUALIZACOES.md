@@ -651,7 +651,7 @@ Este checklist deve ser tratado como **documentação permanente de manutenção
 - Cumprir objetivo evita sua punição; nunca concede delta negativo na condição especial.
 - Objetivos independentes: sucesso em um não desconta a punição da falha de outro.
 - Preservar alívio por canastras (Limpa / Real / Ás-a-Ás), incluindo Flores.
-- Não confundir com gasto do próprio chefe por vantagem: Vinho Carmesim e Renascimento continuam funcionando. Favorita é escolha automática do chefe, não recompensa por cumprir objetivo.
+- Não confundir com gasto do próprio chefe por vantagem: Vinho Carmesim e Renascimento continuam funcionando. Favorita não é exceção: F2/F3 mantém protegida inalterada (0) e pune o cooperador menos dominado com +8.
 - Não alterar custos positivos de escolha/obediência já aprovados nem valores de falha ao corrigir recompensas negativas.
 - Auditar engine, adapters, BOT, Laboratório, snapshots legados, HUD/ajuda, definições e documentos; não basta trocar o texto.
 - Rodar `tests/boss-objective-resource-rule.test.mjs`, testes de alívio, chefes e suíte ampla. Comparar falhas com baseline e registrar testes bloqueados.
@@ -675,3 +675,10 @@ Revisão de 05/10/2026: fonte de verdade exclusivamente local por instrução ex
 - Florescimento Real: todas as falhas compartilham +1; sem cura/fortalecimento novos.
 - Preservar HP 2000, derrota em 5, Limpa −1 / Real −1 adicional / Ás-a-Ás −1 adicional, Orvalho, Casulo, cura atual e Renascimento F3 (1x, consome 1 Flor, 300 HP).
 - Reavaliar a cura somente depois do teste de jogo; este patch não altera seus limites nem outros chefes.
+# Regra global de recuperação e Favorita (05/10/2026)
+
+Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O sucesso apenas evita a punição. A recuperação concedida aos jogadores ocorre somente através das canastras aprovadas. Sucesso parcial não recupera recurso. A regra também vale para efeitos automáticos, como Favorita, e recursos equivalentes futuros.
+
+- Exceções: gastos internos aprovados, como Vinho Carmesim e Renascimento. Não são recompensas aos jogadores.
+- Favorita F2/F3: protegida 0; cooperador menos dominado +8; seleção e aplicação única preservadas. Não alterar os demais valores/chefes.
+- Regressão global percorre todas as habilidades ativas registradas e suas fases com recurso inicial positivo; as exceções são identificadas explicitamente. Testes específicos cobrem sucesso, parcial, canastras e snapshot.

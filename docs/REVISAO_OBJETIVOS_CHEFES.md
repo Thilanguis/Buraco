@@ -19,7 +19,9 @@ Sucesso de objetivo não reduz a condição especial. Evita sua punição. Canas
 
 Auditoria do Banqueiro já usava sucesso +0, mas agora ignora `successDelta` negativo em snapshots antigos. O evento registra sucesso explicitamente; o HUD não exige mais delta negativo para mostrar “Objetivo concluído”, mantendo compatibilidade com eventos antigos. Não houve mudança de falha.
 
-Banqueiro, Dominadora, Matriarca, Nehelenia e Nemesis não tinham outras recompensas negativas por sucesso nos fluxos atuais auditados. Preservados: Vinho Carmesim (consumo de Sede para cura), Renascimento (consumo de Flor), Favorita (escolha automática do chefe, sem objetivo), custos positivos de escolha/obediência e purificação do Morto por canastra.
+Auditoria global ampliada em 05/10/2026: Favorita também não pode recuperar Dominação, mesmo sendo uma escolha automática. Removido −2 da protegida na F2; F2/F3 agora são 0/+8, preservando o alvo menos dominado. Nenhuma outra habilidade ativa mostrou alívio fora das canastras e dos gastos internos aprovados. Preservados: Vinho Carmesim (consumo de Sede para cura), Renascimento (consumo de Flor), custos positivos de escolha/obediência e purificação do Morto por canastra.
+
+**Regra permanente:** Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O sucesso apenas evita a punição. A recuperação concedida aos jogadores ocorre somente através das canastras aprovadas. Sucesso parcial evita apenas a punição correspondente, sem recuperar recurso. Gastos internos explicitamente aprovados do próprio chefe não são recompensas ao jogador.
 
 BOT e Laboratório usam as resoluções reais; não existia expectativa numérica negativa específica a substituir nos cenários. Definições, mensagens compactas, ajuda e feedback de rompimento do Coágulo foram corrigidos.
 

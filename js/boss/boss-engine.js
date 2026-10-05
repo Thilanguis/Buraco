@@ -5187,14 +5187,10 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         : 'A troca falhou por falta de cartas.';
       resultData = { ...(swap || {}), lockedReceivedCardIds };
     } else if (intent.abilityId === 'favorite') {
-      const phase = Number(intent.announcedPhase || boss.phase || 1);
       const protectedPlayer = gameState.players.find((player) => player.id === intent.payload.protectedPlayerId);
       const punishedPlayer = gameState.players.find((player) => player.id === intent.payload.punishedPlayerId);
-      if (phase < 3) changeChains(gameState, intent.payload.protectedPlayerId, -0.16, 'favorite_protection'); // -2
       changeChains(gameState, intent.payload.punishedPlayerId, 0.64, 'favorite_punishment'); // +8
-      outcome = phase >= 3
-        ? `${protectedPlayer?.name || 'A favorita'} foi poupada; ${punishedPlayer?.name || 'o outro cooperador'} recebeu Dominação +8.`
-        : `${protectedPlayer?.name || 'A favorita'} recebeu Dominação -2; ${punishedPlayer?.name || 'o outro cooperador'} recebeu Dominação +8.`;
+      outcome = `${protectedPlayer?.name || 'A favorita'} foi poupada, sem alteração de Dominação; ${punishedPlayer?.name || 'o outro cooperador'} recebeu Dominação +8.`;
       resultData = { protectedPlayerId: intent.payload.protectedPlayerId, punishedPlayerId: intent.payload.punishedPlayerId };
     } else if (intent.abilityId === 'exposure') {
       const target = gameState.players.find((player) => player.id === intent.payload.targetPlayerId);

@@ -1263,8 +1263,8 @@ fases: 2 e 3
 
 - só existe nas Fases 2–3;
 - prioriza como punida quem está **menos dominado**, ajudando a aproximar os dois jogadores da condição 50/50;
-- F2: a favorita recupera 2 pontos e a punida recebe +8;
-- F3: a favorita apenas é poupada e a punida recebe +8;
+- F2 e F3: a favorita fica inalterada (0); a punida recebe +8;
+- poupada significa sem punição, nunca recuperação de Dominação;
 - respeita limites;
 - aplica uma vez.
 
@@ -2921,7 +2921,7 @@ O estado interno continua compatível com a escala legada 0–4 em `chainsByPlay
 - os dois jogadores em 50/50: derrota especial.
 
 
-Pressões atuais de teste: Escolha Forçada F1 +6 ou ordem +2/falha +12, F2 +7 ou +3/+14, F3 +8 ou +3/+16; Exposição sucesso +1 e falha +9/+11/+13; Etiqueta +2/+2/+3 ao cumprir e +10/+12/+14 ao falhar; Favorita F2 -2/+8 e F3 +8; Controle Absoluto +5; Quebra de Vontade +8 ou cura de até 180 HP; Ordem Final recusar +7, aceitar +2 e +6 por carta sorteada não usada.
+Pressões atuais de teste: Escolha Forçada F1 +6 ou ordem +2/falha +12, F2 +7 ou +3/+14, F3 +8 ou +3/+16; Exposição sucesso +1 e falha +9/+11/+13; Etiqueta +2/+2/+3 ao cumprir e +10/+12/+14 ao falhar; Favorita F2/F3 0/+8; Controle Absoluto +5; Quebra de Vontade +8 ou cura de até 180 HP; Ordem Final recusar +7, aceitar +2 e +6 por carta sorteada não usada.
 
 
 ### Nehelenia
@@ -3025,3 +3025,6 @@ Som de ganho: `assets/sfx/ganho-infeccao-nemesis.mp3`, registrado na infraestrut
 Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados. O único teste antigo ajustado é a expectativa obsoleta da Prisão no Espelho, não sua regra atual.
 
 Teste manual simultâneo em dois clientes reais ainda é necessário para confirmar o transporte Firebase, o layout completo da mesa e o balanceamento. A matriz automatizada e os resultados estão em `docs/NEMESIS_IMPLEMENTACAO.md`.
+# Regra global de recuperação da condição especial
+
+Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O sucesso apenas evita a punição. A recuperação concedida aos jogadores ocorre somente através das canastras aprovadas. Sucesso parcial evita apenas a punição correspondente. Vale para Dívida, Dominação, Flores, Sede, Mundo do Espelho, Infecção e recursos futuros, incluindo efeitos automáticos de habilidades. Somente gastos internos explicitamente aprovados do chefe são exceções, como Vinho Carmesim e Renascimento.

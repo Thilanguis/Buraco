@@ -605,8 +605,8 @@ test('Troca Forçada e Favorita alteram as mãos e Correntes sem destruir cartas
   favoriteState.boss.currentIntent = { id: 'favorite', abilityId: 'favorite', name: 'Favorita', payload: { protectedPlayerId: 0, punishedPlayerId: 1 } };
   completeBossPlayerTurn(favoriteState, 0);
   completeBossPlayerTurn(favoriteState, 1);
-  assert.equal(getBossChains(favoriteState, 0), 0);
-  assert.equal(getBossChains(favoriteState, 1), 1);
+  assert.equal(getBossChains(favoriteState, 0), 1);
+  assert.equal(getBossChains(favoriteState, 1), 0.64);
 });
 
 test('Ordem Final sorteada seleciona duas cartas existentes de cada mao', () => {
