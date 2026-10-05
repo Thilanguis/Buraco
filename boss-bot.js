@@ -882,7 +882,9 @@ export class BossBuracoBot {
         );
         const matchesHarvest = naturePriorities?.harvestActive && threat.type === 'harvest' && threat.targetPlayerId === player.id;
         if (!matchesCard && !matchesMeld && !matchesHarvest) continue;
-        bloom = Math.max(bloom, Number(threat.bloomAmount) || (threat.type === 'graft' ? 2 : 1));
+        const activationId = threat.sourceIntentId || threat.id;
+        const flowerAlreadyApplied = (boss.natureThreats || []).some((entry) => (entry.sourceIntentId || entry.id) === activationId && Number(entry.bloomApplied) > 0);
+        bloom = Math.max(bloom, flowerAlreadyApplied ? 0 : Math.min(1, Number(threat.bloomAmount) || 1));
         sidePenalty = Math.max(sidePenalty, (Number(threat.healAmount) || 0) / 5);
       }
       if (!bloom && directObjective) bloom = boss.bloom >= 4 ? 1 : 0;

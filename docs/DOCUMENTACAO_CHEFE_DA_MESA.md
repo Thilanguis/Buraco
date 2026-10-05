@@ -1636,7 +1636,7 @@ Cada lado:
 
 
 - alimentado: sucesso;
-- falhou: +1 Flor, sem cura.
+- falhou: a ativação recebe +1 Flor no total, mesmo se os dois lados falharem; sem cura.
 
 
 Se os dois lados falharem:
@@ -1664,7 +1664,7 @@ Dois jogos devem receber carta.
 ```text
 2 lados: sem punição
 1 lado: +1 Flor
-0 lados: +2 Flores e propagação
+0 lados: +1 Flor e propagação
 ```
 
 
@@ -1755,7 +1755,7 @@ Cria até três objetivos válidos, preferencialmente:
 - lixo.
 
 
-Cada objetivo falho:
+Uma ou mais falhas na mesma ativação (teto compartilhado, inclusive entre turnos/reload):
 
 
 ```text

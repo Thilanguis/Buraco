@@ -1714,10 +1714,72 @@ test('Raiz e Enxerto resolvem sucesso, falha parcial e falha total separadamente
     }
     completeBossPlayerTurn(state, 0);
     completeBossPlayerTurn(state, 1);
-    assert.equal(state.boss.bloom, fedCount === 2 ? 0 : fedCount === 1 ? 1 : 2);
+    assert.equal(state.boss.bloom, fedCount === 2 ? 0 : 1);
     const cardDamage = fedCount === 2 ? 15 : fedCount === 1 ? 5 : 0;
     assert.equal(state.boss.hp, 1700 - cardDamage);
   }
+});
+
+for (const abilityId of ['twin_vines', 'graft', 'royal_bloom']) {
+  test(`Matriarca ${abilityId}: falhas da mesma ativação somam no máximo +1 Flor`, () => {
+    const state = matriarchGame();
+    state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3];
+    const targets = [0, 1].map(meldIndex => {
+      applyBossMeldTransition(state, { teamId: 0, meldIndex, cardsAdded: [] });
+      return { meldIndex, meldId: getBossMeldContribution(state, 0, meldIndex).meldId };
+    });
+    const payload = abilityId === 'royal_bloom' ? { objectives: [
+      { type: 'seed', targetPlayerId: 0, cardId: state.players[0].hand[0].id },
+      ...targets.map(target => ({ type: 'root', ...target })),
+    ] } : { targets, targetCount: 2 };
+    applyMatriarchAbility(state, abilityId, payload, 3);
+    const activationId = state.boss.currentIntent.id;
+    completeBossPlayerTurn(state, 0);
+    const restored = JSON.parse(JSON.stringify(state)); normalizeBossState(restored);
+    completeBossPlayerTurn(restored, 1);
+    assert.equal(restored.boss.bloom, 1);
+    const threats = restored.boss.natureThreats.filter(t => t.sourceIntentId === activationId);
+    assert.equal(threats.reduce((sum, t) => sum + (t.bloomApplied || 0), 0), 1);
+    assert.ok(threats.every(t => t.status === 'failed'));
+  });
+}
+
+test('Matriarca: Pólen Real imediato e falhas posteriores compartilham uma Flor após reload', () => {
+  let state = matriarchGame(); state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3];
+  applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, cardsAdded: [] });
+  const meldId = getBossMeldContribution(state, 0, 0).meldId;
+  applyMatriarchAbility(state, 'royal_bloom', { objectives: [
+    { type: 'pollen', discardCardId: state.discard[0].id },
+    { type: 'seed', targetPlayerId: 1, cardId: state.players[1].hand[0].id },
+    { type: 'root', meldId, meldIndex: 0 },
+  ] }, 3);
+  const activationId = state.boss.currentIntent.id;
+  const card = state.discard.pop(); state.players[0].hand.push(card);
+  notifyBossDiscardTaken(state, 0, [card]); assert.equal(state.boss.bloom, 1);
+  state = JSON.parse(JSON.stringify(state)); normalizeBossState(state);
+  completeBossPlayerTurn(state, 0); completeBossPlayerTurn(state, 1);
+  const threats = state.boss.natureThreats.filter(t => t.sourceIntentId === activationId);
+  assert.equal(threats.reduce((sum, t) => sum + (t.bloomApplied || 0), 0), 1);
+  assert.equal(state.boss.bloom, 1);
+});
+
+test('Matriarca: canastra entre falhas não reabre quota; outra ativação tem sua própria quota', () => {
+  let state = matriarchGame(); state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3];
+  applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, cardsAdded: [] });
+  const meldId = getBossMeldContribution(state, 0, 0).meldId;
+  applyMatriarchAbility(state, 'royal_bloom', { objectives: [
+    { type: 'seed', targetPlayerId: 0, cardId: state.players[0].hand[0].id },
+    { type: 'root', meldId, meldIndex: 0 },
+  ] }, 3);
+  completeBossPlayerTurn(state, 0); assert.equal(state.boss.bloom, 1);
+  applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 1, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
+  state = JSON.parse(JSON.stringify(state)); normalizeBossState(state);
+  completeBossPlayerTurn(state, 1); assert.equal(state.boss.bloom, 0);
+  state.turnNumber = (state.turnNumber || 0) + 2;
+  applyMatriarchAbility(state, 'living_seed', { targetPlayerId: 1, cardId: state.players[1].hand[0].id }, 3);
+  const nextActivationId = state.boss.currentIntent.id;
+  completeBossPlayerTurn(state, 0); completeBossPlayerTurn(state, 1);
+  assert.equal(state.boss.natureThreats.filter(t => t.sourceIntentId === nextActivationId).reduce((sum, t) => sum + (t.bloomApplied || 0), 0), 1);
 });
 
 test('Polen pune imediatamente a retirada do lixo, Colheita usa as tres faixas e Orvalho conta IDs unicos', () => {

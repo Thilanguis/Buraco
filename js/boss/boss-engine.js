@@ -2940,7 +2940,14 @@ function failNatureThreat(gameState, threat, { bloom = threat?.bloomAmount || 0,
   if (!threat || threat.status !== 'active') return null;
   const event = completeNatureThreat(boss, threat, 'failed', outcome || 'A ameaca natural nao foi contida.');
   resolveSpringCrownForThreat(gameState, threat, 'failed');
-  const bloomEvent = bloom ? changeMatriarchBloom(gameState, bloom, threat.name || 'Ameaca natural', `${threat.id}:bloom`) : null;
+  // One activation shares a single flower budget, even when its objectives
+  // resolve on different turns or after reload/undo. Canastra relief does not
+  // replenish this budget; historical threat amounts remain in the save.
+  const activationId = threat.sourceIntentId || threat.id;
+  const usedBloom = (boss.natureThreats || []).filter((entry) => (entry.sourceIntentId || entry.id) === activationId)
+    .reduce((sum, entry) => sum + Math.max(0, Number(entry.bloomApplied) || 0), 0);
+  const allowedBloom = Math.min(Math.max(0, Number(bloom) || 0), Math.max(0, 1 - usedBloom));
+  const bloomEvent = allowedBloom ? changeMatriarchBloom(gameState, allowedBloom, threat.name || 'Ameaca natural', `${threat.id}:bloom`) : null;
   const healEvent = heal
     ? healMatriarch(gameState, heal, threat.name || 'Ameaca natural', `${threat.id}:heal`)
     : null;
@@ -3012,7 +3019,7 @@ function resolveMatriarchRound(gameState) {
       if (fed >= 2) events.push(succeedNatureThreat(gameState, threat, 'Os dois jogos alimentaram o Enxerto.'));
       else if (fed === 1) events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 0, outcome: 'Apenas um jogo alimentou o Enxerto.' }));
       else {
-        events.push(failNatureThreat(gameState, threat, { bloom: 2, heal: 0, outcome: 'Nenhum jogo alimentou o Enxerto.' }));
+        events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 0, outcome: 'Nenhum jogo alimentou o Enxerto.' }));
         requestRootPropagation(gameState, threat);
       }
     } else if (threat.type === 'dew') {
@@ -3306,13 +3313,19 @@ export function getBossNatureThreatSummaries(gameState) {
     } else if (threat.type === 'graft') {
       const fed = new Set(threat.fedMeldIds || []).size;
       condition = `Alimentar os dois jogos ligados (${fed}/2).`;
-      consequence = fed ? 'Falha parcial: +1 Flor, sem cura.' : 'Falha total: +2 Flores, sem cura, e pode propagar.';
+      consequence = fed ? 'Falha parcial: +1 Flor, sem cura.' : 'Falha total: +1 Flor, sem cura, e pode propagar.';
     } else if (threat.type === 'dew') {
       condition = `Cartas novas na mesa: ${uniqueDewCards}/6. A cura cai por faixas e zera com 6 cartas.`;
       consequence = `Cura prevista: ${predictedHeal} HP.`;
     } else if (threat.type === 'harvest') {
       condition = 'A quantidade de cartas na mão será conferida no fim do turno.';
       consequence = '0–7: sem efeito · 8–10: cura 60 HP · 11+: +1 Flor e cura 100 HP.';
+    }
+    if (['twin_vines', 'royal_bloom'].includes(threat.sourceAbilityId)) {
+      const activationFlowerApplied = (boss.natureThreats || []).some((entry) => entry.sourceIntentId === threat.sourceIntentId && Number(entry.bloomApplied) > 0);
+      consequence = activationFlowerApplied
+        ? 'Flor desta ativação já aplicada: nenhuma Flor adicional. Propagação existente ainda pode ocorrer.'
+        : 'Falhas desta ativação: máximo +1 Flor no total, sem cura. Propagação existente ainda pode ocorrer.';
     }
     const deadline = threat.deadlinePlayerId != null
       ? `Fim do turno de ${playerName(threat.deadlinePlayerId)} · rodada ${deadlineValue(threat)}`
@@ -5592,7 +5605,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         meldIndexes: (intent.payload.targets || []).map((target) => target.meldIndex),
         fedMeldIds: [],
         healAmount: 0,
-        bloomAmount: 2,
+        bloomAmount: 1,
       });
       outcome = threat ? 'O Enxerto ligou dois jogos; ambos precisam receber uma carta.' : 'O Enxerto nao encontrou dois jogos validos.';
       resultData = { threatIds: threat ? [threat.id] : [] };

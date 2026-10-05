@@ -667,3 +667,11 @@ Revisão de 05/10/2026: fonte de verdade exclusivamente local por instrução ex
 - Horda/Ômega e duração ficam no painel amarelo. Alvo do dano integrado à arte, sem faixas soltas acima/abaixo dos zumbis.
 - Moldura de chefe envolve somente `.meld-line-cards`. Canastra/Limpa, pontuação e contribuições ficam fora. Padronizar Penhora, Posse, Interdito, Raiz, Enxerto, Banquete, Impacto e Espelho, mantendo os efeitos especiais já restritos às cartas.
 - Regressões: `boss-ui-readability.test.mjs` e `nemesis-ui.browser.mjs` (cinco viewports, oito famílias de marcação). Não mudar mecânicas para corrigir apresentação.
+# Matriarca — teto de Flores por ativação (05/10/2026)
+
+- Uma mesma ativação gera no máximo +1 Flor, mesmo que vários objetivos falhem em turnos diferentes. Reload/snapshot/undo preservam o histórico das Flores aplicadas; canastra não reabre a quota da ativação.
+- Trepadeiras Gêmeas: 1 ou 2 falhas = +1 no total; propagação por falha dupla preservada.
+- Enxerto: parcial/total = +1; propagação por falha total preservada.
+- Florescimento Real: todas as falhas compartilham +1; sem cura/fortalecimento novos.
+- Preservar HP 2000, derrota em 5, Limpa −1 / Real −1 adicional / Ás-a-Ás −1 adicional, Orvalho, Casulo, cura atual e Renascimento F3 (1x, consome 1 Flor, 300 HP).
+- Reavaliar a cura somente depois do teste de jogo; este patch não altera seus limites nem outros chefes.

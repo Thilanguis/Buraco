@@ -74,6 +74,8 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 ## A Matriarca Esmeralda
 
+**Teto de burst:** uma ativação aplica no máximo +1 Flor, mesmo com falhas múltiplas. Trepadeiras: uma/duas falhas = +1; Enxerto: parcial/total = +1; Florescimento Real: qualquer número de falhas = +1. Propagações existentes permanecem. HP 2000, derrota em 5 Flores, alívio incremental por canastras e Renascimento F3 (1 Flor, 300 HP, 1x) preservados. Orvalho, Casulo e cura não foram alterados neste patch.
+
 
 **HP:** 2000. **Limite total de cura por rodada:** F1 100 / F2 150 / F3 200.
 

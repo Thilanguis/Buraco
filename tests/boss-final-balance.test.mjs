@@ -590,7 +590,7 @@ test('Trepadeiras e Enxerto propagam sem cura e respeitam falhas independentes',
   completeBossPlayerTurn(vines, 0);
   completeBossPlayerTurn(vines, 1);
   assert.equal(vines.boss.hp, 1700);
-  assert.equal(vines.boss.bloom, 2);
+  assert.equal(vines.boss.bloom, 1);
   assert.equal(getBossNatureThreats(vines).filter((entry) => entry.status === 'active' && entry.propagated).length, 1);
 
   const graft = bossGame('matriarca_esmeralda');

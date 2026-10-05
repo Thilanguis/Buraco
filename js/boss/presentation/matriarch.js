@@ -256,8 +256,8 @@ export const matriarchBossPresentation = Object.freeze({
         const phase = threat?.announcedPhase || payload.announcedPhase || intent.announcedPhase || gameState?.boss?.phase || 1;
         return detailFields([['Cartas contabilizadas', `${Math.min(counted, 6)}/6`], ['Cura prevista', `${getRestorativeDewHealing(phase, counted)} HP`], ['Faixas', '0-1 / 2-3 / 4-5 / 6+ cartas'], ['Prazo', 'fim da rodada']]);
       }
-      case 'twin_vines': return detailFields([['Jogos', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'alimentar cada jogo separadamente'], ['Falha por raiz', '+1 Flor, sem cura'], ['Falha dupla', 'pode propagar uma Raiz']]);
-      case 'graft': return detailFields([['Jogos ligados', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'adicionar 1 carta em cada jogo'], ['Falha parcial', '+1 Flor, sem cura'], ['Falha total', '+2 Flores, sem cura, e pode propagar uma Raiz']]);
+      case 'twin_vines': return detailFields([['Jogos', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'alimentar cada jogo separadamente'], ['Falhas da ativação', 'máximo +1 Flor no total, sem cura'], ['Falha dupla', 'pode propagar uma Raiz']]);
+      case 'graft': return detailFields([['Jogos ligados', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'adicionar 1 carta em cada jogo'], ['Falha parcial', '+1 Flor, sem cura'], ['Falha total', '+1 Flor, sem cura, e pode propagar uma Raiz']]);
       case 'discard_pollen': {
         const discardCard = gameState?.discard?.find((entry) => entry.id === payload.discardCardId);
         return detailFields([['Carta', discardCard ? `${discardCard.rank}${discardCard.suit}` : 'topo do lixo'], ['Gatilho', 'pegar a carta contaminada do lixo'], ['Consequência imediata', '+1 Flor e cura de até 40 HP']]);
@@ -266,7 +266,7 @@ export const matriarchBossPresentation = Object.freeze({
       case 'royal_bloom': {
         const threats = natureThreatsForIntent(gameState, intent);
         const objectives = threats.length ? threats : (payload.objectives || []).map((objective) => ({ ...objective, type: objective.type === 'seed' ? 'royal_seed' : objective.type === 'root' ? 'royal_root' : 'royal_pollen' }));
-        return detailFields([...objectives.map((objective, index) => [`Objetivo ${index + 1}`, royalBloomObjectiveLabel(gameState, objective, helpers)]), ['Falha por objetivo', '+1 Flor, sem cura'], ['Raiz falha', 'pode solicitar uma propagacao']]);
+        return detailFields([...objectives.map((objective, index) => [`Objetivo ${index + 1}`, royalBloomObjectiveLabel(gameState, objective, helpers)]), ['Falhas da ativação', 'máximo +1 Flor no total, sem cura'], ['Raiz falha', 'pode solicitar uma propagacao']]);
       }
       case 'emerald_cocoon': return detailFields([['Casulo', `${payload.amount || 180} de absorcao`], ['Ruptura', 'canastra limpa ou superior'], ['Fim da rodada', 'cura metade do valor restante']]);
       case 'spring_crown': {
@@ -294,15 +294,15 @@ export const matriarchBossPresentation = Object.freeze({
         const phase = threat?.announcedPhase || payload.announcedPhase || intent.announcedPhase || gameState?.boss?.phase || 1;
         return { instruction: 'Baixe cartas para reduzir a cura.', progress: '', consequence: `Cura prevista: ${getRestorativeDewHealing(phase, counted)} HP` };
       }
-      case 'twin_vines': return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogos marcados.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falha: +1 Flor por raiz' };
-      case 'graft': return { instruction: 'Alimente os 2 jogos ligados.', progress: compactNatureProgress(gameState, intent, helpers), consequence: '0/2: +2 Flores · 1/2: +1' };
+      case 'twin_vines': return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogos marcados.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Uma ou duas falhas: +1 Flor no total' };
+      case 'graft': return { instruction: 'Alimente os 2 jogos ligados.', progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falha parcial ou total: +1 Flor' };
       case 'discard_pollen': {
         const threat = natureThreatsForIntent(gameState, intent)[0];
         const contaminatedCard = cardLabelAnywhere(gameState, threat?.discardCardId || payload.discardCardId);
         return { instruction: `☣️ Não recolha ${contaminatedCard}.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Se vier: +1 Flor · cura até 40 HP' };
       }
       case 'harvest': return { instruction: `${target}: termine com até 7 cartas.`, progress: '', consequence: 'Mais cartas = efeito pior' };
-      case 'royal_bloom': return { instruction: 'Cumpra cada objetivo marcado.', progress: compactNatureProgress(gameState, intent, helpers), consequence: '+1 Flor por falha' };
+      case 'royal_bloom': return { instruction: 'Cumpra cada objetivo marcado.', progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falhas: máximo +1 Flor nesta ativação' };
       case 'emerald_cocoon': {
         const boss = gameState?.boss;
         const cocoon = boss?.emeraldCocoon;
@@ -363,15 +363,15 @@ export const matriarchBossPresentation = Object.freeze({
       case 'restorative_dew':
         return 'Cada carta nova colocada legalmente na mesa reduz a cura prevista do Orvalho por faixas. O medidor mostra a faixa atual; com 6 ou mais cartas novas, a cura cai a zero.';
       case 'twin_vines':
-        return 'Os jogos marcados são objetivos separados: cada um precisa receber ao menos 1 carta legal nesta rodada. Uma raiz que ficar sem alimentação falha individualmente e acrescenta sua Flor.';
+        return 'Os jogos marcados são objetivos separados: cada um precisa receber ao menos 1 carta legal nesta rodada. Uma ou duas raízes sem alimentação geram +1 Flor no total nesta ativação. Falha dupla ainda pode propagar uma Raiz.';
       case 'graft':
-        return 'Os dois jogos ligados são objetivos separados. Cada um precisa receber ao menos 1 carta legal nesta rodada; alimentar apenas um lado ainda deixa o outro em falha.';
+        return 'Alimente os dois jogos ligados nesta rodada. Falha parcial ou total: +1 Flor no total. Falha total ainda pode propagar uma Raiz.';
       case 'discard_pollen':
         return 'A carta contaminada é o topo atual do Lixo. Se alguém recolher esse topo enquanto o Pólen estiver ativo, a Matriarca ganha 1 Flor e cura; comprar do Monte ou deixar o topo passar evita o gatilho.';
       case 'harvest':
         return 'A Colheita olha a quantidade de cartas na mão do alvo no fim do turno. 0–7 não gera efeito; 8–10 cura 50 HP; 11 ou mais acrescenta 1 Flor e cura 80 HP.';
       case 'royal_bloom':
-        return 'Florescimento Real combina vários objetivos naturais, mas cada um é resolvido separadamente. Cumprir um objetivo não compensa outro que falhou; cada falha acrescenta a própria Flor.';
+        return 'Florescimento Real combina vários objetivos naturais, mas cada um é resolvido separadamente. Uma ou várias falhas geram no máximo +1 Flor nesta ativação. Cumprir todos evita a punição; raízes falhas ainda podem propagar.';
       case 'emerald_cocoon':
         return 'Casulo absorve 180 de dano; o excesso atinge o HP. Limpa ou superior rompe imediatamente. Se sobreviver à rodada, metade da proteção restante vira cura.';
       case 'spring_crown': {
