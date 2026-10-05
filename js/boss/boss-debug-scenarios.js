@@ -1,5 +1,5 @@
 import { createDeck } from '../deck.js';
-import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
+import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, getBossAbilityPhases, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
 import { getBossDefinition, listBossDefinitions } from './boss-registry.js';
 
 const SUITS = Object.freeze(['\u2660', '\u2666', '\u2663', '\u2665']);
@@ -440,19 +440,19 @@ function findSeedForTarget(state, abilityId, target) {
     if (abilityId === 'interdict') {
       for (let seed = seedStart; seed < seedStart + 256; seed += 1) {
         state.boss.seed = seed;
-        const eligibility = inspectBossAbilityEligibility(state, abilityId);
+        const eligibility = inspectBossAbilityEligibility(state, abilityId, { debug: true });
         if (eligibility.eligible && eligibility.payload?.eligiblePlayerIds?.includes(0)) {
           return eligibility;
         }
       }
     }
 
-    return inspectBossAbilityEligibility(state, abilityId);
+    return inspectBossAbilityEligibility(state, abilityId, { debug: true });
   }
 
   for (let seed = seedStart; seed < seedStart + 256; seed += 1) {
     state.boss.seed = seed;
-    const eligibility = inspectBossAbilityEligibility(state, abilityId);
+    const eligibility = inspectBossAbilityEligibility(state, abilityId, { debug: true });
     if (eligibility.eligible && payloadMatchesTarget(eligibility.payload, target)) return eligibility;
   }
   return { eligible: false, reason: `Nenhum alvo legal corresponde a ${target} neste cenario.`, entry: null, payload: null };
@@ -570,7 +570,7 @@ export function getBossDebugCatalog() {
     abilities: definition.abilities.map((ability) => ({
       id: ability.id,
       name: ability.name,
-      phases: [...ability.phases],
+      phases: [...getBossAbilityPhases(definition.id, ability, { debug: true })],
       weight: ability.weight,
       variants: variantsForAbility(ability.id),
       targets: targetsForAbility(ability.id),
@@ -703,9 +703,10 @@ export function resolveBossDebugPhase(bossId, abilityId, requestedPhase = 'auto'
   const definition = getBossDefinition(bossId);
   const ability = definition?.abilities?.find((entry) => entry.id === abilityId);
   if (!definition || !ability) throw new Error(`Cenario desconhecido: ${bossId}:${abilityId}.`);
-  if (requestedPhase === 'auto' || requestedPhase == null || requestedPhase === '') return Math.min(...ability.phases);
+  const phases = getBossAbilityPhases(bossId, ability, { debug: true });
+  if (requestedPhase === 'auto' || requestedPhase == null || requestedPhase === '') return Math.min(...phases);
   const phase = Number(requestedPhase);
-  if (!ability.phases.includes(phase)) throw new Error(`${ability.name} nao e elegivel na Fase ${phase}.`);
+  if (!phases.includes(phase)) throw new Error(`${ability.name} nao e elegivel na Fase ${phase}.`);
   return phase;
 }
 
@@ -745,7 +746,7 @@ export function validateBossDebugScenario(state, { bossId, abilityId, phase, var
   if (phase && state.boss?.phase !== Number(phase)) errors.push(`Fase incorreta: ${state.boss?.phase}.`);
   let eligibility = null;
   if (abilityId && !errors.length) {
-    eligibility = inspectBossAbilityEligibility(state, abilityId);
+    eligibility = inspectBossAbilityEligibility(state, abilityId, { debug: true });
     if (variant === 'no_target' && eligibility.eligible) errors.push(`${abilityId} encontrou alvo quando deveria usar fallback.`);
     if (variant !== 'no_target' && !eligibility.eligible) errors.push(eligibility.reason);
   }

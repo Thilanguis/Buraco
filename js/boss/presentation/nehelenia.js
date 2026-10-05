@@ -149,7 +149,12 @@ export const neheleniaBossPresentation = Object.freeze({
       case 'dream_theft': return { instruction: `${target}: ache o reflexo real.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: perde o Espelho dos Sonhos' };
       case 'discard_mirror': return { instruction: `${target}: escolha 1 reflexo do Lixo.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: Mundo +16 · Lixo selado' };
       case 'shattered_mirror': return { instruction: `${target}: ache o único falso.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: 2 cartas presas 1 turno' };
-      case 'mirror_prison': return { instruction: `${playerName(gameState, payload.rescuerPlayerId)}: alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: mirrorProgress(gameState, intent, helpers), consequence: `Resgate: Mundo do Espelho -8` };
+      case 'mirror_prison': {
+        const trapped = playerName(gameState, payload.trappedPlayerId);
+        const rescuer = playerName(gameState, payload.rescuerPlayerId);
+        const failure = Math.max(0, Number(payload.failureMirrorPoints) || 8);
+        return { instruction: `${trapped} foi preso. ${rescuer}: alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: mirrorProgress(gameState, intent, helpers), consequence: `Libertou: sem penalidade · Falhou: +${failure}` };
+      }
       case 'eternal_nightmare': return { instruction: `${target}: acompanhe a ORIGINAL.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: Mundo +24' };
       case 'tiger_link': return { instruction: 'Alimente os 2 jogos ligados.', progress: mirrorProgress(gameState, intent, helpers), consequence: 'Falha: Mundo +12 · Garras persistem' };
       case 'tiger_prey': return { instruction: `${target}: alimente primeiro o Jogo ${Number(payload.meldIndex) + 1}.`, progress: mirrorProgress(gameState, intent, helpers), consequence: 'Até cumprir: outros jogos bloqueados' };
@@ -171,7 +176,7 @@ export const neheleniaBossPresentation = Object.freeze({
       case 'mirrored_meld': return `${target} precisa usar exatamente 1 carta legal no jogo espelhado e escolher qual reflexo é o verdadeiro. Errar ou ignorar acrescenta 18 ao Mundo do Espelho, manda a carta ao fundo do Monte e deixa o jogador Desorientado: ele não pode fazer novas baixadas naquele turno, apenas descartar. Se havia uma Presa Marcada antiga, ela volta a valer depois que o espelho for resolvido.`;
       case 'follow_reflection': return `${playerName(gameState, payload.firstPlayerId)} define o padrão pela quantidade TOTAL de cartas baixadas no turno inteiro. ${playerName(gameState, payload.secondPlayerId)} precisa terminar o próprio turno com exatamente a mesma quantidade; zero também conta. O jogo não bloqueia uma quantidade diferente durante o turno: a comparação acontece somente no final. Qualquer diferença acrescenta 16 ao Mundo do Espelho.`;
       case 'discard_mirror': return 'Os dois reflexos do topo do Lixo são visualmente idênticos e não existe pista escondida: a escolha é realmente 50/50. Errar acrescenta 16 ao Mundo do Espelho e sela o Lixo durante a rodada.';
-      case 'mirror_prison': return 'A Prisão só pode aparecer quando o Mundo do Espelho está acima de 0. O parceiro indicado precisa alimentar o jogo refletido; cumprir o resgate reduz 8 do Mundo do Espelho.';
+      case 'mirror_prison': return 'A Prisão só entra na rotação quando existe pressão no Mundo do Espelho e o parceiro possui uma jogada legal em um jogo existente. Nehelenia prioriza prender quem estiver com mais pressão. Libertar não reduz o recurso; falhar acrescenta +8/+10/+12 conforme a fase.';
       case 'eternal_nightmare': return 'Primeiro a carta ORIGINAL aparece sozinha. Depois surgem dois reflexos, o rótulo some e os três se embaralham. Nenhum deles recebe pista de verdadeiro ou falso: é preciso acompanhar visualmente a posição da original. Errar acrescenta 24 ao Mundo do Espelho.';
       case 'tiger_link': return 'Tiger liga dois jogos e cada lado precisa receber ao menos 1 carta. Se algum lado ficar sem alimentação, o Mundo do Espelho sobe 12 e as garras permanecem no lado ignorado até um turno futuro. A carta usada para romper essas garras não causa o dano individual normal.';
       case 'tiger_prey': return `A Presa prende somente ${target}. Até esse jogador alimentar o jogo marcado, ele não pode alimentar outro jogo existente. O parceiro continua livre e a Presa atravessa rodadas até ser resolvida. Jogo Espelhado tem precedência temporária, mas não apaga a Presa.`;

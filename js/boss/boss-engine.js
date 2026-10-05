@@ -1454,11 +1454,27 @@ function createPayload(gameState, abilityId) {
       return buildNeheleniaReflectionChoice(gameState, target, 439, { pickFake: true }) || {};
     }
     if (abilityId === 'mirror_prison') {
-      const trapped = chooseSeeded(neheleniaStolenPlayers(gameState), gameState, 443);
+      const stolen = neheleniaStolenPlayers(gameState);
+      if (!stolen.length) return {};
+      const highestPressure = Math.max(...stolen.map((player) => Number(gameState.boss.dreamMirrorMarksByPlayer?.[player.id]) || 0));
+      const trapped = chooseSeeded(
+        stolen.filter((player) => (Number(gameState.boss.dreamMirrorMarksByPlayer?.[player.id]) || 0) === highestPressure),
+        gameState,
+        443,
+      );
       if (!trapped) return {};
       const rescuer = (gameState.players || []).find((player) => player.id !== trapped.id);
       const pair = chooseSeeded(neheleniaFeedablePairs(gameState).filter((entry) => entry.playerId === rescuer?.id), gameState, 449);
-      return trapped && rescuer && pair ? { trappedPlayerId: trapped.id, rescuerPlayerId: rescuer.id, meldIndex: pair.meldIndex, meldId: pair.meldId, fed: false } : {};
+      const phase = Math.max(1, Math.min(3, Number(gameState.boss.phase) || 1));
+      const failureMirrorPoints = phase === 3 ? 12 : phase === 2 ? 10 : 8;
+      return trapped && rescuer && pair ? {
+        trappedPlayerId: trapped.id,
+        rescuerPlayerId: rescuer.id,
+        meldIndex: pair.meldIndex,
+        meldId: pair.meldId,
+        fed: false,
+        failureMirrorPoints,
+      } : {};
     }
     if (abilityId === 'eternal_nightmare') {
       const target = chooseSeeded((gameState.players || []).filter((player) => player.hand?.length), gameState, 457);
@@ -2199,9 +2215,9 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   return boss;
 }
 
-function eligibleAbilityCandidates(gameState, entries, { avoidLast = false } = {}) {
+function eligibleAbilityCandidates(gameState, entries, { avoidLast = false, debug = false } = {}) {
   const boss = gameState.boss;
-  let choices = entries.filter((entry) => entry.phases.includes(boss.phase));
+  let choices = entries.filter((entry) => getBossAbilityPhases(boss.id, entry, { debug }).includes(boss.phase));
   if (avoidLast && boss.lastAbilityId && choices.length > 1) choices = choices.filter((entry) => entry.id !== boss.lastAbilityId);
   if (boss.phase === 3 && boss.lastMaintenanceRound === boss.roundNumber) choices = choices.filter((entry) => entry.id !== 'maintenance_fee');
   if (!eligibleMeldIndexes(gameState).length) choices = choices.filter((entry) => entry.id !== 'pledge');
@@ -2225,16 +2241,20 @@ function eligibleAbilityCandidates(gameState, entries, { avoidLast = false } = {
     .filter(({ entry, payload }) => hasValidAbilityPayload(gameState, entry.id, payload));
 }
 
-export function inspectBossAbilityEligibility(gameState, abilityId) {
+export function getBossAbilityPhases(bossId, entry, { debug = false } = {}) {
+  return entry.phases;
+}
+
+export function inspectBossAbilityEligibility(gameState, abilityId, { debug = false } = {}) {
   const boss = normalizeBossState(gameState);
   if (!boss) return { eligible: false, reason: 'O estado nao pertence a um modo Chefe da Mesa.', entry: null, payload: null };
   const definition = getBossDefinition(boss.id);
   const entry = definition?.abilities?.find((ability) => ability.id === abilityId) || null;
   if (!entry) return { eligible: false, reason: `Habilidade desconhecida para ${definition?.name || boss.id}: ${abilityId}.`, entry: null, payload: null };
-  if (!entry.phases.includes(boss.phase)) {
+  if (!getBossAbilityPhases(boss.id, entry, { debug }).includes(boss.phase)) {
     return { eligible: false, reason: `${entry.name} nao e elegivel na Fase ${boss.phase}.`, entry, payload: null };
   }
-  const candidate = eligibleAbilityCandidates(gameState, [entry])[0] || null;
+  const candidate = eligibleAbilityCandidates(gameState, [entry], { debug })[0] || null;
   if (!candidate) {
     return { eligible: false, reason: `${entry.name} nao encontrou um alvo legal no estado atual.`, entry, payload: null };
   }
@@ -2262,8 +2282,8 @@ export function selectNextBossIntent(gameState, { debug = false, forcedAbilityId
   if (queuedDebugAbilityId) {
     const forcedEntry = definition.abilities.find((entry) => entry.id === queuedDebugAbilityId);
     if (!forcedEntry) throw new Error(`Habilidade debug desconhecida para ${definition.name}: ${queuedDebugAbilityId}.`);
-    if (!forcedEntry.phases.includes(boss.phase)) throw new Error(`${forcedEntry.name} nao e elegivel na Fase ${boss.phase}.`);
-    candidates = eligibleAbilityCandidates(gameState, [forcedEntry]);
+    if (!getBossAbilityPhases(boss.id, forcedEntry, { debug }).includes(boss.phase)) throw new Error(`${forcedEntry.name} nao e elegivel na Fase ${boss.phase}.`);
+    candidates = eligibleAbilityCandidates(gameState, [forcedEntry], { debug });
     if (!candidates.length && !allowDebugFallback) throw new Error(`${forcedEntry.name} nao encontrou um alvo legal no cenario preparado.`);
     selectionSource = candidates.length ? 'debug_forced' : 'debug_fallback';
   } else if (boss.phaseIntroPending === boss.phase) {
@@ -3497,10 +3517,11 @@ function changeChains(gameState, playerId, amount, reason = '') {
     }
 
     const overflow = Math.max(0, requested - appliedHere);
+    let overflowApplied = 0;
     if (overflow > 0) {
       const partner = (gameState.players || []).find((player) => player.id !== playerId);
       if (partner && (Number(boss.chainsByPlayer[partner.id]) || 0) < 4) {
-        const overflowApplied = changeChains(gameState, partner.id, overflow, `overflow:${reason}`);
+        overflowApplied = changeChains(gameState, partner.id, overflow, `overflow:${reason}`);
         if (overflowApplied) {
           boss.actionSequence += 1;
           recordEvent(boss, {
@@ -3517,7 +3538,7 @@ function changeChains(gameState, playerId, amount, reason = '') {
       }
     }
     dominatrixDefeatIfNeeded(gameState);
-    return appliedHere + overflow;
+    return appliedHere + overflowApplied;
   }
 
   // Resistance relief is cooperative just like offensive overflow: first remove
@@ -5325,12 +5346,29 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       resultData = { success, firstCount: first, secondCount: second, firstPlayerId: payload.firstPlayerId, secondPlayerId: payload.secondPlayerId, mirrorEventId: mirrorEvent?.actionId || null };
     } else if (intent.abilityId === 'mirror_prison') {
       const success = !!payload.fed;
+      const failureMirrorPoints = Math.max(0, Number(payload.failureMirrorPoints) || (intent.announcedPhase === 3 ? 12 : intent.announcedPhase === 2 ? 10 : 8));
       let mirrorEvent = null;
-      if (success) mirrorEvent = restoreNeheleniaDreamMirror(gameState, payload.trappedPlayerId, 'Prisão no Espelho', `mirror_prison_${intent.id}`, 0.4);
+      if (!success) {
+        mirrorEvent = stealNeheleniaDreamMirror(
+          gameState,
+          payload.trappedPlayerId,
+          'Prisão no Espelho',
+          `mirror_prison_${intent.id}`,
+          failureMirrorPoints / 20,
+        );
+      }
+      const trappedName = gameState.players.find((player) => player.id === payload.trappedPlayerId)?.name || 'O jogador preso';
       outcome = success
-        ? mirrorEvent?.outcome || 'O parceiro alimentou o reflexo e abriu a Prisão no Espelho.'
-        : 'A Prisão no Espelho resistiu; o Espelho dos Sonhos roubado continua com Nehelenia.';
-      resultData = { success, trappedPlayerId: payload.trappedPlayerId, rescuerPlayerId: payload.rescuerPlayerId, fedCardIds: [...(payload.fedCardIds || [])], mirrorEventId: mirrorEvent?.actionId || null };
+        ? `${trappedName} foi libertado da Prisão no Espelho.`
+        : mirrorEvent?.outcome || `A Prisão no Espelho resistiu: +${failureMirrorPoints} no Mundo do Espelho.`;
+      resultData = {
+        success,
+        trappedPlayerId: payload.trappedPlayerId,
+        rescuerPlayerId: payload.rescuerPlayerId,
+        fedCardIds: [...(payload.fedCardIds || [])],
+        failureMirrorPoints,
+        mirrorEventId: mirrorEvent?.actionId || null,
+      };
     } else if (intent.abilityId === 'tiger_link') {
       const fed = new Set(payload.fedMeldIds || []);
       const targets = payload.targets || [];

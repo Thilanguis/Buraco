@@ -74,10 +74,62 @@ test('Nehelenia usa Mundo do Espelho contínuo sobre cinco espelhos visuais e ro
     'mirrored_meld', 'follow_reflection', 'discard_mirror', 'mirror_prison', 'eternal_nightmare',
     'tiger_link', 'tiger_prey', 'hawk_suit', 'hawk_watch', 'fish_marked_card', 'fish_inverted',
   ]);
-  assert.deepEqual(definition.abilities.map((ability) => ability.weight), [5, 5, 4, 0, 5, 4, 3, 3, 3, 3, 3]);
+  assert.deepEqual(definition.abilities.map((ability) => ability.weight), [5, 5, 4, 2, 5, 4, 3, 3, 3, 3, 3]);
+  assert.deepEqual(definition.abilities.find((ability) => ability.id === 'mirror_prison').phases, [1, 2, 3]);
   assert.equal(definition.attendants.tiger.portrait, 'assets/images/nehelenia-tigers-eye.png');
   assert.equal(definition.attendants.hawk.portrait, 'assets/images/nehelenia-hawks-eye.png');
   assert.equal(definition.attendants.fish.portrait, 'assets/images/nehelenia-fish-eye.png');
+});
+
+
+
+test('Prisão no Espelho entra na rotação, prioriza o mais pressionado e só aparece com resgate legal', () => {
+  const state = game();
+  state.boss.dreamMirrorMarksMigrated = true;
+  state.boss.dreamMirrorMarksByPlayer = { 0: 1.4, 1: 0.6 };
+  state.boss.danger = 2;
+  const eligibility = inspectBossAbilityEligibility(state, 'mirror_prison');
+  assert.equal(eligibility.eligible, true);
+  assert.equal(eligibility.payload.trappedPlayerId, 0, 'deve prender quem tem mais pressão');
+  assert.equal(eligibility.payload.rescuerPlayerId, 1);
+  assert.equal(eligibility.payload.failureMirrorPoints, 8);
+
+  state.teams[0].melds = [];
+  assert.equal(inspectBossAbilityEligibility(state, 'mirror_prison').eligible, false, 'sem jogo alimentável a Prisão sai do pool');
+});
+
+test('Prisão no Espelho: libertar não altera o Mundo; falhar aplica +8/+10/+12 conforme a fase', () => {
+  for (const [phase, expectedPoints] of [[1, 8], [2, 10], [3, 12]]) {
+    const success = game();
+    success.boss.phase = phase;
+    success.boss.phaseModel = 'progress-v1';
+    success.boss.dreamMirrorMarksMigrated = true;
+    success.boss.dreamMirrorMarksByPlayer = { 0: 1.2, 1: 0.4 };
+    success.boss.danger = 1.6;
+    const successIntent = selectNextBossIntent(success, { debug: true, forcedAbilityId: 'mirror_prison' });
+    const beforeSuccess = success.boss.danger;
+    feed(success, successIntent.payload.rescuerPlayerId, successIntent.payload.meldIndex, 1);
+    completeBossPlayerTurn(success, 0);
+    completeBossPlayerTurn(success, 1);
+    assert.ok(Math.abs(success.boss.danger - beforeSuccess) < 1e-9, `sucesso F${phase} não deve alterar o Mundo`);
+    assert.equal(success.boss.lastEvent?.success, true);
+
+    const failure = game();
+    failure.boss.phase = phase;
+    failure.boss.phaseModel = 'progress-v1';
+    failure.boss.dreamMirrorMarksMigrated = true;
+    failure.boss.dreamMirrorMarksByPlayer = { 0: 1.2, 1: 0.4 };
+    failure.boss.danger = 1.6;
+    const failureIntent = selectNextBossIntent(failure, { debug: true, forcedAbilityId: 'mirror_prison' });
+    const beforeFailure = failure.boss.danger;
+    completeBossPlayerTurn(failure, 0);
+    completeBossPlayerTurn(failure, 1);
+    const expectedDanger = beforeFailure + expectedPoints / 20;
+    assert.ok(Math.abs(failure.boss.danger - expectedDanger) < 1e-9, `falha F${phase} deve acrescentar ${expectedPoints}/100`);
+    assert.equal(failure.boss.lastEvent?.success, false);
+    assert.equal(failure.boss.lastEvent?.failureMirrorPoints, expectedPoints);
+    assert.equal(failureIntent.payload.failureMirrorPoints, expectedPoints);
+  }
 });
 
 test('Jogo Espelhado falso manda a carta ao fundo e Desorienta', () => {

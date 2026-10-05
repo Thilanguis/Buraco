@@ -53,8 +53,8 @@ export const neheleniaDefinition = Object.freeze({
       'O segundo cooperador precisa igualar a quantidade baixada pelo primeiro; falhar avança +16 no Mundo do Espelho.'),
     ability('discard_mirror', 'Espelho do Lixo', 4, [2, 3], () =>
       'O topo do lixo aparece em dois reflexos idênticos. Errar sela o lixo e avança +16 no Mundo do Espelho.'),
-    ability('mirror_prison', 'Prisão no Espelho', 0, [], () =>
-      'Mecânica de resgate: alimentar o jogo refletido reduz 8 do Mundo do Espelho. Não participa do sorteio ofensivo normal.'),
+    ability('mirror_prison', 'Prisão no Espelho', 2, [1, 2, 3], ({ failureMirrorPoints = 8 } = {}) =>
+      `Nehelenia aprisiona quem está mais pressionado pelo Mundo do Espelho. O parceiro precisa alimentar um jogo válido; sucesso liberta sem penalidade, falha avança +${failureMirrorPoints}.`),
     ability('eternal_nightmare', 'Pesadelo Eterno', 5, [3], () =>
       'A original e dois reflexos se misturam. Errar avança +24 no Mundo do Espelho.'),
     ability('tiger_link', 'Laço do Tigre', 4, [1, 2, 3], () =>

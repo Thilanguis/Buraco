@@ -1,7 +1,7 @@
 # Inventário atual de habilidades dos chefes
 
 
-**Atualizado em 04/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do catálogo do Laboratório de Chefes.**
+**Atualizado em 05/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do catálogo do Laboratório de Chefes.**
 
 
 Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
@@ -139,7 +139,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 | Jogo Espelhado | 1, 2 e 3 | 5 | Duplica fisicamente um jogo em dois reflexos idênticos. O alvo usa exatamente 1 carta legal em um reflexo. Errar ou ignorar envia a carta ao fundo do Monte, deixa o jogador **Desorientado** e acrescenta **+18** ao Mundo do Espelho. |
 | Siga o Reflexo | 1, 2 e 3 | 5 | O primeiro cooperador define, pelo turno inteiro, quantas cartas baixou; o segundo precisa terminar com a mesma quantidade, inclusive 0. Diferença acrescenta **+16**. |
 | Espelho do Lixo | 2 e 3 | 4 | Mostra dois reflexos idênticos do topo do Lixo, sem pista escondida. Errar acrescenta **+16** e sela o Lixo durante a rodada. |
-| Prisão no Espelho | — | 0 | Mecânica de resgate fora do sorteio ofensivo. Quando acionada, alimentar o jogo refletido reduz **8** do Mundo do Espelho. |
+| Prisão no Espelho | 1, 2 e 3 | 2 | Só entra quando já existe pressão no Mundo do Espelho e o parceiro possui uma alimentação legal. Nehelenia prioriza prender o cooperador mais pressionado; o parceiro precisa alimentar o jogo indicado. Sucesso liberta sem alterar o recurso; falha acrescenta **+8/+10/+12** conforme a fase. |
 | Pesadelo Eterno | 3 | 5 | Mostra a ORIGINAL, cria dois reflexos e embaralha os três. Errar acrescenta **+24**. |
 | Laço do Tigre | 1, 2 e 3 | 4 | Liga dois jogos; cada lado precisa receber carta. Falhar acrescenta **+12** e deixa garras persistentes no lado ignorado. |
 | Presa Marcada | 1, 2 e 3 | 3 | Marca um jogo; até resolvê-lo, o alvo não pode alimentar outro jogo existente. É controle puro, sem avanço direto do recurso. |

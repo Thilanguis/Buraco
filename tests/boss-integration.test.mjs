@@ -206,15 +206,15 @@ test('HUD compacto remove marcas falsas de HP e mantem detalhes expansisveis', (
   assert.doesNotMatch(app, /intentProgress\.textContent = actionPresentation\.details/);
 });
 
-test('HUD explica Dominado e anima Correntes e Divida a partir dos eventos reais', () => {
-  assert.match(app, /SOB CONTROLE — 3 CORRENTES/);
-  assert.match(app, /DOMINADO — 4 CORRENTES/);
-  assert.match(app, /Não pode pegar o lixo nem criar jogos novos/);
+test('HUD explica Dominação 0–50 e anima pressão e Divida a partir dos eventos reais', () => {
+  assert.match(app, /SOB CONTROLE · Dominado em/);
+  assert.match(app, /DOMINADO · sem Lixo e sem jogo novo/);
+  assert.match(app, /const controlled = domination >= 37\.5 && !dominated/);
   assert.match(app, /feedback\.type === 'chainChange'/);
   assert.match(app, /feedback\.dangerChangeLabel/);
   assert.match(app, /data-player-id="\$\{player\.id\}"/);
-  assert.match(app, /querySelectorAll\('#bossChainStatus \.boss-chain-player'\)/);
-  assert.match(app, /querySelector\('\.boss-chain-links'\)\?\.getBoundingClientRect\(\)/);
+  assert.match(app, /querySelectorAll\('#bossChainStatus \.boss-domination-player'\)/);
+  assert.match(app, /querySelector\('\.boss-domination-track'\)\?\.getBoundingClientRect\(\)/);
   assert.doesNotMatch(app.match(/const feedbackEvents[\s\S]*?scheduleBossTurnAdvance/)?.[0] || '', /opponentAnchorRect/);
   assert.match(app, /bossDangerMeter/);
   assert.match(bossCss, /\.boss-floating-number\.chain-up/);
@@ -270,10 +270,11 @@ test('Cofre fica junto ao jogador, permite juros e anima o resgate sem entrar no
   assert.match(bossCss, /@keyframes bossVaultClose/);
 });
 
-test('HUD mostra quatro Correntes, estado Sob Controle e Posses independentes', () => {
-  assert.match(app, /Array\.from\(\{ length: 4 \}/);
-  assert.match(app, /SOB CONTROLE — 3 CORRENTES/);
-  assert.match(app, /DOMINADO — 4 CORRENTES/);
+test('HUD mostra barra individual 0–50, cortes e Posses independentes', () => {
+  assert.match(app, /aria-valuemin="0" aria-valuemax="50" aria-valuenow="\$\{domination\}"/);
+  assert.match(app, /left:25%[\s\S]*?left:50%[\s\S]*?left:75%/);
+  assert.match(app, /SOB CONTROLE · Dominado em/);
+  assert.match(app, /DOMINADO · sem Lixo e sem jogo novo/);
   assert.match(app, /boss\.possessions \|\| \[\]/);
   assert.match(app, /Posse: jogo/);
 });

@@ -18,7 +18,7 @@ import {
   simulateBossDebugReload,
   validateBossDebugScenario,
 } from '../js/boss/boss-debug-scenarios.js';
-import { advanceBossTurn, beginBossTurn, resolveBossChoice, selectNextBossIntent } from '../js/boss/boss-engine.js';
+import { advanceBossTurn, beginBossTurn, inspectBossAbilityEligibility, resolveBossChoice, selectNextBossIntent } from '../js/boss/boss-engine.js';
 import { listBossDefinitions } from '../js/boss/boss-registry.js';
 
 const [appSource, htmlSource, bossCssSource] = await Promise.all([
@@ -155,6 +155,47 @@ test('fase automatica usa a primeira fase elegivel e fase incompativel e rejeita
     () => build('banker', 'suit_audit', { phase: 1 }),
     /nao e elegivel na Fase 1/,
   );
+});
+
+test('Prisão no Espelho é habilidade normal de peso baixo em F1/F2/F3 e continua testável no Laboratório', () => {
+  const official = listBossDefinitions().find((boss) => boss.id === 'nehelenia').abilities.find((ability) => ability.id === 'mirror_prison');
+  assert.deepEqual(official.phases, [1, 2, 3]);
+  assert.equal(official.weight, 2);
+  const catalogEntry = getBossDebugCatalog().find((boss) => boss.id === 'nehelenia').abilities.find((ability) => ability.id === 'mirror_prison');
+  assert.deepEqual(catalogEntry.phases, [1, 2, 3]);
+  for (const phase of ['auto', 1, 2, 3]) {
+    const prepared = build('nehelenia', 'mirror_prison', { phase });
+    assert.equal(prepared.phase, phase === 'auto' ? 1 : phase);
+    assert.equal(prepared.invariants.valid, true);
+    assert.equal(inspectBossAbilityEligibility(prepared.state, 'mirror_prison').eligible, true);
+    assert.equal(inspectBossAbilityEligibility(prepared.state, 'mirror_prison', { debug: true }).eligible, true);
+    const restored = simulateBossDebugReload(prepared.state);
+    const intent = selectNextBossIntent(restored, { debug: true });
+    assert.equal(intent.abilityId, 'mirror_prison');
+    assert.equal(intent.selectionSource, 'debug_forced');
+    assert.equal(restored.boss.debugForcedAbilityId, undefined);
+  }
+  assert.throws(() => build('nehelenia', 'mirror_prison', { phase: 4 }), /nao e elegivel na Fase 4/);
+});
+
+test('Prisão no Espelho: sucesso não reduz recurso, falha aumenta o Mundo e sem alvo usa fallback', () => {
+  const success = build('nehelenia', 'mirror_prison', { variant: 'success' }).state;
+  const beforeSuccess = success.boss.danger;
+  const result = executeBossDebugScenarioVariant(success);
+  assert.equal(result.executed, true);
+  assert.equal(result.action, 'mirror_prison_fed');
+  assert.ok(Math.abs(success.boss.danger - beforeSuccess) < 1e-9, 'libertar não deve reduzir o Mundo do Espelho');
+  assert.equal(validateBossDebugScenario(success).valid, true);
+
+  const failure = build('nehelenia', 'mirror_prison', { variant: 'failure' }).state;
+  const beforeFailure = failure.boss.danger;
+  executeBossDebugScenarioVariant(failure);
+  assert.ok(Math.abs(failure.boss.danger - (beforeFailure + 0.4)) < 1e-9, 'falha F1 deve acrescentar 8/100');
+
+  const noTarget = build('nehelenia', 'mirror_prison', { variant: 'no_target' }).state;
+  const fallback = selectNextBossIntent(noTarget, { debug: true });
+  assert.ok(fallback);
+  assert.notEqual(fallback.abilityId, 'mirror_prison');
 });
 
 test('cenarios usam 108 cartas oficiais com IDs unicos e jogos validos', () => {

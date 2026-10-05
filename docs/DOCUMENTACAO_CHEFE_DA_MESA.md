@@ -4,7 +4,7 @@
 ## Status da documentação
 
 
-**Versão revisada contra o código atual — 04/10/2026.**
+**Versão revisada contra o código atual — 05/10/2026.**
 
 
 Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
@@ -141,7 +141,7 @@ Exemplos:
 
 ```text
 Auditoria concluída: sem cobrança
-Biel perdeu 1 Chicote
+Biel recuperou 4 pontos de Dominação
 Raiz Faminta falhou: +1 Flor
 Orvalho Restaurador: +60 HP
 ```
@@ -235,7 +235,7 @@ Dano individual não remove:
 
 
 - Dívida;
-- Chicote;
+- Dominação;
 - Florescimento.
 
 
@@ -339,11 +339,11 @@ Mostra a redução real de Dívida produzida pelo jogo.
 
 
 ```text
-💥 180   ⛓️ -1
+💥 180   ⛓️ -4
 ```
 
 
-Mostra Chicotes realmente removidos por Resistência através daquele jogo.
+Mostra pontos de Dominação realmente removidos por Resistência através daquele jogo (4/8/12 no total dos tiers).
 
 
 ## 3.4 Matriarca
@@ -828,23 +828,23 @@ A faixa é congelada pelos valores anunciados da habilidade e o HUD destaca a fa
 ## 5.1 Identidade
 
 
-Chefe de controle direto, ordens, Chicotes individuais e perda de eficiência.
+Chefe de controle direto, ordens, Dominação individual e perda de eficiência.
 
 
-> Obedecer reduz a eficiência. Desobedecer adiciona Chicote.
+> Obedecer reduz a eficiência. Desobedecer aumenta a Dominação.
 
 
-## 5.2 Vida e Chicotes
+## 5.2 Vida e Dominação
 
 
 ```text
 HP: 2600
 Dominação por jogador: 0..50
-Marcadores visuais: 4 Chicotes por jogador
+Barra visual: 4 segmentos de 12,5 pontos por jogador
 ```
 
 
-Cada Chicote visual representa **12,5 pontos** e pode ficar parcialmente preenchido.
+Cada segmento da barra representa **12,5 pontos** e pode ficar parcialmente preenchido. O campo interno `chainsByPlayer` mantém a escala legada 0–4, aceitando frações; a regra e a interface usam Dominação 0–50.
 
 | Dominação | Estado       |
 | --------: | ------------ |
@@ -859,7 +859,7 @@ Os dois jogadores em 50/50 causam derrota imediata.
 ## 5.3 Sob Controle
 
 
-Com 3 Chicotes:
+Com pelo menos 37,5 e menos de 50 pontos de Dominação:
 
 
 - não cria jogo novo;
@@ -871,7 +871,7 @@ Com 3 Chicotes:
 ## 5.4 Dominado
 
 
-Com 4 Chicotes:
+Com 50 pontos de Dominação:
 
 
 - não pega lixo;
@@ -879,7 +879,7 @@ Com 4 Chicotes:
 - pode comprar do monte;
 - alimenta jogos existentes;
 - sofre redução no ataque final;
-- permanece Dominado até remover Chicote.
+- permanece Dominado até a Dominação ficar abaixo de 50.
 
 
 ## 5.5 Resistência
@@ -997,7 +997,7 @@ Para `evolve_specific_meld`:
 Se uma mudança externa eliminar todas as formas de cumprir:
 
 
-- cancelar sem Chicote.
+- cancelar sem ganhar Dominação.
 
 
 Se o jogador usar ou desperdiçar voluntariamente os recursos necessários:
@@ -1188,6 +1188,8 @@ boss.possessions[meldId].releasedEventId;
 
 > Esta habilidade não faz parte da rotação ativa nem aparece no Laboratório. O código interno foi preservado temporariamente apenas para compatibilidade e possível redesenho futuro.
 
+As regras e os termos “Chicote” abaixo são históricos, não regras ativas da barra atual de Dominação 0–50.
+
 
 ```text
 id: interdict
@@ -1263,7 +1265,7 @@ fases: 2 e 3
 - aplica uma vez.
 
 
-## 5.15 Transbordamento de Chicotes
+## 5.15 Transbordamento de Dominação
 
 
 Em qualquer fase:
@@ -1271,6 +1273,7 @@ Em qualquer fase:
 
 - se um alvo já está em **50/50 de Dominação** e receberia mais pressão, o excesso transborda para o parceiro;
 - o parceiro recebe somente o excesso que ainda couber;
+- o total retornado pelo motor corresponde somente à pressão realmente aplicada nas duas barras, não à pressão solicitada;
 - nenhum jogador ultrapassa 50;
 - preserva a origem da punição (Exposição, ordem, Etiqueta, Ordem Final etc.);
 - feedback identifica o transbordamento;
@@ -2264,7 +2267,7 @@ Avalia:
 
 
 - custo de obedecer;
-- Chicotes em 3/3, 4/2, 4/3 e 4/4;
+- Dominação dos dois cooperadores e proximidade dos limiares de 37,5 e 50;
 - Etiqueta;
 - Posse coordenada;
 - Mãos Atadas compartilhada.
@@ -2373,7 +2376,7 @@ Mostrar:
 Mostrar:
 
 
-- Chicotes de cada jogador;
+- barra de Dominação 0–50 de cada jogador, dividida em quatro segmentos de 12,5;
 - estado Normal, Sob Controle ou Dominado;
 - ordem ativa;
 - Etiqueta;
@@ -2490,7 +2493,7 @@ Snapshot não duplica:
 - dano;
 - cura;
 - Dívida;
-- Chicote;
+- Dominação;
 - Flor;
 - Sede de Sangue;
 - propagação;
@@ -2592,10 +2595,10 @@ Em touch, tablet e `prefers-reduced-motion`:
 |---|---|---|---|---|---|
 | HP | 2650 | 2600 | 2000 | 2300 | 2400 |
 | Perigo | Dívida coletiva | Dominação individual | Florescimento | Sede de Sangue | Mundo do Espelho (0–100) |
-| Derrota especial | Dívida 100 | ambos com 4 Chicotes | 5 Flores | Sede 100 | 5 Espelhos |
+| Derrota especial | Dívida 100 | ambos em 50/50 de Dominação | 5 Flores | Sede 100 | 5 Espelhos |
 | Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas |
 | Recuperação da equipe | redução de Dívida | Dominação -4/-8/-12 | poda por evolução | redução de Sede por canastra | Mundo do Espelho -4/-8/-12 |
-| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Chicotes e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo |
+| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Dominação e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo |
 | Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim | Jogo Espelhado, Laço do Tigre, Presa Marcada e Vigilância |
 
 
@@ -2701,7 +2704,7 @@ A recuperação por canastra segue a régua comum:
 - evoluções sucessivas acrescentam `-4` por novo tier válido.
 
 
-A Prisão no Espelho é uma mecânica de resgate fora do sorteio ofensivo e reduz `8` quando cumprida.
+A Prisão no Espelho participa da rotação com peso `2` nas três fases. Só fica elegível quando já existe pressão no Mundo do Espelho e o parceiro possui uma alimentação legal em um jogo existente.
 
 
 ## 15.3 Fases
@@ -2800,12 +2803,13 @@ O bot também não recebe a resposta secreta: escolhe um dos dois reflexos de fo
 
 ### Prisão no Espelho
 
+Participa da rotação normal com **peso 2** nas Fases 1, 2 e 3. É uma habilidade rara e condicional: se não existir pressão no Mundo do Espelho ou se o parceiro não tiver uma alimentação legal em jogo existente, ela fica inelegível e não pode ser sorteada.
 
-Só pode ser acionada quando o Mundo do Espelho está acima de 0 e o parceiro possui uma jogada legal para um jogo existente.
+Nehelenia prioriza aprisionar o cooperador que estiver com **maior pressão acumulada de Espelho**. Em empate, a escolha continua determinística pela seed da partida. O outro cooperador vira o resgatador e recebe um jogo que ele realmente consegue alimentar.
 
-
-- alimentar o jogo refletido reduz **8 no Mundo do Espelho**;
-- falhar não concede esse resgate.
+- se o parceiro alimentar o jogo indicado, o jogador é libertado e **nenhum ponto é removido nem acrescentado** ao Mundo do Espelho;
+- se o parceiro falhar até a resolução da habilidade, Nehelenia avança o Mundo do Espelho em **+8 na Fase 1, +10 na Fase 2 e +12 na Fase 3**;
+- a penalidade de falha é persistida no payload da ativação, portanto uma mudança de fase durante a rodada não altera o valor anunciado.
 
 
 ### Pesadelo Eterno
@@ -2905,7 +2909,7 @@ Dominadora e Nehelenia passaram a usar progresso fracionário por baixo dos marc
 
 
 ### Dominadora
-O estado continua compatível com 4 Chicotes por jogador, agora aceitando frações. Cada jogador representa 0–50 de Dominação; cada Chicote visual equivale a 12,5 pontos e pode aparecer parcialmente preenchido.
+O estado interno continua compatível com a escala legada 0–4 em `chainsByPlayer`, aceitando frações. A regra usa Dominação 0–50 por jogador; cada segmento da barra equivale a 12,5 pontos e pode aparecer parcialmente preenchido.
 
 
 - 37,5/50: Sob Controle.
@@ -2920,12 +2924,12 @@ Pressões atuais de teste: Escolha Forçada F1 +6 ou ordem +2/falha +12, F2 +7 o
 O estado continua compatível com 5 Espelhos, agora com preenchimento parcial. Cada Espelho equivale a 20 pontos do Mundo do Espelho.
 
 
-Pressões de teste: Jogo Espelhado erro/ignorar +18; Siga o Reflexo falha +16; Espelho do Lixo erro +16; Laço do Tigre falha +12; Pesadelo Eterno erro +24. Prisão no Espelho saiu do sorteio ofensivo normal; quando acionada como resgate, reduz 8.
+Pressões de teste: Jogo Espelhado erro/ignorar +18; Siga o Reflexo falha +16; Espelho do Lixo erro +16; Prisão no Espelho falha +8/+10/+12; Laço do Tigre falha +12; Pesadelo Eterno erro +24. Na Prisão, libertar o parceiro não altera o Mundo do Espelho.
 
 **Revisão de 04/10/2026:** os valores foram mantidos após comparação com a Dominadora. A Nehelenia alterna habilidades de pressão e de controle, usa uma barra coletiva de 100 pontos e recupera 4/8/12 pelas canastras; a pressão mais forte, +24, fica restrita à Fase 3. Não foi aplicado buff/nerf nesta revisão.
 
 
-O HUD mostra o preenchimento parcial dos Chicotes/Espelhos e o progresso numérico para tornar o risco legível.
+O HUD mostra o preenchimento parcial da Dominação/Espelhos e o progresso numérico para tornar o risco legível.
 ---
 
 ## Correções técnicas — Laboratório da Ordem Final e Amigas da Dominação (04/10/2026)

@@ -5787,7 +5787,7 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   mirrored_meld: 'Use 1 carta e escolha o jogo verdadeiro. Errar = +18 no Mundo do Espelho e Desorientado.',
   follow_reflection: 'O 1º define a quantidade; o 2º precisa igualar. Falha = +16 no Mundo do Espelho.',
   discard_mirror: 'Escolha entre 2 reflexos do Lixo. Errar = +16 no Mundo do Espelho e sela o Lixo.',
-  mirror_prison: 'Alimente o jogo refletido para libertar o parceiro e reduzir 8 do Mundo do Espelho.',
+  mirror_prison: 'Liberte o parceiro alimentando o jogo indicado. Sucesso: sem penalidade. Falha: +8/+10/+12 no Mundo do Espelho.',
   eternal_nightmare: 'Memorize a original e siga-a no embaralhamento. Errar = +24 no Mundo do Espelho.',
   tiger_link: 'Alimente os 2 jogos ligados. Falha = +12 no Mundo do Espelho e garras persistentes.',
   tiger_prey: 'O alvo deve alimentar o jogo marcado antes dos outros jogos existentes.',
