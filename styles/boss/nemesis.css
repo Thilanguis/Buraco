@@ -10,8 +10,9 @@ body[data-boss-id="nemesis"] .boss-combat-entity { box-sizing: border-box; width
 body[data-boss-id="nemesis"] .boss-combat-entity > .boss-combat-portrait { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: cover; object-position: center; background: none; }
 body[data-boss-id="nemesis"] .boss-combat-entity > b { padding-right: 27px; padding-left: 4px; }
 body[data-boss-id="nemesis"] .boss-combat-content { position: absolute; bottom: 29px; left: 7px; right: 7px; z-index: 3; display: grid; gap: 2px; text-shadow: 0 1px 3px #000; pointer-events: none; }
-body[data-boss-id="nemesis"] .boss-combat-chips { position: absolute; top: 7px; right: 7px; z-index: 4; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; pointer-events: none; }
-body[data-boss-id="nemesis"] .boss-combat-chips .boss-daughter-state { position: static; max-width: none; }
+body[data-boss-id="nemesis"] .boss-combat-chips { position: absolute; top: 7px; right: 7px; z-index: 5; display: flex; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 14px); align-items: flex-end; gap: 3px; }
+body[data-boss-id="nemesis"] .boss-combat-chips .boss-daughter-state { position: static; flex: 0 0 auto; max-width: none; width: auto; height: auto; min-height: 16px; padding: 2px 5px; margin: 0; border-radius: 3px; font-size: 8px; line-height: 1; cursor: pointer; }
+body[data-boss-id="nemesis"] .boss-combat-chips .boss-daughter-state:focus-visible { outline: 2px solid #fff0b3; outline-offset: 2px; }
 body[data-boss-id="nemesis"] .boss-combat-entity.is-corpse { opacity: .6; border-color: #555; }
 body[data-boss-id="nemesis"] .boss-combat-entity.is-corpse .boss-combat-portrait { filter: grayscale(1); }
 body[data-boss-id="nemesis"] .boss-combat-entity.is-entering { border-color: #e8b654; }
@@ -20,6 +21,8 @@ body[data-boss-id="nemesis"] .boss-combat-card-target { position: absolute; inse
 body[data-boss-id="nemesis"] .boss-combat-card-target:focus-visible { opacity: 1; background: transparent; outline: 2px solid #ffe19f; }
 body[data-boss-id="nemesis"] .boss-combat-entity > .boss-combat-help { position: absolute; bottom: 7px; right: 7px; z-index: 5; margin: 0; }
 body[data-boss-id="nemesis"] .boss-portrait { position: relative; }
+body[data-boss-id="nemesis"] .boss-combat-main-target { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; border: 0; border-radius: inherit; cursor: crosshair; }
+body[data-boss-id="nemesis"] .boss-combat-main-target:focus-visible { outline: 2px solid #ffe19f; outline-offset: -3px; }
 body[data-boss-id="nemesis"] .nemesis-stars-overlay { position: absolute; top: 5px; right: 5px; z-index: 5; display: flex; align-items: center; gap: 3px; box-sizing: border-box; max-width: calc(100% - 10px); padding: 3px 4px; border-radius: 4px; background: rgba(8, 13, 23, .8); color: #fef3c7; font-size: 8px; font-weight: 800; }
 body[data-boss-id="nemesis"] .nemesis-stars-overlay > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body[data-boss-id="nemesis"] .nemesis-stars-overlay .boss-combat-help { margin: 0; }
@@ -49,17 +52,16 @@ body[data-boss-id="nemesis"] #nemesisEffectSummary[hidden] { display: none; }
   background: radial-gradient(ellipse at 0% 25%, #a4e34f99, transparent 32%),
     radial-gradient(ellipse at 100% 75%, #74b833aa, transparent 34%),
     radial-gradient(ellipse at 0% 85%, #65992f88, transparent 25%);
-  animation: nemesisCardInfection 3s ease-in-out infinite;
 }
 .boss-mode .boss-card-status-nemesis {
   background: #172d10ee; border-color: #91d345; color: #d8f5ad;
 }
 .boss-mode .bought-card-marker ~ .boss-card-status-nemesis { bottom: 20px; }
-@keyframes nemesisCardInfection { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .nemesis-infection-overlay::before { animation: none; }
 }
-@media (max-width: 650px) { body[data-boss-id="nemesis"] .boss-combat-entity { min-height: 100px; font-size: 9px; } body[data-boss-id="nemesis"] .boss-combat-targets { bottom: 4px; right: 4px; } }
+@media (max-width: 650px) { body[data-boss-id="nemesis"] .boss-combat-entity { min-height: 120px; font-size: 9px; } body[data-boss-id="nemesis"] .boss-combat-targets { bottom: 4px; right: 4px; } }
+@media (max-width: 650px) { body[data-boss-id="nemesis"] .boss-combat-chips .boss-daughter-state { font-size: 7px; letter-spacing: .25px; padding: 2px 4px; } }
 
 
 /* Infecção — medidor biomecânico exclusivo do Nemesis. */
@@ -189,15 +191,11 @@ body[data-boss-id="nemesis"] .boss-debt-meter #bossDebtBar[style^='width: 0']::a
     animation: none !important;
   }
 }
-.boss-mode #drawDiscardBtn.boss-nemesis-contaminated-discard .pile-card,
-.boss-mode #drawDiscardBtn.boss-nemesis-contaminated-discard .discard-face {
-  box-shadow: 0 0 0 2px #e86938, 0 0 16px rgba(232, 105, 56, .5) !important;
-}
 .boss-mode #drawDiscardBtn.boss-nemesis-contaminated-discard::after {
   content: '☣ +6 INFECÇÃO / RETIRADA';
   display: block;
   margin-top: 3px;
-  color: #ffb68f;
+  color: #d8f5ad;
   font-size: 8px;
   font-weight: 1000;
   text-align: center;

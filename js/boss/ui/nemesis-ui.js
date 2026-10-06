@@ -1,6 +1,7 @@
+import { getNemesisZombieEffect } from '../mechanics/nemesis.js';
 const passiveText = (boss, entity) => {
   if (entity.status === 'corpse') return 'CADÁVER · pode ser reanimado';
-  if (entity.status === 'entering') return 'ENTRANDO · impeça a invasão';
+  if (entity.status === 'entering') return 'INVADINDO · cumpra o objetivo para expulsar';
   if (entity.status === 'repelled') return 'REPELIDO · ameaça expulsa';
   const buff = boss.hordeBuff?.entityId === entity.id && boss.roundNumber <= boss.hordeBuff.expiresRound;
   if (entity.id === 'grabber') return `Lixo: prende ${(entity.mutated ? 2 : 1) + Number(buff)} carta(s)`;
@@ -13,6 +14,21 @@ const passiveHelp = (entity, reinforced) => {
       : 'Primeira contribuição de 3+ cartas ao mesmo jogo por turno: cura Nemesis 40 HP (Mutado: 70).\nHorda: +30 (70 normal / 100 Mutado). Teto: 2600 HP.';
   return `${rule} Passiva só com o zumbi ATIVO.${reinforced ? ' Reforço temporário ativo.' : ''}`;
 };
+function zombieChips(boss, entity, reinforced) {
+  if (entity.status === 'entering') return [{ label: 'INVADINDO', text: 'Cumpra o objetivo de Invasão da Horda para expulsar.\nSem HP de combate, passiva ou seleção de alvo. Falha: ATIVO com HP cheio.' }];
+  if (entity.status === 'corpse') return [{ label: 'CADÁVER', text: 'Foi derrotado. Pode voltar por Reanimação Viral; um repelido não é cadáver.' }];
+  if (entity.status !== 'persistent' || entity.hp <= 0) return [];
+  const effect = getNemesisZombieEffect(boss, entity);
+  const rule = entity.id === 'grabber' ? `Ao retirar o Lixo, agarra até ${effect.value} cartas que vierem para sua mão. O topo usado imediatamente no jogo fica livre.\nNão podem entrar em jogo neste turno; ainda podem ser descartadas. Libera no fim do seu turno ou ao matar o Agarrador.`
+    : entity.id === 'infected' ? `Uma falha que aumenta Infecção recebe +${effect.value}, uma vez por evento.\nFalha na invasão não gera esse bônus.`
+      : `Sua primeira contribuição de 3+ cartas ao mesmo jogo no turno cura Nemesis até ${effect.value} HP.\nUma vez por turno; não ultrapassa 2600 HP.`;
+  return [
+    { label: 'ATIVO', text: 'Está na mesa: passiva ativa e pode receber dano. Toque na arte para escolhê-lo como alvo.' },
+    ...(entity.mutated ? [{ label: 'MUTADO', text: `Mutação da fase 3: ${entity.id === 'grabber' ? 'cartas agarradas' : entity.id === 'infected' ? 'bônus de Infecção por falha' : 'cura por contribuição'} passa de ${effect.normal} para ${effect.mutated}.\nComando da Horda soma seu reforço à parte.` }] : []),
+    ...(reinforced ? [{ label: 'REFORÇADO', text: `Comando da Horda: +${effect.bonus} ${entity.id === 'grabber' ? 'carta agarrada' : entity.id === 'infected' ? 'Infecção por falha' : 'HP de cura'}.\nDura até o fim da rodada ${boss.hordeBuff.expiresRound}, inclusive.` }] : []),
+    { label: effect.label, text: rule },
+  ];
+}
 export const nemesisBossUi = Object.freeze({
   id: 'nemesis',
   finalStrikeWarning({ gameState, playerId }) {
@@ -29,7 +45,7 @@ export const nemesisBossUi = Object.freeze({
     element.querySelectorAll('.nemesis-infection-overlay, .boss-card-status-nemesis').forEach((node) => node.remove());
     element.classList.remove('nemesis-marked', 'nemesis-grabbed', 'nemesis-contaminated');
     const model = effect === 'nemesis-contaminated'
-      ? { classes: [effect], label: 'CONTAMINADO' } : this.card(effect);
+      ? { classes: [effect], label: 'CONTAMINADA' } : this.card(effect);
     if (!model) return;
     element.classList.add(...model.classes);
     const overlay = element.ownerDocument.createElement('span');
@@ -40,6 +56,24 @@ export const nemesisBossUi = Object.freeze({
     status.setAttribute('aria-hidden', 'true');
     status.textContent = `☣ ${model.label}`;
     element.append(overlay, status);
+  },
+  syncCardTransitions(root, boss, { reducedMotion = false } = {}) {
+    const scope = String(boss?.seed);
+    const initial = !root._nemesisSeenGrabs || root._nemesisGrabScope !== scope;
+    if (initial) { root._nemesisSeenGrabs = new Set(); root._nemesisGrabScope = scope; }
+    for (const event of boss?.eventLog || []) {
+      if (event.type !== 'nemesisGrab') continue;
+      const key = event.actionId || `${event.playerId}:${event.turnId}:${event.cardIds.join(',')}`;
+      const unseen = !root._nemesisSeenGrabs.has(key);
+      root._nemesisSeenGrabs.add(key);
+      if (initial || !unseen || reducedMotion) continue;
+      for (const node of root.querySelectorAll('.nemesis-grabbed[data-card-id]')) {
+        if (!event.cardIds.includes(node.dataset.cardId)) continue;
+        const overlay = node.querySelector('.nemesis-infection-overlay');
+        const pulse = overlay?.animate?.([{ opacity: .25 }, { opacity: 1 }], { duration: 650, easing: 'ease-out' });
+        if (pulse) pulse.id = 'nemesis-grab-entry';
+      }
+    }
   },
   meldContribution(contribution) {
     const value = contribution?.infectionRelief || 0;
@@ -65,8 +99,9 @@ export const nemesisBossUi = Object.freeze({
       entities: boss.combatEntities.filter((entity) => ['entering', 'persistent', 'corpse'].includes(entity.status) || (entity.status === 'repelled' && Date.now() - entity.transitionAt < 900)).map((entity) => {
         const reinforced = entity.status === 'persistent' && boss.hordeBuff?.entityId === entity.id && boss.roundNumber <= boss.hordeBuff.expiresRound;
         return { ...entity, selectable: entity.status === 'persistent' && entity.hp > 0, reinforced,
-          stateLabel: entity.status === 'persistent' ? reinforced ? 'DEBUFF REFORÇADO' : 'DEBUFF ATIVO' : entity.status === 'entering' ? 'ENTRANDO' : entity.status === 'corpse' ? 'CADÁVER' : 'REPELIDO',
+          stateLabel: entity.status === 'persistent' ? reinforced ? 'DEBUFF REFORÇADO' : 'DEBUFF ATIVO' : entity.status === 'entering' ? 'INVADINDO' : entity.status === 'corpse' ? 'CADÁVER' : 'REPELIDO',
           visualEventId: reinforced ? `${boss.hordeBuff.sourceIntentId}:reinforced` : entity.transitionEventId,
+          chips: zombieChips(boss, entity, reinforced),
           description: passiveText(boss, entity), help: passiveHelp(entity, reinforced) };
       }),
       effects: [boss.hordeBuff ? `Horda: até fim da rodada ${boss.hordeBuff.expiresRound}` : '', boss.omegaBuff ? `Ômega: até fim da rodada ${boss.omegaBuff.expiresRound}` : ''].filter(Boolean).join(' · '),

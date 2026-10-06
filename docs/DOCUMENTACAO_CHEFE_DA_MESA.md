@@ -199,6 +199,25 @@ Regras:
 - O bot utiliza a lógica oficial do Buraco Fechado.
 - Confirmações de custo, Pólen ou Ágio acontecem antes de consumir a retirada.
 
+### Retirada protegida — somente modo Chefe (06/10/2026)
+
+Vale para todos os chefes; Buraco normal e Dominação permanecem inalterados. A justificativa realmente escolhida no fluxo do Fechado decide, mesmo quando existe outro encaixe público:
+
+| Topo e destino escolhido | Retirada |
+|---|---|
+| Carta natural em jogo já existente na mesa | Somente topo |
+| Carta natural em jogo novo formado pela mão | Lixo inteiro |
+| Joker, em qualquer destino | Somente Joker |
+| 2 em jogo existente, natural ou coringa | Somente 2 |
+| 2 coringa em jogo novo pela mão | Somente 2 |
+| 2 natural em jogo novo pela mão, como 2–3–4 | Lixo inteiro |
+
+`quoteBossDiscardPickup()` é a consulta compartilhada pelo jogador, BOT e planejamento de Zona Contaminada. Reutiliza `isValidBossSequence()`; o papel natural do 2 é consultado com `forceNatural` no validador oficial, nunca pela ordem visual do array. 2–3–4 e 3–4–2 têm a mesma classificação. Não existe um detector paralelo de sequência.
+
+Antes da retirada, exibir `Retirada protegida · 1 carta` ou `Retirada completa · X cartas`. Custos, limites e cálculo de mão final consideram somente as cartas efetivamente adquiridas. Tentativa inválida não move cartas; snapshot/reload não permite retirar novamente no mesmo turno. O BOT não utiliza a compra aberta sem destino no modo Chefe.
+
+Consulta opcional: um `?` pequeno junto ao contador do Lixo aparece somente no modo Chefe e abre o popover oficial **Lixo — Modo Chefe**, resumindo as seis regras acima. Não acrescenta avisos à seleção/destino/confirmação nem tutorial permanente. Mouse, toque e teclado funcionam sem disparar a retirada; a ajuda continua consultável quando a compra está bloqueada e é removida ao sair do modo Chefe. O popover respeita viewport/scroll/resize, inclusive antes de existir habilidade ativa.
+
 
 ---
 
@@ -2956,7 +2975,7 @@ Foi adicionada uma barreira defensiva imediatamente antes de gravar qualquer jog
 
 ### Marcação visual de cartas
 
-A carta exata de um objetivo do Nemesis deve ficar visível com infecção verde e selo **MARCADA**, inclusive na entrada do Agarrador. Cartas presas pela passiva usam **AGARRADA** e a carta do topo sob Zona Contaminada usa **CONTAMINADO**, reutilizando o mesmo overlay. Áreas de perigo/Zona de Impacto continuam laranja. A animação é um pulso leve, desligado com redução de movimento; valor, naipe, seleção, NOVA e cliques permanecem acessíveis. Estar marcada não acrescenta Infecção automaticamente nem muda as regras da habilidade.
+A carta exata de um objetivo do Nemesis deve ficar visível com infecção verde e selo **MARCADA**, inclusive na entrada do Agarrador. Cartas presas pela passiva usam **AGARRADA** e a carta do topo sob Zona Contaminada usa **CONTAMINADA**, reutilizando o mesmo overlay. Zona de Impacto continua laranja. Ao receber a restrição do Agarrador, a carta pulsa uma única vez por evento, sem replay por rerender/reload/snapshot/undo; depois mantém a marca até expirar. Redução de movimento desativa o pulso. Valor, naipe, seleção, NOVA e cliques permanecem acessíveis. Estar marcada não acrescenta Infecção automaticamente nem muda as regras da habilidade.
 
 A decoração é aplicada depois de renderizar a face, para não ser apagada por `innerHTML`, sem duplicar overlays em rerender. Sem efeito ativo, a decoração é removida. Novos chefes/habilidades devem validar o alvo na lógica **e na tela**, seguindo a matriz da seção 23 do checklist permanente; o texto do painel sozinho não substitui a marcação da carta.
 
@@ -3004,7 +3023,7 @@ Pesos são relativos às habilidades elegíveis da fase, não percentuais fixos.
 | Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | Alvo contribui com ao menos 1 carta para um jogo antes de encerrar seu turno. Falha base +8/+10/+12. |
 | Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | Marca 2 cartas; ao menos 1 precisa sair por jogo ou descarte legal no turno do alvo. Falha base +8/+10/+12. |
 | Zona Contaminada (`contaminated_zone`) | 1/2/3 | 3 | Só entra com retirada legal comprovada do Lixo Fechado, respeitando bloqueios e condições de Morto/batida. Pegar custa +6; Agarrador persistente também age. Não é falha e não recebe seus bônus. |
-| Comando da Horda (`horde_command`) | 1/2/3 | 3 | Reforça apenas persistente vivo: Agarrador prende +1; Infectado cobra +2 por falha; Devorador cura +30. Soma à versão normal/Mutada. Não coloca zumbis na mesa. |
+| Comando da Horda (`horde_command`) | 1/2/3 | 3 | Reforça apenas persistente vivo: Agarrador prende +1; Infectado cobra +2 por falha; Devorador cura +30. Soma à versão normal/Mutada. Não coloca zumbis na mesa. Dura até o fim da rodada seguinte, inclusive (`expiresRound = rodada atual + 1`). |
 | Lança-Foguetes (`rocket_launcher`) | 2/3 | 4 | Marca por ID estável um jogo válido e alimentável. Cada carta nova nele custa +10/+12 durante a rodada; três cartas juntas custam +30/+36. Cartas já contabilizadas não cobram novamente. A ação não é proibida. |
 | Regeneração Parasita (`parasite_regeneration`) | 2/3 | 2 | Cura até 100 HP do persistente vivo e ferido com menor percentual de HP. Não cura outras etapas do lifecycle. |
 | Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Revive somente cadáver com 50% do HP máximo. Uma utilização por fase e espaço no teto 1/2/3. Repelido nunca é alvo. |
@@ -3027,6 +3046,10 @@ O Laboratório deriva suas onze habilidades da definição e usa o motor real. A
 HUD: cards em faixa própria abaixo do HUD principal, sem aumentar sua altura; ausentes não ocupam espaço; entrando mostra arte/nome, com objetivo apenas no painel de Invasão da Horda. Cards reutilizam o padrão full-bleed das filhas/capangas e chips oficiais INVADINDO, ATIVO, MUTADO, REFORÇADO e CADÁVER quando aplicáveis. Persistentes têm HP/barra e seleção pelo card. O `?` pequeno, completamente interno, abre o popover oficial compartilhado e explica valores normais/Mutados/reforçados. S.T.A.R.S. aparece sobre a região direita da arte principal, sem linha extra, e sua ajuda explica prioridade e troca por dano direto ao Nemesis (nunca aos zumbis). Repelidos têm retirada breve e somem; cadáveres ficam sem barra. Animações são pontuais por evento, sem replay em reload e com `prefers-reduced-motion`. Os retratos fornecidos foram conectados por entidade em `nemesis-agarrador.png`, `nemesis-infectado.png` e `nemesis-devorador.png`; seus arquivos originais são preservados, com apresentação 8:3 e `cover` natural sem distorção. Usa-se o retrato existente do Nemesis em `assets/images/boss-nemesis.png` e a moldura de Infecção existente, sem alterar sua barra.
 
 Som de ganho: `assets/sfx/ganho-infeccao-nemesis.mp3`, registrado na infraestrutura central de áudio e no precache. Toca somente quando `changeNemesisInfection()` produz delta aplicado positivo, pelo evento de apresentação correspondente, sem reprodução dentro da função de estado. Bônus do Infectado/Horda/Ômega fazem parte do mesmo delta e não têm sons separados. Deduplicação por `actionId` impede replay de render/snapshot/Firebase/undo; eventos iniciais de reload, redução e +0 ficam silenciosos. Eventos lógicos distintos podem tocar separadamente.
+
+Revisão de UX/objetivos de 06/10/2026: INVADINDO não mostra HP de combate nem permite seleção. A arte principal do Nemesis seleciona `boss` com as mesmas permissões dos cards; chips e ajuda não trocam o alvo. Chips clicáveis mostram o efeito final: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado também é exibido corretamente (2/4/70). MUTADO explica a mudança base; REFORÇADO informa bônus e rodada final inclusiva no popover oficial.
+
+Objetivos de usar ou descartar são preparados a partir de uma rota real de jogo com `findNemesisLegalPlan()`: Agarrador escolhe uma carta jogável; Tentáculo escolhe duas alternativas jogáveis; Barragem escolhe três marcas com solução conjunta para pelo menos duas; Extermínio exige contribuição e uma segunda carta realmente jogável. Depois da marcação, o descarte continua contando. Sem plano viável, a habilidade é inelegível e usa o fallback normal, sem mudar punições/Infecção.
 
 Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados. O único teste antigo ajustado é a expectativa obsoleta da Prisão no Espelho, não sua regra atual.
 

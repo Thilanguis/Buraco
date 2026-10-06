@@ -9,18 +9,50 @@ const turnKey = (state, playerId) => `${state.turnNumber || 0}:${playerId}`;
 const boosted = (boss, id) => boss.hordeBuff?.entityId === id && boss.roundNumber <= boss.hordeBuff.expiresRound;
 const objectiveIds = new Set(['stars_hunt', 'infectious_tentacle', 'tentacle_barrage', 'stars_extermination']);
 
+export function getNemesisZombieEffect(boss, entity) {
+  const reinforced = boosted(boss, entity.id);
+  const normal = entity.id === 'grabber' ? 1 : entity.id === 'infected' ? 2 : 40;
+  const mutated = entity.id === 'grabber' ? 2 : entity.id === 'infected' ? 4 : 70;
+  const bonus = entity.id === 'grabber' ? 1 : entity.id === 'infected' ? 2 : 30;
+  const value = (entity.mutated ? mutated : normal) + (reinforced ? bonus : 0);
+  return { normal, mutated, bonus, value, reinforced,
+    label: entity.id === 'grabber' ? `AGARRA ${value}` : entity.id === 'infected' ? `INFECÇÃO +${value}` : `CURA ${value}` };
+}
+
+export function projectNemesisInfection(boss, amount, { failure = false } = {}) {
+  let infectedAmount = 0, reinforcedAmount = 0, omegaAmount = 0, mutated = false;
+  if (failure && amount > 0) {
+    const infected = (boss.combatEntities || []).find(entry => entry.id === 'infected' && persistent(entry));
+    if (infected) {
+      const effect = getNemesisZombieEffect(boss, infected);
+      mutated = !!infected.mutated;
+      infectedAmount = mutated ? effect.mutated : effect.normal;
+      reinforcedAmount = effect.reinforced ? effect.bonus : 0;
+    }
+    if (boss.omegaBuff && boss.roundNumber <= boss.omegaBuff.expiresRound) omegaAmount = boss.danger < 50 ? 2 : boss.danger < 75 ? 4 : 6;
+  }
+  const before = boss.danger || 0;
+  const total = amount + infectedAmount + reinforcedAmount + omegaAmount;
+  return { base: amount, infectedAmount, reinforcedAmount, omegaAmount, mutated, total,
+    applied: boss.result ? 0 : Math.max(0, Math.min(100, before + total)) - before };
+}
+
+export function getNemesisObjectiveOutcome(boss, intent) {
+  const payload = intent.payload || {};
+  const fulfilled = intent.abilityId === 'stars_hunt' ? Number(!!payload.contributed)
+    : intent.abilityId === 'stars_extermination' ? Number(!!payload.contributed) + Number(!!payload.secondExited)
+      : (payload.exitedCardIds || []).length >= payload.required ? 1 : 0;
+  const failed = intent.abilityId === 'stars_extermination' ? fulfilled < 2 : !fulfilled;
+  const base = intent.abilityId === 'stars_extermination' ? fulfilled === 2 ? 0 : fulfilled === 1 ? 8 : 16 : failed ? payload.failure ?? 6 + boss.phase * 2 : 0;
+  return { fulfilled, failed, ...projectNemesisInfection(boss, base, { failure: failed }) };
+}
+
 export function changeNemesisInfection(boss, amount, eventId, { failure = false } = {}) {
   if (boss.result || boss.infectionEventIds.includes(eventId)) return 0;
   boss.infectionEventIds.push(eventId);
   if (boss.infectionEventIds.length > 100) boss.infectionEventIds.splice(0, boss.infectionEventIds.length - 100);
-  let bonus = 0;
-  if (failure && amount > 0) {
-    const infected = alive(boss, 'infected');
-    if (infected) bonus += (infected.mutated ? 4 : 2) + (boosted(boss, 'infected') ? 2 : 0);
-    if (boss.omegaBuff && boss.roundNumber <= boss.omegaBuff.expiresRound) bonus += boss.danger < 50 ? 2 : boss.danger < 75 ? 4 : 6;
-  }
   const before = boss.danger;
-  boss.danger = Math.max(0, Math.min(100, before + amount + bonus));
+  boss.danger += projectNemesisInfection(boss, amount, { failure }).applied;
   if (boss.danger >= 100) boss.result = { victory: false, reason: 'max_infection', title: 'Infecção Total', detail: 'A Infecção atingiu 100. A batalha terminou.' };
   return boss.danger - before;
 }
@@ -119,10 +151,9 @@ function entryCandidates(state, helpers) {
   return boss.combatEntities.filter((entity) => ['absent', 'repelled'].includes(entity.status)).flatMap((entity) => {
     if (entity.id === 'grabber') {
       for (const player of preferredPlayers(state).filter((player) => entryPlayers(state).some((entry) => entry.id === player.id))) {
-        const discard = helpers.canLeaveHand?.(player, []) === false ? null : player.hand.find((card) => card.id !== state.pickedDiscardCardId && !helpers.blocked(player.id, card.id, 'discard'));
-        const plan = discard ? { moves: [], playedCardIds: [], discardCardId: discard.id } : findNemesisLegalPlan(state, player, helpers);
+        const plan = findNemesisLegalPlan(state, player, helpers);
         if (plan) return [{ entityId: entity.id, entryKind: entity.id, duration: 'target_turn', targetPlayerId: player.id, targetPlayerName: player.name,
-          cardIds: [plan.discardCardId || plan.playedCardIds[0]], required: 1, exitedCardIds: [], solution: plan }];
+          cardIds: [plan.playedCardIds[0]], required: 1, exitedCardIds: [], solution: plan }];
       }
       return [];
     }
@@ -141,10 +172,15 @@ function canLegallyTakeDiscard(state, player, helpers) {
   const previewPlayer = preview.players.find((entry) => entry.id === player.id);
   const pickupHelpers = { ...helpers, canLeaveHand: (_player, moves) => {
     const selected = moves.flatMap((move) => move.cardIds).filter((id) => id !== top.id);
-    const resultingSize = player.hand.length - selected.length + state.discard.length - 1;
+    const destination = moves.find((move) => move.cardIds.includes(top.id));
+    if (!destination) return false;
+    const quote = helpers.discardPickupQuote?.(player.id, { meldIndex: destination.meldIndex ?? null, handCardIds: destination.cardIds.filter(id => id !== top.id) });
+    if (quote && !quote.allowed) return false;
+    const count = quote?.count ?? state.discard.length;
+    const resultingSize = player.hand.length - selected.length + count - 1;
     // Include the mandatory top in canastra classification and the lower pile
     // in finishing math, without making those lower cards available to play.
-    const afterPickup = { ...player, hand: [...player.hand, ...state.discard] };
+    const afterPickup = { ...player, hand: [...player.hand, ...state.discard.slice(-count)] };
     return resultingSize > 1 || helpers.canLeaveHand?.(afterPickup, moves) !== false;
   } };
   return !!findNemesisLegalPlan(preview, previewPlayer, pickupHelpers, (plan) => plan.playedCardIds.includes(top.id));
@@ -203,31 +239,40 @@ function buildPayload({ gameState: state, helpers }, abilityId) {
   if (abilityId === 'omega_outbreak') return base;
   for (const player of preferredPlayers(state)) {
     const cards = hand(state, player.id).filter((card) => card?.id);
-    const legalDiscards = cards.filter((card) => card.id !== state.pickedDiscardCardId && !helpers.blocked(player.id, card.id, 'discard'));
     if (abilityId === 'contaminated_zone') {
       if (canLegallyTakeDiscard(state, player, helpers)) return { ...base, targetPlayerId: player.id };
     } else if (abilityId === 'stars_hunt') {
       const plan = findNemesisLegalPlan(state, player, helpers);
       if (plan) return { ...base, targetPlayerId: player.id, contributed: false, solution: plan };
     } else if (abilityId === 'infectious_tentacle' && cards.length >= 2) {
-      const plan = legalDiscards.length ? { moves: [], playedCardIds: [], discardCardId: legalDiscards[0].id } : findNemesisLegalPlan(state, player, helpers);
+      const plan = findNemesisLegalPlan(state, player, helpers);
       if (!plan) continue;
-      const firstId = plan.discardCardId || plan.playedCardIds[0];
-      return { ...base, targetPlayerId: player.id, cardIds: [firstId, cards.find((card) => card.id !== firstId).id], required: 1, exitedCardIds: [], solution: plan };
+      const cardIds = playableObjectiveCards(state, player, helpers, plan, 2);
+      if (!cardIds) continue;
+      return { ...base, targetPlayerId: player.id, cardIds, required: 1, exitedCardIds: [], solution: plan };
     } else if (abilityId === 'tentacle_barrage' && cards.length >= 3) {
-      const plan = findNemesisLegalPlan(state, player, helpers, (entry) => entry.playedCardIds.length + Number(!!entry.discardCardId) >= 2);
+      const plan = findNemesisLegalPlan(state, player, helpers, (entry) => entry.playedCardIds.length >= 2);
       if (!plan) continue;
-      const exits = [...plan.playedCardIds, plan.discardCardId].filter(Boolean);
-      const cardIds = [...new Set([...exits, ...cards.map((card) => card.id)])].slice(0, 3);
+      const cardIds = playableObjectiveCards(state, player, helpers, plan, 3);
+      if (!cardIds) continue;
       return { ...base, targetPlayerId: player.id, cardIds, required: 2, failure: 16, exitedCardIds: [], solution: plan };
     } else if (abilityId === 'stars_extermination') {
-      const plan = findNemesisLegalPlan(state, player, helpers, (entry) => entry.playedCardIds.length + Number(!!entry.discardCardId) >= 2);
+      const plan = findNemesisLegalPlan(state, player, helpers, (entry) => entry.playedCardIds.length >= 2);
       if (!plan) continue;
-      const secondCardId = plan.discardCardId || plan.playedCardIds[1];
+      const secondCardId = plan.playedCardIds[1];
       return { ...base, targetPlayerId: player.id, contributed: false, secondCardId, secondExited: false, solution: plan, failure: 16 };
     }
   }
   return null;
+}
+
+function playableObjectiveCards(state, player, helpers, solution, count) {
+  const ids = new Set(solution.playedCardIds);
+  if (ids.size < count) findNemesisLegalPlan(state, player, helpers, (plan) => {
+    plan.playedCardIds.forEach((id) => ids.add(id));
+    return ids.size >= count;
+  });
+  return ids.size >= count ? [...ids].slice(0, count) : null;
 }
 
 export function chooseNemesisDamageTarget(state, damage) {
@@ -307,14 +352,14 @@ export const nemesisBossMechanics = Object.freeze({
     const events = []; const grabber = alive(boss, 'grabber');
     if (grabber) {
       const ids = new Set(hand(gameState, playerId).map((card) => card.id));
-      const count = (grabber.mutated ? 2 : 1) + (boosted(boss, 'grabber') ? 1 : 0);
+      const count = getNemesisZombieEffect(boss, grabber).value;
       // Closed-discard pickup calls this hook before the remaining pile enters
       // the hand. Its last/top card is the mandatory immediate meld card.
       const inHand = takenCards.filter((card) => ids.has(card.id));
       const acquired = inHand.length ? inHand : takenCards.slice(0, -1);
       const cardIds = acquired.slice(0, count).map((card) => card.id);
       boss.grabbedByPlayer[playerId] = { cardIds, turnId: turnKey(gameState, playerId) };
-      events.push(recordBossEvent({ type: 'nemesisGrab', playerId, cardIds, outcome: `${cardIds.length} carta(s) Agarrada(s) até o fim do turno.` }));
+      events.push(recordBossEvent({ type: 'nemesisGrab', playerId, cardIds, turnId: turnKey(gameState, playerId), outcome: `${cardIds.length} carta(s) Agarrada(s) até o fim do turno.` }));
     }
     const intent = boss.currentIntent;
     if (intent?.abilityId === 'contaminated_zone' && intent.payload.targetPlayerId === playerId) {
@@ -345,7 +390,7 @@ export const nemesisBossMechanics = Object.freeze({
       const devourer = alive(boss, 'devourer'); const key = turnKey(gameState, playerId);
       if (devourer && fresh.length >= 3 && !boss.devourerTurnIds.includes(key)) {
         boss.devourerTurnIds.push(key); if (boss.devourerTurnIds.length > 60) boss.devourerTurnIds.shift();
-        const amount = Math.min(boss.maxHp - boss.hp, (devourer.mutated ? 70 : 40) + (boosted(boss, 'devourer') ? 30 : 0));
+        const amount = Math.min(boss.maxHp - boss.hp, getNemesisZombieEffect(boss, devourer).value);
         boss.hp += amount; boss.devourerHealingTotal = (boss.devourerHealingTotal || 0) + amount;
         if (amount) recordBossEvent({ type: 'bossHeal', amount, hp: boss.hp, outcome: `Devorador: Nemesis recuperou ${amount} HP.` });
       }
@@ -367,11 +412,7 @@ export const nemesisBossMechanics = Object.freeze({
     const intent = boss.currentIntent; const payload = intent?.payload;
     if (intent?.abilityId === 'horde_invasion' && payload.entryKind === 'grabber' && payload.targetPlayerId === playerId) resolveEntry(boss, intent);
     if (!intent || !objectiveIds.has(intent.abilityId) || payload.targetPlayerId !== playerId || payload.resolved) return {};
-    let fulfilled = intent.abilityId === 'stars_hunt' ? Number(!!payload.contributed)
-      : intent.abilityId === 'stars_extermination' ? Number(!!payload.contributed) + Number(!!payload.secondExited)
-        : (payload.exitedCardIds || []).length >= payload.required ? 1 : 0;
-    const failed = intent.abilityId === 'stars_extermination' ? fulfilled < 2 : !fulfilled;
-    const amount = intent.abilityId === 'stars_extermination' ? fulfilled === 2 ? 0 : fulfilled === 1 ? 8 : 16 : failed ? payload.failure : 0;
+    const { fulfilled, failed, base: amount } = getNemesisObjectiveOutcome(boss, intent);
     payload.infectionApplied = changeNemesisInfection(boss, amount, `${intent.id}:failure`, { failure: failed });
     payload.resolved = true; payload.fulfilled = fulfilled;
     payload.resolutionText = `${intent.name}: ${failed ? 'objetivo incompleto' : 'sucesso'}; Infecção +${payload.infectionApplied}.`;

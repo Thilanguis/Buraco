@@ -2,17 +2,25 @@
 
 ## Medidores de objetivos
 
+Comando da Horda é um reforço temporário em um único zumbi, sem objetivo cumulativo/faixas: não usa barra de progresso. O HUD identifica o zumbi e o prazo, seguido apenas da passiva reforçada total (Agarrador: cartas presas para jogo; Infectado: Infecção extra por falha; Devorador: cura ao contribuir 3+ cartas no mesmo jogo). A ajuda explica o gatilho real, sem listar como ativos os bônus dos outros dois zumbis. Mudar o alvo de dano não muda quem recebeu o comando.
+
 Lança-Foguetes cobra por **carta nova** adicionada à Zona de Impacto: +10 Infecção na fase 2 e +12 na fase 3. Três cartas juntas custam +30/+36, igual a três jogadas separadas. Cartas já contabilizadas/reorganizadas não cobram novamente. O teto de Infecção e a derrota imediata permanecem; a cobrança de uma jogada é um único evento/SFX.
 
-Zona Contaminada mantém o aviso de perigo laranja no Lixo e aplica à carta do topo a infecção verde compartilhada, com selo CONTAMINADO e custo +6 Infecção por retirada durante o turno do alvo. O destaque é removido fora desse turno ou ao encerrar a partida. Zona de Impacto é independente: marca somente o jogo do lança-foguetes enquanto o efeito ainda não expirou.
+Zona Contaminada aplica à carta exata do topo a infecção verde compartilhada, com selo CONTAMINADA e custo +6 Infecção por retirada durante o turno do alvo. O destaque é removido fora desse turno ou ao encerrar a partida. Zona de Impacto permanece laranja e independente: marca somente as cartas do jogo do lança-foguetes enquanto o efeito ainda não expirou.
 
-O painel reutiliza o medidor de faixas dos outros chefes somente no Extermínio S.T.A.R.S.: 0/1/2 exigências cumpridas projetam +16/+8/+0 Infecção base. Uma única barra mostra as três faixas; indicadores compactos identificam contribuição e saída da segunda carta separadamente. Infectado/Ômega podem acrescentar bônus às falhas. Invasão, Caçada e Tentáculos mantêm contadores/estado do objetivo, sem barras binárias desnecessárias. Nenhuma regra ou punição foi alterada.
+O painel reutiliza o medidor de faixas dos outros chefes somente no Extermínio S.T.A.R.S.: 0/1/2 exigências cumpridas têm base +16/+8/+0. HUD e faixas exibem o total projetado atual, somando Infectado (normal/Mutado), Reforçado e Ômega somente se houver falha, respeitando o limite 100. Caçada e Tentáculos também mostram esse total; o `?` apresenta a composição curta. `getNemesisObjectiveOutcome()` e `projectNemesisInfection()` são compartilhados com a resolução real, sem conta paralela no HUD. Invasão, Caçada e Tentáculos mantêm contadores/estado do objetivo, sem barras binárias desnecessárias. Nenhuma regra ou punição foi alterada.
+
+Seleção de alvo usa o gate local de ações durante o salvamento, assim como compra/descarte: snapshots aguardam sua conclusão. Clique no alvo já escolhido não repete a gravação. Regressão de browser simula salvamento atrasado, clique concorrente e snapshots antigo/novo; não substitui teste ao vivo em dois clientes Firebase.
 
 ## Marcação das cartas — correção de 05/10/2026
 
-Objetivos de carta usam selo MARCADA; cartas presas pelo Agarrador usam AGARRADA; topo do Lixo sob Zona Contaminada usa CONTAMINADO. Todos compartilham borda verde e manchas de infecção com pulso leve em CSS, sem asset novo, sem cobrir número/naipe nem interceptar cliques. O selo NOVA permanece separado. Redução de movimento desativa o pulso. Marcação visual não cria cobrança de Infecção nem muda permissões.
+Objetivos de carta usam selo MARCADA; cartas presas pelo Agarrador usam AGARRADA; topo do Lixo sob Zona Contaminada usa CONTAMINADA. Todos compartilham borda verde e manchas de infecção, sem asset novo, sem cobrir número/naipe nem interceptar cliques. Ao entrar a restrição do Agarrador, a carta exata pulsa uma vez pelo evento de aquisição; depois mantém a marca estática. Rerender/reload/snapshot/undo não repetem o pulso. O selo NOVA permanece separado. Redução de movimento desativa o pulso. Marcação visual não cria cobrança de Infecção nem muda permissões.
 
 O adapter `nemesisBossUi.decorateCard()` é aplicado depois da face da carta. Antes disso, `innerHTML` apagava o selo inserido antecipadamente na mão. A decoração é idempotente e removida quando não há efeito; a lógica de escolha/saída das cartas permanece intacta.
+
+Padronização de 06/10/2026: removidos contorno e brilho extras do contêiner/face do Lixo, que se somavam ao overlay da carta e engrossavam a marca. MARCADA, AGARRADA e CONTAMINADA usam exatamente o mesmo overlay original. O pulso de aquisição varia somente a opacidade, sem ampliar o brilho. Nenhuma mecânica alterada.
+
+Padronização de 06/10/2026: removidos contorno e brilho extras do contêiner/face do Lixo, que se somavam ao overlay da carta e engrossavam a marca. MARCADA, AGARRADA e CONTAMINADA usam exatamente o mesmo overlay original. O pulso de aquisição varia somente a opacidade, sem ampliar o brilho. Nenhuma mecânica alterada.
 
 Validação desta correção: 80 testes específicos (`nemesis-boss`, `nemesis-discard-ui`, `nemesis-progress-meters`) passaram; `nemesis-ui.browser.mjs` passou nos cinco viewports já adotados e sua captura foi revisada. Cobertura inclui carta real do Agarrador, parceiro, limpeza, repetição, NOVA e redução de movimento. Não foi uma partida completa com Firebase ao vivo nem uma nova execução da suíte ampla; os resultados históricos abaixo pertencem às rodadas indicadas. Checklist permanente: seção 23 de `CHECKLIST_REGRESSOES_E_ATUALIZACOES.md`.
 
@@ -63,7 +71,7 @@ Saves antigos com mais vivos que o teto da fase não perdem entidades silenciosa
 
 `horde_invasion`: fases 1/2/3, peso **4**; onze habilidades e soma dos pesos **39**. A seleção seeded usa apenas ausentes/repelidos com plano legal. Evita o último repelido imediatamente quando outro candidato real existe.
 
-- **Agarrador:** marca carta com saída legal por jogo ou descarte no turno do alvo. Não marca descarte final proibido por falta de Morto/canastra. Falha: 350 HP.
+- **Agarrador:** escolhe carta com rota real de uso legal em jogo no turno do alvo. Após marcada, sair por jogo ou descarte continua cumprindo o objetivo. Um descarte legal isolado não torna a habilidade elegível. Não marca descarte final proibido por falta de Morto/canastra. Falha: 350 HP.
 - **Infectado:** equipe contribui duas cartas válidas para jogos durante a rodada. O plano pode ser individual ou cooperativo. Falha: 300 HP.
 - **Devorador:** equipe alimenta dois jogos existentes diferentes na rodada. Plano conjunto, sem usar a mesma carta duas vezes nem contar jogo novo. Falha: 400 HP.
 
@@ -79,7 +87,7 @@ Comando da Horda continua separado da Invasão: não traz zumbis, exige persiste
 | Infectado | +2 Infecção em falha positiva real | +4 | +2 |
 | Devorador | Cura Nemesis 40 HP na primeira contribuição de 3+ cartas no mesmo jogo por turno | 70 HP | +30 HP |
 
-Os valores completos normais/Mutados/reforçados aparecem na ajuda. Regeneração só cura persistente ferido. Reanimação só revive cadáver com 50% HP, uma vez por fase e com espaço no teto; em F3 retorna Mutado. A entrada da F3 muta todos os persistentes vivos.
+Os totais aparecem diretamente em chips clicáveis: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado mostra 2/4/70. O mesmo helper calcula a passiva aplicada e o total exibido; MUTADO e REFORÇADO abrem ajuda específica. Comando usa `expiresRound = roundNumber + 1`, válido até essa rodada inclusive; não reforça entering/repelled/corpse. Regeneração só cura persistente ferido. Reanimação só revive cadáver com 50% HP, uma vez por fase e com espaço no teto; em F3 retorna Mutado. A entrada da F3 muta todos os persistentes vivos.
 
 BOT executa planos legais para impedir entradas, respeita guard de batida segura e seleciona apenas persistentes vivos; mantém avaliação de Infecção/letalidade/cura, sem simplificação para menor HP.
 
@@ -100,7 +108,15 @@ Os arquivos foram copiados sem alterar seus bytes. Os cards reutilizam `boss-dau
 
 Cards entram apenas quando relevantes, em faixa própria abaixo do HUD principal, como Filhas/Capangas, sem aumentar sua altura. `entering` mostra o chip INVADINDO; o objetivo continua no painel de Invasão da Horda. Persistente mostra nome, HP/barra e chips compactos ATIVO, MUTADO e REFORÇADO; cadáver mostra CADÁVER. O próprio card seleciona alvo e mantém destaque. O alvo atual e o botão ↩ para voltar ao Nemesis ficam na própria arte principal, sem linha abaixo dos zumbis. O `?` de 17px fica dentro do card e abre o popover oficial compartilhado junto ao botão clicado, com ponteiro, explicando passiva normal, Mutado e Comando da Horda em blocos curtos.
 
-S.T.A.R.S. aparece como overlay discreto à direita da arte principal, sem linha estrutural extra. Sua ajuda usa o mesmo popover oficial e explica prioridade ofensiva, troca após dano direto ao Nemesis e ausência de troca por dano aos zumbis. Sua lógica não foi alterada.
+S.T.A.R.S. aparece como overlay discreto à direita da arte principal, sem linha estrutural extra. Sua ajuda usa o mesmo popover oficial e explica prioridade ofensiva, troca após dano direto ao Nemesis e ausência de troca por dano aos zumbis. Sua lógica não foi alterada. A arte principal inteira também seleciona Nemesis como alvo, por toque/clique ou teclado, quando permitido; clicar nos chips/ajuda não troca alvo.
+
+### Objetivos viáveis e Lixo protegido (06/10/2026)
+
+`findNemesisLegalPlan()` prepara marcas a partir de possibilidades reais de jogo. Tentáculo exige duas alternativas jogáveis; Barragem exige três marcas jogáveis e uma solução conjunta de duas; Extermínio comprova contribuição e segunda carta utilizável. Descartar a carta marcada continua contando na resolução. Carta inútil apenas descartável não é candidata; ausência de plano implica inelegibilidade/fallback normal.
+
+A regra compartilhada de Lixo do modo Chefe vale também para Nemesis: jogo existente → topo; jogo novo pela mão → Lixo inteiro; Joker → topo; 2 existente ou coringa em jogo novo → topo; 2 natural em jogo novo → Lixo inteiro. A consulta usa o validador canônico, não ordem visual, e o destino realmente escolhido. Zona Contaminada calcula viabilidade com o tamanho real da retirada; Agarrador só pode prender as cartas efetivamente adquiridas para a mão, nunca o topo usado imediatamente.
+
+Resultado da revisão atual: ver `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Os resultados abaixo são históricos, não o estado atual da suíte.
 
 Horda/Ômega e duração ficam no painel amarelo, sem faixa de texto acima dos zumbis. Zona de Impacto usa moldura compartilhada apenas em `.meld-line-cards`; Canastra/Limpa e contribuição ficam fora, como nos demais efeitos de chefes. Nenhuma regra de alvo, dano, prazo ou lifecycle mudou.
 

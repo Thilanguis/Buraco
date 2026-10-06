@@ -84,6 +84,7 @@ import {
   resolveNeheleniaMirroredMeldChoice,
   resolveBossInterdictAttempt,
   validateBossClosedDiscardSelection,
+  quoteBossDiscardPickup,
   validateBossMeldPlay,
   isValidBossSequence,
 } from './js/boss/boss-engine.js';
@@ -4031,10 +4032,16 @@ function discardChoiceIsCurrent() {
 async function animateLocalDiscardPickup(presentation, origin, handOrigins = {}) {
   const session = window.gameSessionId;
   const hidden = [];
+  const pausedPulses = [];
   const conceal = (el) => {
     if (!el) return null;
     const rect = getRect(el);
     hidden.push([el, el.style.visibility]);
+    for (const animation of el.getAnimations?.({ subtree: true }) || []) {
+      if (animation.id === 'nemesis-grab-entry' && animation.playState === 'running') {
+        animation.pause(); pausedPulses.push(animation);
+      }
+    }
     el.style.visibility = 'hidden';
     return rect;
   };
@@ -4058,6 +4065,7 @@ async function animateLocalDiscardPickup(presentation, origin, handOrigins = {})
     hidden.forEach(([el, visibility]) => {
       el.style.visibility = visibility;
     });
+    if (session === window.gameSessionId && !window.isClosingGame) pausedPulses.forEach(animation => animation.play());
     discardPickupAnimating = false;
   }
 }
@@ -4134,7 +4142,7 @@ async function drawFromDiscardOnce(options = {}) {
   // =========================================================
   // LÓGICA: BURACO FECHADO DIRETO DA MESA
   // =========================================================
-  if (state.variant === 'fechado') {
+  if (state.variant === 'fechado' || isCurrentBossMode()) {
     const indexes = Array.from(selectedHandIndexes).sort((a, b) => b - a);
     const selectedCards = indexes.map((i) => ({ ...hand[i] }));
     const bossSelection = validateBossClosedDiscardSelection(state, me.id, selectedCards);
@@ -4207,14 +4215,19 @@ async function drawFromDiscardOnce(options = {}) {
       return;
     }
 
-    const bossMeldValidation = validateBossMeldPlay(state, me.id, selectedCards, state.discard.slice(0, -1));
+    const pickupQuote = isCurrentBossMode() ? quoteBossDiscardPickup(state, me.id, {
+      meldIndex: isNewMeld ? null : extendedMeldIndex, handCardIds: selectedCards.map(card => card.id),
+    }) : { allowed: true, count: state.discard.length };
+    if (!pickupQuote.allowed) { showMessage(pickupQuote.message); return; }
+    const retainedDiscard = state.discard.slice(state.discard.length - pickupQuote.count, -1);
+    const bossMeldValidation = validateBossMeldPlay(state, me.id, selectedCards, retainedDiscard);
     if (!bossMeldValidation.allowed) {
       showMessage(bossMeldValidation.message);
       return;
     }
 
     // 🛡️ TRAVA DA MATEMÁTICA: O cálculo exato que você descreveu
-    const futureHandSize = hand.length - selectedCards.length + (state.discard.length - 1);
+    const futureHandSize = hand.length - selectedCards.length + (pickupQuote.count - 1);
     if ((futureHandSize === 0 || futureHandSize === 1) && !canTeamTakeDeadNow(team.id)) {
       const hasCanasta = teamHasGoodCanastra(team.id);
       let willCreateCanastra = false;
@@ -4234,6 +4247,7 @@ async function drawFromDiscardOnce(options = {}) {
     }
     if (futureHandSize === 0 && isCurrentBossMode() && !canTeamTakeDeadNow(team.id) && !confirmBossFinalStrike()) return;
 
+    if (pickupQuote.message) showMessage(pickupQuote.message);
     const pickupDecision = confirmBossDiscardPickup(me.id);
     if (!pickupDecision.allowed) return;
 
@@ -4267,7 +4281,7 @@ async function drawFromDiscardOnce(options = {}) {
     const discardOriginEl = document.querySelector('#drawDiscardBtn .pile-card');
     const discardOrigin = discardOriginEl ? getRect(discardOriginEl) : null;
     const handOrigins = Object.fromEntries(selectedCards.map((card) => [card.id, cardElById(card.id) ? getRect(cardElById(card.id)) : null]));
-    const pile = state.discard.splice(0, state.discard.length);
+    const pile = state.discard.splice(state.discard.length - pickupQuote.count, pickupQuote.count);
     pile.forEach(ensureCardId);
     const topCard = pile.pop();
     notifyBossDiscardTaken(state, me.id, [...pile, topCard].filter(Boolean));
@@ -7241,11 +7255,10 @@ function syncBossIntentHelp(gameState) {
     closeBossIntentHelp();
     title.textContent = 'Ajuda da habilidade';
     text.textContent = '';
-    return;
+  } else {
+    title.textContent = help.title;
+    renderBossHudRichText(text, help.text);
   }
-
-  title.textContent = help.title;
-  renderBossHudRichText(text, help.text);
 
   if (button.dataset.helpBound === '1') return;
   button.dataset.helpBound = '1';
@@ -7279,10 +7292,10 @@ function syncBossIntentHelp(gameState) {
   });
 }
 
-function createBossCombatHelp(label, title, text) {
+function createBossCombatHelp(label, title, text, caption = '?') {
   const button = document.createElement('button');
   button.type = 'button'; button.className = 'boss-intent-help-button boss-combat-help';
-  button.textContent = '?'; button.setAttribute('aria-label', label);
+  button.textContent = caption; button.setAttribute('aria-label', label);
   button.setAttribute('aria-controls', 'bossIntentHelpPopover'); button.setAttribute('aria-expanded', 'false');
   button.onclick = (event) => {
     event.stopPropagation();
@@ -7300,10 +7313,26 @@ function createBossCombatHelp(label, title, text) {
   return button;
 }
 
+function syncBossDiscardHelp(bossMode) {
+  let button = document.getElementById('bossDiscardHelpButton');
+  if (!bossMode) {
+    if (document.getElementById('bossIntentHelpPopover')?._extraTrigger === button && button) closeBossIntentHelp();
+    button?.remove();
+    return;
+  }
+  if (button) return;
+  const label = document.querySelector('#drawDiscardBtn .pile-info');
+  if (!label) return;
+  button = createBossCombatHelp('Explicar Lixo no modo Chefe', 'Lixo — Modo Chefe',
+    'Topo em jogo já baixado → pega só o topo.\nTopo em jogo novo com sua mão → pode pegar o Lixo inteiro.\n\nJoker → pega só o Joker.\n\n2 em jogo já baixado → pega só o 2.\n2 como coringa em jogo novo → pega só o 2.\n2 natural em jogo novo (2–3–4) → pode pegar o Lixo inteiro.');
+  button.id = 'bossDiscardHelpButton';
+  label.append(button);
+}
+
 function renderBossCombatPanel(hud, boss) {
   let panel = document.getElementById('bossCombatPanel');
   const model = getBossUiAdapter(boss.id)?.combatHud?.({ gameState: state, playerId: state.players[myPlayerIndex]?.id });
-  if (!model) { if (panel) panel.hidden = true; if (document.getElementById('bossIntentHelpPopover')?._extraTrigger) closeBossIntentHelp(); document.getElementById('nemesisStarsOverlay')?.remove(); hud.querySelector('.boss-combat-targets')?.remove(); document.getElementById('nemesisEffectSummary')?.remove(); hud.querySelector('.boss-portrait')?.setAttribute('aria-hidden', 'true'); return; }
+  if (!model) { if (panel) panel.hidden = true; if (document.getElementById('bossIntentHelpPopover')?._extraTrigger) closeBossIntentHelp(); document.getElementById('nemesisStarsOverlay')?.remove(); hud.querySelector('.boss-combat-targets')?.remove(); hud.querySelector('.boss-combat-main-target')?.remove(); document.getElementById('nemesisEffectSummary')?.remove(); hud.querySelector('.boss-portrait')?.setAttribute('aria-hidden', 'true'); return; }
   if (!panel) { panel = document.createElement('section'); panel.id = 'bossCombatPanel'; panel.className = 'boss-combat-panel'; }
   // Helpers occupy their own strip below the HUD, just like daughters/attendants.
   if (panel.previousElementSibling !== hud) hud.insertAdjacentElement('afterend', panel);
@@ -7320,17 +7349,22 @@ function renderBossCombatPanel(hud, boss) {
   panel.replaceChildren();
   document.getElementById('nemesisStarsOverlay')?.remove();
   hud.querySelector('.boss-combat-targets')?.remove();
+  hud.querySelector('.boss-combat-main-target')?.remove();
   const starsOverlay = document.createElement('span'); starsOverlay.id = 'nemesisStarsOverlay';
   starsOverlay.className = 'nemesis-stars-overlay';
   const starsLabel = document.createElement('span'); starsLabel.textContent = `🎯 S.T.A.R.S. — ${model.stars.toLocaleUpperCase('pt-BR')}`;
   starsOverlay.append(starsLabel, createBossCombatHelp('Explicar alvo S.T.A.R.S.', 'Alvo S.T.A.R.S.', 'Prioridade ofensiva: este jogador.\nQuem causar dano direto ao Nemesis assume S.T.A.R.S.\nDano causado aos zumbis não altera o alvo.'));
   const mainPortrait = hud.querySelector('.boss-portrait');
   mainPortrait.removeAttribute('aria-hidden'); mainPortrait.append(starsOverlay);
-  const selectTarget = async (id) => {
+  const selectTarget = (id) => localActionGate.run(async () => {
+    if (state.boss?.combatTargetsByPlayer?.[state.players[myPlayerIndex]?.id] === id) return;
     if (disabled || committing || state.finished || window.isClosingGame || !canPerformCommonGameAction() || !setBossDamageTarget(state, state.players[myPlayerIndex].id, id)) return;
     renderBossCombatPanel(hud, state.boss);
     await commitState();
-  };
+  });
+  const mainTarget = document.createElement('button'); mainTarget.type = 'button'; mainTarget.className = 'boss-combat-main-target';
+  mainTarget.setAttribute('aria-label', 'Selecionar Nemesis como alvo'); mainTarget.setAttribute('aria-pressed', String(model.target === 'boss'));
+  mainTarget.disabled = disabled; mainTarget.onclick = () => selectTarget('boss'); mainPortrait.append(mainTarget);
   let effects = document.getElementById('nemesisEffectSummary');
   if (!effects) { effects = document.createElement('small'); effects.id = 'nemesisEffectSummary'; document.getElementById('bossIntentProgress').insertAdjacentElement('afterend', effects); }
   effects.textContent = model.effects; effects.hidden = !model.effects;
@@ -7345,8 +7379,9 @@ function renderBossCombatPanel(hud, boss) {
     const content = document.createElement('div'); content.className = 'boss-combat-content';
     const label = document.createElement('b'); label.textContent = entity.name.toLocaleUpperCase('pt-BR'); item.append(label);
     const chips = document.createElement('span'); chips.className = 'boss-combat-chips';
-    for (const text of entity.status === 'corpse' ? ['CADÁVER'] : entity.status === 'entering' ? ['INVADINDO'] : entity.selectable ? ['ATIVO', ...(entity.mutated ? ['MUTADO'] : []), ...(entity.reinforced ? ['REFORÇADO'] : [])] : []) {
-      const chip = document.createElement('small'); chip.className = 'boss-daughter-state'; chip.textContent = text; chips.append(chip);
+    for (const entry of entity.chips || []) {
+      const chip = createBossCombatHelp(`${entity.name}: ${entry.label}`, `${entity.name} · ${entry.label}`, entry.text, entry.label);
+      chip.classList.add('boss-daughter-state'); chips.append(chip);
     }
     item.append(chips);
     if (entity.selectable) {
@@ -7379,7 +7414,7 @@ function renderBossCombatPanel(hud, boss) {
     button.onclick = () => selectTarget(choice.id);
     targets.append(button);
   }
-  targets.append(createBossCombatHelp('Explicar alvo do dano', 'Alvo do dano', 'Toque num zumbi ATIVO para atacá-lo. O botão ↩ na arte do Nemesis volta o alvo para o chefe.\nEscolha antes de jogar; vale para o ataque final. Dano excedente não passa para outro alvo.'));
+  targets.append(createBossCombatHelp('Explicar alvo do dano', 'Alvo do dano', 'Toque num zumbi ATIVO para atacá-lo ou na arte do Nemesis para voltar ao chefe.\nEscolha antes de jogar; vale para o ataque final. Dano excedente não passa para outro alvo.'));
   mainPortrait.append(targets);
 }
 
@@ -7388,6 +7423,7 @@ function renderBossHud() {
   const resultSection = document.getElementById('bossResultSection');
   const bossMode = isCurrentBossMode();
   document.body.classList.toggle('boss-mode', bossMode);
+  syncBossDiscardHelp(bossMode);
   if (!bossMode) {
     closeBossIntentHelp(); closeBossRuleHelp();
     const combatPanel = document.getElementById('bossCombatPanel');
@@ -9060,6 +9096,9 @@ function renderHand() {
     nextCards.appendChild(div);
   });
   commitHand();
+  getBossUiAdapter(state.boss?.id)?.syncCardTransitions?.(handRoot, state.boss, {
+    reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  });
 }
 
 function seatForPlayer(pid, friendId = null) {
@@ -10956,6 +10995,7 @@ const botEngine = {
     }
   },
   isDiscardBlocked: () => isBossDiscardBlocked(state) || isDominationDiscardDecreeActive(state, state.currentPlayer),
+  quoteDiscardPickup: (playerId, destination) => quoteBossDiscardPickup(state, playerId, destination),
   isMeldLocked: (teamId, meldIndex) => isBossMeldLocked(state, teamId, meldIndex) || !canBossUseMeld(state, state.currentPlayer, meldIndex),
   isCardBlocked: (playerId, cardId, action = 'play') => isBossCardBlocked(state, playerId, cardId, action),
   canCreateMeld: (playerId) => canBossCreateMeld(state, playerId),
@@ -11254,6 +11294,8 @@ const botEngine = {
   async executeDrawDiscard(botIndex) {
     let s = this.getState();
     if (!s) return false;
+    // Boss pickups require a validated destination; never use the open shortcut.
+    if (isBossMode(s.mode)) return false;
     if (s.hasDrawnThisTurn) return false;
     if (isBossDiscardBlocked(s) || isDominationDiscardDecreeActive(s, botIndex)) return false;
     if (await waitForDominationDecreeReaction(botIndex)) return false;
@@ -11343,6 +11385,7 @@ const botEngine = {
       return true;
     }
     const team = s.teams[me.teamId];
+    if (!['extend', 'new'].includes(intent?.action)) return false;
     const selectedHandCards = intent.action === 'new' ? (intent.handIndexes || []).map((index) => me.hand[index]).filter(Boolean) : [];
     if (intent.action === 'extend' && !canBossUseMeld(s, me.id, intent.meldIndex)) return false;
     if (intent.action === 'new') {
@@ -11350,7 +11393,11 @@ const botEngine = {
       if (selectedHandCards.length !== (intent.handIndexes || []).length) return false;
       if (selectedHandCards.some((card) => isBossCardBlocked(s, me.id, card.id, 'play'))) return false;
     }
-    const bossMeldValidation = validateBossMeldPlay(s, me.id, selectedHandCards, s.discard.slice(0, -1));
+    const pickupQuote = isBossMode(s) ? quoteBossDiscardPickup(s, me.id, {
+      meldIndex: intent.action === 'extend' ? intent.meldIndex : null, handCardIds: selectedHandCards.map(card => card.id),
+    }) : { allowed: true, count: s.discard.length };
+    if (!pickupQuote.allowed) return false;
+    const bossMeldValidation = validateBossMeldPlay(s, me.id, selectedHandCards, s.discard.slice(s.discard.length - pickupQuote.count, -1));
     if (!bossMeldValidation.allowed) return false;
     const previewTop = s.discard[s.discard.length - 1];
     const previewAddedCards = intent.action === 'new' ? [...selectedHandCards, previewTop] : [previewTop];
@@ -11359,10 +11406,14 @@ const botEngine = {
     const previewNewKind = classifyMeldForUi(previewMeld).kind;
     const previewMeldIndex = intent.action === 'extend' ? intent.meldIndex : team.melds.length;
     const creditEligibleCardIds = selectedHandCards.map((card) => card.id);
+    const futureHandSize = me.hand.length - selectedHandCards.length + pickupQuote.count - 1;
+    if (isBossMode(s) && futureHandSize <= 1 && !canTeamTakeDeadNow(team.id)
+      && !teamHasGoodCanastra(team.id) && !['limpa', 'real', 'asas'].includes(previewNewKind)) return false;
     if (!(await this.evaluateBossMeldMutation(botIndex, previewMeldIndex, previewOldKind, previewNewKind, previewAddedCards, { creditEligibleCardIds }))) return false;
+    if (pickupQuote.message) this.showMessage(pickupQuote.message);
     const surchargeDecision = this.acceptBossDiscardSurcharge(me.id, intent, getBossNaturePriorities(s, me.id));
     if (!surchargeDecision.allowed) return false;
-    const pile = s.discard.splice(0, s.discard.length);
+    const pile = s.discard.splice(s.discard.length - pickupQuote.count, pickupQuote.count);
     pile.forEach(ensureCardId);
     const topCard = pile.pop();
     notifyBossDiscardTaken(s, me.id, [...pile, topCard].filter(Boolean));

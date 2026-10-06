@@ -682,7 +682,7 @@ Regressão de 05/10/2026: Invasão da Horda escolhia corretamente a carta do Aga
 - [ ] Testar no navegador os viewports adotados e revisar captura visual. Registrar separadamente o que foi automatizado e o que ainda depende de partida real/validação do usuário.
 - [ ] Atualizar documentação funcional, inventário e relatório específico do chefe. Comparar textos com código atual, removendo descrições antigas conflitantes.
 
-Proteção automatizada atual: `tests/nemesis-ui.browser.mjs` verifica ordem da renderização, alvo real da entrada do Agarrador, parceiro sem marca, selos MARCADA/AGARRADA/CONTAMINADO, efeito verde compartilhado, ausência de duplicação, limpeza do overlay, NOVA sem sobreposição e redução de movimento. O teste de navegador usa fixture local, não uma sessão Firebase ao vivo; os demais itens da matriz continuam obrigatórios em futuras alterações.
+Proteção automatizada atual: `tests/nemesis-ui.browser.mjs` verifica ordem da renderização, alvo real da entrada do Agarrador, parceiro sem marca, selos MARCADA/AGARRADA/CONTAMINADA, efeito verde compartilhado, ausência de duplicação, limpeza do overlay, NOVA sem sobreposição e redução de movimento. O teste de navegador usa fixture local, não uma sessão Firebase ao vivo; os demais itens da matriz continuam obrigatórios em futuras alterações.
 # Matriarca — teto de Flores por ativação (05/10/2026)
 
 - Uma mesma ativação gera no máximo +1 Flor, mesmo que vários objetivos falhem em turnos diferentes. Reload/snapshot/undo preservam o histórico das Flores aplicadas; canastra não reabre a quota da ativação.
@@ -711,3 +711,20 @@ Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O
 - [ ] Conferir cura anunciada contra mecânica: Pólen até 30 HP; Colheita 0–7 nada, 8–10 cura 50, 11+ cura 80 e +1 Flor. Corrigir somente texto quando o motor já estiver certo.
 
 Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. Nenhuma regra de balanceamento foi revertida.
+
+## 25. Lixo protegido dos chefes e UX do Nemesis — 06/10/2026
+
+- [ ] Regra limitada a TODOS os modos Chefe, sem alterar Buraco normal/Dominação. Destino realmente escolhido: jogo existente → topo; jogo novo pela mão → inteiro; Joker → topo; 2 existente → topo; 2 coringa novo → topo; 2 natural novo → inteiro.
+- [ ] Papel do 2 usa o validador canônico; 2–3–4 e 3–4–2 equivalentes. Não criar detector paralelo ou decidir pela posição visual.
+- [ ] Mostrar feedback curto antes de consumir. Humano/BOT usam a mesma consulta e quantidade real para mão final, Morto/batida e limites. Bloqueio/erro não move cartas; rerender/snapshot/reload não duplica retirada.
+- [ ] Ajuda opcional `?` junto ao contador do Lixo somente no modo Chefe: não disparar retirada, não duplicar controle nem criar avisos adicionais. Validar mouse/toque/Enter/Escape, compra bloqueada, saída do modo e popover dentro dos cinco viewports. O componente oficial precisa inicializar fechar/teclado mesmo sem habilidade ativa. Fixture do HUD deve incluir a seção externa inteira, não encerrar na seção aninhada oculta do registro.
+- [ ] Nemesis INVADINDO: explica expulsão, sem HP de combate nem alvo. Arte principal seleciona boss; chip/help não seleciona. Testar teclado e permissões de turno/observador.
+- [ ] Chip final calculado com a passiva real: Agarrador 1/2/3, Infectado 2/4/6, Devorador 40/70/100; incluir Normal + Reforçado 2/4/70. Ajuda específica de Mutado e reforço, prazo inclusivo (`roundNumber + 1`). Comando apenas persistent vivo.
+- [ ] MARCADA / AGARRADA / CONTAMINADA na carta exata; mesma identidade verde. Pulso de Agarrada só em evento novo, sem replay, depois marca estática; limpar no término/morte, respeitar redução de movimento.
+- [ ] Comparar contorno, espessura e brilho reais da mão/Invasão com o Lixo: um único overlay compartilhado, sem somar bordas/glows no contêiner e na face. Pulso altera apenas opacidade, sem engrossar ou ampliar a marca. A fixture deve decorar a face real do Lixo, não apenas ativar a classe do contêiner.
+- [ ] Comparar contorno, espessura e brilho reais da mão/Invasão com o Lixo: um único overlay compartilhado, sem somar bordas/glows no contêiner e na face. Pulso altera apenas opacidade, sem engrossar ou ampliar a marca. A fixture deve decorar a face real do Lixo, não apenas ativar a classe do contêiner.
+- [ ] Zona de Impacto somente em `.meld-line-cards`, excluindo metadados/cabeçalho.
+- [ ] Objetivos usar/descarte comprovam rota real de jogo no planejador existente; descarte continua resolvendo depois. Barragem prova duas saídas jogáveis conjuntas; Extermínio contribuição + segunda carta. Sem plano → inelegível/fallback.
+- [ ] Rodar regra do Lixo, handlers humano/BOT, Nemesis, laboratório, integração e suíte ampla; browser nos cinco viewports. Medir proximidade do popover entre bordas, não a partir do centro de um chip largo.
+
+Relatório e limitações: `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Sem novo balanceamento, commit, deploy ou Google Drive.

@@ -41,6 +41,7 @@ function bossMechanicsContext(gameState) {
   const boss = gameState.boss;
   return { gameState, boss, helpers: {
     validSequence: isValidBossSequence,
+    discardPickupQuote: (playerId, destination) => quoteBossDiscardPickup(gameState, playerId, destination),
     discardBlocked: (playerId) => isBossDiscardBlocked({ ...gameState, currentPlayer: gameState.players.findIndex((player) => player.id === playerId) }),
     blocked: (playerId, cardId, action) => isCardBlockedByBossState(boss, playerId, cardId, action),
     meldId: (teamId, index) => resolveBossMeldId(gameState, teamId, index, true),
@@ -477,6 +478,43 @@ export function isValidBossSequence(cards) {
     needed += Math.max(0, difference - 1);
   }
   return needed <= availableWilds;
+}
+
+// Canonical role check: prefer the legal natural assignment, never array position.
+// The sequence validator above remains the sole authority (including A/2/Joker).
+export function isBossCardNaturalInSequence(cards, cardId) {
+  const card = cards.find((entry) => entry?.id === cardId);
+  if (!card || card.joker) return false;
+  const preview = cards.map((entry) => ({ ...entry }));
+  const selected = preview.find((entry) => entry.id === cardId);
+  selected.forceWild = false;
+  selected.forceNatural = true;
+  return isValidBossSequence(preview);
+}
+
+// Pure quote, shared by local pickup, BOT and legality previews. No cards move.
+export function quoteBossDiscardPickup(gameState, playerId, { meldIndex = null, handCardIds = [] } = {}) {
+  const top = gameState.discard?.at(-1);
+  const complete = { allowed: true, protected: false, count: gameState.discard?.length || 0 };
+  if (!isBossMode(gameState)) return complete;
+  const player = gameState.players?.find((entry) => entry.id === playerId);
+  const team = gameState.teams?.find((entry) => entry.id === player?.teamId);
+  const selected = handCardIds.map((id) => player?.hand?.find((card) => card.id === id));
+  const base = meldIndex == null ? [] : team?.melds?.[meldIndex];
+  const invalid = { allowed: false, count: 0, protected: false, message: 'Retirada inválida: escolha uma jogada legal com o topo.' };
+  if (!top || !player || !team || selected.some((card) => !card)
+    || new Set(handCardIds).size !== handCardIds.length || !Array.isArray(base)
+    || (meldIndex != null && (!Number.isInteger(meldIndex) || meldIndex < 0))
+    || (meldIndex == null && selected.length < 2)) return invalid;
+  if ([...selected, top].some((card) => isCardBlockedByBossState(gameState.boss, playerId, card.id, 'play'))) return invalid;
+  const meld = [...base, ...selected, top].map((card) => ({ ...card }));
+  for (const card of meld) if (!card.joker && String(card.rank) === '2') { card.forceNatural = false; card.forceWild = false; }
+  if (!isValidBossSequence(meld)) return invalid;
+  const protectedPickup = meldIndex != null || !!top.joker
+    || (String(top.rank) === '2' && !isBossCardNaturalInSequence(meld, top.id));
+  const count = protectedPickup ? 1 : gameState.discard.length;
+  return { allowed: true, protected: protectedPickup, count,
+    message: protectedPickup ? 'Retirada protegida · 1 carta' : `Retirada completa · ${count} cartas` };
 }
 
 function isCompleteAceToAce(meld) {

@@ -166,7 +166,9 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 ## Nemesis
 
-**Marcação visual:** carta-alvo recebe infecção verde e selo MARCADA; restrição do Agarrador usa AGARRADA; topo do Lixo contaminado usa CONTAMINADO. Compartilham o mesmo overlay, aplicado após a arte, sem cobrir número/naipe/NOVA. Perigo/Zona de Impacto continuam laranja. O efeito visual não altera cobrança ou regras.
+**Marcação visual:** carta-alvo recebe infecção verde e selo MARCADA; restrição do Agarrador usa AGARRADA; topo do Lixo contaminado usa CONTAMINADA. Compartilham o mesmo overlay, aplicado após a arte, sem cobrir número/naipe/NOVA. Agarrada pulsa uma vez ao entrar, sem replay de render/reload/snapshot/undo; marca estática até expirar. Zona de Impacto continua laranja e envolve somente as cartas. O efeito visual não altera cobrança ou regras.
+
+**Revisão de 06/10/2026:** objetivos de jogo/descarte escolhem marcas com rota real de jogo via `findNemesisLegalPlan`; Barragem comprova uso conjunto de duas e Extermínio contribuição + segunda carta jogável. Descarte continua válido depois da marcação; objetivo impossível é inelegível. INVADINDO sem HP/alvo; retrato principal seleciona Nemesis; ajuda/chips não mudam o alvo. Chips mostram totais 1/2/3, +2/+4/+6 e 40/70/100, com explicação específica de Mutado/Reforçado e duração inclusiva até o fim da rodada seguinte. Lixo protegido segue a regra geral do modo Chefe descrita na seção 1.6 da documentação, sem mudanças aos outros modos ou números das habilidades.
 
 **HP:** 2600. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos F1/F2/F3: **1/2/3**. Aparecer como ameaça ≠ persistir ≠ cadáver.
 

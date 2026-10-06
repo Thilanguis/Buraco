@@ -381,7 +381,7 @@ test('bot resolve escolha antes de agir e compra extra verifica antes de mutar',
 test('humano e bot validam descarte livre antes de mover cartas', () => {
   assert.match(app, /validateBossMeldPlay\(state, currentPlayer\(\)\.id, cards\)/);
   assert.match(app, /validateBossMeldPlay\(s, me\.id, cards\)\.allowed/);
-  assert.match(app, /validateBossMeldPlay\(s, me\.id, selectedHandCards, s\.discard\.slice\(0, -1\)\)/);
+  assert.match(app, /validateBossMeldPlay\(s, me\.id, selectedHandCards, s\.discard\.slice\(s\.discard\.length - pickupQuote\.count, -1\)\)/);
   assert.match(bot, /const moved = await engine\.executeMeld(?:New|Extend)[\s\S]*?madeMove = moved !== false/);
 });
 

@@ -457,8 +457,13 @@ export class BossBuracoBot {
 
     const topIsWildOrTwo = topCard.joker || topCard.rank === '2';
 
-    const checkSafe = (cardsUsedFromHand, pendingMeld) => {
-      const cardsAdded = state.variant === 'fechado' ? pileSize - 1 : pileSize;
+    const checkSafe = (cardsUsedFromHand, pendingMeld, meldIndex = null) => {
+      const quote = engine.quoteDiscardPickup?.(state.players[state.currentPlayer].id, {
+        meldIndex, handCardIds: (pendingMeld || []).filter(card => hand.some(entry => entry.id === card.id)).map(card => card.id),
+      });
+      if (quote && !quote.allowed) return false;
+      const closedPickup = state.variant === 'fechado' || state.mode?.startsWith('boss_');
+      const cardsAdded = (quote?.count ?? pileSize) - Number(closedPickup);
       const predictedHandSize = hand.length - cardsUsedFromHand + cardsAdded;
 
       // 🛑 TRAVA ANTI-OBESIDADE CORRIGIDA (Visão de Monopólio)
@@ -511,7 +516,7 @@ export class BossBuracoBot {
           const topIsNatural = !topCard.joker && topCard.rank !== '2';
 
           if (!needsWild || isPerfectTwo || (wasDirty && topIsNatural)) {
-            if (!checkSafe(0, testMeld)) continue;
+            if (!checkSafe(0, testMeld, mIdx)) continue;
             return { wants: true, action: 'extend', meldIndex: mIdx };
           }
         }
@@ -610,7 +615,7 @@ export class BossBuracoBot {
               }
             }
 
-            if (!checkSafe(0, testMeld)) continue;
+            if (!checkSafe(0, testMeld, mIdx)) continue;
             return { wants: true, action: 'extend', meldIndex: mIdx };
           }
         }
@@ -653,7 +658,7 @@ export class BossBuracoBot {
 
     // FASE 3: Lixo Aberto (Comprar sem formar jogo imediato na mesa)
     // Devolvemos o interesse deles por lixo solto, mantendo a agressividade natural.
-    if (state.variant === 'fechado') return false;
+    if (state.variant === 'fechado' || state.mode?.startsWith('boss_')) return false;
     if (state.stock.length === 0) return false; // 🛑 BLOQUEIO DO LOOP INFINITO: Impede o bot de ficar pescando lixo inútil e travando o fim do jogo
     if (!checkSafe(0, null)) return false;
 

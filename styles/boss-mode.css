@@ -678,6 +678,12 @@
   overflow: visible !important; box-sizing: border-box;
 }
 .boss-help-anchored p { max-height: min(290px, calc(100vh - 85px)); overflow: auto; }
+.boss-mode #drawDiscardBtn .pile-info { position: relative; }
+.boss-mode #bossDiscardHelpButton {
+  position: absolute; left: calc(100% + 5px); top: 50%; translate: 0 -50%;
+  margin: 0; pointer-events: auto;
+}
+#bossDiscardHelpButton[hidden] { display: none; }
 .boss-help-anchored::before { right: auto; top: auto; left: auto; bottom: auto; }
 .boss-help-anchored[data-anchor-side='right']::before { left: -6px; top: calc(var(--help-arrow) - 5px); transform: rotate(-45deg); }
 .boss-help-anchored[data-anchor-side='left']::before { right: -6px; top: calc(var(--help-arrow) - 5px); transform: rotate(135deg); }

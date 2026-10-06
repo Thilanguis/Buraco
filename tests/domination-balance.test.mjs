@@ -3,6 +3,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
 import { isDominationDiscardDecreeActive } from '../js/game/domination-decree.js';
+import { isBossMode } from '../js/boss/boss-engine.js';
 import { readFileSync } from 'node:fs';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
@@ -23,7 +24,7 @@ function fixture(mode, variant) {
 function sandbox(state) {
   const noop = () => {};
   const allowed = () => ({ allowed: true });
-  const live = vm.createContext({ state, window: {}, isDominationDiscardDecreeActive, waitForDominationDecreeReaction: async () => {}, document: { querySelector: () => null },
+  const live = vm.createContext({ state, window: {}, isBossMode, isDominationDiscardDecreeActive, waitForDominationDecreeReaction: async () => {}, document: { querySelector: () => null },
     selectedHandIndexes: new Set(), selectedMeldTarget: null, ignoreOwnActionId: null,
     currentPlayer: () => state.players[1], currentTeam: () => state.teams[1], ensureMyTurn: () => true,
     isBossVaultDrawRequired: () => false, isBossDiscardBlocked: () => false, hasPendingBossChoices: () => false,

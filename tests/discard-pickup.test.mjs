@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
 import { isDominationDiscardDecreeActive } from '../js/game/domination-decree.js';
-import { isValidBossSequence } from '../js/boss/boss-engine.js';
+import { isValidBossSequence, isBossMode, quoteBossDiscardPickup, createBossState, normalizeBossState, validateBossClosedDiscardSelection, isBossCardBlocked } from '../js/boss/boss-engine.js';
 import { animateDiscardTransfer } from '../js/game/discard-presentation.js';
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 function fn(name) {
@@ -25,7 +25,7 @@ function fixture(mode = '1x1_duploMorto', variant = 'fechado') {
     currentPlayer: () => state.players[1], currentTeam: () => state.teams[1],
     isBossVaultDrawRequired: () => false, isBossDiscardBlocked: () => false, hasPendingBossChoices: () => false,
     ensureCardId() {}, validateBossClosedDiscardSelection: () => ({ allowed: true }),
-    isBossMeldLocked: () => false, canBossUseMeld: () => true, canBossCreateMeld: () => true,
+    isBossMeldLocked: () => false, canBossUseMeld: () => true, canBossCreateMeld: () => true, isBossMode, quoteBossDiscardPickup,
     isValidSequenceMeld: isValidBossSequence, validateBossMeldPlay: () => ({ allowed: true }),
     canTeamTakeDeadNow: () => false, isCurrentBossMode: () => false,
     confirmBossDiscardPickup: () => ({ allowed: true }), saveStateForUndo() {},
@@ -38,6 +38,7 @@ function fixture(mode = '1x1_duploMorto', variant = 'fechado') {
     document: { querySelector: () => ({}) }, getRect: () => ({ left: 10, top: 20, width: 60, height: 90 }), cardElById: () => null,
     animateLocalDiscardPickup: async presentation => presentations.push(structuredClone(presentation)),
     packCard: c => ({ ...c }), newActionId: () => `action${serial++}`,
+    resetDeniedCardSelection() { context.selectedHandIndexes.clear(); context.selectedMeldTarget = null; },
     showMessage: text => messages.push(text), commitState: async () => commits.push(state.lastAction),
   });
   vm.runInContext(['discardChoiceIsCurrent', 'chooseDiscardDestination', 'drawFromDiscard', 'drawFromDiscardOnce'].map(fn).join('\n'), context);
@@ -59,6 +60,97 @@ test('fechado aguarda escolha e respeita o segundo jogo em Humilhacao e demais m
     assert.equal(f.presentations[0].topCard.rank, '7');
     assert.equal(f.presentations[0].cards[0].rank, '9');
     assert.equal(f.commits[0].discardPresentation.meldIndex, 1);
+  }
+});
+
+test('modo Chefe: jogador e BOT retiram o mesmo conjunto, sem duplicar após snapshot', async () => {
+  for (const [rank, handRanks, existing, count] of [
+    ['7', [], ['4', '5', '6'], 1], ['10', ['8', '9'], [], 2],
+    ['JOKER', ['8', '9'], [], 1], ['2', [], ['3', '4', '5'], 1],
+    ['2', ['8', '10'], [], 1], ['2', ['3', '4'], [], 2],
+  ]) for (const bot of [false, true]) {
+    const f = fixture('boss_nemesis');
+    f.state.boss = createBossState('nemesis', 123);
+    f.state.players[1].hand = cards([...handRanks, 'Q', 'K']);
+    f.state.teams[1].melds = existing.length ? [cards(existing)] : [];
+    f.state.discard = cards(['A', rank]); f.state.discard.at(-1).joker = rank === 'JOKER';
+    const lowerId = f.state.discard[0].id;
+    Object.assign(f.context, { isCurrentBossMode: () => true, validateBossClosedDiscardSelection, isBossCardBlocked,
+      getBossVault: () => null, shouldBossBotReclaimVault: () => false, waitForDominationDecreeReaction: async () => {},
+      getBossNaturePriorities: () => null, consumeBossExtraDraw: () => 0, registerBossFinancedCards: () => null,
+    });
+    if (bot) {
+      const start = app.indexOf('  async executeDrawDiscardFechado(');
+      vm.runInContext(`this.engine = { ${app.slice(start, app.indexOf('\n  },', start) + 5)} };`, f.context);
+      Object.assign(f.context.engine, { getState: () => f.context.state, commitState: async () => f.commits.push(f.context.state.lastAction),
+        evaluateBossMeldMutation: async () => true, acceptBossDiscardSurcharge: () => ({ allowed: true }), normalizeMeld() {},
+        showMessage: text => f.messages.push(text), _checkBotMortoOrWin: async () => null,
+      });
+      const intent = existing.length ? { action: 'extend', meldIndex: 0 } : { action: 'new', handIndexes: [0, 1] };
+      assert.equal(await f.context.engine.executeDrawDiscardFechado(1, intent), true);
+      f.context.state = JSON.parse(JSON.stringify(f.state));
+      const saved = JSON.stringify(f.context.state);
+      assert.equal(await f.context.engine.executeDrawDiscardFechado(1, intent), false);
+      assert.equal(JSON.stringify(f.context.state), saved);
+    } else {
+      f.context.selectedHandIndexes = new Set(handRanks.map((_, i) => i));
+      await f.context.drawFromDiscard();
+      f.context.state = JSON.parse(JSON.stringify(f.state));
+      const saved = JSON.stringify(f.context.state);
+      f.context.selectedHandIndexes = new Set(); // Reload does not restore local selection.
+      // The outer click wrapper intentionally delegates to discard after drawing;
+      // the pickup implementation itself must refuse another acquisition.
+      await f.context.drawFromDiscardOnce();
+      assert.equal(JSON.stringify(f.context.state), saved, 'human repeated pickup cannot consume again');
+    }
+    assert.equal(f.state.discard.length, 2 - count);
+    assert.equal(f.state.players[1].hand.some(card => card.id === lowerId), count === 2);
+    assert.equal(f.state.stock.length, 1);
+    assert.ok(f.messages.some(message => message === (count === 1 ? 'Retirada protegida · 1 carta' : 'Retirada completa · 2 cartas')));
+    assert.equal(f.commits.length, 1);
+  }
+});
+
+test('modo Chefe: bloqueio e mão final usam a retirada real e não mutam tentativas inválidas', async () => {
+  for (const bot of [false, true]) for (const blocked of [false, true]) {
+    const f = fixture('boss_nemesis'); f.state.boss = createBossState('nemesis', 123);
+    f.state.teams[1].melds = blocked ? [] : [cards(['4', '5', '6'])];
+    f.state.players[1].hand = cards(blocked ? ['8', '9', 'K'] : ['K']);
+    Object.assign(f.context, { isCurrentBossMode: () => true, validateBossClosedDiscardSelection, isBossCardBlocked,
+      teamHasGoodCanastra: () => false, getBossVault: () => null, shouldBossBotReclaimVault: () => false,
+      waitForDominationDecreeReaction: async () => {}, getBossNaturePriorities: () => null,
+    });
+    if (blocked) {
+      f.state.boss.combatEntities[0].status = 'persistent';
+      f.state.boss.grabbedByPlayer[1] = { cardIds: [f.state.players[1].hand[0].id], turnId: '3:1' };
+    }
+    normalizeBossState(f.state); // Real games normalize on load, before any action.
+    const before = JSON.stringify(f.state);
+    if (bot) {
+      const start = app.indexOf('  async executeDrawDiscardFechado(');
+      vm.runInContext(`this.engine = { ${app.slice(start, app.indexOf('\n  },', start) + 5)} };`, f.context);
+      Object.assign(f.context.engine, { getState: () => f.state });
+      assert.equal(await f.context.engine.executeDrawDiscardFechado(1, blocked
+        ? { action: 'new', handIndexes: [0, 1] } : { action: 'extend', meldIndex: 0 }), false);
+    } else {
+      f.context.selectedHandIndexes = new Set(blocked ? [0, 1] : []);
+      await f.context.drawFromDiscard();
+    }
+    assert.equal(JSON.stringify(f.state), before, `bot=${bot}, blocked=${blocked}`);
+    assert.equal(f.commits.length, 0);
+  }
+});
+
+test('modo Chefe: múltiplos destinos aguardam escolha e só jogo novo leva o restante', async () => {
+  for (const destination of [0, null]) {
+    const f = fixture('boss_nemesis'); f.state.boss = createBossState('nemesis', 123);
+    Object.assign(f.context, { isCurrentBossMode: () => true });
+    f.state.teams[1].melds = [cards(['4', '5', '6'])];
+    f.state.players[1].hand.push(...cards(['8', '9'])); f.context.selectedHandIndexes = new Set([4, 5]);
+    const before = JSON.stringify(f.state);
+    await f.context.drawFromDiscard(); assert.equal(JSON.stringify(f.state), before);
+    await f.context.chooseDiscardDestination(1, destination);
+    assert.equal(f.state.discard.length, destination == null ? 0 : 1);
   }
 });
 
@@ -139,4 +231,18 @@ test('voo local bloqueia acoes e restaura cartas mesmo se animacao for cancelada
   await assert.rejects(pending, /cancelled/);
   assert.equal(node.style.visibility, '');
   assert.equal(f.context.canPerformCommonGameAction(), true);
+});
+
+test('pulso AGARRADA fica pausado durante o voo e aparece ao revelar a carta, sem reiniciar', async () => {
+  const f = fixture(); let complete, pauses = 0, plays = 0;
+  const pulse = { id: 'nemesis-grab-entry', playState: 'running', pause() { pauses++; }, play() { plays++; } };
+  const node = { style: { visibility: '' }, getAnimations: () => [pulse, { id: 'other', playState: 'running' }] };
+  Object.assign(f.context, { animateDiscardTransfer, discardPickupAnimating: false, cardElById: () => node,
+    flyRectToRect: () => new Promise(resolve => { complete = resolve; }),
+  });
+  vm.runInContext(fn('animateLocalDiscardPickup'), f.context);
+  const pending = f.context.animateLocalDiscardPickup({ cards: cards(['9']) }, {});
+  assert.equal(pauses, 1); assert.equal(plays, 0); assert.equal(node.style.visibility, 'hidden');
+  complete(); await pending;
+  assert.equal(node.style.visibility, ''); assert.equal(plays, 1); assert.equal(pauses, 1);
 });

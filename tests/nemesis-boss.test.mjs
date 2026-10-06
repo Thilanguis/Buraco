@@ -11,6 +11,7 @@ import { buildBossActionPresentation, buildBossRuleSummary } from '../js/boss/bo
 import { createBossState, normalizeBossState, selectNextBossIntent, inspectBossAbilityEligibility, beginBossTurn, advanceBossTurn,
   applyBossMeldTransition, completeBossPlayerTurn, notifyBossDiscardTaken, notifyBossCardDiscarded, isBossCardBlocked, isValidBossSequence,
   setBossDamageTarget, getBossCombatPriorities, shouldBossBotTakeDiscard, applyBossFinalStrike, applyBossResourceDefeat, isBossDiscardBlocked,
+  queueDebugBossAbility,
 } from '../js/boss/boss-engine.js';
 import { buildBossDebugScenario, executeBossDebugScenarioVariant, simulateBossDebugReload, createBossDebugSnapshot, restoreBossDebugSnapshot, validateBossDebugScenario, getBossDebugCatalog, getBossDebugResourceState } from '../js/boss/boss-debug-scenarios.js';
 
@@ -204,6 +205,10 @@ test('Devorador heals once per turn, caps boss HP, mutation/buff stack, death re
 
 test('Horde buffs normal/mutated passives and expires after the next round, through reload', () => {
   const state = game('horde_command', 3); const intent = activate(state);
+  assert.equal(state.boss.hordeBuff.expiresRound, intent.activatedRound + 1);
+  state.boss.roundNumber = state.boss.hordeBuff.expiresRound;
+  nemesisBossMechanics.afterRoundAdvance({ boss: state.boss });
+  assert.ok(state.boss.hordeBuff, 'command remains active through the final round, inclusive');
   state.boss.hordeBuff.entityId = 'grabber';
   notifyBossDiscardTaken(state, 0, state.players[0].hand.slice(0, 4));
   assert.equal(state.boss.grabbedByPlayer[0].cardIds.length, 3);
@@ -212,6 +217,17 @@ test('Horde buffs normal/mutated passives and expires after the next round, thro
   assert.equal(changeNemesisInfection(state.boss, 8, 'horde-fail', { failure: true }), 14);
   state.boss.roundNumber = intent.activatedRound + 2; nemesisBossMechanics.afterRoundAdvance({ boss: state.boss });
   assert.equal(state.boss.hordeBuff, null);
+});
+
+test('Comando da Horda rejects absent, entering, repelled and corpse; it never establishes an enemy', () => {
+  for (const status of ['absent', 'entering', 'repelled', 'corpse']) {
+    const state = fresh();
+    state.boss.combatEntities.forEach(zombie => { zombie.status = status; zombie.hp = status === 'corpse' ? 0 : zombie.maxHp; });
+    const before = state.boss.combatEntities.map(zombie => ({ ...zombie }));
+    assert.equal(inspectBossAbilityEligibility(state, 'horde_command').eligible, false, status);
+    assert.deepEqual(state.boss.combatEntities, before);
+    assert.equal(state.boss.hordeBuff, null);
+  }
 });
 
 test('Contaminated Zone costs 6, coexists with Grabber, is not a failure and does not block trash', () => {
@@ -561,10 +577,73 @@ for (const phase of [1, 2, 3]) test(`phase ${phase}: persistent ceiling prevents
 test('entry objectives exclude impossible hands without valid contributions', () => {
   const state = fresh(); state.teams[0].melds = [];
   state.players.forEach((player) => player.hand = [{ id: `single-${player.id}`, rank: 'K', suit: '♦' }]);
-  const payload = inspectBossAbilityEligibility(state, 'horde_invasion').payload;
-  assert.equal(payload.entryKind, 'grabber');
+  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false, 'discardable alone is not a playable objective');
   entity(state, 'grabber').status = 'corpse'; entity(state, 'grabber').hp = 0;
   assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false);
+});
+
+test('marked objectives choose actually playable cards; sacrificing one still resolves the mark', () => {
+  for (const abilityId of ['infectious_tentacle', 'tentacle_barrage', 'stars_extermination', 'horde_invasion']) {
+    const state = fresh(); state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3];
+    if (abilityId === 'horde_invasion') { dead(state, 'infected'); dead(state, 'devourer'); }
+    state.teams[0].melds = [];
+    state.players[0].hand = [
+      { id: 'useless-first', rank: 'K', suit: '♠' },
+      ...['7', '8', '9'].map(rank => ({ id: `legal-${rank}`, rank, suit: '♥' })),
+      { id: 'keep', rank: 'Q', suit: '♦' },
+    ];
+    state.players[1].hand = [{ id: 'partner-useless', rank: 'K', suit: '♦' }];
+    const eligibility = inspectBossAbilityEligibility(state, abilityId);
+    assert.equal(eligibility.eligible, true, abilityId);
+    const payload = eligibility.payload;
+    const marked = payload.cardIds || [payload.secondCardId];
+    assert.ok(marked.every(id => id.startsWith('legal-')), `${abilityId}: useless discard is not a mark`);
+    assert.ok(payload.solution.playedCardIds.length >= (['tentacle_barrage', 'stars_extermination'].includes(abilityId) ? 2 : 1));
+    queueDebugBossAbility(state, abilityId);
+    const intent = activate(state);
+    assert.equal(intent.abilityId, abilityId);
+    const markedCard = state.players[0].hand.find(card => card.id === marked[0]);
+    notifyBossCardDiscarded(state, 0, markedCard);
+    assert.ok(intent.payload.exitedCardIds?.includes(markedCard.id) || intent.payload.secondExited);
+  }
+});
+
+test('tentacle/barrage/extermination reject a useless hand even when every card can be discarded', () => {
+  for (const id of ['infectious_tentacle', 'tentacle_barrage', 'stars_extermination']) {
+    const state = fresh(); state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3]; state.teams[0].melds = [];
+    state.players.forEach((player) => { player.hand = ['4', '8', 'K'].map((rank, index) => ({ id: `${player.id}:${rank}`, rank, suit: ['♠', '♥', '♦'][index] })); });
+    assert.equal(inspectBossAbilityEligibility(state, id).eligible, false);
+    assert.throws(() => selectNextBossIntent(state, { debug: true, forcedAbilityId: id }), /alvo legal/);
+    assert.equal(state.boss.currentIntent, null);
+  }
+});
+
+test('Barrage and Extermination require joint use routes, not one playable card plus one discard', () => {
+  for (const id of ['tentacle_barrage', 'stars_extermination']) {
+    const state = fresh(); state.boss.phase = 3;
+    state.teams[0].melds = [[{ id: 'm3', rank: '3', suit: '♥' }, { id: 'm4', rank: '4', suit: '♥' }, { id: 'm5', rank: '5', suit: '♥' }]];
+    state.players.forEach(player => { player.hand = [{ id: `${player.id}:6`, rank: '6', suit: '♥' }, { id: `${player.id}:Q`, rank: 'Q', suit: '♠' }, { id: `${player.id}:K`, rank: 'K', suit: '♦' }]; });
+    assert.equal(inspectBossAbilityEligibility(state, id).eligible, false);
+  }
+});
+
+test('zombie chips show final passive amounts and specific mutation/command duration help', () => {
+  const state = fresh(); state.boss.roundNumber = 4;
+  for (const [id, labels] of [['grabber', ['AGARRA 1', 'AGARRA 2', 'AGARRA 3']], ['infected', ['INFECÇÃO +2', 'INFECÇÃO +4', 'INFECÇÃO +6']], ['devourer', ['CURA 40', 'CURA 70', 'CURA 100']]]) {
+    const zombie = entity(state, id); zombie.status = 'persistent';
+    for (let stage = 0; stage < 3; stage++) {
+      zombie.mutated = stage >= 1;
+      state.boss.hordeBuff = stage === 2 ? { entityId: id, expiresRound: 5 } : null;
+      const model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id);
+      assert.equal(model.chips.at(-1).label, labels[stage]);
+      if (stage === 2) assert.match(model.chips.find(chip => chip.label === 'REFORÇADO').text, /fim da rodada 5, inclusive/);
+    }
+    state.boss.roundNumber = 6;
+    assert.equal(nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id).chips.at(-1).label, labels[1]);
+    state.boss.roundNumber = 4;
+    zombie.mutated = false;
+    assert.equal(nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id).chips.at(-1).label, labels[1], 'normal + reforço has the same total as mutation alone');
+  }
 });
 
 test('Devorador cannot count one card twice across two different melds', () => {
@@ -658,7 +737,7 @@ test('new combat HUD is empty, entering is contextual, help contains exact passi
   const state = fresh(); assert.equal(nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.length, 0);
   entity(state, 'grabber').status = 'entering';
   let model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
-  assert.equal(model.entities[0].stateLabel, 'ENTRANDO'); assert.equal(model.entities[0].selectable, false);
+  assert.equal(model.entities[0].stateLabel, 'INVADINDO'); assert.equal(model.entities[0].selectable, false);
   entity(state, 'grabber').status = 'persistent'; state.boss.hordeBuff = { entityId: 'grabber', expiresRound: 9, sourceIntentId: 'buff' };
   model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
   assert.equal(model.entities[0].stateLabel, 'DEBUFF REFORÇADO'); assert.match(model.entities[0].help, /2 normal \/ 3 Mutado/);
