@@ -166,6 +166,8 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 ## Nemesis
 
+**Marcação visual:** carta-alvo recebe infecção verde e selo MARCADA; restrição do Agarrador usa AGARRADA; topo do Lixo contaminado usa CONTAMINADO. Compartilham o mesmo overlay, aplicado após a arte, sem cobrir número/naipe/NOVA. Perigo/Zona de Impacto continuam laranja. O efeito visual não altera cobrança ou regras.
+
 **HP:** 2600. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos F1/F2/F3: **1/2/3**. Aparecer como ameaça ≠ persistir ≠ cadáver.
 
 | Habilidade (`id`) | Fases | Peso | Funcionamento atual |

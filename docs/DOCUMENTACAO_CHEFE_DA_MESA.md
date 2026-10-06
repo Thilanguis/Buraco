@@ -2954,6 +2954,12 @@ Foi adicionada uma barreira defensiva imediatamente antes de gravar qualquer jog
 
 # 16. Nemesis (05/10/2026)
 
+### Marcação visual de cartas
+
+A carta exata de um objetivo do Nemesis deve ficar visível com infecção verde e selo **MARCADA**, inclusive na entrada do Agarrador. Cartas presas pela passiva usam **AGARRADA** e a carta do topo sob Zona Contaminada usa **CONTAMINADO**, reutilizando o mesmo overlay. Áreas de perigo/Zona de Impacto continuam laranja. A animação é um pulso leve, desligado com redução de movimento; valor, naipe, seleção, NOVA e cliques permanecem acessíveis. Estar marcada não acrescenta Infecção automaticamente nem muda as regras da habilidade.
+
+A decoração é aplicada depois de renderizar a face, para não ser apagada por `innerHTML`, sem duplicar overlays em rerender. Sem efeito ativo, a decoração é removida. Novos chefes/habilidades devem validar o alvo na lógica **e na tela**, seguindo a matriz da seção 23 do checklist permanente; o texto do painel sozinho não substitui a marcação da carta.
+
 ## 16.1 Regra funcional
 
 Nemesis começa com **2600 HP** e **Infecção 0/100**. Usa os gatilhos e o fluxo de fases compartilhados do modo Chefe, sem progressão paralela. Chegar a **100 de Infecção encerra a batalha imediatamente**, inclusive por pegar o Lixo ou alimentar uma Zona de Impacto. Uma redução posterior na mesma ação não desfaz uma derrota já confirmada.

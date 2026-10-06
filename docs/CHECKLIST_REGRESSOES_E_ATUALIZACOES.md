@@ -632,7 +632,8 @@ O repositório atual já tem testes explicitamente voltados a regressões, inclu
 29. gerar objetivo de habilidade sem solução legal;
 30. alterar transform/scale sem testar viewport largo/4K;
 31. reutilizar ação especial em handler genérico que dispara efeitos colaterais;
-32. usar lock de BOT para esconder agendamento duplicado em vez de achar a origem.
+32. usar lock de BOT para esconder agendamento duplicado em vez de achar a origem;
+33. validar carta-alvo na lógica, mas não conferir se a marcação sobrevive à renderização da arte.
 
 ---
 
@@ -667,6 +668,21 @@ Revisão de 05/10/2026: fonte de verdade exclusivamente local por instrução ex
 - Horda/Ômega e duração ficam no painel amarelo. Alvo do dano integrado à arte, sem faixas soltas acima/abaixo dos zumbis.
 - Moldura de chefe envolve somente `.meld-line-cards`. Canastra/Limpa, pontuação e contribuições ficam fora. Padronizar Penhora, Posse, Interdito, Raiz, Enxerto, Banquete, Impacto e Espelho, mantendo os efeitos especiais já restritos às cartas.
 - Regressões: `boss-ui-readability.test.mjs` e `nemesis-ui.browser.mjs` (cinco viewports, oito famílias de marcação). Não mudar mecânicas para corrigir apresentação.
+
+## 23. Carta-alvo precisa estar marcada na tela — regra para novos chefes e habilidades
+
+Regressão de 05/10/2026: Invasão da Horda escolhia corretamente a carta do Agarrador, mas `renderHand()` anexava seu selo antes de substituir a face com `innerHTML`. A arte apagava o selo. Ter `cardIds` correto no estado ou uma classe CSS não comprova que o jogador vê o alvo.
+
+- [ ] Anunciar a habilidade pelo fluxo real/Laboratório e conferir a carta exata do jogador alvo, não uma carta fictícia marcada manualmente.
+- [ ] Renderizar a face antes de anexar overlays/selos; verificar que nenhum `innerHTML` posterior apaga a marcação.
+- [ ] Conferir alvo correto, parceiro sem marca indevida, múltiplas cartas e decks diferentes. Não ocultar valor, naipe, seleção ou selo NOVA.
+- [ ] Conferir aplicar/remover a marca conforme o estado real, término/expiração, rerender, reload/snapshot/undo e cliente remoto. Não deixar overlays duplicados ou persistentes após o efeito terminar.
+- [ ] Usar a identidade visual do chefe e o componente oficial de status; distinguir carta marcada, restrição e área de perigo. Nemesis: infecção verde na carta; Zona de Impacto/perigo laranja.
+- [ ] Overlay não intercepta cliques, não aumenta a carta e respeita redução de movimento; animação leve, sem timers por carta.
+- [ ] Testar no navegador os viewports adotados e revisar captura visual. Registrar separadamente o que foi automatizado e o que ainda depende de partida real/validação do usuário.
+- [ ] Atualizar documentação funcional, inventário e relatório específico do chefe. Comparar textos com código atual, removendo descrições antigas conflitantes.
+
+Proteção automatizada atual: `tests/nemesis-ui.browser.mjs` verifica ordem da renderização, alvo real da entrada do Agarrador, parceiro sem marca, selos MARCADA/AGARRADA/CONTAMINADO, efeito verde compartilhado, ausência de duplicação, limpeza do overlay, NOVA sem sobreposição e redução de movimento. O teste de navegador usa fixture local, não uma sessão Firebase ao vivo; os demais itens da matriz continuam obrigatórios em futuras alterações.
 # Matriarca — teto de Flores por ativação (05/10/2026)
 
 - Uma mesma ativação gera no máximo +1 Flor, mesmo que vários objetivos falhem em turnos diferentes. Reload/snapshot/undo preservam o histórico das Flores aplicadas; canastra não reabre a quota da ativação.

@@ -8560,9 +8560,7 @@ function renderAll() {
     discardFace.style.zIndex = 20;
 
     const hawkSuitLabel = hawkSuitIntent?.payload?.suit || hawkSuitIntent?.payload?.suitLabel || '';
-    const discardBossStatus = nemesisContaminated
-      ? '<span class="boss-card-status boss-card-status-nemesis-contamination" aria-hidden="true"><i>☣</i><b>CONTAMINADO</b></span>'
-      : pollenThreat
+    const discardBossStatus = pollenThreat
       ? '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>'
       : danielaOnTop
         ? '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-daniela" aria-hidden="true"><i>🩸</i><b>DANIELA</b></span>'
@@ -8577,6 +8575,7 @@ function renderAll() {
     if (discardFace._faceMarkup !== discardMarkup) discardFace.innerHTML = discardMarkup;
     discardFace._faceMarkup = discardMarkup;
     discardFace.className = `discard-face ${suitClass(discardTop)} ${deckFaceClass(discardTop)}${pollenThreat ? ' boss-discard-pollen-card' : ''}${danielaOnTop ? ' boss-discard-dimitrescu-card' : ''}${neheleniaDiscardMirror || neheleniaMirrorDiscardSealed ? ' boss-discard-nehelenia-card' : ''}${neheleniaHawkGuardedDiscard || neheleniaHawkDiscardDemand ? ' boss-discard-nehelenia-hawk-card' : ''}`;
+    getBossUiAdapter('nemesis')?.decorateCard?.(discardFace, nemesisContaminated ? 'nemesis-contaminated' : null);
     if (danielaOnTop) applyDimitrescuBloodScatter(discardFace, discardTop?.id || 'daniela-discard', 'discard');
     discardFace.style.color = discardTop.joker ? '#000' : discardTop.suit === '♥' || discardTop.suit === '♦' ? '#b91c1c' : '#000';
   }
@@ -8917,8 +8916,6 @@ function renderHand() {
     if (adapterCard) {
       div.classList.add(...adapterCard.classes);
       div.title = adapterCard.title;
-      const status = document.createElement('span'); status.className = 'boss-combat-card-label'; status.textContent = adapterCard.label;
-      div.append(status);
     }
     const bossDiscardFeedback = getBossCardBlockFeedback(state, me.id, card.id, 'discard');
     const bossCardLocked = bossCardEffect === 'locked';
@@ -9025,6 +9022,9 @@ function renderHand() {
       const sender = state.players.find((player) => player.id === swapHighlight.fromPlayerId);
       div.insertAdjacentHTML('beforeend', `<span class="boss-swap-origin">DO PARCEIRO${sender?.name ? `: ${sender.name}` : ''}</span>`);
     }
+
+    // Decorate after the face markup: innerHTML must not erase the objective marker.
+    getBossUiAdapter(state.boss?.id)?.decorateCard?.(div, bossCardEffect);
 
     // A seleção visual agora aplica a classe 'selected' isoladamente
     if (selectedHandIndexes.has(idx)) div.classList.add('selected');

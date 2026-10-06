@@ -23,7 +23,23 @@ export const nemesisBossUi = Object.freeze({
   },
   card(effect) {
     if (!['nemesis-grabbed', 'nemesis-marked'].includes(effect)) return null;
-    return { classes: [effect], label: effect === 'nemesis-grabbed' ? 'AGARRADA' : 'OBJETIVO', title: effect === 'nemesis-grabbed' ? 'Não pode entrar em jogo neste turno; pode ser descartada.' : 'Carta marcada pelo objetivo atual do Nemesis.' };
+    return { classes: [effect], label: effect === 'nemesis-grabbed' ? 'AGARRADA' : 'MARCADA', title: effect === 'nemesis-grabbed' ? 'Não pode entrar em jogo neste turno; pode ser descartada.' : 'Carta marcada pelo objetivo atual do Nemesis.' };
+  },
+  decorateCard(element, effect) {
+    element.querySelectorAll('.nemesis-infection-overlay, .boss-card-status-nemesis').forEach((node) => node.remove());
+    element.classList.remove('nemesis-marked', 'nemesis-grabbed', 'nemesis-contaminated');
+    const model = effect === 'nemesis-contaminated'
+      ? { classes: [effect], label: 'CONTAMINADO' } : this.card(effect);
+    if (!model) return;
+    element.classList.add(...model.classes);
+    const overlay = element.ownerDocument.createElement('span');
+    overlay.className = 'nemesis-infection-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    const status = element.ownerDocument.createElement('span');
+    status.className = 'boss-card-status boss-card-status-nemesis';
+    status.setAttribute('aria-hidden', 'true');
+    status.textContent = `☣ ${model.label}`;
+    element.append(overlay, status);
   },
   meldContribution(contribution) {
     const value = contribution?.infectionRelief || 0;

@@ -4,13 +4,17 @@
 
 Lança-Foguetes cobra por **carta nova** adicionada à Zona de Impacto: +10 Infecção na fase 2 e +12 na fase 3. Três cartas juntas custam +30/+36, igual a três jogadas separadas. Cartas já contabilizadas/reorganizadas não cobram novamente. O teto de Infecção e a derrota imediata permanecem; a cobrança de uma jogada é um único evento/SFX.
 
-Zona Contaminada marca o Lixo com contorno laranja, selo CONTAMINADO e custo +6 Infecção por retirada durante o turno do alvo. O destaque é removido fora desse turno ou ao encerrar a partida. Zona de Impacto é independente: marca somente o jogo do lança-foguetes enquanto o efeito ainda não expirou.
+Zona Contaminada mantém o aviso de perigo laranja no Lixo e aplica à carta do topo a infecção verde compartilhada, com selo CONTAMINADO e custo +6 Infecção por retirada durante o turno do alvo. O destaque é removido fora desse turno ou ao encerrar a partida. Zona de Impacto é independente: marca somente o jogo do lança-foguetes enquanto o efeito ainda não expirou.
 
 O painel reutiliza o medidor de faixas dos outros chefes somente no Extermínio S.T.A.R.S.: 0/1/2 exigências cumpridas projetam +16/+8/+0 Infecção base. Uma única barra mostra as três faixas; indicadores compactos identificam contribuição e saída da segunda carta separadamente. Infectado/Ômega podem acrescentar bônus às falhas. Invasão, Caçada e Tentáculos mantêm contadores/estado do objetivo, sem barras binárias desnecessárias. Nenhuma regra ou punição foi alterada.
 
-## Medidores de objetivos
+## Marcação das cartas — correção de 05/10/2026
 
-O painel da habilidade reutiliza a barra compartilhada dos chefes, preenchida pelo progresso real salvo no estado: Invasão da Horda conta 1 saída legal (Agarrador), 2 cartas contribuídas pela equipe (Infectado) ou 2 jogos diferentes alimentados (Devorador). Caçada S.T.A.R.S. conta 1 contribuição; Tentáculo Infeccioso e Rajada de Tentáculos contam respectivamente 1 e 2 saídas legais. Extermínio S.T.A.R.S. mostra duas barras independentes: contribuição e saída da segunda carta marcada. Efeitos imediatos, passivas e custos não são objetivos de preenchimento. Nenhuma regra ou punição foi alterada.
+Objetivos de carta usam selo MARCADA; cartas presas pelo Agarrador usam AGARRADA; topo do Lixo sob Zona Contaminada usa CONTAMINADO. Todos compartilham borda verde e manchas de infecção com pulso leve em CSS, sem asset novo, sem cobrir número/naipe nem interceptar cliques. O selo NOVA permanece separado. Redução de movimento desativa o pulso. Marcação visual não cria cobrança de Infecção nem muda permissões.
+
+O adapter `nemesisBossUi.decorateCard()` é aplicado depois da face da carta. Antes disso, `innerHTML` apagava o selo inserido antecipadamente na mão. A decoração é idempotente e removida quando não há efeito; a lógica de escolha/saída das cartas permanece intacta.
+
+Validação desta correção: 80 testes específicos (`nemesis-boss`, `nemesis-discard-ui`, `nemesis-progress-meters`) passaram; `nemesis-ui.browser.mjs` passou nos cinco viewports já adotados e sua captura foi revisada. Cobertura inclui carta real do Agarrador, parceiro, limpeza, repetição, NOVA e redução de movimento. Não foi uma partida completa com Firebase ao vivo nem uma nova execução da suíte ampla; os resultados históricos abaixo pertencem às rodadas indicadas. Checklist permanente: seção 23 de `CHECKLIST_REGRESSOES_E_ATUALIZACOES.md`.
 
 Revisão de 05/10/2026 sobre a implementação já existente. A base local foi comparada com os arquivos oficiais do Google Drive antes dos patches. Não foi reconstruída a batalha a partir do prompt antigo. O nome exibido, o relatório e o retrato usam somente **Nemesis**, sem sufixos de versão.
 

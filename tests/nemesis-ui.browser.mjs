@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_PATH || 'playwright');
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const source = await readFile(resolve(root, 'app.js'), 'utf8');
+const handSource = source.slice(source.indexOf('function renderHand('), source.indexOf('function renderHand(') + 25000);
+assert.ok(handSource.indexOf('decorateCard?.(div, bossCardEffect)') > handSource.indexOf('div.innerHTML = cardFrontHTML(card)'), 'card marker must survive face rendering');
 const index = await readFile(resolve(root, 'index.html'), 'utf8');
 const panelSource = source.slice(source.indexOf('function createBossCombatHelp('), source.indexOf('\nfunction renderBossHud(', source.indexOf('function renderBossCombatPanel(')));
 const helpSource = source.slice(source.indexOf('function closeBossIntentHelp('), source.indexOf('\nfunction createBossCombatHelp('));
@@ -22,7 +24,7 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8">${styles.map((
 import { buildBossDebugScenario } from '/js/boss/boss-debug-scenarios.js';
 import { getBossUiAdapter } from '/js/boss/ui/boss-ui-registry.js';
 import { nemesisBossPresentation } from '/js/boss/presentation/nemesis.js';
-import { setBossDamageTarget, isBossTurnActive } from '/js/boss/boss-engine.js';
+import { setBossDamageTarget, isBossTurnActive, getBossCardEffect, beginBossTurn, advanceBossTurn } from '/js/boss/boss-engine.js';
 let state = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'stars_hunt', phase: 1 }).state;
 state.currentPlayer = 0; state.boss.bossFlow = null;
 let myPlayerIndex = 0; let committing = false;
@@ -59,6 +61,23 @@ window.fixture.discard = (active) => {
   document.getElementById('drawDiscardBtn').classList.toggle('boss-nemesis-contaminated-discard', getBossUiAdapter('nemesis').discard({ gameState: sample }));
 };
 window.fixture.meter = (abilityId, payload) => renderBossRangeMeters(document.getElementById('bossIntentDescription'), nemesisBossPresentation.rangeMeters({ intent: { abilityId, payload } }) || []);
+window.fixture.infectedCard = () => {
+  const sample = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'horde_invasion', phase: 1, target: 'zombie_grabber' }).state;
+  beginBossTurn(sample, { first: true, now: 1000, debug: true });
+  for (let i = 0; i < 15 && sample.boss.bossFlow.stage !== 'players'; i++) advanceBossTurn(sample, sample.boss.bossFlow.endsAt + 1);
+  const intent = sample.boss.currentIntent;
+  const cardId = intent.payload.cardIds[0];
+  const effect = getBossCardEffect(sample, intent.payload.targetPlayerId, cardId);
+  const node = document.createElement('div'); node.id = 'infectionTestCard'; node.className = 'carta';
+  node.style.cssText = 'position:relative;width:100px;height:150px;background:#fff9e8;margin:20px';
+  node.innerHTML = '<b style="position:absolute;top:4px;left:4px">2♣</b><span class="bought-card-marker"><span>NOVA</span></span>';
+  const hand = document.createElement('div'); hand.id = 'handContainer';
+  hand.style.cssText = 'position:relative;display:flex;justify-content:center;height:190px;overflow:visible';
+  hand.append(node); document.querySelector('main').append(hand);
+  const ui = getBossUiAdapter('nemesis'); ui.decorateCard(node, effect); ui.decorateCard(node, effect);
+  return { effect, other: getBossCardEffect(sample, 1 - intent.payload.targetPlayerId, cardId) };
+};
+window.fixture.decorate = (effect) => getBossUiAdapter('nemesis').decorateCard(document.getElementById('infectionTestCard'), effect);
 </script></body></html>`;
 const server = createServer(async (req, res) => {
   try {
@@ -82,6 +101,26 @@ try {
   try { await page.waitForSelector('#bossCombatPanel', { state: 'attached', timeout: 10000 }); }
   catch (error) { throw new Error(`Fixture did not render: ${errors.join('; ')}`, { cause: error }); }
   assert.equal(await page.locator('.boss-combat-entity').count(), 0, 'new match has no permanent zombie cards');
+  const cardEffects = await page.evaluate(() => window.fixture.infectedCard());
+  assert.equal(cardEffects.effect, 'nemesis-marked', 'Agarrador entry exposes the actual marked card');
+  assert.equal(cardEffects.other, null, 'other players are not marked');
+  assert.equal(await page.locator('#infectionTestCard .nemesis-infection-overlay').count(), 1, 'rerender does not duplicate infection');
+  assert.equal(await page.locator('#infectionTestCard .boss-card-status-nemesis').innerText(), '☣ MARCADA');
+  assert.equal(await page.locator('#infectionTestCard .bought-card-marker').innerText(), 'NOVA');
+  assert.equal(await page.locator('#infectionTestCard').evaluate(node => {
+    const marker = node.querySelector('.boss-card-status-nemesis').getBoundingClientRect();
+    const nova = node.querySelector('.bought-card-marker > span').getBoundingClientRect();
+    return marker.bottom <= nova.top;
+  }), true, 'infection label must not cover NOVA');
+  assert.equal(await page.locator('.nemesis-infection-overlay').evaluate(node => getComputedStyle(node).pointerEvents), 'none');
+  for (const [effect, label] of [['nemesis-grabbed', 'AGARRADA'], ['nemesis-contaminated', 'CONTAMINADO']]) {
+    await page.evaluate(effect => window.fixture.decorate(effect), effect);
+    assert.equal(await page.locator('#infectionTestCard .boss-card-status-nemesis').innerText(), `☣ ${label}`);
+    assert.equal(await page.locator('#infectionTestCard .nemesis-infection-overlay').count(), 1);
+  }
+  await page.evaluate(() => window.fixture.decorate(null));
+  assert.equal(await page.locator('#infectionTestCard .nemesis-infection-overlay, #infectionTestCard .boss-card-status-nemesis').count(), 0, 'clearing the effect removes infection decoration');
+  await page.evaluate(() => window.fixture.decorate('nemesis-marked'));
   await page.evaluate(() => { const entity = window.fixture.state().boss.combatEntities[0]; entity.status = 'entering'; entity.transitionEventId = 'entry'; entity.transitionAt = Date.now(); window.fixture.render(); });
   assert.equal(await page.locator('.boss-combat-entity.is-entering').count(), 1);
   await page.waitForFunction(() => { const image = document.querySelector('.is-entering .boss-combat-portrait'); return image?.complete && image.naturalWidth > 0; });
@@ -208,6 +247,7 @@ try {
   });
   for (const r of frameResults) { assert.ok(r.rowFrame && r.metaOutside && r.outline === 'solid', JSON.stringify(r)); assert.equal(r.parentBefore, 'none'); assert.equal(r.parentAfter, 'none'); }
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(await page.locator('.nemesis-infection-overlay').evaluate(node => getComputedStyle(node, '::before').animationName), 'none');
   await page.evaluate(() => { const entity = window.fixture.state().boss.combatEntities[0]; entity.transitionEventId = 'persistent-transition'; window.fixture.render(); });
   assert.equal(await page.locator('[data-entity-id="grabber"]').evaluate((node) => getComputedStyle(node).animationName), 'none');
   await page.evaluate(() => { const entity = window.fixture.state().boss.combatEntities[0]; entity.status = 'repelled'; entity.transitionAt = Date.now(); entity.transitionEventId = 'repelled'; window.fixture.render(); });
