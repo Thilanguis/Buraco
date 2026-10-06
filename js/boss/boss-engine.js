@@ -514,7 +514,7 @@ export function quoteBossDiscardPickup(gameState, playerId, { meldIndex = null, 
     || (String(top.rank) === '2' && !isBossCardNaturalInSequence(meld, top.id));
   const count = protectedPickup ? 1 : gameState.discard.length;
   return { allowed: true, protected: protectedPickup, count,
-    message: protectedPickup ? 'Retirada protegida · 1 carta' : `Retirada completa · ${count} cartas` };
+    message: '' };
 }
 
 function isCompleteAceToAce(meld) {
@@ -3131,6 +3131,12 @@ function resolveDimitrescuRoundEffects(gameState) {
     }
   }
   return events.filter(Boolean);
+}
+
+export function notifyBossPurchaseCompleted(gameState, playerId) {
+  if (gameState?.mode !== BOSS_MODE_NEMESIS || gameState.finished || !gameState.hasDrawnThisTurn || gameState.partialDraw || gameState.players?.[gameState.currentPlayer]?.id !== playerId) return [];
+  const boss = normalizeBossState(gameState);
+  return getBossMechanicsAdapter(boss.id)?.onPurchaseCompleted?.({ ...bossMechanicsContext(gameState), playerId, recordBossEvent: event => recordEvent(boss, event) }) || [];
 }
 
 export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {

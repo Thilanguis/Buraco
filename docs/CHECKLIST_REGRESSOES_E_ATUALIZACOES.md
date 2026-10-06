@@ -714,6 +714,16 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 
 ## 25. Lixo protegido dos chefes e UX do Nemesis — 06/10/2026
 
+### Durabilidade e Agarrador por turno — decisão posterior de 06/10/2026
+
+- [ ] Novas partidas/Laboratório: Nemesis 2200 HP; Agarrador 220, Infectado 240, Devorador 260. Reanimação 110/120/130; manter 1x/fase, teto e Mutado na F3. Corpse nunca elegível para Invasão.
+- [ ] Após compra **Monte e Lixo**, testar humano e BOT, cada jogador em seu turno; normal/Mutado/Reforçado/ambos prendem até 1/2/2/3 cartas jogáveis da mão inteira. Só após concluir compra e jogada obrigatória do Lixo. Cartas permanecem na mão, descarte livre, fim do turno/morte liberam imediatamente.
+- [ ] Preservar solução completa de Caçada, Tentáculo, Barragem, Extermínio e Invasão, incluindo apoio e descarte final; verificar Invasão cooperativa com progresso já feito pelo parceiro. Sem candidato seguro, menos/zero travas, sem punição nova.
+- [ ] BOT: plano do objetivo, extensão genérica, tríades/worker e panic dump não usam Agarradas; recalcular após compra, conseguir jogar/descarte sem deadlock. Não mudar heurística de alvo.
+- [ ] Compra repetida/reload/snapshot/undo não duplicam restrição/evento/pulso; saves antigos preservam lifecycle, quota/alvo e HP baixo, limitando HP acima dos novos máximos sem reset da partida.
+- [ ] Preservar Infecção, pesos, cura/bônus/regen, regra global do Lixo, alívio por canastra e demais cinco chefes. Dano em zumbi sem overflow nem troca de S.T.A.R.S.; Comando continua no zumbi reforçado.
+- [ ] Executar Nemesis/compra/BOT focados, browser nos cinco viewports e suíte ampla. Registrar estimativa ~68,9% apenas como histórico anterior à regra global do Lixo e a este patch, nunca percentual atual. Referência: `BALANCEAMENTO_NEMESIS.md`.
+
 - [ ] Decreto contra Escravo BOT: testar bloqueio antes da compra e durante a janela de reação. BOT compra do Monte, sem coletar o Lixo. `BOT_PLAN_STALE` em sessão/turno ainda válidos retoma a recuperação após concluir a operação do Decreto; cancelamento real, troca de turno ou saída da sessão não podem comprar/descartar. Não deixar `lastBotTurnPlayed` travar um turno com plano invalidado. Cobertura: `domination-decree-bot-resume.test.mjs`.
 
 - [ ] Regra limitada a TODOS os modos Chefe, sem alterar Buraco normal/Dominação. Destino realmente escolhido: jogo existente → topo; jogo novo pela mão → inteiro; Joker → topo; 2 existente → topo; 2 coringa novo → topo; 2 natural novo → inteiro.

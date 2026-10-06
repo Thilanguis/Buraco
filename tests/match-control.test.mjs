@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { applyPauseVote, pauseBlocksPlay, stockIsExhausted, createActionGate } from '../js/game/match-control.js';
+import { notifyBossPurchaseCompleted } from '../js/boss/boss-engine.js';
 const makeState = (names = ['Ana', 'Bia', 'BOT C', 'BOT D']) => ({
   players: names.map((name, id) => ({ id, name, hand: [], teamId: id % 2 })),
   stock: [], deadPiles: [[], []], discard: [], currentPlayer: 0, turnNumber: 4, hasDrawnThisTurn: true,
@@ -88,7 +89,7 @@ const drawContext = {
   isBossVaultDrawRequired: () => false, document: { querySelector: () => null },
   saveStateForUndo() {}, consumeBossExtraDraw: () => 0,
   recycleDeadToStockIfPossible: async () => { recycleCalls++; await new Promise(resolve => { releaseRecycle = resolve; }); drawState.stock = [{ id: 'one' }, { id: 'two' }]; return 0; },
-  ensureCardId() {}, currentPlayer: () => drawState.players[0], registerBossFinancedCards: () => null,
+  ensureCardId() {}, currentPlayer: () => drawState.players[0], registerBossFinancedCards: () => null, notifyBossPurchaseCompleted,
   deferBossVault: () => null, sortHand() {}, window: {}, renderAll() {}, showMessage() {},
   newActionId: () => 'draw', packCard: c => c, ignoreOwnActionId: null, resetTurnTimer() {}, commitState: async () => {},
 };

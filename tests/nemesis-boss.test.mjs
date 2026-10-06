@@ -11,7 +11,7 @@ import { buildBossActionPresentation, buildBossRuleSummary } from '../js/boss/bo
 import { createBossState, normalizeBossState, selectNextBossIntent, inspectBossAbilityEligibility, beginBossTurn, advanceBossTurn,
   applyBossMeldTransition, completeBossPlayerTurn, notifyBossDiscardTaken, notifyBossCardDiscarded, isBossCardBlocked, isValidBossSequence,
   setBossDamageTarget, getBossCombatPriorities, shouldBossBotTakeDiscard, applyBossFinalStrike, applyBossResourceDefeat, isBossDiscardBlocked,
-  queueDebugBossAbility,
+  queueDebugBossAbility, notifyBossPurchaseCompleted,
 } from '../js/boss/boss-engine.js';
 import { buildBossDebugScenario, executeBossDebugScenarioVariant, simulateBossDebugReload, createBossDebugSnapshot, restoreBossDebugSnapshot, validateBossDebugScenario, getBossDebugCatalog, getBossDebugResourceState } from '../js/boss/boss-debug-scenarios.js';
 
@@ -90,8 +90,8 @@ test('objective modifiers emit one sound event with final clamped delta and no e
 
 test('creation, registry, menu and infection resource are integrated without active zombies', () => {
   const boss = createBossState('nemesis', 19);
-  assert.equal(boss.hp, 2600); assert.equal(boss.danger, 0); assert.equal(boss.dangerType, 'infection');
-  assert.deepEqual(boss.combatEntities.map((entry) => [entry.id, entry.hp, entry.status, entry.mutated]), [['grabber', 350, 'absent', false], ['infected', 300, 'absent', false], ['devourer', 400, 'absent', false]]);
+  assert.equal(boss.hp, 2200); assert.equal(boss.danger, 0); assert.equal(boss.dangerType, 'infection');
+  assert.deepEqual(boss.combatEntities.map((entry) => [entry.id, entry.hp, entry.status, entry.mutated]), [['grabber', 220, 'absent', false], ['infected', 240, 'absent', false], ['devourer', 260, 'absent', false]]);
   assert.equal(getBossDebugCatalog().find((entry) => entry.id === 'nemesis').abilities.length, 11);
   const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(index, /option value="nemesis"/); assert.match(index, /boss_nemesis/);
@@ -104,7 +104,7 @@ test('real engine math routes damage, never overflows and does not change S.T.A.
   entity(state, 'grabber').hp = 50;
   const event = hit(state, { targetId: 'grabber', kind: 'real' });
   assert.equal(event.damage, 300); assert.equal(event.appliedDamage, 50); assert.equal(event.targetId, 'grabber');
-  assert.equal(state.boss.hp, 2600); assert.equal(state.boss.danger, 22); assert.equal(state.boss.starsPlayerId, 0);
+  assert.equal(state.boss.hp, 2200); assert.equal(state.boss.danger, 22); assert.equal(state.boss.starsPlayerId, 0);
   assert.equal(entity(state, 'grabber').status, 'corpse'); assert.equal(entity(state, 'grabber').diedAt != null, true);
   assert.equal(setBossDamageTarget(state, 0, 'grabber'), false);
 });
@@ -140,32 +140,35 @@ test('infection clamps, deduplicates real failures and defeats immediately at 10
   changeNemesisInfection(boss, 101, 'lethal'); assert.equal(boss.danger, 100); assert.equal(boss.result.reason, 'max_infection');
 });
 
-test('Agarrador blocks only acquired cards for play, not discard; expires on owner turn end', () => {
-  const state = game(); const cards = state.players[0].hand.slice(0, 3);
-  notifyBossDiscardTaken(state, 0, cards);
-  assert.equal(isBossCardBlocked(state, 0, cards[0].id, 'play'), true);
-  assert.equal(isBossCardBlocked(state, 0, cards[0].id, 'discard'), false);
-  assert.equal(isBossCardBlocked(state, 1, cards[0].id, 'play'), false);
-  completeBossPlayerTurn(state, 0); assert.equal(isBossCardBlocked(state, 0, cards[0].id, 'play'), false);
+test('Agarrador blocks playable hand cards after purchase, not discard; expires on owner turn end', () => {
+  const state = game(); state.hasDrawnThisTurn = true;
+  notifyBossPurchaseCompleted(state, 0);
+  const id = state.boss.grabbedByPlayer[0].cardIds[0]; assert.ok(id);
+  assert.equal(isBossCardBlocked(state, 0, id, 'play'), true);
+  assert.equal(isBossCardBlocked(state, 0, id, 'discard'), false);
+  assert.equal(isBossCardBlocked(state, 1, id, 'play'), false);
+  completeBossPlayerTurn(state, 0); assert.equal(isBossCardBlocked(state, 0, id, 'play'), false);
 });
 
-test('closed pickup before hand insertion grabs remaining pile, never the mandatory top meld card', () => {
+test('closed pickup waits until purchase is complete; never grabs the mandatory top outside hand', () => {
   const state = game(); const pile = state.stock.splice(0, 3);
   notifyBossDiscardTaken(state, 0, pile);
+  assert.equal(state.boss.grabbedByPlayer[0], undefined);
   state.players[0].hand.push(...pile.slice(0, -1));
-  assert.equal(isBossCardBlocked(state, 0, pile[0].id), true);
+  state.hasDrawnThisTurn = true; notifyBossPurchaseCompleted(state, 0);
+  assert.equal(state.boss.grabbedByPlayer[0].cardIds.length, 1);
   assert.equal(isBossCardBlocked(state, 0, pile.at(-1).id), false);
 });
 
 test('death immediately removes grab passive even with outstanding serialized lock', () => {
-  const state = game(); const card = state.players[0].hand[0];
-  notifyBossDiscardTaken(state, 0, [card]); assert.equal(isBossCardBlocked(state, 0, card.id), true);
-  dead(state, 'grabber'); assert.equal(isBossCardBlocked(state, 0, card.id), false);
+  const state = game(); state.hasDrawnThisTurn = true; notifyBossPurchaseCompleted(state, 0);
+  const id = state.boss.grabbedByPlayer[0].cardIds[0]; assert.equal(isBossCardBlocked(state, 0, id), true);
+  dead(state, 'grabber'); assert.equal(isBossCardBlocked(state, 0, id), false);
 });
 
 test('F3 mutates living zombies; revived corpses are mutated and quota is one per phase', () => {
   const state = game('viral_reanimation', 2); activate(state);
-  assert.equal(entity(state, 'grabber').hp, 175); assert.equal(entity(state, 'grabber').revivals, 1);
+  assert.equal(entity(state, 'grabber').hp, 110); assert.equal(entity(state, 'grabber').revivals, 1);
   dead(state, 'grabber'); assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
   state.boss.phase = 3; normalizeBossState(state);
   assert.equal(entity(state, 'devourer').mutated, true);
@@ -174,13 +177,13 @@ test('F3 mutates living zombies; revived corpses are mutated and quota is one pe
   selectNextBossIntent(state, { debug: true, forcedAbilityId: 'viral_reanimation' });
   const intent = state.boss.currentIntent;
   nemesisBossMechanics.resolveIntent({ boss: state.boss, gameState: state, intent });
-  assert.equal(entity(state, 'grabber').mutated, true); assert.equal(entity(state, 'grabber').hp, 175);
+  assert.equal(entity(state, 'grabber').mutated, true); assert.equal(entity(state, 'grabber').hp, 110);
   dead(state, 'grabber'); assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
 });
 
 test('Regeneration selects lowest percentage, caps HP, and excludes corpses/full health', () => {
   const state = game('parasite_regeneration', 2);
-  entity(state, 'grabber').hp = 340; entity(state, 'infected').hp = 10;
+  entity(state, 'grabber').hp = 210; entity(state, 'infected').hp = 10;
   const payload = inspectBossAbilityEligibility(state, 'parasite_regeneration').payload;
   assert.equal(payload.entityId, 'infected');
   selectNextBossIntent(state, { debug: true, forcedAbilityId: 'parasite_regeneration' });
@@ -210,7 +213,7 @@ test('Horde buffs normal/mutated passives and expires after the next round, thro
   nemesisBossMechanics.afterRoundAdvance({ boss: state.boss });
   assert.ok(state.boss.hordeBuff, 'command remains active through the final round, inclusive');
   state.boss.hordeBuff.entityId = 'grabber';
-  notifyBossDiscardTaken(state, 0, state.players[0].hand.slice(0, 4));
+  state.hasDrawnThisTurn = true; notifyBossPurchaseCompleted(state, 0);
   assert.equal(state.boss.grabbedByPlayer[0].cardIds.length, 3);
   const restored = simulateBossDebugReload(state); assert.deepEqual(restored.boss.hordeBuff, state.boss.hordeBuff);
   state.boss.hordeBuff.entityId = 'infected';
@@ -234,8 +237,9 @@ test('Contaminated Zone costs 6, coexists with Grabber, is not a failure and doe
   const state = game('contaminated_zone'); activate(state);
   const target = state.boss.currentIntent.payload.targetPlayerId;
   const events = notifyBossDiscardTaken(state, target, state.players[target].hand.slice(0, 3));
+  state.currentPlayer = target; state.hasDrawnThisTurn = true; notifyBossPurchaseCompleted(state, target);
   assert.equal(state.boss.danger, 6); assert.equal(state.boss.grabbedByPlayer[target].cardIds.length, 1);
-  assert.equal(events.length, 2); assert.equal(isBossDiscardBlocked(state, target), false);
+  assert.equal(events.length, 1); assert.equal(isBossDiscardBlocked(state, target), false);
   notifyBossDiscardTaken(state, target, state.players[target].hand.slice(0, 3)); assert.equal(state.boss.danger, 6);
 });
 
@@ -337,7 +341,7 @@ test('all abilities/phases/variants preserve 108 cards and real laboratory succe
 test('bot target heuristic values lethal boss, infection pressure and expensive healing, not only lowest HP', () => {
   const state = game(); state.boss.hp = 25;
   assert.equal(chooseNemesisDamageTarget(state, 300), 'boss');
-  state.boss.hp = 2600; state.boss.danger = 90;
+  state.boss.hp = 2200; state.boss.danger = 90;
   assert.equal(chooseNemesisDamageTarget(state, 300), 'infected');
   state.boss.danger = 0; state.boss.devourerHealingTotal = 180;
   assert.equal(chooseNemesisDamageTarget(state, 400), 'devourer');
@@ -348,7 +352,7 @@ test('BOT chooses its actual damage target through the real engine and avoids le
   assert.equal(shouldBossBotTakeDiscard(state, 1, { intent: { wants: true } }), false);
   state.boss.bossFlow = null;
   const event = hit(state, { playerId: 1, kind: 'real' }); assert.equal(event.targetId, 'infected');
-  assert.equal(entity(state, 'infected').status, 'corpse'); assert.equal(state.boss.hp, 2600);
+  assert.equal(entity(state, 'infected').status, 'corpse'); assert.equal(state.boss.hp, 2200);
 });
 
 test('BOT priority plans and discard execute legal marked exits for Tentacle', async () => {
@@ -366,13 +370,13 @@ test('reload, snapshot and actual undo preserve all combat fields and duplicate-
   const state = game('rocket_launcher', 3); activate(state);
   state.boss.combatTargetsByPlayer[0] = 'devourer'; state.boss.starsPlayerId = 1;
   state.boss.hordeBuff = { entityId: 'grabber', expiresRound: 6 }; state.boss.omegaBuff = { expiresRound: 6 };
-  state.boss.reanimationsByPhase[2] = 'used'; notifyBossDiscardTaken(state, 0, state.players[0].hand.slice(0, 4));
+  state.boss.reanimationsByPhase[2] = 'used'; state.hasDrawnThisTurn = true; notifyBossPurchaseCompleted(state, 0);
   changeNemesisInfection(state.boss, 8, 'saved-failure', { failure: true });
   const undo = createUndoTransaction(state, {}, { actorPlayerId: 0 });
   for (const restored of [simulateBossDebugReload(state), restoreBossDebugSnapshot(createBossDebugSnapshot(state)), restoreUndoTransaction(undo).state]) {
     assert.deepEqual(restored.boss, state.boss);
     assert.equal(changeNemesisInfection(restored.boss, 8, 'saved-failure', { failure: true }), 0);
-    assert.equal(isBossCardBlocked(restored, 0, restored.players[0].hand[0].id), true);
+    assert.equal(isBossCardBlocked(restored, 0, restored.boss.grabbedByPlayer[0].cardIds[0]), true);
   }
 });
 
@@ -394,7 +398,7 @@ test('final strike also honors explicit target and cannot spill damage', () => {
   const state = game(); state.boss.starsPlayerId = null;
   setBossDamageTarget(state, 0, 'grabber');
   const event = applyBossFinalStrike(state, 1000, 0);
-  assert.equal(event.damage, 750); assert.equal(event.appliedDamage, 350); assert.equal(state.boss.hp, 2600);
+  assert.equal(event.damage, 750); assert.equal(event.appliedDamage, 220); assert.equal(state.boss.hp, 2200);
   assert.equal(state.boss.result.victory, false); assert.equal(state.boss.starsPlayerId, null);
   assert.match(nemesisBossUi.finalStrikeWarning({ gameState: game(), playerId: 0 }) || '', /^$/);
   const selected = game(); selected.boss.combatTargetsByPlayer[0] = 'infected';
@@ -554,7 +558,7 @@ test('repelled can reenter but is neither corpse nor regenerative/reanimation ta
   assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').payload.entityId, 'grabber');
   const intent = selectNextBossIntent(state, { debug: true, forcedAbilityId: 'horde_invasion' });
   nemesisBossMechanics.resolveIntent({ boss: state.boss, intent });
-  assert.equal(entity(state, 'grabber').status, 'persistent'); assert.equal(entity(state, 'grabber').hp, 350);
+  assert.equal(entity(state, 'grabber').status, 'persistent'); assert.equal(entity(state, 'grabber').hp, 220);
 });
 
 test('last repelled is not selected immediately while another legal entrant exists', () => {

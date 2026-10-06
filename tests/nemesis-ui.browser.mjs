@@ -28,7 +28,7 @@ import { buildBossDebugScenario } from '/js/boss/boss-debug-scenarios.js';
 import { getBossUiAdapter } from '/js/boss/ui/boss-ui-registry.js';
 import { nemesisBossPresentation } from '/js/boss/presentation/nemesis.js';
 import { createActionGate } from '/js/game/match-control.js';
-import { setBossDamageTarget, isBossTurnActive, getBossCardEffect, beginBossTurn, advanceBossTurn, notifyBossDiscardTaken, completeBossPlayerTurn } from '/js/boss/boss-engine.js';
+import { setBossDamageTarget, isBossTurnActive, getBossCardEffect, beginBossTurn, advanceBossTurn, notifyBossPurchaseCompleted, completeBossPlayerTurn } from '/js/boss/boss-engine.js';
 let state = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'stars_hunt', phase: 1 }).state;
 state.currentPlayer = 0; state.boss.bossFlow = null;
 let myPlayerIndex = 0; let committing = false;
@@ -51,7 +51,7 @@ const hud = document.getElementById('bossHud');
 document.getElementById('bossName').textContent = 'NEMESIS';
 document.getElementById('bossPortraitImage').src = '/assets/images/boss-nemesis.png';
 document.getElementById('bossDangerLabel').textContent = 'INFECÇÃO';
-document.getElementById('bossHpText').textContent = '2600 / 2600';
+document.getElementById('bossHpText').textContent = state.boss.hp + ' / ' + state.boss.maxHp;
 document.getElementById('bossIntentName').textContent = 'Caçada S.T.A.R.S.';
 document.getElementById('bossIntentDescription').textContent = 'Contribua com 1 carta neste turno.';
 window.fixture = { render: () => renderBossCombatPanel(hud, state.boss), state: () => state, commits: () => commits, frame: applyBossMeldEffectFrame,
@@ -128,8 +128,10 @@ window.fixture.grabPulse = (reducedMotion = false) => {
   const sample = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'stars_hunt', phase: 1 }).state;
   sample.boss.currentIntent = null; sample.boss.bossFlow = null; sample.boss.combatEntities[0].status = 'persistent';
   const ui = getBossUiAdapter('nemesis'), root = document.createElement('div');
-  const acquired = [{ id: 'grab-a', rank: 'Q', suit: '♥' }, { id: 'free-b', rank: 'K', suit: '♥' }];
-  sample.players[0].hand.push(...acquired);
+  const acquired = [{ id: 'grab-a', rank: '7', suit: '♥' }, { id: 'free-b', rank: 'K', suit: '♠' }];
+  sample.players[0].hand = acquired.slice();
+  sample.teams[0].melds = [['3','4','5','6'].map(rank => ({ id: 'table-' + rank, rank, suit: '♥' }))];
+  sample.hasDrawnThisTurn = true; sample.partialDraw = false;
   let pulses = 0;
   const render = () => {
     root.replaceChildren();
@@ -142,10 +144,13 @@ window.fixture.grabPulse = (reducedMotion = false) => {
     ui.syncCardTransitions(root, sample.boss, { reducedMotion });
   };
   render();
-  notifyBossDiscardTaken(sample, 0, acquired); render();
+  const beforePurchase = JSON.parse(JSON.stringify(sample.boss));
+  notifyBossPurchaseCompleted(sample, 0); render();
   const first = pulses, marked = [...root.querySelectorAll('.nemesis-grabbed')].map(node => node.dataset.cardId);
   const label = root.querySelector('.boss-card-status-nemesis')?.textContent;
-  render(); sample.boss = JSON.parse(JSON.stringify(sample.boss)); render();
+  render(); sample.boss = JSON.parse(JSON.stringify(sample.boss)); notifyBossPurchaseCompleted(sample, 0); render();
+  // Undo/reapply the same logical purchase must not replay its presentation.
+  sample.boss = beforePurchase; notifyBossPurchaseCompleted(sample, 0); render();
   const repeat = pulses;
   const reloadedRoot = root.cloneNode(true);
   reloadedRoot.querySelectorAll('.nemesis-infection-overlay').forEach(node => { node.animate = () => { pulses++; }; });

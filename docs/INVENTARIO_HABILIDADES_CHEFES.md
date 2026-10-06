@@ -1,12 +1,12 @@
 # Inventário atual de habilidades dos chefes
 
 
-**Atualizado em 05/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do catálogo do Laboratório de Chefes.**
+**Atualizado em 06/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do catálogo do Laboratório de Chefes, incluindo a revisão experimental de durabilidade do Nemesis.**
 
 
 Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
 
-**Regra permanente:** cumprir objetivos não reduz a condição especial do chefe; evita a punição. Sucessos não descontam falhas de outros objetivos. Alívio por canastra e gastos próprios do chefe por vantagem permanecem. Nenhum valor de falha, peso, HP ou fase foi rebalanceado. Correções auditadas em `REVISAO_OBJETIVOS_CHEFES.md`.
+**Regra permanente:** cumprir objetivos não reduz a condição especial do chefe; evita a punição. Sucessos não descontam falhas de outros objetivos. Alívio por canastra e gastos próprios do chefe por vantagem permanecem. Correções auditadas em `REVISAO_OBJETIVOS_CHEFES.md`. Na revisão experimental posterior, foram alterados os HPs do Nemesis e dos zumbis e a passiva do Agarrador, conforme `BALANCEAMENTO_NEMESIS.md`; pesos, punições, Infecção, fases e demais chefes não foram alterados nessa revisão.
 
 
 ### Regra de apresentação no HUD
@@ -170,7 +170,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Revisão de 06/10/2026:** objetivos de jogo/descarte escolhem marcas com rota real de jogo via `findNemesisLegalPlan`; Barragem comprova uso conjunto de duas e Extermínio contribuição + segunda carta jogável. Descarte continua válido depois da marcação; objetivo impossível é inelegível. INVADINDO sem HP/alvo; retrato principal seleciona Nemesis; ajuda/chips não mudam o alvo. Chips mostram totais 1/2/3, +2/+4/+6 e 40/70/100, com explicação específica de Mutado/Reforçado e duração inclusiva até o fim da rodada seguinte. Lixo protegido segue a regra geral do modo Chefe descrita na seção 1.6 da documentação, sem mudanças aos outros modos ou números das habilidades.
 
-**HP:** 2600. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos F1/F2/F3: **1/2/3**. Aparecer como ameaça ≠ persistir ≠ cadáver.
+**HP:** 2200. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos F1/F2/F3: **1/2/3**. Aparecer como ameaça ≠ persistir ≠ cadáver.
 
 | Habilidade (`id`) | Fases | Peso | Funcionamento atual |
 |---|---|---:|---|
@@ -188,7 +188,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Lifecycle:** `absent → entering → repelled` no sucesso; `absent/repelled → entering → persistent → corpse` após falha e morte real. Repelido pode tentar entrar novamente. Somente persistente vivo tem passiva/seleção de dano. Saves antigos vivos/mortos migram sem reset de HP ou da batalha.
 
-**Zumbis persistentes:** Agarrador 350 HP, prende 1/2 cartas do Lixo (normal/Mutado) para jogo, não descarte; Infectado 300 HP, +2/+4 por falha positiva; Devorador 400 HP, cura 40/70 uma vez por turno ao contribuir 3+ cartas ao mesmo jogo. Horda soma seus bônus. Morte remove a passiva imediatamente, mantém cadáver e não alivia Infecção. F3 muta persistentes vivos, novas persistências e reanimados; não é habilidade sorteável. A falha de entrada do Infectado não recebe seu bônus retroativamente.
+**Zumbis persistentes:** Agarrador 220 HP, após compra do Monte ou Lixo prende até 1/2 cartas jogáveis da mão (normal/Mutado) para jogo, não descarte, até fim do turno do dono; Horda soma +1 (totais 1/2/3). Preserva uma rota legal completa de objetivo ativo, inclusive apoios; sem candidato seguro, não prende. Infectado 240 HP, +2/+4 por falha positiva; Devorador 260 HP, cura 40/70 uma vez por turno ao contribuir 3+ cartas ao mesmo jogo. Horda soma seus bônus. Morte remove a passiva imediatamente, mantém cadáver e não alivia Infecção. F3 muta persistentes vivos, novas persistências e reanimados; não é habilidade sorteável. A falha de entrada do Infectado não recebe seu bônus retroativamente. Reanimação: 110/120/130 HP, preservando quota e teto. Decisão: `BALANCEAMENTO_NEMESIS.md`.
 
 **Dano e alívio:** alvo escolhido antes da jogada entre Nemesis e zumbis vivos, inclusive no ataque final; não há transbordamento. Limpa/Real/Ás-a-Ás aliviam −4/−8/−12 no total incremental por jogo, mesmo atacando zumbi. Dano direto ao Nemesis troca S.T.A.R.S.; dano em zumbi não.
 

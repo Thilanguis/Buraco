@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { createActionGate } from '../js/game/match-control.js';
+import { notifyBossPurchaseCompleted, createBossState } from '../js/boss/boss-engine.js';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const start = app.indexOf('async function drawFromStock()');
@@ -28,7 +29,7 @@ function fixture({ partial = false, origin = true, cancel = false } = {}) {
     ensureMyTurn: () => true, isBossVaultDrawRequired: () => false,
     document: { querySelector: () => origin ? {} : null }, getRect: () => ({}),
     saveStateForUndo() {}, consumeBossExtraDraw: () => 0, ensureCardId() {},
-    currentPlayer: () => state.players[1], registerBossFinancedCards: () => null,
+    currentPlayer: () => state.players[1], registerBossFinancedCards: () => null, notifyBossPurchaseCompleted,
     deferBossVault: () => null, sortHand() {}, renderAll,
     cardElById: id => elements.get(id),
     flyRectToRect: async card => {
@@ -42,6 +43,30 @@ function fixture({ partial = false, origin = true, cancel = false } = {}) {
   vm.runInContext(source, context);
   return { context, state, pendingStockCardIds, elements, flights, commits: () => commits };
 }
+
+test('Nemesis: real human and BOT stock handlers apply one Grabber restriction before commit', async () => {
+  for (const bot of [false, true]) {
+    const f = fixture({ origin: false });
+    Object.assign(f.state, { mode: 'boss_nemesis', turnNumber: 9, boss: createBossState('nemesis', 123),
+      teams: [{ id: 0, melds: [] }], deadChunksTaken: [0] });
+    f.state.boss.combatEntities[0].status = 'persistent';
+    f.state.players[1].id = 1; f.state.players[1].teamId = 0;
+    f.state.players[1].hand = ['3','4','5','K'].map(rank => ({ id: 'old-' + rank, rank, suit: '♥' }));
+    f.state.stock = [{ id: 'new-card', rank: 'Q', suit: '♠' }];
+    if (bot) {
+      const start = app.indexOf('  async executeDrawStock(');
+      Object.assign(f.context, { getBossVault: () => null });
+      vm.runInContext(`this.engine = { ${app.slice(start, app.indexOf('\n  },', start) + 5)} };`, f.context);
+      Object.assign(f.context.engine, { getState: () => f.state, commitState: f.context.commitState });
+      await f.context.engine.executeDrawStock(1);
+    } else await f.context.drawFromStock();
+    assert.equal(f.state.hasDrawnThisTurn, true);
+    assert.equal(f.state.boss.grabbedByPlayer[1].cardIds.length, 1);
+    assert.ok(f.state.boss.grabbedByPlayer[1].cardIds[0].startsWith('old-'));
+    assert.equal(f.state.boss.eventLog.filter(e => e.type === 'nemesisGrab').length, 1);
+    assert.equal(f.commits(), 1);
+  }
+});
 
 test('compra dupla revela cada carta somente depois do seu voo, mesmo com rerender', async () => {
   const f = fixture();

@@ -77,6 +77,7 @@ import {
   prepareBossVaultTurn,
   normalizeBossState,
   notifyBossDiscardTaken,
+  notifyBossPurchaseCompleted,
   notifyBossCardDiscarded,
   reclaimBossVault,
   shouldBossBotReclaimVault,
@@ -3199,6 +3200,7 @@ async function autoPlayTimeoutOnce() {
   }
 
   if (actionDraw) {
+    notifyBossPurchaseCompleted(state, currentPlayer().id);
     state.lastAction = actionDraw;
     ignoreOwnActionId = actionDraw.id;
     await commitState();
@@ -3940,6 +3942,7 @@ async function drawFromStockOnce() {
   sortHand(currentPlayer().hand);
   state.hasDrawnThisTurn = true;
   state.partialDraw = false; // Finalizou as compras
+  notifyBossPurchaseCompleted(state, currentPlayer().id);
   window.isStealModeActive = false; // 👁️ Desativa a visão se tiver comprado do monte
 
   if (!state.boughtCardIds) state.boughtCardIds = [];
@@ -4358,6 +4361,7 @@ async function drawFromDiscardOnce(options = {}) {
       cardOriginsById,
       suppressDominatrixResistance: bossPreparation.event?.type === 'interdictDecision' && bossPreparation.event?.decision === 'disobey',
     });
+    notifyBossPurchaseCompleted(state, me.id);
     if (state.finished) return;
 
     const friendDraw = domReward?.friendBonus ? playDominationFriendSharedDraw(domReward.friendBonus) : Promise.resolve();
@@ -4441,6 +4445,8 @@ async function drawFromDiscardOnce(options = {}) {
   const bossExtraCards = await drawBossTurnExtras(me);
   if (state.finished) return;
   const vaultInterestEvent = deferBossVault(state, me.id);
+
+  notifyBossPurchaseCompleted(state, me.id);
 
   if (!state.boughtCardIds) state.boughtCardIds = [];
   pile.forEach((c) => state.boughtCardIds.push(c.id));
@@ -11274,6 +11280,7 @@ const botEngine = {
     s.partialDraw = false;
 
     const freshS = this.getState();
+    notifyBossPurchaseCompleted(s, me.id);
     if (freshS && drawnCards.length > 0) {
       freshS.lastAction = {
         id: newActionId(),
@@ -11471,6 +11478,7 @@ const botEngine = {
     s.pickedDiscardCardId = null;
 
     const tookDead = domReward?.tookDead || (await this._checkBotMortoOrWin(botIndex));
+    notifyBossPurchaseCompleted(s, me.id);
 
     const freshS = this.getState();
     if (freshS) {

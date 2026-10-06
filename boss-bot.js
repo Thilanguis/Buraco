@@ -973,6 +973,10 @@ export class BossBuracoBot {
   }
 
   static canMeldSafely(me, team, cardsToUse, engine, pendingMeld = null, ctx = null) {
+    // Temporary play restrictions apply to every route, including generic
+    // extensions, worker candidates and panic dump. Discard remains separate.
+    if (engine.getState?.()?.mode === 'boss_nemesis' && pendingMeld?.some(card => me.hand.some(held => held.id === card?.id)
+      && engine.isCardBlocked?.(me.id, card.id, 'play'))) return false;
     const cardsLeft = me.hand.length - cardsToUse;
 
     if (cardsLeft > 1) return true;

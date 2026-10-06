@@ -4,7 +4,7 @@
 ## Status da documentação
 
 
-**Versão revisada contra o código atual — 05/10/2026.**
+**Revisada contra o workspace local atual — 06/10/2026, incluindo a revisão experimental de durabilidade do Nemesis e a decisão final de ajuda opcional do Lixo.**
 
 **Regra permanente de objetivos:** cumprir uma habilidade nunca reduz Dívida, Dominação, Flores, Sede, Mundo do Espelho ou Infecção. O sucesso evita sua punição; a falha mantém a punição aprovada. Sucessos parciais não descontam falhas de outros objetivos. Canastras continuam concedendo todo o alívio aprovado. Gastos do próprio chefe por cura/renascimento são outra categoria e permanecem. Custos positivos de escolhas/obediência não foram rebalanceados nesta revisão. Auditoria detalhada: `REVISAO_OBJETIVOS_CHEFES.md`.
 
@@ -214,7 +214,7 @@ Vale para todos os chefes; Buraco normal e Dominação permanecem inalterados. A
 
 `quoteBossDiscardPickup()` é a consulta compartilhada pelo jogador, BOT e planejamento de Zona Contaminada. Reutiliza `isValidBossSequence()`; o papel natural do 2 é consultado com `forceNatural` no validador oficial, nunca pela ordem visual do array. 2–3–4 e 3–4–2 têm a mesma classificação. Não existe um detector paralelo de sequência.
 
-Antes da retirada, exibir `Retirada protegida · 1 carta` ou `Retirada completa · X cartas`. Custos, limites e cálculo de mão final consideram somente as cartas efetivamente adquiridas. Tentativa inválida não move cartas; snapshot/reload não permite retirar novamente no mesmo turno. O BOT não utiliza a compra aberta sem destino no modo Chefe.
+Somente o pequeno `?` junto ao Lixo explica a regra; não exibir aviso extra durante seleção, escolha do destino, confirmação ou compra. Custos, limites e cálculo de mão final consideram somente as cartas efetivamente adquiridas. Tentativa inválida não move cartas; snapshot/reload não permite retirar novamente no mesmo turno. O BOT não utiliza a compra aberta sem destino no modo Chefe.
 
 Consulta opcional: um `?` pequeno junto ao contador do Lixo aparece somente no modo Chefe e abre o popover oficial **Lixo — Modo Chefe**, resumindo as seis regras acima. Não acrescenta avisos à seleção/destino/confirmação nem tutorial permanente. Mouse, toque e teclado funcionam sem disparar a retirada; a ajuda continua consultável quando a compra está bloqueada e é removida ao sair do modo Chefe. O popover respeita viewport/scroll/resize, inclusive antes de existir habilidade ativa.
 
@@ -2614,15 +2614,15 @@ Em touch, tablet e `prefers-reduced-motion`:
 # 13. Comparação dos chefes
 
 
-| Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu | Rainha Nehelenia |
-|---|---|---|---|---|---|
-| HP | 2650 | 2600 | 2000 | 2300 | 2400 |
-| Perigo | Dívida coletiva | Dominação individual | Florescimento | Sede de Sangue | Mundo do Espelho (0–100) |
-| Derrota especial | Dívida 100 | ambos em 50/50 de Dominação | 5 Flores | Sede 100 | 5 Espelhos |
-| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas |
-| Recuperação da equipe | redução de Dívida | Dominação -4/-8/-12 | poda por evolução | redução de Sede por canastra | Mundo do Espelho -4/-8/-12 |
-| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Dominação e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo |
-| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim | Jogo Espelhado, Laço do Tigre, Presa Marcada e Vigilância |
+| Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu | Rainha Nehelenia | Nemesis |
+|---|---|---|---|---|---|---|
+| HP | 2650 | 2600 | 2000 | 2300 | 2400 | 2200 |
+| Perigo | Dívida coletiva | Dominação individual | Florescimento | Sede de Sangue | Mundo do Espelho (0–100) | Infecção (0–100) |
+| Derrota especial | Dívida 100 | ambos em 50/50 de Dominação | 5 Flores | Sede 100 | 5 Espelhos | Infecção 100 |
+| Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas | Infecção, zumbis persistentes e redirecionamento de dano |
+| Recuperação da equipe | redução de Dívida | Dominação -4/-8/-12 | poda por evolução | redução de Sede por canastra | Mundo do Espelho -4/-8/-12 | Infecção -4/-8/-12 por canastra |
+| Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Dominação e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo | Zona Contaminada e Agarrador após compra |
+| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim | Jogo Espelhado, Laço do Tigre, Presa Marcada e Vigilância | Caçada, Tentáculos, Lança-Foguetes e Devorador |
 
 
 ---
@@ -2918,7 +2918,9 @@ Novas habilidades da Nehelenia devem priorizar **enganação visual, memória, l
 ---
 
 
-## Balanceamento experimental — Dominação e Mundo do Espelho (2026-10-03)
+## Balanceamento experimental — memória dos chefes
+
+Os registros de Dominação e Mundo do Espelho abaixo começaram em 03/10/2026; as revisões posteriores são identificadas por data.
 
 
 ### Régua comum de pressão
@@ -2953,6 +2955,12 @@ Pressões de teste: Jogo Espelhado erro/ignorar +18; Siga o Reflexo falha +16; E
 
 
 O HUD mostra o preenchimento parcial da Dominação/Espelhos e o progresso numérico para tornar o risco legível.
+
+### Nemesis — revisão experimental de 06/10/2026
+
+Durabilidade atual para teste: **Nemesis 2200 / Agarrador 220 / Infectado 240 / Devorador 260 HP**. Agarrador restringe cartas jogáveis da mão após a compra de cada jogador, do Monte ou do Lixo. Pesos, punições, Infecção e demais chefes foram mantidos. Decisão completa: [BALANCEAMENTO_NEMESIS.md](BALANCEAMENTO_NEMESIS.md).
+
+A estimativa de **~68,9%** é histórica, anterior à regra global do Lixo e a este rebalanceamento; não representa win rate atual. Não há novo percentual validado. A recalibração depende de testes de jogo, simulação ou telemetria posteriores.
 ---
 
 ## Correções técnicas — Laboratório da Ordem Final e Amigas da Dominação (04/10/2026)
@@ -2981,7 +2989,7 @@ A decoração é aplicada depois de renderizar a face, para não ser apagada por
 
 ## 16.1 Regra funcional
 
-Nemesis começa com **2600 HP** e **Infecção 0/100**. Usa os gatilhos e o fluxo de fases compartilhados do modo Chefe, sem progressão paralela. Chegar a **100 de Infecção encerra a batalha imediatamente**, inclusive por pegar o Lixo ou alimentar uma Zona de Impacto. Uma redução posterior na mesma ação não desfaz uma derrota já confirmada.
+Nemesis começa com **2200 HP** e **Infecção 0/100**. Usa os gatilhos e o fluxo de fases compartilhados do modo Chefe, sem progressão paralela. Chegar a **100 de Infecção encerra a batalha imediatamente**, inclusive por pegar o Lixo ou alimentar uma Zona de Impacto. Uma redução posterior na mesma ação não desfaz uma derrota já confirmada.
 
 A partida começa **sem zumbis ativos**. Os três zumbis só tentam entrar pela **Invasão da Horda**. Aparecer como ameaça não significa persistir: durante a entrada não há passiva nem alvo de dano. A falha deixa o zumbi persistente com HP máximo; sucesso o repele, sem Infecção extra e sem produzir cadáver.
 
@@ -2993,11 +3001,13 @@ Passivas somente de persistentes vivos:
 
 | Zumbi | HP máximo | Passiva vivo | Mutado na F3 |
 |---|---:|---|---|
-| Agarrador | 350 | Ao pegar o Lixo, prende 1 carta adquirida na mão: não pode entrar em jogo nesse turno, mas pode ser descartada. | Prende 2 cartas. |
-| Infectado | 300 | Cada falha que normalmente gera Infecção recebe +2, uma vez por evento. | +4 por falha. |
-| Devorador | 400 | Na primeira contribuição de 3+ cartas ao mesmo jogo por turno, Nemesis cura até 40 HP. | Cura até 70 HP. |
+| Agarrador | 220 | Após compra do Monte ou Lixo, prende até 1 carta jogável da mão: não pode entrar em jogo nesse turno, mas pode ser descartada. | Até 2 cartas; Reforçado soma +1 (máximo 3). |
+| Infectado | 240 | Cada falha que normalmente gera Infecção recebe +2, uma vez por evento. | +4 por falha. |
+| Devorador | 260 | Na primeira contribuição de 3+ cartas ao mesmo jogo por turno, Nemesis cura até 40 HP. | Cura até 70 HP. |
 
-No Buraco Fechado, o topo do Lixo utilizado obrigatoriamente na jogada de compra não fica Agarrado: a passiva seleciona as cartas restantes efetivamente adquiridas para a mão. Se houver menos cartas elegíveis, prende apenas as disponíveis. As travas terminam no fim do turno do dono; matar o Agarrador desativa imediatamente também as travas ainda registradas.
+No Buraco Fechado, a restrição acontece depois da jogada obrigatória da compra: o topo já na mesa não fica Agarrado. A seleção seeded considera toda a mão restante com uso legal real, não apenas as cartas adquiridas. Preserva uma solução completa do objetivo ativo (marca, apoios e descarte final), inclusive a Invasão cooperativa. Se houver menos candidatos seguros, prende apenas os disponíveis; sem candidato, não inventa punição. As travas terminam no fim do turno do dono; matar o Agarrador desativa imediatamente também as travas ainda registradas. Reload/snapshot/undo não repetem aplicação/pulso. O BOT consulta o bloqueio canônico antes de qualquer meld; descarte segue livre.
+
+A migração mantém HP restante abaixo dos novos máximos, limitando apenas valores acima deles, sem reiniciar a batalha ou restaurar HP perdido. Reanimação usa metade dos máximos atuais: Agarrador 110, Infectado 120, Devorador 130; quota, teto e retorno Mutado na F3 permanecem. Decisão de balanceamento: `BALANCEAMENTO_NEMESIS.md`.
 
 Ao morrer, o zumbi perde sua passiva imediatamente, fica como cadáver no estado e deixa de aparecer nas escolhas de ataque. **Não há transbordamento de dano nem alívio de Infecção pela morte**. Cadáveres continuam visíveis para a Reanimação Viral.
 
@@ -3051,7 +3061,7 @@ Revisão de UX/objetivos de 06/10/2026: INVADINDO não mostra HP de combate nem 
 
 Objetivos de usar ou descartar são preparados a partir de uma rota real de jogo com `findNemesisLegalPlan()`: Agarrador escolhe uma carta jogável; Tentáculo escolhe duas alternativas jogáveis; Barragem escolhe três marcas com solução conjunta para pelo menos duas; Extermínio exige contribuição e uma segunda carta realmente jogável. Depois da marcação, o descarte continua contando. Sem plano viável, a habilidade é inelegível e usa o fallback normal, sem mudar punições/Infecção.
 
-Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados. O único teste antigo ajustado é a expectativa obsoleta da Prisão no Espelho, não sua regra atual.
+Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. Registro histórico da revisão de UX anterior: HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados naquela rodada; somente a expectativa obsoleta da Prisão no Espelho foi ajustada. A revisão posterior de durabilidade desta seção passa o HP do Nemesis a 2200, sem alterar as demais regras.
 
 Teste manual simultâneo em dois clientes reais ainda é necessário para confirmar o transporte Firebase, o layout completo da mesa e o balanceamento. A matriz automatizada e os resultados estão em `docs/NEMESIS_IMPLEMENTACAO.md`.
 # Regra global de recuperação da condição especial

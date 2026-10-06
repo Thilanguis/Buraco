@@ -11,10 +11,10 @@ function hordeCommandPresentation(boss, intent) {
   const expiresRound = active ? boss.hordeBuff.expiresRound : boss.roundNumber + 1;
   const effect = getNemesisZombieEffect(active ? boss : { ...boss, hordeBuff: { entityId: entity.id, expiresRound } }, entity);
   const instruction = `${entity.name}${active ? ' reforçado' : ': reforço'} até fim da rodada ${expiresRound}.`;
-  const consequence = entity.id === 'grabber' ? `Lixo: até ${effect.value} cartas presas para jogo.`
+  const consequence = entity.id === 'grabber' ? `Após compra: até ${effect.value} cartas presas.`
     : entity.id === 'infected' ? `Falha: +${effect.value} Infecção extra.`
       : `3+ cartas no mesmo jogo: cura até ${effect.value} HP.`;
-  const rule = entity.id === 'grabber' ? 'As cartas presas não podem entrar em jogo neste turno; podem ser descartadas. O topo usado direto na mesa fica livre.'
+  const rule = entity.id === 'grabber' ? 'Após a compra de cada jogador, prende cartas jogáveis da mão até o fim do turno. Não podem entrar em jogo; podem ser descartadas. Preserva uma solução dos objetivos.'
     : entity.id === 'infected' ? 'Uma falha que já aumenta Infecção recebe esse adicional uma vez. Falhar na Invasão não gera esse bônus.'
       : 'Sua primeira contribuição de 3 ou mais cartas ao mesmo jogo no turno cura o Nemesis. Uma vez por turno, sem ultrapassar o HP máximo.';
   return { instruction, consequence, help: `${instruction}\n${consequence}\n${rule}\nSó ${entity.name} recebe este reforço.` };

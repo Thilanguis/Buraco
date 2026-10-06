@@ -1,6 +1,6 @@
 # Lixo protegido e UX do Nemesis — 06/10/2026
 
-Fonte de verdade: workspace local atual. Nenhuma operação no Google Drive, commit ou deploy. Alterações de artes Resident Evil surgidas paralelamente no workspace foram preservadas e não fazem parte deste patch.
+Fonte de verdade: workspace local atual. Limpeza documental pós-rebalanceamento em 06/10/2026. As regras finais abaixo continuam correntes; arquivos, alterações e resultados de testes da revisão original são registros históricos, não uma nova execução ou especificação anterior de HP. Nenhuma operação no Google Drive, commit ou deploy. Alterações de artes Resident Evil surgidas paralelamente no workspace foram preservadas e não fazem parte do patch original.
 
 ## Regra final do Lixo
 
@@ -15,7 +15,7 @@ Somente modo Chefe, para todos os seis chefes. Outros modos permanecem inalterad
 | 2 coringa / jogo novo pela mão | 1 |
 | 2 natural / jogo novo pela mão | Lixo inteiro |
 
-A escolha oficial do Fechado foi preservada. Um encaixe público alternativo não restringe um jogo novo escolhido pelo jogador. Feedback antes de consumir: `Retirada protegida · 1 carta` / `Retirada completa · X cartas`.
+A escolha oficial do Fechado foi preservada. Um encaixe público alternativo não restringe um jogo novo escolhido pelo jogador. Decisão final de apresentação: somente o pequeno `?` ao lado do Lixo explica a regra; sem aviso extra durante seleção, escolha do destino, confirmação ou compra.
 
 Validação reutilizada: `isValidBossSequence()`, incluindo seus flags oficiais `forceNatural`/`forceWild`. `isBossCardNaturalInSequence()` consulta esse mesmo validador com o topo na função natural; não implementa uma segunda regra de sequência nem usa posição visual. A consulta não altera cartas/flags. 2–3–4 e 3–4–2 são equivalentes.
 
@@ -23,7 +23,7 @@ Validação reutilizada: `isValidBossSequence()`, incluindo seus flags oficiais 
 
 ## Nemesis
 
-- INVADINDO: chip/ajuda de expulsão, sem HP de combate nem seleção. Lifecycle, HP e resolução preservados.
+- INVADINDO: chip/ajuda de expulsão, sem HP de combate nem seleção. Lifecycle e resolução preservados.
 - Retrato principal clicável e acessível por teclado seleciona `boss` quando permitido. Chips/ajuda não selecionam nem persistem mudança de alvo.
 - Chips mostram o efeito final calculado pelo mesmo helper usado na passiva: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado: 2/4/70.
 - MUTADO e REFORÇADO explicam mudanças separadas; reforço informa a rodada final inclusiva. Comando continua apenas persistent vivo, até `roundNumber + 1`, sem mudança de duração.
@@ -32,9 +32,11 @@ Validação reutilizada: `isValidBossSequence()`, incluindo seus flags oficiais 
 - AGARRADA pulsa uma vez por evento novo. O pulso pausa durante o voo de compra e continua quando a carta aparece; não reinicia. Rerender/reload/snapshot/undo não repetem; marca permanece até expirar e redução de movimento deixa apenas a marca estática.
 - Agarrador/Tentáculo/Barragem/Extermínio escolhem marcas com rota real de jogo por `findNemesisLegalPlan()`. Barragem comprova duas saídas utilizáveis em conjunto; Extermínio comprova contribuição e segunda carta utilizável. Descarte continua contando depois da marcação. Sem plano viável: inelegibilidade/fallback normal.
 
-Nenhuma mudança aos números de HP, Infecção, punições, pesos, fases, cura, alívio por canastra, S.T.A.R.S., overflow, mutação ou reanimação. Nenhuma regra aprovada dos outros chefes foi revertida.
+**Estado atual pós-rebalanceamento:** Nemesis 2200 HP, Agarrador 220, Infectado 240 e Devorador 260. A passiva do Agarrador considera cartas jogáveis da mão após compra do Monte ou Lixo, bloqueando jogo, não descarte, até o fim do turno; Normal 1, Mutado 2, Reforçado +1, ambos 3. Referência: `BALANCEAMENTO_NEMESIS.md`.
 
-## Arquivos de produção alterados
+**Registro histórico da revisão original de Lixo/UX, anterior ao rebalanceamento:** aquela rodada não mudou HP, Infecção, punições, pesos, fases, cura, alívio por canastra, S.T.A.R.S., overflow, mutação ou reanimação. A afirmação de HP preservado pertence apenas àquela rodada; os máximos atuais são os listados acima. Nenhuma regra aprovada dos outros chefes foi revertida.
+
+## Histórico — arquivos de produção alterados na revisão original
 
 - `app.js`: retirada humano/BOT, quantidade real, retrato/chips oficiais, pulso durante voo e conexão da apresentação da mão.
 - `boss-bot.js`: avaliação usa a quantidade cotada; modo Chefe não tenta compra aberta.
@@ -46,7 +48,7 @@ Nenhuma mudança aos números de HP, Infecção, punições, pesos, fases, cura,
 
 Sem novos assets/dependências. Service Worker/cache preservados; não houve publicação.
 
-## Testes e documentação
+## Histórico — testes e documentação da revisão original
 
 Testes adicionados/atualizados: `boss-discard-rule.test.mjs` (matriz de oito casos nos seis chefes), `discard-pickup.test.mjs` (handlers reais humano/BOT, destino, bloqueio, mão final, snapshot e voo), `nemesis-boss.test.mjs` (marcas realmente jogáveis, descarte e chips), `nemesis-ui.browser.mjs` (renderer real, teclado, permissões, pulso, ajuda e geometria), `boss-integration.test.mjs` e `domination-balance.test.mjs` (expectativa da quantidade real/dependência importada na VM).
 
@@ -61,7 +63,7 @@ Documentos atualizados: `DOCUMENTACAO_CHEFE_DA_MESA.md`, `NEMESIS_IMPLEMENTACAO.
 
 Limites da validação: browser usa fixture local com renderer/handlers reais, não uma partida completa em dois clientes Firebase autenticados. Avaliação de balanceamento e desempenho de partida inteira continua sendo uma etapa de teste de jogo; não foi simulada por estes resultados.
 
-## Complemento: ajuda opcional do Lixo
+## Histórico do complemento — ajuda opcional do Lixo (decisão vigente)
 
 Adicionado `?` pequeno junto ao contador, exclusivamente no modo Chefe. Reutiliza botão/popover/âncora oficiais; texto curto contém jogo existente/novo, Joker e as três situações do 2. Sem avisos novos na seleção, escolha ou confirmação; nenhum ajuste às mecânicas. Clique/toque não propagam para a compra, teclado funciona e a ajuda permanece acessível com compra bloqueada. Remover o modo remove também o controle e fecha sua ajuda.
 
@@ -69,7 +71,7 @@ Arquivos deste complemento: `app.js`, `styles/boss-mode.css`, `tests/nemesis-ui.
 
 Validação do complemento: **819/819** na suíte ampla, sem falhas/skip/todo. Browser passou nos mesmos cinco viewports, com mouse/Enter/Escape, consulta com retirada bloqueada, saída do modo, ausência de duplicação e página adicional com toque real em 390×844. Captura mobile revisada. Sem commit/deploy/cache novo.
 
-## Correção do excesso de destaque nas cartas
+## Histórico — correção do excesso de destaque nas cartas
 
 Removidos os contornos/glows extras aplicados simultaneamente à pilha e à face do Lixo. Eles se acumulavam com a marca compartilhada da carta. Mantidos os detalhes e a espessura originais do overlay MARCADA/AGARRADA/CONTAMINADA; o pulso de aquisição agora varia apenas a opacidade, sem expandir o brilho. Nenhuma mudança de regras, seleção ou balanceamento.
 

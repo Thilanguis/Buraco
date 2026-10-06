@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
 import { isDominationDiscardDecreeActive } from '../js/game/domination-decree.js';
-import { isValidBossSequence, isBossMode, quoteBossDiscardPickup, createBossState, normalizeBossState, validateBossClosedDiscardSelection, isBossCardBlocked } from '../js/boss/boss-engine.js';
+import { isValidBossSequence, isBossMode, quoteBossDiscardPickup, createBossState, normalizeBossState, validateBossClosedDiscardSelection, isBossCardBlocked, notifyBossPurchaseCompleted } from '../js/boss/boss-engine.js';
 import { animateDiscardTransfer } from '../js/game/discard-presentation.js';
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 function fn(name) {
@@ -31,7 +31,7 @@ function fixture(mode = '1x1_duploMorto', variant = 'fechado') {
     confirmBossDiscardPickup: () => ({ allowed: true }), saveStateForUndo() {},
     classifyMeldForUi: () => ({ kind: 'simple' }), classifyMeldPreview: () => ({ kind: 'simple' }),
     prepareBossMeldMutation: async () => ({ allowed: true }),
-    notifyBossDiscardTaken() {}, sortHand() {}, optimizeMeld() {}, normalizeMeldOrder() {}, autoSwapWildWhenFillingGap() {},
+    notifyBossDiscardTaken() {}, notifyBossPurchaseCompleted, sortHand() {}, optimizeMeld() {}, normalizeMeldOrder() {}, autoSwapWildWhenFillingGap() {},
     drawBossTurnExtras: async () => [], deferBossVault: () => null,
     processDominationReward: async () => null, processBossMeldChange: async () => null, checkPostMeldStatus: async () => null,
     renderAll() {}, renderHand() {}, renderMelds() {}, resetTurnTimer() {},
@@ -106,7 +106,34 @@ test('modo Chefe: jogador e BOT retiram o mesmo conjunto, sem duplicar após sna
     assert.equal(f.state.discard.length, 2 - count);
     assert.equal(f.state.players[1].hand.some(card => card.id === lowerId), count === 2);
     assert.equal(f.state.stock.length, 1);
-    assert.ok(f.messages.some(message => message === (count === 1 ? 'Retirada protegida · 1 carta' : 'Retirada completa · 2 cartas')));
+    assert.equal(f.messages.some(message => message.startsWith('Retirada protegida') || message.startsWith('Retirada completa')), false);
+    assert.equal(f.commits.length, 1);
+  }
+});
+
+test('Nemesis: real human/BOT closed pickup applies Grabber to the old hand after the mandatory top meld', async () => {
+  for (const bot of [false, true]) {
+    const f = fixture('boss_nemesis'); f.state.boss = createBossState('nemesis', 123);
+    f.state.boss.combatEntities[0].status = 'persistent';
+    f.state.teams[1].melds = [cards(['4','5','6'])];
+    f.state.players[1].hand.push(...cards(['9'])); // A legal trio still leaves a legal discard without Morto/canastra.
+    const topId = f.state.discard.at(-1).id, oldHand = f.state.players[1].hand.map(c => c.id);
+    Object.assign(f.context, { isCurrentBossMode: () => true, validateBossClosedDiscardSelection, isBossCardBlocked,
+      getBossVault: () => null, shouldBossBotReclaimVault: () => false, waitForDominationDecreeReaction: async () => {},
+      getBossNaturePriorities: () => null, consumeBossExtraDraw: () => 0, registerBossFinancedCards: () => null });
+    if (bot) {
+      const start = app.indexOf('  async executeDrawDiscardFechado(');
+      vm.runInContext(`this.engine = { ${app.slice(start, app.indexOf('\n  },', start) + 5)} };`, f.context);
+      Object.assign(f.context.engine, { getState: () => f.state, commitState: async () => f.commits.push(f.state.lastAction),
+        evaluateBossMeldMutation: async () => true, acceptBossDiscardSurcharge: () => ({ allowed: true }),
+        normalizeMeld() {}, showMessage: text => f.messages.push(text), _checkBotMortoOrWin: async () => null });
+      assert.equal(await f.context.engine.executeDrawDiscardFechado(1, { action: 'extend', meldIndex: 0 }), true);
+    } else await f.context.drawFromDiscard();
+    assert.ok(f.state.teams[1].melds[0].some(c => c.id === topId));
+    const ids = f.state.boss.grabbedByPlayer[1].cardIds;
+    assert.equal(ids.length, 1); assert.ok(oldHand.includes(ids[0])); assert.ok(!ids.includes(topId));
+    assert.equal(isBossCardBlocked(f.state, 1, ids[0], 'discard'), false);
+    assert.equal(f.state.boss.eventLog.filter(e => e.type === 'nemesisGrab').length, 1);
     assert.equal(f.commits.length, 1);
   }
 });

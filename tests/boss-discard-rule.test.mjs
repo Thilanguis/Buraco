@@ -22,7 +22,7 @@ for (const boss of listBossDefinitions()) for (const [name, top, hand, melds, me
     const before = JSON.stringify(game);
     const quote = quoteBossDiscardPickup(game, 0, { meldIndex, handCardIds: hand.map(card => card.id) });
     assert.equal(quote.allowed, true); assert.equal(quote.count, count);
-    assert.equal(quote.message, count === 1 ? 'Retirada protegida · 1 carta' : 'Retirada completa · 2 cartas');
+    assert.equal(quote.message, '', 'successful pickup has no extra contextual warning; rule is available through ?');
     assert.equal(JSON.stringify(game), before, 'quote does not mutate cards, flags or state');
   });
 }

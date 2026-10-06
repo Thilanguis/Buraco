@@ -14,7 +14,7 @@ test('Comando da Horda explains only its reinforced zombie, with no progress bar
       const copy = nemesisBossPresentation.compactAction(context);
       assert.equal(copy.instruction, `${name} reforçado até fim da rodada 2.`);
       const value = mutation ? mutated : normal;
-      assert.equal(copy.consequence, id === 'grabber' ? `Lixo: até ${value} cartas presas para jogo.` : id === 'infected' ? `Falha: +${value} Infecção extra.` : `3+ cartas no mesmo jogo: cura até ${value} HP.`);
+      assert.equal(copy.consequence, id === 'grabber' ? `Após compra: até ${value} cartas presas.` : id === 'infected' ? `Falha: +${value} Infecção extra.` : `3+ cartas no mesmo jogo: cura até ${value} HP.`);
       assert.equal(nemesisBossPresentation.rangeMeters(context), null);
       const help = nemesisBossPresentation.help(context);
       assert.match(help, new RegExp(`Só ${name} recebe este reforço`));

@@ -1,4 +1,4 @@
-import { NEMESIS_ZOMBIES } from '../bosses/nemesis.js';
+import { NEMESIS_ZOMBIES, nemesisDefinition } from '../bosses/nemesis.js';
 import { createCombatEntities, normalizeCombatEntities, damageCombatEntity, healCombatEntity, reviveCombatEntity } from '../boss-combat.js';
 
 const persistent = (entry) => entry.status === 'persistent' && entry.hp > 0;
@@ -116,11 +116,14 @@ function entryPlayers(state) {
 
 // Prove a cooperative solution by applying the first player's legal plan to a
 // private preview, then validating the second plan against that resulting table.
-function teamEntryPlan(state, helpers, kind) {
+function teamEntryPlan(state, helpers, kind, progress = {}) {
   const players = entryPlayers(state);
   const satisfies = (plans) => kind === 'infected'
-    ? plans.flatMap((plan) => plan.playedCardIds).length >= 2
-    : new Set(plans.flatMap((plan) => plan.moves.filter((move) => move.meldIndex != null && move.meldIndex < state.teams[0].melds.length).map((move) => move.meldIndex))).size >= 2;
+    ? new Set([...(progress.contributionCardIds || []), ...plans.flatMap((plan) => plan.playedCardIds)]).size >= 2
+    : new Set([...(progress.fedMeldIds || []), ...plans.flatMap((plan) => plan.moves
+      .filter((move) => move.meldIndex != null && move.meldIndex < state.teams[0].melds.length)
+      .map((move) => helpers.meldId(0, move.meldIndex))
+      .filter((id) => !progress.entryMeldIds || progress.entryMeldIds.includes(id)))]).size >= 2;
   for (const player of players) {
     const plan = findNemesisLegalPlan(state, player, helpers, (candidate) => satisfies([candidate]));
     if (plan) return [{ ...plan, playerId: player.id }];
@@ -292,10 +295,18 @@ export function chooseNemesisDamageTarget(state, damage) {
 
 export const nemesisBossMechanics = Object.freeze({
   id: 'nemesis',
-  createState: () => ({ combatLifecycleVersion: 1, combatEntities: createCombatEntities(NEMESIS_ZOMBIES, { initialStatus: 'absent' }), lastRepelledZombieId: null, combatTargetsByPlayer: {}, starsPlayerId: null, grabbedByPlayer: {}, reanimationsByPhase: {}, infectionEventIds: [], devourerTurnIds: [], devourerHealingTotal: 0, hordeBuff: null, omegaBuff: null, impactZone: null }),
+  createState: () => ({ combatLifecycleVersion: 1, combatEntities: createCombatEntities(NEMESIS_ZOMBIES, { initialStatus: 'absent' }), lastRepelledZombieId: null, combatTargetsByPlayer: {}, starsPlayerId: null, grabbedByPlayer: {}, grabbedTurnIds: [], reanimationsByPhase: {}, infectionEventIds: [], devourerTurnIds: [], devourerHealingTotal: 0, hordeBuff: null, omegaBuff: null, impactZone: null }),
   normalize({ boss, gameState }) {
     normalizeCombatEntities(boss, NEMESIS_ZOMBIES, { lifecycle: true });
     boss.combatTargetsByPlayer ||= {}; boss.grabbedByPlayer ||= {}; boss.reanimationsByPhase ||= {};
+    boss.maxHp = nemesisDefinition.maxHp; boss.hp = Math.max(0, Math.min(boss.maxHp, boss.hp));
+    boss.grabbedTurnIds ||= [];
+    for (const [playerId, lock] of Object.entries(boss.grabbedByPlayer)) {
+      const key = turnKey(gameState, playerId);
+      if (lock.turnId && lock.turnId !== key) delete boss.grabbedByPlayer[playerId];
+      else if (!boss.grabbedTurnIds.includes(key)) boss.grabbedTurnIds.push(key);
+    }
+    if (!alive(boss, 'grabber')) boss.grabbedByPlayer = {};
     boss.infectionEventIds ||= []; boss.devourerTurnIds ||= [];
     boss.danger = Math.max(0, Math.min(100, Number(boss.danger) || 0));
     if (boss.starsPlayerId != null && !gameState.players.some((player) => player.id === boss.starsPlayerId)) boss.starsPlayerId = null;
@@ -336,7 +347,10 @@ export const nemesisBossMechanics = Object.freeze({
     // A stale target is rejected by the selector; if it dies between actions,
     // the next action safely defaults to boss (never spills the current hit).
     let hpDamage = 0;
-    if (entity) hpDamage = damageCombatEntity(entity, damage, sourceActionId);
+    if (entity) {
+      hpDamage = damageCombatEntity(entity, damage, sourceActionId);
+      if (entity.id === 'grabber' && entity.hp === 0) boss.grabbedByPlayer = {};
+    }
     else { hpDamage = Math.min(boss.hp, Math.max(0, damage)); boss.hp -= hpDamage; if (hpDamage && playerId != null) boss.starsPlayerId = playerId; }
     return { hpDamage, targetId: entity?.id || 'boss', absorbed: 0, reborn: false };
   },
@@ -348,19 +362,46 @@ export const nemesisBossMechanics = Object.freeze({
     return null;
   },
   cardBlockFeedback: () => ({ effect: 'nemesis-grabbed', reason: 'grabbed', message: 'Carta Agarrada: não pode entrar em jogo neste turno. O descarte continua permitido.' }),
-  onDiscardTaken({ boss, gameState, playerId, takenCards, recordBossEvent }) {
-    const events = []; const grabber = alive(boss, 'grabber');
-    if (grabber) {
-      const ids = new Set(hand(gameState, playerId).map((card) => card.id));
-      const count = getNemesisZombieEffect(boss, grabber).value;
-      // Closed-discard pickup calls this hook before the remaining pile enters
-      // the hand. Its last/top card is the mandatory immediate meld card.
-      const inHand = takenCards.filter((card) => ids.has(card.id));
-      const acquired = inHand.length ? inHand : takenCards.slice(0, -1);
-      const cardIds = acquired.slice(0, count).map((card) => card.id);
-      boss.grabbedByPlayer[playerId] = { cardIds, turnId: turnKey(gameState, playerId) };
-      events.push(recordBossEvent({ type: 'nemesisGrab', playerId, cardIds, turnId: turnKey(gameState, playerId), outcome: `${cardIds.length} carta(s) Agarrada(s) até o fim do turno.` }));
+  onPurchaseCompleted({ boss, gameState, playerId, helpers, recordBossEvent }) {
+    const grabber = alive(boss, 'grabber'), key = turnKey(gameState, playerId);
+    if (!grabber || boss.result || boss.grabbedTurnIds.includes(key)) return [];
+    boss.grabbedTurnIds.push(key);
+    if (boss.grabbedTurnIds.length > 100) boss.grabbedTurnIds.splice(0, boss.grabbedTurnIds.length - 100);
+    const player = gameState.players.find(entry => entry.id === playerId);
+    const intent = boss.currentIntent, payload = intent?.payload;
+    const protectedIds = new Set();
+    if (payload && !payload.resolved) {
+      // Keep a whole canonical solution, not just the named card: support cards
+      // and the legal final discard can also be the only route to success.
+      const priorities = this.botPriorities({ boss, gameState, playerId, helpers });
+      if (priorities?.active) {
+        if (!priorities.plan) player.hand.forEach(card => protectedIds.add(card.id));
+        else [...priorities.plan.playedCardIds, priorities.plan.discardCardId].filter(Boolean).forEach(id => protectedIds.add(id));
+        priorities.markedCardIds?.forEach(id => protectedIds.add(id));
+      }
+      if (intent.abilityId === 'horde_invasion' && payload.entryKind !== 'grabber') {
+        // Re-evaluate against the current table/progress, including the partner.
+        const plans = teamEntryPlan(gameState, helpers, payload.entryKind, payload);
+        if (!plans) player.hand.forEach(card => protectedIds.add(card.id));
+        for (const plan of plans || []) if (plan.playerId === playerId) {
+          [...plan.playedCardIds, plan.discardCardId].filter(Boolean).forEach(id => protectedIds.add(id));
+        }
+      }
     }
+    const count = getNemesisZombieEffect(boss, grabber).value, playableIds = new Set();
+    findNemesisLegalPlan(gameState, player, helpers, plan => {
+      plan.playedCardIds.forEach(id => playableIds.add(id));
+      return playableIds.size >= count + protectedIds.size;
+    });
+    const eligible = [...playableIds].filter(id => !protectedIds.has(id));
+    const offset = helpers.pickIndex(eligible.length);
+    const cardIds = [...eligible.slice(offset), ...eligible.slice(0, offset)].slice(0, count);
+    boss.grabbedByPlayer[playerId] = { cardIds, turnId: key };
+    if (!cardIds.length) return [];
+    return [recordBossEvent({ type: 'nemesisGrab', actionId: `nemesisGrab:${key}`, playerId, cardIds, turnId: key, outcome: `${cardIds.length} carta(s) Agarrada(s) até o fim do turno.` })];
+  },
+  onDiscardTaken({ boss, gameState, playerId, takenCards, recordBossEvent }) {
+    const events = [];
     const intent = boss.currentIntent;
     if (intent?.abilityId === 'contaminated_zone' && intent.payload.targetPlayerId === playerId) {
       const eventId = `${intent.id}:trash:${playerId}:${turnKey(gameState, playerId)}:${takenCards.map((card) => card.id).join(',')}`;

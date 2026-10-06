@@ -4,14 +4,14 @@ const passiveText = (boss, entity) => {
   if (entity.status === 'entering') return 'INVADINDO · cumpra o objetivo para expulsar';
   if (entity.status === 'repelled') return 'REPELIDO · ameaça expulsa';
   const buff = boss.hordeBuff?.entityId === entity.id && boss.roundNumber <= boss.hordeBuff.expiresRound;
-  if (entity.id === 'grabber') return `Lixo: prende ${(entity.mutated ? 2 : 1) + Number(buff)} carta(s)`;
+  if (entity.id === 'grabber') return `Após comprar: prende ${(entity.mutated ? 2 : 1) + Number(buff)} carta(s) da mão`;
   if (entity.id === 'infected') return `Falha: +${(entity.mutated ? 4 : 2) + (buff ? 2 : 0)} Infecção`;
   return `3+ cartas no mesmo jogo: cura ${(entity.mutated ? 70 : 40) + (buff ? 30 : 0)} HP, 1x/turno`;
 };
 const passiveHelp = (entity, reinforced) => {
-  const rule = entity.id === 'grabber' ? 'Lixo: prende 1 carta para jogo neste turno (Mutado: 2). Descartar é permitido.\nHorda: +1 (2 normal / 3 Mutado). Topo obrigatório do Fechado fica livre.'
+  const rule = entity.id === 'grabber' ? 'Após a compra de cada jogador: prende cartas jogáveis da mão até o fim do turno. Não podem entrar em jogo; podem ser descartadas.\nNormal: 1; Mutado: 2. Reforçado: +1 (2 normal / 3 Mutado). Preserva uma solução dos objetivos ativos.'
     : entity.id === 'infected' ? 'Falha com Infecção: +2 (Mutado: +4), uma vez por evento.\nHorda: +2 extra (total +4 normal / +6 Mutado). Falhar na invasão não gera Infecção.'
-      : 'Primeira contribuição de 3+ cartas ao mesmo jogo por turno: cura Nemesis 40 HP (Mutado: 70).\nHorda: +30 (70 normal / 100 Mutado). Teto: 2600 HP.';
+      : 'Primeira contribuição de 3+ cartas ao mesmo jogo por turno: cura Nemesis 40 HP (Mutado: 70).\nHorda: +30 (70 normal / 100 Mutado). Teto: HP máximo do Nemesis.';
   return `${rule} Passiva só com o zumbi ATIVO.${reinforced ? ' Reforço temporário ativo.' : ''}`;
 };
 function zombieChips(boss, entity, reinforced) {
@@ -19,9 +19,9 @@ function zombieChips(boss, entity, reinforced) {
   if (entity.status === 'corpse') return [{ label: 'CADÁVER', text: 'Foi derrotado. Pode voltar por Reanimação Viral; um repelido não é cadáver.' }];
   if (entity.status !== 'persistent' || entity.hp <= 0) return [];
   const effect = getNemesisZombieEffect(boss, entity);
-  const rule = entity.id === 'grabber' ? `Ao retirar o Lixo, agarra até ${effect.value} cartas que vierem para sua mão. O topo usado imediatamente no jogo fica livre.\nNão podem entrar em jogo neste turno; ainda podem ser descartadas. Libera no fim do seu turno ou ao matar o Agarrador.`
+  const rule = entity.id === 'grabber' ? `Após sua compra do Monte ou Lixo: prende até ${effect.value} cartas jogáveis da mão, preservando uma solução dos objetivos.\nNão podem entrar em jogo; podem ser descartadas. Libera no fim do turno ou ao matar o Agarrador.`
     : entity.id === 'infected' ? `Uma falha que aumenta Infecção recebe +${effect.value}, uma vez por evento.\nFalha na invasão não gera esse bônus.`
-      : `Sua primeira contribuição de 3+ cartas ao mesmo jogo no turno cura Nemesis até ${effect.value} HP.\nUma vez por turno; não ultrapassa 2600 HP.`;
+      : `Sua primeira contribuição de 3+ cartas ao mesmo jogo no turno cura Nemesis até ${effect.value} HP.\nUma vez por turno; não ultrapassa o HP máximo do Nemesis.`;
   return [
     { label: 'ATIVO', text: 'Está na mesa: passiva ativa e pode receber dano. Toque na arte para escolhê-lo como alvo.' },
     ...(entity.mutated ? [{ label: 'MUTADO', text: `Mutação da fase 3: ${entity.id === 'grabber' ? 'cartas agarradas' : entity.id === 'infected' ? 'bônus de Infecção por falha' : 'cura por contribuição'} passa de ${effect.normal} para ${effect.mutated}.\nComando da Horda soma seu reforço à parte.` }] : []),

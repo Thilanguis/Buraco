@@ -3,7 +3,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
 import { isDominationDiscardDecreeActive } from '../js/game/domination-decree.js';
-import { isBossMode } from '../js/boss/boss-engine.js';
+import { isBossMode, notifyBossPurchaseCompleted } from '../js/boss/boss-engine.js';
 import { readFileSync } from 'node:fs';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
@@ -37,7 +37,7 @@ function sandbox(state) {
     processDominationReward: async () => null, processBossMeldChange: async () => null, checkPostMeldStatus: async () => null,
     packCard: c => ({ ...c }), newActionId: () => 'pickup', commitState: async () => {},
     getBossVault: () => null, consumeBossExtraDraw: () => 0, registerBossFinancedCards: () => null,
-    getBossNaturePriorities: () => null,
+    getBossNaturePriorities: () => null, notifyBossPurchaseCompleted,
     ...Object.fromEntries(['showMessage', 'ensureCardId', 'saveStateForUndo', 'notifyBossDiscardTaken', 'optimizeMeld',
       'normalizeMeldOrder', 'autoSwapWildWhenFillingGap', 'sortHand', 'renderAll', 'renderHand', 'resetTurnTimer'].map(name => [name, noop])),
   });

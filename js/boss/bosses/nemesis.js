@@ -1,7 +1,7 @@
 export const NEMESIS_ZOMBIES = Object.freeze([
-  Object.freeze({ id: 'grabber', name: 'Agarrador', maxHp: 350, passive: 'grab', portrait: 'assets/images/nemesis-agarrador.png' }),
-  Object.freeze({ id: 'infected', name: 'Infectado', maxHp: 300, passive: 'failure', portrait: 'assets/images/nemesis-infectado.png' }),
-  Object.freeze({ id: 'devourer', name: 'Devorador', maxHp: 400, passive: 'heal', portrait: 'assets/images/nemesis-devorador.png' }),
+  Object.freeze({ id: 'grabber', name: 'Agarrador', maxHp: 220, passive: 'grab', portrait: 'assets/images/nemesis-agarrador.png' }),
+  Object.freeze({ id: 'infected', name: 'Infectado', maxHp: 240, passive: 'failure', portrait: 'assets/images/nemesis-infectado.png' }),
+  Object.freeze({ id: 'devourer', name: 'Devorador', maxHp: 260, passive: 'heal', portrait: 'assets/images/nemesis-devorador.png' }),
 ]);
 export const NEMESIS_RELIEF = Object.freeze({ simple: 0, suja: 0, limpa: 4, real: 8, asas: 12 });
 const ability = (id, name, weight, phases, duration, describe) => ({
@@ -21,7 +21,7 @@ export const nemesisDefinition = Object.freeze({
   tableTheme: 'resident',
   deckTheme: 'resident',
   accent: '#bd563c',
-  maxHp: 2600,
+  maxHp: 2200,
   dangerType: 'infection',
   dangerLabel: 'INFECÇÃO',
   maxDanger: 100,
