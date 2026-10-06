@@ -8,7 +8,8 @@ Somente modo Chefe, para todos os seis chefes. Outros modos permanecem inalterad
 
 | Topo / destino real escolhido | Quantidade retirada |
 |---|---|
-| Natural / jogo existente | 1 |
+| Natural comum / jogo existente, topo entra sozinho | 1 |
+| Natural comum / jogo existente, depende de cartas da mão como ponte/complemento | Lixo inteiro |
 | Natural / jogo novo pela mão | Lixo inteiro |
 | Joker / qualquer jogo | 1 |
 | 2 natural ou coringa / jogo existente | 1 |
@@ -32,7 +33,7 @@ Validação reutilizada: `isValidBossSequence()`, incluindo seus flags oficiais 
 - AGARRADA pulsa uma vez por evento novo. O pulso pausa durante o voo de compra e continua quando a carta aparece; não reinicia. Rerender/reload/snapshot/undo não repetem; marca permanece até expirar e redução de movimento deixa apenas a marca estática.
 - Agarrador/Tentáculo/Barragem/Extermínio escolhem marcas com rota real de jogo por `findNemesisLegalPlan()`. Barragem comprova duas saídas utilizáveis em conjunto; Extermínio comprova contribuição e segunda carta utilizável. Descarte continua contando depois da marcação. Sem plano viável: inelegibilidade/fallback normal.
 
-**Estado atual pós-rebalanceamento:** Nemesis 2200 HP, Agarrador 220, Infectado 240 e Devorador 260. A passiva do Agarrador considera cartas jogáveis da mão após compra do Monte ou Lixo, bloqueando jogo, não descarte, até o fim do turno; Normal 1, Mutado 2, Reforçado +1, ambos 3. Referência: `BALANCEAMENTO_NEMESIS.md`.
+**Estado atual pós-rebalanceamento:** Nemesis 2200 HP, Agarrador 220, Infectado 240 e Devorador 260. A passiva do Agarrador prioriza cartas jogáveis e completa com outras seguras da mão após compra do Monte ou Lixo, bloqueando jogo, não descarte, até o fim do turno; Normal 1, Mutado 2, Reforçado +1, ambos 3. Referência: `BALANCEAMENTO_NEMESIS.md`.
 
 **Registro histórico da revisão original de Lixo/UX, anterior ao rebalanceamento:** aquela rodada não mudou HP, Infecção, punições, pesos, fases, cura, alívio por canastra, S.T.A.R.S., overflow, mutação ou reanimação. A afirmação de HP preservado pertence apenas àquela rodada; os máximos atuais são os listados acima. Nenhuma regra aprovada dos outros chefes foi revertida.
 

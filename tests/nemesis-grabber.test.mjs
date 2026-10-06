@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBossDebugScenario, createBossDebugSnapshot, restoreBossDebugSnapshot, simulateBossDebugReload } from '../js/boss/boss-debug-scenarios.js';
 import { notifyBossPurchaseCompleted, notifyBossDiscardTaken, isBossCardBlocked, completeBossPlayerTurn, getBossCombatPriorities,
-  normalizeBossState, beginBossTurn, advanceBossTurn, applyBossMeldTransition, notifyBossCardDiscarded, isValidBossSequence } from '../js/boss/boss-engine.js';
+  normalizeBossState, beginBossTurn, advanceBossTurn, applyBossMeldTransition, notifyBossCardDiscarded, isValidBossSequence, getBossCardEffect } from '../js/boss/boss-engine.js';
 import { createUndoTransaction, restoreUndoTransaction } from '../js/game/undo-transaction.js';
 import { nemesisBossMechanics, getNemesisZombieEffect } from '../js/boss/mechanics/nemesis.js';
 import { BossBuracoBot } from '../boss-bot.js';
+import { nemesisBossUi } from '../js/boss/ui/nemesis-ui.js';
 
 const fixture = () => {
   const state = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'horde_command', phase: 1 }).state;
@@ -52,16 +53,17 @@ for (const [mutated, reinforced, count] of [[false,false,1],[true,false,2],[fals
   });
 }
 
-test('No usable safe card: no punishment, movement or empty pulse event; partial purchase does not trigger', () => {
+test('A sole non-playable card is grabbed without blocking its legal final discard; partial purchase does not trigger', () => {
   const s = fixture(); s.players[0].hand = [{ id: 'x', rank: '4', suit: '♠' }]; s.teams[0].melds = [];
   s.hasDrawnThisTurn = true; s.partialDraw = true;
   assert.deepEqual(notifyBossPurchaseCompleted(s, 0), []); assert.equal(s.boss.grabbedTurnIds.length, 0);
   s.partialDraw = false;
   const before = JSON.stringify([s.players, s.stock, s.discard, s.boss.hp, s.boss.danger]);
-  assert.deepEqual(notifyBossPurchaseCompleted(s, 0), []);
-  assert.deepEqual(s.boss.grabbedByPlayer[0].cardIds, []);
+  assert.equal(notifyBossPurchaseCompleted(s, 0).length, 1);
+  assert.deepEqual(s.boss.grabbedByPlayer[0].cardIds, ['x']);
+  assert.equal(isBossCardBlocked(s, 0, 'x', 'discard'), false);
   assert.equal(JSON.stringify([s.players, s.stock, s.discard, s.boss.hp, s.boss.danger]), before);
-  assert.equal(s.boss.eventLog.filter(e => e.type === 'nemesisGrab').length, 0);
+  assert.equal(s.boss.eventLog.filter(e => e.type === 'nemesisGrab').length, 1);
 });
 
 for (const abilityId of ['stars_hunt','infectious_tentacle','tentacle_barrage','stars_extermination']) test(`Grabber preserves an actual solution to ${abilityId}`, () => {
@@ -72,8 +74,162 @@ for (const abilityId of ['stars_hunt','infectious_tentacle','tentacle_barrage','
   const id = s.boss.currentIntent.payload.targetPlayerId; s.currentPlayer = id;
   const before = getBossCombatPriorities(s, id); assert.ok(before.plan, 'canonical route exists before restriction');
   buy(s, id);
-  assert.ok(getBossCombatPriorities(s, id).plan, 'a complete legal route still exists after restriction');
-  for (const cardId of [...before.plan.playedCardIds, before.plan.discardCardId].filter(Boolean)) assert.equal(isBossCardBlocked(s, id, cardId), false);
+  const after = getBossCombatPriorities(s, id).plan;
+  assert.ok(after, 'a complete legal route still exists after restriction');
+  for (const cardId of after.playedCardIds) assert.equal(isBossCardBlocked(s, id, cardId), false);
+  if (after.discardCardId) assert.equal(isBossCardBlocked(s, id, after.discardCardId, 'discard'), false);
+});
+
+const card = (id, rank, suit = '♠') => ({id, rank, suit});
+for (const [mutated, reinforced, count] of [[true,false,2],[false,true,2],[true,true,3]]) {
+  test(`Barragem: three marked cards preserve two real exits with AGARRA ${count} (${mutated}/${reinforced})`, () => {
+    const s = fixture(); grabber(s).mutated = mutated;
+    s.boss.hordeBuff = reinforced ? {entityId:'grabber',expiresRound:9} : null;
+    s.teams[0].melds = [['3','4','5'].map(rank => card(`base-${rank}`,rank,'♣'))];
+    s.players[0].hand = [card('safe','4'),...['6','7','8'].map(rank => card(`marked-${rank}`,rank,'♣'))];
+    s.boss.currentIntent = {id:'barrage',abilityId:'tentacle_barrage',payload:{targetPlayerId:0,cardIds:['marked-6','marked-7','marked-8'],required:2,exitedCardIds:[],failure:14}};
+    s.hasDrawnThisTurn = true; s.partialDraw = false;
+    const untouched = JSON.stringify(s);
+    const duplicate = JSON.parse(untouched);
+    notifyBossPurchaseCompleted(s,0); notifyBossPurchaseCompleted(duplicate,0);
+    const ids = s.boss.grabbedByPlayer[0].cardIds;
+    assert.equal(ids.length,count);
+    assert.deepEqual(duplicate.boss.grabbedByPlayer[0].cardIds,ids,'seeded combination selection is deterministic');
+    const dual = ids.find(id => s.boss.currentIntent.payload.cardIds.includes(id));
+    assert.ok(dual);
+    assert.deepEqual(getBossCardEffect(s,0,dual),['nemesis-marked','nemesis-grabbed']);
+    const visual = nemesisBossUi.card(getBossCardEffect(s,0,dual));
+    assert.deepEqual(visual.classes,['nemesis-marked','nemesis-grabbed']);
+    assert.deepEqual(visual.labels,['MARCADA','AGARRADA']);
+    assert.equal(isBossCardBlocked(s,0,dual,'play'),true);
+    assert.equal(isBossCardBlocked(s,0,dual,'discard'),false);
+    assert.deepEqual(getBossCardEffect(simulateBossDebugReload(s),0,dual),['nemesis-marked','nemesis-grabbed']);
+    const plan = getBossCombatPriorities(s,0).plan;
+    assert.ok(plan); assert.ok(ids.includes(plan.discardCardId),'an AGARRADA may be the legal marked discard');
+    const exits = [...plan.playedCardIds,plan.discardCardId].filter(id => s.boss.currentIntent.payload.cardIds.includes(id));
+    assert.ok(new Set(exits).size >= 2,'two legal marked exits remain, not just two abstract playable candidates');
+    // Execute the canonical plan, not only an existence assertion.
+    for (const move of plan.moves) {
+      const played = s.players[0].hand.filter(c => move.cardIds.includes(c.id));
+      played.forEach(c => assert.equal(isBossCardBlocked(s,0,c.id,'play'),false));
+      const index = move.meldIndex ?? s.teams[0].melds.length;
+      const before = move.meldIndex == null ? [] : s.teams[0].melds[index];
+      assert.equal(isValidBossSequence([...before,...played]),true);
+      s.players[0].hand = s.players[0].hand.filter(c => !played.includes(c));
+      if (move.meldIndex == null) s.teams[0].melds.push(played); else before.push(...played);
+      applyBossMeldTransition(s,{teamId:0,playerId:0,meldIndex:index,oldKind:'simple',newKind:'simple',cardsAdded:played,isNewMeld:move.meldIndex==null});
+    }
+    const discarded = s.players[0].hand.find(c => c.id === plan.discardCardId);
+    assert.equal(isBossCardBlocked(s,0,discarded.id,'discard'),false);
+    s.players[0].hand = s.players[0].hand.filter(c => c !== discarded);
+    s.discard.push(discarded); notifyBossCardDiscarded(s,0,discarded);
+    assert.ok(s.boss.currentIntent.payload.exitedCardIds.length >= 2);
+    completeBossPlayerTurn(s,0);
+    assert.equal(s.boss.currentIntent.payload.infectionApplied,0);
+  });
+}
+
+test('Marked and grabbed have independent lifetimes and one combined visual model', () => {
+  const s = fixture(); s.hasDrawnThisTurn = true;
+  const id = s.players[0].hand[0].id;
+  s.boss.currentIntent = {abilityId:'infectious_tentacle',payload:{targetPlayerId:0,cardIds:[id],required:1,exitedCardIds:[]}};
+  s.boss.grabbedByPlayer[0] = {cardIds:[id],turnId:`${s.turnNumber}:0`};
+  assert.deepEqual(getBossCardEffect(s,0,id),['nemesis-marked','nemesis-grabbed']);
+  s.boss.currentIntent.payload.resolved = true;
+  assert.equal(getBossCardEffect(s,0,id),'nemesis-grabbed');
+  s.boss.currentIntent.payload.resolved = false;
+  grabber(s).hp = 0; grabber(s).status = 'corpse';
+  assert.equal(getBossCardEffect(s,0,id),'nemesis-marked');
+  assert.equal(isBossCardBlocked(s,0,id),false);
+});
+for (const [mutated, reinforced, count] of [[false,false,1],[true,false,2],[false,true,2],[true,true,3]]) {
+  for (const source of ['stock','discard']) for (const playerId of [0,1]) {
+    test(`Grabber fills ${count} with safe fallback cards after ${source}, player ${playerId}`, () => {
+      const s = fixture(); grabber(s).mutated = mutated;
+      s.boss.hordeBuff = reinforced ? {entityId:'grabber',expiresRound:9} : null;
+      s.teams[0].melds = [['4','5','6'].map(rank => card(`base-${rank}`,rank))];
+      s.players[playerId].hand = [card('playable','7'),card('safe1','K','♣'),card('safe2','Q','♥'),card('safe3','J','♦')];
+      s.stock = [card('stock-draw','A','♥')]; s.discard = [card('discard-draw','A','♥')];
+      buy(s, playerId, source);
+      const ids = s.boss.grabbedByPlayer[playerId].cardIds;
+      assert.equal(ids.length, count); assert.equal(new Set(ids).size, count);
+      assert.ok(ids.includes('playable'), 'real legal play has priority over fallback');
+      assert.equal(getNemesisZombieEffect(s.boss,grabber(s)).label, `AGARRA ${count}`);
+      assert.equal(s.boss.eventLog.at(-1).cardIds.length, count);
+      for (const restored of [simulateBossDebugReload(s), restoreBossDebugSnapshot(createBossDebugSnapshot(s)),
+        restoreUndoTransaction(createUndoTransaction(s, {}, {actorPlayerId:playerId})).state]) {
+        const events = restored.boss.eventLog.length;
+        assert.deepEqual(notifyBossPurchaseCompleted(restored,playerId), []);
+        assert.deepEqual(restored.boss.grabbedByPlayer[playerId].cardIds,ids);
+        assert.equal(restored.boss.eventLog.length,events);
+      }
+      completeBossPlayerTurn(s,playerId);
+      ids.forEach(id => assert.equal(isBossCardBlocked(s,playerId,id),false));
+    });
+  }
+}
+
+for (const size of [0,1,2]) test(`Grabber AGARRA 3 uses the physical maximum of ${size} safe cards`, () => {
+  const s = fixture(); grabber(s).mutated = true; s.boss.hordeBuff = {entityId:'grabber',expiresRound:9};
+  s.teams[0].melds = []; s.players[0].hand = [card('a','K','♣'),card('b','Q','♥')].slice(0,size);
+  s.hasDrawnThisTurn = true; s.partialDraw = false;
+  const events = notifyBossPurchaseCompleted(s,0);
+  assert.equal(s.boss.grabbedByPlayer[0].cardIds.length,size);
+  assert.equal(events.length,size ? 1 : 0);
+  assert.equal(getNemesisZombieEffect(s.boss,grabber(s)).value,3);
+});
+
+test('Grabber protects a unique required play, not its safe final discard or the entire quota', () => {
+  const s = fixture(); grabber(s).mutated = true; s.boss.hordeBuff = {entityId:'grabber',expiresRound:9};
+  s.teams[0].melds = [['4','5','6'].map(rank => card(`base-${rank}`,rank))];
+  s.players[0].hand = [card('needed','7'),card('safe1','K','♣'),card('safe2','Q','♥'),card('safe3','J','♦')];
+  s.boss.currentIntent = {abilityId:'stars_hunt',payload:{targetPlayerId:0,contributed:false}};
+  s.hasDrawnThisTurn = true; s.partialDraw = false;
+  notifyBossPurchaseCompleted(s,0);
+  assert.deepEqual(new Set(s.boss.grabbedByPlayer[0].cardIds),new Set(['safe1','safe2','safe3']));
+  assert.ok(getBossCombatPriorities(s,0).plan);
+});
+
+test('Grabber keeps one objective alternative, but may grab the other marked cards', () => {
+  const s = fixture(); grabber(s).mutated = true; s.boss.hordeBuff = {entityId:'grabber',expiresRound:9};
+  s.teams[0].melds = [['4','5','6'].map(rank => card(`base-${rank}`,rank))];
+  s.players[0].hand = [card('option1','7'),card('option2','7'),card('safe1','K','♣'),card('safe2','Q','♥')];
+  s.boss.currentIntent = {abilityId:'infectious_tentacle',payload:{targetPlayerId:0,cardIds:['option1','option2'],required:1,exitedCardIds:[]}};
+  s.hasDrawnThisTurn = true; s.partialDraw = false;
+  notifyBossPurchaseCompleted(s,0);
+  assert.equal(s.boss.grabbedByPlayer[0].cardIds.length,3);
+  assert.ok(getBossCombatPriorities(s,0).plan);
+});
+
+test('Quota reduces only where the only objective solution requires protecting the remaining card', () => {
+  const s = fixture(); grabber(s).mutated = true; s.boss.hordeBuff = {entityId:'grabber',expiresRound:9};
+  s.teams[0].melds = [['4','5','6'].map(rank => card(`base-${rank}`,rank))];
+  s.players[0].hand = [card('needed','7'),card('discard','K','♣')];
+  s.boss.currentIntent = {abilityId:'stars_hunt',payload:{targetPlayerId:0,contributed:false}};
+  s.hasDrawnThisTurn = true; s.partialDraw = false; notifyBossPurchaseCompleted(s,0);
+  assert.deepEqual(s.boss.grabbedByPlayer[0].cardIds,['discard']);
+  assert.equal(isBossCardBlocked(s,0,'needed'),false);
+  assert.equal(isBossCardBlocked(s,0,'discard','discard'),false);
+  assert.ok(getBossCombatPriorities(s,0).plan);
+});
+
+test('No legal discard: Grabber never takes away the legal Morto/batida route', () => {
+  const s = fixture(); s.players[0].hand = [card('picked','7')];
+  s.teams[0].melds = [['4','5','6'].map(rank => card(`base-${rank}`,rank))];
+  s.pickedDiscardCardId = 'picked'; s.hasDrawnThisTurn = true; s.partialDraw = false;
+  notifyBossPurchaseCompleted(s,0);
+  assert.equal(isBossCardBlocked(s,0,'picked'),false);
+  assert.equal(s.boss.grabbedByPlayer[0].cardIds.length,0);
+});
+
+test('Killing Grabber clears fallback locks immediately', () => {
+  const s = fixture(); s.players[0].hand = [card('safe','K','♣')]; s.teams[0].melds = [];
+  s.hasDrawnThisTurn = true; notifyBossPurchaseCompleted(s,0);
+  assert.equal(isBossCardBlocked(s,0,'safe'),true);
+  s.boss.combatTargetsByPlayer[0] = 'grabber';
+  nemesisBossMechanics.applyDamage({boss:s.boss,gameState:s,playerId:0,damage:999});
+  assert.equal(isBossCardBlocked(s,0,'safe'),false);
+  assert.deepEqual(s.boss.grabbedByPlayer,{});
 });
 
 for (const kind of ['infected','devourer']) test(`Grabber preserves cooperative Invasion ${kind} across both players`, () => {
@@ -95,6 +251,7 @@ for (const kind of ['infected','devourer']) test(`Grabber preserves remaining co
   s.teams[0].melds = (kind === 'infected' ? ['♦'] : ['♦','♥']).map((suit, i) => ['4','5','6'].map(rank => ({ id: `base-${i}-${rank}`, rank, suit })));
   s.players.forEach((p, i) => p.hand = [{ id: `play-${i}`, rank: kind === 'infected' && i === 1 ? '8' : '7', suit: kind === 'infected' || i === 0 ? '♦' : '♥' },
     { id: `keep-${i}`, rank: 'K', suit: '♠' }, { id: `keep2-${i}`, rank: 'Q', suit: '♣' }]);
+  if (kind === 'devourer') s.players[1].hand.push({ id: 'third-entry-card', rank: '8', suit: '♥' });
   beginBossTurn(s, { first: true, now: 1000, debug: true });
   for (let i = 0; i < 15 && s.boss.bossFlow.stage !== 'players'; i++) advanceBossTurn(s, s.boss.bossFlow.endsAt + 1);
   assert.equal(s.boss.currentIntent.payload.entryKind, kind);
@@ -102,23 +259,28 @@ for (const kind of ['infected','devourer']) test(`Grabber preserves remaining co
   for (const p of s.players) {
     buy(s, p.id);
     assert.ok(grabber(s).hp > 0); assert.ok(s.boss.grabbedTurnIds.includes(`${s.turnNumber}:${p.id}`));
-    const plan = getBossCombatPriorities(s, p.id).plan;
+    let plan = getBossCombatPriorities(s, p.id).plan;
     assert.ok(plan, 'remaining objective is legal after restriction and partner progress');
-    for (const move of plan.moves) {
-      const cards = p.hand.filter(c => move.cardIds.includes(c.id));
-      cards.forEach(c => assert.equal(isBossCardBlocked(s, p.id, c.id), false));
-      const meldIndex = move.meldIndex ?? s.teams[0].melds.length;
-      const before = move.meldIndex == null ? [] : s.teams[0].melds[meldIndex];
-      assert.equal(isValidBossSequence([...before, ...cards]), true);
-      p.hand = p.hand.filter(c => !cards.includes(c));
-      if (move.meldIndex == null) s.teams[0].melds.push(cards); else before.push(...cards);
-      applyBossMeldTransition(s, { teamId: 0, playerId: p.id, meldIndex, oldKind: 'simple', newKind: 'simple', cardsAdded: cards, isNewMeld: move.meldIndex == null });
+    let discardId;
+    for (let step = 0; plan && step < 3; step++) {
+      discardId = plan.discardCardId;
+      for (const move of plan.moves) {
+        const cards = p.hand.filter(c => move.cardIds.includes(c.id));
+        cards.forEach(c => assert.equal(isBossCardBlocked(s, p.id, c.id), false));
+        const meldIndex = move.meldIndex ?? s.teams[0].melds.length;
+        const before = move.meldIndex == null ? [] : s.teams[0].melds[meldIndex];
+        assert.equal(isValidBossSequence([...before, ...cards]), true);
+        p.hand = p.hand.filter(c => !cards.includes(c));
+        if (move.meldIndex == null) s.teams[0].melds.push(cards); else before.push(...cards);
+        applyBossMeldTransition(s, { teamId: 0, playerId: p.id, meldIndex, oldKind: 'simple', newKind: 'simple', cardsAdded: cards, isNewMeld: move.meldIndex == null });
+      }
+      plan = kind === 'devourer' ? getBossCombatPriorities(s, p.id).plan : null;
     }
-    const discard = p.hand.find(c => c.id === plan.discardCardId);
+    const discard = p.hand.find(c => c.id === discardId);
     assert.ok(discard); p.hand = p.hand.filter(c => c !== discard); s.discard.push(discard);
     notifyBossCardDiscarded(s, p.id, discard); completeBossPlayerTurn(s, p.id); s.turnNumber++;
   }
-  assert.ok(kind === 'infected' ? objectivePayload.contributionCardIds.length >= 2 : objectivePayload.fedMeldIds.length >= 2);
+  assert.ok(kind === 'infected' ? objectivePayload.contributionCardIds.length >= 2 : objectivePayload.devourerCardIds.length >= 3);
   assert.equal(s.boss.combatEntities.find(e => e.id === kind).status, 'repelled');
 });
 
@@ -128,6 +290,7 @@ test('Cooperative protection only counts the Devorador games present at announce
   s.teams[0].melds = ['♦','♥'].map((suit, i) => ['4','5','6'].map(rank => ({ id: `base-${i}-${rank}`, rank, suit })));
   s.players[0].hand = [{ id: 'needed', rank: '7', suit: '♦' }, { id: 'keep', rank: 'K', suit: '♠' }, { id: 'unrelated', rank: '7', suit: '♣' }];
   s.players[1].hand = [{ id: 'partner-needed', rank: '7', suit: '♥' }, { id: 'keep1', rank: 'K', suit: '♣' }, { id: 'keep2', rank: 'Q', suit: '♠' }];
+  s.players[1].hand.push({ id: 'partner-third', rank: '8', suit: '♥' });
   beginBossTurn(s, { first: true, now: 1000, debug: true });
   for (let i = 0; i < 15 && s.boss.bossFlow.stage !== 'players'; i++) advanceBossTurn(s, s.boss.bossFlow.endsAt + 1);
   assert.equal(s.boss.currentIntent.payload.entryMeldIds.length, 2);

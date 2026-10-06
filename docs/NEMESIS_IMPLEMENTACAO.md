@@ -2,9 +2,13 @@
 
 ## Durabilidade e Agarrador — revisão de 06/10/2026
 
-Estado atual: Nemesis **2200 HP**; Agarrador **220**, Infectado **240**, Devorador **260**. Após concluir a compra do Monte ou do Lixo, cada jogador recebe até 1/2/3 cartas AGARRADAS da própria mão, conforme normal/Mutado/Reforçado. A seleção seeded usa `findNemesisLegalPlan()` e preserva uma solução completa do objetivo ativo: cartas marcadas, apoios e descarte final, inclusive no plano cooperativo da Invasão. Sem candidato seguro, não prende nem inventa punição.
+Estado atual: Nemesis **2200 HP**; Agarrador **220**, Infectado **240**, Devorador **260**. Após concluir a compra do Monte ou do Lixo, Agarrador prende exatamente **1 normal / 2 Mutado / 2 Reforçado / 3 ambos**, quando houver cartas seguras suficientes. A seleção seeded prioriza cartas com uso legal real (`findNemesisLegalPlan()`) e completa com outras cartas seguras da mão, mesmo sem jogada imediata. Testa combinações determinísticas da quota completa no estado resultante com o planner canônico, incluindo objetivo cooperativo e todos os descartes legais (AGARRADA bloqueia somente jogo). Só tenta uma quota menor após esgotar as combinações do tamanho anterior; não reserva cegamente cartas do primeiro plano. Quantidade menor somente por falta física de cartas ou proteção necessária contra estado impossível. Sem descarte legal, preserva a rota de Morto/batida validada pelo planner.
 
 `notifyBossPurchaseCompleted()` é chamado após a compra efetiva e, no Lixo Fechado, após sua jogada obrigatória. A restrição só impede jogo, nunca descarte; termina no turno do dono ou na morte do Agarrador. `grabbedTurnIds` e o evento estável `nemesisGrab:<turno>:<jogador>` evitam reaplicação por reload/snapshot; a apresentação existente também deduplica undo/reaplicação. O BOT recalcula a partir da mão atual e consulta o bloqueio canônico nas rotas genéricas e de objetivo, sem nova heurística de combate.
+
+Registro da primeira correção de quantidade de 06/10/2026 (anterior à busca de combinações): 143 testes focados passaram; suíte ampla `tests/*.test.mjs`: 879/879, sem falhas, skips ou todo. Browser do Nemesis passou nos cinco viewports existentes. Regressões cobrem prioridade jogável + complemento seguro, quantidades físicas insuficientes, solução única/alternativas, Invasão cooperativa, descarte, Morto/batida, morte/fim do turno e deduplicação de reload/snapshot/undo. Testes e fixture local, não uma partida Firebase ao vivo. Nenhum HP, bônus, peso, outra passiva ou BOT foi rebalanceado.
+
+Correção posterior de 06/10/2026: o planner considera todos os descartes legais, não só o primeiro. A seleção do Agarrador valida combinações da quota completa no estado resultante antes de tentar quantidades menores. Barragem com 3 MARCADAS mantém 2 saídas legais com AGARRA 2 (Mutado ou Reforçado); a regressão também executa AGARRA 3 com ambos. A mesma carta pode ser MARCADA e AGARRADA: dois status legíveis em um único selo, com um único overlay verde, sem brilho duplicado. Os estados expiram independentemente; descarte permanece permitido. Validação: 147 testes focados, 883/883 na suíte ampla, nenhum skip/todo; browser nos cinco viewports, incluindo carta pequena 65×95 e NOVA. Nenhum rebalanceamento adicional.
 
 Reanimações usam os máximos atuais: **110/120/130 HP**. Infecção, cura, pesos, lifecycle, regras do Lixo e demais chefes não foram rebalanceados. Decisão e limites das estimativas históricas: [BALANCEAMENTO_NEMESIS.md](BALANCEAMENTO_NEMESIS.md).
 
@@ -79,13 +83,13 @@ Saves antigos com mais vivos que o teto da fase não perdem entidades silenciosa
 
 ## 4. Invasão da Horda
 
-`horde_invasion`: fases 1/2/3, peso **4**; onze habilidades e soma dos pesos **39**. A seleção seeded usa apenas ausentes/repelidos com plano legal. Evita o último repelido imediatamente quando outro candidato real existe.
+`horde_invasion`: fases 1/2/3, peso **4**; onze habilidades e soma dos pesos **39**. A seleção seeded usa apenas ausentes/repelidos elegíveis. Agarrador/Infectado preservam a prova do objetivo; Devorador exige apenas uma contribuição legal possível em jogo existente. Evita o último repelido imediatamente quando outro candidato real existe.
 
 - **Agarrador:** escolhe carta com rota real de uso legal em jogo no turno do alvo. Após marcada, sair por jogo ou descarte continua cumprindo o objetivo. Um descarte legal isolado não torna a habilidade elegível. Não marca descarte final proibido por falta de Morto/canastra. Falha: 220 HP.
 - **Infectado:** equipe contribui duas cartas válidas para jogos durante a rodada. O plano pode ser individual ou cooperativo. Falha: 240 HP.
-- **Devorador:** equipe alimenta dois jogos existentes diferentes na rodada. Plano conjunto, sem usar a mesma carta duas vezes nem contar jogo novo. Falha: 260 HP.
+- **Devorador:** elegível quando ao menos um jogo existente aceita uma contribuição legal; não exige prova antecipada da expulsão. A equipe acumula 3 cartas novas em jogos que existiam no início da invasão, registrando seus IDs. Pode alimentar o mesmo jogo, em contribuições separadas, por um jogador ou pelos dois. Ao atingir 3, é repelido; menos de 3 no fim da rodada deixa-o persistente com 260 HP (Mutado na F3). IDs de cartas deduplicados; reorganização e jogos novos não contam, inclusive após reload/snapshot/undo. Isso não muda a passiva: contribuição única de 3+ cartas no mesmo jogo cura 40/70 HP, Reforçado +30, no máximo uma vez por turno e sem ultrapassar o HP máximo.
 
-O planejamento considera jogadores que ainda podem agir e a ordem real da rodada. Não escolhe objetivo que só funcionaria invertendo turnos. Sucesso repele; falha só estabelece o zumbi. Em F3, novas persistências já entram Mutadas.
+O planejamento considera jogadores que ainda podem agir e a ordem real da rodada. Para Agarrador/Infectado, não escolhe objetivo que só funcionaria invertendo turnos. Para Devorador, não exige que as três cartas já estejam disponíveis na elegibilidade; o BOT tenta contribuições incrementais válidas. Sucesso repele; falha só estabelece o zumbi. Em F3, novas persistências já entram Mutadas.
 
 ## 5. Comando, passivas e recuperação
 
@@ -93,7 +97,7 @@ Comando da Horda continua separado da Invasão: não traz zumbis, exige persiste
 
 | Zumbi | Normal | Mutado | Reforço |
 |---|---|---|---|
-| Agarrador | Após compra do Monte/Lixo, prende até 1 carta jogável da mão para jogo, não descarte, até fim do turno | Até 2 cartas | +1 carta (até 3 com Mutado) |
+| Agarrador | Após compra do Monte/Lixo, prende 1 carta da mão para jogo, não descarte, até fim do turno | 2 cartas | +1 carta (2 normal / 3 Mutado) |
 | Infectado | +2 Infecção em falha positiva real | +4 | +2 |
 | Devorador | Cura Nemesis 40 HP na primeira contribuição de 3+ cartas no mesmo jogo por turno | 70 HP | +30 HP |
 
@@ -124,7 +128,7 @@ S.T.A.R.S. aparece como overlay discreto à direita da arte principal, sem linha
 
 `findNemesisLegalPlan()` prepara marcas a partir de possibilidades reais de jogo. Tentáculo exige duas alternativas jogáveis; Barragem exige três marcas jogáveis e uma solução conjunta de duas; Extermínio comprova contribuição e segunda carta utilizável. Descartar a carta marcada continua contando na resolução. Carta inútil apenas descartável não é candidata; ausência de plano implica inelegibilidade/fallback normal.
 
-A regra compartilhada de Lixo do modo Chefe vale também para Nemesis: jogo existente → topo; jogo novo pela mão → Lixo inteiro; Joker → topo; 2 existente ou coringa em jogo novo → topo; 2 natural em jogo novo → Lixo inteiro. A consulta usa o validador canônico, não ordem visual, e o destino realmente escolhido. Zona Contaminada calcula viabilidade com o tamanho real da retirada. Após a jogada obrigatória, Agarrador considera a mão inteira restante, incluindo cartas anteriores à compra, nunca cartas já colocadas na mesa.
+A regra compartilhada de Lixo do modo Chefe vale também para Nemesis: natural comum em jogo existente → somente topo se entrar sozinho; se depender de cartas da mão como ponte/complemento → Lixo inteiro. Jogo novo pela mão → Lixo inteiro; Joker → topo; 2 existente ou coringa em jogo novo → topo; 2 natural em jogo novo → Lixo inteiro. A consulta usa o validador canônico, não ordem visual, e somente o destino realmente escolhido. Zona Contaminada calcula viabilidade com o tamanho real da retirada e continua cobrando por retirada, não por carta. Após a jogada obrigatória, Agarrador considera a mão inteira restante, incluindo cartas anteriores à compra, nunca cartas já colocadas na mesa.
 
 Resultado da revisão atual: ver `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Os resultados abaixo são históricos, não o estado atual da suíte.
 
@@ -159,6 +163,8 @@ O arquivo antigo `tests/boss-debug-scenarios.test.mjs` foi tentado separadamente
 Comparação anterior à revisão: 504 testes, 452 passaram, 52 falharam. As falhas pré-existentes incluem expectativas antigas de balanceamento/visual, fixtures VM incompletas, importações antigas, amigas da Dominação e SW. A suíte inteira não será declarada verde enquanto permanecerem.
 
 ## 10. Teste manual e riscos restantes
+
+- Feedback de HP (06/10/2026): dano aparece no card do alvo registrado no evento, inclusive no golpe fatal; o número usa o HP efetivamente perdido, sem overflow. O HUD principal só recebe impacto quando o alvo é Nemesis. Barras dos zumbis: verde acima de 50%, amarelo de 50% até acima de 25%, vermelho em 25% ou menos. No Nemesis, tensão usa âmbar mais evidente e perigo vermelho vivo. Pulsos respeitam reduced motion; nenhuma regra de dano/vida mudou.
 
 - Ajuste visual/SFX final: 72/72 testes do Nemesis e browser nos cinco viewports passaram; cards full-bleed, chips/ajuda oficiais, S.T.A.R.S. integrado e ganho de Infecção deduplicado. Originais de imagem/MP3 preservados, sem mudança de mecânica.
 - Partida completa humano/humano em dois clientes reais: transporte Firebase ao vivo, reload no turno do parceiro, morte/reanimação e alvo.

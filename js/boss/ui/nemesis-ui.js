@@ -9,7 +9,7 @@ const passiveText = (boss, entity) => {
   return `3+ cartas no mesmo jogo: cura ${(entity.mutated ? 70 : 40) + (buff ? 30 : 0)} HP, 1x/turno`;
 };
 const passiveHelp = (entity, reinforced) => {
-  const rule = entity.id === 'grabber' ? 'Após a compra de cada jogador: prende cartas jogáveis da mão até o fim do turno. Não podem entrar em jogo; podem ser descartadas.\nNormal: 1; Mutado: 2. Reforçado: +1 (2 normal / 3 Mutado). Preserva uma solução dos objetivos ativos.'
+  const rule = entity.id === 'grabber' ? 'Após comprar do Monte ou Lixo: prende cartas da mão até o fim do turno. Prioriza jogáveis e completa com outras seguras. Não impede descarte.\nNormal: 1; Mutado: 2; Reforçado: 2; ambos: 3. Só prende menos por falta de cartas ou para preservar uma solução obrigatória.'
     : entity.id === 'infected' ? 'Falha com Infecção: +2 (Mutado: +4), uma vez por evento.\nHorda: +2 extra (total +4 normal / +6 Mutado). Falhar na invasão não gera Infecção.'
       : 'Primeira contribuição de 3+ cartas ao mesmo jogo por turno: cura Nemesis 40 HP (Mutado: 70).\nHorda: +30 (70 normal / 100 Mutado). Teto: HP máximo do Nemesis.';
   return `${rule} Passiva só com o zumbi ATIVO.${reinforced ? ' Reforço temporário ativo.' : ''}`;
@@ -19,7 +19,7 @@ function zombieChips(boss, entity, reinforced) {
   if (entity.status === 'corpse') return [{ label: 'CADÁVER', text: 'Foi derrotado. Pode voltar por Reanimação Viral; um repelido não é cadáver.' }];
   if (entity.status !== 'persistent' || entity.hp <= 0) return [];
   const effect = getNemesisZombieEffect(boss, entity);
-  const rule = entity.id === 'grabber' ? `Após sua compra do Monte ou Lixo: prende até ${effect.value} cartas jogáveis da mão, preservando uma solução dos objetivos.\nNão podem entrar em jogo; podem ser descartadas. Libera no fim do turno ou ao matar o Agarrador.`
+  const rule = entity.id === 'grabber' ? `Após comprar do Monte ou Lixo: prende ${effect.value} cartas da mão. Prioriza jogáveis e completa com outras seguras. Só prende menos por falta de cartas ou proteção necessária.\nNão impede descarte. Libera no fim do turno ou ao matar o Agarrador.`
     : entity.id === 'infected' ? `Uma falha que aumenta Infecção recebe +${effect.value}, uma vez por evento.\nFalha na invasão não gera esse bônus.`
       : `Sua primeira contribuição de 3+ cartas ao mesmo jogo no turno cura Nemesis até ${effect.value} HP.\nUma vez por turno; não ultrapassa o HP máximo do Nemesis.`;
   return [
@@ -38,8 +38,11 @@ export const nemesisBossUi = Object.freeze({
     return entity ? `O ataque final está direcionado ao ${entity.name}, não ao Nemesis.\n\nO dano excedente será perdido e, se Nemesis continuar vivo, a equipe perderá. Cancele para trocar o alvo.` : null;
   },
   card(effect) {
-    if (!['nemesis-grabbed', 'nemesis-marked'].includes(effect)) return null;
-    return { classes: [effect], label: effect === 'nemesis-grabbed' ? 'AGARRADA' : 'MARCADA', title: effect === 'nemesis-grabbed' ? 'Não pode entrar em jogo neste turno; pode ser descartada.' : 'Carta marcada pelo objetivo atual do Nemesis.' };
+    const classes = [...new Set(Array.isArray(effect) ? effect : [effect])].filter(value => ['nemesis-grabbed', 'nemesis-marked'].includes(value));
+    if (!classes.length) return null;
+    const marked = classes.includes('nemesis-marked'), grabbed = classes.includes('nemesis-grabbed');
+    const labels = [marked && 'MARCADA', grabbed && 'AGARRADA'].filter(Boolean);
+    return { classes, labels, label: labels.join(' · '), title: [marked && 'Carta marcada pelo objetivo atual do Nemesis.', grabbed && 'Não pode entrar em jogo neste turno; pode ser descartada.'].filter(Boolean).join(' ') };
   },
   decorateCard(element, effect) {
     element.querySelectorAll('.nemesis-infection-overlay, .boss-card-status-nemesis').forEach((node) => node.remove());
@@ -54,7 +57,14 @@ export const nemesisBossUi = Object.freeze({
     const status = element.ownerDocument.createElement('span');
     status.className = 'boss-card-status boss-card-status-nemesis';
     status.setAttribute('aria-hidden', 'true');
-    status.textContent = `☣ ${model.label}`;
+    if (model.labels?.length > 1) {
+      status.classList.add('nemesis-dual-status');
+      model.labels.forEach((label, index) => {
+        const line = element.ownerDocument.createElement('span');
+        line.textContent = `${index === 0 ? '☣ ' : ''}${label}`;
+        status.append(line);
+      });
+    } else status.textContent = `☣ ${model.label}`;
     element.append(overlay, status);
   },
   syncCardTransitions(root, boss, { reducedMotion = false } = {}) {

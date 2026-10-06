@@ -1,5 +1,5 @@
 import { createDeck } from '../deck.js';
-import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, getBossAbilityPhases, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
+import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, getBossAbilityPhases, getBossCombatPriorities, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
 import { getBossDefinition, listBossDefinitions } from './boss-registry.js';
 import { getBossMechanicsAdapter } from './mechanics/boss-mechanics-registry.js';
 
@@ -847,7 +847,7 @@ function executeMinimalSuccess(state, preferredPlayerId = null) {
   const intent = state.boss?.currentIntent;
   const adapter = getBossMechanicsAdapter(state.boss?.id);
   if (adapter?.debugSuccessPlan) {
-    const plan = adapter.debugSuccessPlan(state);
+    const plan = adapter.debugSuccessPlan(state, getBossCombatPriorities);
     const playerId = intent?.payload.targetPlayerId ?? preferredPlayerId ?? state.players[state.currentPlayer].id;
     const plans = plan.teamPlans || [{ ...plan, playerId }];
     for (const memberPlan of plans) {

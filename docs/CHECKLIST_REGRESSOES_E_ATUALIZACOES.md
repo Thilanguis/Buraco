@@ -4,6 +4,13 @@
 **Criado em:** 05/10/2026  
 **Objetivo:** ser lido **antes de qualquer alteração** em regra, UI, animação, BOT, sincronização, reinício, Service Worker ou asset do jogo.
 
+### HUD de fases e HP — UX de 06/10/2026
+
+- [ ] Próxima fase compacta (até 22px no fixture desktop/tablet); limites/gatilhos apenas no `?` oficial, ancorado, com toque, Enter, Escape e clique fora. Não repetir Monte/Morto na régua; preservar contadores da mesa. Régua e rodada no fluxo abaixo dos medidores: espelhos da Nehelenia ocupam a largura disponível sem sobreposição. Conferir alinhamento vertical dos botões `?`, inclusive junto ao Lixo.
+- [ ] Barra mantém `getBossPhaseProgress().hpProgress`; apresentação nunca recalcula regras, números ou transição.
+- [ ] HP normal >50%, tensão >25% até 50%, perigo ≤25%; fluxo interno leve, estático em touch, pulso lento só em perigo e nunca com HP zero. Movimento reduzido desliga fluxo, pulso e transições.
+- [ ] Rodar `tests/boss-hud-ux.browser.mjs` (1920×1080, 1376×1032, 1024×768) e testes de HUD/integração. Fixture local, sem Firebase; verificar largura, legibilidade e ausência de sobreposição.
+
 > Este documento não substitui o código atual. A fonte de verdade executável é sempre o estado atual do Google Drive. Ele existe para lembrar erros reais que já aconteceram e impedir que sejam repetidos.
 
 ---
@@ -717,7 +724,7 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 ### Durabilidade e Agarrador por turno — decisão posterior de 06/10/2026
 
 - [ ] Novas partidas/Laboratório: Nemesis 2200 HP; Agarrador 220, Infectado 240, Devorador 260. Reanimação 110/120/130; manter 1x/fase, teto e Mutado na F3. Corpse nunca elegível para Invasão.
-- [ ] Após compra **Monte e Lixo**, testar humano e BOT, cada jogador em seu turno; normal/Mutado/Reforçado/ambos prendem até 1/2/2/3 cartas jogáveis da mão inteira. Só após concluir compra e jogada obrigatória do Lixo. Cartas permanecem na mão, descarte livre, fim do turno/morte liberam imediatamente.
+- [ ] Após compra **Monte e Lixo**, testar humano e BOT, cada jogador em seu turno; normal/Mutado/Reforçado/ambos prendem exatamente 1/2/2/3 quando houver cartas seguras suficientes. Priorizar jogáveis e completar com outras cartas da mão, mesmo sem jogada imediata; reduzir só por falta física ou proteção necessária. Não reservar `priorities.plan.playedCardIds`: testar combinações da quota completa no estado resultante, reduzindo só após esgotá-las. Planner testa todos os descartes legais; AGARRADA bloqueia somente jogo. Barragem com 3 MARCADAS + AGARRA 2 precisa manter 2 saídas reais. MARCADA + AGARRADA coexistem com um overlay e dois selos legíveis. Validar solução única/alternativas, descarte final, Morto/batida, snapshot/undo e chip vs. quantidade. Só após concluir compra e jogada obrigatória do Lixo. Cartas permanecem na mão, descarte livre, fim do turno/morte liberam imediatamente. Regressão: `tests/nemesis-grabber.test.mjs`.
 - [ ] Preservar solução completa de Caçada, Tentáculo, Barragem, Extermínio e Invasão, incluindo apoio e descarte final; verificar Invasão cooperativa com progresso já feito pelo parceiro. Sem candidato seguro, menos/zero travas, sem punição nova.
 - [ ] BOT: plano do objetivo, extensão genérica, tríades/worker e panic dump não usam Agarradas; recalcular após compra, conseguir jogar/descarte sem deadlock. Não mudar heurística de alvo.
 - [ ] Compra repetida/reload/snapshot/undo não duplicam restrição/evento/pulso; saves antigos preservam lifecycle, quota/alvo e HP baixo, limitando HP acima dos novos máximos sem reset da partida.
@@ -726,9 +733,9 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 
 - [ ] Decreto contra Escravo BOT: testar bloqueio antes da compra e durante a janela de reação. BOT compra do Monte, sem coletar o Lixo. `BOT_PLAN_STALE` em sessão/turno ainda válidos retoma a recuperação após concluir a operação do Decreto; cancelamento real, troca de turno ou saída da sessão não podem comprar/descartar. Não deixar `lastBotTurnPlayed` travar um turno com plano invalidado. Cobertura: `domination-decree-bot-resume.test.mjs`.
 
-- [ ] Regra limitada a TODOS os modos Chefe, sem alterar Buraco normal/Dominação. Destino realmente escolhido: jogo existente → topo; jogo novo pela mão → inteiro; Joker → topo; 2 existente → topo; 2 coringa novo → topo; 2 natural novo → inteiro.
+- [ ] Regra limitada a TODOS os modos Chefe, sem alterar Buraco normal/Dominação. Natural comum no jogo existente escolhido: topo legal sozinho → topo; depende de cartas da mão como ponte/complemento → inteiro. Validar com `isValidBossSequence()`, sem consultar outro destino. Jogo novo pela mão → inteiro; Joker → topo; 2 existente → topo; 2 coringa novo → topo; 2 natural novo → inteiro. Testar ponte/complemento, Lixo com várias cartas, humano/BOT/Nemesis/Zona Contaminada e tentativa inválida sem mutação.
 - [ ] Papel do 2 usa o validador canônico; 2–3–4 e 3–4–2 equivalentes. Não criar detector paralelo ou decidir pela posição visual.
-- [ ] Mostrar feedback curto antes de consumir. Humano/BOT usam a mesma consulta e quantidade real para mão final, Morto/batida e limites. Bloqueio/erro não move cartas; rerender/snapshot/reload não duplica retirada.
+- [ ] Somente o `?` explica a retirada; não adicionar feedback contextual durante seleção/compra. Humano/BOT usam a mesma consulta e quantidade real para mão final, Morto/batida e limites. Bloqueio/erro não move cartas; rerender/snapshot/reload não duplica retirada.
 - [ ] Ajuda opcional `?` junto ao contador do Lixo somente no modo Chefe: não disparar retirada, não duplicar controle nem criar avisos adicionais. Validar mouse/toque/Enter/Escape, compra bloqueada, saída do modo e popover dentro dos cinco viewports. O componente oficial precisa inicializar fechar/teclado mesmo sem habilidade ativa. Fixture do HUD deve incluir a seção externa inteira, não encerrar na seção aninhada oculta do registro.
 - [ ] Nemesis INVADINDO: explica expulsão, sem HP de combate nem alvo. Arte principal seleciona boss; chip/help não seleciona. Testar teclado e permissões de turno/observador.
 - [ ] Chip final calculado com a passiva real: Agarrador 1/2/3, Infectado 2/4/6, Devorador 40/70/100; incluir Normal + Reforçado 2/4/70. Ajuda específica de Mutado e reforço, prazo inclusivo (`roundNumber + 1`). Comando apenas persistent vivo.
@@ -740,3 +747,14 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 - [ ] Rodar regra do Lixo, handlers humano/BOT, Nemesis, laboratório, integração e suíte ampla; browser nos cinco viewports. Medir proximidade do popover entre bordas, não a partir do centro de um chip largo.
 
 Relatório e limitações: `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Sem novo balanceamento, commit, deploy ou Google Drive.
+
+### Feedback de dano por alvo — Nemesis (06/10/2026)
+
+- [ ] Golpes em cada zumbi mostram impacto/número no próprio card, inclusive ao virar cadáver, nunca no HUD do Nemesis. Usar `targetId` do evento e HP efetivamente perdido; zero não cria número. Manter deduplicação por evento no render/reload.
+- [ ] Validar HP dos zumbis verde (>50%), amarelo (25–50%) e vermelho (≤25%); Nemesis com âmbar/vermelho claramente distintos, números legíveis e reduced motion sem pulso.
+
+### Entrada do Devorador — Nemesis (06/10/2026)
+
+- [ ] Elegibilidade exige só um jogo existente alimentável, sem exigir plano completo de expulsão. Objetivo: 3 cartas novas acumuladas na rodada nos IDs dos jogos do início, no mesmo jogo ou em vários, por um ou dois jogadores.
+- [ ] Reorganização, jogos novos, cartas repetidas e replay/reload/snapshot/undo não duplicam progresso. Aos 3 repele imediatamente; menos de 3 ao fim da rodada persiste, Mutado na F3. BOT e Laboratório usam planos incrementais dos jogos válidos.
+- [ ] Não confundir com a passiva de cura: 3+ cartas DE UMA VEZ no mesmo jogo, 40/70 HP, Reforçado +30, máximo 1x por turno; não alterar seus valores nem regras.

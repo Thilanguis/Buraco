@@ -2,12 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { quoteBossDiscardPickup, isBossCardNaturalInSequence, isValidBossSequence, createBossState } from '../js/boss/boss-engine.js';
 import { listBossDefinitions } from '../js/boss/boss-registry.js';
+import { nemesisBossMechanics } from '../js/boss/mechanics/nemesis.js';
 const card = (rank, id = rank, suit = '♥') => ({ id, rank, suit, joker: rank === 'JOKER' });
 const state = (top, hand, melds = []) => ({ mode: 'boss_nemesis', boss: createBossState('nemesis', 123),
   players: [{ id: 0, teamId: 0, hand }], teams: [{ id: 0, melds }], discard: [card('K', 'lower'), top] });
 
 const cases = [
   ['natural existente', card('6'), [], [[card('3'), card('4'), card('5')]], 0, 1],
+  ['J com ponte 10 existente', card('J'), [card('10')], [[card('7'), card('8'), card('9')]], 0, 2],
+  ['natural abaixo com complemento', card('3'), [card('4')], [[card('5'), card('6'), card('7')]], 0, 2],
+  ['Joker existente com auxiliares', card('JOKER'), [card('10')], [[card('7'), card('8'), card('9')]], 0, 1],
+  ['2 existente com auxiliares', card('2', 'wild-two', '♣'), [card('10')], [[card('7'), card('8'), card('9')]], 0, 1],
   ['natural novo', card('10'), [card('8'), card('9')], [], null, 2],
   ['Joker existente', card('JOKER'), [], [[card('3'), card('4'), card('5')]], 0, 1],
   ['Joker novo', card('JOKER'), [card('8'), card('9')], [], null, 1],
@@ -54,4 +59,30 @@ test('tentativas inválidas e cartas bloqueadas não justificam nem mutam retira
     assert.equal(quoteBossDiscardPickup(game, 0, destination).allowed, false);
     assert.equal(JSON.stringify(game), before);
   }
+});
+
+test('destino existente real: outro jogo que aceita sozinho não protege o escolhido com ponte', () => {
+  const game = state(card('J'), [card('10')], [['8','9','10'], ['7','8','9']].map((ranks, i) => ranks.map(rank => card(rank, `m${i}-${rank}`))));
+  game.discard.unshift(card('3','bottom-1'), card('4','bottom-2'));
+  const before = JSON.stringify(game);
+  assert.equal(quoteBossDiscardPickup(game, 0, { meldIndex: 0 }).count, 1);
+  const quote = quoteBossDiscardPickup(game, 0, { meldIndex: 1, handCardIds: ['10'] });
+  assert.equal(quote.allowed, true); assert.equal(quote.protected, false); assert.equal(quote.count, 4);
+  assert.equal(JSON.stringify(game), before);
+  assert.equal(quoteBossDiscardPickup(game, 0, { meldIndex: 1 }).allowed, false);
+  assert.equal(JSON.stringify(game), before);
+});
+
+test('Zona Contaminada planner consults the canonical quote for an existing-game bridge', () => {
+  const game = state(card('J'), [card('10'), card('K', 'keep', '♠')], [[card('7'), card('8'), card('9')]]);
+  game.stock = [card('4', 'stock')];
+  const quotes = [];
+  const payload = nemesisBossMechanics.buildPayload({ gameState: game, helpers: {
+    blocked: () => false, validSequence: isValidBossSequence, canLeaveHand: () => true,
+    discardPickupQuote: (playerId, destination) => {
+      const quote = quoteBossDiscardPickup(game, playerId, destination); quotes.push(quote); return quote;
+    },
+  } }, 'contaminated_zone');
+  assert.equal(payload.targetPlayerId, 0);
+  assert.ok(quotes.some(quote => quote.allowed && !quote.protected && quote.count === 2));
 });

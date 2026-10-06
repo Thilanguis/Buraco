@@ -7310,13 +7310,50 @@ function createBossCombatHelp(label, title, text, caption = '?') {
     closeBossIntentHelp(); closeBossRuleHelp();
     if (!opening) return;
     document.getElementById('bossIntentHelpTitle').textContent = title;
-    document.getElementById('bossIntentHelpText').textContent = text;
+    document.getElementById('bossIntentHelpText').textContent = typeof text === 'function' ? text() : text;
     popover._extraTrigger = button;
     popover.hidden = false; popover.setAttribute('aria-hidden', 'false');
     button.setAttribute('aria-expanded', 'true');
     positionBossHelpPopover(button, popover);
   };
   return button;
+}
+
+// Presentation only: use the engine's existing progress/thresholds without recomputing phase rules.
+function renderBossPhaseAndHealth(gameState, progress) {
+  const boss = gameState.boss;
+  const panel = document.getElementById('bossPhaseProgress');
+  if (panel) {
+    panel.hidden = !progress;
+    if (progress) {
+      panel.classList.toggle('is-ready', progress.ready);
+      panel.classList.toggle('is-final', progress.final);
+      document.getElementById('bossPhaseProgressNext').textContent = progress.final ? 'FASE FINAL' : `FASE ${progress.nextPhase}`;
+      const bar = document.getElementById('bossPhaseProgressBar');
+      bar.parentElement.hidden = progress.final;
+      bar.style.width = `${Math.round(Math.max(0, Math.min(1, progress.hpProgress || 0)) * 100)}%`;
+      let button = document.getElementById('bossPhaseHelpButton');
+      if (!button) {
+        button = createBossCombatHelp('Explicar a progressão de fase', 'Próxima fase', () => button._phaseHelpText);
+        button.id = 'bossPhaseHelpButton';
+        document.getElementById('bossPhaseHelpSlot').append(button);
+      }
+      button._phaseHelpText = progress.final
+        ? 'Fase final: não há outra transição. Monte e Morto mostram os recursos atuais da mesa.'
+        : `Basta 1 gatilho para liberar a Fase ${progress.nextPhase}:\n• HP do chefe em ${progress.hp.targetPercent}% ou menos.\n• Monte com ${progress.stock.target} cartas ou menos.\n• ${progress.dead.target} morto(s) retirado(s).\n\nA barra acompanha o HP até o próximo marco. A transição segue o fluxo da batalha; não exige cumprir todos os gatilhos.`;
+      const popover = document.getElementById('bossIntentHelpPopover');
+      if (!popover?.hidden && popover?._extraTrigger === button) {
+        document.getElementById('bossIntentHelpText').textContent = button._phaseHelpText;
+        positionBossHelpPopover(button, popover);
+      }
+    }
+  }
+  const ratio = boss.maxHp > 0 ? Math.max(0, boss.hp / boss.maxHp) : 0;
+  const hpBar = document.getElementById('bossHpBar');
+  document.getElementById('bossHpText').textContent = `${boss.hp} / ${boss.maxHp}`;
+  hpBar.style.width = `${ratio * 100}%`;
+  hpBar.dataset.health = ratio > 0.5 ? 'normal' : ratio > 0.25 ? 'tension' : 'danger';
+  hpBar.classList.toggle('is-empty', boss.hp <= 0);
 }
 
 function syncBossDiscardHelp(bossMode) {
@@ -7330,7 +7367,7 @@ function syncBossDiscardHelp(bossMode) {
   const label = document.querySelector('#drawDiscardBtn .pile-info');
   if (!label) return;
   button = createBossCombatHelp('Explicar Lixo no modo Chefe', 'Lixo — Modo Chefe',
-    'Topo em jogo já baixado → pega só o topo.\nTopo em jogo novo com sua mão → pode pegar o Lixo inteiro.\n\nJoker → pega só o Joker.\n\n2 em jogo já baixado → pega só o 2.\n2 como coringa em jogo novo → pega só o 2.\n2 natural em jogo novo (2–3–4) → pode pegar o Lixo inteiro.');
+    'Num jogo da mesa:\n• A carta de cima encaixa sozinha? Pegue só ela.\n• Precisa juntar cartas da sua mão? Pegue o Lixo inteiro.\n\nFez um jogo novo com a mão? Pegue o Lixo inteiro.\n\nJoker: só ele.\n2: só ele, mesmo completando um jogo. Só pega tudo se abrir um jogo novo com o 2 valendo como 2 (ex.: 2–3–4).');
   button.id = 'bossDiscardHelpButton';
   label.append(button);
 }
@@ -7393,6 +7430,8 @@ function renderBossCombatPanel(hud, boss) {
     if (entity.selectable) {
       const hp = document.createElement('span'); hp.textContent = `${entity.hp}/${entity.maxHp} HP`;
       const meter = document.createElement('meter'); meter.min = 0; meter.max = entity.maxHp; meter.value = entity.hp; meter.setAttribute('aria-label', `HP de ${entity.name}`);
+      meter.low = entity.maxHp * .25; meter.high = entity.maxHp * .5; meter.optimum = entity.maxHp;
+      meter.dataset.health = entity.hp > meter.high ? 'normal' : entity.hp > meter.low ? 'tension' : 'danger';
       content.append(hp, meter);
       const target = document.createElement('button'); target.type = 'button'; target.className = 'boss-combat-card-target'; target.textContent = entity.name;
       target.setAttribute('aria-label', `Selecionar ${entity.name} como alvo`); target.setAttribute('aria-pressed', String(entity.id === model.target));
@@ -7422,6 +7461,31 @@ function renderBossCombatPanel(hud, boss) {
   }
   targets.append(createBossCombatHelp('Explicar alvo do dano', 'Alvo do dano', 'Toque num zumbi ATIVO para atacá-lo ou na arte do Nemesis para voltar ao chefe.\nEscolha antes de jogar; vale para o ataque final. Dano excedente não passa para outro alvo.'));
   mainPortrait.append(targets);
+}
+
+function presentBossDamageFeedback(hud, boss, event) {
+  const zombieTarget = Array.isArray(boss.combatEntities) && event.targetId && event.targetId !== 'boss';
+  const target = zombieTarget
+    ? [...document.querySelectorAll('.boss-combat-entity')].find(node => node.dataset.entityId === event.targetId)
+    : hud;
+  const damage = Array.isArray(boss.combatEntities) ? (event.appliedDamage ?? event.damage) : event.damage;
+  if (!target || !(damage > 0)) return;
+  if (event.type === 'bossDamage') {
+    const hitClass = zombieTarget ? 'boss-combat-hit' : 'boss-hit';
+    target.classList.remove(hitClass);
+    void target.offsetWidth;
+    target.classList.add(hitClass);
+  }
+  const floating = document.createElement('div');
+  floating.className = 'boss-floating-number';
+  floating.dataset.targetId = zombieTarget ? event.targetId : 'boss';
+  floating.textContent = `-${damage} HP`;
+  const anchor = zombieTarget ? target : hud.querySelector('.boss-hp-meter') || hud;
+  const rect = anchor.getBoundingClientRect();
+  floating.style.left = `${rect.left + rect.width / 2}px`;
+  floating.style.top = `${rect.top + rect.height / 2}px`;
+  document.body.appendChild(floating);
+  setTimeout(() => floating.remove(), 2600);
 }
 
 function renderBossHud() {
@@ -7501,41 +7565,8 @@ function renderBossHud() {
   if (legacyPhaseRule) legacyPhaseRule.hidden = true;
 
   const phaseProgress = getBossPhaseProgress(state);
-  const phaseProgressPanel = document.getElementById('bossPhaseProgress');
-  const phaseProgressNext = document.getElementById('bossPhaseProgressNext');
-  const phaseProgressHint = document.getElementById('bossPhaseProgressHint');
-  const phaseProgressHp = document.getElementById('bossPhaseProgressHp');
-  const phaseProgressStock = document.getElementById('bossPhaseProgressStock');
-  const phaseProgressDead = document.getElementById('bossPhaseProgressDead');
-  const phaseProgressBar = document.getElementById('bossPhaseProgressBar');
-  if (phaseProgressPanel && phaseProgress) {
-    // Na fase final não existe próxima transição: esconder o bloco mantém o HUD limpo.
-    phaseProgressPanel.hidden = phaseProgress.final;
-    phaseProgressPanel.classList.toggle('is-ready', phaseProgress.ready);
-    if (!phaseProgress.final) {
-      if (phaseProgressNext) phaseProgressNext.textContent = `FASE ${phaseProgress.nextPhase}`;
-      if (phaseProgressHint) phaseProgressHint.textContent = phaseProgress.ready ? 'TRANSIÇÃO LIBERADA' : '1 GATILHO BASTA';
-      if (phaseProgressHp) {
-        phaseProgressHp.textContent = `HP ${phaseProgress.hp.currentPercent}% · ALVO ≤${phaseProgress.hp.targetPercent}%`;
-        phaseProgressHp.classList.toggle('ready', phaseProgress.hp.ready);
-      }
-      if (phaseProgressStock) {
-        phaseProgressStock.textContent = `MONTE ${phaseProgress.stock.current} · ALVO ≤${phaseProgress.stock.target}`;
-        phaseProgressStock.classList.toggle('ready', phaseProgress.stock.ready);
-      }
-      if (phaseProgressDead) {
-        const deadLabel = phaseProgress.dead.target === 1 ? 'MORTO' : 'MORTOS';
-        phaseProgressDead.textContent = `${deadLabel} ${Math.min(phaseProgress.dead.current, phaseProgress.dead.target)}/${phaseProgress.dead.target}`;
-        phaseProgressDead.classList.toggle('ready', phaseProgress.dead.ready);
-      }
-      if (phaseProgressBar) phaseProgressBar.style.width = `${Math.round(Math.max(0, Math.min(1, phaseProgress.hpProgress || 0)) * 100)}%`;
-    }
-  } else if (phaseProgressPanel) {
-    phaseProgressPanel.hidden = true;
-  }
+  renderBossPhaseAndHealth(state, phaseProgress);
   syncBossRuleHelp(state, definition);
-  document.getElementById('bossHpText').textContent = `${boss.hp} / ${boss.maxHp}`;
-  document.getElementById('bossHpBar').style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
   const cocoonMeter = document.getElementById('bossCocoonMeter');
   const cocoonText = document.getElementById('bossCocoonText');
   const wardLabel = document.getElementById('bossWardLabel');
@@ -8078,22 +8109,7 @@ function renderBossHud() {
   const event = resolvingEvent || (boss.lastEvent?.type === 'bossAbility' ? null : boss.lastEvent);
   if (event?.actionId && event.actionId !== lastRenderedBossEventId) {
     lastRenderedBossEventId = event.actionId;
-    if (event.type === 'bossDamage') {
-      hud.classList.remove('boss-hit');
-      void hud.offsetWidth;
-      hud.classList.add('boss-hit');
-    }
-    const amount = event.damage ? `-${event.damage} HP` : '';
-    if (amount) {
-      const floating = document.createElement('div');
-      floating.className = `boss-floating-number${event.damage ? '' : event.dangerDelta > 0 ? ' debt-up' : ' debt-down'}`;
-      floating.textContent = amount;
-      const rect = hud.getBoundingClientRect();
-      floating.style.left = `${rect.left + rect.width / 2}px`;
-      floating.style.top = `${rect.top + rect.height / 2}px`;
-      document.body.appendChild(floating);
-      setTimeout(() => floating.remove(), 2600);
-    }
+    presentBossDamageFeedback(hud, boss, event);
   }
 
   const feedbackEvents = boss.eventLog || [];
@@ -11393,7 +11409,10 @@ const botEngine = {
     }
     const team = s.teams[me.teamId];
     if (!['extend', 'new'].includes(intent?.action)) return false;
-    const selectedHandCards = intent.action === 'new' ? (intent.handIndexes || []).map((index) => me.hand[index]).filter(Boolean) : [];
+    const selectedIndexes = intent.action === 'new' || isBossMode(s) ? (intent.handIndexes || []) : [];
+    const selectedHandCards = selectedIndexes.map(index => me.hand[index]).filter(Boolean);
+    if (selectedHandCards.length !== selectedIndexes.length || new Set(selectedIndexes).size !== selectedIndexes.length) return false;
+    if (selectedHandCards.some(card => isBossCardBlocked(s, me.id, card.id, 'play'))) return false;
     if (intent.action === 'extend' && !canBossUseMeld(s, me.id, intent.meldIndex)) return false;
     if (intent.action === 'new') {
       if (!canBossCreateMeld(s, me.id)) return false;
@@ -11407,9 +11426,9 @@ const botEngine = {
     const bossMeldValidation = validateBossMeldPlay(s, me.id, selectedHandCards, s.discard.slice(s.discard.length - pickupQuote.count, -1));
     if (!bossMeldValidation.allowed) return false;
     const previewTop = s.discard[s.discard.length - 1];
-    const previewAddedCards = intent.action === 'new' ? [...selectedHandCards, previewTop] : [previewTop];
+    const previewAddedCards = [...selectedHandCards, previewTop];
     const previewOldKind = intent.action === 'extend' ? classifyMeldForUi(team.melds[intent.meldIndex]).kind : 'simple';
-    const previewMeld = intent.action === 'extend' ? [...team.melds[intent.meldIndex], previewTop] : [...selectedHandCards, previewTop];
+    const previewMeld = intent.action === 'extend' ? [...team.melds[intent.meldIndex], ...previewAddedCards] : previewAddedCards;
     const previewNewKind = classifyMeldForUi(previewMeld).kind;
     const previewMeldIndex = intent.action === 'extend' ? intent.meldIndex : team.melds.length;
     const creditEligibleCardIds = selectedHandCards.map((card) => card.id);
@@ -11435,7 +11454,9 @@ const botEngine = {
 
     if (intent.action === 'extend') {
       kindBeforeFechado = classifyMeldForUi(team.melds[intent.meldIndex]).kind;
-      team.melds[intent.meldIndex].push(topCard);
+      bossAddedCards = [...selectedHandCards, topCard];
+      [...selectedIndexes].sort((a, b) => b - a).forEach(index => me.hand.splice(index, 1));
+      team.melds[intent.meldIndex].push(...bossAddedCards);
       this.normalizeMeld(team.melds[intent.meldIndex]);
       meldToCheck = team.melds[intent.meldIndex];
     } else if (intent.action === 'new') {

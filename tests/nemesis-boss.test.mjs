@@ -650,12 +650,12 @@ test('zombie chips show final passive amounts and specific mutation/command dura
   }
 });
 
-test('Devorador cannot count one card twice across two different melds', () => {
+test('Devorador eligibility requires one legal contribution, not a complete expulsion plan', () => {
   const state = fresh(); dead(state, 'grabber'); dead(state, 'infected');
   state.teams[0].melds = [0, 1].map((meld) => ['4', '5', '6'].map((rank) => ({ id: `${meld}-${rank}`, rank, suit: '♦' })));
   state.players[0].hand = [{ id: 'shared-seven', rank: '7', suit: '♦' }, { id: 'keep', rank: 'K', suit: '♠' }];
   state.players[1].hand = [{ id: 'partner-keep', rank: 'K', suit: '♥' }];
-  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false);
+  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, true);
 });
 
 test('Agarrador never marks an illegal last-card discard without Morto or good canastra', () => {
@@ -744,7 +744,10 @@ test('new combat HUD is empty, entering is contextual, help contains exact passi
   assert.equal(model.entities[0].stateLabel, 'INVADINDO'); assert.equal(model.entities[0].selectable, false);
   entity(state, 'grabber').status = 'persistent'; state.boss.hordeBuff = { entityId: 'grabber', expiresRound: 9, sourceIntentId: 'buff' };
   model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
-  assert.equal(model.entities[0].stateLabel, 'DEBUFF REFORÇADO'); assert.match(model.entities[0].help, /2 normal \/ 3 Mutado/);
+  assert.equal(model.entities[0].stateLabel, 'DEBUFF REFORÇADO');
+  assert.match(model.entities[0].help, /Normal: 1; Mutado: 2; Reforçado: 2; ambos: 3/);
+  assert.match(model.entities[0].help, /Prioriza jogáveis e completa com outras seguras/);
+  assert.match(model.entities[0].help, /Só prende menos por falta de cartas ou para preservar uma solução obrigatória/);
   assert.deepEqual(model.choices.map((entry) => entry.id), ['boss']);
   dead(state, 'grabber'); model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
   assert.equal(model.entities[0].stateLabel, 'CADÁVER'); assert.equal(model.entities[0].selectable, false);

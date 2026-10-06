@@ -58,10 +58,16 @@ window.fixture = { render: () => renderBossCombatPanel(hud, state.boss), state: 
   reload: () => { state = JSON.parse(JSON.stringify(state)); renderBossCombatPanel(hud, state.boss); },
   observer: (index) => { myPlayerIndex = index; renderBossCombatPanel(hud, state.boss); } };
 window.fixture.render();
+window.fixture.damage = event => presentBossDamageFeedback(hud, state.boss, event);
 let discardClicks = 0;
 document.getElementById('drawDiscardBtn').onclick = () => { discardClicks++; };
 window.fixture.discardClicks = () => discardClicks;
 window.fixture.discardHelp = syncBossDiscardHelp;
+window.fixture.helpAlignment = () => {
+  const label = document.querySelector('#drawDiscardBtn .pile-info').getBoundingClientRect();
+  const button = document.getElementById('bossDiscardHelpButton').getBoundingClientRect();
+  return Math.abs(label.top + label.height / 2 - button.top - button.height / 2);
+};
 window.fixture.targetRace = async () => {
   let release; commitDelay = new Promise(resolve => { release = resolve; });
   const before = commits, oldState = JSON.parse(JSON.stringify(state));
@@ -124,6 +130,18 @@ window.fixture.infectedCard = () => {
   return { effect, other: getBossCardEffect(sample, 1 - intent.payload.targetPlayerId, cardId) };
 };
 window.fixture.decorate = (effect) => getBossUiAdapter('nemesis').decorateCard(document.getElementById('infectionTestCard'), effect);
+window.fixture.dualStatus = () => {
+  const sample = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'infectious_tentacle', phase: 1 }).state;
+  beginBossTurn(sample, {first:true,now:1000,debug:true});
+  for (let i=0; i<15 && sample.boss.bossFlow.stage !== 'players'; i++) advanceBossTurn(sample, sample.boss.bossFlow.endsAt + 1);
+  const owner = sample.boss.currentIntent.payload.targetPlayerId;
+  const id = sample.boss.currentIntent.payload.cardIds[0];
+  sample.boss.combatEntities[0].status = 'persistent';
+  sample.boss.grabbedByPlayer[owner] = {cardIds:[id],turnId:sample.turnNumber + ':' + owner};
+  const effect = getBossCardEffect(sample, owner, id);
+  window.fixture.decorate(effect); window.fixture.decorate(effect);
+  return effect;
+};
 window.fixture.grabPulse = (reducedMotion = false) => {
   const sample = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'stars_hunt', phase: 1 }).state;
   sample.boss.currentIntent = null; sample.boss.bossFlow = null; sample.boss.combatEntities[0].status = 'persistent';
@@ -187,12 +205,14 @@ try {
   assert.equal(await page.locator('#bossIntentHelpTitle').innerText(), 'Lixo — Modo Chefe');
   const discardRule = await page.locator('#bossIntentHelpText').innerText();
   assert.ok(discardRule.length < 350, 'discard rule remains short');
-  assert.match(discardRule, /jogo já baixado.*só o topo/);
+  assert.match(discardRule, /encaixa sozinha\? Pegue só ela/);
+  assert.match(discardRule, /juntar cartas da sua mão\? Pegue o Lixo inteiro/);
   assert.match(discardRule, /jogo novo.*Lixo inteiro/);
-  assert.match(discardRule, /Joker.*só o Joker/);
-  assert.match(discardRule, /2 como coringa.*só o 2/);
-  assert.match(discardRule, /2 natural.*Lixo inteiro/);
+  assert.match(discardRule, /Joker: só ele/);
+  assert.match(discardRule, /2: só ele, mesmo completando um jogo/);
+  assert.match(discardRule, /Só pega tudo se abrir um jogo novo com o 2 valendo como 2/);
   assert.equal(await page.evaluate(() => window.fixture.discardClicks()), 0, 'help never triggers pickup');
+  assert.ok(await page.evaluate(() => window.fixture.helpAlignment()) <= 1, 'discard ? is vertically centered with its counter');
   await page.keyboard.press('Escape');
   assert.equal(await discardHelp.getAttribute('aria-expanded'), 'false');
   await page.locator('#drawDiscardBtn .pile-card').click();
@@ -232,6 +252,23 @@ try {
       return { border: css.border, shadow: css.boxShadow, inset: css.inset };
     }), infectionStyle, 'all exact-card marks retain the same restrained outline');
   }
+  assert.deepEqual(await page.evaluate(() => window.fixture.dualStatus()), ['nemesis-marked','nemesis-grabbed']);
+  const combinedCard = page.locator('#infectionTestCard');
+  assert.equal(await combinedCard.locator('.nemesis-infection-overlay').count(), 1);
+  assert.equal(await combinedCard.locator('.boss-card-status-nemesis').count(), 1);
+  assert.deepEqual(await combinedCard.locator('.nemesis-dual-status > span').allTextContents(), ['☣ MARCADA','AGARRADA']);
+  assert.deepEqual(await combinedCard.locator('.nemesis-infection-overlay').evaluate(node => {
+    const css = getComputedStyle(node); return { border:css.border, shadow:css.boxShadow, inset:css.inset };
+  }), infectionStyle, 'two statuses never double the green border/glow');
+  await combinedCard.evaluate(node => { node.style.width='65px'; node.style.height='95px'; });
+  const dualLayout = await combinedCard.evaluate(node => {
+    const label = node.querySelector('.nemesis-dual-status'), status = label.getBoundingClientRect();
+    const card = node.getBoundingClientRect(), nova = node.querySelector('.bought-card-marker > span').getBoundingClientRect();
+    return {fits:label.scrollWidth <= label.clientWidth, inside:status.left >= card.left && status.right <= card.right, below:status.bottom <= nova.top, width:label.clientWidth, content:label.scrollWidth, bottom:status.bottom,novaTop:nova.top};
+  });
+  assert.ok(dualLayout.fits && dualLayout.inside && dualLayout.below, `both compact labels fit a small card and do not cover NOVA: ${JSON.stringify(dualLayout)}`);
+  await mkdir(resolve(root, '.cache/nemesis-ui'), {recursive:true});
+  await combinedCard.screenshot({path:resolve(root, '.cache/nemesis-ui/nemesis-dual-status.png')});
   assert.deepEqual(await page.evaluate(() => window.fixture.grabPulse()), { first: 1, repeat: 1, pulses: 1, marked: ['grab-a'], label: '☣ AGARRADA', remaining: 0 });
   assert.deepEqual(await page.evaluate(() => window.fixture.grabPulse(true)), { first: 0, repeat: 0, pulses: 0, marked: ['grab-a'], label: '☣ AGARRADA', remaining: 0 });
   await page.evaluate(() => window.fixture.decorate(null));
@@ -416,6 +453,38 @@ try {
   assert.equal(await page.locator('.boss-combat-entity.is-corpse').count(), 3);
   assert.equal(await page.locator('.boss-combat-entity.is-corpse .boss-combat-portrait').count(), 3);
   assert.equal(await page.locator('.boss-combat-entity meter').count(), 0);
+  for (const targetId of ['grabber', 'infected', 'devourer']) {
+    const feedback = await page.evaluate(targetId => {
+      document.querySelectorAll('.boss-floating-number').forEach(node => node.remove());
+      const hud = document.getElementById('bossHud'); hud.classList.remove('boss-hit');
+      window.fixture.damage({ type: 'bossDamage', targetId, damage: 300, appliedDamage: 50 });
+      const card = document.querySelector('[data-entity-id="' + targetId + '"]');
+      const rect = card.getBoundingClientRect(), number = document.querySelector('.boss-floating-number');
+      return { text: number.textContent, target: number.dataset.targetId, x: Number.parseFloat(number.style.left), y: Number.parseFloat(number.style.top), cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, mainHit: hud.classList.contains('boss-hit'), cardHit: card.classList.contains('boss-combat-hit') };
+    }, targetId);
+    assert.equal(feedback.text, '-50 HP'); assert.equal(feedback.target, targetId);
+    assert.equal(feedback.x, feedback.cx); assert.equal(feedback.y, feedback.cy);
+    assert.equal(feedback.mainHit, false); assert.equal(feedback.cardHit, true);
+  }
+  await page.evaluate(() => {
+    document.querySelectorAll('.boss-floating-number').forEach(node => node.remove());
+    window.fixture.damage({ type: 'bossDamage', targetId: 'grabber', damage: 300, appliedDamage: 0 });
+  });
+  assert.equal(await page.locator('.boss-floating-number').count(), 0);
+  await page.evaluate(() => window.fixture.damage({ type: 'bossDamage', targetId: 'boss', damage: 20, appliedDamage: 20 }));
+  assert.equal(await page.locator('.boss-floating-number').getAttribute('data-target-id'), 'boss');
+  assert.equal(await page.locator('#bossHud').evaluate(node => node.classList.contains('boss-hit')), true);
+  for (const [ratio, health, color] of [[1, 'normal', '#73ce54'], [.5, 'tension', '#e7a622'], [.25, 'danger', '#ef2944']]) {
+    await page.evaluate(ratio => {
+      for (const entity of window.fixture.state().boss.combatEntities) { entity.status = 'persistent'; entity.hp = entity.maxHp * ratio; }
+      window.fixture.render();
+    }, ratio);
+    for (const meter of await page.locator('.boss-combat-entity meter').all()) {
+      assert.equal(await meter.getAttribute('data-health'), health);
+      assert.equal(await meter.evaluate(node => getComputedStyle(node).getPropertyValue('--combat-hp-color').trim()), color);
+      assert.equal(await meter.evaluate(node => getComputedStyle(node).animationName), 'none', 'reduced motion disables HP pulse');
+    }
+  }
   assert.deepEqual(errors, []);
   const touchPage = await browser.newPage({ hasTouch: true, viewport: { width: 390, height: 844 } });
   await touchPage.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:') ? route.continue() : route.abort());

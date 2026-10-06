@@ -67,10 +67,15 @@ export function findNemesisLegalPlan(state, player, helpers, predicate = () => t
     if (helpers.canLeaveHand && !helpers.canLeaveHand(player, moves)) return null;
     const played = moves.flatMap((move) => move.cardIds);
     const remaining = hand(state, player.id).filter((card) => !played.includes(card.id));
-    const discard = remaining.find((card) => card.id !== state.pickedDiscardCardId && !helpers.blocked(player.id, card.id, 'discard'));
-    if (remaining.length && !discard) return null;
-    const plan = { moves, playedCardIds: played, discardCardId: discard?.id || null };
-    return predicate(plan) ? plan : null;
+    const discards = remaining.filter((card) => card.id !== state.pickedDiscardCardId && !helpers.blocked(player.id, card.id, 'discard'));
+    if (remaining.length && !discards.length) return null;
+    // The first legal discard is not necessarily the objective's legal discard.
+    // AGARRADA only blocks play, so consider every legal exit before rejecting.
+    for (const discard of remaining.length ? discards : [null]) {
+      const plan = { moves, playedCardIds: played, discardCardId: discard?.id || null };
+      if (predicate(plan)) return plan;
+    }
+    return null;
   };
   const singles = [];
   for (let index = 0; index < melds.length; index += 1) {
@@ -120,10 +125,10 @@ function teamEntryPlan(state, helpers, kind, progress = {}) {
   const players = entryPlayers(state);
   const satisfies = (plans) => kind === 'infected'
     ? new Set([...(progress.contributionCardIds || []), ...plans.flatMap((plan) => plan.playedCardIds)]).size >= 2
-    : new Set([...(progress.fedMeldIds || []), ...plans.flatMap((plan) => plan.moves
+    : new Set([...(progress.devourerCardIds || []), ...plans.flatMap((plan) => plan.moves
       .filter((move) => move.meldIndex != null && move.meldIndex < state.teams[0].melds.length)
-      .map((move) => helpers.meldId(0, move.meldIndex))
-      .filter((id) => !progress.entryMeldIds || progress.entryMeldIds.includes(id)))]).size >= 2;
+      .filter((move) => !progress.entryMeldIds || progress.entryMeldIds.includes(helpers.meldId(0, move.meldIndex)))
+      .flatMap((move) => move.cardIds))]).size >= 3;
   for (const player of players) {
     const plan = findNemesisLegalPlan(state, player, helpers, (candidate) => satisfies([candidate]));
     if (plan) return [{ ...plan, playerId: player.id }];
@@ -160,8 +165,14 @@ function entryCandidates(state, helpers) {
       }
       return [];
     }
-    const plans = teamEntryPlan(state, helpers, entity.id);
-    return plans ? [{ entityId: entity.id, entryKind: entity.id, duration: 'full_round', contributionCardIds: [], fedMeldIds: [], entryMeldIds: state.teams[0].melds.map((_meld, index) => helpers.meldId(0, index)),
+    // Devorador needs one legal existing-game contribution to enter, not a
+    // proof that the team can already complete its three-card round objective.
+    const plans = entity.id === 'devourer' ? entryPlayers(state).flatMap(player => {
+      const plan = findNemesisLegalPlan(state, player, helpers, candidate => candidate.moves.some(move => move.meldIndex != null));
+      return plan ? [{ ...plan, playerId: player.id }] : [];
+    }).slice(0, 1) : teamEntryPlan(state, helpers, entity.id);
+    return plans?.length ? [{ entityId: entity.id, entryKind: entity.id, duration: 'full_round', contributionCardIds: [], entryMeldIds: state.teams[0].melds.map((_meld, index) => helpers.meldId(0, index)),
+      ...(entity.id === 'devourer' ? { devourerCardIds: [], entryTableCardIds: state.teams[0].melds.flat().map(card => card.id) } : { fedMeldIds: [] }),
       solution: { teamPlans: plans, moves: [], playedCardIds: [], discardCardId: null } }] : [];
   });
 }
@@ -195,7 +206,7 @@ function resolveEntry(boss, intent) {
   const entity = boss.combatEntities.find((entry) => entry.id === payload.entityId && entry.status === 'entering');
   if (!entity) return;
   const success = payload.entryKind === 'grabber' ? payload.exitedCardIds.length >= 1
-    : payload.entryKind === 'infected' ? payload.contributionCardIds.length >= 2 : payload.fedMeldIds.length >= 2;
+    : payload.entryKind === 'infected' ? payload.contributionCardIds.length >= 2 : (payload.devourerCardIds || []).length >= 3;
   entity.status = success ? 'repelled' : 'persistent';
   entity.hp = entity.maxHp;
   entity.mutated = !success && boss.phase >= 3;
@@ -356,10 +367,11 @@ export const nemesisBossMechanics = Object.freeze({
   },
   isCardBlocked(boss, playerId, cardId, action) { return action === 'play' && !!alive(boss, 'grabber') && !!boss.grabbedByPlayer?.[playerId]?.cardIds?.includes(cardId); },
   cardEffect({ boss, playerId, cardId }) {
-    if (alive(boss, 'grabber') && boss.grabbedByPlayer[playerId]?.cardIds.includes(cardId)) return 'nemesis-grabbed';
+    const grabbed = !!alive(boss, 'grabber') && !!boss.grabbedByPlayer[playerId]?.cardIds.includes(cardId);
     const intent = boss.currentIntent;
-    if (intent?.payload.targetPlayerId === playerId && !intent.payload.resolved && (intent.payload.cardIds?.includes(cardId) || intent.payload.secondCardId === cardId)) return 'nemesis-marked';
-    return null;
+    const marked = intent?.payload.targetPlayerId === playerId && !intent.payload.resolved && (intent.payload.cardIds?.includes(cardId) || intent.payload.secondCardId === cardId);
+    if (marked && grabbed) return ['nemesis-marked', 'nemesis-grabbed'];
+    return marked ? 'nemesis-marked' : grabbed ? 'nemesis-grabbed' : null;
   },
   cardBlockFeedback: () => ({ effect: 'nemesis-grabbed', reason: 'grabbed', message: 'Carta Agarrada: não pode entrar em jogo neste turno. O descarte continua permitido.' }),
   onPurchaseCompleted({ boss, gameState, playerId, helpers, recordBossEvent }) {
@@ -369,33 +381,63 @@ export const nemesisBossMechanics = Object.freeze({
     if (boss.grabbedTurnIds.length > 100) boss.grabbedTurnIds.splice(0, boss.grabbedTurnIds.length - 100);
     const player = gameState.players.find(entry => entry.id === playerId);
     const intent = boss.currentIntent, payload = intent?.payload;
-    const protectedIds = new Set();
-    if (payload && !payload.resolved) {
-      // Keep a whole canonical solution, not just the named card: support cards
-      // and the legal final discard can also be the only route to success.
-      const priorities = this.botPriorities({ boss, gameState, playerId, helpers });
-      if (priorities?.active) {
-        if (!priorities.plan) player.hand.forEach(card => protectedIds.add(card.id));
-        else [...priorities.plan.playedCardIds, priorities.plan.discardCardId].filter(Boolean).forEach(id => protectedIds.add(id));
-        priorities.markedCardIds?.forEach(id => protectedIds.add(id));
-      }
-      if (intent.abilityId === 'horde_invasion' && payload.entryKind !== 'grabber') {
-        // Re-evaluate against the current table/progress, including the partner.
-        const plans = teamEntryPlan(gameState, helpers, payload.entryKind, payload);
-        if (!plans) player.hand.forEach(card => protectedIds.add(card.id));
-        for (const plan of plans || []) if (plan.playerId === playerId) {
-          [...plan.playedCardIds, plan.discardCardId].filter(Boolean).forEach(id => protectedIds.add(id));
-        }
-      }
-    }
+    const cooperative = intent?.abilityId === 'horde_invasion' && !payload.resolved && payload.entryKind !== 'grabber';
+    const priorities = cooperative ? null : this.botPriorities({ boss, gameState, playerId, helpers });
+    const preserveObjective = !!(priorities?.active && priorities.plan);
+    const preserveTeamEntry = cooperative && !!teamEntryPlan(gameState, helpers, payload.entryKind, payload);
+    const hasDiscard = player.hand.some(card => card.id !== gameState.pickedDiscardCardId && !helpers.blocked(playerId, card.id, 'discard'));
+    // Validate the resulting restrictions, not the cards used by the first plan.
+    // A marked+grabbed card may still solve an objective via legal discard.
+    const preservesSolution = (ids) => {
+      if (!preserveObjective && !preserveTeamEntry && hasDiscard) return true;
+      const selected = new Set(ids);
+      const trialBoss = { ...boss, grabbedByPlayer: { ...boss.grabbedByPlayer, [playerId]: { cardIds: ids, turnId: key } } };
+      const preview = { ...gameState, boss: trialBoss };
+      const trialHelpers = { ...helpers, blocked: (id, cardId, action) =>
+        (id === playerId && action === 'play' && selected.has(cardId)) || helpers.blocked(id, cardId, action) };
+      if (preserveObjective && !this.botPriorities({ boss: trialBoss, gameState: preview, playerId, helpers: trialHelpers }).plan) return false;
+      if (preserveTeamEntry && !teamEntryPlan(preview, trialHelpers, payload.entryKind, payload)) return false;
+      if (!hasDiscard && !findNemesisLegalPlan(preview, player, trialHelpers)) return false;
+      return true;
+    };
     const count = getNemesisZombieEffect(boss, grabber).value, playableIds = new Set();
     findNemesisLegalPlan(gameState, player, helpers, plan => {
       plan.playedCardIds.forEach(id => playableIds.add(id));
-      return playableIds.size >= count + protectedIds.size;
+      return playableIds.size >= count;
     });
-    const eligible = [...playableIds].filter(id => !protectedIds.has(id));
-    const offset = helpers.pickIndex(eligible.length);
-    const cardIds = [...eligible.slice(offset), ...eligible.slice(0, offset)].slice(0, count);
+    const eligible = player.hand.filter(card => card?.id && !helpers.blocked(playerId, card.id, 'play'));
+    const rotate = cards => {
+      if (!cards.length) return [];
+      const offset = helpers.pickIndex(cards.length);
+      return [...cards.slice(offset), ...cards.slice(0, offset)].map(card => card.id);
+    };
+    const playable = eligible.filter(card => playableIds.has(card.id));
+    const fallback = eligible.filter(card => !playableIds.has(card.id));
+    const ordered = [...rotate(playable), ...rotate(fallback)];
+    const checked = new Map();
+    const valid = (ids) => {
+      const signature = JSON.stringify([...ids].sort());
+      if (!checked.has(signature)) checked.set(signature, preservesSolution(ids));
+      return checked.get(signature);
+    };
+    const choose = (size, start = 0, chosen = []) => {
+      // Adding play-only locks cannot restore a lost solution. Prove impossible
+      // local branches early, without a search cap or reducing the quota.
+      // The cooperative planner has its own candidate budget: only validate
+      // full combinations there, since a partial false is not a proof.
+      if (chosen.length && (chosen.length === size || !preserveTeamEntry) && !valid(chosen)) return null;
+      if (chosen.length === size) return chosen;
+      for (let index = start; index <= ordered.length - (size - chosen.length); index++) {
+        const found = choose(size, index + 1, [...chosen, ordered[index]]);
+        if (found) return found;
+      }
+      return null;
+    };
+    let cardIds = [];
+    for (let size = Math.min(count, ordered.length); size > 0; size--) {
+      const found = choose(size);
+      if (found) { cardIds = found; break; }
+    }
     boss.grabbedByPlayer[playerId] = { cardIds, turnId: key };
     if (!cardIds.length) return [];
     return [recordBossEvent({ type: 'nemesisGrab', actionId: `nemesisGrab:${key}`, playerId, cardIds, turnId: key, outcome: `${cardIds.length} carta(s) Agarrada(s) até o fim do turno.` })];
@@ -424,8 +466,13 @@ export const nemesisBossMechanics = Object.freeze({
       const payload = boss.currentIntent?.payload;
       if (boss.currentIntent?.abilityId === 'horde_invasion' && !payload.resolved) {
         payload.contributionCardIds = [...new Set([...(payload.contributionCardIds || []), ...fresh.map((card) => card.id)])];
-        // Only the two existing, distinct melds matter for the Devorador.
-        if (payload.entryMeldIds?.includes(meldId)) payload.fedMeldIds = [...new Set([...(payload.fedMeldIds || []), meldId])];
+        if (payload.entryKind === 'devourer' && payload.entryMeldIds?.includes(meldId)) {
+          const additions = fresh.filter(card => !(payload.entryTableCardIds || []).includes(card.id));
+          payload.devourerCardIds = [...new Set([...(payload.devourerCardIds || []), ...additions.map(card => card.id)])];
+          if (payload.devourerCardIds.length >= 3) resolveEntry(boss, boss.currentIntent);
+        } else if (payload.entryKind !== 'devourer' && payload.entryMeldIds?.includes(meldId)) {
+          payload.fedMeldIds = [...new Set([...(payload.fedMeldIds || []), meldId])];
+        }
       }
       if (payload?.targetPlayerId === playerId && !payload.resolved) payload.contributed = true;
       const devourer = alive(boss, 'devourer'); const key = turnKey(gameState, playerId);
@@ -468,11 +515,11 @@ export const nemesisBossMechanics = Object.freeze({
     if (intent?.abilityId === 'horde_invasion' && !payload.resolved) {
       const player = gameState.players.find((entry) => entry.id === playerId);
       const marked = payload.entryKind === 'grabber' && payload.targetPlayerId === playerId ? payload.cardIds : [];
-      const fulfilled = payload.entryKind === 'grabber' ? payload.exitedCardIds.length >= 1 : payload.entryKind === 'infected' ? payload.contributionCardIds.length >= 2 : payload.fedMeldIds.length >= 2;
+      const fulfilled = payload.entryKind === 'grabber' ? payload.exitedCardIds.length >= 1 : payload.entryKind === 'infected' ? payload.contributionCardIds.length >= 2 : (payload.devourerCardIds || []).length >= 3;
       const active = !fulfilled && (payload.entryKind !== 'grabber' || marked.length > 0);
       const predicate = (plan) => payload.entryKind === 'grabber' ? [...plan.playedCardIds, plan.discardCardId].some((id) => marked.includes(id))
         : payload.entryKind === 'infected' ? plan.playedCardIds.length > 0
-          : plan.moves.some((move) => move.meldIndex != null && payload.entryMeldIds.includes(helpers.meldId(player.teamId, move.meldIndex)) && !payload.fedMeldIds.includes(helpers.meldId(player.teamId, move.meldIndex)));
+          : plan.moves.some((move) => move.meldIndex != null && payload.entryMeldIds.includes(helpers.meldId(player.teamId, move.meldIndex)) && move.cardIds.some(id => !(payload.devourerCardIds || []).includes(id) && !(payload.entryTableCardIds || []).includes(id)));
       const plan = active ? findNemesisLegalPlan(gameState, player, helpers, predicate) : null;
       const discard = marked.find((id) => player.hand.some((card) => card.id === id) && id !== gameState.pickedDiscardCardId && !helpers.blocked(playerId, id, 'discard'));
       return { active, urgent: active, markedCardIds: marked, preferredDiscardCardIds: active ? [plan?.discardCardId || discard].filter(Boolean) : [], plan, infection: boss.danger };
@@ -535,8 +582,30 @@ export const nemesisBossMechanics = Object.freeze({
     }
     boss.starsPlayerId = state.players[target === 'bot' || variant === 'bot' ? 1 : 0]?.id;
   },
-  debugSuccessPlan(state) {
+  debugSuccessPlan(state, getPriorities) {
     const intent = state.boss.currentIntent;
+    if (intent?.abilityId === 'horde_invasion' && intent.payload.entryKind === 'devourer' && getPriorities) {
+      // Laboratory success uses the same incremental plans as the BOT. The
+      // announcement only proved eligibility, never the whole expulsion.
+      const preview = JSON.parse(JSON.stringify(state));
+      const teamPlans = [];
+      for (const player of entryPlayers(preview)) {
+        const member = { playerId: player.id, moves: [], playedCardIds: [], discardCardId: null };
+        for (let step = 0; step < 3; step++) {
+          const plan = getPriorities(preview, player.id).plan;
+          if (!plan) break;
+          member.moves.push(...plan.moves); member.playedCardIds.push(...plan.playedCardIds); member.discardCardId = plan.discardCardId;
+          for (const move of plan.moves) {
+            const cards = player.hand.filter(card => move.cardIds.includes(card.id));
+            preview.teams[player.teamId].melds[move.meldIndex].push(...cards);
+            preview.boss.currentIntent.payload.devourerCardIds = [...new Set([...(preview.boss.currentIntent.payload.devourerCardIds || []), ...move.cardIds])];
+          }
+          player.hand = player.hand.filter(card => !plan.playedCardIds.includes(card.id));
+        }
+        if (member.moves.length) teamPlans.push(member);
+      }
+      return { teamPlans, moves: [], playedCardIds: [], discardCardId: null };
+    }
     return intent?.payload.solution || { moves: [], playedCardIds: [], discardCardId: null };
   },
 });

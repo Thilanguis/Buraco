@@ -14,7 +14,7 @@ function hordeCommandPresentation(boss, intent) {
   const consequence = entity.id === 'grabber' ? `Após compra: até ${effect.value} cartas presas.`
     : entity.id === 'infected' ? `Falha: +${effect.value} Infecção extra.`
       : `3+ cartas no mesmo jogo: cura até ${effect.value} HP.`;
-  const rule = entity.id === 'grabber' ? 'Após a compra de cada jogador, prende cartas jogáveis da mão até o fim do turno. Não podem entrar em jogo; podem ser descartadas. Preserva uma solução dos objetivos.'
+  const rule = entity.id === 'grabber' ? 'Após comprar do Monte ou Lixo, prioriza cartas jogáveis e completa com outras seguras da mão. Só prende menos por falta de cartas ou proteção necessária. Impede jogo, não descarte, até o fim do turno. Preserva uma solução dos objetivos.'
     : entity.id === 'infected' ? 'Uma falha que já aumenta Infecção recebe esse adicional uma vez. Falhar na Invasão não gera esse bônus.'
       : 'Sua primeira contribuição de 3 ou mais cartas ao mesmo jogo no turno cura o Nemesis. Uma vez por turno, sem ultrapassar o HP máximo.';
   return { instruction, consequence, help: `${instruction}\n${consequence}\n${rule}\nSó ${entity.name} recebe este reforço.` };
@@ -27,7 +27,7 @@ function compact({ gameState, intent, helpers = {} }) {
   const names = (payload.cardIds || []).map(label).join(' · ');
   const who = target.slice(0, 16);
   const instruction = {
-    horde_invasion: payload.entryKind === 'grabber' ? `${who}: jogue/descarte a carta marcada.` : payload.entryKind === 'infected' ? 'Equipe: contribua 2 cartas nesta rodada.' : 'Equipe: alimente 2 jogos nesta rodada.',
+    horde_invasion: payload.entryKind === 'grabber' ? `${who}: jogue/descarte a carta marcada.` : payload.entryKind === 'infected' ? 'Equipe: contribua 2 cartas nesta rodada.' : 'Alimente jogos existentes com 3 cartas nesta rodada.',
     stars_hunt: `${who}: contribua 1 carta neste turno.`,
     infectious_tentacle: `${who}: jogue/descarte 1 marcada.`,
     tentacle_barrage: `${who}: jogue/descarte 2 marcadas.`,
@@ -39,7 +39,7 @@ function compact({ gameState, intent, helpers = {} }) {
     viral_reanimation: 'Um cadáver retorna com 50% do HP.',
     omega_outbreak: 'Falhas futuras recebem +2/+4/+6 Infecção.',
   }[intent.abilityId] || 'Efeito do Nemesis ativo.';
-  const progress = intent.abilityId === 'horde_invasion' ? `${gameState.boss.combatEntities.find((entity) => entity.id === payload.entityId)?.name || ''} · ${payload.entryKind === 'grabber' ? `${payload.exitedCardIds.length}/1 saída` : payload.entryKind === 'infected' ? `${payload.contributionCardIds.length}/2 cartas` : `${payload.fedMeldIds.length}/2 jogos`}` : payload.required ? `${(payload.exitedCardIds || []).length}/${payload.required} saídas legais`
+  const progress = intent.abilityId === 'horde_invasion' ? `${gameState.boss.combatEntities.find((entity) => entity.id === payload.entityId)?.name || ''} · ${payload.entryKind === 'grabber' ? `${payload.exitedCardIds.length}/1 saída` : payload.entryKind === 'infected' ? `${payload.contributionCardIds.length}/2 cartas` : `${(payload.devourerCardIds || []).length}/3 cartas`}` : payload.required ? `${(payload.exitedCardIds || []).length}/${payload.required} saídas legais`
     : intent.abilityId === 'stars_extermination' ? `${payload.contributed ? '✓' : '○'} Contribuição · ${payload.secondExited ? '✓' : '○'} Segunda carta: ${label(payload.secondCardId)}`
       : intent.abilityId === 'stars_hunt' ? payload.contributed ? 'Contribuição cumprida' : 'Contribuição pendente' : '';
   const consequence = {
@@ -88,7 +88,7 @@ export const nemesisBossPresentation = Object.freeze({
     const target = gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'Equipe';
     const labels = [...(payload.cardIds || []), payload.secondCardId].filter(Boolean).map((id) => helpers.cardLabelAnywhere?.(gameState, id) || id).join(' · ');
     if (intent.abilityId === 'horde_invasion') {
-      const goal = payload.entryKind === 'grabber' ? `${target}: jogue ou descarte a carta marcada neste turno.` : payload.entryKind === 'infected' ? 'Equipe: adicione 2 cartas legais aos jogos nesta rodada.' : 'Equipe: adicione cartas a 2 jogos diferentes nesta rodada.';
+      const goal = payload.entryKind === 'grabber' ? `${target}: jogue ou descarte a carta marcada neste turno.` : payload.entryKind === 'infected' ? 'Equipe: adicione 2 cartas legais aos jogos nesta rodada.' : 'Alimente jogos existentes com 3 cartas nesta rodada. Pode ser no mesmo jogo, por um jogador ou pelos dois. Só cartas novas nos jogos que existiam no início; reorganizar não conta.';
       return `${goal}\nSucesso: expulsa o zumbi. Falha: ele fica ATIVO com HP cheio, sem Infecção extra.\nINVADINDO: sem dano/passiva. Repelido não é cadáver e pode voltar. Teto: 1/2/3 ativos nas fases 1/2/3.`;
     }
     const goal = {

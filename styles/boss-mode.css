@@ -556,7 +556,8 @@
   flex: 0 0 17px;
   display: inline-grid;
   place-items: center;
-  margin-top: -2px;
+  margin: 0;
+  vertical-align: middle;
   border: 1px solid rgba(251, 191, 36, 0.74);
   border-radius: 50%;
   background: rgba(15, 23, 42, 0.9);
@@ -680,7 +681,7 @@
 .boss-help-anchored p { max-height: min(290px, calc(100vh - 85px)); overflow: auto; }
 .boss-mode #drawDiscardBtn .pile-info { position: relative; }
 .boss-mode #bossDiscardHelpButton {
-  position: absolute; left: calc(100% + 5px); top: 50%; translate: 0 -50%;
+  position: absolute; left: calc(100% + 5px); top: 50%; translate: none; transform: translateY(-50%);
   margin: 0; pointer-events: auto;
 }
 #bossDiscardHelpButton[hidden] { display: none; }
@@ -7537,4 +7538,67 @@ body.boss-mode .meld-line.boss-meld-marked > .meld-meta { margin-top: 8px; }
   border: 1px solid var(--boss-effect-color); border-radius: 3px;
   color: var(--boss-effect-color); background: rgba(8,13,23,.92);
   font-size: 7px; font-weight: 900; line-height: 1.2; pointer-events: none;
+}
+
+/* Phase HUD stays in the vitals' normal flow, never over a resource meter. */
+body.boss-mode .boss-vitals { display: flex; flex-direction: column; align-self: stretch; gap: 7px; }
+body.boss-mode .boss-round-summary {
+  position: static; width: 100%; max-width: none; margin: 0;
+  padding-top: 5px; border-top: 1px solid rgba(148,163,184,.18);
+}
+body.boss-mode .boss-phase-progress {
+  position: static; width: 100%; max-width: none; box-sizing: border-box; margin: auto 0 0;
+  display: grid;
+  grid-template-columns: auto minmax(24px, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 2px 6px;
+  pointer-events: auto;
+}
+body.boss-mode .boss-phase-progress-head { display: contents; }
+body.boss-mode .boss-phase-progress-title { grid-column: 1; grid-row: 1; gap: 4px; }
+body.boss-mode .boss-phase-progress-title > span { font-size: 8px; letter-spacing: .3px; }
+body.boss-mode #bossPhaseHelpSlot { display: inline-flex; }
+body.boss-mode #bossPhaseHelpButton {
+  position: static; width: 17px; height: 17px; min-width: 17px;
+  padding: 0; margin: 0; font-size: 10px;
+}
+body.boss-mode .boss-phase-progress-head > strong { grid-column: 3; grid-row: 1; font-size: 8px; }
+body.boss-mode .boss-phase-progress-bar { grid-column: 2; grid-row: 1; margin: 0; }
+body.boss-mode .boss-phase-progress-bar[hidden] { display: none; }
+body.boss-mode .boss-phase-progress-metrics { grid-column: 1 / -1; grid-row: 2; }
+body.boss-mode .boss-phase-progress-metrics > span { font-size: 8px; }
+
+/* HP only — no special-condition meter is changed. Texture stays clipped in the fill. */
+body.boss-mode #bossHpBar {
+  position: relative; overflow: hidden;
+  background: linear-gradient(90deg, #861c37, #dc354b);
+  box-shadow: none;
+}
+body.boss-mode #bossHpBar::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255,185,185,.22) 0 18%, transparent 28%) 0 0 / 29px 11px;
+  animation: boss-hp-flow 16s linear infinite;
+}
+body.boss-mode #bossHpBar[data-health='tension'] {
+  background: linear-gradient(90deg, #b92537, #e34736 72%, #df9347);
+  box-shadow: inset 0 0 4px rgba(255,199,110,.3);
+}
+body.boss-mode #bossHpBar[data-health='danger'] {
+  background: linear-gradient(90deg, #c71c36, #ff4050);
+  animation: boss-hp-heartbeat 3.2s ease-in-out infinite;
+}
+body.boss-mode #bossHpBar[data-health].is-empty { animation: none; }
+@keyframes boss-hp-flow { to { background-position: 116px 0; } }
+@keyframes boss-hp-heartbeat {
+  0%, 100% { box-shadow: inset 0 0 1px rgba(255,190,190,.1); }
+  45% { box-shadow: inset 0 0 6px rgba(255,190,190,.55); }
+}
+@media (pointer: coarse) {
+  body.boss-mode #bossHpBar::after { animation: none; opacity: .5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.boss-mode #bossHpBar[data-health],
+  body.boss-mode #bossHpBar::after,
+  body.boss-mode .boss-phase-progress-bar > span { animation: none; transition: none; }
 }

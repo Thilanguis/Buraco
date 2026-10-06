@@ -9,7 +9,7 @@
 | Infectado | 300 | 240 |
 | Devorador | 400 | 260 |
 
-Agarrador deixa de depender de cartas adquiridas do Lixo. Após a compra de cada jogador (Monte ou Lixo), restringe cartas jogáveis da mão até o fim desse turno: normal 1, Mutado 2, Reforçado normal 2, ambos 3. Só bloqueia jogo; descarte é permitido. Preserva uma solução legal completa de objetivo ativo. Sem candidato seguro, pode prender menos ou nenhuma carta, sem punição adicional.
+Agarrador deixa de depender de cartas adquiridas do Lixo. Após a compra de cada jogador (Monte ou Lixo), restringe cartas da mão até o fim desse turno: normal 1, Mutado 2, Reforçado normal 2, ambos 3. Essas são quantidades efetivas pretendidas: prioriza cartas jogáveis e completa com outras seguras, mesmo sem jogada imediata. Só bloqueia jogo; descarte é permitido. Testa combinações determinísticas com o planner canônico no estado resultante, preservando uma solução legal (inclusive descartando AGARRADA), não as cartas fixas do primeiro plano. Só reduz a quota se nenhuma combinação desse tamanho funcionar. Prende menos somente por falta física de cartas ou proteção necessária contra estado impossível, sem punição adicional.
 
 Objetivo: cada zumbi deve ser uma ameaça que mereça consideração como alvo, sem transformar o pacote em milhares de HP obrigatórios adicionais. O envelope de durabilidade deve ser testado antes de alterar outros números.
 

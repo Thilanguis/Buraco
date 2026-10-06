@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
 import { isDominationDiscardDecreeActive } from '../js/game/domination-decree.js';
-import { isValidBossSequence, isBossMode, quoteBossDiscardPickup, createBossState, normalizeBossState, validateBossClosedDiscardSelection, isBossCardBlocked, notifyBossPurchaseCompleted } from '../js/boss/boss-engine.js';
+import { isValidBossSequence, isBossMode, quoteBossDiscardPickup, createBossState, normalizeBossState, validateBossClosedDiscardSelection, isBossCardBlocked, notifyBossPurchaseCompleted, notifyBossDiscardTaken } from '../js/boss/boss-engine.js';
 import { animateDiscardTransfer } from '../js/game/discard-presentation.js';
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 function fn(name) {
@@ -64,8 +64,10 @@ test('fechado aguarda escolha e respeita o segundo jogo em Humilhacao e demais m
 });
 
 test('modo Chefe: jogador e BOT retiram o mesmo conjunto, sem duplicar após snapshot', async () => {
-  for (const [rank, handRanks, existing, count] of [
+  for (const [rank, handRanks, existing, count, lowerRanks = ['A']] of [
     ['7', [], ['4', '5', '6'], 1], ['10', ['8', '9'], [], 2],
+    ['J', ['10'], ['7', '8', '9'], 2], ['3', ['4'], ['5', '6', '7'], 2],
+    ['J', ['10'], ['7', '8', '9'], 4, ['A','3','K']],
     ['JOKER', ['8', '9'], [], 1], ['2', [], ['3', '4', '5'], 1],
     ['2', ['8', '10'], [], 1], ['2', ['3', '4'], [], 2],
   ]) for (const bot of [false, true]) {
@@ -73,12 +75,18 @@ test('modo Chefe: jogador e BOT retiram o mesmo conjunto, sem duplicar após sna
     f.state.boss = createBossState('nemesis', 123);
     f.state.players[1].hand = cards([...handRanks, 'Q', 'K']);
     f.state.teams[1].melds = existing.length ? [cards(existing)] : [];
-    f.state.discard = cards(['A', rank]); f.state.discard.at(-1).joker = rank === 'JOKER';
+    f.state.discard = cards([...lowerRanks, rank]); f.state.discard.at(-1).joker = rank === 'JOKER';
+    const pileSize = f.state.discard.length;
+    const lowerIds = f.state.discard.slice(0, -1).map(card => card.id);
     const lowerId = f.state.discard[0].id;
     Object.assign(f.context, { isCurrentBossMode: () => true, validateBossClosedDiscardSelection, isBossCardBlocked,
       getBossVault: () => null, shouldBossBotReclaimVault: () => false, waitForDominationDecreeReaction: async () => {},
       getBossNaturePriorities: () => null, consumeBossExtraDraw: () => 0, registerBossFinancedCards: () => null,
     });
+    if (rank === 'J' && existing.length) {
+      f.state.boss.currentIntent = { id: 'bridge-zone', abilityId: 'contaminated_zone', payload: { targetPlayerId: 1 } };
+      f.context.notifyBossDiscardTaken = notifyBossDiscardTaken;
+    }
     if (bot) {
       const start = app.indexOf('  async executeDrawDiscardFechado(');
       vm.runInContext(`this.engine = { ${app.slice(start, app.indexOf('\n  },', start) + 5)} };`, f.context);
@@ -86,7 +94,7 @@ test('modo Chefe: jogador e BOT retiram o mesmo conjunto, sem duplicar após sna
         evaluateBossMeldMutation: async () => true, acceptBossDiscardSurcharge: () => ({ allowed: true }), normalizeMeld() {},
         showMessage: text => f.messages.push(text), _checkBotMortoOrWin: async () => null,
       });
-      const intent = existing.length ? { action: 'extend', meldIndex: 0 } : { action: 'new', handIndexes: [0, 1] };
+      const intent = existing.length ? { action: 'extend', meldIndex: 0, handIndexes: handRanks.map((_, i) => i) } : { action: 'new', handIndexes: [0, 1] };
       assert.equal(await f.context.engine.executeDrawDiscardFechado(1, intent), true);
       f.context.state = JSON.parse(JSON.stringify(f.state));
       const saved = JSON.stringify(f.context.state);
@@ -103,8 +111,10 @@ test('modo Chefe: jogador e BOT retiram o mesmo conjunto, sem duplicar após sna
       await f.context.drawFromDiscardOnce();
       assert.equal(JSON.stringify(f.context.state), saved, 'human repeated pickup cannot consume again');
     }
-    assert.equal(f.state.discard.length, 2 - count);
-    assert.equal(f.state.players[1].hand.some(card => card.id === lowerId), count === 2);
+    assert.equal(f.state.discard.length, pileSize - count);
+    assert.equal(f.state.players[1].hand.some(card => card.id === lowerId), count === pileSize);
+    for (const id of lowerIds) assert.equal(f.state.players[1].hand.some(card => card.id === id), count === pileSize);
+    if (rank === 'J' && existing.length) assert.equal(f.state.boss.danger, 6, 'Zona Contaminada applies once to the shared full-pile pickup');
     assert.equal(f.state.stock.length, 1);
     assert.equal(f.messages.some(message => message.startsWith('Retirada protegida') || message.startsWith('Retirada completa')), false);
     assert.equal(f.commits.length, 1);

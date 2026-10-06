@@ -824,3 +824,16 @@ body[data-boss-id='nehelenia'] .boss-dream-mirror-orb.taken .boss-dream-mirror-g
   background: linear-gradient(0deg, rgba(76, 5, 25, 0.96), rgba(244, 63, 94, 0.7) 54%, rgba(196, 181, 253, 0.72));
   box-shadow: 0 -2px 8px rgba(244, 63, 94, 0.48), inset 0 0 8px rgba(255, 255, 255, 0.1);
 }
+
+/* Distribute the five mirrors across their own row; phase/round follow in flow. */
+body[data-boss-id='nehelenia'] .boss-bloom-flowers {
+  display: flex; justify-content: space-between; width: 100%; max-width: none; box-sizing: border-box;
+  min-height: 0 !important; gap: 4px !important; padding: 3px 6px !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb {
+  width: clamp(32px, 3.3vw, 52px) !important;
+  height: clamp(55px, 5.7vw, 90px) !important;
+  flex: 0 0 auto !important;
+}
+body[data-boss-id='nehelenia'] .boss-dream-mirror-glass { inset: 19% 23% 22% !important; }
+body[data-boss-id='nehelenia'] .boss-dream-mirror-orb::after { inset: 20% 23% 23% !important; }

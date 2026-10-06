@@ -510,8 +510,11 @@ export function quoteBossDiscardPickup(gameState, playerId, { meldIndex = null, 
   const meld = [...base, ...selected, top].map((card) => ({ ...card }));
   for (const card of meld) if (!card.joker && String(card.rank) === '2') { card.forceNatural = false; card.forceWild = false; }
   if (!isValidBossSequence(meld)) return invalid;
-  const protectedPickup = meldIndex != null || !!top.joker
-    || (String(top.rank) === '2' && !isBossCardNaturalInSequence(meld, top.id));
+  const topAlone = [...base, top].map(card => ({ ...card }));
+  for (const card of topAlone) if (!card.joker && String(card.rank) === '2') { card.forceNatural = false; card.forceWild = false; }
+  const protectedPickup = !!top.joker
+    || (String(top.rank) === '2' && (meldIndex != null || !isBossCardNaturalInSequence(meld, top.id)))
+    || (meldIndex != null && isValidBossSequence(topAlone));
   const count = protectedPickup ? 1 : gameState.discard.length;
   return { allowed: true, protected: protectedPickup, count,
     message: '' };

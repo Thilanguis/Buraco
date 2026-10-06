@@ -37,6 +37,22 @@ body[data-boss-id="nemesis"] .boss-combat-entity.is-withdrawing { pointer-events
 }
 body[data-boss-id="nemesis"] .boss-combat-entity.is-mutated { border-color: #b76f32; }
 body[data-boss-id="nemesis"] .boss-combat-entity meter { width: 100%; height: 9px; }
+/* Health feedback belongs to the damaged combatant, not the selected target. */
+body[data-boss-id="nemesis"] .boss-combat-entity.boss-combat-hit { animation: bossHudHit .55s ease; }
+body[data-boss-id="nemesis"] .boss-combat-entity meter { --combat-hp-color: #73ce54; --combat-hp-light: #b5ee80; }
+body[data-boss-id="nemesis"] .boss-combat-entity meter[data-health="tension"] { --combat-hp-color: #e7a622; --combat-hp-light: #ffe16c; }
+body[data-boss-id="nemesis"] .boss-combat-entity meter[data-health="danger"] { --combat-hp-color: #ef2944; --combat-hp-light: #ff7378; animation: boss-hp-heartbeat 3.2s ease-in-out infinite; }
+body[data-boss-id="nemesis"] .boss-combat-entity meter::-webkit-meter-bar { background: #16181de6; border: 1px solid #ffffff38; border-radius: 4px; }
+body[data-boss-id="nemesis"] .boss-combat-entity meter::-webkit-meter-optimum-value,
+body[data-boss-id="nemesis"] .boss-combat-entity meter::-webkit-meter-suboptimum-value,
+body[data-boss-id="nemesis"] .boss-combat-entity meter::-webkit-meter-even-less-good-value { background: linear-gradient(90deg, var(--combat-hp-color), var(--combat-hp-light)); }
+body[data-boss-id="nemesis"] .boss-combat-entity meter::-moz-meter-bar { background: linear-gradient(90deg, var(--combat-hp-color), var(--combat-hp-light)); }
+body[data-boss-id="nemesis"] #bossHpBar[data-health="tension"] { background: linear-gradient(90deg, #bf5c19, #f5bb43); }
+body[data-boss-id="nemesis"] #bossHpBar[data-health="danger"] { background: linear-gradient(90deg, #ed1839, #ff625e); }
+@media (prefers-reduced-motion: reduce) {
+  body[data-boss-id="nemesis"] .boss-combat-entity.boss-combat-hit,
+  body[data-boss-id="nemesis"] .boss-combat-entity meter[data-health] { animation: none; }
+}
 body[data-boss-id="nemesis"] .boss-combat-targets { position: absolute; bottom: 8px; right: 8px; z-index: 6; display: flex; align-items: center; gap: 3px; max-width: calc(100% - 10px); padding: 2px 3px; border-radius: 5px; background: rgba(8,13,23,.88); color: #ede6cf; font-size: 8px; }
 body[data-boss-id="nemesis"] .boss-combat-targets button:not(.boss-combat-help) { width: auto; margin: 0; padding: 3px 5px; min-height: 22px; color: #e7e7d5; background: #1e251c; border: 1px solid #627241; border-radius: 4px; font-size: 9px; }
 body[data-boss-id="nemesis"] .boss-combat-targets button[aria-pressed="true"] { background: #5b291f; border-color: #f0c46c; }
@@ -57,6 +73,11 @@ body[data-boss-id="nemesis"] #nemesisEffectSummary[hidden] { display: none; }
   background: #172d10ee; border-color: #91d345; color: #d8f5ad;
 }
 .boss-mode .bought-card-marker ~ .boss-card-status-nemesis { bottom: 20px; }
+.boss-mode .boss-card-status-nemesis.nemesis-dual-status {
+  flex-direction: column; gap: 1px;
+  white-space: normal; line-height: 1.15; padding-top: 2px; padding-bottom: 2px;
+}
+.boss-mode .nemesis-dual-status > span { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .nemesis-infection-overlay::before { animation: none; }
 }

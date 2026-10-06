@@ -168,6 +168,10 @@ A suíte `boss-hud-copy-v1.test.mjs` protege esse orçamento de texto para todos
 
 ## 1.5 Evolução híbrida das fases
 
+**HUD (06/10/2026):** fase atual, barra de avanço por HP e próximo marco ficam visíveis; os limites e a explicação de que basta um gatilho ficam no `?` oficial junto de “Próxima fase”. HP atual e rodada continuam visíveis; Monte/Morto foram retirados da régua, sem remover os contadores da mesa nem os gatilhos da ajuda. Régua e rodada ficam no fluxo da coluna de medidores, evitando sobreposição com os cinco espelhos da Nehelenia, distribuídos pela largura disponível. Nenhum cálculo de transição foi alterado.
+
+**Leitura do HP:** acima de 50% usa vinho/vermelho; de mais de 25% até 50%, vermelho/laranja com brilho leve; em 25% ou menos, vermelho vivo com pulso lento. Textura de fluxo restrita ao preenchimento, estática em touch e sem animações/transições com movimento reduzido. HP zerado não pulsa. Não modifica dano, cura ou condições especiais.
+
 
 A fase avança ao cumprir **qualquer** condição.
 
@@ -2958,7 +2962,7 @@ O HUD mostra o preenchimento parcial da Dominação/Espelhos e o progresso numé
 
 ### Nemesis — revisão experimental de 06/10/2026
 
-Durabilidade atual para teste: **Nemesis 2200 / Agarrador 220 / Infectado 240 / Devorador 260 HP**. Agarrador restringe cartas jogáveis da mão após a compra de cada jogador, do Monte ou do Lixo. Pesos, punições, Infecção e demais chefes foram mantidos. Decisão completa: [BALANCEAMENTO_NEMESIS.md](BALANCEAMENTO_NEMESIS.md).
+Durabilidade atual para teste: **Nemesis 2200 / Agarrador 220 / Infectado 240 / Devorador 260 HP**. Agarrador prioriza cartas jogáveis e completa com outras seguras da mão após a compra de cada jogador, do Monte ou do Lixo. Pesos, punições, Infecção e demais chefes foram mantidos. Decisão completa: [BALANCEAMENTO_NEMESIS.md](BALANCEAMENTO_NEMESIS.md).
 
 A estimativa de **~68,9%** é histórica, anterior à regra global do Lixo e a este rebalanceamento; não representa win rate atual. Não há novo percentual validado. A recalibração depende de testes de jogo, simulação ou telemetria posteriores.
 ---
@@ -3001,11 +3005,11 @@ Passivas somente de persistentes vivos:
 
 | Zumbi | HP máximo | Passiva vivo | Mutado na F3 |
 |---|---:|---|---|
-| Agarrador | 220 | Após compra do Monte ou Lixo, prende até 1 carta jogável da mão: não pode entrar em jogo nesse turno, mas pode ser descartada. | Até 2 cartas; Reforçado soma +1 (máximo 3). |
+| Agarrador | 220 | Após compra do Monte ou Lixo, prende 1 carta da mão: não pode entrar em jogo nesse turno, mas pode ser descartada. | 2 cartas; Reforçado soma +1 (2 normal / 3 Mutado). |
 | Infectado | 240 | Cada falha que normalmente gera Infecção recebe +2, uma vez por evento. | +4 por falha. |
 | Devorador | 260 | Na primeira contribuição de 3+ cartas ao mesmo jogo por turno, Nemesis cura até 40 HP. | Cura até 70 HP. |
 
-No Buraco Fechado, a restrição acontece depois da jogada obrigatória da compra: o topo já na mesa não fica Agarrado. A seleção seeded considera toda a mão restante com uso legal real, não apenas as cartas adquiridas. Preserva uma solução completa do objetivo ativo (marca, apoios e descarte final), inclusive a Invasão cooperativa. Se houver menos candidatos seguros, prende apenas os disponíveis; sem candidato, não inventa punição. As travas terminam no fim do turno do dono; matar o Agarrador desativa imediatamente também as travas ainda registradas. Reload/snapshot/undo não repetem aplicação/pulso. O BOT consulta o bloqueio canônico antes de qualquer meld; descarte segue livre.
+No Buraco Fechado, a restrição acontece depois da jogada obrigatória da compra: o topo já na mesa não fica Agarrado. A seleção seeded prioriza cartas jogáveis da mão restante e completa a quantidade com outras seguras, sem exigir jogada imediata. Aplica 1/2/2/3 (normal/Mutado/Reforçado/ambos) sempre que houver cartas suficientes. Valida cada combinação seeded no estado resultante com o planner canônico, inclusive a Invasão cooperativa e descartes legais de cartas AGARRADAS. Só reduz a quota depois de esgotar as combinações maiores; não reserva o primeiro plano. Quantidade menor somente por falta física de cartas ou proteção necessária contra estado impossível; sem descarte legal, preserva a rota válida de Morto/batida. As travas terminam no fim do turno do dono; matar o Agarrador desativa imediatamente também as travas ainda registradas. Reload/snapshot/undo não repetem aplicação/pulso. O BOT consulta o bloqueio canônico antes de qualquer meld; descarte segue livre.
 
 A migração mantém HP restante abaixo dos novos máximos, limitando apenas valores acima deles, sem reiniciar a batalha ou restaurar HP perdido. Reanimação usa metade dos máximos atuais: Agarrador 110, Infectado 120, Devorador 130; quota, teto e retorno Mutado na F3 permanecem. Decisão de balanceamento: `BALANCEAMENTO_NEMESIS.md`.
 
@@ -3029,7 +3033,7 @@ Pesos são relativos às habilidades elegíveis da fase, não percentuais fixos.
 
 | Habilidade (`id`) | Fases | Peso | Funcionamento |
 |---|---|---:|---|
-| Invasão da Horda (`horde_invasion`) | 1/2/3 | 4 | Escolhe ausente/repelido com solução legal e espaço no teto. Agarrador: carta marcada sai por jogo/descarte no turno do alvo. Infectado: equipe contribui 2 cartas na rodada. Devorador: equipe alimenta 2 jogos existentes diferentes na rodada. Sucesso repele; falha deixa persistente com HP cheio, sem penalidade extra. Evita o último repelido se houver outra entrada válida. |
+| Invasão da Horda (`horde_invasion`) | 1/2/3 | 4 | Escolhe ausente/repelido com espaço no teto. Agarrador: carta marcada sai por jogo/descarte no turno do alvo. Infectado: equipe contribui 2 cartas na rodada. Devorador: basta um jogo existente alimentável para entrar; equipe acumula 3 cartas novas na rodada nos jogos registrados no início, no mesmo jogo ou em vários, por um ou ambos os jogadores. Não exige prova antecipada da expulsão; reorganização/duplicatas/jogos novos não contam. Aos 3 repele; falha deixa persistente com HP cheio, sem penalidade extra. Evita o último repelido se houver outra entrada válida. |
 | Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | Alvo contribui com ao menos 1 carta para um jogo antes de encerrar seu turno. Falha base +8/+10/+12. |
 | Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | Marca 2 cartas; ao menos 1 precisa sair por jogo ou descarte legal no turno do alvo. Falha base +8/+10/+12. |
 | Zona Contaminada (`contaminated_zone`) | 1/2/3 | 3 | Só entra com retirada legal comprovada do Lixo Fechado, respeitando bloqueios e condições de Morto/batida. Pegar custa +6; Agarrador persistente também age. Não é falha e não recebe seus bônus. |
