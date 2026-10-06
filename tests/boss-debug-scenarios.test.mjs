@@ -24,7 +24,7 @@ import { listBossDefinitions } from '../js/boss/boss-registry.js';
 const [appSource, htmlSource, bossCssSource] = await Promise.all([
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
-  readFile(new URL('../styles/boss-mode.css', import.meta.url), 'utf8'),
+  Promise.all(['boss-mode', 'boss/matriarch', 'boss/dominatrix'].map(name => readFile(new URL(`../styles/${name}.css`, import.meta.url), 'utf8'))).then(parts => parts.join('\n')),
 ]);
 
 function build(bossId = 'banker', abilityId = 'fixed_interest', overrides = {}) {
@@ -128,10 +128,12 @@ test('Ordem Final interativa prepara duas extensoes naturais por cooperador', ()
 test('Ordem Final do Laboratorio nasce elegivel e so revela cartas depois do aceite', () => {
   const prepared = build('dominadora', 'final_order', { variant: 'success' });
   beginBossTurn(prepared.state, { first: true, now: 1000, debug: true });
-  while (prepared.state.boss.bossFlow?.stage !== 'players') {
+  for (let step = 0; step < 15 && prepared.state.boss.bossFlow?.stage !== 'choice'; step++) {
     const flow = prepared.state.boss.bossFlow;
     advanceBossTurn(prepared.state, Math.max(1001, Number(flow?.endsAt || 0) + 1));
   }
+
+  assert.equal(prepared.state.boss.bossFlow?.stage, 'choice', 'Ordem Final waits for acceptance before the player turn');
 
   const result = executeBossDebugScenarioVariant(prepared.state);
 

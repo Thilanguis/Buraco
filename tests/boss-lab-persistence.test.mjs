@@ -6,6 +6,7 @@ import * as lab from '../js/boss/boss-debug-scenarios.js';
 import * as bossEngine from '../js/boss/boss-engine.js';
 import { getBossDefinitionForMode } from '../js/boss/boss-registry.js';
 import { BuracoBot } from '../bot.js';
+import { BossBuracoBot } from '../boss-bot.js';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const slice = (start, end) => app.slice(app.indexOf(start), app.indexOf(end, app.indexOf(start)));
@@ -41,10 +42,10 @@ function harness(bossId, abilityId) {
     setBossLabError: message => { element('error').textContent = message; },
     showMessage: message => { element('message').textContent = message; },
     activateGameSession: () => { ctx.window.gameSessionId++; ctx.botTurnController = new AbortController(); },
-    stopBossLabReportTimer() {}, stopTurnTimer() {}, startTurnTimerIfNeeded() {},
+    refreshBossLabResourceControls() {}, cancelPendingBotTurns() {}, stopBossLabReportTimer() {}, stopTurnTimer() {}, startTurnTimerIfNeeded() {},
     startBossLabReportTimer() {}, refreshBossLabObserved: async () => {}, renderAll() {},
     newActionId: (() => { let id = 0; return () => `test-${++id}`; })(),
-    pauseBlocksPlay: () => false, BuracoBot,
+    pauseBlocksPlay: () => false, BuracoBot, BossBuracoBot,
     setDoc: async (_ref, data) => { persisted = JSON.parse(data.stateJson); writes.push(structuredClone(persisted)); },
     runTransaction: async (_db, action) => action({
       get: async () => ({ exists: () => !!persisted, data: () => ({ stateJson: JSON.stringify(persisted) }) }),

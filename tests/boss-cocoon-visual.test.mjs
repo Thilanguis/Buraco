@@ -4,14 +4,14 @@ import test from 'node:test';
 
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
-const css = fs.readFileSync(new URL('../styles/boss-mode.css', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../styles/boss-mode.css', import.meta.url), 'utf8') + fs.readFileSync(new URL('../styles/boss/matriarch.css', import.meta.url), 'utf8');
 
 test('Casulo Esmeralda possui protecao no retrato e medidor junto ao HP', () => {
   assert.match(html, /class="boss-cocoon-ward"/);
   assert.match(html, /id="bossCocoonMeter"/);
   assert.match(html, /id="bossCocoonText"/);
   assert.match(app, /boss\.emeraldCocoon\?\.status === 'active'/);
-  assert.match(app, /cocoonText\.textContent = `\$\{cocoonRemaining\} \/ \$\{cocoonMaximum\}`/);
+  assert.match(app, /: cocoonActive\s*\? `\$\{cocoonRemaining\} \/ \$\{cocoonMaximum\}`/);
 });
 
 test('feedback do Casulo reage somente a dano realmente absorvido', () => {

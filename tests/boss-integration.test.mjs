@@ -165,7 +165,7 @@ test('acao e resultado usam falas separadas sem misturar seus payloads', () => {
 });
 
 test('dialogo em quadrinho fica separado do historico de resultados', () => {
-  assert.match(app, /\['ability', 'phase', 'taunt'\]\.includes\(flow\?\.stage\)/);
+  assert.match(app, /\['ability', 'taunt'\]\.includes\(flow\?\.stage\) && !hasPendingBossChoices\(state\) && Boolean\(actionPresentation\.speech\)/);
   assert.match(app, /dialoguePanel\.style\.display = dialogueVisible \? 'grid' : 'none'/);
   const dialogueRule = bossCss.match(/\.boss-dialogue-presentation \{[^}]+\}/)?.[0] || '';
   assert.match(dialogueRule, /background:\s*#f8fafc/);
@@ -184,9 +184,9 @@ test('DevTools permite revisar toda canastra no balao sem alterar o limite do jo
 });
 
 test('primeira habilidade usa o balao e o HUD permanente continua separado', () => {
-  assert.match(app, /flow\.stage === 'ability' \? 'NOVA HABILIDADE'/);
-  assert.match(app, /bossDialogueName'\)\.textContent = actionPresentation\.name/);
-  assert.match(app, /bossDialogueSpeech'\)\.textContent = actionPresentation\.speech \?/);
+  assert.match(app, /bossDialogueType'\)\.textContent = \(definition\?\.name \|\| 'Chefe da Mesa'\)\.toUpperCase\(\)/);
+  assert.match(app, /bossDialogueName'\)\.textContent = ''/);
+  assert.match(app, /bossDialogueSpeech'\)\.textContent = `“\$\{actionPresentation\.speech\}”`/);
   assert.match(app, /bossIntentName'\)\.textContent = actionPresentation\.name/);
   assert.match(html, /id="bossFinalSpeech" class="boss-dialogue-presentation boss-final-dialogue"/);
 });
@@ -200,9 +200,9 @@ test('HUD compacto remove marcas falsas de HP e mantem detalhes expansisveis', (
   assert.doesNotMatch(html, /id="bossStatusRail"|class="boss-round-card"/);
   assert.match(app, /bossBattleDetails'\);\s*if \(battleDetails\) battleDetails\.open = false/);
   assert.match(app, /bossActionType'\)\.textContent = actionPresentation\.category\.toUpperCase\(\)/);
-  assert.match(app, /intentDescription\.textContent = actionPresentation\.instruction/);
+  assert.match(app, /renderBossHudRichText\(intentDescription, actionPresentation\.instruction\)/);
   assert.match(app, /const intentProgressParts = \[actionPresentation\.progress, actionPresentation\.consequence\]\.filter\(Boolean\)/);
-  assert.match(app, /intentProgress\.textContent = intentProgressParts\.join/);
+  assert.match(app, /renderBossHudRichText\(intentProgress, intentProgressParts\.join/);
   assert.doesNotMatch(app, /intentProgress\.textContent = actionPresentation\.details/);
 });
 

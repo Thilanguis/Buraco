@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { createActionGate } from '../js/game/match-control.js';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const start = app.indexOf('async function drawFromStock()');
-const source = app.slice(start, app.indexOf('\n}', start) + 2);
+const source = app.slice(start, app.indexOf('\nfunction canUseDiscardInClosed', start));
 
 function fixture({ partial = false, origin = true, cancel = false } = {}) {
   const state = { mode: '1x1_dominacao', currentPlayer: 1, partialDraw: partial,
@@ -23,7 +24,7 @@ function fixture({ partial = false, origin = true, cancel = false } = {}) {
       elements.set(card.id, div);
     }
   };
-  const context = vm.createContext({ state, pendingStockCardIds, window: {},
+  const context = vm.createContext({ state, pendingStockCardIds, window: {}, localActionGate: createActionGate(),
     ensureMyTurn: () => true, isBossVaultDrawRequired: () => false,
     document: { querySelector: () => origin ? {} : null }, getRect: () => ({}),
     saveStateForUndo() {}, consumeBossExtraDraw: () => 0, ensureCardId() {},

@@ -4,7 +4,7 @@ import test from 'node:test';
 import { BossBuracoBot } from '../boss-bot.js';
 
 const appSource = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
-const engineSource = fs.readFileSync(new URL('../boss-engine.js', import.meta.url), 'utf8');
+const engineSource = fs.readFileSync(new URL('../js/boss/boss-engine.js', import.meta.url), 'utf8');
 
 function hand(prefix, count = 10) {
   return Array.from({ length: count }, (_, index) => ({ id: `${prefix}${index}` }));

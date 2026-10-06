@@ -67,7 +67,7 @@ for (const exhausted of [true, false]) {
     canTeamTakeDeadNow: () => false, teamHasGoodCanastra: () => true, isCurrentBossMode: () => false,
     passTurn: () => { turns++; state.currentPlayer = 1; },
     finishGame: async winner => { assert.equal(winner, null); finishes++; state.finished = true; },
-    packCard: c => c, newActionId: () => 'a1', renderAll() {}, commitState: async () => {}, showMessage() {},
+    packCard: c => c, newActionId: () => 'a1', renderAll() {}, renderHand() {}, commitState: async () => {}, showMessage() {},
   };
   vm.createContext(context);
   vm.runInContext(discardCode, context);

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
+import { isDominationDiscardDecreeActive } from '../js/game/domination-decree.js';
 import { isValidBossSequence } from '../js/boss/boss-engine.js';
 import { animateDiscardTransfer } from '../js/game/discard-presentation.js';
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
@@ -18,7 +20,7 @@ function fixture(mode = '1x1_duploMorto', variant = 'fechado') {
     discard: cards(['9', '7']), hasDrawnThisTurn: false };
   const messages = [], presentations = [], commits = [];
   const context = vm.createContext({ state, myPlayerIndex: 1, selectedHandIndexes: new Set(), selectedMeldTarget: null,
-    pendingDiscardChoice: null, window: {},
+    pendingDiscardChoice: null, window: {}, localActionGate: createActionGate(), pauseBlocksPlay, isDominationDiscardDecreeActive,
     ensureMyTurn: () => true, canPerformCommonGameAction: () => true,
     currentPlayer: () => state.players[1], currentTeam: () => state.teams[1],
     isBossVaultDrawRequired: () => false, isBossDiscardBlocked: () => false, hasPendingBossChoices: () => false,
@@ -38,7 +40,7 @@ function fixture(mode = '1x1_duploMorto', variant = 'fechado') {
     packCard: c => ({ ...c }), newActionId: () => `action${serial++}`,
     showMessage: text => messages.push(text), commitState: async () => commits.push(state.lastAction),
   });
-  vm.runInContext(['discardChoiceIsCurrent', 'chooseDiscardDestination', 'drawFromDiscard'].map(fn).join('\n'), context);
+  vm.runInContext(['discardChoiceIsCurrent', 'chooseDiscardDestination', 'drawFromDiscard', 'drawFromDiscardOnce'].map(fn).join('\n'), context);
   return { state, context, presentations, commits, messages };
 }
 

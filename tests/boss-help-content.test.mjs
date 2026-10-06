@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildBossAbilityHelp, buildBossActionPresentation } from '../js/boss/boss-presentation.js';
+import { matriarchBossPresentation } from '../js/boss/presentation/matriarch.js';
+import { buildBossDebugScenario } from '../js/boss/boss-debug-scenarios.js';
+import { beginBossTurn, advanceBossTurn, getBossNatureThreatSummaries } from '../js/boss/boss-engine.js';
 
 function state(bossId, abilityId, payload = {}, { name = abilityId, description = 'DESCRICAO OFICIAL LONGA QUE NAO DEVE SER COPIADA', phase = 2, players = null } = {}) {
   return {
@@ -17,6 +20,29 @@ function state(bossId, abilityId, payload = {}, { name = abilityId, description 
     },
   };
 }
+
+test('Matriarca: texto de Pólen e Colheita coincide com cura aprovada sem alterar mecânica', () => {
+  const pollen = state('matriarca_esmeralda', 'discard_pollen', {});
+  assert.match(buildBossActionPresentation(pollen).consequence, /30 HP/);
+  assert.match(JSON.stringify(matriarchBossPresentation.details({ gameState: pollen, intent: pollen.boss.currentIntent })), /30 HP/);
+  const harvest = state('matriarca_esmeralda', 'harvest', { targetPlayerId: 0 });
+  const help = buildBossAbilityHelp(harvest).text;
+  assert.match(help, /0–7 não gera efeito/);
+  assert.match(help, /8–10 cura 50 HP/);
+  assert.match(help, /cura 80 HP/);
+  const ranges = matriarchBossPresentation.rangeMeters({ gameState: harvest, intent: harvest.boss.currentIntent })[0].segments;
+  assert.deepEqual(ranges.map(segment => segment.effect), ['sem efeito', 'cura 50 HP', '+1 Flor · cura 80 HP']);
+  const sample = buildBossDebugScenario(null, { bossId: 'matriarca_esmeralda', abilityId: 'harvest', variant: 'failure', phase: 2 }).state;
+  beginBossTurn(sample, { first: true, now: 1000, debug: true });
+  for (let step = 0; step < 15 && sample.boss.bossFlow?.stage !== 'players'; step++) {
+    advanceBossTurn(sample, Number(sample.boss.bossFlow?.endsAt || 1000) + 1);
+  }
+  assert.equal(sample.boss.bossFlow?.stage, 'players');
+  const threat = getBossNatureThreatSummaries(sample).find(entry => entry.type === 'harvest');
+  assert.ok(threat, 'Laboratório deve criar a ameaça real de Colheita');
+  assert.match(threat.consequence, /cura 50 HP.*cura 80 HP/);
+  assert.doesNotMatch(threat.consequence, /60 HP|100 HP/);
+});
 
 test('ajuda usa explicacao editorial e nao duplica a descricao oficial', () => {
   const game = state('dimitrescu', 'crimson_clot', { amount: 180 }, { name: 'Coágulo Carmesim' });

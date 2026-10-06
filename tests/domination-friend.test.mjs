@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
+import nativeVm from 'node:vm';
+import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
+import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from '../js/game/domination-strategy.js';
+import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint } from '../js/game/bot-planner.js';
+import { debugFriendMeld } from '../js/game/domination-dev-tools.js';
+// Isolated app handlers still require the real shared pause/action dependencies.
+const vm = { ...nativeVm, createContext: (context) => nativeVm.createContext({
+  pauseBlocksPlay, localActionGate: createActionGate(), isDebugMode: false, currentLobby: null, myPlayerIndex: -1,
+  cleanDominationMelds, dominationOpeningCards, dominationStockEndgame,
+  isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint,
+  ...context,
+}) };
 import { isValidBossSequence } from '../js/boss/boss-engine.js';
 import {
   hasDominationFriendSelection,
@@ -723,7 +734,7 @@ test('selecao de quantidade comeca em zero e bloqueia inicio sem alert', async (
 });
 
 test('opcoes independentes iniciam ligadas, persistem na partida e nao alteram outros modos', async () => {
-  assert.deepEqual(normalizeDominationOptions(), { friend: true, plus: true, vision: true, friendCapacity: 1 });
+  assert.deepEqual(normalizeDominationOptions(), { friend: true, plus: true, vision: true, decree: true, friendCapacity: 1 });
   const elements = Object.fromEntries(['friend', 'plus', 'vision'].map((key) => [`dominationOption_${key}`, { checked: true }]));
   elements.dominationFriendCapacity = { value: '1', style: { setProperty() {} }, setAttribute() {} };
   const live = vm.createContext({
@@ -1001,7 +1012,7 @@ test('Visao prefere natural para canastra e nao age em outro modo ou jogador', a
 test('turno real do bot nao compra monte ou lixo novamente depois da Visao', async () => {
   const source = readFileSync(new URL('../bot.js', import.meta.url), 'utf8');
   const live = vm.createContext({ getDominationFriend, activeDominationFriends, dominationFriends, normalizeDominationFriends, friendControllerId: 'test-host', console: { error: (...args) => assert.fail(args.join(' ')), warn() {} } });
-  vm.runInContext(source.replace('export class BuracoBot', 'class BuracoBot') + '\nthis.TestBot = BuracoBot;', live);
+  vm.runInContext(source.replace(/^import .*;\r?\n/gm, '').replaceAll('import.meta.url', "'file:///test-bot.js'").replace('export class BuracoBot', 'class BuracoBot') + '\nthis.TestBot = BuracoBot;', live);
   live.TestBot.sleep = async () => {};
   live.TestBot.processMelds = async () => {};
   live.TestBot.processDiscard = async () => true;
@@ -1819,9 +1830,11 @@ test('amiga nao acrescenta coringa a jogo existente em formacao, nem na despedid
       const before = structuredClone(existing);
       const result = friendTurn(state);
       assert.deepEqual(state.teams[1].melds[0], before);
-      assert.equal(result.plays[0].meldIndex, 1, 'coringa somente no novo jogo separado');
-      assert.equal(state.teams[1].melds[1].length, 3);
-      assert.ok(state.teams[1].melds[1].some((card) => rules.isWild(card, state.teams[1].melds[1])));
+      if (turns === 1) {
+        assert.equal(result.plays[0].meldIndex, 1, 'coringa somente no novo jogo separado na despedida');
+        assert.equal(state.teams[1].melds[1].length, 3);
+        assert.ok(state.teams[1].melds[1].some((card) => rules.isWild(card, state.teams[1].melds[1])));
+      } else assert.equal(result.plays.length, 0, 'abertura suja espera a despedida');
     }
   }
 });
@@ -1930,8 +1943,22 @@ test('despedida final remove amiga da rotacao e preserva todos os jogos baixados
   assert.equal(state.finished, false);
 });
 
-test('IA guarda trincas fracas e aberturas com 2 coringa para a despedida', () => {
-  for (const hand of [cards(['7', '8', '9'], '♦', 'natural-triple'), [...cards(['7', '8'], '♦', 'pair'), ...cards(['2', 'K'], '♥', 'wild-two')]]) {
+test('IA abre trinca natural sem esperar a despedida', () => {
+  const state = invite();
+  const existing = cards(['3', '4', '5', '6', '7', '8', '9']);
+  state.teams[1].melds = [existing];
+  state.dominationFriends[0].hand = [...cards(['K'], '♠', 'discard'), ...cards(['7', '8', '9'], '♦', 'natural-triple')];
+  state.dominationFriendShared.stock = [];
+  const result = friendTurn(state);
+  assert.equal(result.farewell, false);
+  assert.equal(result.plays.length, 1);
+  assert.equal(result.plays[0].cardIds.length, 3);
+  assert.deepEqual(state.teams[1].melds[0], existing);
+  assert.ok(state.teams[1].melds[1].every(card => !rules.isWild(card, state.teams[1].melds[1])));
+});
+
+test('IA guarda aberturas com coringa para a despedida', () => {
+  for (const hand of [[...cards(['7', '8'], '♦', 'pair'), ...cards(['2', 'K'], '♥', 'wild-two')]]) {
     const state = invite();
     const clean = cards(['3', '4', '5', '6', '7', '8', '9']);
     state.teams[1].melds = [clean];
@@ -1953,11 +1980,12 @@ test('IA guarda trincas fracas e aberturas com 2 coringa para a despedida', () =
   }
 });
 
-test('IA pode esvaziar a mao com jogo sujo separado sem tocar no jogo limpo existente', () => {
+test('IA na despedida pode esvaziar a mao com jogo sujo separado sem tocar no jogo limpo existente', () => {
   for (const rank of ['2', 'JOKER']) {
     const state = invite();
     const clean = cards(['3', '4', '5', '6', '7', '8', '9']);
     state.teams[1].melds = [clean];
+    state.dominationFriends[0].turnsRemaining = 1;
     state.dominationFriends[0].hand = [...cards(['9', '10'], '♦', 'pair'), ...cards([rank], '♥', 'wild')];
     state.dominationFriendShared.stock = [];
     const result = friendTurn(state);
@@ -2022,7 +2050,7 @@ test('canastra da amiga concede bonus a ambos, cada um usando seu proprio monte'
   }
 });
 
-test('IA concentra naturais na canastra maior e planeja varias extensoes ate As-a-As', () => {
+test('IA preserva o primeiro jogo do naipe e reserva seus ases antes de completar o segundo', () => {
   const state = invite();
   const small = cards(['3', '4', '5'], '♣', 'small');
   state.teams[1].melds = [small, cards(['6', '7', '8', '9', '10', 'J', 'Q', 'K'], '♣', 'large')];
@@ -2030,9 +2058,11 @@ test('IA concentra naturais na canastra maior e planeja varias extensoes ate As-
   state.dominationFriendShared.stock = [];
   const result = friendTurn(state);
   assert.equal(result.plays[0].meldIndex, 1);
-  assert.equal(rules.classify(state.teams[1].melds[1]), 'asas');
-  assert.deepEqual(state.teams[1].melds[0], small);
-  assert.equal(state.dominationFriends[0].hand.length, 0);
+  assert.notEqual(rules.classify(state.teams[1].melds[1]), 'asas');
+  assert.equal(state.teams[1].melds[1].some(card => card.rank === 'A'), false, 'ases reservados para o primeiro jogo');
+  assert.ok(small.every(card => state.teams[1].melds[0].some(entry => entry.id === card.id)));
+  assert.equal(state.teams[1].melds[0].filter(card => card.rank === 'A').length, 1);
+  assert.ok(result.plays.flatMap(play => play.cardIds).length > 0);
 });
 
 test('IA reserva naturais que faltam no jogo limpo em vez de abrir outro jogo ou alimentar sujo', () => {
@@ -2048,7 +2078,7 @@ test('IA reserva naturais que faltam no jogo limpo em vez de abrir outro jogo ou
   assert.deepEqual(state.teams[1].melds, [clean, dirty]);
 });
 
-test('abertura prioriza sequencia natural e permite 2 coringa para canastra imediata', () => {
+test('abertura prioriza sequencia natural e nao gasta coringa antes da despedida', () => {
   const natural = invite();
   natural.dominationFriends[0].hand = [...cards(['3', '4', '5', '6'], '♣', 'guest'), ...cards(['2'], '♥', 'two')];
   natural.dominationFriendShared.stock = [];
@@ -2061,8 +2091,8 @@ test('abertura prioriza sequencia natural e permite 2 coringa para canastra imed
   scoring.dominationFriends[0].hand = [...cards(['3', '4', '5', '7', '8', '9'], '♣', 'guest'), ...cards(['2'], '♥', 'two')];
   scoring.dominationFriendShared.stock = [];
   friendTurn(scoring);
-  assert.equal(scoring.teams[1].melds[0].length, 7);
-  assert.equal(rules.classify(scoring.teams[1].melds[0]), 'suja');
+  assert.equal(scoring.teams[1].melds[0].length, 3);
+  assert.ok(scoring.teams[1].melds[0].every(card => !rules.isWild(card, scoring.teams[1].melds[0])));
 });
 
 test('sobras da despedida nao entram no lixo comum nem penalizam o adversario', () => {
@@ -2136,6 +2166,10 @@ test('DevTools concede o mesmo bonus ao Dominador e a amiga fora do turno dela',
     const state = invite();
     const before = structuredClone(state);
     const live = vm.createContext({
+      isDebugMode: true, friendOperationPending: false, committing: false,
+      isDominationFriendBusy, debugFriendMeld, friendMeldRules: rules,
+      document: { querySelector: () => null, getElementById: () => null },
+      performDominationDevOperation: async operation => operation(state),
       getDominationFriend,
       activeDominationFriends,
       dominationFriends,
@@ -2484,10 +2518,10 @@ test('sorteio de cinco turnos cresce alem de cinco com conquistas do Dominador e
 
 test('reta final depende do monte principal e de todos os mortos, nao encerra a presenca antecipadamente', () => {
   for (const [stockCount, hasDead, urgent] of [
-    [5, false, true],
+    [4, false, true],
     [0, false, true],
-    [6, false, false],
-    [5, true, false],
+    [5, false, false],
+    [4, true, false],
   ]) {
     const state = invite();
     state.stock = cards(Array(stockCount).fill('K'), '♥', 'main');
@@ -2509,7 +2543,7 @@ test('reta final depende do monte principal e de todos os mortos, nao encerra a 
   assert.equal(isDominationFriendEndgame({ mode: '1x1', stock: [], deadPiles: [] }), false);
 });
 
-test('com varios turnos espera em vez de abrir fragmento duplicado do mesmo naipe', () => {
+test('segundo jogo usa somente copias ja presentes no primeiro, inclusive com varios turnos', () => {
   for (const turns of [5, 3, 2, 1]) {
     const state = invite();
     const base = cards(['3', '4', '5', '6']);
@@ -2520,7 +2554,8 @@ test('com varios turnos espera em vez de abrir fragmento duplicado do mesmo naip
     const before = structuredClone(base);
     const result = friendTurn(state);
     assert.deepEqual(state.teams[1].melds[0], before);
-    assert.equal(result.plays.length, turns >= 3 ? 0 : 1);
+    assert.equal(result.plays.length, 1);
+    assert.ok(state.teams[1].melds[1].every(card => base.some(first => first.rank === card.rank && first.suit === card.suit)));
   }
 });
 

@@ -260,7 +260,7 @@ export const matriarchBossPresentation = Object.freeze({
       case 'graft': return detailFields([['Jogos ligados', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'adicionar 1 carta em cada jogo'], ['Falha parcial', '+1 Flor, sem cura'], ['Falha total', '+1 Flor, sem cura, e pode propagar uma Raiz']]);
       case 'discard_pollen': {
         const discardCard = gameState?.discard?.find((entry) => entry.id === payload.discardCardId);
-        return detailFields([['Carta', discardCard ? `${discardCard.rank}${discardCard.suit}` : 'topo do lixo'], ['Gatilho', 'pegar a carta contaminada do lixo'], ['Consequência imediata', '+1 Flor e cura de até 40 HP']]);
+        return detailFields([['Carta', discardCard ? `${discardCard.rank}${discardCard.suit}` : 'topo do lixo'], ['Gatilho', 'pegar a carta contaminada do lixo'], ['Consequência imediata', '+1 Flor e cura de até 30 HP']]);
       }
       case 'harvest': return [];
       case 'royal_bloom': {
@@ -299,7 +299,7 @@ export const matriarchBossPresentation = Object.freeze({
       case 'discard_pollen': {
         const threat = natureThreatsForIntent(gameState, intent)[0];
         const contaminatedCard = cardLabelAnywhere(gameState, threat?.discardCardId || payload.discardCardId);
-        return { instruction: `☣️ Não recolha ${contaminatedCard}.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Se vier: +1 Flor · cura até 40 HP' };
+        return { instruction: `☣️ Não recolha ${contaminatedCard}.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Se vier: +1 Flor · cura até 30 HP' };
       }
       case 'harvest': return { instruction: `${target}: termine com até 7 cartas.`, progress: '', consequence: 'Mais cartas = efeito pior' };
       case 'royal_bloom': return { instruction: 'Cumpra cada objetivo marcado.', progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falhas: máximo +1 Flor nesta ativação' };

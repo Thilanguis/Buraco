@@ -56,9 +56,9 @@ test('Exposição esquecida cobra Chicote; última carta exposta não trava nem 
       s.discard.push(s.players[0].hand.pop());
     }
     completeBossPlayerTurn(s, 0);
-    assert.equal(getBossChains(s, 0), 1);
+    assert.equal(getBossChains(s, 0), 0.72);
     normalizeBossState(s);
-    assert.equal(getBossChains(s, 0), 1);
+    assert.equal(getBossChains(s, 0), 0.72);
   }
 });
 
@@ -73,7 +73,7 @@ test('última carta exposta ainda pode cumprir a tarefa sem Chicote antecipado',
   assert.equal(getBossChains(s, 0), 0);
   s.teams[0].melds[0].push(s.players[0].hand.pop());
   completeBossPlayerTurn(s, 0);
-  assert.equal(getBossChains(s, 0), 0);
+  assert.equal(getBossChains(s, 0), 0.08, 'Exposição cumprida cobra +1 ponto aprovado');
 });
 test('Enxerto conta ambos os lados mesmo quando a carta termina Ás-a-Ás', () => {
   const s = game('matriarca_esmeralda'); s.boss.phase = 2;
@@ -123,7 +123,7 @@ test('Escolha Forçada mantém a tarefa no painel principal até o prazo', () =>
   assert.equal(view.name, 'Escolha Forçada');
   assert.match(view.instruction, /Biel: não crie um jogo novo/);
   assert.match(view.progress, /fim do turno/);
-  assert.match(view.consequence, /\+1 Chicote/);
+  assert.match(view.consequence, /Dominação \+12/);
 });
 
 test('Raiz Fortalecida não pede contribuição repetida de quem já a alimentou', () => {

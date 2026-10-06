@@ -16,7 +16,9 @@ test('all bosses preserve selected ability across phases and variants; fallback 
       const { state } = buildBossDebugScenario(null, { bossId: boss.id, abilityId: ability.id, phase, variant: variant.id, target: 'auto' });
       beginBossTurn(state, { first: true, now: 1000, debug: true });
       const selected = state.boss.currentIntent?.abilityId;
-      if (variant.id === 'no_target') assert.notEqual(selected, ability.id);
+      const expectsFallback = variant.id === 'no_target' || variant.id === 'phase_cap'
+        || (variant.id === 'persistent_corpse' && phase === 1);
+      if (expectsFallback) assert.notEqual(selected, ability.id);
       else {
         assert.equal(selected, ability.id, `${boss.id}/${ability.id}/${phase}/${variant.id}`);
         assert.equal(buildBossActionPresentation(state).name, ability.name);

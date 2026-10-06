@@ -391,6 +391,17 @@ function configureNoTargetState(state, abilityId) {
   if (abilityId === 'cassandra_dead_feast') {
     (state.deadPiles || []).forEach((pile) => moveCardsToStock(state, pile.splice(0)));
   }
+  // Pesadelo only needs one hand card; retaining one does not make it ineligible.
+  if (abilityId === 'eternal_nightmare') {
+    state.players.forEach((player) => moveCardsToStock(state, player.hand.splice(0)));
+  }
+  if (abilityId === 'tiger_link') {
+    state.teams[0].melds.forEach((meld) => moveCardsToStock(state, meld));
+    state.teams[0].melds = [];
+  }
+  if (['hawk_suit', 'fish_marked_card', 'fish_inverted'].includes(abilityId)) {
+    state.players.forEach((player) => moveCardsToStock(state, player.hand.splice(0)));
+  }
   if (['royal_bloom'].includes(abilityId)) {
     state.boss.natureThreats = [];
   }

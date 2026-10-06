@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
+import { createActionGate, pauseBlocksPlay } from '../js/game/match-control.js';
+import { isDominationDiscardDecreeActive } from '../js/game/domination-decree.js';
 import { readFileSync } from 'node:fs';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
@@ -21,7 +23,7 @@ function fixture(mode, variant) {
 function sandbox(state) {
   const noop = () => {};
   const allowed = () => ({ allowed: true });
-  const live = vm.createContext({ state, window: {}, document: { querySelector: () => null },
+  const live = vm.createContext({ state, window: {}, isDominationDiscardDecreeActive, waitForDominationDecreeReaction: async () => {}, document: { querySelector: () => null },
     selectedHandIndexes: new Set(), selectedMeldTarget: null, ignoreOwnActionId: null,
     currentPlayer: () => state.players[1], currentTeam: () => state.teams[1], ensureMyTurn: () => true,
     isBossVaultDrawRequired: () => false, isBossDiscardBlocked: () => false, hasPendingBossChoices: () => false,
@@ -30,7 +32,7 @@ function sandbox(state) {
     validateBossMeldPlay: allowed, canTeamTakeDeadNow: () => true, isCurrentBossMode: () => false,
     confirmBossDiscardPickup: allowed, classifyMeldForUi: () => ({ kind: 'simple' }), classifyMeldPreview: () => 'simple',
     prepareBossMeldMutation: async () => ({ allowed: true, undoSaved: true }),
-    drawBossTurnExtras: async () => [], deferBossVault: () => null,
+    animateLocalDiscardPickup: async () => {}, drawBossTurnExtras: async () => [], deferBossVault: () => null,
     processDominationReward: async () => null, processBossMeldChange: async () => null, checkPostMeldStatus: async () => null,
     packCard: c => ({ ...c }), newActionId: () => 'pickup', commitState: async () => {},
     getBossVault: () => null, consumeBossExtraDraw: () => 0, registerBossFinancedCards: () => null,
@@ -57,7 +59,8 @@ test('jogador e bot: lixo encerra compra nos dois modos e variantes sem tocar o 
         assert.equal(await live.engine.executeDrawStock(1), false, 'nem chamada direta compra extra');
         assert.equal(await live.engine.executeDrawDiscard(1), false, 'nem segunda retirada');
       } else {
-        vm.runInContext(`async ${fn('drawFromDiscard')}\nasync ${fn('drawFromStock')}`, live);
+        Object.assign(live, { localActionGate: createActionGate(), pauseBlocksPlay, isDominationDiscardDecreeActive });
+        vm.runInContext(`async ${fn('drawFromDiscard')}\nasync ${fn('drawFromDiscardOnce')}\nasync ${fn('drawFromStock')}\nasync ${fn('drawFromStockOnce')}`, live);
         await live.drawFromDiscard();
         await live.drawFromStock();
       }

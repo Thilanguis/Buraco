@@ -31,7 +31,7 @@ function compact({ gameState, intent, helpers = {} }) {
     rocket_launcher: `Cada carta: +${payload.infectionCost || 0} Infecção`,
     contaminated_zone: 'Lixo: +6 Infecção por retirada',
     omega_outbreak: 'Falhas: +2/+4/+6 conforme Infecção',
-    stars_extermination: 'Falhas podem receber bônus do Infectado/Ômega.',
+    stars_extermination: 'Falha: bônus de Infectado/Ômega',
   }[intent.abilityId] || `Falha: +${payload.failure || 6 + gameState.boss.phase * 2} Infecção + bônus`;
   return { instruction, progress: names ? `${names}\n${progress}` : progress, consequence };
 }

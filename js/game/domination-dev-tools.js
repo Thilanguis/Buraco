@@ -54,6 +54,12 @@ export function debugFriendMeld(state, friendId, meld, rules) {
   if (dominationFeatureEnabled(state, 'plus') && ['limpa', 'real', 'asas'].includes(kind)) {
     friendBonus = grantDominationFriendSharedBonus(state, 1, kind, 1, meldIndex);
     drawDominadorSharedBonus(state, 1, kind, steps, rules);
+    // The live reward handler must see the bonus already granted by DevTools.
+    // Persist the same-turn guard with the match so reload cannot draw twice.
+    (state.dominationTurnTracking ||= {})[`${team.id}:${meldIndex}`] = {
+      turnNumber: state.turnNumber || 0,
+      highestWeight: 1,
+    };
   }
   return { type: 'dominatorBonus', playerId: 1, friendBonus,
     drawnCards: steps.flatMap(step => step.cards), autoRecycledIndex: steps.find(step => step.recycledIndex != null)?.recycledIndex ?? null };

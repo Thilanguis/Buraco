@@ -698,3 +698,16 @@ Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O
 - Exceções: gastos internos aprovados, como Vinho Carmesim e Renascimento. Não são recompensas aos jogadores.
 - Favorita F2/F3: protegida 0; cooperador menos dominado +8; seleção e aplicação única preservadas. Não alterar os demais valores/chefes.
 - Regressão global percorre todas as habilidades ativas registradas e suas fases com recurso inicial positivo; as exceções são identificadas explicitamente. Testes específicos cobrem sucesso, parcial, canastras e snapshot.
+
+## 24. Suíte local e fixtures — revisão de 06/10/2026
+
+- [ ] Executar a suíte atual antes de corrigir. Distinguir regressão de produção, expectativa antiga, harness incompleto e sincronização; não usar skip/todo para esconder falhas.
+- [ ] Funções extraídas de `app.js` devem receber as dependências atuais: gate real de ação/pausa, wrappers e implementações `Once`, helpers importados e callbacks isolados. Não adicionar globals artificiais à produção para satisfazer uma VM antiga.
+- [ ] Ler módulos e CSS no caminho atual; styles específicos de chefe podem estar separados de `boss-mode.css`. Validar versão atual do cache sem regredir releases para satisfazer literals antigos.
+- [ ] Loops de avanço de apresentação devem ter limite e assertion de estágio. Uma escolha humana pendente não avança para `players` sem resolução; não esperar esse estágio indefinidamente.
+- [ ] Cenários `no_target` precisam realmente retirar todos os alvos válidos, preservando as 108 cartas. Fallback de teto de fase/cadáver deve ser esperado explicitamente, sem flexibilizar a exigência da habilidade escolhida nos demais cenários.
+- [ ] Canastra criada pelo DevTools deve persistir o mesmo controle de bônus do fluxo normal. Reprocessar após reload não pode conceder nova compra no mesmo turno.
+- [ ] Manter o orçamento do HUD: se o texto estourar, corrigir a apresentação, não aumentar silenciosamente o limite do teste. Validar nos viewports do browser test.
+- [ ] Conferir cura anunciada contra mecânica: Pólen até 30 HP; Colheita 0–7 nada, 8–10 cura 50, 11+ cura 80 e +1 Flor. Corrigir somente texto quando o motor já estiver certo.
+
+Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. Nenhuma regra de balanceamento foi revertida.

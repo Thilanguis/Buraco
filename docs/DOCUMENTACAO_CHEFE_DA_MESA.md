@@ -3034,3 +3034,11 @@ Teste manual simultâneo em dois clientes reais ainda é necessário para confir
 # Regra global de recuperação da condição especial
 
 Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O sucesso apenas evita a punição. A recuperação concedida aos jogadores ocorre somente através das canastras aprovadas. Sucesso parcial evita apenas a punição correspondente. Vale para Dívida, Dominação, Flores, Sede, Mundo do Espelho, Infecção e recursos futuros, incluindo efeitos automáticos de habilidades. Somente gastos internos explicitamente aprovados do chefe são exceções, como Vinho Carmesim e Renascimento.
+
+## Verificação técnica da suíte local — 06/10/2026
+
+Os cenários sem alvo de Pesadelo Eterno, Laço do Tigre, Olho do Falcão, Mão no Espelho e Reflexo Invertido agora removem efetivamente seus alvos elegíveis, devolvendo as cartas ao monte sem alterar elegibilidade ou regras da partida. A canastra criada pelo DevTools de Dominação registra também `dominationTurnTracking`, como o fluxo normal, para impedir compra bônus duplicada ao reprocessar o mesmo turno após reload.
+
+Os textos de Pólen do Lixo e do resumo de ameaça da Colheita foram alinhados aos valores já documentados nas seções 6.12/6.13: 30 / 50 / 80 HP. A mecânica não mudou. Extermínio S.T.A.R.S. teve somente sua consequência compacta encurtada para respeitar o orçamento existente do HUD; detalhes e punições permanecem intactos.
+
+Execução, arquivos e classificação dos achados: `docs/LIMPEZA_SUITE_2026-10-06.md`.

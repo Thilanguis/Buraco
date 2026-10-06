@@ -3319,7 +3319,7 @@ export function getBossNatureThreatSummaries(gameState) {
       consequence = `Cura prevista: ${predictedHeal} HP.`;
     } else if (threat.type === 'harvest') {
       condition = 'A quantidade de cartas na mão será conferida no fim do turno.';
-      consequence = '0–7: sem efeito · 8–10: cura 60 HP · 11+: +1 Flor e cura 100 HP.';
+      consequence = '0–7: sem efeito · 8–10: cura 50 HP · 11+: +1 Flor e cura 80 HP.';
     }
     if (['twin_vines', 'royal_bloom'].includes(threat.sourceAbilityId)) {
       const activationFlowerApplied = (boss.natureThreats || []).some((entry) => entry.sourceIntentId === threat.sourceIntentId && Number(entry.bloomApplied) > 0);

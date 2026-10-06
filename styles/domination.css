@@ -642,7 +642,7 @@
 #gameSection .board[data-mode='1x1_dominacao'] .player-actions {
   position: relative !important;
   display: grid !important;
-  grid-template-columns: minmax(60px, 1fr) minmax(0, 140px) 32px minmax(0, 140px) minmax(60px, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 140px) 32px minmax(0, 140px) minmax(0, 1fr);
   align-items: center;
   gap: 6px;
   width: 100% !important;
@@ -742,6 +742,12 @@
 #gameSection .board[data-mode='1x1_dominacao'] #rematchBtn {
   grid-column: 4;
   width: 100%;
+}
+@media (min-width: 601px) {
+  #gameSection .board[data-mode='1x1_dominacao'] #decreeBtn {
+    grid-column: 5;
+    justify-self: start;
+  }
 }
 @media (max-width: 600px) {
   #gameSection .board[data-mode='1x1_dominacao'] .player-actions {
