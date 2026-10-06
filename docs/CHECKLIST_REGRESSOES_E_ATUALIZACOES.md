@@ -714,6 +714,8 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 
 ## 25. Lixo protegido dos chefes e UX do Nemesis — 06/10/2026
 
+- [ ] Decreto contra Escravo BOT: testar bloqueio antes da compra e durante a janela de reação. BOT compra do Monte, sem coletar o Lixo. `BOT_PLAN_STALE` em sessão/turno ainda válidos retoma a recuperação após concluir a operação do Decreto; cancelamento real, troca de turno ou saída da sessão não podem comprar/descartar. Não deixar `lastBotTurnPlayed` travar um turno com plano invalidado. Cobertura: `domination-decree-bot-resume.test.mjs`.
+
 - [ ] Regra limitada a TODOS os modos Chefe, sem alterar Buraco normal/Dominação. Destino realmente escolhido: jogo existente → topo; jogo novo pela mão → inteiro; Joker → topo; 2 existente → topo; 2 coringa novo → topo; 2 natural novo → inteiro.
 - [ ] Papel do 2 usa o validador canônico; 2–3–4 e 3–4–2 equivalentes. Não criar detector paralelo ou decidir pela posição visual.
 - [ ] Mostrar feedback curto antes de consumir. Humano/BOT usam a mesma consulta e quantidade real para mão final, Morto/batida e limites. Bloqueio/erro não move cartas; rerender/snapshot/reload não duplica retirada.

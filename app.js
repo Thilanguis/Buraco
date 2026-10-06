@@ -12195,20 +12195,28 @@ onSnapshot(gameRef, async (snap) => {
             const BotController = botControllerForState(state);
             const activeBotTurn = { turnNumber: scheduledTurn, sessionId: scheduledSessionId, promise: null };
             window.activeBotTurn = activeBotTurn;
+            const recoverIncompleteTurn = async () => {
+              // A live revision can invalidate a plan without cancelling the match.
+              // Wait for the Decree transaction/presentation before resuming.
+              while (friendOperationPending && isGameSessionActive(scheduledSessionId, scheduledSignal) && state?.turnNumber === scheduledTurn && state?.currentPlayer === scheduledBotIndex && !state.finished) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+              }
+              const live = state;
+              const sameTurn = isGameSessionActive(scheduledSessionId, scheduledSignal) && live && !live.finished && live.turnNumber === scheduledTurn && live.currentPlayer === scheduledBotIndex;
+              if (sameTurn && canPerformCommonGameAction(live) && !isBossTurnActive(live) && !hasPendingBossChoices(live)) {
+                console.warn('[BOT] Rotina terminou sem avançar o turno; aplicando recuperação segura.');
+                window.lastBotTurnPlayed = null;
+                if (!live.hasDrawnThisTurn) await sessionEngine.executeDrawStock(scheduledBotIndex);
+                if (isGameSessionActive(scheduledSessionId, scheduledSignal) && state?.turnNumber === scheduledTurn && state?.currentPlayer === scheduledBotIndex && !state.finished) await sessionEngine.recoverBotTurn(scheduledBotIndex);
+              }
+            };
             activeBotTurn.promise = BotController.playTurn(state, scheduledBotIndex, sessionEngine, { signal: scheduledSignal, sessionId: scheduledSessionId })
-              .then(async () => {
-                // Blindagem: se a rotina do bot terminou sem passar o turno, não
-                // deixamos lastBotTurnPlayed congelar a partida para sempre.
-                const live = state;
-                const sameTurn = live && !live.finished && live.turnNumber === scheduledTurn && live.currentPlayer === scheduledBotIndex;
-                if (sameTurn && canPerformCommonGameAction(live) && !isBossTurnActive(live) && !hasPendingBossChoices(live)) {
-                  console.warn('[BOT] Rotina terminou sem avançar o turno; aplicando recuperação segura.');
-                  window.lastBotTurnPlayed = null;
-                  if (!live.hasDrawnThisTurn) await sessionEngine.executeDrawStock(scheduledBotIndex);
-                  if (state?.currentPlayer === scheduledBotIndex && !state.finished) await sessionEngine.recoverBotTurn(scheduledBotIndex);
+              .then(recoverIncompleteTurn)
+              .catch(async (err) => {
+                if (err?.code === 'BOT_PLAN_STALE') {
+                  await recoverIncompleteTurn();
+                  return;
                 }
-              })
-              .catch((err) => {
                 if (BotController.isCancellationError(err)) return;
                 console.error('Erro na Matrix:', err);
                 window.lastBotTurnPlayed = null;
