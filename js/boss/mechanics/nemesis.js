@@ -9,6 +9,25 @@ const turnKey = (state, playerId) => `${state.turnNumber || 0}:${playerId}`;
 const boosted = (boss, id) => boss.hordeBuff?.entityId === id && boss.roundNumber <= boss.hordeBuff.expiresRound;
 const objectiveIds = new Set(['stars_hunt', 'infectious_tentacle', 'tentacle_barrage', 'stars_extermination']);
 
+function resetDevourerFeed(boss, gameState = null) {
+  boss.devourerFeed = { version: 1, active: !!alive(boss, 'devourer'), credits: 0,
+    countedCardIds: [...new Set([...(boss.damagedCardIds || []), ...(gameState?.teams?.[0]?.melds || []).flat().map(card => card.id)])] };
+}
+
+function healFromDevourerFeed(boss, gameState, playerId, recordBossEvent) {
+  const entity = alive(boss, 'devourer'), feed = boss.devourerFeed;
+  if (!entity || boss.result || !feed?.active || feed.credits < 3) return;
+  const key = turnKey(gameState, playerId);
+  if (boss.devourerTurnIds.includes(key)) return;
+  feed.credits -= 3;
+  boss.devourerTurnIds.push(key);
+  const amount = Math.min(boss.maxHp - boss.hp, getNemesisZombieEffect(boss, entity).value);
+  boss.hp += amount;
+  boss.devourerHealingTotal = (boss.devourerHealingTotal || 0) + amount;
+  if (amount) recordBossEvent({ type: 'bossHeal', actionId: `devourer:${key}`, amount, hp: boss.hp,
+    outcome: `Devorador: Nemesis recuperou ${amount} HP.` });
+}
+
 export function getNemesisZombieEffect(boss, entity) {
   const reinforced = boosted(boss, entity.id);
   const normal = entity.id === 'grabber' ? 1 : entity.id === 'infected' ? 2 : 40;
@@ -200,7 +219,7 @@ function canLegallyTakeDiscard(state, player, helpers) {
   return !!findNemesisLegalPlan(preview, previewPlayer, pickupHelpers, (plan) => plan.playedCardIds.includes(top.id));
 }
 
-function resolveEntry(boss, intent) {
+function resolveEntry(boss, intent, gameState) {
   const payload = intent.payload;
   if (payload.resolved) return;
   const entity = boss.combatEntities.find((entry) => entry.id === payload.entityId && entry.status === 'entering');
@@ -213,6 +232,7 @@ function resolveEntry(boss, intent) {
   entity.diedAt = null;
   entity.transitionEventId = `${intent.id}:${entity.status}`;
   entity.transitionAt = Date.now();
+  if (entity.id === 'devourer') resetDevourerFeed(boss, gameState);
   if (success) boss.lastRepelledZombieId = entity.id;
   payload.resolved = true; payload.entrySuccess = success;
   payload.infectionApplied = 0;
@@ -306,7 +326,7 @@ export function chooseNemesisDamageTarget(state, damage) {
 
 export const nemesisBossMechanics = Object.freeze({
   id: 'nemesis',
-  createState: () => ({ combatLifecycleVersion: 1, combatEntities: createCombatEntities(NEMESIS_ZOMBIES, { initialStatus: 'absent' }), lastRepelledZombieId: null, combatTargetsByPlayer: {}, starsPlayerId: null, grabbedByPlayer: {}, grabbedTurnIds: [], reanimationsByPhase: {}, infectionEventIds: [], devourerTurnIds: [], devourerHealingTotal: 0, hordeBuff: null, omegaBuff: null, impactZone: null }),
+  createState: () => ({ combatLifecycleVersion: 1, combatEntities: createCombatEntities(NEMESIS_ZOMBIES, { initialStatus: 'absent' }), lastRepelledZombieId: null, combatTargetsByPlayer: {}, starsPlayerId: null, grabbedByPlayer: {}, grabbedTurnIds: [], reanimationsByPhase: {}, infectionEventIds: [], devourerTurnIds: [], devourerFeed: { version: 1, active: false, credits: 0, countedCardIds: [] }, devourerHealingTotal: 0, hordeBuff: null, omegaBuff: null, impactZone: null }),
   normalize({ boss, gameState }) {
     normalizeCombatEntities(boss, NEMESIS_ZOMBIES, { lifecycle: true });
     boss.combatTargetsByPlayer ||= {}; boss.grabbedByPlayer ||= {}; boss.reanimationsByPhase ||= {};
@@ -319,6 +339,12 @@ export const nemesisBossMechanics = Object.freeze({
     }
     if (!alive(boss, 'grabber')) boss.grabbedByPlayer = {};
     boss.infectionEventIds ||= []; boss.devourerTurnIds ||= [];
+    // Old live saves start at zero without crediting the existing table. Reload
+    // never consumes pending credits: only gameplay hooks can heal.
+    if (!boss.devourerFeed || boss.devourerFeed.version !== 1 || !alive(boss, 'devourer')
+      || !boss.devourerFeed.active) resetDevourerFeed(boss, gameState);
+    boss.devourerFeed.credits = Math.max(0, Math.floor(Number(boss.devourerFeed.credits) || 0));
+    boss.devourerFeed.countedCardIds = [...new Set(boss.devourerFeed.countedCardIds || [])];
     boss.danger = Math.max(0, Math.min(100, Number(boss.danger) || 0));
     if (boss.starsPlayerId != null && !gameState.players.some((player) => player.id === boss.starsPlayerId)) boss.starsPlayerId = null;
     if (boss.danger >= 100 && !boss.result) boss.result = { victory: false, reason: 'max_infection', title: 'Infecção Total', detail: 'A Infecção atingiu 100.' };
@@ -340,13 +366,16 @@ export const nemesisBossMechanics = Object.freeze({
     if (intent.abilityId === 'omega_outbreak') boss.omegaBuff = { expiresRound: boss.roundNumber + 1, sourceIntentId: intent.id };
     if (intent.abilityId === 'rocket_launcher') boss.impactZone = { ...intent.payload, expiresRound: boss.roundNumber, sourceIntentId: intent.id };
   },
-  resolveIntent({ boss, intent }) {
+  resolveIntent({ boss, intent, gameState }) {
     const payload = intent.payload;
-    if (intent.abilityId === 'horde_invasion') resolveEntry(boss, intent);
+    if (intent.abilityId === 'horde_invasion') resolveEntry(boss, intent, gameState);
     if (intent.abilityId === 'parasite_regeneration') payload.healed = healCombatEntity(alive(boss, payload.entityId), 100);
     if (intent.abilityId === 'viral_reanimation' && nemesisPersistentCount(boss) < boss.phase && !boss.reanimationsByPhase[intent.announcedPhase]) {
       const entity = boss.combatEntities.find((entry) => entry.id === payload.entityId);
-      if (reviveCombatEntity(entity, boss.phase)) boss.reanimationsByPhase[intent.announcedPhase] = intent.id;
+      if (reviveCombatEntity(entity, boss.phase)) {
+        boss.reanimationsByPhase[intent.announcedPhase] = intent.id;
+        if (entity.id === 'devourer') resetDevourerFeed(boss, gameState);
+      }
     }
     return { outcome: payload.resolutionText || (payload.healed != null ? `Regeneração: +${payload.healed} HP.` : `${intent.name}: período resolvido.`), resultData: { infectionApplied: payload.infectionApplied || 0, targetEntityId: payload.entityId || null } };
   },
@@ -361,6 +390,7 @@ export const nemesisBossMechanics = Object.freeze({
     if (entity) {
       hpDamage = damageCombatEntity(entity, damage, sourceActionId);
       if (entity.id === 'grabber' && entity.hp === 0) boss.grabbedByPlayer = {};
+      if (entity.id === 'devourer' && entity.hp === 0) resetDevourerFeed(boss);
     }
     else { hpDamage = Math.min(boss.hp, Math.max(0, damage)); boss.hp -= hpDamage; if (hpDamage && playerId != null) boss.starsPlayerId = playerId; }
     return { hpDamage, targetId: entity?.id || 'boss', absorbed: 0, reborn: false };
@@ -459,7 +489,7 @@ export const nemesisBossMechanics = Object.freeze({
     payload.exitedCardIds = [...new Set([...(payload.exitedCardIds || []), ...cardIds.filter((id) => payload.cardIds?.includes(id))])];
     if (cardIds.includes(payload.secondCardId)) payload.secondExited = true;
   },
-  onMeldTransition({ boss, gameState, playerId, meldId, cardsAdded, previousDangerReliefValue, nextDangerReliefValue, recordBossEvent }) {
+  onMeldTransition({ boss, gameState, teamId, playerId, meldId, cardsAdded, previousDangerReliefValue, nextDangerReliefValue, recordBossEvent }) {
     const fresh = cardsAdded.filter((card) => !boss.damagedCardIds.includes(card.id));
     if (fresh.length) {
       this.markExit(boss, playerId, fresh.map((card) => card.id));
@@ -469,18 +499,17 @@ export const nemesisBossMechanics = Object.freeze({
         if (payload.entryKind === 'devourer' && payload.entryMeldIds?.includes(meldId)) {
           const additions = fresh.filter(card => !(payload.entryTableCardIds || []).includes(card.id));
           payload.devourerCardIds = [...new Set([...(payload.devourerCardIds || []), ...additions.map(card => card.id)])];
-          if (payload.devourerCardIds.length >= 3) resolveEntry(boss, boss.currentIntent);
+          if (payload.devourerCardIds.length >= 3) resolveEntry(boss, boss.currentIntent, gameState);
         } else if (payload.entryKind !== 'devourer' && payload.entryMeldIds?.includes(meldId)) {
           payload.fedMeldIds = [...new Set([...(payload.fedMeldIds || []), meldId])];
         }
       }
       if (payload?.targetPlayerId === playerId && !payload.resolved) payload.contributed = true;
-      const devourer = alive(boss, 'devourer'); const key = turnKey(gameState, playerId);
-      if (devourer && fresh.length >= 3 && !boss.devourerTurnIds.includes(key)) {
-        boss.devourerTurnIds.push(key); if (boss.devourerTurnIds.length > 60) boss.devourerTurnIds.shift();
-        const amount = Math.min(boss.maxHp - boss.hp, getNemesisZombieEffect(boss, devourer).value);
-        boss.hp += amount; boss.devourerHealingTotal = (boss.devourerHealingTotal || 0) + amount;
-        if (amount) recordBossEvent({ type: 'bossHeal', amount, hp: boss.hp, outcome: `Devorador: Nemesis recuperou ${amount} HP.` });
+      if (teamId === 0 && alive(boss, 'devourer')) {
+        const feed = boss.devourerFeed;
+        const ids = [...new Set(fresh.map(card => card.id))].filter(id => !feed.countedCardIds.includes(id));
+        feed.countedCardIds.push(...ids);
+        feed.credits += ids.length;
       }
       if (boss.impactZone?.meldId === meldId && boss.roundNumber <= boss.impactZone.expiresRound) {
         const eventId = `${boss.impactZone.sourceIntentId}:impact:${fresh.map((card) => card.id).join(',')}`;
@@ -488,6 +517,7 @@ export const nemesisBossMechanics = Object.freeze({
         if (applied) recordBossEvent({ type: 'infection', actionId: eventId, danger: boss.danger, amount: applied, outcome: `Zona de Impacto: Infecção +${applied}.` });
       }
     }
+    healFromDevourerFeed(boss, gameState, playerId, recordBossEvent);
     // Shared engine progress tracks total tier relief; only the increment applies.
     return { resourceReduction: boss.result ? 0 : Math.max(0, nextDangerReliefValue - previousDangerReliefValue) };
   },
@@ -497,8 +527,10 @@ export const nemesisBossMechanics = Object.freeze({
   },
   onPlayerTurnEnd({ boss, gameState, playerId, recordBossEvent }) {
     delete boss.grabbedByPlayer[playerId];
+    // A later turn can consume queued credits even without a new contribution.
+    healFromDevourerFeed(boss, gameState, playerId, recordBossEvent);
     const intent = boss.currentIntent; const payload = intent?.payload;
-    if (intent?.abilityId === 'horde_invasion' && payload.entryKind === 'grabber' && payload.targetPlayerId === playerId) resolveEntry(boss, intent);
+    if (intent?.abilityId === 'horde_invasion' && payload.entryKind === 'grabber' && payload.targetPlayerId === playerId) resolveEntry(boss, intent, gameState);
     if (!intent || !objectiveIds.has(intent.abilityId) || payload.targetPlayerId !== playerId || payload.resolved) return {};
     const { fulfilled, failed, base: amount } = getNemesisObjectiveOutcome(boss, intent);
     payload.infectionApplied = changeNemesisInfection(boss, amount, `${intent.id}:failure`, { failure: failed });

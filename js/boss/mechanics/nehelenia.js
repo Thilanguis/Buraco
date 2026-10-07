@@ -9,8 +9,32 @@ function appendUnique(target, values) {
   return [...new Set([...(target || []), ...values])];
 }
 
+export function canReceiveNeheleniaIllusionLock(boss, playerId, cardId) {
+  return !(boss.effects || []).some(effect => effect.id === 'nehelenia_fish_dead_card'
+    && effect.playerId === playerId && effect.cardId === cardId);
+}
+
 export const neheleniaBossMechanics = Object.freeze({
   id: 'nehelenia',
+  normalize({ boss, discardBlocked }) {
+    // Legacy overlap: Fish Dead owns this card's exit through discard.
+    boss.effects = boss.effects.filter(effect => effect.id !== 'nehelenia_illusion_lock'
+      || canReceiveNeheleniaIllusionLock(boss, effect.playerId, effect.cardId));
+    const intent = boss.currentIntent;
+    if (intent?.abilityId === 'discard_mirror' && !intent.payload?.resolved
+      && discardBlocked?.(intent.payload?.targetPlayerId)) {
+      intent.payload.resolved = true;
+      intent.payload.cancelled = true;
+      intent.payload.reflections = [];
+      intent.payload.correctOption = null;
+      boss.pendingChoices = boss.pendingChoices.filter(choice => choice.type !== 'discard_mirror');
+    }
+    boss.pendingChoices = boss.pendingChoices.filter(choice => choice.type !== 'discard_mirror' || !discardBlocked?.(choice.playerId));
+  },
+  isCardBlocked(boss, playerId, cardId, action) {
+    return boss.effects.some(effect => effect.playerId === playerId && effect.cardId === cardId
+      && (effect.id === 'nehelenia_illusion_lock' || (effect.id === 'nehelenia_fish_dead_card' && action === 'play')));
+  },
   onMeldTransition({
     boss,
     gameState,

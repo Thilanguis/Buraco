@@ -136,6 +136,9 @@ export const neheleniaBossPresentation = Object.freeze({
   details() { return []; },
 
   compactAction(context = {}) {
+    if (context.intent?.abilityId === 'discard_mirror' && context.intent.payload?.cancelled) {
+      return { instruction: 'Espelho encerrado: Lixo bloqueado.', progress: '', consequence: 'Sem punição deste objetivo.' };
+    }
     const { gameState, intent } = context;
     if (!intent) return null;
     const helpers = helpersFor(context);
@@ -169,6 +172,7 @@ export const neheleniaBossPresentation = Object.freeze({
   help(context = {}) {
     const { gameState, intent } = context;
     if (!intent) return null;
+    if (intent.abilityId === 'discard_mirror' && intent.payload?.cancelled) return 'O Lixo está bloqueado. Este Espelho foi encerrado sem punição.';
     const { playerName } = helpersFor(context);
     const payload = intent.payload || {};
     const target = playerName(gameState, payload.targetPlayerId);

@@ -1,6 +1,8 @@
 # Balanceamento do Nemesis
 
-## Decisão atual — 06/10/2026
+## Durabilidade — 06/10/2026; correções funcionais — 07/10/2026
+
+O modelo atual usa **batida fixa de 100 HP**, pelo pipeline oficial, sem escala por pontos nem redução percentual da Dominadora. A passiva persistente do Devorador acumula cartas novas da equipe entre jogos, jogadores e turnos; cada 3 créditos cura 40/70 HP (+30 Reforçado), no máximo uma vez por turno. Excedentes ficam pendentes e são consumidos na próxima contribuição ou no fim de um turno posterior elegível. Morte/reanimação zeram progresso. Entrada da Invasão permanece independente. Nenhum HP/peso/valor de cura/Infecção foi alterado neste pacote.
 
 | Combatente | HP anterior (histórico) | HP atual |
 |---|---:|---:|
@@ -17,7 +19,7 @@ Preservados: Infecção 0–100 e valores das habilidades; Infectado +2/+4, refo
 
 ## Estimativa histórica, não resultado atual
 
-A estimativa antiga de **~68,9%**, citada no pedido desta revisão, é anterior à regra global do Lixo e anterior a esta mudança de HP/passiva. É mantida aqui somente como histórico, não como probabilidade atual validada. Não foi encontrada uma simulação correspondente no workspace local para reproduzi-la. Não há novo percentual de vitória afirmado neste patch; recalibração depende de partidas, simulação ou telemetria posteriores.
+A estimativa antiga de **~68,9%**, citada no pedido desta revisão, é anterior à regra global do Lixo e anterior a esta mudança de HP/passiva. Também não há evidência de que ela modelava corretamente o dano histórico de encerramento. É mantida aqui somente como histórico, não como probabilidade atual validada sob batida fixa de 100 e contador coletivo do Devorador. Não foi encontrada uma simulação correspondente no workspace local para reproduzi-la. Não há novo percentual de vitória afirmado neste patch; recalibração depende de partidas, simulação ou telemetria posteriores.
 
 ## Validação e migração
 
@@ -25,7 +27,7 @@ Saves antigos mantêm lifecycle, alvo, S.T.A.R.S., quotas e HP restante (limitad
 
 Regressões: `nemesis-grabber.test.mjs`, `nemesis-boss.test.mjs`, `nemesis-progress-meters.test.mjs`, handlers de compra e `nemesis-ui.browser.mjs`; depois executar todos os `tests/*.test.mjs`. Testes automatizados não substituem duas sessões Firebase reais nem medição de força contra jogadores.
 
-## Resultado desta revisão
+## Registro histórico da revisão de 06/10/2026
 
 - Focados: **132 testes, 132 passaram, 0 falhas** em Nemesis, Grabber, medidores, descarte/HUD, handlers de compra, controle de partida, Dominação e arquitetura de combate.
 - Suíte ampla local (`node --test` sobre todos os `tests/*.test.mjs`): **855 testes, 855 passaram, 0 falhas, 0 cancelados, 0 skipped, 0 todo**.

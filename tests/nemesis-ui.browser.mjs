@@ -15,12 +15,13 @@ const panelSource = source.slice(source.indexOf('function createBossCombatHelp('
 const helpSource = source.slice(source.indexOf('function closeBossIntentHelp('), source.indexOf('\nfunction createBossCombatHelp('));
 const frameSource = source.slice(source.indexOf('function applyBossMeldEffectFrame('), source.indexOf('\nfunction applyBossMeldCardDecoration('));
 const meterSource = source.slice(source.indexOf('function renderBossRangeMeters('), source.indexOf('\nconst BOSS_GUIDE_CORE'));
+const discardRenderSource = source.slice(source.indexOf('  const discardCount = state.discard.length;'), source.indexOf('  // 3. Aplica o 3D nos Mortos'));
 const snapshotGuard = source.match(/if \(localActionGate\.pending\) await localActionGate\.pending;\s*if \(snapshotSequence !== gameSnapshotSequence\) return;/)[0];
 assert.ok(panelSource.endsWith('}\r\n') || panelSource.trimEnd().endsWith('}'));
 // Include the outer section, not the nested hidden battle-log section.
 const hudMarkup = index.match(/<section id="bossHud"[\s\S]*?<\/section>(?=\s*<div id="bossDaughterStrip")/)[0].replace('style="display: none"', 'style="display: grid"');
 const discardMarkup = index.match(/<div class="pile-area" id="drawDiscardBtn">[\s\S]*?<span id="discardTop"[^>]*><\/span>\s*<\/div>/)[0];
-const styles = ['base-menu', 'game', 'cards', 'hud', 'responsive', 'boss-mode', 'boss/nemesis'];
+const styles = ['base-menu', 'game', 'cards', 'hud', 'responsive', 'boss-mode', 'boss/nemesis', 'boss/matriarch'];
 const fixture = `<!doctype html><html><head><meta charset="utf-8">${styles.map((name) => `<link rel="stylesheet" href="/styles/${name}.css">`).join('')}</head>
 <body class="boss-mode" data-boss-id="nemesis"><main style="padding:14px;max-width:1440px;margin:auto">${hudMarkup}${discardMarkup}</main>
 <script type="module">
@@ -103,6 +104,22 @@ window.fixture.discard = (active) => {
   const sample = { players: [{ id: 0 }], currentPlayer: 0, boss: { currentIntent: { abilityId: active ? 'contaminated_zone' : 'rocket_launcher', payload: { targetPlayerId: 0 } } } };
   document.getElementById('drawDiscardBtn').classList.toggle('boss-nemesis-contaminated-discard', getBossUiAdapter('nemesis').discard({ gameState: sample }));
   getBossUiAdapter('nemesis').decorateCard(document.getElementById('discardFace'), active ? 'nemesis-contaminated' : null);
+};
+// Use the actual discard renderer, not a synthetic badge. Only face art and
+// stack geometry are doubles; threat identity/classes come from production.
+window.fixture.pollen = (buried, reload = false) => {
+  const previous = state;
+  document.body.dataset.bossId = 'matriarca_esmeralda';
+  state = { players: [{ id: 0 }], currentPlayer: 0, discard: [{ id: 'pollen', rank: '7', suit: '♠' }],
+    boss: { id: 'matriarca_esmeralda', natureThreats: [{ type: 'pollen', status: 'active', targetPlayerId: null, discardCardId: 'pollen' }] } };
+  if (buried) state.discard.push({ id: 'normal', rank: '8', suit: '♠' });
+  if (reload) state = JSON.parse(JSON.stringify(state));
+  const updatePile3D = () => state.discard.length;
+  const cardFrontHTML = card => '<b data-card-id="' + card.id + '">' + card.rank + card.suit + '</b>';
+  const suitClass = () => '', deckFaceClass = () => '';
+  const applyDimitrescuBloodScatter = () => {};
+  ${discardRenderSource}
+  state = previous;
 };
 window.fixture.meter = (abilityId, payload) => renderBossRangeMeters(document.getElementById('bossIntentDescription'), nemesisBossPresentation.rangeMeters({ gameState: state, intent: { abilityId, payload } }) || []);
 window.fixture.command = () => {
@@ -483,6 +500,21 @@ try {
       assert.equal(await meter.getAttribute('data-health'), health);
       assert.equal(await meter.evaluate(node => getComputedStyle(node).getPropertyValue('--combat-hp-color').trim()), color);
       assert.equal(await meter.evaluate(node => getComputedStyle(node).animationName), 'none', 'reduced motion disables HP pulse');
+    }
+  }
+  for (const [width, height] of [[1920, 1080], [1376, 1032], [768, 1024], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    for (const buried of [false, true]) {
+      await page.evaluate(buried => window.fixture.pollen(buried, true), buried);
+      assert.equal(await page.locator('#discardFace .boss-card-status-pollen').count(), buried ? 0 : 1);
+      assert.equal(await page.locator('#discardFace').evaluate(node => node.classList.contains('boss-discard-pollen-card')), !buried);
+      assert.equal(await page.locator('#drawDiscardBtn').evaluate(node => node.classList.contains('boss-pollen-discard')), !buried);
+      assert.equal(await page.locator('#drawDiscardBtn').evaluate(node => node.classList.contains('boss-pollen-buried')), buried);
+      assert.equal(await page.locator('#discardFace [data-card-id]').getAttribute('data-card-id'), buried ? 'normal' : 'pollen');
+      if (buried) {
+        assert.equal(await page.locator('#drawDiscardBtn').evaluate(node => getComputedStyle(node, '::after').content), '"PÓLEN NA PILHA"');
+        assert.equal(await page.locator('#drawDiscardBtn').evaluate(node => getComputedStyle(node, '::after').fontSize), '8px');
+      }
     }
   }
   assert.deepEqual(errors, []);

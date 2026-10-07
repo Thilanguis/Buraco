@@ -1,5 +1,9 @@
 # Nemesis — implementação e validação
 
+## Contador do Devorador e batida — 07/10/2026
+
+Batida usa 100 HP fixos no pipeline oficial; o BOT só encerra se a simulação canônica confirmar vitória. Devorador persistente soma todas as cartas novas da equipe, entre jogos (inclusive novos), turnos e jogadores. Cada 3 créditos cura pelo helper 40/70 HP, Reforçado +30, no máximo 1x/turno; excedentes seguem pendentes para uma contribuição ou fim de turno posterior. `devourerFeed` versão 1 deduplica cardIds; `devourerTurnIds` guarda quota. Saves antigos iniciam zero sem contar mesa anterior; normalização não cura. Entrada/morte/reanimação zeram o contador; undo restaura créditos/IDs/quota juntos. A entrada da Invasão não mudou. Sem alterações em HP, Infecção, pesos, Regeneração ou Reanimação. Estimativas anteriores continuam históricas, não win rate atual.
+
 ## Durabilidade e Agarrador — revisão de 06/10/2026
 
 Estado atual: Nemesis **2200 HP**; Agarrador **220**, Infectado **240**, Devorador **260**. Após concluir a compra do Monte ou do Lixo, Agarrador prende exatamente **1 normal / 2 Mutado / 2 Reforçado / 3 ambos**, quando houver cartas seguras suficientes. A seleção seeded prioriza cartas com uso legal real (`findNemesisLegalPlan()`) e completa com outras cartas seguras da mão, mesmo sem jogada imediata. Testa combinações determinísticas da quota completa no estado resultante com o planner canônico, incluindo objetivo cooperativo e todos os descartes legais (AGARRADA bloqueia somente jogo). Só tenta uma quota menor após esgotar as combinações do tamanho anterior; não reserva cegamente cartas do primeiro plano. Quantidade menor somente por falta física de cartas ou proteção necessária contra estado impossível. Sem descarte legal, preserva a rota de Morto/batida validada pelo planner.
@@ -16,7 +20,7 @@ Validação desta rodada de durabilidade: **132/132 focados**, **855/855 na suí
 
 ## Medidores de objetivos
 
-Comando da Horda é um reforço temporário em um único zumbi, sem objetivo cumulativo/faixas: não usa barra de progresso. O HUD identifica o zumbi e o prazo, seguido apenas da passiva reforçada total (Agarrador: cartas presas para jogo; Infectado: Infecção extra por falha; Devorador: cura ao contribuir 3+ cartas no mesmo jogo). A ajuda explica o gatilho real, sem listar como ativos os bônus dos outros dois zumbis. Mudar o alvo de dano não muda quem recebeu o comando.
+Comando da Horda é um reforço temporário em um único zumbi, sem objetivo cumulativo/faixas: não usa barra de progresso. O HUD identifica o zumbi e o prazo, seguido apenas da passiva reforçada total (Agarrador: cartas presas para jogo; Infectado: Infecção extra por falha; Devorador: cura a cada 3 cartas novas acumuladas pela equipe). A ajuda explica o gatilho real, sem listar como ativos os bônus dos outros dois zumbis. Mudar o alvo de dano não muda quem recebeu o comando.
 
 Lança-Foguetes cobra por **carta nova** adicionada à Zona de Impacto: +10 Infecção na fase 2 e +12 na fase 3. Três cartas juntas custam +30/+36, igual a três jogadas separadas. Cartas já contabilizadas/reorganizadas não cobram novamente. O teto de Infecção e a derrota imediata permanecem; a cobrança de uma jogada é um único evento/SFX.
 
@@ -87,7 +91,7 @@ Saves antigos com mais vivos que o teto da fase não perdem entidades silenciosa
 
 - **Agarrador:** escolhe carta com rota real de uso legal em jogo no turno do alvo. Após marcada, sair por jogo ou descarte continua cumprindo o objetivo. Um descarte legal isolado não torna a habilidade elegível. Não marca descarte final proibido por falta de Morto/canastra. Falha: 220 HP.
 - **Infectado:** equipe contribui duas cartas válidas para jogos durante a rodada. O plano pode ser individual ou cooperativo. Falha: 240 HP.
-- **Devorador:** elegível quando ao menos um jogo existente aceita uma contribuição legal; não exige prova antecipada da expulsão. A equipe acumula 3 cartas novas em jogos que existiam no início da invasão, registrando seus IDs. Pode alimentar o mesmo jogo, em contribuições separadas, por um jogador ou pelos dois. Ao atingir 3, é repelido; menos de 3 no fim da rodada deixa-o persistente com 260 HP (Mutado na F3). IDs de cartas deduplicados; reorganização e jogos novos não contam, inclusive após reload/snapshot/undo. Isso não muda a passiva: contribuição única de 3+ cartas no mesmo jogo cura 40/70 HP, Reforçado +30, no máximo uma vez por turno e sem ultrapassar o HP máximo.
+- **Devorador:** elegível quando ao menos um jogo existente aceita uma contribuição legal; não exige prova antecipada da expulsão. A equipe acumula 3 cartas novas em jogos que existiam no início da invasão, registrando seus IDs. Pode alimentar o mesmo jogo, em contribuições separadas, por um jogador ou pelos dois. Ao atingir 3, é repelido; menos de 3 no fim da rodada deixa-o persistente com 260 HP (Mutado na F3). IDs de cartas deduplicados; reorganização e jogos novos não contam, inclusive após reload/snapshot/undo. Entrada e passiva são distintas: a passiva persistente agora soma cartas novas em qualquer jogo, inclusive jogos novos, entre turnos e jogadores; cada 3 créditos cura 40/70 HP, Reforçado +30, máximo uma vez por turno, sem perder excedentes nem ultrapassar o HP máximo.
 
 O planejamento considera jogadores que ainda podem agir e a ordem real da rodada. Para Agarrador/Infectado, não escolhe objetivo que só funcionaria invertendo turnos. Para Devorador, não exige que as três cartas já estejam disponíveis na elegibilidade; o BOT tenta contribuições incrementais válidas. Sucesso repele; falha só estabelece o zumbi. Em F3, novas persistências já entram Mutadas.
 
@@ -99,7 +103,7 @@ Comando da Horda continua separado da Invasão: não traz zumbis, exige persiste
 |---|---|---|---|
 | Agarrador | Após compra do Monte/Lixo, prende 1 carta da mão para jogo, não descarte, até fim do turno | 2 cartas | +1 carta (2 normal / 3 Mutado) |
 | Infectado | +2 Infecção em falha positiva real | +4 | +2 |
-| Devorador | Cura Nemesis 40 HP na primeira contribuição de 3+ cartas no mesmo jogo por turno | 70 HP | +30 HP |
+| Devorador | Cura Nemesis 40 HP a cada 3 cartas novas acumuladas pela equipe; 1x/turno, excedentes pendentes | 70 HP | +30 HP |
 
 Os totais aparecem diretamente em chips clicáveis: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado mostra 2/4/70. O mesmo helper calcula a passiva aplicada e o total exibido; MUTADO e REFORÇADO abrem ajuda específica. Comando usa `expiresRound = roundNumber + 1`, válido até essa rodada inclusive; não reforça entering/repelled/corpse. Regeneração só cura persistente ferido. Reanimação só revive cadáver com 50% HP, uma vez por fase e com espaço no teto; em F3 retorna Mutado. A entrada da F3 muta todos os persistentes vivos.
 

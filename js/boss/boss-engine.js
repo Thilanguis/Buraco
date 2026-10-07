@@ -18,6 +18,7 @@ import {
 } from './mechanics/boss-mechanics-registry.js';
 import { quoteBankerCreditLimit } from './mechanics/banker.js';
 import { isCombatEntityAlive } from './boss-combat.js';
+import { canReceiveNeheleniaIllusionLock } from './mechanics/nehelenia.js';
 
 export { getRestorativeDewHealing } from './boss-balance.js';
 
@@ -747,14 +748,6 @@ function isCardBlockedByBossState(boss, playerId, cardId, action = 'play') {
       && ['seed', 'royal_seed', 'pollen', 'royal_pollen'].includes(threat.type)
     ));
   }
-  if (boss.id === 'nehelenia') {
-    return boss.effects.some((effect) => {
-      if (effect.playerId !== playerId || effect.cardId !== cardId) return false;
-      if (effect.id === 'nehelenia_illusion_lock') return true;
-      if (effect.id === 'nehelenia_fish_dead_card') return action === 'play';
-      return false;
-    });
-  }
   if (boss.id !== 'dominadora') return false;
   const intent = boss.currentIntent;
   if (intent?.abilityId === 'collar' && intent.payload?.targetPlayerId === playerId) {
@@ -1086,11 +1079,13 @@ function neheleniaShuffle(items, gameState, salt = 0) {
   return result;
 }
 
-function buildNeheleniaReflectionChoice(gameState, targetPlayer, salt = 0, { pickFake = false } = {}) {
+function buildNeheleniaReflectionChoice(gameState, targetPlayer, salt = 0, { pickFake = false, locksCards = false } = {}) {
   if (!targetPlayer?.hand?.length) return null;
+  const candidates = { ...targetPlayer, hand: targetPlayer.hand.filter(card => !locksCards
+    || canReceiveNeheleniaIllusionLock(gameState.boss, targetPlayer.id, card.id)) };
   const handLabels = new Set((targetPlayer.hand || []).map(compactCardLabel));
   if (pickFake) {
-    const realCards = chooseCards(targetPlayer, gameState, salt, Math.min(2, targetPlayer.hand.length));
+    const realCards = chooseCards(candidates, gameState, salt, Math.min(2, candidates.hand.length));
     if (realCards.length < 2) return null;
     const labels = realCards.map(compactCardLabel);
     const fake = neheleniaFakeCardLabel(gameState, [...handLabels], salt + 71);
@@ -1106,7 +1101,7 @@ function buildNeheleniaReflectionChoice(gameState, targetPlayer, salt = 0, { pic
       mode: 'find_fake',
     };
   }
-  const trueCard = chooseCard(targetPlayer, gameState, salt + 3);
+  const trueCard = chooseCard(candidates, gameState, salt + 3);
   if (!trueCard) return null;
   const trueLabel = compactCardLabel(trueCard);
   const fakeOne = neheleniaFakeCardLabel(gameState, [...handLabels], salt + 29);
@@ -1487,8 +1482,9 @@ function createPayload(gameState, abilityId) {
   if (boss.id === 'nehelenia') {
     syncNeheleniaDreamMirrors(gameState);
     if (abilityId === 'false_image') {
-      const target = chooseSeeded((gameState.players || []).filter((player) => player.hand?.length), gameState, 371);
-      return buildNeheleniaReflectionChoice(gameState, target, 373) || {};
+      const target = chooseSeeded((gameState.players || []).filter(player => player.hand?.some(card =>
+        canReceiveNeheleniaIllusionLock(boss, player.id, card.id))), gameState, 371);
+      return buildNeheleniaReflectionChoice(gameState, target, 373, { locksCards: true }) || {};
     }
     if (abilityId === 'mirrored_meld') {
       const pair = chooseSeeded(neheleniaMirroredMeldPairs(gameState), gameState, 379);
@@ -1521,7 +1517,8 @@ function createPayload(gameState, abilityId) {
       return buildNeheleniaReflectionChoice(gameState, target, 397) || {};
     }
     if (abilityId === 'discard_mirror') {
-      const target = chooseSeeded((gameState.players || []).filter((player) => player?.id != null), gameState, 401);
+      const target = chooseSeeded((gameState.players || []).filter((player) => player?.id != null
+        && !discardBlockedByBossState(gameState, boss, player.id)), gameState, 401);
       const top = gameState.discard?.at?.(-1) || null;
       if (!target || !top) return {};
       const trueLabel = compactCardLabel(top);
@@ -1534,8 +1531,9 @@ function createPayload(gameState, abilityId) {
       return { targetPlayerId: target.id, discardCardId: top.id, reflections, correctOption: `reflection:${realIndex}`, mirrorCount: 2 };
     }
     if (abilityId === 'shattered_mirror') {
-      const target = chooseSeeded((gameState.players || []).filter((player) => (player.hand?.length || 0) >= 2), gameState, 433);
-      return buildNeheleniaReflectionChoice(gameState, target, 439, { pickFake: true }) || {};
+      const target = chooseSeeded((gameState.players || []).filter(player => (player.hand || []).filter(card =>
+        canReceiveNeheleniaIllusionLock(boss, player.id, card.id)).length >= 2), gameState, 433);
+      return buildNeheleniaReflectionChoice(gameState, target, 439, { pickFake: true, locksCards: true }) || {};
     }
     if (abilityId === 'mirror_prison') {
       const stolen = neheleniaStolenPlayers(gameState);
@@ -1779,7 +1777,8 @@ function hasValidAbilityPayload(gameState, abilityId, payload) {
   if (abilityId === 'dream_theft') {
     return payload.targetPlayerId != null && neheleniaMirrorStatus(gameState, payload.targetPlayerId) === 'intact' && !!payload.correctOption;
   }
-  if (abilityId === 'discard_mirror') return payload.targetPlayerId != null && !!payload.discardCardId && !!payload.correctOption;
+  if (abilityId === 'discard_mirror') return payload.targetPlayerId != null && !!payload.discardCardId && !!payload.correctOption
+    && !discardBlockedByBossState(gameState, gameState.boss, payload.targetPlayerId);
   if (abilityId === 'shattered_mirror') return payload.targetPlayerId != null && (payload.realCardIds || []).length === 2 && !!payload.correctOption;
   if (abilityId === 'mirror_prison') {
     return payload.trappedPlayerId != null && payload.rescuerPlayerId != null && !!payload.meldId
@@ -2299,7 +2298,8 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
     boss.phaseTransitions = [boss.phase];
   }
   boss.phase ||= 1;
-  getBossMechanicsAdapter(boss.id)?.normalize?.({ boss, gameState });
+  getBossMechanicsAdapter(boss.id)?.normalize?.({ boss, gameState,
+    discardBlocked: playerId => discardBlockedByBossState(gameState, boss, playerId) });
   return boss;
 }
 
@@ -3154,7 +3154,7 @@ export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
   const resolved = [];
   if (boss.id === 'nehelenia') {
     const intent = boss.currentIntent;
-    if (intent?.abilityId === 'discard_mirror' && !intent.payload?.triggered) {
+    if (intent?.abilityId === 'discard_mirror' && !intent.payload?.triggered && !intent.payload?.cancelled) {
       intent.payload.triggered = true;
       intent.payload.targetPlayerId = playerId;
       intent.payload.takenCardIds = [...takenIds];
@@ -4309,11 +4309,13 @@ export function resolveBossChoice(gameState, playerId, option) {
     if (choice.type === 'false_image') {
       if (correct) outcome = `${target?.name || 'O alvo'} reconheceu a imagem verdadeira.`;
       else {
-        if (choice.cardId) {
+        if (choice.cardId && canReceiveNeheleniaIllusionLock(boss, playerId, choice.cardId)) {
           boss.effects.push({ id: 'nehelenia_illusion_lock', source: 'false_image', playerId, cardId: choice.cardId, expiresAfterTurn: true, appliedAtRound: boss.roundNumber });
           lockedCardIds = [choice.cardId];
         }
-        outcome = `${target?.name || 'O alvo'} seguiu a imagem falsa; a carta verdadeira ficou aprisionada até o fim do próximo turno.`;
+        outcome = lockedCardIds.length
+          ? `${target?.name || 'O alvo'} seguiu a imagem falsa; a carta verdadeira ficou aprisionada até o fim do próximo turno.`
+          : `${target?.name || 'O alvo'} seguiu a imagem falsa; o Reflexo Morto continua podendo ser descartado.`;
       }
     } else if (choice.type === 'dream_theft') {
       if (correct) outcome = `${target?.name || 'O alvo'} protegeu o próprio Espelho dos Sonhos.`;
@@ -4331,9 +4333,11 @@ export function resolveBossChoice(gameState, playerId, option) {
     } else if (choice.type === 'shattered_mirror') {
       if (correct) outcome = `${target?.name || 'O alvo'} encontrou o fragmento falso.`;
       else {
-        lockedCardIds = [...(choice.realCardIds || [])];
+        lockedCardIds = (choice.realCardIds || []).filter(cardId => canReceiveNeheleniaIllusionLock(boss, playerId, cardId));
         lockedCardIds.forEach((cardId) => boss.effects.push({ id: 'nehelenia_illusion_lock', source: 'shattered_mirror', playerId, cardId, expiresAfterTurn: true, appliedAtRound: boss.roundNumber }));
-        outcome = `${target?.name || 'O alvo'} apontou um reflexo verdadeiro; as duas cartas reais ficaram presas no espelho até o fim do próximo turno.`;
+        outcome = lockedCardIds.length === 2
+          ? `${target?.name || 'O alvo'} apontou um reflexo verdadeiro; as duas cartas reais ficaram presas no espelho até o fim do próximo turno.`
+          : `${target?.name || 'O alvo'} apontou um reflexo verdadeiro; ${lockedCardIds.length === 1 ? 'uma carta ficou presa' : 'nenhuma carta ficou presa'}. Reflexo Morto continua podendo ser descartado.`;
       }
     } else if (choice.type === 'eternal_nightmare') {
       if (correct) outcome = `${target?.name || 'O alvo'} atravessou o Pesadelo Eterno sem perder o próprio reflexo.`;
@@ -4914,6 +4918,10 @@ export function isBossDiscardBlocked(gameState) {
   if (!isBossMode(gameState)) return false;
   const boss = normalizeBossState(gameState);
   const playerId = gameState.players?.[gameState.currentPlayer]?.id ?? gameState.currentPlayer;
+  return discardBlockedByBossState(gameState, boss, playerId);
+}
+
+function discardBlockedByBossState(gameState, boss, playerId) {
   if (boss.id === 'banker') return boss.currentIntent?.abilityId === 'credit_block' || isBossVaultDrawRequired(gameState, playerId);
   if (boss.id === 'dimitrescu') return boss.currentIntent?.abilityId === 'castle_lockdown';
   if (boss.id === 'nehelenia') {
@@ -5909,10 +5917,11 @@ export function completeBossPlayerTurn(gameState, playerId) {
 }
 
 export function applyBossFinalStrike(gameState, projectedTeamScore, playerId = gameState.currentPlayer) {
+  // The legacy score argument remains compatible with existing callers/saves,
+  // but never scales finish damage. Damage always uses the canonical pipeline.
   const boss = normalizeBossState(gameState);
   if (!boss || boss.result) return null;
-  const baseDamage = 500 + Math.max(0, Math.floor((Number(projectedTeamScore) || 0) * 0.25));
-  const damage = boss.id === 'dominadora' && isBossPlayerDominated(gameState, playerId) ? Math.floor(baseDamage * 0.65) : baseDamage;
+  const damage = 100;
   const damageResult = applyDamageToBoss(gameState, damage, { breaksCocoon: true, sourceActionId: `final_${boss.actionSequence + 1}`, playerId });
   boss.stats.totalDamage += damage;
   boss.stats.finalStrike = damage;

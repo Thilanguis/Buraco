@@ -4,7 +4,13 @@
 ## Status da documentação
 
 
-**Revisada contra o workspace local atual — 06/10/2026, incluindo a revisão experimental de durabilidade do Nemesis e a decisão final de ajuda opcional do Lixo.**
+**Revisada contra o workspace local atual — 07/10/2026, incluindo durabilidade do Nemesis, ajuda opcional do Lixo e o pacote de compatibilidade/passiva/batida.**
+
+### Compatibilidade de estados — 07/10/2026
+
+- Nehelenia: REFLEXO MORTO impede jogar, mas permite descartar. A seleção de illusion lock exclui essas cartas; saves sobrepostos removem somente esse lock conflitante. Espelho do Lixo usa o bloqueio canônico; objetivo legado incompatível é encerrado sem punição e sem escolha pendente.
+- Matriarca: Pólen acompanha o `discardCardId` real. No topo, marca a carta; enterrado, mostra apenas “PÓLEN NA PILHA”. Retirar só um topo normal não ativa a punição; adquirir a carta contaminada continua ativando a regra existente.
+- Nemesis: `devourerFeed` versão 1 guarda créditos coletivos e IDs já contados; `devourerTurnIds` impede mais de uma cura por turno. Saves antigos iniciam o contador em zero, excluindo cartas já na mesa, sem cura retroativa. Reload só normaliza; não consome créditos. Undo restaura créditos, IDs e quota juntos. Entrada como persistente/reanimação começam em zero; morte apaga créditos. Cada 3 cartas novas consome 3 créditos (inclusive quando HP já está cheio); excedentes ficam pendentes para uma contribuição ou fim de turno posterior elegível. Valor vem do helper da passiva: 40/70 HP, Reforçado +30, limitado ao HP máximo. A entrada da Invasão continua sendo outra regra.
 
 **Regra permanente de objetivos:** cumprir uma habilidade nunca reduz Dívida, Dominação, Flores, Sede, Mundo do Espelho ou Infecção. O sucesso evita sua punição; a falha mantém a punição aprovada. Sucessos parciais não descontam falhas de outros objetivos. Canastras continuam concedendo todo o alívio aprovado. Gastos do próprio chefe por cura/renascimento são outra categoria e permanecem. Custos positivos de escolhas/obediência não foram rebalanceados nesta revisão. Auditoria detalhada: `REVISAO_OBJETIVOS_CHEFES.md`.
 
@@ -294,11 +300,11 @@ Suja → Limpa
 
 
 ```text
-500 + piso(25% da pontuação projetada da equipe)
+Batida = 100 HP de dano fixo
 ```
 
 
-Jogador Dominado causa apenas 65% da própria parcela do ataque final, conforme a regra da Dominadora.
+A batida não escala com pontuação e não recebe a antiga redução percentual da Dominadora. Usa o pipeline oficial de dano, preservando absorções, alvo do Nemesis, eventos, estatísticas e Renascimento. Se o chefe sobreviver, a equipe perde; o BOT só encerra se a simulação desse mesmo pipeline confirmar vitória.
 
 
 O Renascimento da Matriarca pode ocorrer durante o ataque final.
@@ -905,7 +911,7 @@ Com 50 pontos de Dominação:
 - não cria jogo novo;
 - pode comprar do monte;
 - alimenta jogos existentes;
-- sofre redução no ataque final;
+- batida continua causando 100 de dano fixo, sem redução por Dominação;
 - permanece Dominado até a Dominação ficar abaixo de 50.
 
 
@@ -3007,7 +3013,7 @@ Passivas somente de persistentes vivos:
 |---|---:|---|---|
 | Agarrador | 220 | Após compra do Monte ou Lixo, prende 1 carta da mão: não pode entrar em jogo nesse turno, mas pode ser descartada. | 2 cartas; Reforçado soma +1 (2 normal / 3 Mutado). |
 | Infectado | 240 | Cada falha que normalmente gera Infecção recebe +2, uma vez por evento. | +4 por falha. |
-| Devorador | 260 | Na primeira contribuição de 3+ cartas ao mesmo jogo por turno, Nemesis cura até 40 HP. | Cura até 70 HP. |
+| Devorador | 260 | Cada 3 cartas novas da equipe, acumuladas entre jogos/turnos/jogadores, curam até 40 HP. Máximo 1 cura/turno; créditos excedentes ficam pendentes. | Cura até 70 HP. |
 
 No Buraco Fechado, a restrição acontece depois da jogada obrigatória da compra: o topo já na mesa não fica Agarrado. A seleção seeded prioriza cartas jogáveis da mão restante e completa a quantidade com outras seguras, sem exigir jogada imediata. Aplica 1/2/2/3 (normal/Mutado/Reforçado/ambos) sempre que houver cartas suficientes. Valida cada combinação seeded no estado resultante com o planner canônico, inclusive a Invasão cooperativa e descartes legais de cartas AGARRADAS. Só reduz a quota depois de esgotar as combinações maiores; não reserva o primeiro plano. Quantidade menor somente por falta física de cartas ou proteção necessária contra estado impossível; sem descarte legal, preserva a rota válida de Morto/batida. As travas terminam no fim do turno do dono; matar o Agarrador desativa imediatamente também as travas ainda registradas. Reload/snapshot/undo não repetem aplicação/pulso. O BOT consulta o bloqueio canônico antes de qualquer meld; descarte segue livre.
 

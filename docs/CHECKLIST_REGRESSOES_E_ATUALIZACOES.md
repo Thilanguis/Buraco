@@ -757,4 +757,17 @@ Relatório e limitações: `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Sem novo bal
 
 - [ ] Elegibilidade exige só um jogo existente alimentável, sem exigir plano completo de expulsão. Objetivo: 3 cartas novas acumuladas na rodada nos IDs dos jogos do início, no mesmo jogo ou em vários, por um ou dois jogadores.
 - [ ] Reorganização, jogos novos, cartas repetidas e replay/reload/snapshot/undo não duplicam progresso. Aos 3 repele imediatamente; menos de 3 ao fim da rodada persiste, Mutado na F3. BOT e Laboratório usam planos incrementais dos jogos válidos.
-- [ ] Não confundir com a passiva de cura: 3+ cartas DE UMA VEZ no mesmo jogo, 40/70 HP, Reforçado +30, máximo 1x por turno; não alterar seus valores nem regras.
+- [ ] Entrada é distinta da passiva persistente: a passiva soma cartas novas em qualquer jogo da equipe, inclusive jogo novo, entre jogadores e turnos. A cada 3 créditos cura 40/70 HP, Reforçado +30; máximo 1x/turno sem perder créditos excedentes. Morte/reanimação zeram créditos.
+
+### Pacote de compatibilidade e batida — 07/10/2026 (regressões permanentes)
+
+- [ ] REFLEXO MORTO bloqueia jogo, não descarte; seletores legados de Imagem Falsa/Espelho Estilhaçado excluem a carta. Normalização remove só illusion lock sobreposto, mantendo outros locks. Não reintroduzir habilidades fora da rotação.
+- [ ] Espelho do Lixo inelegível com Hawk/bloqueio canônico; volta após desbloqueio. Snapshot incompatível cancela objetivo sem punição, remove escolha e ajusta HUD/ajuda.
+- [ ] Pólen no topo marca a carta exata; enterrado indica só a pilha. Cotação protegida não dispara punição ao adquirir topo normal; retirada completa com a carta contaminada dispara uma vez. Render/reload preservam identidade. Browser desktop/tablet/mobile.
+- [ ] Batida = 100 em qualquer pontuação e mesmo com Dominação. Preservar absorção, Renascimento, alvo Nemesis, eventos/estatísticas e derrota por chefe sobrevivente; BOT simula o mesmo pipeline em clone, sem mutar partida real. Fora de Chefe não muda.
+- [ ] Devorador: 3 juntas e 1+1+1 equivalentes; contador da equipe atravessa jogadores/turnos/jogos, inclusive novos. Mesma carta/reorganização/replay não soma. 6 cartas geram uma cura e 3 créditos pendentes, consumidos em turno posterior. Morte/reanimação zeram; entering/repelled/corpse não somam. 40/70/+30 pelo helper, HP máximo respeitado.
+- [ ] Save antigo inicia contador zero sem contar mesa antiga; reload/render não cura; undo restaura contador/IDs/quota. Humano e BOT usam o mesmo hook sem exigir jogada artificial de 3 cartas.
+
+Regressões: `tests/boss-october-package.test.mjs`; fixture visual real do Lixo: `tests/nemesis-ui.browser.mjs`. Rodar suítes focadas e ampla, sem skip/todo para esconder falhas. Preservar HEADER e alterações manuais fora do pacote.
+
+Validação local em 07/10/2026: baseline 919/919; 35 regressões novas; focados 774/774; ampla 954/954, zero falhas/skip/todo. Browser Nemesis passou nos cinco viewports e Pólen no render real em quatro tamanhos; HUD UX passou em desktop/tablet com seis chefes, ajuda e reduced motion. Checagem extra `lunar-theme.browser.mjs` falha na expectativa de cores dos painéis (#35f08a/#ff4b5f vs. tema atual #eed39b/#c4a0ed); todos os seus arquivos de entrada são idênticos ao HEAD anterior ao pacote. Falha preexistente mantida visível, sem alterar tema/HEADER ou teste fora do escopo. Partida Firebase real não foi validada.

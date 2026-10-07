@@ -1,4 +1,15 @@
 /*  matriarca_esmeralda — estilos exclusivos. Regra: todo seletor deve permanecer escopado por body[data-boss-id='matriarca_esmeralda'].  */
+/* Buried Pollen belongs to the pile, never to the unrelated top card. */
+body[data-boss-id='matriarca_esmeralda'] #drawDiscardBtn.boss-pollen-buried::after {
+  content: 'PÓLEN NA PILHA';
+  display: block;
+  margin-top: 3px;
+  color: #bef264;
+  font-size: 8px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
 body[data-boss-id='matriarca_esmeralda'] .boss-spring-crown-buffed .boss-spring-crown {
   opacity: 1;
   transform: translateX(-50%) scale(1);

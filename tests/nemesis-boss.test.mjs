@@ -398,7 +398,7 @@ test('final strike also honors explicit target and cannot spill damage', () => {
   const state = game(); state.boss.starsPlayerId = null;
   setBossDamageTarget(state, 0, 'grabber');
   const event = applyBossFinalStrike(state, 1000, 0);
-  assert.equal(event.damage, 750); assert.equal(event.appliedDamage, 220); assert.equal(state.boss.hp, 2200);
+  assert.equal(event.damage, 100); assert.equal(event.appliedDamage, 100); assert.equal(entity(state, 'grabber').hp, 120); assert.equal(state.boss.hp, 2200);
   assert.equal(state.boss.result.victory, false); assert.equal(state.boss.starsPlayerId, null);
   assert.match(nemesisBossUi.finalStrikeWarning({ gameState: game(), playerId: 0 }) || '', /^$/);
   const selected = game(); selected.boss.combatTargetsByPlayer[0] = 'infected';

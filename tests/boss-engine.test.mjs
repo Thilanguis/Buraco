@@ -384,15 +384,15 @@ test('Carta Financiada descartada ainda cobra porque so jogo quita a Tarifa', ()
 
 test('ataque final decide vitoria ou derrota imediatamente', () => {
   const victory = game();
-  victory.boss.hp = 550;
+  victory.boss.hp = 100;
   const winEvent = applyBossFinalStrike(victory, 400);
-  assert.equal(winEvent.damage, 600);
+  assert.equal(winEvent.damage, 100);
   assert.equal(victory.boss.result.victory, true);
 
   const defeat = game();
   defeat.boss.hp = 900;
   applyBossFinalStrike(defeat, 0);
-  assert.equal(defeat.boss.hp, 400);
+  assert.equal(defeat.boss.hp, 800);
   assert.equal(defeat.boss.result.reason, 'insufficient_final_strike');
 });
 
@@ -683,7 +683,7 @@ test('Ordem Final aplica um Chicote por carta aceita que nao entrou em jogo', ()
   assert.deepEqual(resolved.missedCardIds, ['d0-b']);
 });
 
-test('Ataque final perde força quando o jogador está Dominado', () => {
+test('Batida fixa mantém 100 de dano mesmo quando o jogador está Dominado', () => {
   const normal = dominatrixGame();
   normal.boss.hp = 1000;
   const normalEvent = applyBossFinalStrike(normal, 400, 0);
@@ -692,8 +692,8 @@ test('Ataque final perde força quando o jogador está Dominado', () => {
   dominated.boss.hp = 1000;
   dominated.boss.chainsByPlayer[0] = 4;
   const dominatedEvent = applyBossFinalStrike(dominated, 400, 0);
-  assert.equal(normalEvent.damage, 600);
-  assert.equal(dominatedEvent.damage, 390);
+  assert.equal(normalEvent.damage, 100);
+  assert.equal(dominatedEvent.damage, 100);
 });
 
 test('escolha pendente bloqueia acoes, sobrevive ao reload e impede nova intencao', () => {

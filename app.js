@@ -5553,7 +5553,7 @@ async function finishGame(winnerTeamId, options = {}) {
   if (isCurrentBossMode()) {
     normalizeBossState(state);
     if (!options.skipFinalStrike && !state.boss.result) {
-      bossEvent = winnerTeamId === null ? applyBossResourceDefeat(state) : applyBossFinalStrike(state, getCooperativeProjectedScore());
+      bossEvent = winnerTeamId === null ? applyBossResourceDefeat(state) : applyBossFinalStrike(state);
     }
     if (bossEvent?.reborn && !state.boss.result) {
       state.lastAction = {
@@ -8089,9 +8089,10 @@ function renderBossHud() {
     const nemesisContaminated = !!getBossUiAdapter(boss.id)?.discard?.({ gameState: state });
     discardButton.classList.toggle('boss-nemesis-contaminated-discard', nemesisContaminated);
     discardButton.classList.toggle('boss-locked', isBossDiscardBlocked(state) && !state.hasDrawnThisTurn);
-    const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
-    const pollenActive = (boss.natureThreats || []).some((threat) => threat.status === 'active' && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId));
+    const pollen = getBossUiAdapter('matriarca_esmeralda')?.pollenDiscard?.({ gameState: state });
+    const pollenActive = pollen?.pollenOnTop;
     discardButton.classList.toggle('boss-pollen-discard', pollenActive);
+    discardButton.classList.toggle('boss-pollen-buried', !!pollen?.pollenBuried);
     const dimitrescuIntent = boss.id === 'dimitrescu' ? boss.currentIntent : null;
     const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
     const danielaActive = (dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered) || danielaObjective?.status === 'active';
@@ -8101,6 +8102,7 @@ function renderBossHud() {
     if (nemesisContaminated) discardButton.setAttribute('aria-label', 'Lixo contaminado pelo Nemesis: +6 Infecção por retirada');
     else if (castleLockdownActive) discardButton.setAttribute('aria-label', 'Lixo bloqueado por Portas do Castelo');
     else if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
+    else if (pollen?.pollenBuried) discardButton.setAttribute('aria-label', 'Há Pólen enterrado no Lixo; a carta do topo não está contaminada');
     else if (danielaActive) discardButton.setAttribute('aria-label', 'Lixo cercado pelo Enxame de Daniela');
     else discardButton.removeAttribute('aria-label');
     discardButton.classList.toggle('boss-surcharge-discard', boss.id === 'banker' && boss.discardSurcharge?.status === 'active');
@@ -8578,7 +8580,8 @@ function renderAll() {
 
   const discardTop = state.discard[discardCount - 1];
   const discardCardIds = new Set((state.discard || []).map((card) => card?.id).filter(Boolean));
-  const pollenThreat = state.boss?.id === 'matriarca_esmeralda' ? (state.boss.natureThreats || []).find((threat) => threat.status === 'active' && threat.targetPlayerId == null && discardCardIds.has(threat.discardCardId)) : null;
+  const pollen = getBossUiAdapter('matriarca_esmeralda')?.pollenDiscard?.({ gameState: state });
+  const pollenThreat = pollen?.pollenOnTop;
   const dimitrescuIntent = state.boss?.id === 'dimitrescu' ? state.boss.currentIntent : null;
   const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
   const danielaCardId = dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered ? dimitrescuIntent.payload?.discardCardId : danielaObjective?.status === 'active' ? danielaObjective.discardCardId : null;
@@ -8595,6 +8598,7 @@ function renderAll() {
   const nemesisContaminated = !!getBossUiAdapter(state.boss?.id)?.discard?.({ gameState: state });
   discardButtonEl?.classList.toggle('boss-nemesis-contaminated-discard', nemesisContaminated);
   discardButtonEl?.classList.toggle('boss-pollen-discard', !!pollenThreat);
+  discardButtonEl?.classList.toggle('boss-pollen-buried', !!pollen?.pollenBuried);
   discardButtonEl?.classList.toggle('boss-daniela-discard', danielaInDiscard);
   discardButtonEl?.classList.toggle('boss-surcharge-discard', state.boss?.id === 'banker' && state.boss.discardSurcharge?.status === 'active');
   discardButtonEl?.classList.toggle('boss-nehelenia-discard', neheleniaDiscardMirror);
@@ -11009,7 +11013,7 @@ const botEngine = {
     if (!isCurrentBossMode() || !state?.boss || state.boss.result) return true;
     try {
       const probe = typeof structuredClone === 'function' ? structuredClone(state) : JSON.parse(JSON.stringify(state));
-      applyBossFinalStrike(probe, getCooperativeProjectedScore());
+      applyBossFinalStrike(probe);
       return probe.boss?.result?.victory === true;
     } catch (error) {
       console.warn('[BOT-BOSS] Não foi possível simular o ataque final; mantendo a partida aberta.', error);

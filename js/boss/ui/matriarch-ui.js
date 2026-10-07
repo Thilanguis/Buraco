@@ -1,5 +1,13 @@
 export const matriarchBossUi = Object.freeze({
   id: 'matriarca_esmeralda',
+  pollenDiscard({ gameState }) {
+    const pile = gameState.discard || [], topId = pile.at(-1)?.id;
+    const ids = new Set(pile.map(card => card.id));
+    const threats = (gameState.boss?.natureThreats || []).filter(threat => threat.status === 'active'
+      && ['pollen', 'royal_pollen'].includes(threat.type) && threat.targetPlayerId == null && ids.has(threat.discardCardId));
+    return { pollenOnTop: threats.some(threat => threat.discardCardId === topId),
+      pollenBuried: threats.some(threat => threat.discardCardId !== topId) };
+  },
   meldContribution(contribution) {
     const value = Number(contribution?.matriarchBloomRemoved) || 0;
     return value > 0 ? { type: 'bloom', value, icon: '&#127800;', title: 'Florescimentos removidos por este jogo' } : null;
