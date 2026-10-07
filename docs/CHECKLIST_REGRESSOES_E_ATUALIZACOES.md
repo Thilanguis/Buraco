@@ -8,8 +8,8 @@
 
 - [ ] Próxima fase compacta (até 22px no fixture desktop/tablet); limites/gatilhos apenas no `?` oficial, ancorado, com toque, Enter, Escape e clique fora. Não repetir Monte/Morto na régua; preservar contadores da mesa. Régua e rodada no fluxo abaixo dos medidores: espelhos da Nehelenia ocupam a largura disponível sem sobreposição. Conferir alinhamento vertical dos botões `?`, inclusive junto ao Lixo.
 - [ ] Barra mantém `getBossPhaseProgress().hpProgress`; apresentação nunca recalcula regras, números ou transição.
-- [ ] HP normal >50%, tensão >25% até 50%, perigo ≤25%; fluxo interno leve, estático em touch, pulso lento só em perigo e nunca com HP zero. Movimento reduzido desliga fluxo, pulso e transições.
-- [ ] Rodar `tests/boss-hud-ux.browser.mjs` (1920×1080, 1376×1032, 1024×768) e testes de HUD/integração. Fixture local, sem Firebase; verificar largura, legibilidade e ausência de sobreposição.
+- [ ] HP normal >50%, tensão >25% até 50%, perigo ≤25%; fluxo interno leve, pulso lento só em perigo e nunca com HP zero. Revisão visual de 07/10: hemácias biconcavas em alturas/profundidades variadas, não uma fileira central de pontos claros. Textura vetorial inline pequena, uma camada animada por transform; sem partículas DOM, blur animado ou canvas. Touch mantém fluxo mais lento (20s, desktop 14s). Movimento reduzido desliga fluxo, pulso e transições.
+- [ ] Rodar `tests/boss-hud-ux.browser.mjs` (1920×1080, 1376×1032, 1024×768 e 390×844) e testes de HUD/integração. Fixture local, sem Firebase; visualizar os recortes `vessel-*.png`, verificar largura, legibilidade e ausência de sobreposição.
 
 > Este documento não substitui o código atual. A fonte de verdade executável é sempre o estado atual do Google Drive. Ele existe para lembrar erros reais que já aconteceram e impedir que sejam repetidos.
 

@@ -176,7 +176,7 @@ A suíte `boss-hud-copy-v1.test.mjs` protege esse orçamento de texto para todos
 
 **HUD (06/10/2026):** fase atual, barra de avanço por HP e próximo marco ficam visíveis; os limites e a explicação de que basta um gatilho ficam no `?` oficial junto de “Próxima fase”. HP atual e rodada continuam visíveis; Monte/Morto foram retirados da régua, sem remover os contadores da mesa nem os gatilhos da ajuda. Régua e rodada ficam no fluxo da coluna de medidores, evitando sobreposição com os cinco espelhos da Nehelenia, distribuídos pela largura disponível. Nenhum cálculo de transição foi alterado.
 
-**Leitura do HP:** acima de 50% usa vinho/vermelho; de mais de 25% até 50%, vermelho/laranja com brilho leve; em 25% ou menos, vermelho vivo com pulso lento. Textura de fluxo restrita ao preenchimento, estática em touch e sem animações/transições com movimento reduzido. HP zerado não pulsa. Não modifica dano, cura ou condições especiais.
+**Leitura do HP:** acima de 50% usa vinho/vermelho; de mais de 25% até 50%, vermelho/laranja com brilho leve; em 25% ou menos, vermelho vivo com pulso lento. Revisão visual de 07/10/2026: hemácias com volume, distribuídas pela altura do vaso, usando uma pequena textura vetorial inline em uma camada deslocada por CSS. Fluxo restrito ao preenchimento, mais lento em touch e sem animações/transições com movimento reduzido; sem partículas, canvas ou filtros animados. HP zerado não pulsa. Não modifica dano, cura ou condições especiais.
 
 
 A fase avança ao cumprir **qualquer** condição.

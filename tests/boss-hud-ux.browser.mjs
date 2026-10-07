@@ -73,6 +73,15 @@ try {
       }
     }
     await page.evaluate(() => window.renderSample('nehelenia'));
+    const flow = await page.locator('#bossHpBar').evaluate(el => {
+      const current = getComputedStyle(el, '::after'), surface = getComputedStyle(el, '::before');
+      return { size: current.backgroundSize, duration: current.animationDuration, surfaceAnimation: surface.animationName, filter: current.filter };
+    });
+    assert.equal(flow.size, '160px 100%', 'one small cell texture covers the vessel height');
+    assert.equal(flow.surfaceAnimation, 'none', 'surface highlight stays static');
+    assert.equal(flow.filter, 'none', 'no animated blur/filter cost');
+    assert.equal(flow.duration, viewport.width === 1920 ? '14s' : '20s', 'touch uses a slower, compositor-only current');
+    await page.locator('.boss-hp-meter').screenshot({path:resolve(root, `.cache/boss-hud-ux/vessel-${viewport.width}.png`)});
     const mirrorLayout = await page.evaluate(() => {
       const mirrors = document.getElementById('bossBloomFlowers').getBoundingClientRect();
       const phase = document.getElementById('bossPhaseProgress').getBoundingClientRect();
@@ -121,11 +130,25 @@ try {
     assert.equal(await page.locator('#bossHpBar').evaluate(el => getComputedStyle(el).animationName), 'none');
     assert.equal(await page.locator('#bossHpBar').evaluate(el => getComputedStyle(el, '::after').animationName), 'none');
     await page.emulateMedia({reducedMotion:'no-preference'});
-    if (viewport.width < 1920) assert.equal(await page.locator('#bossHpBar').evaluate(el => getComputedStyle(el, '::after').animationName), 'none');
+    assert.equal(await page.locator('#bossHpBar').evaluate(el => getComputedStyle(el, '::after').animationName), 'boss-hp-flow');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({path:resolve(root, `.cache/boss-hud-ux/hud-${viewport.width}.png`)});
     assert.deepEqual(errors, []);
     console.log(`${viewport.width}×${viewport.height}: phase ${height.toFixed(1)}px; six bosses, HP thresholds, help, touch/keyboard, reduced motion OK`);
     await context.close();
   }
+  const mobile = await browser.newPage({viewport:{width:390,height:844},hasTouch:true});
+  await mobile.goto(`http://127.0.0.1:${server.address().port}/fixture`);
+  await mobile.waitForFunction(() => !!window.renderSample);
+  await mobile.evaluate(() => window.renderSample('dimitrescu', .8));
+  assert.equal(await mobile.locator('#bossHpBar').evaluate(el => getComputedStyle(el, '::after').animationName), 'boss-hp-flow');
+  const start = await mobile.locator('#bossHpBar').evaluate(el => getComputedStyle(el, '::after').transform);
+  await mobile.waitForTimeout(350);
+  assert.notEqual(await mobile.locator('#bossHpBar').evaluate(el => getComputedStyle(el, '::after').transform), start, 'blood actually flows on touch, not merely a static texture');
+  await mobile.locator('.boss-hp-meter').screenshot({path:resolve(root, '.cache/boss-hud-ux/vessel-390.png')});
+  assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await mobile.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await mobile.locator('#bossHpBar').evaluate(el => getComputedStyle(el, '::after').animationName), 'none');
+  await mobile.close();
+  console.log('390×844: lightweight vessel flow, clipping, viewport and reduced motion OK');
 } finally { await browser?.close(); await new Promise(done => server.close(done)); }
