@@ -2,6 +2,8 @@ import { createDeck } from '../deck.js';
 import { distributeCastleItems, killDaughter } from './dimitrescu-castle.js';
 import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, getBossAbilityPhases, getBossCombatPriorities, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
 import { getBossDefinition, listBossDefinitions } from './boss-registry.js';
+import { triggerBossDebugCombatEffect, triggerBossDebugDaughterEffect } from './boss-engine.js';
+import { getNemesisZombieEffect } from './mechanics/nemesis.js';
 import { getBossMechanicsAdapter } from './mechanics/boss-mechanics-registry.js';
 
 const SUITS = Object.freeze(['\u2660', '\u2666', '\u2663', '\u2665']);
@@ -729,11 +731,30 @@ export function getBossDebugCombatState(state, { bossId = null } = {}) {
   if (!supported || !boss || (bossId && boss.id !== bossId)) return { available:false, entities:[] };
   return { available:!boss.result && !state.finished, bossId:boss.id, phase:boss.phase,
     entities:boss.combatEntities.map(entity => ({ id:entity.id, name:entity.name, hp:entity.hp, maxHp:entity.maxHp,
-      status:entity.status, mutated:!!entity.mutated,
+      status:entity.status, mutated:!!entity.mutated, effectLabel:boss.id==='nemesis'?getNemesisZombieEffect(boss,entity).label:null,
       reinforced:boss.hordeBuff?.entityId === entity.id && boss.roundNumber <= boss.hordeBuff.expiresRound })) };
 }
 
 // Manual laboratory fixture edits, never called by normal turns/BOT or ability selection.
+export function triggerBossDebugZombie(state, { entityId, playerId, action = 'passive', setup = null, prepareHeal = false } = {}) {
+  const execute=target=>target.boss?.id==='dimitrescu'?triggerBossDebugDaughterEffect(target,entityId,playerId,action)
+    :triggerBossDebugCombatEffect(target,entityId,playerId,action,{laboratory:true});
+  if (setup || prepareHeal) {
+    // Validate the complete fixture + action before mutating the real lab state.
+    const preview=restoreBossDebugSnapshot(createBossDebugSnapshot(state));
+    if (!['nemesis','dimitrescu'].includes(preview?.boss?.id)) throw new Error('Abra Nemesis ou Dimitrescu para testar auxiliares.');
+    if (setup) setBossDebugCombatEntity(preview,{...setup,entityId,bossId:preview.boss.id});
+    execute(preview);
+    if (setup) setBossDebugCombatEntity(state,{...setup,entityId,bossId:state.boss.id});
+    if (prepareHeal && entityId==='devourer' && action==='passive' && state.boss.hp===state.boss.maxHp) {
+      state.boss.hp-=getNemesisZombieEffect(state.boss,state.boss.combatEntities.find(e=>e.id===entityId)).value;
+    }
+  }
+  const events = execute(state);
+  state.lastAction = { id: `boss_debug_passive_${state.boss.actionSequence}`, type: 'bossDebugPassive', entityId, playerId };
+  return events;
+}
+
 export function setBossDebugCombatEntity(state, { bossId, entityId, status, hp, mutated = false, reinforced = false } = {}) {
   const info = getBossDebugCombatState(state, { bossId });
   if (!info.available) throw new Error('Prepare este chefe antes de ajustar os auxiliares.');

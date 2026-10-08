@@ -8193,7 +8193,7 @@ function renderBossHud() {
       }
       const isChain = feedback.type === 'chainChange' && feedback.amount;
       const isDebt = !resourceFeedbackHandled && feedback.dangerChangeLabel && (feedback.type === 'bossAbility' || feedback.type === 'bossDamage' || feedback.type === 'debtReduction');
-      const isHeal = feedback.type === 'bossHeal' && feedback.amount;
+      const isHeal = !resourceFeedbackHandled && feedback.type === 'bossHeal' && feedback.amount;
       const isDimitrescuHeal = boss.id === 'dimitrescu' && feedback.type === 'bossAbility' && feedback.abilityId === 'red_wine' && Number(feedback.healAmount) > 0;
       const isBloom = feedback.type === 'bloomChange' && feedback.amount;
       const isBlood = !resourceFeedbackHandled && boss.id === 'dimitrescu' && feedback.dangerChangeLabel && ['bossAbility', 'bossDamage', 'bloodChange'].includes(feedback.type);
@@ -13146,13 +13146,48 @@ if (isDebugMode) {
     const nemesis=bossId==='nemesis';
     setBossLabOptions(bossLabElement('debugBossLabCombatStatus'),nemesis
       ? [{id:'persistent',label:'Na mesa'},{id:'absent',label:'Fora da mesa'},{id:'corpse',label:'Derrotado'}]
-      : [{id:'alive',label:'Viva'},{id:'dead',label:'Derrotada'}],entity?.status);
+      : [{id:'alive',label:'Viva'},{id:'dead',label:'Derrotada'}],nemesis?'persistent':entity?.status);
     const hp=bossLabElement('debugBossLabCombatHp');hp.max=entity?.maxHp||1;hp.value=entity?.hp||entity?.maxHp||1;
     bossLabElement('debugBossLabCombatModifiers').hidden=!nemesis;
     bossLabElement('debugBossLabCombatMutated').checked=!!entity?.mutated;
     bossLabElement('debugBossLabCombatReinforced').checked=!!entity?.reinforced;
     for(const control of group.querySelectorAll('input,select,button')) control.disabled=!info.available;
     bossLabElement('debugBossLabCombatMutated').disabled=!info.available||info.phase>=3;
+    const actions=bossLabElement('debugBossLabZombieActions');actions.hidden=!['nemesis','dimitrescu'].includes(bossId);
+    const players=state?.players||[], playerSelect=bossLabElement('debugBossLabZombiePlayer');
+    setBossLabOptions(playerSelect,players.map(p=>({id:String(p.id),label:p.name||`Jogador ${p.id}`})),playerSelect.value||String(players[state?.currentPlayer]?.id));
+    const usable=info.available&&!!entity;
+    bossLabElement('debugBossLabZombiePrepareHeal').parentElement.hidden=entity?.id!=='devourer';
+    const passive=bossLabElement('debugBossLabZombiePassive');
+    passive.textContent=!nemesis?`Executar ${({bela:'CAÇADA',cassandra:'BANQUETE',daniela:'LIXO +3'})[entity?.id]||'passiva'}`:entity?.id==='grabber'?`Testar ${entity.effectLabel} na mão`:entity?.id==='devourer'?`Testar ${entity.effectLabel} no Nemesis`:`Testar ${entity?.effectLabel||'Infecção'}`;
+    passive.disabled=!usable;
+    bossLabElement('debugBossLabDaughterPrepare').hidden=nemesis;
+    bossLabElement('debugBossLabDaughterPrepare').disabled=!usable;
+    const objective=bossLabElement('debugBossLabZombieObjective');objective.hidden=entity?.id!=='infected';
+    const intent=state?.boss?.currentIntent;
+    objective.disabled=!usable||!['stars_hunt','infectious_tentacle','tentacle_barrage','stars_extermination'].includes(intent?.abilityId)||intent.payload.resolved||String(intent.payload.targetPlayerId)!==playerSelect.value;
+    bossLabElement('debugBossLabZombieHint').textContent=!usable?'Prepare um cenário do laboratório.':entity.id==='devourer'?'O clique coloca o zumbi na mesa e cura Nemesis. Preparar ferimento garante espaço para a cura quando a vida está cheia.':entity.id==='grabber'?'O clique coloca o zumbi na mesa e prende cartas reais, mantendo as proteções de objetivo.':'O clique coloca o zumbi na mesa e envia Infecção. Resolver objetivo aplica base e bônus atuais.';
+    if (!nemesis) bossLabElement('debugBossLabZombieHint').textContent='Preparar escolhe carta/jogo legal e destaca a filha. Executar resolve a pendência de Bela/Cassandra ou simula a retirada de Daniela, sem mover cartas. Sem alvo válido, cumprida ou suspensa: não cobra Sede. Prepare novamente para repetir.';
+  }
+
+  async function triggerBossLabZombie(action) {
+    setBossLabError('');
+    try {
+      const module=await loadBossDebugLabModule();
+      const config={entityId:bossLabElement('debugBossLabCombatEntity').value,
+        playerId:state.players.find(p=>String(p.id)===bossLabElement('debugBossLabZombiePlayer').value)?.id,action,
+        setup:{status:bossLabElement('debugBossLabCombatStatus').value,hp:Number(bossLabElement('debugBossLabCombatHp').value),
+          mutated:bossLabElement('debugBossLabCombatMutated').checked,reinforced:bossLabElement('debugBossLabCombatReinforced').checked},
+        prepareHeal:bossLabElement('debugBossLabZombiePrepareHeal').checked};
+      module.triggerBossDebugZombie(module.restoreBossDebugSnapshot(module.createBossDebugSnapshot(state)),config);
+      saveStateForUndo('bossDebugPassive',[]);
+      // Seed only old events before the manual action, even on the first HUD render.
+      // Otherwise the renderer's initial/reload baseline can swallow its animation.
+      renderedBossFeedbackEventIds ||= new Set((state.boss.eventLog||[]).map(event=>event.actionId).filter(Boolean));
+      const events=module.triggerBossDebugZombie(state,config);
+      renderAll();await commitState();await refreshBossLabObserved();await refreshBossLabResourceControls();
+      showMessage(events.at(-1)?.outcome||(action==='prepare'?'Laboratório: passiva preparada; confira o alvo no HUD.':'Laboratório: nenhum efeito aplicado (limite, sem alvo, cumprida ou suspensa).'));
+    } catch(error) {setBossLabError(error.message||String(error));}
   }
 
   async function applyBossLabCombatEntity() {
@@ -13436,6 +13471,10 @@ if (isDebugMode) {
     bossLabElement('debugBossLabResourceTarget')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
     bossLabElement('debugBossLabCombatEntity')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
     bossLabElement('debugBossLabCombatApply')?.addEventListener('click', () => localActionGate.run(applyBossLabCombatEntity));
+    bossLabElement('debugBossLabZombiePlayer')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
+    bossLabElement('debugBossLabZombiePassive')?.addEventListener('click', () => localActionGate.run(() => triggerBossLabZombie('passive')));
+    bossLabElement('debugBossLabZombieObjective')?.addEventListener('click', () => localActionGate.run(() => triggerBossLabZombie('objective')));
+    bossLabElement('debugBossLabDaughterPrepare')?.addEventListener('click', () => localActionGate.run(() => triggerBossLabZombie('prepare')));
     bossLabElement('debugBossLabUndo')?.addEventListener('click', async () => {
       await window.executeUndo();
       await refreshBossLabObserved();

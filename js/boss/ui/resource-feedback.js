@@ -1,6 +1,10 @@
 // Presentation only: amounts come from resolved events, never from current buffs.
 export function resourceFeedbackSteps(boss, event) {
   if (!['nemesis', 'dimitrescu'].includes(boss.id)) return [];
+  if (boss.id==='nemesis' && event.type==='bossHeal' && event.sourceEntityId==='devourer' && event.amount>0) {
+    return [{entityId:'devourer',metric:'hp',amount:event.amount,before:event.hpBefore??event.hp-event.amount,
+      after:event.hp,color:'#9cde4d',label:'HP'}];
+  }
   const supported = boss.id === 'nemesis'
     ? ['infection', 'nemesisObjective', 'bossDamage'].includes(event.type)
     : ['bloodChange', 'bossAbility', 'bossDamage'].includes(event.type);
@@ -26,15 +30,15 @@ export function resourceFeedbackSteps(boss, event) {
 }
 
 export function createResourceFeedbackPresenter({ document, reducedMotion = () => false }) {
-  let scope = null, queue = [], running = false, version = 0, displayed = null, maximum = 100;
+  let scope = null, queue = [], running = false, version = 0, displayed = null, maximum = 100, metric = 'danger';
   const nodes = new Set(), animations = new Set();
   const seen = new Set();
   const scopeOf = boss => `${boss.id}:${boss.seed}`;
   const sync = (boss, immediate = false) => {
     if (scope !== scopeOf(boss)) { clear(); scope = scopeOf(boss); }
-    maximum = boss.maxDanger || 100;
+    maximum = metric==='hp'?boss.maxHp:boss.maxDanger || 100;
     if (displayed == null) return;
-    const bar = document.getElementById('bossDebtBar'), text = document.getElementById('bossDebtText');
+    const bar = document.getElementById(metric==='hp'?'bossHpBar':'bossDebtBar'), text = document.getElementById(metric==='hp'?'bossHpText':'bossDebtText');
     if (bar) {
       const transition = bar.style.transition;
       if (immediate) bar.style.transition = 'none';
@@ -62,8 +66,9 @@ export function createResourceFeedbackPresenter({ document, reducedMotion = () =
     const token = version;
     while (queue.length && token === version) {
       const step = queue.shift();
+      metric = step.metric || 'danger';
       displayed = step.before; sync(boss, true);
-      const bar = document.getElementById('bossDebtBar'), track = bar?.parentElement;
+      const bar = document.getElementById(metric==='hp'?'bossHpBar':'bossDebtBar'), track = bar?.parentElement;
       const source = step.entityId === 'boss' ? document.querySelector('#bossHud .boss-portrait')
         : document.querySelector(`[data-entity-id="${step.entityId}"]`);
       if (!track) continue;

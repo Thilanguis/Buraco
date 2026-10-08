@@ -1,5 +1,18 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+### Cura do Devorador e passivas das filhas no DevTools — 08/10/2026
+
+- [x] Cura efetiva do Devorador registra origem e HP anterior. Fluxo verde sai do retrato, chega à borda do HP anterior e só então preenche a vida/número; não mexe na Infecção nem duplica o número antigo de cura. Mesmo presenter de Sede/Infecção, com fila, deduplicação, cancelamento em undo/reload e reduced motion sem voo. Aplica-se a jogo real e teste manual, respeitando máximo e valores existentes.
+- [x] Dimitrescu mostra Preparar passiva e Executar para Bela/Cassandra/Daniela. Preparar usa candidatos canônicos e destaca só a filha escolhida; Bela respeita o jogador selecionado. Executar resolve Bela/Cassandra pendentes (+3 somente por falha) ou simula a primeira retirada efetiva de Daniela (+3), sem mover cartas/turnos nem alterar HP/PROT./Fúria. Cumprida, sem candidato ou suspensa não pune; preparar novamente permite novo teste explícito, com evento único. Itens/Relíquia continuam respeitados.
+- [x] Cobertura focada: HP anterior/cura limitada, três filhas, Sede real/origem/limite, repetir só após preparar, sucesso/Relíquia/sem alvo, snapshot e undo. Browser desktop/tablet/mobile verifica chegada à borda do HP antes de subir, controle da Daniela e regressões de Infecção.
+
+### Ações dos zumbis no DevTools — 08/10/2026
+
+- [x] No DevTools de uma partida Nemesis, escolher zumbi preenche Estado com Na mesa. O botão da passiva aplica a configuração e dispara em um clique, mesmo sem cenário preparado e com zumbi inicialmente ausente: Agarrar cartas, enviar Infecção ou curar Nemesis. Valores seguem Mutado/Reforçado; jogador selecionável. Outros chefes não mostram estes botões. Estado derrotado/fora da mesa escolhido explicitamente não executa passiva.
+- [x] Infectado também oferece resolver o objetivo atual para seu alvo: resultado/progresso/base/bônus usam a resolução real, sem inventar falha em objetivo cumprido nem repetir um objetivo resolvido. Não avança turno/rodada; pode executar os efeitos de fim de turno do Nemesis associados à resolução. Preferir o botão simples de Infecção para testar só a transferência.
+- [x] Ações são manuais de laboratório: não compram/baixam cartas, cura respeita máximo e não consome créditos reais do Devorador; Agarrador usa planner/guards e suas travas acabam no turno real. Devorador oferece Preparar ferimento para testar cura, marcado por padrão: somente com Nemesis em HP máximo cria espaço do tamanho da cura atual antes do efeito real, no mesmo undo. Desmarcado, vida cheia não inventa cura/animação. Cliques têm eventos distintos; baseline do HUD reserva somente eventos anteriores, sem engolir a primeira animação. Undo/reload não reaplicam efeitos; gate e validação em cópia preservados.
+- [x] Testes dos quatro conjuntos Normal/Mutado/Reforçado/ambos, limites e rejeições; browser 1920/1376/390 com mouse/toque/teclado, transferência real pelo botão do Infectado e undo. Nenhuma alteração de balanceamento ou acionamento automático em partidas normais.
+
 ### Durabilidade das filhas — 08/10/2026
 
 - [x] Filhas 450 HP / regen 50, Anticoagulante 25 sem acumular; itens reduzem máximo para 350/250/200 (piso 200). PROT. 500 por filha, passivas +3, Lady/Sede/Fúria preservadas. Migração única de saves sem cura, ressurreição, perda de anexos ou recarga de PROT.; snapshot/reload/undo idempotentes.

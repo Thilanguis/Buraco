@@ -18,7 +18,7 @@ import {
 } from './mechanics/boss-mechanics-registry.js';
 import { quoteBankerCreditLimit } from './mechanics/banker.js';
 import { isCombatEntityAlive } from './boss-combat.js';
-import { CASTLE_BALANCE, ladyBloodBalance, absorbBloodLink, furyHealing, furyBlood, startCastleRound, sacrificeCastleItem, chooseCastleItem } from './dimitrescu-castle.js';
+import { CASTLE_BALANCE, ladyBloodBalance, absorbBloodLink, furyHealing, furyBlood, startCastleRound, resolveDaughterPassive, sacrificeCastleItem, chooseCastleItem } from './dimitrescu-castle.js';
 export { distributeCastleItems } from './dimitrescu-castle.js';
 import { canReceiveNeheleniaIllusionLock } from './mechanics/nehelenia.js';
 
@@ -877,11 +877,12 @@ function dimitrescuMeldCandidates(gameState) {
   })).filter((entry) => entry.meldId);
 }
 
-export function startDimitrescuRound(gameState) {
+export function startDimitrescuRound(gameState, { selectedDaughterId = null, targetPlayerId = null } = {}) {
   const boss = gameState.boss;
   if (boss?.id !== 'dimitrescu') return;
   startCastleRound(gameState, {
-    huntCandidates: () => dimitrescuHuntCandidates(gameState),
+    selectedDaughterId,
+    huntCandidates: () => dimitrescuHuntCandidates(gameState).filter(candidate=>targetPlayerId==null||candidate.player.id===targetPlayerId),
     meldCandidates: () => dimitrescuMeldCandidates(gameState).filter(({ meldIndex }) => {
       const meld = gameState.teams[0].melds[meldIndex];
       return gameState.players.some(player => player.hand.some(card =>
@@ -3178,6 +3179,39 @@ export function notifyBossPurchaseCompleted(gameState, playerId) {
   if (gameState?.mode !== BOSS_MODE_NEMESIS || gameState.finished || !gameState.hasDrawnThisTurn || gameState.partialDraw || gameState.players?.[gameState.currentPlayer]?.id !== playerId) return [];
   const boss = normalizeBossState(gameState);
   return getBossMechanicsAdapter(boss.id)?.onPurchaseCompleted?.({ ...bossMechanicsContext(gameState), playerId, recordBossEvent: event => recordEvent(boss, event) }) || [];
+}
+
+// Explicit laboratory action; normal turns never call this entry point.
+export function triggerBossDebugCombatEffect(gameState, entityId, playerId, action = 'passive', { laboratory = false } = {}) {
+  if ((!laboratory && !gameState?.debugScenario?.active) || gameState.boss?.id !== 'nemesis') throw new Error('Ação disponível apenas no laboratório do Nemesis.');
+  const boss = normalizeBossState(gameState);
+  const entity = boss.combatEntities.find(e => e.id === entityId && e.status === 'persistent' && e.hp > 0);
+  if (!entity || boss.result || gameState.finished) throw new Error('Coloque o zumbi vivo na mesa antes de testar.');
+  if (!gameState.players.some(p => p.id === playerId)) throw new Error('Jogador inválido.');
+  if (!['passive', 'objective'].includes(action) || (action === 'objective' && (entityId !== 'infected'
+    || !['stars_hunt','infectious_tentacle','tentacle_barrage','stars_extermination'].includes(boss.currentIntent?.abilityId)
+    || boss.currentIntent.payload.resolved || boss.currentIntent.payload.targetPlayerId !== playerId))) throw new Error('Escolha o alvo do objetivo ativo para resolver sua consequência.');
+  return getBossMechanicsAdapter(boss.id).onDebugCombatEffect({ ...bossMechanicsContext(gameState), entityId, playerId, action,
+    recordBossEvent: event => recordEvent(boss, event) });
+}
+
+export function triggerBossDebugDaughterEffect(gameState, entityId, playerId, action='passive') {
+  const boss=normalizeBossState(gameState);
+  const daughter=boss?.id==='dimitrescu'&&boss.combatEntities.find(d=>d.id===entityId&&d.status==='alive'&&d.hp>0);
+  if (!daughter||boss.result||gameState.finished||!gameState.players.some(p=>p.id===playerId)||!['prepare','passive'].includes(action)) throw new Error('Escolha uma filha viva e um jogador válido.');
+  if (action==='prepare'||!boss.castleSelectedDaughterIds?.includes(entityId)) startDimitrescuRound(gameState,{selectedDaughterId:entityId,targetPlayerId:playerId});
+  const events=[];
+  const actionId=`daughter_${entityId}_debug_${++boss.actionSequence}`;
+  if (action==='passive') {
+    if (entityId==='daniela') {
+      events.push(...notifyBossDiscardTaken(gameState,playerId,[{id:actionId}]));
+      for (const event of events) if(event.sourceEntityId==='daniela') event.actionId=actionId;
+    }
+    else resolveDaughterPassive(gameState,daughter,(amount,origin)=>{
+      const event=changeDimitrescuBlood(gameState,amount,origin,actionId);if(event)events.push(event);
+    });
+  }
+  return events;
 }
 
 export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {

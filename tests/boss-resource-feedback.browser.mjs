@@ -15,22 +15,29 @@ const fixture=`<!doctype html><meta charset="utf-8"><meta name="viewport" conten
 <link rel="stylesheet" href="/styles/boss/nemesis.css"><link rel="stylesheet" href="/styles/boss/dimitrescu.css">
 <style>body{margin:20px;background:#140c14;color:white;font:14px sans-serif}#bossHud{display:block;position:static;width:auto;margin:0;padding:12px;max-width:none}.boss-portrait{width:100px;height:70px;background:#522}#bossDangerMeter{max-width:500px;margin:10px 0}.boss-meter-track{height:14px;background:#302a35}#bossDebtBar{display:block;height:100%;width:0;transition:width .2s}#aux{display:flex;gap:12px;margin:30px 0}#aux>div{width:130px;height:90px;background-size:cover;background-position:center}select,input,button{font-size:14px;max-width:100%}fieldset{max-width:460px;box-sizing:border-box}#debugBossLabCombatModifiers:not([hidden]){display:flex;flex-wrap:wrap}#debugBossLabCombatInfo{overflow-wrap:anywhere}</style>
 <section id="bossHud"><div class="boss-portrait">CHEFE</div><div id="bossDangerMeter" class="boss-debt-meter"><strong id="bossDebtText">0 / 100</strong><div class="boss-meter-track"><span id="bossDebtBar"></span></div></div></section>
+<div style="width:400px;max-width:100%"><strong id="bossHpText">2200 / 2200</strong><div class="boss-meter-track"><span id="bossHpBar" style="display:block;height:100%;background:#a32b40;transition:width .2s"></span></div></div>
+<div data-entity-id="devourer" style="width:130px;height:90px;background:#383">DEVORADOR</div>
 <div id="aux"><div data-entity-id="bela" style="background-image:url('/assets/images/boss-dimitrescu-bela.png')"></div><div data-entity-id="infected" style="background-image:url('/assets/images/nemesis-infectado.png')"></div></div>
 <label>Chefe <select id="debugBossLabBoss"><option value="nemesis">Nemesis</option><option value="dimitrescu">Dimitrescu</option><option value="nehelenia">Nehelenia</option></select></label>${markup}<pre id="error"></pre>
 <script type="module">
 import {createResourceFeedbackPresenter} from '/js/boss/ui/resource-feedback.js';
 import * as module from '/js/boss/boss-debug-scenarios.js';
-let state,undos=[];const bossLabElement=id=>document.getElementById(id);
+let state,undos=[],renderedBossFeedbackEventIds=null;const bossLabElement=id=>document.getElementById(id);
 ${options}
 const loadBossDebugLabModule=async()=>module,setBossLabError=text=>document.getElementById('error').textContent=text;
 const saveStateForUndo=()=>undos.push(module.createBossDebugSnapshot(state));
-const renderAll=()=>{},commitState=async()=>{},refreshBossLabObserved=async()=>{},showMessage=()=>{};
+const renderAll=()=>{selectTransferBoss(state.boss.id);presenter.sync(state.boss);presenter.enqueue(state.boss,state.boss.lastEvent);},commitState=async()=>{},refreshBossLabObserved=async()=>{},showMessage=()=>{};
 const refreshBossLabResourceControls=async()=>refreshBossLabCombatControls(module);
 ${controls}
 window.setupLab=id=>{bossLabElement('debugBossLabBoss').value=id;state=module.buildBossDebugScenario(null,{bossId:id,abilityId:id==='nemesis'?'stars_hunt':'blood_tithe',phase:1,variant:'interactive',target:'auto'}).state;refreshBossLabCombatControls(module);};
 bossLabElement('debugBossLabBoss').onchange=()=>refreshBossLabCombatControls(module);
 bossLabElement('debugBossLabCombatEntity').onchange=()=>refreshBossLabCombatControls(module);
 bossLabElement('debugBossLabCombatApply').onclick=applyBossLabCombatEntity;
+bossLabElement('debugBossLabZombiePassive').onclick=()=>triggerBossLabZombie('passive');
+bossLabElement('debugBossLabZombieObjective').onclick=()=>triggerBossLabZombie('objective');
+bossLabElement('debugBossLabDaughterPrepare').onclick=()=>triggerBossLabZombie('prepare');
+bossLabElement('debugBossLabZombiePlayer').onchange=()=>refreshBossLabCombatControls(module);
+window.labState=()=>state;
 window.info=()=>module.getBossDebugCombatState(state);window.undo=()=>{state=module.restoreBossDebugSnapshot(undos.pop());refreshBossLabCombatControls(module);};
 const presenter=createResourceFeedbackPresenter({document,reducedMotion:()=>matchMedia('(prefers-reduced-motion: reduce)').matches});
 window.transferHistory=[];new MutationObserver(records=>{for(const r of records) for(const n of r.addedNodes) if(n.classList?.contains('boss-resource-arrival')) window.transferHistory.push({source:n.dataset.sourceId,text:n.textContent,value:bossLabElement('bossDebtText').textContent});}).observe(document.body,{childList:true});
@@ -114,8 +121,51 @@ try {
     await activate('#debugBossLabCombatApply');await page.waitForFunction(()=>window.info().entities.find(e=>e.id==='infected').hp===80);
     const infected=await page.evaluate(()=>window.info().entities.find(e=>e.id==='infected'));assert.equal(infected.status,'persistent');assert.equal(infected.mutated,true);assert.equal(infected.reinforced,true);
     const labRect=await page.locator('#debugBossLabCombat').boundingBox();assert.ok(labRect.x>=0&&labRect.x+labRect.width<=width);
+    assert.match(await page.locator('#debugBossLabZombiePassive').innerText(),/INFECÇÃO \+6/);
+    const dangerBefore=await page.evaluate(()=>window.labState().boss.danger);
+    await activate('#debugBossLabZombiePassive');await page.waitForFunction(before=>window.labState().boss.danger===before+6,dangerBefore);
+    assert.equal(await page.evaluate(()=>window.labState().boss.lastEvent.sourceEntityId),'infected');
+    await page.waitForFunction(()=>!!document.querySelector('.boss-resource-transfer'));
+    await page.waitForFunction(()=>!document.querySelector('.boss-resource-transfer,.boss-resource-arrival'));
+    assert.equal(await page.locator('#bossDebtText').textContent(),`${dangerBefore+6} / 100`);
+    await page.evaluate(()=>window.undo());assert.equal(await page.evaluate(()=>window.labState().boss.danger),dangerBefore);
     await page.evaluate(()=>window.undo());assert.equal((await page.evaluate(()=>window.info().entities.find(e=>e.id==='infected'))).status,'absent');
+    assert.equal(await page.locator('#debugBossLabCombatStatus').inputValue(),'persistent');
+    assert.ok(await page.locator('#debugBossLabZombiePassive').isEnabled());
+    await page.evaluate(()=>{delete window.labState().debugScenario;});
+    await activate('#debugBossLabZombiePassive');
+    await page.waitForFunction(()=>window.info().entities.find(e=>e.id==='infected').status==='persistent');
+    await page.waitForFunction(()=>!!document.querySelector('.boss-resource-transfer'));
+    await page.waitForFunction(()=>!document.querySelector('.boss-resource-transfer,.boss-resource-arrival'));
+    assert.equal(await page.evaluate(()=>window.labState().boss.lastEvent.sourceEntityId),'infected');
+    await page.evaluate(()=>window.undo());
+    await page.selectOption('#debugBossLabCombatEntity','devourer');
+    assert.equal(await page.locator('#debugBossLabCombatStatus').inputValue(),'persistent');
+    assert.ok(await page.locator('#debugBossLabZombiePrepareHeal').isChecked());
+    await activate('#debugBossLabZombiePassive');
+    await page.waitForFunction(()=>window.labState().boss.lastEvent.type==='bossHeal');
+    await page.waitForFunction(()=>!!document.querySelector('.boss-resource-transfer[data-source-id="devourer"]'));
+    await page.evaluate(()=>document.querySelector('.boss-resource-transfer[data-source-id="devourer"]').getAnimations()[0].pause());
+    assert.equal(await page.locator('#bossHpText').textContent(),'2160 / 2200');
+    const hpEdge=await page.locator('#bossHpBar').evaluate(el=>el.getBoundingClientRect().right);
+    await page.evaluate(()=>{const a=document.querySelector('.boss-resource-transfer[data-source-id="devourer"]').getAnimations()[0];a.currentTime=690;});
+    const rayX=await page.locator('.boss-resource-transfer[data-source-id="devourer"]').evaluate(el=>el.getBoundingClientRect().x+el.getBoundingClientRect().width/2);
+    assert.ok(Math.abs(rayX-hpEdge)<12,'cura chega à borda anterior do HP');
+    await page.evaluate(()=>document.querySelector('.boss-resource-transfer[data-source-id="devourer"]').getAnimations()[0].play());
+    await page.waitForFunction(()=>!document.querySelector('.boss-resource-transfer,.boss-resource-arrival'));
+    assert.equal(await page.locator('#bossHpText').textContent(),'2200 / 2200');
+    assert.equal(await page.evaluate(()=>window.labState().boss.lastEvent.amount),40);
+    assert.equal(await page.evaluate(()=>window.labState().boss.hp),await page.evaluate(()=>window.labState().boss.maxHp));
+    await page.evaluate(()=>window.undo());
     await page.evaluate(()=>window.setupLab('dimitrescu'));assert.ok(await page.locator('#debugBossLabCombatModifiers').isHidden());
+    assert.ok(await page.locator('#debugBossLabZombieActions').isVisible());
+    await page.selectOption('#debugBossLabCombatEntity','daniela');
+    assert.match(await page.locator('#debugBossLabZombiePassive').innerText(),/LIXO \+3/);
+    await activate('#debugBossLabDaughterPrepare');await activate('#debugBossLabZombiePassive');
+    await page.waitForFunction(()=>window.labState().boss.danger===3);
+    assert.equal(await page.evaluate(()=>window.labState().boss.lastEvent.sourceEntityId),'daniela');
+    await page.waitForFunction(()=>!document.querySelector('.boss-resource-transfer,.boss-resource-arrival'));
+    await page.selectOption('#debugBossLabCombatEntity','bela');
     await page.selectOption('#debugBossLabCombatStatus','dead');await activate('#debugBossLabCombatApply');await page.waitForFunction(()=>window.info().entities[0].status==='dead');
     await page.selectOption('#debugBossLabCombatStatus','alive');await page.fill('#debugBossLabCombatHp','120');
     await page.locator('#debugBossLabCombatApply').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>window.info().entities[0].hp===120);

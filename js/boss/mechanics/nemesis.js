@@ -22,9 +22,10 @@ function healFromDevourerFeed(boss, gameState, playerId, recordBossEvent) {
   feed.credits -= 3;
   boss.devourerTurnIds.push(key);
   const amount = Math.min(boss.maxHp - boss.hp, getNemesisZombieEffect(boss, entity).value);
+  const hpBefore = boss.hp;
   boss.hp += amount;
   boss.devourerHealingTotal = (boss.devourerHealingTotal || 0) + amount;
-  if (amount) recordBossEvent({ type: 'bossHeal', actionId: `devourer:${key}`, amount, hp: boss.hp,
+  if (amount) recordBossEvent({ type: 'bossHeal', actionId: `devourer:${key}`, sourceEntityId: 'devourer', amount, hpBefore, hp: boss.hp,
     outcome: `Devorador: Nemesis recuperou ${amount} HP.` });
 }
 
@@ -404,6 +405,31 @@ export const nemesisBossMechanics = Object.freeze({
     return marked ? 'nemesis-marked' : grabbed ? 'nemesis-grabbed' : null;
   },
   cardBlockFeedback: () => ({ effect: 'nemesis-grabbed', reason: 'grabbed', message: 'Carta Agarrada: não pode entrar em jogo neste turno. O descarte continua permitido.' }),
+  onDebugCombatEffect(context) {
+    const { boss, gameState, entityId, playerId, action, recordBossEvent } = context;
+    const actionId = `nemesis_debug_passive_${++boss.actionSequence}`;
+    // Repeat animation tests without moving the real turn or consuming its quota.
+    const previewTurn = { ...gameState, turnNumber: actionId };
+    const events = [];
+    const record = event => { events.push(recordBossEvent(event)); return events.at(-1); };
+    if (action === 'objective') this.onPlayerTurnEnd({ ...context, recordBossEvent: record });
+    else if (entityId === 'grabber') {
+      delete boss.grabbedByPlayer[playerId];
+      this.onPurchaseCompleted({ ...context, gameState: previewTurn, recordBossEvent: event => record({ ...event, turnId: turnKey(gameState, playerId) }) });
+      if (boss.grabbedByPlayer[playerId]) boss.grabbedByPlayer[playerId].turnId = turnKey(gameState, playerId);
+    }
+    else if (entityId === 'devourer') {
+      const credits = boss.devourerFeed.credits;
+      boss.devourerFeed.credits = Math.max(3, credits);
+      healFromDevourerFeed(boss, previewTurn, playerId, record);
+      boss.devourerFeed.credits = credits;
+    } else {
+      const before = boss.danger, amount = changeNemesisInfection(boss, getNemesisZombieEffect(boss, alive(boss, 'infected')).value, actionId);
+      if (amount) record({ type: 'infection', actionId, sourceEntityId: 'infected', amount, dangerBefore: before, danger: boss.danger,
+        outcome: `Infectado: Infecção +${amount}.` });
+    }
+    return events;
+  },
   onPurchaseCompleted({ boss, gameState, playerId, helpers, recordBossEvent }) {
     const grabber = alive(boss, 'grabber'), key = turnKey(gameState, playerId);
     if (!grabber || boss.result || boss.grabbedTurnIds.includes(key)) return [];

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v285';
+const CACHE_NAME = 'buraco-v286';
 const ASSETS = [
   './js/history-totals.js',
   './js/history-comparison.js',

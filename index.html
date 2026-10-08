@@ -621,6 +621,14 @@
                   <label><input id="debugBossLabCombatReinforced" type="checkbox" /> Reforçado</label>
                 </div>
                 <button id="debugBossLabCombatApply" type="button">Aplicar no auxiliar</button>
+                <div id="debugBossLabZombieActions" hidden>
+                  <label>Jogador <select id="debugBossLabZombiePlayer"></select></label>
+                  <label hidden><input id="debugBossLabZombiePrepareHeal" type="checkbox" checked /> Preparar ferimento para testar cura</label>
+                  <button id="debugBossLabZombiePassive" type="button">Testar passiva</button>
+                  <button id="debugBossLabDaughterPrepare" type="button" hidden>Preparar passiva da filha</button>
+                  <button id="debugBossLabZombieObjective" type="button" hidden>Resolver objetivo atual</button>
+                  <small id="debugBossLabZombieHint">Use os efeitos na partida de teste, sem avançar a rodada.</small>
+                </div>
               </fieldset>
 
               <div class="debug-boss-lab-actions">

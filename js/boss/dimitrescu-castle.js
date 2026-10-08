@@ -112,14 +112,14 @@ export function damageDaughter(state, daughter, amount, eventId, record) {
   if (daughter.hp === 0 && applied) killDaughter(state, daughter, eventId, record);
   return applied;
 }
-export function startCastleRound(state, { huntCandidates, meldCandidates, choose }) {
+export function startCastleRound(state, { huntCandidates, meldCandidates, choose, selectedDaughterId = null }) {
   const boss = state.boss;
-  if (boss.castlePassiveRound === boss.roundNumber || boss.result) return;
+  if ((!selectedDaughterId && boss.castlePassiveRound === boss.roundNumber) || boss.result) return;
   boss.castlePassiveRound = boss.roundNumber;
   const alive = livingDaughters(boss);
   const all = boss.currentIntent?.abilityId === 'three_daughters' && boss.currentIntent.activatedRound === boss.roundNumber;
   const alternatives = alive.filter(d => d.id !== boss.castleLastDaughterId);
-  const selected = all ? alive : [choose(alternatives.length ? alternatives : alive, 907)].filter(Boolean);
+  const selected = selectedDaughterId ? alive.filter(d=>d.id===selectedDaughterId) : all ? alive : [choose(alternatives.length ? alternatives : alive, 907)].filter(Boolean);
   boss.castleSelectedDaughterIds = selected.map(d => d.id);
   if (!all && selected.length) boss.castleLastDaughterId = selected[0].id;
   for (const daughter of boss.combatEntities) {
