@@ -1,5 +1,7 @@
-const CACHE_NAME = 'buraco-v286';
+const CACHE_NAME = 'buraco-v287';
 const ASSETS = [
+  './js/boss/ui/matriarch-bloom-view.js',
+  './assets/images/matriarch-lotus.png',
   './js/history-totals.js',
   './js/history-comparison.js',
   './js/account-page.js',

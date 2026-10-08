@@ -167,7 +167,7 @@ test('laboratório filhas: morte devolve anexos; restauração/undo não sorteia
   assert.equal(d.hp,0);assert.equal(state.discard[0].id,'attached');assert.equal(d.sacrificedCards.length,0);
   setBossDebugCombatEntity(state,{entityId:d.id,status:'alive',hp:120});assert.equal(d.deathRecorded,false);
   assert.equal(JSON.stringify(boss.castleItems),inventory);
-  const undo=restoreBossDebugSnapshot(snapshot);assert.equal(undo.boss.combatEntities[0].hp,450);
+  const undo=restoreBossDebugSnapshot(snapshot);assert.equal(undo.boss.combatEntities[0].hp,500);
 });
 
 test('laboratório rejeita chefe diferente, entidade e vida inválidas sem mutação',()=>{

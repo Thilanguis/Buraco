@@ -17,7 +17,7 @@ test('ajuda dos cinco itens prioriza efeito e petrificação, sem burocracia de 
   const effects={dagger:/50 de dano imediato/,explosive:/100 de dano imediato/,cold_flask:/próxima regeneração/,
     anticoagulant:/50 para 25.*Não acumula/,relic:/Cancela uma passiva.*a próxima vez que ela agir/};
   for(const [type,effect] of Object.entries(effects)) {
-    const help=castleItemHelp(type);assert.match(help,effect);assert.match(help,/petrifica 100 HP/);
+    const help=castleItemHelp(type,{castleItemRulesVersion:1});assert.match(help,effect);assert.match(help,/Petrifica 100 HP/);
     assert.match(help,/mínimo de 200 HP/);assert.ok(help.length<240);
     assert.doesNotMatch(help,/já foi usado|janela|reutilizável/);
   }
@@ -29,6 +29,9 @@ function game() {
     players:[{id:0, teamId:0, name:'Biel', hand:[c('six','6','♠'), c('nine','9','♠'), c('ten','10','♠'), c('jack','J','♠'), c('spare')]},
       {id:1, teamId:0, name:'Cooperador', hand:[c('q'),c('k'),c('a','A')]}],
     teams:[{id:0, melds:[['3','4','5'].map(r => c(`m${r}`,r,'♠'))]}, {id:1,melds:[]}], boss:createBossState('dimitrescu',1234) };
+  // Explicit v1 save fixture: these regressions continue protecting the old matches.
+  s.boss.castleItemRulesVersion=1;delete s.boss.castleItemRules;s.boss.castleDaughterBalanceVersion=2;
+  for(const d of s.boss.combatEntities)d.hp=d.maxHp=d.originalMaxHp=450;
   s.boss.bossFlow = {stage:'players'}; return s;
 }
 const daughter = (s,id='bela') => s.boss.combatEntities.find(d=>d.id===id);

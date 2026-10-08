@@ -1,10 +1,15 @@
-import { CASTLE_BALANCE, ITEM_DEFINITIONS, bloodLinkCapacity, bloodLinkRemaining, furyLevel } from '../dimitrescu-castle.js';
+import { CASTLE_BALANCE, ITEM_DEFINITIONS, bloodLinkCapacity, bloodLinkRemaining, furyLevel, castleRules, castleItemHpLoss, daughterOriginalHp } from '../dimitrescu-castle.js';
 
-export function castleItemHelp(type) {
-  const effect = type === 'relic'
+export function castleItemHelp(type, boss = {castleItemRulesVersion:2}) {
+  const rules = castleRules(boss), modern = boss.castleItemRulesVersion === 2;
+  const effect = !modern && ['dagger','explosive'].includes(type)
+    ? `Causa ${type === 'dagger' ? rules.daggerDamage : rules.explosiveDamage} de dano imediato.`
+    : !modern && type === 'cold_flask' ? 'Bloqueia a próxima regeneração.' : type === 'dagger'
+      ? `Vínculo Sangrento: ${rules.daggerTransfer * 100}% do dano dos seus ataques à filha também atinge a vida da Lady, ignorando PROT. e Coágulo. Outra Adaga petrifica mais HP, sem aumentar a porcentagem.`
+      : type === 'explosive' ? `Causa ${rules.explosiveDamage} de dano e hemorragia: ${Math.round(rules.daughterHp * rules.bleedPercent)} HP antes da regeneração nos próximos ${rules.bleedRounds} fins de rodada. Reaplicar renova; não soma sangramentos.` : type === 'relic'
     ? 'Cancela uma passiva da filha: a desta rodada, se ainda pendente, ou a próxima vez que ela agir.'
     : ITEM_DEFINITIONS[type].special;
-  return `${effect}\nTambém petrifica ${CASTLE_BALANCE.itemMaxHpLoss} HP: essa parte não regenera (mínimo de ${CASTLE_BALANCE.daughterHpFloor} HP recuperáveis).`;
+  return `${effect}\nPetrifica ${castleItemHpLoss(boss,type)} HP: essa parte não regenera (mínimo de ${rules.daughterHpFloor} HP recuperáveis).`;
 }
 
 export function daughterPassiveHelp(d, state) {
@@ -43,6 +48,19 @@ export function daughterPassiveChips(d, state) {
   return ['LIXO +3'];
 }
 
+export function daughterRegenerationHelp(d) {
+  if (d.status === 'dead' || !d.hp) return 'Derrotada: não regenera.';
+  const available = Math.max(0, d.maxHp - d.hp);
+  const effective = d.cold ? 0 : Math.min(d.regeneration, available);
+  const now = d.cold ? 'Frio: a próxima regeneração está bloqueada.'
+    : !available ? 'Vida completa: não há cura agora.' : `Neste estado, recupera ${effective} HP.`;
+  return `${now}\nCada filha viva regenera até ${CASTLE_BALANCE.regeneration} HP no fim da rodada, mesmo sem ser escolhida.\nAnticoagulante reduz para ${CASTLE_BALANCE.anticoagulantRegeneration}; Frio bloqueia uma vez. Itens limitam a recuperação a ${d.maxHp} HP. Filhas derrotadas não regeneram.`;
+}
+
+export function daughterRegenerationChip(d) {
+  return `PASSIVA +${d.cold ? 0 : d.regeneration} HP`;
+}
+
 export function castleItemInventory(boss, type) {
   const items = Object.values(boss.castleItems || {}).filter(item => item.type === type);
   return { total: items.length, available: items.filter(item => !item.consumed).length,
@@ -57,6 +75,7 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
   let marker = document.getElementById('castleBloodLink');
   let fury = document.getElementById('castleFury');
   if (boss?.id !== 'dimitrescu') {
+    document.getElementById('castleDaggerLink')?.remove();
     panel?.remove(); ribbon?.remove(); marker?.remove(); fury?.remove(); hud?.removeAttribute('data-fury');
     document.getElementById('bossHpText')?.removeAttribute('aria-label');
     return;
@@ -67,13 +86,13 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     for (const [type, definition] of Object.entries(ITEM_DEFINITIONS)) {
       const button = createHelp(`Explicar ${definition.label}`, definition.label, () => {
         const count = castleItemInventory(ribbon._boss, type);
-        return `${castleItemHelp(type)}\n\n${count.available}/${count.total} disponíveis · ${count.used} usados · ${count.attached} nas filhas.`;
+        return `${castleItemHelp(type,ribbon._boss)}\n\n${count.available}/${count.total} disponíveis · ${count.used} usados · ${count.attached} nas filhas.`;
       }, '');
       const art = document.createElement('img'); art.src = definition.image; art.alt = definition.label; button.append(art); button.dataset.itemType = type;
       const count = document.createElement('span'); count.className = 'castle-item-count'; button.append(count);
       ribbon.append(button);
     }
-    ribbon.append(createHelp('Explicar itens do castelo', 'Itens do Castelo', '15 cartas têm itens: 3 de cada tipo. Toque no item da sua mão e escolha uma filha.\nCada item tem um efeito próprio e petrifica 100 HP (mínimo recuperável: 200).\nO contador mostra quantos ainda podem ser usados. Usar um item não encerra seu turno: guarde uma carta para descartar.', 'i'));
+    ribbon.append(createHelp('Explicar itens do castelo', 'Itens do Castelo', () => `15 cartas têm itens: 3 de cada tipo. Toque no item da sua mão e escolha uma filha.\nCada item tem um efeito próprio e petrifica parte da vida (mínimo recuperável: ${castleRules(ribbon._boss).daughterHpFloor}).\nO contador mostra quantos ainda podem ser usados. Guarde uma carta para descartar.`, 'i'));
     document.getElementById('bossDangerMeter').insertAdjacentElement('afterend', ribbon);
   }
   ribbon._boss = boss;
@@ -119,6 +138,17 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
   mainTarget.setAttribute('aria-label', 'Selecionar Lady Dimitrescu como alvo');
   mainTarget.disabled = disabled; mainTarget.setAttribute('aria-pressed', String(target === 'boss'));
   mainTarget.onclick = () => selectTarget('boss');
+  let daggerChip = document.getElementById('castleDaggerLink');
+  const linked = boss.combatEntities.filter(d => d.hp > 0 && d.daggerLink);
+  if (!linked.length) daggerChip?.remove();
+  else {
+    if (!daggerChip) {
+      daggerChip = createHelp('Explicar Adaga vinculada à Lady', 'Vínculo Sangrento', () => daggerChip._help, '');
+      daggerChip.id = 'castleDaggerLink'; daggerChip.classList.add('boss-daughter-state'); mainPortrait.append(daggerChip);
+    }
+    daggerChip.textContent = `ADAGA · ${castleRules(boss).daggerTransfer * 100}%`;
+    daggerChip._help = `${linked.map(d => d.name).join(' e ')}: parte do dano dos ataques também atinge a vida da Lady, ignorando as proteções.\n${castleItemHelp('dagger',boss).split('\n')[0]}`;
+  }
   const signature = JSON.stringify([boss.combatEntities, boss.roundNumber, boss.castlePassiveRound, boss.castleSelectedDaughterIds, disabled, target, state.players.map(p => p.name)]);
   if (panel.dataset.signature === signature) return;
   panel.dataset.signature = signature; panel.replaceChildren();
@@ -130,7 +160,9 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     const name = document.createElement('b'); name.textContent = d.name.toUpperCase(); card.append(name);
     const chips = document.createElement('div'); chips.className = 'boss-combat-chips';
     const debuffs = [
-      d.cold && ['FRIO', 'Não regenera no próximo fim de rodada. Depois, o efeito acaba.'],
+      d.cold && ['FRIO', boss.castleItemRulesVersion === 2 ? `Bloqueia ${d.coldCharges || 1} regeneração(ões) que recuperariam HP. Vida completa não gasta a carga.` : 'Não regenera no próximo fim de rodada. Depois, o efeito acaba.'],
+      d.daggerLink && ['VÍNCULO ' + castleRules(boss).daggerTransfer * 100 + '%', castleItemHelp('dagger',boss)],
+      d.hemorrhage?.remaining && [`HEMORRAGIA · ${d.hemorrhage.remaining}`, `${d.hemorrhage.amount} HP antes da regeneração, por mais ${d.hemorrhage.remaining} fim(ns) de rodada. Não aciona a Adaga.`],
       d.regeneration === CASTLE_BALANCE.anticoagulantRegeneration && ['ANTICOAGULANTE', `Regenera ${CASTLE_BALANCE.anticoagulantRegeneration} HP por rodada, em vez de ${CASTLE_BALANCE.regeneration}. Dura até ser derrotada; não acumula.`],
       d.relicRound != null && ['RELÍQUIA', d.passive?.status === 'suppressed' ? 'Passiva suspensa nesta rodada. Não bloqueia a regeneração.' : 'Suspende a passiva na próxima oportunidade. Não bloqueia a regeneração.'],
     ];
@@ -140,9 +172,14 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     }
     card.append(chips);
     const content = document.createElement('div'); content.className = 'boss-combat-content';
-    const hp = document.createElement('span'); hp.textContent = `${d.hp} / ${CASTLE_BALANCE.daughterHp} HP`;
+    const originalHp = daughterOriginalHp(boss,d);
+    const hp = document.createElement('span'); hp.textContent = `${d.hp} / ${originalHp} HP`;
+    if (d.maxHp < originalHp) {
+      const recoverable = document.createElement('small'); recoverable.className = 'castle-hp-recoverable';
+      recoverable.textContent = ` · máx. ${d.maxHp}`; hp.append(recoverable);
+    }
+    hp.setAttribute('aria-label', `${d.hp} HP atuais, máximo recuperável ${d.maxHp}, original ${originalHp}`);
     const health = document.createElement('div'); health.className = 'castle-daughter-health';
-    const originalHp = CASTLE_BALANCE.daughterHp;
     const meter = document.createElement('meter'); meter.min = 0; meter.max = originalHp; meter.value = d.hp;
     meter.low = d.maxHp * .25; meter.high = d.maxHp * .5; meter.optimum = d.maxHp;
     meter.dataset.health = d.hp > meter.high ? 'normal' : d.hp > meter.low ? 'tension' : 'danger'; meter.setAttribute('aria-label', `HP de ${d.name}`);
@@ -164,9 +201,10 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
       // The tint identifies whose round it is, not whether a candidate/punishment is pending.
       chip.classList.toggle('is-highlighted', selectedPassive);
       passive.append(chip);
-      const indicator = createHelp(`Explicar passiva da rodada de ${d.name}`, `Passiva de ${d.name}`,
-        daughterPassiveHelp(d, state), 'PASSIVA');
+      const indicator = createHelp(`Explicar regeneração de ${d.name}`, `Regeneração de ${d.name}`,
+        daughterRegenerationHelp(d), daughterRegenerationChip(d));
       indicator.classList.add('boss-daughter-state', 'castle-passive-indicator');
+      indicator.classList.toggle('is-debuffed', d.cold || d.regeneration < CASTLE_BALANCE.regeneration);
       indicator.classList.toggle('is-highlighted', selectedPassive);
       passive.append(indicator);
     }
@@ -174,7 +212,7 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     const stack = document.createElement('div'); stack.className = 'castle-sacrifice-stack';
     for (const saved of d.sacrificedCards) {
       const itemName = ITEM_DEFINITIONS[saved.castleItem.type].label;
-      const mini = createHelp(`Explicar ${itemName} sacrificado`, itemName, `${castleItemHelp(saved.castleItem.type)}\n\n${saved.rank}${saved.suit} fica com ${d.name} e volta ao fundo do Lixo quando ela morrer, sem item.`, '');
+      const mini = createHelp(`Explicar ${itemName} sacrificado`, itemName, `${castleItemHelp(saved.castleItem.type,boss)}\n\n${saved.rank}${saved.suit} fica com ${d.name} e volta ao fundo do Lixo quando ela morrer, sem item.`, '');
       mini.className = 'carta castle-sacrifice-card';
       mini.innerHTML = cardFrontHTML({ ...saved, castleItem: { ...saved.castleItem, consumed: false } });
       mini.title = `${saved.rank}${saved.suit} · ${itemName}`;

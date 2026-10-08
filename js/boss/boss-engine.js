@@ -1,7 +1,7 @@
 import { getBossDefinition, getBossDefinitionForMode } from './boss-registry.js';
 import { BOSS_DAMAGE_BY_KIND, DEBT_REDUCTION_BY_KIND } from './bosses/banker.js';
 import { buildBossActionPresentation } from './boss-presentation.js';
-import { getRestorativeDewHealing } from './boss-balance.js';
+import { getRestorativeDewHealing, MATRIARCH_GRAFT_PARTIAL_HEAL } from './boss-balance.js';
 import {
   applyBossCardDamageMechanics,
   applyBossMeldContributionMechanics,
@@ -44,18 +44,19 @@ function bossMechanicsContext(gameState) {
   const boss = gameState.boss;
   return { gameState, boss, helpers: {
     validSequence: isValidBossSequence,
+    damageForPlan: (player, plan, preview = gameState) => quoteBossPlanDamage(preview, player, plan),
     discardPickupQuote: (playerId, destination) => quoteBossDiscardPickup(gameState, playerId, destination),
     discardBlocked: (playerId) => isBossDiscardBlocked({ ...gameState, currentPlayer: gameState.players.findIndex((player) => player.id === playerId) }),
     blocked: (playerId, cardId, action) => isCardBlockedByBossState(boss, playerId, cardId, action),
     meldId: (teamId, index) => resolveBossMeldId(gameState, teamId, index, true),
     pickIndex: (length) => length ? Math.floor(seededUnit(bossSeed(gameState, 173)) * length) % length : 0,
-    canLeaveHand: (player, moves) => {
+    canLeaveHand: (player, moves, preview = gameState) => {
       const playedIds = new Set(moves.flatMap((move) => move.cardIds));
       if (player.hand.length - playedIds.size > 1) return true;
-      const taken = gameState.deadChunksTaken?.[player.teamId] || 0;
-      const maximum = gameState.deadChunksMax?.[player.teamId] ?? 1;
-      if (taken < maximum && gameState.deadPiles?.some((pile) => pile?.length)) return true;
-      const melds = gameState.teams?.[player.teamId]?.melds || [];
+      const taken = preview.deadChunksTaken?.[player.teamId] || 0;
+      const maximum = preview.deadChunksMax?.[player.teamId] ?? 1;
+      if (taken < maximum && preview.deadPiles?.some((pile) => pile?.length)) return true;
+      const melds = preview.teams?.[player.teamId]?.melds || [];
       const hasGood = (meld) => ['limpa', 'real', 'asas'].includes(classifyBossMeldKind(meld));
       if (melds.some(hasGood)) return true;
       return moves.some((move) => hasGood([...(move.meldIndex == null ? [] : melds[move.meldIndex]), ...player.hand.filter((card) => move.cardIds.includes(card.id))]));
@@ -562,12 +563,34 @@ function isNaturalBossSequence(meld) {
   });
 }
 
-function classifyBossMeldKind(meld) {
+export function classifyBossMeldKind(meld) {
   const cards = (meld || []).filter(Boolean);
   if (cards.length < 7 || !isValidBossSequence(cards)) return 'simple';
   if (isCompleteAceToAce(cards)) return 'asas';
   if (!isNaturalBossSequence(cards)) return 'suja';
   return cards.length === 13 ? 'real' : 'limpa';
+}
+
+// Quote the same fresh-card + incremental canastra damage used at resolution.
+// Legality is established by the canonical planner before calling this helper.
+export function quoteBossPlanDamage(gameState, player, plan) {
+  const boss = gameState.boss, damaged = new Set(boss.damagedCardIds || []);
+  const groups = new Map();
+  for (const [i, move] of plan.moves.entries()) {
+    const key = move.meldIndex == null ? `new:${i}` : move.meldIndex;
+    if (!groups.has(key)) groups.set(key, { index: move.meldIndex, cards: [] });
+    groups.get(key).cards.push(...player.hand.filter(card => move.cardIds.includes(card.id)));
+  }
+  let damage = 0;
+  for (const { index, cards } of groups.values()) {
+    const previous = index == null ? [] : gameState.teams[player.teamId].melds[index];
+    const id = index == null ? null : resolveBossMeldId(gameState, player.teamId, index, false);
+    const credited = boss.meldProgress[id] || boss.meldProgress[`${player.teamId}:${index}`];
+    damage += Math.max(0, (BOSS_DAMAGE_BY_KIND[classifyBossMeldKind([...previous, ...cards])] || 0)
+      - (credited?.damageValue ?? BOSS_DAMAGE_BY_KIND[classifyBossMeldKind(previous)] ?? 0));
+    for (const card of cards) if (!damaged.has(card.id)) { damage += bossCardDamage(card); damaged.add(card.id); }
+  }
+  return Math.min(boss.hp, damage);
 }
 
 function combinationsOfSize(items, size, visit, start = 0, chosen = []) {
@@ -1700,7 +1723,7 @@ function createPayload(gameState, abilityId) {
       const candidates = matriarchRootCandidates(gameState);
       const first = chooseSeeded(candidates, gameState, 189);
       const second = chooseSeeded(candidates.filter((entry) => entry.meldId !== first?.meldId), gameState, 191);
-      return { targets: [first, second].filter(Boolean) };
+      return { targets: [first, second].filter(Boolean), partialHeal: MATRIARCH_GRAFT_PARTIAL_HEAL };
     }
     if (abilityId === 'discard_pollen') return { discardCardId: matriarchDiscardCandidate(gameState)?.id ?? null };
     if (abilityId === 'harvest') return { targetPlayerId: choosePlayer(gameState, 193)?.id ?? null };
@@ -3097,7 +3120,11 @@ function resolveMatriarchRound(gameState) {
     } else if (threat.type === 'graft') {
       const fed = new Set(threat.fedMeldIds || []).size;
       if (fed >= 2) events.push(succeedNatureThreat(gameState, threat, 'Os dois jogos alimentaram o Enxerto.'));
-      else if (fed === 1) events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 0, outcome: 'Apenas um jogo alimentou o Enxerto.' }));
+      else if (fed === 1) events.push(failNatureThreat(gameState, threat, {
+        // Older already-announced threats retain their saved rule until resolved.
+        bloom: threat.partialHeal == null ? 1 : 0, heal: threat.partialHeal || 0,
+        outcome: threat.partialHeal == null ? 'Apenas um jogo alimentou o Enxerto.' : `Um lado neutralizado: cura de até ${threat.partialHeal} HP, sem Flor nem propagação comum.`,
+      }));
       else {
         events.push(failNatureThreat(gameState, threat, { bloom: 1, heal: 0, outcome: 'Nenhum jogo alimentou o Enxerto.' }));
         requestRootPropagation(gameState, threat);
@@ -3439,7 +3466,8 @@ export function getBossNatureThreatSummaries(gameState) {
     } else if (threat.type === 'graft') {
       const fed = new Set(threat.fedMeldIds || []).size;
       condition = `Alimentar os dois jogos ligados (${fed}/2).`;
-      consequence = fed ? 'Falha parcial: +1 Flor, sem cura.' : 'Falha total: +1 Flor, sem cura, e pode propagar.';
+      consequence = fed ? threat.partialHeal == null ? 'Falha parcial: +1 Flor, sem cura.'
+        : `Um lado: cura até ${threat.partialHeal} HP, sem Flor.` : 'Nenhum lado: +1 Flor e pode propagar.';
     } else if (threat.type === 'dew') {
       condition = `Cartas novas na mesa: ${uniqueDewCards}/6. A cura cai por faixas e zera com 6 cartas.`;
       consequence = `Cura prevista: ${predictedHeal} HP.`;
@@ -5746,6 +5774,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       const threat = addNatureThreat(gameState, {
         ...baseThreat,
         type: 'graft',
+        partialHeal: intent.payload.partialHeal,
         meldIds: (intent.payload.targets || []).map((target) => target.meldId),
         meldIndexes: (intent.payload.targets || []).map((target) => target.meldIndex),
         fedMeldIds: [],

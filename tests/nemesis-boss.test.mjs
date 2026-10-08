@@ -285,10 +285,11 @@ for (const [id, phase, amount] of [['stars_hunt', 1, 10], ['infectious_tentacle'
 
 test('Extermination gives 8 base for only one of two independent requirements', () => {
   const state = game('stars_extermination', 3); const intent = activate(state);
-  const target = intent.payload.targetPlayerId; const second = intent.payload.secondCardId;
-  const card = state.players[target].hand.find((entry) => entry.id === second);
-  state.players[target].hand = state.players[target].hand.filter((entry) => entry.id !== second); state.discard.push(card);
-  notifyBossCardDiscarded(state, target, card); completeBossPlayerTurn(state, target);
+  const target = intent.payload.targetPlayerId;
+  hit(state, { playerId: target, cards: [{id:'direct-test',rank:'3',suit:'♠'}] });
+  completeBossPlayerTurn(state, target);
+  assert.equal(state.boss.danger, 0, 'partner still has the rest of the round');
+  completeBossPlayerTurn(state, intent.payload.partnerPlayerId);
   assert.equal(state.boss.danger, 12);
 });
 
@@ -301,11 +302,11 @@ for (const [infection, bonus] of [[49, 2], [50, 4], [74, 4], [75, 6], [99, 6]]) 
   });
 }
 
-test('Hunt prefers S.T.A.R.S. and falls back to a partner with a real solution', () => {
+test('Hunt freezes S.T.A.R.S. and is ineligible when that player has no real attack', () => {
   const state = game(); state.boss.starsPlayerId = 1;
   assert.equal(inspectBossAbilityEligibility(state, 'stars_hunt').payload.targetPlayerId, 1);
   state.players[1].hand = [{ id: 'impossible', rank: 'K', suit: '♦' }];
-  assert.equal(inspectBossAbilityEligibility(state, 'stars_hunt').payload.targetPlayerId, 0);
+  assert.equal(inspectBossAbilityEligibility(state, 'stars_hunt').eligible, false);
 });
 
 for (const id of ['stars_hunt', 'infectious_tentacle', 'tentacle_barrage', 'stars_extermination']) {
@@ -363,7 +364,7 @@ test('BOT priority plans and discard execute legal marked exits for Tentacle', a
     isValidSequenceMeld: () => false, getCombatPriorities: (id) => getBossCombatPriorities(state, id),
     executeDiscard: async (_index, handIndex) => { discarded = state.players[1].hand.splice(handIndex, 1)[0]; state.discard.push(discarded); notifyBossCardDiscarded(state, 1, discarded); completeBossPlayerTurn(state, 1); state.currentPlayer = 0; return true; } };
   await BossBuracoBot.processDiscard(1, 1, engine);
-  assert.ok(priorities.markedCardIds.includes(discarded.id)); assert.equal(state.boss.danger, 0);
+  assert.ok(priorities.markedCardIds.includes(discarded.id)); assert.equal(state.boss.danger, 6, 'discard-only partial: base 4 + Infectado 2');
 });
 
 test('reload, snapshot and actual undo preserve all combat fields and duplicate-event guards', () => {
@@ -390,7 +391,7 @@ test('combat HUD hides dead targets and all choices when only Nemesis lives', ()
 test('presentation explains infection and marked objectives, not unrelated debt mechanics', () => {
   const state = game('stars_extermination', 3); activate(state);
   const view = buildBossActionPresentation(state);
-  assert.match(view.instruction, /contribua E/); assert.match(buildBossRuleSummary(state), /Infecção/);
+  assert.match(view.instruction, /ataque Nemesis.*Jogo/); assert.match(buildBossRuleSummary(state), /Infecção/);
   assert.doesNotMatch(view.instruction, /Dívida|Sede/);
 });
 
@@ -587,7 +588,7 @@ test('entry objectives exclude impossible hands without valid contributions', ()
 });
 
 test('marked objectives choose actually playable cards; sacrificing one still resolves the mark', () => {
-  for (const abilityId of ['infectious_tentacle', 'tentacle_barrage', 'stars_extermination', 'horde_invasion']) {
+  for (const abilityId of ['infectious_tentacle', 'tentacle_barrage', 'horde_invasion']) {
     const state = fresh(); state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3];
     if (abilityId === 'horde_invasion') { dead(state, 'infected'); dead(state, 'devourer'); }
     state.teams[0].melds = [];
@@ -602,7 +603,7 @@ test('marked objectives choose actually playable cards; sacrificing one still re
     const payload = eligibility.payload;
     const marked = payload.cardIds || [payload.secondCardId];
     assert.ok(marked.every(id => id.startsWith('legal-')), `${abilityId}: useless discard is not a mark`);
-    assert.ok(payload.solution.playedCardIds.length >= (['tentacle_barrage', 'stars_extermination'].includes(abilityId) ? 2 : 1));
+    assert.ok(payload.solution.playedCardIds.length >= (abilityId === 'tentacle_barrage' ? 2 : 1));
     queueDebugBossAbility(state, abilityId);
     const intent = activate(state);
     assert.equal(intent.abilityId, abilityId);

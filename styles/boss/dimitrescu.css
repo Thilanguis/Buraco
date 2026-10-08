@@ -12,6 +12,8 @@ body[data-boss-id='dimitrescu'] .castle-link-fill { position:absolute; inset:0 a
 body[data-boss-id='dimitrescu'] .castle-link-label { white-space:nowrap; }
 body[data-boss-id='dimitrescu'] #castleBloodLink button { flex:0 0 auto; width:14px; height:14px; min-width:0; padding:0; margin:0; font-size:9px; }
 body[data-boss-id='dimitrescu'] #castleFury { position:absolute; right:10px; top:10px; z-index:5; width:auto; height:auto; margin:0; font-size:10px; font-weight:900; color:#ffddad; background:#2d080ce6; border:1px solid #d39962; border-radius:5px; padding:4px 7px; }
+body[data-boss-id='dimitrescu'] #castleDaggerLink { position:absolute; bottom:10px; right:10px; z-index:6; width:auto; height:auto; min-width:0; margin:0; padding:2px 5px; font-size:8px; color:#ffd1d9; border:1px solid #e5728a; background:#3b101be8; }
+body[data-boss-id='dimitrescu'] .castle-passive-indicator.is-debuffed::before { content:'↓ '; color:#a8d6ff; }
 body[data-boss-id='dimitrescu'] #bossHud[data-fury='1'] .boss-portrait { box-shadow:0 0 15px #ca183844; }
 body[data-boss-id='dimitrescu'] #bossHud[data-fury='2'] .boss-portrait { box-shadow:0 0 22px #eb254a66; }
 body[data-boss-id='dimitrescu'] #bossHud[data-fury='3'] .boss-portrait { box-shadow:0 0 30px #ff365a99; }
@@ -35,6 +37,12 @@ body[data-boss-id='dimitrescu'] .carta .castle-item-overlay { height:auto; borde
 body[data-boss-id='dimitrescu'] #handContainer .carta .castle-item-overlay,
 body[data-boss-id='dimitrescu'] #sampleHand .carta .castle-item-overlay { box-sizing:border-box; width:64%; max-height:55%; top:47%; padding:2px; background:radial-gradient(ellipse,#182e45f5 35%,#152435db 68%,#bd9b65 72%,transparent 76%); filter:drop-shadow(0 1px 2px #000); }
 body[data-boss-id='dimitrescu'] .castle-daughter-health { position:relative; display:grid; align-items:center; height:9px; }
+body[data-boss-id='dimitrescu'] .castle-hp-recoverable { font-size:inherit; color:#cbd5e1; }
+@media (max-width:600px) {
+  body[data-boss-id='dimitrescu'] .castle-hp-recoverable { display:block; line-height:12px; }
+  /* Keep multiple attached items above the two-line HP label on narrow portraits. */
+  body[data-boss-id='dimitrescu'] .castle-daughter:has(.castle-hp-recoverable) .castle-sacrifice-stack { max-height:calc(100% - 125px); }
+}
 body[data-boss-id='dimitrescu'] .castle-hp-petrified { position:absolute; top:50%; height:3px; transform:translateY(-50%); right:0; box-sizing:border-box; background:linear-gradient(165deg,transparent 46%,#323942 47% 50%,transparent 51%),linear-gradient(25deg,#747d86,#a8afb6 40%,#5e6872 70%,#8c969e); background-size:17px 100%,100% 100%; border-left:1px solid #b5c0cb; border-radius:0 3px 3px 0; }
 body[data-boss-id='dimitrescu'] .castle-hp-petrified[hidden] { display:none; }
 body[data-boss-id='dimitrescu'] .castle-max-loss { color:#edcabb; background:#39212ae0; border:1px solid #b78b78; border-radius:4px; padding:2px 5px; font-size:9px; }

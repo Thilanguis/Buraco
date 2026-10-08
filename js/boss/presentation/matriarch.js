@@ -78,6 +78,16 @@ function natureThreatsForIntent(gameState, intent) {
   return (gameState?.boss?.natureThreats || []).filter((threat) => threat.sourceIntentId === intent.id);
 }
 
+function graftPartialHeal(gameState, intent) {
+  const threat = natureThreatsForIntent(gameState, intent).find(t => t.type === 'graft');
+  return threat ? threat.partialHeal : intent.payload?.partialHeal;
+}
+
+function graftPartialHelp(gameState, intent) {
+  const heal = graftPartialHeal(gameState, intent);
+  return heal == null ? '+1 Flor, sem cura' : `cura até ${heal} HP, sem Flor`;
+}
+
 function helpersFor(context = {}) {
   const helpers = context.helpers || {};
   return {
@@ -257,7 +267,7 @@ export const matriarchBossPresentation = Object.freeze({
         return detailFields([['Cartas contabilizadas', `${Math.min(counted, 6)}/6`], ['Cura prevista', `${getRestorativeDewHealing(phase, counted)} HP`], ['Faixas', '0-1 / 2-3 / 4-5 / 6+ cartas'], ['Prazo', 'fim da rodada']]);
       }
       case 'twin_vines': return detailFields([['Jogos', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'alimentar cada jogo separadamente'], ['Falhas da ativação', 'máximo +1 Flor no total, sem cura'], ['Falha dupla', 'pode propagar uma Raiz']]);
-      case 'graft': return detailFields([['Jogos ligados', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'adicionar 1 carta em cada jogo'], ['Falha parcial', '+1 Flor, sem cura'], ['Falha total', '+1 Flor, sem cura, e pode propagar uma Raiz']]);
+      case 'graft': return detailFields([['Jogos ligados', (payload.targets || []).map((entry) => meldLabel(entry.meldIndex)).join(' e ')], ['Objetivo', 'adicionar 1 carta em cada jogo'], ['Um lado', graftPartialHelp(gameState, intent)], ['Nenhum lado', '+1 Flor e pode propagar uma Raiz']]);
       case 'discard_pollen': {
         const discardCard = gameState?.discard?.find((entry) => entry.id === payload.discardCardId);
         return detailFields([['Carta', discardCard ? `${discardCard.rank}${discardCard.suit}` : 'topo do lixo'], ['Gatilho', 'pegar a carta contaminada do lixo'], ['Consequência imediata', '+1 Flor e cura de até 30 HP']]);
@@ -295,7 +305,7 @@ export const matriarchBossPresentation = Object.freeze({
         return { instruction: 'Baixe cartas para reduzir a cura.', progress: '', consequence: `Cura prevista: ${getRestorativeDewHealing(phase, counted)} HP` };
       }
       case 'twin_vines': return { instruction: `Alimente ${payload.targetCount || payload.targets?.length || 0} jogos marcados.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Uma ou duas falhas: +1 Flor no total' };
-      case 'graft': return { instruction: 'Alimente os 2 jogos ligados.', progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falha parcial ou total: +1 Flor' };
+      case 'graft': return { instruction: 'Adicione cartas aos dois jogos ligados nesta rodada.', progress: '', consequence: '' };
       case 'discard_pollen': {
         const threat = natureThreatsForIntent(gameState, intent)[0];
         const contaminatedCard = cardLabelAnywhere(gameState, threat?.discardCardId || payload.discardCardId);
@@ -336,6 +346,18 @@ export const matriarchBossPresentation = Object.freeze({
     const helpers = helpersFor(context);
     const { playerById, getRestorativeDewHealing } = helpers;
     const payload = intent.payload || {};
+    if (intent.abilityId === 'graft') {
+      const threat = natureThreatsForIntent(gameState, intent).find(t => t.type === 'graft');
+      const fed = new Set(threat?.fedMeldIds || payload.fedMeldIds || []).size;
+      const value = Math.min(2, fed), heal = graftPartialHeal(gameState, intent);
+      const partial = heal == null ? '+1 Flor' : `cura até ${heal} HP`;
+      return [{ label: 'Jogos alimentados', value, max: 2, unit: 'de 2',
+        tone: value === 2 ? 'safe' : value === 1 ? 'warning' : 'danger',
+        currentEffect: value === 2 ? 'SEM EFEITO' : value === 1 ? partial : '+1 Flor',
+        segments: [{ from: 0, to: 0, label: 'Nenhum', effect: '+1 Flor', tone: 'danger' },
+          { from: 1, to: 1, label: 'Um jogo', effect: partial, tone: 'warning' },
+          { from: 2, to: 2, label: 'Dois jogos', effect: 'sem efeito', tone: 'safe' }] }];
+    }
     if (intent.abilityId === 'harvest') {
       const target = playerById(gameState, payload.targetPlayerId);
       const cards = target?.hand?.length || 0;
@@ -365,7 +387,7 @@ export const matriarchBossPresentation = Object.freeze({
       case 'twin_vines':
         return 'Os jogos marcados são objetivos separados: cada um precisa receber ao menos 1 carta legal nesta rodada. Uma ou duas raízes sem alimentação geram +1 Flor no total nesta ativação. Falha dupla ainda pode propagar uma Raiz.';
       case 'graft':
-        return 'Alimente os dois jogos ligados nesta rodada. Falha parcial ou total: +1 Flor no total. Falha total ainda pode propagar uma Raiz.';
+        return `Dois jogos alimentados evitam tudo. Só um: ${graftPartialHelp(gameState, intent)}, sem propagação comum. Nenhum: +1 Flor e pode propagar uma Raiz. A cura respeita os limites da rodada e de HP. A Coroa, se estiver ligada ao Enxerto, mantém sua reação própria à falha.`;
       case 'discard_pollen':
         return 'A carta contaminada é o topo atual do Lixo. Se alguém recolher esse topo enquanto o Pólen estiver ativo, a Matriarca ganha 1 Flor e cura; comprar do Monte ou deixar o topo passar evita o gatilho.';
       case 'harvest':

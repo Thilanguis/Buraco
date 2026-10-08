@@ -56,7 +56,7 @@ document.getElementById('bossPortraitImage').src = '/assets/images/boss-nemesis.
 document.getElementById('bossDangerLabel').textContent = 'INFECÇÃO';
 document.getElementById('bossHpText').textContent = state.boss.hp + ' / ' + state.boss.maxHp;
 document.getElementById('bossIntentName').textContent = 'Caçada S.T.A.R.S.';
-document.getElementById('bossIntentDescription').textContent = 'Contribua com 1 carta neste turno.';
+document.getElementById('bossIntentDescription').textContent = 'Cause dano direto ao Nemesis neste turno.';
 window.fixture = { render: () => renderBossCombatPanel(hud, state.boss), state: () => state, commits: () => commits, frame: applyBossMeldEffectFrame,
   reload: () => { state = JSON.parse(JSON.stringify(state)); renderBossCombatPanel(hud, state.boss); },
   observer: (index) => { myPlayerIndex = index; renderBossCombatPanel(hud, state.boss); } };
@@ -131,6 +131,21 @@ window.fixture.command = () => {
   document.getElementById('bossIntentDescription').textContent = copy.instruction;
   document.getElementById('bossIntentProgress').textContent = [copy.progress, copy.consequence].filter(Boolean).join(' · ');
   renderBossRangeMeters(document.getElementById('bossIntentDescription'), nemesisBossPresentation.rangeMeters(context) || []);
+};
+window.fixture.reworkObjective = (abilityId, progress = 0) => {
+  const sample = buildBossDebugScenario(null, {bossId:'nemesis',abilityId,phase:3}).state;
+  beginBossTurn(sample,{first:true,now:1000,debug:true});
+  for(let i=0;i<20&&sample.boss.bossFlow.stage!=='players';i++)advanceBossTurn(sample,sample.boss.bossFlow.endsAt+1);
+  const intent=sample.boss.currentIntent,p=intent.payload;
+  if(abilityId==='stars_extermination'){p.directDamage=progress>=1?1:0;p.partnerContributed=progress>=2;}
+  if(abilityId==='infectious_tentacle'){p.exitedCardIds=progress?[p.cardIds[0]]:[];p.playedMarkedCardIds=progress===2?[p.cardIds[0]]:[];}
+  const context={gameState:sample,intent},copy=nemesisBossPresentation.compactAction(context);
+  document.getElementById('bossIntentName').textContent=intent.name;
+  const description=document.getElementById('bossIntentDescription');description.textContent=copy.instruction;
+  description.append(createBossCombatHelp('Testar ajuda do objetivo',intent.name,nemesisBossPresentation.help(context)));
+  document.getElementById('bossIntentProgress').textContent=[copy.progress,copy.consequence].join(' · ');
+  renderBossRangeMeters(description,nemesisBossPresentation.rangeMeters(context)||[]);
+  return {instruction:copy.instruction,progress:copy.progress};
 };
 window.fixture.infectedCard = () => {
   const sample = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'horde_invasion', phase: 1, target: 'zombie_grabber' }).state;
@@ -395,6 +410,21 @@ try {
     assert.equal(await page.locator('#bossRangeMeters').isVisible(), false, 'Horde Command is a timed buff, not a graded objective');
     assert.match(await page.locator('#bossIntentDescription').innerText(), /Infectado reforçado até fim da rodada/);
     assert.equal(await page.locator('#bossIntentProgress').innerText(), 'Falha: +6 Infecção extra.');
+    for (const ability of ['stars_hunt','infectious_tentacle','stars_extermination']) {
+      const copy=await page.evaluate(ability=>window.fixture.reworkObjective(ability,1),ability);
+      assert.match(copy.instruction,ability==='stars_extermination'?/ataque Nemesis.*Jogo/:ability==='infectious_tentacle'?/jogue 1 marcada/:/dano direto/);
+      if(ability==='infectious_tentacle')assert.match(copy.progress,/descartada · parcial/);
+      if(ability!=='stars_hunt')assert.equal(await page.locator('#bossRangeMeters [role="progressbar"]').getAttribute('aria-valuenow'),'1');
+      await page.getByLabel('Testar ajuda do objetivo',{exact:true}).click();
+      const help=await page.locator('#bossIntentHelpText').innerText();
+      assert.match(help,ability==='stars_extermination'?/rodada/:ability==='infectious_tentacle'?/descartar/:/dano positivo à vida do Nemesis/);
+      const fits=await page.locator('#bossIntentHelpPopover').evaluate(node=>{const r=node.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;});
+      assert.ok(fits,`${width}: new objective help fits viewport`);
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('#bossIntentProgress').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`${width}: new objective text fits`);
+      await page.screenshot({path:resolve(root,`.cache/nemesis-ui/rework-${ability}-${width}.png`)});
+    }
+    await page.evaluate(() => window.fixture.command());
     await page.setViewportSize({ width, height });
     for (const label of ['Explicar Lixo no modo Chefe', 'Passiva de Agarrador', 'Passiva de Infectado', 'Infectado: MUTADO', 'Infectado: REFORÇADO', 'Infectado: INFECÇÃO +6', 'Explicar alvo S.T.A.R.S.', 'Explicar alvo do dano', 'Explicar esta habilidade', 'Explicar a regra deste chefe']) {
       await page.getByLabel(label, { exact: true }).click();

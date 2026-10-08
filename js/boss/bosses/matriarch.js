@@ -1,3 +1,5 @@
+import { MATRIARCH_GRAFT_PARTIAL_HEAL } from '../boss-balance.js';
+
 const ability = (id, name, weight, phases, describe) => ({ id, name, weight, phases, describe });
 
 export const matriarchDefinition = Object.freeze({
@@ -32,7 +34,7 @@ export const matriarchDefinition = Object.freeze({
     ability('hungry_root', 'Raiz Faminta', 5, [1, 2, 3], () => 'Adicione uma carta legal ao jogo marcado antes do fim da rodada. Se falhar, ela pode gerar uma única nova Raiz na rodada seguinte; uma Raiz já propagada não se propaga novamente.'),
     ability('restorative_dew', 'Orvalho Restaurador', 3, [1, 2, 3], () => 'A cura prevista cai por faixas conforme cartas novas entram legalmente na mesa e zera com 6 cartas.'),
     ability('twin_vines', 'Trepadeiras Gemeas', 4, [2, 3], ({ targetCount = 2 }) => `${targetCount} jogo(s) precisam receber uma carta legal nesta rodada. Uma ou duas falhas: +1 Flor no total.`),
-    ability('graft', 'Enxerto', 3, [2, 3], () => 'Os dois jogos ligados precisam receber uma carta legal nesta rodada. Falha parcial ou total: +1 Flor.'),
+    ability('graft', 'Enxerto', 3, [2, 3], () => `Alimente os dois jogos ligados nesta rodada: dois evitam tudo; apenas um cura até ${MATRIARCH_GRAFT_PARTIAL_HEAL} HP, sem Flor; nenhum gera +1 Flor e pode propagar uma Raiz.`),
     ability('discard_pollen', 'Polen do Lixo', 3, [2, 3], () => 'Se o topo contaminado for pego, ganho +1 Flor e curo ate 30 HP.'),
     ability('harvest', 'Colheita', 2, [2, 3], () => 'A quantidade de cartas na mao do alvo sera avaliada no fim do turno.'),
     ability('royal_bloom', 'Florescimento Real', 4, [3], ({ targetCount = 0 }) => `${targetCount} objetivo(s) naturais precisam ser cumpridos separadamente. Falhas desta ativação: máximo +1 Flor no total.`),

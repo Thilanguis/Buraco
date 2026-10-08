@@ -66,7 +66,7 @@ for (const isBot of [false, true]) {
     assert.equal(result.bloodLinkAbsorbed,Math.min(protection,100));
     assert.equal(state.boss.hp,2000-Math.max(0,100-protection));
     assert.equal(state.boss.bloodLinkProtection,Math.max(0,protection-100));
-    assert.deepEqual(state.boss.combatEntities.map(d=>d.hp),[450,450,450]);
+    assert.deepEqual(state.boss.combatEntities.map(d=>d.hp),[500,500,500]);
   });
   test(`Coágulo -> Vínculo -> vida no mesmo golpe ${isBot?'BOT':'humano'}`,()=>{
     const state=game('blood_tithe',{});state.players[0].isBot=isBot;state.boss.combatTargetsByPlayer[0]='boss';
@@ -76,7 +76,7 @@ for (const isBot of [false, true]) {
     assert.equal(result.hpDamage,10);assert.equal(state.boss.hp,1990);assert.equal(state.boss.bloodLinkProtection,0);
     const daughter=state.boss.combatEntities[0];state.boss.combatTargetsByPlayer[0]=daughter.id;
     applyDamageToBoss(state,10,{playerId:0,sourceActionId:'daughter'});
-    assert.equal(daughter.hp,440);assert.equal(state.boss.hp,1990);
+    assert.equal(daughter.hp,490);assert.equal(state.boss.hp,1990);
   });
   for (const protection of [180, 60]) test(`Lady: Coágulo absorve antes da vida, ${isBot ? 'BOT' : 'humano'}, proteção ${protection}`, () => {
     const state = game('blood_tithe', {});
@@ -88,13 +88,13 @@ for (const isBot of [false, true]) {
     assert.equal(state.boss.hp, 2000);
     assert.equal(state.boss.bloodLinkProtection,1500-Math.max(0,100-protection));
     assert.equal(state.boss.crimsonClot.remaining, Math.max(0, protection - 100));
-    assert.deepEqual(state.boss.combatEntities.map(d => d.hp), [450, 450, 450]);
+    assert.deepEqual(state.boss.combatEntities.map(d => d.hp), [500, 500, 500]);
   });
   test(`Lady: Vínculo consumível, ${isBot ? 'BOT' : 'humano'} usa o mesmo pipeline`, () => {
     const state = game('blood_tithe', {}); state.players[0].isBot = isBot;
     const result = applyDamageToBoss(state, 100, { playerId: 0, sourceActionId: 'link-regression' });
     assert.equal(result.hpDamage, 0); assert.equal(state.boss.hp, 2000);assert.equal(state.boss.bloodLinkProtection,1400);
-    assert.deepEqual(state.boss.combatEntities.map(d => d.hp), [450, 450, 450]);
+    assert.deepEqual(state.boss.combatEntities.map(d => d.hp), [500, 500, 500]);
   });
 }
 

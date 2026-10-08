@@ -1,5 +1,32 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+### Polimento HUD — Enxerto, Flores e PASSIVA — 08/10/2026
+
+- [x] Enxerto usa o medidor de faixas compartilhado: jogos alimentados0/1/2, preenchimento0/50/100%, consequência atual e legendas separadas. Sem sequência textual de regras no HUD; save legado respeita sua consequência salva. Nenhuma mudança de resolução.
+- [x] PASSIVA mostra +50HP normal, +25 com Anticoagulante e +0 com Frio; seta de debuff e status separados. Destaque de turno intacto; regeneração continua no fim da rodada para todas as vivas. Chip ADAGA30% na Lady dura enquanto houver filha viva vinculada, ajuda oficial sem alterar alvo.
+- [x] Cinco Flores usam `assets/images/matriarch-lotus.png`, PNG original enviada: foscas apagadas e cor original ativas, sem alterar bloom/limite/canastras. Asset/helper no precache; reduced motion preservado. Validar browser desktop/tablet/mobile e suíte ampla.
+
+### Itens v2 da Dimitrescu — 08/10/2026
+
+- [x] Partidas novas: filhas 500, regen50/Anti25, piso300; perdas originais aditivas Adaga25/Explosivo50/Frio100/Anti75/Relíquia100. Não curar nem duplicar dano ao limitar o máximo. Efeitos continuam no piso.
+- [x] Adaga30% somente em ataque efetivo à filha, inclusive humano/BOT/Ataque Final; ignora PROT./Coágulo sem consumir. Overkill limitado, duplicatas não somam porcentagem, item/hemorragia não transmitem. Morte da Lady encerra a batalha; morte da filha encerra vínculo e retira PROT. canonicamente.
+- [x] Explosivo60 + hemorragia50/2 fechamentos; antes da regen, limitada à vida, letal via morte/Fúria/PROT. Novo Explosivo renova sem empilhar. IDs/último tick/round salvo impedem replay.
+- [x] Frio guarda carga na vida cheia, bloqueia apenas cura efetiva, teto2. Anticoagulante permanente25 sem stack. Relíquia espera oportunidade válida, não consome sem candidato/não selecionada e não acumula supressões em duplicatas; As Três Filhas continua funcionando.
+- [x] Ajuda atual/legacy usa a regra da partida; vínculo/hemorragia separados de PASSIVA. HP original, máximo recuperável/petrificação; transferência vermelha até retrato da Lady e número no HP real; sangramento vermelho antes de regen verde na filha. Toque/teclado/Escape/clique fora/reduced motion e replay verificados em 1920/1376/390px.
+- [x] BOT escolhe item/alvo investido e golpe letal direto, preservando coringas/cartas obrigatórias/descarte. Laboratório usa versão nova e conserva 108 IDs/15 itens. `castleItemRulesVersion:2`/configuração e versão filhas3 persistem; saves sem versão continuam v1/450/piso200 sem reinterpretar consumidos.
+- [x] Execução inicial1112/1112; regressões focadas/ampla, compatibilidade de saves e experimento canônico reproduzível. Comparações completas em `REWORK_ITENS_DIMITRESCU_2026-10-08.md`.
+- [ ] Meta70% (65–75%) contra dupla competente ainda não validada: política gulosa não é evidência suficiente. Playtest humano e dois clientes Firebase reais permanecem necessários. Não inventar percentual atual.
+
+### Rework Nemesis/Enxerto e regeneração visual — 08/10/2026
+
+- [x] Caçada: dano direto efetivo positivo, não dano em zumbi; S.T.A.R.S. congelado, sem fallback silencioso para parceiro impossível. BOT prioriza Nemesis só enquanto precisa cumprir o objetivo. Cartas já creditadas sem evolução não provam dano.
+- [x] Tentáculo: jogar marcada = completo; só descartar = parcial +4/+5/+6; nenhuma = +8/+10/+12. Duas marcas realmente jogáveis. HUD/resolução compartilham bônus Infectado/Mutado/Reforçado/Ômega uma vez, inclusive parcial; sucesso não reduz Infecção.
+- [x] Extermínio: rodada cooperativa, S.T.A.R.S. dano direto e parceiro contribuição legal ao jogo existente congelado; ordem real e solução conjunta com descarte/Morto/batida. Ambos/um/nenhum = +0/+8/+16; Agarrador preserva solução sem reserva fixa. Snapshot/undo/reload não duplicam; anúncio v1 salvo conclui pela regra antiga.
+- [x] Enxerto novo: dois lados sem efeito; um lado cura até 50 HP, sem Flor nem propagação comum; zero lados +1 Flor e propagação posterior. Cura limitada por rodada/HP máximo, Coroa mantém reação própria. Save antigo sem `partialHeal` conclui pela regra salva; canastra não reabre quota de Flores.
+- [x] PASSIVA das três filhas explica regeneração 50/25/Frio/máximo/morte/vida cheia, não CAÇADA/BANQUETE/LIXO. Evento real `daughterRegen` gera +50/+25/+20 sobre cada retrato, sem novo cálculo de HP/Sede. Deduplicação, baseline de reload/reconexão, undo, três simultâneas, texto acessível e reduced motion verificados.
+- [x] Suítes focadas e ampla; browser local desktop/tablet/mobile e cinco tamanhos Nemesis. Calibração reproduzível de partidas completas e sensibilidades documentadas sem confundir política gulosa com dupla competente.
+- [ ] Playtest humano competente e dois clientes Firebase reais; medir 65%–75% antes de declarar balanceamento validado. Relatório: `REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md`.
+
 ### Cura do Devorador e passivas das filhas no DevTools — 08/10/2026
 
 - [x] Cura efetiva do Devorador registra origem e HP anterior. Fluxo verde sai do retrato, chega à borda do HP anterior e só então preenche a vida/número; não mexe na Infecção nem duplica o número antigo de cura. Mesmo presenter de Sede/Infecção, com fila, deduplicação, cancelamento em undo/reload e reduced motion sem voo. Aplica-se a jogo real e teste manual, respeitando máximo e valores existentes.
@@ -15,7 +42,7 @@
 
 ### Durabilidade das filhas — 08/10/2026
 
-- [x] Filhas 450 HP / regen 50, Anticoagulante 25 sem acumular; itens reduzem máximo para 350/250/200 (piso 200). PROT. 500 por filha, passivas +3, Lady/Sede/Fúria preservadas. Migração única de saves sem cura, ressurreição, perda de anexos ou recarga de PROT.; snapshot/reload/undo idempotentes.
+- [x] Histórico v1, preservado em saves antigos: filhas450/regen50, Anticoagulante25, perdas uniformes100/piso200. Partidas novas usam o contrato v2 acima. PROT.500/passivas+3/Lady/Sede/Fúria permanecem.
 - [x] Testes focados, suíte ampla e browser desktop/tablet/mobile (1920/1376/390), incluindo ajuda, petrificação, estados de vida e reduced motion. Estimativa de durabilidade registrada no rework, sem inventar win rate.
 
 ### Origem de Sede/Infecção e auxiliares no laboratório — 07/10/2026
@@ -34,13 +61,13 @@
 - [ ] Chips dos capangas/filhas de Nemesis, Nehelenia e Dimitrescu compartilham o padrão Nemesis: 8px desktop/7px mobile, altura mínima 16px, padding 2px 5px (mobile 4px), cantos 3px, estados ativos dourados. Contexto da Nehelenia não usa fonte inline de 5px nem cápsula divergente. Preservar estados sucesso/falha/inativo e debuffs azuis consultáveis exclusivos da Dimitrescu; validar wraps/arte/toque/teclado em desktop/tablet/celular.
 - [ ] Não confundir padronização de chips com barras de vida: filhas e zumbis usam meter de 9px e o mesmo desenho interno nativo, sem forçar uma faixa interna mais grossa só na Dimitrescu. Medir também preenchimento renderizado por pixels (rasterização fracionária pode variar 1px); petrificação centralizada com a mesma espessura fina, não um segundo trilho acima.
 
-- [ ] Lady 2000, filhas permanentes 450/450, sem revive. Vínculo consumível começa 1500 PROT., capacidade 500 por filha viva; Coágulo → PROT. → vida, incluindo batida 100 e excedente. Dano à filha não transfere à Lady; morte retira até 500 PROT. restantes, sem dano automático à vida.
+- [x] Lady2000, filhas novas500/500 (v1 histórico450), sem revive. Vínculo1500PROT.,500/filha; Coágulo→PROT.→HP, batida100/excedente. Exceção v2: ataques à filha com Adaga também atingem HP real da Lady. Morte retira até500PROT., sem dano automático à vida.
 - [ ] Bela: carta concretamente jogável, prazo do alvo; Cassandra: contribuição concreta ao jogo; sem candidatos não pune. Validar descarte/Morto/batida. Daniela: primeira retirada EFETIVA protegida/completa +3 uma vez na rodada, nunca na tentativa/Monte/render. Sucesso não reduz Sede.
-- [ ] Obrigações/Sede antes da regen própria das filhas 50; Frio bloqueia exatamente uma; Anticoagulante 25 permanente sem stack. Relíquia suprime só a filha escolhida, janela atual pendente ou próxima já resolvida. Morte cancela obrigação, não regenera/volta.
+- [ ] Obrigações/Sede, hemorragia e então regen própria das filhas 50; Frio v2 guarda até2 cargas, cada uma bloqueia uma cura efetiva (vida cheia não consome); Anticoagulante25 permanente sem stack. Relíquia espera uma oportunidade válida da própria filha, sem gastar em rodada não selecionada/sem candidato. Morte cancela obrigação, não regenera/volta. Saves v1 mantêm efeitos históricos.
 - [ ] Exatamente 15 IDs físicos, 3/tipo entre todas as 108 cartas, inclusive Joker. Nenhuma garantia de mão inicial/posição/zoneamento. Associação uma vez, salva por ID/consumo; reload/undo/reconexão/Morto/Lixo/jogo não rerrolam nem duplicam. Laboratório conserva 108 IDs e 15 itens.
-- [ ] Sacrifício apenas mão/turno após compra, filha viva, gates/descarte/topo obrigatório. Não é meld/descarte/batida/fim de turno. -100 máximo com piso 200 + efeito especial mesmo no piso. Carta real anexada; morte devolve ao fundo do Lixo sem alterar topo nem restaurar item.
+- [x] Sacrifício apenas mão/turno após compra, filha viva, gates/descarte/topo obrigatório. Não é meld/descarte/batida/fim de turno. Perdas diferentes/piso300 v2; -100/piso200 somente no histórico v1. Carta real anexada; morte devolve ao fundo do Lixo sem alterar topo nem restaurar item.
 - [ ] Conferir PNG REAL em faces visíveis; sem vazar ocultas. Mão: overlay 64%/máximo 55%, ação focável sobre o PNG sem texto grande, cantos intactos; imagem com pointer-events none; outras zonas 46%/40%. Marca de Bela periférica, sem cobrir o item. Cinco artes distribuídas e ampliadas entre Sede e Próxima Fase sem aumentar o HUD. Ajuda oficial por toque/teclado/Escape/clique fora.
-- [ ] Filhas em três colunas, arte integral, HP/passivas sobrepostos e sacrifícios laterais sem painel quadrado. Vida/450 visual; barra verde/amarelo/vermelho com fundo escuro igual Nemesis, máximo perdido por itens cinza petrificado à direita. Dano comum permanece vazio escuro; chip ↓ MÁX/ajuda informam máximo recuperável, sem modificar mecânica. Hitbox dentro do próprio card.
+- [x] Filhas em três colunas, arte integral, HP/passivas sobrepostos e sacrifícios laterais sem painel quadrado. Vida/500 (450 histórico v1), máximo recuperável explícito; barra verde/amarelo/vermelho com fundo escuro igual Nemesis e petrificação cinza. Hitbox dentro do próprio card. 1920/1376/390px verificados.
 - [ ] Uma barra da Lady com HP + PROT. consumível anexada à direita, sem sobreposição: 3500/3500 inicial, 2000 HP reais; restante/preenchimento/`i` legíveis com 3/2/1 filhas vivas e após gasto. Fúria clicável explica +10% cura/+2 Sede própria por morte, sem aumentar passivas das filhas.
 - [x] Revisão Sede 07/10: Tributo F1/F2/F3 +3/+6, +4/+8, +6/+10; Marca +5/+7/+9; Banquete +10/+14; Fúria +0/+2/+4/+6 por evento. Cobertura do motor/HUD, sucesso sem recuperação, passivas +3 e Sangue Impuro máximo +6 preservados. O Vínculo em piso deste passe foi substituído pela revisão consumível abaixo.
 - [x] Vínculo consumível: Coágulo → PROT. → HP, humano/BOT/Ataque Final; excedente, zero com filhas vivas, alvo explícito, morte −500 restantes uma vez, teto por filhas, migração única e snapshot/reload/undo sem recarga/duplicação. Sede/Fúria/HP das filhas/regen/itens inalterados.
@@ -744,7 +771,7 @@ Proteção automatizada atual: `tests/nemesis-ui.browser.mjs` verifica ordem da 
 
 - Uma mesma ativação gera no máximo +1 Flor, mesmo que vários objetivos falhem em turnos diferentes. Reload/snapshot/undo preservam o histórico das Flores aplicadas; canastra não reabre a quota da ativação.
 - Trepadeiras Gêmeas: 1 ou 2 falhas = +1 no total; propagação por falha dupla preservada.
-- Enxerto: parcial/total = +1; propagação por falha total preservada.
+- Enxerto: regra histórica de 05/10 parcial/total = +1. Revisão de 08/10: novos anúncios com um lado curam até 50 HP sem Flor; zero lados = +1, propagação por falha total preservada. Teto global continua +1 por ativação.
 - Florescimento Real: todas as falhas compartilham +1; sem cura/fortalecimento novos.
 - Preservar HP 2000, derrota em 5, Limpa −1 / Real −1 adicional / Ás-a-Ás −1 adicional, Orvalho, Casulo, cura atual e Renascimento F3 (1x, consome 1 Flor, 300 HP).
 - Reavaliar a cura somente depois do teste de jogo; este patch não altera seus limites nem outros chefes.
@@ -793,7 +820,7 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 - [ ] Comparar contorno, espessura e brilho reais da mão/Invasão com o Lixo: um único overlay compartilhado, sem somar bordas/glows no contêiner e na face. Pulso altera apenas opacidade, sem engrossar ou ampliar a marca. A fixture deve decorar a face real do Lixo, não apenas ativar a classe do contêiner.
 - [ ] Comparar contorno, espessura e brilho reais da mão/Invasão com o Lixo: um único overlay compartilhado, sem somar bordas/glows no contêiner e na face. Pulso altera apenas opacidade, sem engrossar ou ampliar a marca. A fixture deve decorar a face real do Lixo, não apenas ativar a classe do contêiner.
 - [ ] Zona de Impacto somente em `.meld-line-cards`, excluindo metadados/cabeçalho.
-- [ ] Objetivos usar/descarte comprovam rota real de jogo no planejador existente; descarte continua resolvendo depois. Barragem prova duas saídas jogáveis conjuntas; Extermínio contribuição + segunda carta. Sem plano → inelegível/fallback.
+- [ ] Objetivos comprovam rota real no planner: Tentáculo distingue jogo completo/descarte parcial; Barragem prova duas saídas conjuntas; Caçada dano direto, Extermínio dano do S.T.A.R.S. + contribuição do parceiro, congelados e conjuntamente legais. Sem plano → inelegível/fallback. Saves v1 preservam objetivo já anunciado.
 - [ ] Rodar regra do Lixo, handlers humano/BOT, Nemesis, laboratório, integração e suíte ampla; browser nos cinco viewports. Medir proximidade do popover entre bordas, não a partir do centro de um chip largo.
 
 Relatório e limitações: `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Sem novo balanceamento, commit, deploy ou Google Drive.

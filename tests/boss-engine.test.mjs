@@ -1708,15 +1708,15 @@ test('Raiz e Enxerto resolvem sucesso, falha parcial e falha total separadamente
     applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, cardsAdded: [] });
     applyBossMeldTransition(state, { teamId: 0, meldIndex: 1, cardsAdded: [] });
     const targets = [0, 1].map((meldIndex) => ({ meldIndex, meldId: getBossMeldContribution(state, 0, meldIndex).meldId }));
-    applyMatriarchAbility(state, 'graft', { targets }, 2);
+    applyMatriarchAbility(state, 'graft', { targets, partialHeal: 50 }, 2);
     for (let index = 0; index < fedCount; index += 1) {
       applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: index, cardsAdded: [{ id: `graft-${fedCount}-${index}`, rank: index ? '10' : '6', suit: index ? '♦' : '♣' }] });
     }
     completeBossPlayerTurn(state, 0);
     completeBossPlayerTurn(state, 1);
-    assert.equal(state.boss.bloom, fedCount === 2 ? 0 : 1);
+    assert.equal(state.boss.bloom, fedCount === 0 ? 1 : 0);
     const cardDamage = fedCount === 2 ? 15 : fedCount === 1 ? 5 : 0;
-    assert.equal(state.boss.hp, 1700 - cardDamage);
+    assert.equal(state.boss.hp, 1700 - cardDamage + (fedCount === 1 ? 50 : 0));
   }
 });
 

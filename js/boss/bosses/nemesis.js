@@ -4,6 +4,10 @@ export const NEMESIS_ZOMBIES = Object.freeze([
   Object.freeze({ id: 'devourer', name: 'Devorador', maxHp: 260, passive: 'heal', portrait: 'assets/images/nemesis-devorador.png' }),
 ]);
 export const NEMESIS_RELIEF = Object.freeze({ simple: 0, suja: 0, limpa: 4, real: 8, asas: 12 });
+export const NEMESIS_OBJECTIVE_BALANCE = Object.freeze({
+  directDamage: 1, failure: Object.freeze({ 1: 8, 2: 10, 3: 12 }),
+  tentaclePartial: Object.freeze({ 1: 4, 2: 5, 3: 6 }), exterminationPartial: 8, exterminationFailure: 16,
+});
 const ability = (id, name, weight, phases, duration, describe) => ({
   id,
   name,
@@ -33,15 +37,15 @@ export const nemesisDefinition = Object.freeze({
   phaseIntroAbilities: { 2: ['rocket_launcher'], 3: ['tentacle_barrage', 'stars_extermination'] },
   abilities: [
     ability('horde_invasion', 'Invasão da Horda', 4, [1, 2, 3], 'full_round', ({ entryKind, targetPlayerName = 'Alvo' }) => entryKind === 'grabber' ? `${targetPlayerName}: faça a carta marcada sair por jogo ou descarte neste turno. Sucesso repele; falha deixa o Agarrador persistente, sem Infecção extra.` : entryKind === 'infected' ? 'Equipe: contribua 2 cartas válidas para jogos nesta rodada. Sucesso repele; falha deixa o Infectado persistente, sem Infecção extra.' : 'Alimente jogos existentes com 3 cartas nesta rodada. Sucesso repele; falha deixa o Devorador persistente, sem Infecção extra.'),
-    ability('stars_hunt', 'Caçada S.T.A.R.S.', 5, [1, 2, 3], 'target_turn', ({ phase }) => `Contribua com ao menos 1 carta antes de encerrar seu turno. Falha: +${6 + phase * 2} Infecção, mais modificadores.`),
-    ability('infectious_tentacle', 'Tentáculo Infeccioso', 5, [1, 2, 3], 'target_turn', ({ phase }) => `Faça 1 das 2 cartas marcadas sair legalmente da mão neste turno. Falha: +${6 + phase * 2} Infecção, mais modificadores.`),
+    ability('stars_hunt', 'Caçada S.T.A.R.S.', 5, [1, 2, 3], 'target_turn', ({ phase }) => `O alvo S.T.A.R.S. deve causar dano direto ao Nemesis neste turno. Zumbis não contam. Falha: +${NEMESIS_OBJECTIVE_BALANCE.failure[phase]} Infecção, mais modificadores.`),
+    ability('infectious_tentacle', 'Tentáculo Infeccioso', 5, [1, 2, 3], 'target_turn', ({ phase }) => `Jogue 1 das 2 marcadas para evitar a punição. Só descartar: +${NEMESIS_OBJECTIVE_BALANCE.tentaclePartial[phase]}; nenhuma: +${NEMESIS_OBJECTIVE_BALANCE.failure[phase]} Infecção, mais modificadores.`),
     ability('contaminated_zone', 'Zona Contaminada', 3, [1, 2, 3], 'target_turn', () => 'O alvo pode pegar o lixo neste turno, mas cada retirada custa +6 Infecção. Agarrador continua ativo.'),
     ability('horde_command', 'Comando da Horda', 3, [1, 2, 3], 'full_round', () => 'Reforça 1 zumbi até o fim da próxima rodada: Agarrador +1 carta; Infectado +2 por falha; Devorador +30 HP de cura.'),
     ability('rocket_launcher', 'Lança-Foguetes', 4, [2, 3], 'full_round', ({ phase }) => `Alimentar a Zona de Impacto é permitido e custa +${phase === 3 ? 12 : 10} Infecção por carta nova nesta rodada.`),
     ability('parasite_regeneration', 'Regeneração Parasita', 2, [2, 3], 'immediate', () => 'Cura 100 HP do zumbi vivo com menor percentual de HP, sem superar seu máximo.'),
     ability('viral_reanimation', 'Reanimação Viral', 2, [2, 3], 'immediate', () => 'Reanima 1 cadáver com 50% do HP. Uma utilização por fase. Na F3, volta Mutado.'),
     ability('tentacle_barrage', 'Barragem de Tentáculos', 4, [3], 'target_turn', () => 'Faça 2 das 3 cartas marcadas sair legalmente da mão neste turno. Falha: +16 Infecção, mais modificadores.'),
-    ability('stars_extermination', 'Extermínio S.T.A.R.S.', 4, [3], 'target_turn', () => 'Contribua para um jogo E faça a segunda carta indicada sair legalmente da mão. Duas/uma/nenhuma exigências: +0/+8/+16 Infecção, mais modificadores de falha.'),
+    ability('stars_extermination', 'Extermínio S.T.A.R.S.', 4, [3], 'full_round', () => 'Nesta rodada, S.T.A.R.S. causa dano direto ao Nemesis e o parceiro alimenta o jogo escolhido. Dois/um/nenhum objetivos: +0/+8/+16 Infecção, mais modificadores de falha.'),
     ability('omega_outbreak', 'Surto Ômega', 3, [3], 'full_round', () => 'Até o fim da próxima rodada, falhas reais recebem +2/+4/+6 com Infecção abaixo de 50/50–74/75–99. Ativar não aumenta Infecção.'),
   ],
 });

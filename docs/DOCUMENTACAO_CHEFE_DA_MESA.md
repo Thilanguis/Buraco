@@ -1,10 +1,12 @@
 # DOCUMENTAÇÃO — CHEFE DA MESA
 
+**Polimento visual de 08/10/2026:** Enxerto mostra jogos alimentados numa barra0–2 com as três faixas de consequência, sem lista textual compactada. As cinco Flores usam a PNG `matriarch-lotus.png`, fosca quando apagada e com cor original quando ativa. PASSIVA das filhas mostra +50HP, +25 com Anticoagulante e +0 com Frio, mantendo o destaque de turno e debuffs separados; ADAGA30% permanece no retrato da Lady enquanto houver filha viva vinculada. Nenhuma alteração de resolução, cura, duração ou balanceamento neste polimento.
+
 
 ## Status da documentação
 
 
-**Revisada contra o workspace local atual — 07/10/2026, incluindo o rework experimental da Dimitrescu, durabilidade do Nemesis, ajuda opcional do Lixo e compatibilidade/passiva/batida.**
+**Revisada contra o workspace local atual — 08/10/2026, incluindo itens v2/filhas 500/piso 300 da Dimitrescu e preservando objetivos distintos do Nemesis, Enxerto parcial e ajuda/regeneração visual anteriores. Calibração de 65%–75% ainda não validada; comparações e limitações em `REWORK_ITENS_DIMITRESCU_2026-10-08.md` e `REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md`.**
 
 ### Compatibilidade de estados — 07/10/2026
 
@@ -1692,12 +1694,14 @@ Dois jogos devem receber carta.
 
 ```text
 2 lados: sem punição
-1 lado: +1 Flor
+1 lado: cura até 50 HP, sem Flor
 0 lados: +1 Flor e propagação
 ```
 
 
-Não cura.
+O custo intermediário não propaga o Enxerto comum: permite aceitar uma cura moderada em vez de gastar a segunda contribuição. Respeita o HP máximo e o teto de cura por rodada. Se Coroa estiver ligada à ameaça, sua reação própria à resolução parcial continua funcionando. A falha total continua limitada a +1 Flor nesta ativação; a propagação posterior independente é preservada.
+
+Enxertos já anunciados em saves anteriores, sem `partialHeal`, concluem pela regra salva (um lado = +1 Flor, sem cura); novos Enxertos usam o custo de 50 HP. Reload não converte nem resolve a ameaça.
 
 
 Se um lado ficar inválido por mudança externa:
@@ -1960,15 +1964,15 @@ Vitória da Matriarca:
 
 # 7. Lady Dimitrescu
 
-Rework experimental de 07/10/2026. Contrato detalhado, itens, migração e validação: [REWORK_DIMITRESCU_2026-10-07.md](REWORK_DIMITRESCU_2026-10-07.md).
+Rework de itens v2 de 08/10/2026 para partidas novas. Contrato, comparações e validação: [REWORK_ITENS_DIMITRESCU_2026-10-08.md](REWORK_ITENS_DIMITRESCU_2026-10-08.md). Registro histórico v1: [REWORK_DIMITRESCU_2026-10-07.md](ARQUIVO_HISTORICO/REWORK_DIMITRESCU_2026-10-07.md).
 
 ## 7.1 Identidade e Vínculo de Sangue
 
-Lady tem **2000 HP** e Sede 0–100. Sede 100 ou fim dos recursos com Lady viva derrota a equipe. Bela, Cassandra e Daniela estão presentes desde o início, com **450/450 HP cada**; nunca revivem.
+Lady tem **2000 HP** e Sede 0–100. Sede 100 ou fim dos recursos com Lady viva derrota a equipe. Bela, Cassandra e Daniela estão presentes desde o início, com **500/500 HP cada**; nunca revivem. Saves v1 preservam 450 HP e os itens antigos.
 
 Lady começa com 2000 HP e **1500 PROT. adicionais consumíveis**. Cada filha viva sustenta capacidade de 500 PROT. Todo dano direcionado à Lady, humano/BOT/Ataque Final de 100, passa primeiro pelo Coágulo, depois pela PROT.; o excedente atinge a vida. Morte de filha retira até 500 da PROT. restante e limita ao novo teto de `500 × filhas vivas`, sem dano automático à vida. PROT. consumida não recarrega: zerá-la expõe os 2000 HP mesmo com filhas vivas. Não existe mais piso de HP. `boss.bloodLinkProtection` persiste em snapshot/reload/undo; saves sem o campo inicializam uma vez pelo número de filhas vivas, preservando HP e os demais recursos.
 
-O jogador escolhe Lady ou uma filha viva como alvo do próximo dano. Cada fonte tem um alvo único e não transborda. Filhas têm lifecycle próprio, sem invasão/reanimação do Nemesis.
+O jogador escolhe Lady ou uma filha viva como alvo do próximo dano. Overkill da filha não transborda. Uma filha com Adaga transmite separadamente 30% do dano efetivo de ataques à vida real da Lady, ignorando Coágulo/PROT.; itens/hemorragia não transmitem. Filhas têm lifecycle próprio, sem invasão/reanimação do Nemesis.
 
 ## 7.2 Sede e canastras
 
@@ -2008,7 +2012,9 @@ Rodada normal escolhe exatamente uma filha viva com RNG/seed canônico, evitando
 - **Cassandra — mesa:** marca jogo existente com contribuição legal concreta disponível à equipe. Qualquer cooperador pode alimentá-lo até o fim da rodada; falha +3 Sede. Sem candidato, não marca nem pune.
 - **Daniela — Lixo:** primeira retirada efetiva da equipe na rodada, protegida ou completa, +3 Sede uma vez. Monte ou ausência de retirada não punem.
 
-No fim da rodada, obrigações pendentes resolvem antes da regeneração. Cada filha viva recupera até **50 HP próprios**, nunca HP da Lady. Frio bloqueia exatamente a próxima regeneração; Anticoagulante reduz permanentemente para 25, sem acumular.
+No fim da rodada, obrigações pendentes resolvem, depois hemorragia e, se sobreviver, regeneração. Cada filha viva recupera até **50 HP próprios**, nunca HP da Lady. Frio bloqueia a próxima regeneração que recuperaria HP, guardando a carga na vida cheia (até 2 cargas); Anticoagulante reduz permanentemente para 25, sem acumular.
+
+O chip **PASSIVA** explica somente essa regeneração permanente, inclusive quando a filha não foi selecionada; CAÇADA/BANQUETE/LIXO continuam com sua própria ajuda. O evento real `daughterRegen` mostra um número verde sobre o retrato correto (+50, +25 ou cura efetiva menor, como +20). Frio, vida cheia, morte e cura zero não animam. As três curas podem aparecer juntas, sem viajar para HP/Sede da Lady; `actionId` e baseline do HUD impedem replay em render/reload/reconexão/undo. Movimento reduzido mantém texto acessível sem deslocamento.
 
 Morte cancela obrigação, encerra regeneração, impede alvo/item e atualiza Vínculo/Fúria imediatamente. Cada morte individual gera flash na Lady e toca `what-have-you-done-to-my-daughter.mp3`, sem repetição em reload.
 
@@ -2018,15 +2024,17 @@ Exatamente **15 IDs físicos distintos**, **3 de cada tipo**, associados uma ún
 
 Usar carta normalmente ou sacrificar a partir da mão, após comprar, em filha viva. Sacrifício não é jogo/descarte, não encerra turno nem permite batida; preserva descarte legal e topo obrigatório. Carta real fica anexada à filha. Na morte, retorna ao fundo do Lixo com item permanentemente consumido.
 
-Todo item reduz HP máximo em 100, com piso 200, e limita HP atual ao novo máximo. Efeito especial continua funcionando no piso.
+Cada item reduz o máximo por um percentual dos **500 HP originais**, aditivamente e com piso **300**. HP atual só é limitado ao novo máximo: não recebe dano adicional se já estiver abaixo. Efeitos especiais continuam funcionando no piso.
 
-| Item | Efeito adicional |
-|---|---|
-| Adaga | 50 de dano imediato |
-| Frasco de Frio | Bloqueia a próxima regeneração |
-| Anticoagulante | Regen 50→25 permanente, sem acumular |
-| Explosivo | 100 de dano imediato |
-| Relíquia | Suprime uma janela da passiva da filha: atual se ainda pendente, senão próxima |
+| Item | Petrificação | Efeito adicional |
+|---|---|---|
+| Adaga | 5% / 25 HP | Vínculo permanente enquanto viva: 30% do dano efetivo de ataques também fere o HP real da Lady, sem consumir PROT./Coágulo. Duplicatas petrificam mais 25, sem somar porcentagem. |
+| Frasco de Frio | 20% / 100 HP | Bloqueia uma cura efetiva; vida cheia não gasta; duplicatas até 2 cargas. |
+| Anticoagulante | 15% / 75 HP | Regen 50→25 permanente, sem acumular. Duplicatas ainda petrificam. |
+| Explosivo | 10% / 50 HP | Impacto 60; hemorragia 50 por 2 fechamentos, antes da regen. Reaplicar causa novo impacto e renova duração, sem empilhar sangramento. Não aciona Adaga. |
+| Relíquia | 20% / 100 HP | Suprime uma oportunidade individual válida: atual se pendente, senão espera a próxima. Sem candidato ou não escolhida não consome; duplicatas não empilham supressões. Não bloqueia regen. |
+
+Hemorragia mata pelo mesmo caminho de morte/Fúria/remoção de PROT., limitada ao HP restante. Adaga usa dano efetivo, arredonda a transmissão para baixo, não transmite overkill nem gera ciclos. A morte da Lady por transmissão encerra a batalha mesmo com PROT. restante. HUD mostra efeitos ativos, rodadas de sangramento, HP original/máximo recuperável/petrificação; feedback vermelho de Adaga chega ao retrato da Lady, hemorragia aparece na filha e regen vem depois.
 
 PNGs reais centralizados em `ITEM_DEFINITIONS`, sobrepostos à face sem ocultar cantos nem interceptar clique. HUD oferece “ITENS DO CASTELO”, cinco artes e ajuda opcional oficial. Filhas mostram HP/máximo, barra, regen, efeitos, obrigação e cartas sacrificadas reais.
 
@@ -2049,7 +2057,7 @@ Valores abaixo são **bases**; Fúria soma ao evento ofensivo positivo e multipl
 
 ## 7.7 Persistência e calibração
 
-IDs de item, consumo, anexos, HP/regen, passivas, Frio/Relíquia, alvo e eventos persistem em snapshot/reload/undo. Normalização não sorteia itens nem regenera/ressuscita filhas. Saves anteriores ao rework recebem o modelo das filhas e limite de HP da Lady, mas não inventam distribuição retroativa de itens; para testar a distribuição completa, iniciar nova partida ou cenário do Laboratório.
+IDs de item, consumo, anexos, HP/regen, passivas, cargas de Frio/Relíquia, vínculo de Adaga, hemorragia/último tick, alvo e eventos persistem em snapshot/reload/undo. Partidas novas salvam `castleItemRulesVersion: 2`, configuração e `castleDaughterBalanceVersion: 3`. Ausência de versão de itens significa v1: preserva 450 HP, piso 200, redução uniforme 100, Adaga 50 imediatos e Explosivo 100 imediatos; itens consumidos não adquirem novos efeitos. A migração anterior de 500/60 para 450/50 continua somente no caminho legado. Normalização não sorteia, cura ou reaplica; undo restaura a versão completa. Saves pré-castelo não recebem itens retroativos. Laboratório novo usa v2.
 
 Números centralizados em `js/boss/dimitrescu-castle.js`. Este é um experimento de troca de poder, não win rate comprovado. Meta geral 65–75% (aproximadamente 70%) permanece apenas alvo de calibração.
 
@@ -2247,7 +2255,7 @@ Mostrar:
 - Coágulo Carmesim e proteção restante;
 - três filhas permanentes sob o HUD, com HP/máximo, regen, efeitos e cartas reais anexadas;
 - Vínculo consumível anexado à direita na mesma barra de vida, com restante/preenchimento e `i` interno: total HP + PROT. restante (3500/3500 inicialmente), máximo 2000 + capacidade das filhas vivas. Não há piso de HP; Fúria clicável explica +10% cura/+2 Sede própria por filha morta;
-- filhas em três cards: arte integral, vida/450 visual, barra verde/amarelo/vermelho com fundo escuro como Nemesis e parte petrificada por itens; ↓ MÁX/ajuda esclarecem máximo recuperável real. Sacrifícios laterais sem painel; ícones do castelo ampliados na largura sem aumentar HUD; itens maiores na mão com contraste e cantos preservados;
+- filhas em três cards: arte integral, vida/500 visual (450 nos saves v1), máximo recuperável explícito, barra verde/amarelo/vermelho com fundo escuro como Nemesis e parte petrificada por itens; ↓ MÁX/ajuda esclarecem máximo recuperável real. Sacrifícios laterais sem painel; ícones do castelo ampliados na largura sem aumentar HUD; itens maiores na mão com contraste e cantos preservados;
 - barra de Sede visualmente distinta da barra de HP.
 - Retrato da Lady selecionável por clique/toque/teclado como Nemesis, sem botão abaixo das filhas. Sem REGEN +50 permanente: regeneração na ajuda. Um chip de passiva por filha viva à direita: CAÇADA / BANQUETE / LIXO +3, neutro quando não age e destacado com carta/jogo concreto quando selecionada. As Três Filhas destaca os três. O próprio chip abre a regra completa, consequência e contexto da rodada; sem chips adicionais de falha, CUMPRIDA ou APLICADO. Debuffs de item permanecem separados. PNG do item clicável/focável na mão; marca de Bela somente periférica, sem cobrir o centro nem a ação.
 
@@ -2772,7 +2780,7 @@ O HUD mostra o preenchimento parcial da Dominação/Espelhos e o progresso numé
 
 ### Dimitrescu — rework experimental de 07/10/2026
 
-Lady 2000 / filhas 450 cada / regen 50 / 15 itens / Vínculo 1500–0 / Fúria progressiva. Substitui a rotação forte antiga das filhas, não a acumula. Não há percentual atual medido; meta 65–75% é só alvo. Contrato e centralização: `REWORK_DIMITRESCU_2026-10-07.md` e `js/boss/dimitrescu-castle.js`. Demais chefes não foram rebalanceados por esse rework.
+Lady 2000 / filhas 500 cada / regen 50 / 15 itens distintos / piso 300 / Vínculo 1500–0 / Fúria preservada. Saves v1 mantêm configuração histórica 450/piso200. Não há percentual atual contra dupla competente medido; meta 65–75% é só alvo, não resultado. Comparações e limites do simulador: `REWORK_ITENS_DIMITRESCU_2026-10-08.md`; centralização em `js/boss/dimitrescu-castle.js`. Demais chefes não foram rebalanceados neste passe.
 
 ### Nemesis — revisão experimental de 06/10/2026
 
@@ -2837,7 +2845,7 @@ Todos os ataques reutilizam os valores do motor atual, inclusive dano individual
 
 A redução de Infecção é independente do alvo: **Limpa −4, Real −8 e Ás-a-Ás −12 no total por jogo**. Evoluir entre tiers acrescenta apenas a diferença; repetir snapshot/ação não reaplica o alívio. Simples e Suja não aliviam.
 
-Quem causa dano efetivo diretamente ao Nemesis vira **ALVO S.T.A.R.S.**. O marcador persiste entre turnos, rodadas e reload. Dano em zumbi não altera o marcador. Objetivos ofensivos priorizam esse cooperador, mas usam o parceiro se não houver solução legal real para o alvo preferido.
+Quem causa dano efetivo diretamente ao Nemesis vira **ALVO S.T.A.R.S.**. O marcador persiste entre turnos, rodadas e reload. Dano em zumbi não altera o marcador. Caçada e Extermínio congelam esse alvo no anúncio; se não existir uma rota legal de dano para ele, são inelegíveis, sem trocar silenciosamente pelo parceiro. Antes de existir um S.T.A.R.S., escolhem um cooperador com solução legal. Os demais objetivos mantêm sua seleção atual.
 
 Na entrada da F3, todos os persistentes vivos ficam Mutados. Quem persistir por falha na entrada ou for reanimado na F3 já entra Mutado. Ausentes/repelidos não guardam mutação ativa. Mutação é consequência da fase, não habilidade sorteável.
 
@@ -2848,24 +2856,26 @@ Pesos são relativos às habilidades elegíveis da fase, não percentuais fixos.
 | Habilidade (`id`) | Fases | Peso | Funcionamento |
 |---|---|---:|---|
 | Invasão da Horda (`horde_invasion`) | 1/2/3 | 4 | Escolhe ausente/repelido com espaço no teto. Agarrador: carta marcada sai por jogo/descarte no turno do alvo. Infectado: equipe contribui 2 cartas na rodada. Devorador: basta um jogo existente alimentável para entrar; equipe acumula 3 cartas novas na rodada nos jogos registrados no início, no mesmo jogo ou em vários, por um ou ambos os jogadores. Não exige prova antecipada da expulsão; reorganização/duplicatas/jogos novos não contam. Aos 3 repele; falha deixa persistente com HP cheio, sem penalidade extra. Evita o último repelido se houver outra entrada válida. |
-| Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | Alvo contribui com ao menos 1 carta para um jogo antes de encerrar seu turno. Falha base +8/+10/+12. |
-| Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | Marca 2 cartas; ao menos 1 precisa sair por jogo ou descarte legal no turno do alvo. Falha base +8/+10/+12. |
+| Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | S.T.A.R.S. congelado causa dano direto efetivo positivo ao Nemesis no próprio turno. Dano em zumbi não conta. Falha base +8/+10/+12. |
+| Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | Duas marcas com rota real de jogo: jogar uma neutraliza; só descartar uma custa base +4/+5/+6; nenhuma resolvida custa +8/+10/+12. |
 | Zona Contaminada (`contaminated_zone`) | 1/2/3 | 3 | Só entra com retirada legal comprovada do Lixo Fechado, respeitando bloqueios e condições de Morto/batida. Pegar custa +6; Agarrador persistente também age. Não é falha e não recebe seus bônus. |
 | Comando da Horda (`horde_command`) | 1/2/3 | 3 | Reforça apenas persistente vivo: Agarrador prende +1; Infectado cobra +2 por falha; Devorador cura +30. Soma à versão normal/Mutada. Não coloca zumbis na mesa. Dura até o fim da rodada seguinte, inclusive (`expiresRound = rodada atual + 1`). |
 | Lança-Foguetes (`rocket_launcher`) | 2/3 | 4 | Marca por ID estável um jogo válido e alimentável. Cada carta nova nele custa +10/+12 durante a rodada; três cartas juntas custam +30/+36. Cartas já contabilizadas não cobram novamente. A ação não é proibida. |
 | Regeneração Parasita (`parasite_regeneration`) | 2/3 | 2 | Cura até 100 HP do persistente vivo e ferido com menor percentual de HP. Não cura outras etapas do lifecycle. |
 | Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Revive somente cadáver com 50% do HP máximo. Uma utilização por fase e espaço no teto 1/2/3. Repelido nunca é alvo. |
 | Barragem de Tentáculos (`tentacle_barrage`) | 3 | 4 | Marca 3 cartas; 2 precisam sair legalmente no mesmo turno. Falha base +16. |
-| Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Duas exigências: contribuir para um jogo e resolver uma segunda carta indicada, distinta da primeira contribuição. Duas/uma/nenhuma cumpridas: base +0/+8/+16. |
+| Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Na rodada, S.T.A.R.S. causa dano direto positivo ao Nemesis e parceiro contribui legalmente ao jogo existente congelado no anúncio. Ambos/um/nenhum: base +0/+8/+16. |
 | Surto Ômega (`omega_outbreak`) | 3 | 3 | Só falhas reais recebem +2 abaixo de 50, +4 entre 50–74 ou +6 entre 75–99, usando a Infecção no instante da falha. Ativar não gera Infecção. |
 
-**Prazos:** objetivos e Zona Contaminada valem até o fim do turno do alvo; Impacto até o fim da rodada atual; Regeneração/Reanimação são imediatas antes dos jogadores. Horda e Ômega valem **até o fim da rodada seguinte à ativação**, para poderem afetar uma habilidade futura. O HUD informa a rodada de expiração. Os bônus de Infectado, Horda e Ômega somam apenas em falhas com penalidade positiva, uma vez por evento.
+**Prazos:** Caçada, Tentáculo, Barragem e Zona Contaminada valem até o fim do turno do alvo; Extermínio e Impacto até o fim da rodada atual; Regeneração/Reanimação são imediatas antes dos jogadores. Horda e Ômega valem **até o fim da rodada seguinte à ativação**, para poderem afetar uma habilidade futura. O HUD informa a rodada de expiração. Os bônus de Infectado, Horda e Ômega somam apenas em falhas com penalidade positiva, inclusive parciais, uma vez por evento; HUD e resolução usam o mesmo cálculo.
 
 ## 16.4 Elegibilidade, BOT e persistência
 
 O adapter constrói uma solução com o validador oficial de sequência, cartas livres, descarte legal restante e condições de Morto/batida antes de persistir o intent. Barragem e Extermínio precisam de solução conjunta, não de duas alternativas incompatíveis. Não sorteia primeiro para tentar remediar um objetivo impossível depois.
 
-O BOT usa esses planos para contribuir/resolver cartas marcadas, respeita Agarradas e a proteção existente de batida segura. Evita retirada contaminada letal e alimentar Impacto que leve a 100; avalia alvos por HP do chefe, Infecção, possibilidade de matar, pressão do Infectado e cura acumulada do Devorador. Não ataca simplesmente o menor HP.
+Caçada exige dano novo efetivo (cartas já creditadas sem evolução não bastam). Extermínio prova os dois planos na ordem real dos turnos, preservando o destino existente e os papéis congelados. O Agarrador valida essa solução conjunta no estado após as travas, tentando a quota completa antes de reduzir. Saves com objetivos já anunciados antes do rework (`objectiveVersion` ausente) concluem sob a regra anterior; anúncios novos usam versão 2. Progresso e IDs de dano seguem snapshot/undo/reload sem duplicação.
+
+O BOT usa esses planos por papel: prioriza Nemesis para cumprir seu dano direto pendente, o jogo congelado quando é parceiro e jogar a marcada para sucesso completo do Tentáculo. Fora dessas obrigações, mantém a heurística atual dos zumbis. Respeita Agarradas e batida segura; evita retirada contaminada letal e Impacto que leve a 100.
 
 `boss-combat.js` é uma abstração pequena para criar, normalizar, ferir, curar e reviver entidades serializáveis. Regras específicas permanecem no adapter do Nemesis. Estado novo fica dentro de `boss`, seguindo o save, snapshot, undo e sincronização existentes: HP/status/mutação/revives, seleção de ataque por jogador, S.T.A.R.S., cartas Agarradas, bônus com expiração, Zona de Impacto, quota por fase e guards de eventos. Não há timer exclusivo do Nemesis.
 
@@ -2877,7 +2887,7 @@ Som de ganho: `assets/sfx/ganho-infeccao-nemesis.mp3`, registrado na infraestrut
 
 Revisão de UX/objetivos de 06/10/2026: INVADINDO não mostra HP de combate nem permite seleção. A arte principal do Nemesis seleciona `boss` com as mesmas permissões dos cards; chips e ajuda não trocam o alvo. Chips clicáveis mostram o efeito final: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado também é exibido corretamente (2/4/70). MUTADO explica a mudança base; REFORÇADO informa bônus e rodada final inclusiva no popover oficial.
 
-Objetivos de usar ou descartar são preparados a partir de uma rota real de jogo com `findNemesisLegalPlan()`: Agarrador escolhe uma carta jogável; Tentáculo escolhe duas alternativas jogáveis; Barragem escolhe três marcas com solução conjunta para pelo menos duas; Extermínio exige contribuição e uma segunda carta realmente jogável. Depois da marcação, o descarte continua contando. Sem plano viável, a habilidade é inelegível e usa o fallback normal, sem mudar punições/Infecção.
+Objetivos são preparados com `findNemesisLegalPlan()`: Tentáculo escolhe duas alternativas realmente jogáveis, com descarte apenas parcial; Barragem preserva três marcas e solução conjunta para duas saídas. Caçada exige dano direto; Extermínio comprova ataque e contribuição do parceiro. Agarrador prioriza jogáveis e completa com outras cartas seguras conforme a quota aprovada. Sem plano viável, a habilidade é inelegível e usa o fallback normal. Pesos e punições completas permanecem; novas consequências parciais estão na tabela.
 
 Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. Registro histórico da revisão de UX anterior: HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados naquela rodada; somente a expectativa obsoleta da Prisão no Espelho foi ajustada. A revisão posterior de durabilidade desta seção passa o HP do Nemesis a 2200, sem alterar as demais regras.
 

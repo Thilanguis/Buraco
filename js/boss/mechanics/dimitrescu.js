@@ -16,7 +16,7 @@ export const dimitrescuBossMechanics = Object.freeze({
       ?? (player?.isBot || /bot/i.test(player?.name || '') ? chooseCastleDamageTarget(gameState, damage) : 'boss');
     const daughter = boss.combatEntities.find(d => d.id === selected && d.status === 'alive');
     if (!daughter) return null; // Lady: Coágulo -> consumable Blood Link -> HP.
-    return { hpDamage: damageDaughter(gameState, daughter, damage, sourceActionId, recordBossEvent), targetId: daughter.id, absorbed: 0, reborn: false };
+    return { hpDamage: damageDaughter(gameState, daughter, damage, sourceActionId, recordBossEvent, { source: 'attack', playerId }), targetId: daughter.id, absorbed: 0, reborn: false };
   },
   onPlayerTurnEnd({ boss, gameState, playerId, changeBlood }) {
     const bela = boss.combatEntities.find(d => d.id === 'bela');

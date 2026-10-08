@@ -1,7 +1,7 @@
 # Inventário atual de habilidades dos chefes
 
 
-**Atualizado em 07/10/2026 a partir da rotação ativa em `js/boss/bosses/*.js`, do motor `js/boss/boss-engine.js` e do Laboratório: rework experimental da Dimitrescu, durabilidade do Nemesis e compatibilidade/passiva/batida.**
+**Atualizado em 08/10/2026 a partir do workspace local: itens v2 da Dimitrescu e filhas 500 HP/piso 300 em partidas novas. Pesos, Sede/Fúria e os reworks anteriores de Nemesis/Enxerto permanecem. Meta de 65%–75% ainda depende de playtest competente. Relatórios: `REWORK_ITENS_DIMITRESCU_2026-10-08.md` e `REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md`.**
 
 
 Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
@@ -76,7 +76,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 ## A Matriarca Esmeralda
 
-**Teto de burst:** uma ativação aplica no máximo +1 Flor, mesmo com falhas múltiplas. Trepadeiras: uma/duas falhas = +1; Enxerto: parcial/total = +1; Florescimento Real: qualquer número de falhas = +1. Propagações existentes permanecem. HP 2000, derrota em 5 Flores, alívio incremental por canastras e Renascimento F3 (1 Flor, 300 HP, 1x) preservados. Orvalho, Casulo e cura não foram alterados neste patch.
+**Teto de burst:** uma ativação aplica no máximo +1 Flor, mesmo com falhas múltiplas. Trepadeiras: uma/duas falhas = +1; Enxerto: um lado = cura até 50 HP sem Flor/propagação comum, zero lados = +1 Flor e propagação; Florescimento Real: qualquer número de falhas = +1. Propagações independentes existentes permanecem. HP 2000, derrota em 5 Flores, alívio incremental por canastras, limites de cura e Renascimento F3 (1 Flor, 300 HP, 1x) preservados. Orvalho e Casulo não mudam.
 
 
 **HP:** 2000. **Limite total de cura por rodada:** F1 100 / F2 150 / F3 200.
@@ -88,7 +88,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 | Raiz Faminta | 1, 2 e 3 | 5 | Marca um jogo que precisa receber uma carta legal antes do prazo. Se falhar, pode gerar uma única nova Raiz na rodada seguinte; a Raiz propagada não se propaga novamente. |
 | Orvalho Restaurador | 1, 2 e 3 | 3 | Cura por faixas: F1 = 100/65/30/0; F2 = 120/80/40/0; F3 = 150/100/50/0 para 0–1 / 2–3 / 4–5 / 6+ cartas novas. |
 | Trepadeiras Gêmeas | 2 e 3 | 4 | Marca mais de um jogo; cada objetivo precisa receber uma carta legal na rodada. |
-| Enxerto | 2 e 3 | 3 | Liga dois jogos e exige que ambos recebam uma carta legal na rodada. |
+| Enxerto | 2 e 3 | 3 | Dois jogos ligados: alimentar ambos neutraliza; um custa cura de até 50 HP; nenhum dá +1 Flor e propagação. |
 | Pólen do Lixo | 2 e 3 | 3 | Contamina o topo do lixo. Se ele for retirado, a Matriarca recebe +1 Flor e cura até 30 HP. |
 | Colheita | 2 e 3 | 2 | Avalia a mão do alvo no fim do turno: 0–7 sem efeito; 8–10 cura 50 HP; 11+ gera +1 Flor e cura 80 HP. |
 | Florescimento Real | 3 | 4 | Combina objetivos naturais independentes; cada um precisa ser cumprido separadamente. |
@@ -102,7 +102,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 **Renascimento (passiva):** na Fase 3, se a Matriarca cair a 0 HP com pelo menos **1 Flor** e ainda não tiver usado o efeito, ela consome **1 Flor** e retorna com **300 HP** uma vez. Não entra no sorteio normal; aparece no DevTools com peso 0 para teste manual.
 ## Lady Dimitrescu
 
-**Rework experimental — 07/10/2026:** Lady **2000 HP**, três filhas permanentes **450/450**, regen própria **50** no fim da rodada. Sede 0–100; derrota especial 100. Vínculo adiciona **1500 PROT. consumíveis** inicialmente, capacidade de 500 por filha viva. Coágulo absorve primeiro, depois PROT.; excedente atinge HP. Morte retira até 500 restantes, sem dano automático à vida. Não recarrega; zero expõe Lady mesmo com filhas vivas.
+**Itens v2 — 08/10/2026 (partidas novas):** Lady **2000 HP**, três filhas permanentes **500/500**, regen própria **50** no fim da rodada. Sede 0–100; derrota especial 100. Vínculo adiciona **1500 PROT. consumíveis** inicialmente, capacidade de 500 por filha viva. Coágulo absorve primeiro, depois PROT.; excedente atinge HP. Morte retira até 500 restantes, sem dano automático à vida. Não recarrega; zero expõe Lady mesmo com filhas vivas. Exceção nova: Adaga transmite dano direto à vida real, sem consumir as proteções. Saves v1 mantêm 450/piso 200 e efeitos antigos.
 
 | Habilidade da Lady | Fases | Peso | Funcionamento base |
 |---|---:|---:|---|
@@ -119,7 +119,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Fúria:** 0/1/2/3 filhas mortas = NORMAL/I/II/FINAL. Cura da Lady ×1/1,10/1,20/1,30 (arredondada para baixo), Sede ofensiva própria +0/2/4/6 por evento positivo. Não altera passivas +3, Sangue Impuro (máximo +6), regen das filhas, custo do Vinho nem HP máximo.
 
-**Itens:** 15 cartas físicas aleatórias (incluindo Joker), três de cada PNG real: Adaga, Frasco de Frio, Anticoagulante, Explosivo e Relíquia. Cada uso reduz máximo da filha em 100 (piso 200), além de seu efeito próprio. Sacrifício não encerra turno; cartas anexadas retornam ao fundo do Lixo na morte, sem item reutilizável.
+**Itens:** 15 cartas físicas aleatórias (incluindo Joker), três de cada PNG real. Perdas aditivas sobre os 500 HP originais: Adaga 5%/25; Explosivo 10%/50; Frio 20%/100; Anticoagulante 15%/75; Relíquia 20%/100; piso 300, sem dano extra quando a vida já está abaixo do novo máximo. Adaga transmite 30% do dano efetivo dos ataques à Lady, ignorando PROT./Coágulo, sem somar porcentagem em duplicatas. Explosivo causa 60 e hemorragia de 50 antes da regen por 2 fechamentos; renovar não empilha ticks. Frio bloqueia cura efetiva (até 2 cargas), sem gastar na vida cheia. Anticoagulante mantém regen 25. Relíquia cancela uma oportunidade realmente válida, esperando por ela quando necessário. Sacrifício não encerra turno; cartas anexadas retornam ao fundo do Lixo na morte, sem item reutilizável. Relatório: [REWORK_ITENS_DIMITRESCU_2026-10-08.md](REWORK_ITENS_DIMITRESCU_2026-10-08.md).
 
 **Retiradas da rotação:** Caçada de Bela, Banquete de Cassandra e Enxame de Daniela; identidade absorvida pelas passivas. As Três Filhas retorna reformulada, sem a antiga cobrança +8; payload antigo é cancelado com segurança. Demais pesos-base mantidos.
 
@@ -166,22 +166,22 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Marcação visual:** carta-alvo recebe infecção verde e selo MARCADA; restrição do Agarrador usa AGARRADA; topo do Lixo contaminado usa CONTAMINADA. Compartilham o mesmo overlay, aplicado após a arte, sem cobrir número/naipe/NOVA. Agarrada pulsa uma vez ao entrar, sem replay de render/reload/snapshot/undo; marca estática até expirar. Zona de Impacto continua laranja e envolve somente as cartas. O efeito visual não altera cobrança ou regras.
 
-**Revisão de 06/10/2026:** objetivos de jogo/descarte escolhem marcas com rota real de jogo via `findNemesisLegalPlan`; Barragem comprova uso conjunto de duas e Extermínio contribuição + segunda carta jogável. Descarte continua válido depois da marcação; objetivo impossível é inelegível. INVADINDO sem HP/alvo; retrato principal seleciona Nemesis; ajuda/chips não mudam o alvo. Chips mostram totais 1/2/3, +2/+4/+6 e 40/70/100, com explicação específica de Mutado/Reforçado e duração inclusiva até o fim da rodada seguinte. Lixo protegido segue a regra geral do modo Chefe descrita na seção 1.6 da documentação, sem mudanças aos outros modos ou números das habilidades.
+**Objetivos atuais — 08/10/2026:** Caçada exige dano direto ao Nemesis; Extermínio prova ataque do S.T.A.R.S. e contribuição do parceiro ao jogo existente, na ordem real dos turnos. Alvos congelados e inelegibilidade sem solução. Tentáculo usa duas marcas com rota real de jogo, distinguindo jogo/descarte/falha; Barragem permanece com duas saídas conjuntas. INVADINDO sem HP/alvo; retrato seleciona Nemesis; ajuda/chips não mudam o alvo. Chips de zumbi, Horda, Lixo protegido, HP e pesos permanecem. Objetivos já anunciados em saves anteriores terminam sob a regra salva.
 
 **HP:** 2200. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos F1/F2/F3: **1/2/3**. Aparecer como ameaça ≠ persistir ≠ cadáver.
 
 | Habilidade (`id`) | Fases | Peso | Funcionamento atual |
 |---|---|---:|---|
 | Invasão da Horda (`horde_invasion`) | 1/2/3 | 4 | Ausente/repelido tenta entrar. Agarrador: carta sai no turno por jogo/descarte. Infectado: equipe contribui 2 cartas na rodada. Devorador: elegível com um jogo existente alimentável, sem prova completa da expulsão; equipe acumula 3 cartas novas nos jogos registrados no início da invasão, no mesmo jogo ou em vários, por um ou ambos os jogadores. Reorganização, duplicatas e jogos novos não contam. Aos 3 repele; falha deixa persistente com HP cheio e sem Infecção extra. Respeita teto e evita repetição imediata havendo alternativa. |
-| Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | Contribuir com 1+ carta para jogo no turno; falha base +8/+10/+12 Infecção. |
-| Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | 1 das 2 marcadas sai por jogo/descarte legal; falha base +8/+10/+12. |
+| Caçada S.T.A.R.S. (`stars_hunt`) | 1/2/3 | 5 | S.T.A.R.S. causa dano direto efetivo positivo ao Nemesis no turno; zumbis não contam. Falha base +8/+10/+12 Infecção. |
+| Tentáculo Infeccioso (`infectious_tentacle`) | 1/2/3 | 5 | Jogar 1 das 2 marcadas: zero; só descartar: base +4/+5/+6; nenhuma: +8/+10/+12. |
 | Zona Contaminada (`contaminated_zone`) | 1/2/3 | 3 | Exige retirada legal comprovada do Lixo Fechado e sem bloqueio. +6 por retirada no turno; coexiste com Agarrador persistente. |
 | Comando da Horda (`horde_command`) | 1/2/3 | 3 | Só reforça persistente vivo, não traz zumbis: até fim da próxima rodada, Agarrador +1 carta presa; Infectado +2/falha; Devorador +30 cura. |
 | Lança-Foguetes (`rocket_launcher`) | 2/3 | 4 | Cada carta nova no jogo marcado por ID custa +10/+12 nesta rodada; cartas juntas somam o custo, sem proibir a jogada. |
 | Regeneração Parasita (`parasite_regeneration`) | 2/3 | 2 | Cura até 100 HP no persistente vivo ferido com menor HP percentual. |
 | Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Somente cadáver: 50% HP, 1x/fase, respeitando teto. Na F3 volta Mutado. Repelido não é morto. |
 | Barragem de Tentáculos (`tentacle_barrage`) | 3 | 4 | 2 das 3 marcadas saem legalmente no turno; falha base +16. |
-| Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Contribuição + saída de segunda carta indicada; duas/uma/nenhuma cumpridas: base +0/+8/+16. |
+| Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Na rodada, S.T.A.R.S. ataca Nemesis e parceiro alimenta jogo existente escolhido. Ambos/um/nenhum: base +0/+8/+16. |
 | Surto Ômega (`omega_outbreak`) | 3 | 3 | Até fim da próxima rodada: somente falhas recebem +2/+4/+6 conforme Infecção <50/50–74/75–99. |
 
 **Lifecycle:** `absent → entering → repelled` no sucesso; `absent/repelled → entering → persistent → corpse` após falha e morte real. Repelido pode tentar entrar novamente. Somente persistente vivo tem passiva/seleção de dano. Saves antigos vivos/mortos migram sem reset de HP ou da batalha.

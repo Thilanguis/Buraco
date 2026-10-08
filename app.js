@@ -124,6 +124,7 @@ import { opponentSeats, OPPONENT_SEAT_IDS, renderOpponentBacks } from './js/game
 import { cardFrontHTML, suitClass, deckFaceClass } from './js/game/card-face.js';
 import { ITEM_DEFINITIONS } from './js/boss/dimitrescu-castle.js';
 import { renderCastleHud, castleItemHelp } from './js/boss/ui/dimitrescu-castle-view.js';
+import { matriarchBloomFlowersHTML } from './js/boss/ui/matriarch-bloom-view.js';
 import { createResourceFeedbackPresenter } from './js/boss/ui/resource-feedback.js';
 import { createVisionHintEvaluator } from './js/game/domination-vision-hint.js';
 import { createVisionAlert } from './js/game/domination-vision-alert.js';
@@ -7303,7 +7304,7 @@ function castleItemUseButton(card) {
   const definition = ITEM_DEFINITIONS[state.boss?.castleItems?.[card.id]?.type];
   if (!definition || state.boss.castleItems[card.id].consumed) return null;
   const button = createBossCombatHelp(`Usar ${definition.label} da carta ${card.rank}${card.suit}`, definition.label,
-    `${castleItemHelp(state.boss.castleItems[card.id].type)}\nEscolha uma filha. Guarde uma carta para descartar.`, '');
+    `${castleItemHelp(state.boss.castleItems[card.id].type, state.boss)}\nEscolha uma filha. Guarde uma carta para descartar.`, '');
   button.classList.add('castle-use-item');
   const open = button.onclick;
   button.onclick = event => {
@@ -7687,12 +7688,7 @@ function renderBossHud() {
     const bloomEventChanged = isMatriarch && boss.lastBloomEventId && boss.lastBloomEventId !== lastRenderedBossBloomEventId;
     const previousBloom = lastRenderedBossBloom;
     bloomFlowers.innerHTML = isMatriarch
-      ? Array.from({ length: 5 }, (_, index) => {
-          const isOpen = index < boss.bloom;
-          const isOpening = bloomEventChanged && previousBloom != null && boss.bloom > previousBloom && index >= previousBloom && index < boss.bloom;
-          const isWilting = bloomEventChanged && previousBloom != null && boss.bloom < previousBloom && index >= boss.bloom && index < previousBloom;
-          return `<i class="${[isOpen ? 'open' : '', isOpening ? 'opening' : '', isWilting ? 'wilting' : ''].filter(Boolean).join(' ')}" title="Flor ${index + 1}">✿</i>`;
-        }).join('')
+      ? matriarchBloomFlowersHTML({ bloom: boss.bloom, changed: bloomEventChanged, previous: previousBloom })
       : isNehelenia
         ? Array.from({ length: Math.max(1, Number(boss.maxDanger) || 5) }, (_, index) => {
             const fill = Math.round(Math.max(0, Math.min(1, (Number(boss.danger) || 0) - index)) * 100);

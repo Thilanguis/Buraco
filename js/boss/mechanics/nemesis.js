@@ -1,4 +1,4 @@
-import { NEMESIS_ZOMBIES, nemesisDefinition } from '../bosses/nemesis.js';
+import { NEMESIS_ZOMBIES, NEMESIS_OBJECTIVE_BALANCE, nemesisDefinition } from '../bosses/nemesis.js';
 import { createCombatEntities, normalizeCombatEntities, damageCombatEntity, healCombatEntity, reviveCombatEntity } from '../boss-combat.js';
 
 const persistent = (entry) => entry.status === 'persistent' && entry.hp > 0;
@@ -59,11 +59,15 @@ export function projectNemesisInfection(boss, amount, { failure = false } = {}) 
 
 export function getNemesisObjectiveOutcome(boss, intent) {
   const payload = intent.payload || {};
-  const fulfilled = intent.abilityId === 'stars_hunt' ? Number(!!payload.contributed)
-    : intent.abilityId === 'stars_extermination' ? Number(!!payload.contributed) + Number(!!payload.secondExited)
+  // Live pre-rework snapshots finish their already announced v1 objective.
+  const current = payload.objectiveVersion === 2;
+  const fulfilled = intent.abilityId === 'stars_hunt' ? Number(current ? payload.directDamage >= payload.requiredDamage : !!payload.contributed)
+    : intent.abilityId === 'stars_extermination' ? current ? Number(payload.directDamage >= payload.requiredDamage) + Number(!!payload.partnerContributed) : Number(!!payload.contributed) + Number(!!payload.secondExited)
+      : intent.abilityId === 'infectious_tentacle' && current ? payload.playedMarkedCardIds?.length ? 2 : payload.exitedCardIds?.length ? 1 : 0
       : (payload.exitedCardIds || []).length >= payload.required ? 1 : 0;
-  const failed = intent.abilityId === 'stars_extermination' ? fulfilled < 2 : !fulfilled;
-  const base = intent.abilityId === 'stars_extermination' ? fulfilled === 2 ? 0 : fulfilled === 1 ? 8 : 16 : failed ? payload.failure ?? 6 + boss.phase * 2 : 0;
+  const graded = intent.abilityId === 'stars_extermination' || (current && intent.abilityId === 'infectious_tentacle');
+  const failed = graded ? fulfilled < 2 : !fulfilled;
+  const base = graded ? fulfilled === 2 ? 0 : fulfilled === 1 ? payload.partialFailure ?? 8 : payload.failure ?? 16 : failed ? payload.failure ?? 6 + boss.phase * 2 : 0;
   return { fulfilled, failed, ...projectNemesisInfection(boss, base, { failure: failed }) };
 }
 
@@ -84,7 +88,7 @@ export function findNemesisLegalPlan(state, player, helpers, predicate = () => t
   const cards = (player?.hand || []).filter((card) => card?.id && !helpers.blocked(player.id, card.id, 'play'));
   const melds = state.teams?.[player.teamId]?.melds || [];
   const consider = (moves) => {
-    if (helpers.canLeaveHand && !helpers.canLeaveHand(player, moves)) return null;
+    if (helpers.canLeaveHand && !helpers.canLeaveHand(player, moves, state)) return null;
     const played = moves.flatMap((move) => move.cardIds);
     const remaining = hand(state, player.id).filter((card) => !played.includes(card.id));
     const discards = remaining.filter((card) => card.id !== state.pickedDiscardCardId && !helpers.blocked(player.id, card.id, 'discard'));
@@ -130,6 +134,48 @@ export function findNemesisLegalPlan(state, player, helpers, predicate = () => t
 
 function preferredPlayers(state) {
   return [...state.players].sort((a, b) => Number(b.id === state.boss.starsPlayerId) - Number(a.id === state.boss.starsPlayerId));
+}
+
+function starsCandidates(state) {
+  return state.boss.starsPlayerId == null ? preferredPlayers(state)
+    : state.players.filter(player => player.id === state.boss.starsPlayerId);
+}
+
+function previewPlan(state, player, plan) {
+  const preview = { ...state, players: state.players.map(p => ({ ...p, hand: [...p.hand] })),
+    teams: state.teams.map(team => ({ ...team, melds: team.melds.map(meld => [...meld]) })) };
+  for (const move of plan.moves) {
+    const cards = player.hand.filter(card => move.cardIds.includes(card.id));
+    if (move.meldIndex == null) preview.teams[player.teamId].melds.push(cards);
+    else preview.teams[player.teamId].melds[move.meldIndex].push(...cards);
+  }
+  preview.players.find(p => p.id === player.id).hand = player.hand.filter(card => !plan.playedCardIds.includes(card.id) && card.id !== plan.discardCardId);
+  return preview;
+}
+
+// Joint proof in actual turn order. Both roles and the existing destination are
+// frozen at announcement; later S.T.A.R.S. changes do not move this objective.
+function exterminationPlan(state, helpers, payload) {
+  const remaining = entryPlayers(state), plans = [];
+  const needs = player => player.id === payload.targetPlayerId
+    ? payload.directDamage < payload.requiredDamage : player.id === payload.partnerPlayerId && !payload.partnerContributed;
+  const accepts = (player, plan, preview = state) => player.id === payload.targetPlayerId
+    ? helpers.damageForPlan(player, plan, preview) > 0
+    : plan.moves.some(move => move.meldIndex != null && payload.partnerMeldIds.includes(helpers.meldId(player.teamId, move.meldIndex)));
+  const players = remaining.filter(needs);
+  if (!players.length) return { teamPlans: plans, moves: [], playedCardIds: [], discardCardId: null };
+  const [first, second] = players;
+  let result = null;
+  findNemesisLegalPlan(state, first, helpers, plan => {
+    if (!accepts(first, plan)) return false;
+    if (!second) { result = [{ ...plan, playerId: first.id }]; return true; }
+    const preview = previewPlan(state, first, plan);
+    const secondPlayer = preview.players.find(player => player.id === second.id);
+    const next = findNemesisLegalPlan(preview, secondPlayer, helpers, candidate => accepts(secondPlayer, candidate, preview));
+    if (!next) return false;
+    result = [{ ...plan, playerId: first.id }, { ...next, playerId: second.id }]; return true;
+  });
+  return result ? { teamPlans: result, moves: [], playedCardIds: [], discardCardId: null } : null;
 }
 
 function entryPlayers(state) {
@@ -242,7 +288,32 @@ function resolveEntry(boss, intent, gameState) {
 
 function buildPayload({ gameState: state, helpers }, abilityId) {
   const boss = state.boss;
-  const base = { phase: boss.phase, failure: 6 + boss.phase * 2 };
+  const base = { phase: boss.phase, failure: NEMESIS_OBJECTIVE_BALANCE.failure[boss.phase] };
+  if (abilityId === 'stars_hunt' || abilityId === 'stars_extermination') {
+    for (const player of starsCandidates(state).filter(player => entryPlayers(state).some(p => p.id === player.id))) {
+      // Extermination may become legal only after the partner's contribution.
+      // Its joint proof below must see that preview before testing S.T.A.R.S.
+      const plan = abilityId === 'stars_hunt'
+        ? findNemesisLegalPlan(state, player, helpers, candidate => helpers.damageForPlan(player, candidate) > 0) : null;
+      if (abilityId === 'stars_hunt' && !plan) continue;
+      const payload = { ...base, objectiveVersion: 2, targetPlayerId: player.id,
+        requiredDamage: NEMESIS_OBJECTIVE_BALANCE.directDamage, directDamage: 0, damageActionIds: [], solution: plan };
+      if (abilityId === 'stars_hunt') return payload;
+      const partner = entryPlayers(state).find(p => p.id !== player.id);
+      if (!partner) continue;
+      payload.partnerPlayerId = partner.id; payload.partnerContributed = false;
+      payload.partnerMeldIds = state.teams[player.teamId].melds.map((_meld,index) => helpers.meldId(player.teamId,index));
+      payload.failure = NEMESIS_OBJECTIVE_BALANCE.exterminationFailure; payload.partialFailure = NEMESIS_OBJECTIVE_BALANCE.exterminationPartial;
+      const solution = exterminationPlan(state, helpers, payload);
+      if (!solution) continue;
+      const partnerMove = solution.teamPlans.find(p => p.playerId === partner.id).moves.find(move => move.meldIndex != null && payload.partnerMeldIds.includes(helpers.meldId(partner.teamId,move.meldIndex)));
+      payload.partnerMeldIndex = partnerMove.meldIndex;
+      payload.partnerMeldIds = [helpers.meldId(partner.teamId,partnerMove.meldIndex)];
+      payload.solution = solution;
+      return payload;
+    }
+    return null;
+  }
   if (abilityId === 'horde_invasion') {
     let candidates = entryCandidates(state, helpers);
     if (candidates.length > 1 && boss.lastRepelledZombieId) candidates = candidates.filter((candidate) => candidate.entityId !== boss.lastRepelledZombieId);
@@ -276,26 +347,19 @@ function buildPayload({ gameState: state, helpers }, abilityId) {
     const cards = hand(state, player.id).filter((card) => card?.id);
     if (abilityId === 'contaminated_zone') {
       if (canLegallyTakeDiscard(state, player, helpers)) return { ...base, targetPlayerId: player.id };
-    } else if (abilityId === 'stars_hunt') {
-      const plan = findNemesisLegalPlan(state, player, helpers);
-      if (plan) return { ...base, targetPlayerId: player.id, contributed: false, solution: plan };
     } else if (abilityId === 'infectious_tentacle' && cards.length >= 2) {
       const plan = findNemesisLegalPlan(state, player, helpers);
       if (!plan) continue;
       const cardIds = playableObjectiveCards(state, player, helpers, plan, 2);
       if (!cardIds) continue;
-      return { ...base, targetPlayerId: player.id, cardIds, required: 1, exitedCardIds: [], solution: plan };
+      return { ...base, objectiveVersion: 2, partialFailure: NEMESIS_OBJECTIVE_BALANCE.tentaclePartial[boss.phase],
+        targetPlayerId: player.id, cardIds, required: 1, playedMarkedCardIds: [], exitedCardIds: [], solution: plan };
     } else if (abilityId === 'tentacle_barrage' && cards.length >= 3) {
       const plan = findNemesisLegalPlan(state, player, helpers, (entry) => entry.playedCardIds.length >= 2);
       if (!plan) continue;
       const cardIds = playableObjectiveCards(state, player, helpers, plan, 3);
       if (!cardIds) continue;
       return { ...base, targetPlayerId: player.id, cardIds, required: 2, failure: 16, exitedCardIds: [], solution: plan };
-    } else if (abilityId === 'stars_extermination') {
-      const plan = findNemesisLegalPlan(state, player, helpers, (entry) => entry.playedCardIds.length >= 2);
-      if (!plan) continue;
-      const secondCardId = plan.playedCardIds[1];
-      return { ...base, targetPlayerId: player.id, contributed: false, secondCardId, secondExited: false, solution: plan, failure: 16 };
     }
   }
   return null;
@@ -310,8 +374,11 @@ function playableObjectiveCards(state, player, helpers, solution, count) {
   return ids.size >= count ? [...ids].slice(0, count) : null;
 }
 
-export function chooseNemesisDamageTarget(state, damage) {
+export function chooseNemesisDamageTarget(state, damage, playerId = state.players[state.currentPlayer]?.id) {
   const boss = state.boss;
+  const intent = boss.currentIntent, payload = intent?.payload;
+  if (payload?.objectiveVersion === 2 && ['stars_hunt', 'stars_extermination'].includes(intent.abilityId)
+    && !payload.resolved && payload.targetPlayerId === playerId && payload.directDamage < payload.requiredDamage && damage > 0) return 'boss';
   if (damage >= boss.hp) return 'boss';
   let best = { id: 'boss', score: Math.min(damage, boss.hp) * (boss.hp < 600 ? 1.8 : 0.65) };
   for (const entity of boss.combatEntities.filter(persistent)) {
@@ -383,7 +450,7 @@ export const nemesisBossMechanics = Object.freeze({
   applyDamage({ boss, gameState, damage, playerId, sourceActionId }) {
     if (boss.result) return { hpDamage: 0, targetId: 'boss', absorbed: 0, reborn: false };
     const player = gameState.players.find((entry) => entry.id === playerId);
-    const selected = player?.isBot || player?.name?.toUpperCase().includes('BOT') ? chooseNemesisDamageTarget(gameState, damage) : boss.combatTargetsByPlayer[playerId] || 'boss';
+    const selected = player?.isBot || player?.name?.toUpperCase().includes('BOT') ? chooseNemesisDamageTarget(gameState, damage, playerId) : boss.combatTargetsByPlayer[playerId] || 'boss';
     const entity = alive(boss, selected);
     // A stale target is rejected by the selector; if it dies between actions,
     // the next action safely defaults to boss (never spills the current hit).
@@ -393,7 +460,15 @@ export const nemesisBossMechanics = Object.freeze({
       if (entity.id === 'grabber' && entity.hp === 0) boss.grabbedByPlayer = {};
       if (entity.id === 'devourer' && entity.hp === 0) resetDevourerFeed(boss);
     }
-    else { hpDamage = Math.min(boss.hp, Math.max(0, damage)); boss.hp -= hpDamage; if (hpDamage && playerId != null) boss.starsPlayerId = playerId; }
+    else {
+      hpDamage = Math.min(boss.hp, Math.max(0, damage)); boss.hp -= hpDamage;
+      if (hpDamage && playerId != null) boss.starsPlayerId = playerId;
+      const intent = boss.currentIntent, payload = intent?.payload;
+      if (hpDamage && payload?.objectiveVersion === 2 && ['stars_hunt', 'stars_extermination'].includes(intent.abilityId)
+        && payload.targetPlayerId === playerId && !payload.resolved && !payload.damageActionIds.includes(sourceActionId)) {
+        payload.damageActionIds.push(sourceActionId); payload.directDamage += hpDamage;
+      }
+    }
     return { hpDamage, targetId: entity?.id || 'boss', absorbed: 0, reborn: false };
   },
   isCardBlocked(boss, playerId, cardId, action) { return action === 'play' && !!alive(boss, 'grabber') && !!boss.grabbedByPlayer?.[playerId]?.cardIds?.includes(cardId); },
@@ -441,11 +516,13 @@ export const nemesisBossMechanics = Object.freeze({
     const priorities = cooperative ? null : this.botPriorities({ boss, gameState, playerId, helpers });
     const preserveObjective = !!(priorities?.active && priorities.plan);
     const preserveTeamEntry = cooperative && !!teamEntryPlan(gameState, helpers, payload.entryKind, payload);
+    const preserveExtermination = intent?.abilityId === 'stars_extermination' && payload.objectiveVersion === 2
+      && !payload.resolved && !!exterminationPlan(gameState, helpers, payload);
     const hasDiscard = player.hand.some(card => card.id !== gameState.pickedDiscardCardId && !helpers.blocked(playerId, card.id, 'discard'));
     // Validate the resulting restrictions, not the cards used by the first plan.
     // A marked+grabbed card may still solve an objective via legal discard.
     const preservesSolution = (ids) => {
-      if (!preserveObjective && !preserveTeamEntry && hasDiscard) return true;
+      if (!preserveObjective && !preserveTeamEntry && !preserveExtermination && hasDiscard) return true;
       const selected = new Set(ids);
       const trialBoss = { ...boss, grabbedByPlayer: { ...boss.grabbedByPlayer, [playerId]: { cardIds: ids, turnId: key } } };
       const preview = { ...gameState, boss: trialBoss };
@@ -453,6 +530,7 @@ export const nemesisBossMechanics = Object.freeze({
         (id === playerId && action === 'play' && selected.has(cardId)) || helpers.blocked(id, cardId, action) };
       if (preserveObjective && !this.botPriorities({ boss: trialBoss, gameState: preview, playerId, helpers: trialHelpers }).plan) return false;
       if (preserveTeamEntry && !teamEntryPlan(preview, trialHelpers, payload.entryKind, payload)) return false;
+      if (preserveExtermination && !exterminationPlan(preview, trialHelpers, payload)) return false;
       if (!hasDiscard && !findNemesisLegalPlan(preview, player, trialHelpers)) return false;
       return true;
     };
@@ -481,7 +559,7 @@ export const nemesisBossMechanics = Object.freeze({
       // local branches early, without a search cap or reducing the quota.
       // The cooperative planner has its own candidate budget: only validate
       // full combinations there, since a partial false is not a proof.
-      if (chosen.length && (chosen.length === size || !preserveTeamEntry) && !valid(chosen)) return null;
+      if (chosen.length && (chosen.length === size || (!preserveTeamEntry && !preserveExtermination)) && !valid(chosen)) return null;
       if (chosen.length === size) return chosen;
       for (let index = start; index <= ordered.length - (size - chosen.length); index++) {
         const found = choose(size, index + 1, [...chosen, ordered[index]]);
@@ -509,16 +587,17 @@ export const nemesisBossMechanics = Object.freeze({
     return events;
   },
   onCardDiscarded({ boss, playerId, card }) { this.markExit(boss, playerId, [card.id]); return []; },
-  markExit(boss, playerId, cardIds) {
+  markExit(boss, playerId, cardIds, played = false) {
     const payload = boss.currentIntent?.payload;
     if (!payload || payload.targetPlayerId !== playerId || payload.resolved) return;
     payload.exitedCardIds = [...new Set([...(payload.exitedCardIds || []), ...cardIds.filter((id) => payload.cardIds?.includes(id))])];
+    if (played) payload.playedMarkedCardIds = [...new Set([...(payload.playedMarkedCardIds || []), ...cardIds.filter(id => payload.cardIds?.includes(id))])];
     if (cardIds.includes(payload.secondCardId)) payload.secondExited = true;
   },
   onMeldTransition({ boss, gameState, teamId, playerId, meldId, cardsAdded, previousDangerReliefValue, nextDangerReliefValue, recordBossEvent }) {
     const fresh = cardsAdded.filter((card) => !boss.damagedCardIds.includes(card.id));
     if (fresh.length) {
-      this.markExit(boss, playerId, fresh.map((card) => card.id));
+      this.markExit(boss, playerId, fresh.map((card) => card.id), true);
       const payload = boss.currentIntent?.payload;
       if (boss.currentIntent?.abilityId === 'horde_invasion' && !payload.resolved) {
         payload.contributionCardIds = [...new Set([...(payload.contributionCardIds || []), ...fresh.map((card) => card.id)])];
@@ -531,6 +610,8 @@ export const nemesisBossMechanics = Object.freeze({
         }
       }
       if (payload?.targetPlayerId === playerId && !payload.resolved) payload.contributed = true;
+      if (boss.currentIntent?.abilityId === 'stars_extermination' && payload.objectiveVersion === 2 && !payload.resolved
+        && payload.partnerPlayerId === playerId && payload.partnerMeldIds.includes(meldId)) payload.partnerContributed = true;
       if (teamId === 0 && alive(boss, 'devourer')) {
         const feed = boss.devourerFeed;
         const ids = [...new Set(fresh.map(card => card.id))].filter(id => !feed.countedCardIds.includes(id));
@@ -557,7 +638,10 @@ export const nemesisBossMechanics = Object.freeze({
     healFromDevourerFeed(boss, gameState, playerId, recordBossEvent);
     const intent = boss.currentIntent; const payload = intent?.payload;
     if (intent?.abilityId === 'horde_invasion' && payload.entryKind === 'grabber' && payload.targetPlayerId === playerId) resolveEntry(boss, intent, gameState);
-    if (!intent || !objectiveIds.has(intent.abilityId) || payload.targetPlayerId !== playerId || payload.resolved) return {};
+    if (!intent || !objectiveIds.has(intent.abilityId) || payload.resolved) return {};
+    if (intent.abilityId === 'stars_extermination' && payload.objectiveVersion === 2) {
+      if (!gameState.players.every(player => boss.playersActedThisRound.includes(player.id))) return {};
+    } else if (payload.targetPlayerId !== playerId) return {};
     const projection = getNemesisObjectiveOutcome(boss, intent);
     const { fulfilled, failed, base: amount } = projection;
     const dangerBefore = boss.danger;
@@ -592,16 +676,25 @@ export const nemesisBossMechanics = Object.freeze({
       const discard = marked.find((id) => player.hand.some((card) => card.id === id) && id !== gameState.pickedDiscardCardId && !helpers.blocked(playerId, id, 'discard'));
       return { active, urgent: active, markedCardIds: marked, preferredDiscardCardIds: active ? [plan?.discardCardId || discard].filter(Boolean) : [], plan, infection: boss.danger };
     }
-    const fulfilled = intent?.abilityId === 'stars_hunt' ? payload?.contributed
+    if (payload?.objectiveVersion === 2 && intent.abilityId === 'stars_extermination') {
+      const role = playerId === payload.targetPlayerId ? 'damage' : playerId === payload.partnerPlayerId ? 'feed' : null;
+      const active = !payload.resolved && !!role && (role === 'damage' ? payload.directDamage < payload.requiredDamage : !payload.partnerContributed);
+      const joint = active ? exterminationPlan(gameState, helpers, payload) : null;
+      const plan = joint?.teamPlans.find(plan => plan.playerId === playerId) || null;
+      return { active, urgent: active, plan, infection: boss.danger, markedCardIds: [], preferredDiscardCardIds: [plan?.discardCardId].filter(Boolean), targetId: role === 'damage' ? 'boss' : null };
+    }
+    const fulfilled = intent?.abilityId === 'stars_hunt' ? payload?.objectiveVersion === 2 ? payload.directDamage >= payload.requiredDamage : payload?.contributed
+      : intent?.abilityId === 'infectious_tentacle' && payload?.objectiveVersion === 2 ? payload.playedMarkedCardIds?.length > 0
       : intent?.abilityId === 'stars_extermination' ? payload?.contributed && payload?.secondExited
         : payload?.required && (payload.exitedCardIds || []).length >= payload.required;
     const objective = payload?.targetPlayerId === playerId && !payload.resolved && !fulfilled && objectiveIds.has(intent.abilityId);
     const player = gameState.players.find((entry) => entry.id === playerId);
     const requiredIds = objective ? payload.cardIds || (payload.secondCardId ? [payload.secondCardId] : []) : [];
     const plan = objective ? findNemesisLegalPlan(gameState, player, helpers, (entry) => {
-      if (intent.abilityId === 'stars_hunt') return true;
+      if (intent.abilityId === 'stars_hunt') return payload.objectiveVersion !== 2 || helpers.damageForPlan(player, entry) > 0;
       const exits = [...entry.playedCardIds, entry.discardCardId].filter(Boolean);
       if (intent.abilityId === 'stars_extermination') return payload.secondExited || exits.includes(payload.secondCardId);
+      if (intent.abilityId === 'infectious_tentacle' && payload.objectiveVersion === 2) return entry.playedCardIds.some(id => requiredIds.includes(id));
       return new Set([...(payload.exitedCardIds || []), ...exits.filter((id) => requiredIds.includes(id))]).size >= payload.required;
     }) : null;
     const impactIndex = gameState.teams?.[0]?.melds?.findIndex((_meld, index) => helpers.meldId(0, index) === boss.impactZone?.meldId);
@@ -620,6 +713,7 @@ export const nemesisBossMechanics = Object.freeze({
   },
   configureDebugState(state, abilityId, variant, target) {
     const boss = state.boss;
+    if (abilityId === 'stars_extermination' && variant === 'failure') boss.playersActedThisRound = [];
     if (abilityId === 'contaminated_zone' && variant !== 'no_target') {
       const owner = state.players[target === 'bot' || variant === 'bot' ? 1 : 0];
       const index = owner.hand.findIndex((card) => card.rank === '10' && card.suit === state.teams[0].melds[owner.id]?.[0]?.suit);

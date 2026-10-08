@@ -580,7 +580,7 @@ test('Orvalho usa faixas por fase, conta IDs unicos e pode ser dissipado', () =>
   }
 });
 
-test('Trepadeiras e Enxerto propagam sem cura e respeitam falhas independentes', () => {
+test('Trepadeiras mantêm sua regra; Enxerto parcial cura 50 sem Flor nem propagação comum', () => {
   const vines = bossGame('matriarca_esmeralda');
   vines.boss.phase = 2;
   vines.boss.phaseTransitions = [1, 2];
@@ -598,12 +598,12 @@ test('Trepadeiras e Enxerto propagam sem cura e respeitam falhas independentes',
   graft.boss.phaseTransitions = [1, 2];
   graft.boss.hp = 1700;
   const graftTargets = [0, 1].map((meldIndex) => ({ meldIndex, meldId: establishMeldId(graft, meldIndex) }));
-  applyAbility(graft, 'graft', { targets: graftTargets }, 2);
+  applyAbility(graft, 'graft', { targets: graftTargets, partialHeal: 50 }, 2);
   applyBossMeldTransition(graft, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: [{ id: 'graft-one-side', rank: '9', suit: '♦' }] });
   completeBossPlayerTurn(graft, 0);
   completeBossPlayerTurn(graft, 1);
-  assert.equal(graft.boss.hp, 1690);
-  assert.equal(graft.boss.bloom, 1);
+  assert.equal(graft.boss.hp, 1740);
+  assert.equal(graft.boss.bloom, 0);
   assert.equal(getBossNatureThreats(graft).filter((entry) => entry.status === 'active' && entry.propagated).length, 0);
 });
 

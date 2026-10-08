@@ -26,12 +26,14 @@ function compact({ gameState, intent, helpers = {} }) {
   const label = (id) => helpers.cardLabelAnywhere?.(gameState, id) || id;
   const names = (payload.cardIds || []).map(label).join(' · ');
   const who = target.slice(0, 16);
+  const current = payload.objectiveVersion === 2;
+  const partner = gameState.players.find(player => player.id === payload.partnerPlayerId)?.name.slice(0, 16) || 'Parceiro';
   const instruction = {
     horde_invasion: payload.entryKind === 'grabber' ? `${who}: jogue/descarte a carta marcada.` : payload.entryKind === 'infected' ? 'Equipe: contribua 2 cartas nesta rodada.' : 'Alimente jogos existentes com 3 cartas nesta rodada.',
-    stars_hunt: `${who}: contribua 1 carta neste turno.`,
-    infectious_tentacle: `${who}: jogue/descarte 1 marcada.`,
+    stars_hunt: current ? `${who}: cause dano direto ao Nemesis.` : `${who}: contribua 1 carta neste turno.`,
+    infectious_tentacle: current ? `${who}: jogue 1 marcada; descarte custa menos.` : `${who}: jogue/descarte 1 marcada.`,
     tentacle_barrage: `${who}: jogue/descarte 2 marcadas.`,
-    stars_extermination: `${who}: contribua E resolva a segunda carta.`,
+    stars_extermination: current ? `${who}: ataque Nemesis · ${partner}: Jogo ${payload.partnerMeldIndex + 1}.` : `${who}: contribua E resolva a segunda carta.`,
     contaminated_zone: `${who}: Lixo permitido, custa +6 Infecção.`,
     horde_command: hordeCommandPresentation(gameState.boss, intent).instruction,
     rocket_launcher: `Jogo ${payload.meldIndex + 1}: +${payload.infectionCost} Infecção por carta nova.`,
@@ -39,9 +41,13 @@ function compact({ gameState, intent, helpers = {} }) {
     viral_reanimation: 'Um cadáver retorna com 50% do HP.',
     omega_outbreak: 'Falhas futuras recebem +2/+4/+6 Infecção.',
   }[intent.abilityId] || 'Efeito do Nemesis ativo.';
-  const progress = intent.abilityId === 'horde_invasion' ? `${gameState.boss.combatEntities.find((entity) => entity.id === payload.entityId)?.name || ''} · ${payload.entryKind === 'grabber' ? `${payload.exitedCardIds.length}/1 saída` : payload.entryKind === 'infected' ? `${payload.contributionCardIds.length}/2 cartas` : `${(payload.devourerCardIds || []).length}/3 cartas`}` : payload.required ? `${(payload.exitedCardIds || []).length}/${payload.required} saídas legais`
-    : intent.abilityId === 'stars_extermination' ? `${payload.contributed ? '✓' : '○'} Contribuição · ${payload.secondExited ? '✓' : '○'} Segunda carta: ${label(payload.secondCardId)}`
-      : intent.abilityId === 'stars_hunt' ? payload.contributed ? 'Contribuição cumprida' : 'Contribuição pendente' : '';
+  const progress = intent.abilityId === 'horde_invasion' ? `${gameState.boss.combatEntities.find((entity) => entity.id === payload.entityId)?.name || ''} · ${payload.entryKind === 'grabber' ? `${payload.exitedCardIds.length}/1 saída` : payload.entryKind === 'infected' ? `${payload.contributionCardIds.length}/2 cartas` : `${(payload.devourerCardIds || []).length}/3 cartas`}`
+    : intent.abilityId === 'infectious_tentacle' && current ? payload.playedMarkedCardIds?.length ? 'Marcada jogada · completo' : payload.exitedCardIds?.length ? 'Marcada descartada · parcial' : 'Nenhuma marcada resolvida'
+      : payload.required ? `${(payload.exitedCardIds || []).length}/${payload.required} saídas legais`
+    : intent.abilityId === 'stars_extermination' ? current
+      ? `${payload.directDamage >= payload.requiredDamage ? '✓' : '○'} Dano direto · ${payload.partnerContributed ? '✓' : '○'} Jogo ${payload.partnerMeldIndex + 1}`
+      : `${payload.contributed ? '✓' : '○'} Contribuição · ${payload.secondExited ? '✓' : '○'} Segunda carta: ${label(payload.secondCardId)}`
+      : intent.abilityId === 'stars_hunt' ? current ? `${payload.directDamage || 0} HP de dano direto` : payload.contributed ? 'Contribuição cumprida' : 'Contribuição pendente' : '';
   const consequence = {
     horde_invasion: 'Sucesso: repele · Falha: zumbi permanece',
     horde_command: hordeCommandPresentation(gameState.boss, intent).consequence,
@@ -67,35 +73,37 @@ export const nemesisBossPresentation = Object.freeze({
     const payload = intent.payload || {};
     // Match other bosses: a range meter explains a graded consequence,
     // not every binary objective or card counter.
-    if (intent.abilityId !== 'stars_extermination') return null;
-    const value = Number(!!payload.contributed) + Number(!!payload.secondExited);
+    const tentacle = intent.abilityId === 'infectious_tentacle' && payload.objectiveVersion === 2;
+    if (intent.abilityId !== 'stars_extermination' && !tentacle) return null;
     const boss = gameState?.boss || { danger: 0, combatEntities: [] };
-    const amount = getNemesisObjectiveOutcome(boss, intent).applied;
+    const outcome = getNemesisObjectiveOutcome(boss, intent), value = outcome.fulfilled, amount = outcome.applied;
     const projected = base => projectNemesisInfection(boss, base, { failure: base > 0 }).applied;
-    return [{ label: 'Exigências cumpridas', value, max: 2, unit: 'de 2',
+    return [{ label: tentacle ? 'Carta marcada' : 'Exigências cumpridas', value, max: 2, unit: tentacle ? 'resultado' : 'de 2',
       tone: value === 2 ? 'safe' : value === 1 ? 'warning' : 'danger',
       currentEffect: `+${amount} INFECÇÃO`,
       ariaLabel: `${value} de 2 exigências cumpridas. Punição: +${amount} Infecção.`,
       segments: [
-        { from: 0, to: 0, label: '0 cumpridas', effect: `+${projected(16)} Infecção`, tone: 'danger' },
-        { from: 1, to: 1, label: '1 cumprida', effect: `+${projected(8)} Infecção`, tone: 'warning' },
-        { from: 2, to: 2, label: '2 cumpridas', effect: 'sem punição', tone: 'safe' },
+        { from: 0, to: 0, label: tentacle ? 'Nenhuma' : '0 cumpridas', effect: `+${projected(payload.failure ?? 16)} Infecção`, tone: 'danger' },
+        { from: 1, to: 1, label: tentacle ? 'Descartada' : '1 cumprida', effect: `+${projected(payload.partialFailure ?? 8)} Infecção`, tone: 'warning' },
+        { from: 2, to: 2, label: tentacle ? 'Jogada' : '2 cumpridas', effect: 'sem punição', tone: 'safe' },
       ] }];
   },
   help({ gameState, intent, helpers = {} }) {
     const payload = intent.payload;
     if (intent.abilityId === 'horde_command') return hordeCommandPresentation(gameState.boss, intent).help;
     const target = gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'Equipe';
+    const current = payload.objectiveVersion === 2;
+    const partner = gameState.players.find(player => player.id === payload.partnerPlayerId)?.name || 'O parceiro';
     const labels = [...(payload.cardIds || []), payload.secondCardId].filter(Boolean).map((id) => helpers.cardLabelAnywhere?.(gameState, id) || id).join(' · ');
     if (intent.abilityId === 'horde_invasion') {
       const goal = payload.entryKind === 'grabber' ? `${target}: jogue ou descarte a carta marcada neste turno.` : payload.entryKind === 'infected' ? 'Equipe: adicione 2 cartas legais aos jogos nesta rodada.' : 'Alimente jogos existentes com 3 cartas nesta rodada. Pode ser no mesmo jogo, por um jogador ou pelos dois. Só cartas novas nos jogos que existiam no início; reorganizar não conta.';
       return `${goal}\nSucesso: expulsa o zumbi. Falha: ele fica ATIVO com HP cheio, sem Infecção extra.\nINVADINDO: sem dano/passiva. Repelido não é cadáver e pode voltar. Teto: 1/2/3 ativos nas fases 1/2/3.`;
     }
     const goal = {
-      stars_hunt: `${target}: adicione 1 carta legal a um jogo neste turno. Descarte não vale.`,
-      infectious_tentacle: `${target}: jogue ou descarte 1 das 2 marcadas neste turno.`,
+      stars_hunt: current ? `${target}: cause qualquer dano positivo à vida do Nemesis até o fim do seu turno. Selecione Nemesis como alvo; dano em zumbis não conta. Este alvo S.T.A.R.S. fica fixo até a resolução.` : `${target}: adicione 1 carta legal a um jogo neste turno. Descarte não vale.`,
+      infectious_tentacle: current ? `${target}: jogue 1 das 2 marcadas neste turno para evitar toda a punição. Só descartar uma custa +${payload.partialFailure} Infecção; não resolver nenhuma custa +${payload.failure}. Bônus ativos são somados uma vez aos custos.` : `${target}: jogue ou descarte 1 das 2 marcadas neste turno.`,
       tentacle_barrage: `${target}: jogue ou descarte 2 das 3 marcadas neste turno.`,
-      stars_extermination: `${target}: adicione 1 carta a um jogo E jogue/descarte a segunda marcada neste turno.`,
+      stars_extermination: current ? `Até o fim da rodada: ${target} causa dano direto ao Nemesis; ${partner} adiciona uma carta legal ao Jogo ${payload.partnerMeldIndex + 1}, que já existia no anúncio. Os papéis não mudam. Ambos: sem punição; só um: +8; nenhum: +16 Infecção, mais os bônus ativos uma vez. Zumbis e descarte não cumprem esses objetivos.` : `${target}: adicione 1 carta a um jogo E jogue/descarte a segunda marcada neste turno.`,
       contaminated_zone: `${target}: cada retirada legal do Lixo custa +6 Infecção neste turno. Agarrador continua valendo.`,
       rocket_launcher: `Cada carta nova adicionada à Zona de Impacto custa +${payload.infectionCost || (gameState.boss.phase === 3 ? 12 : 10)} Infecção nesta rodada. Jogar várias juntas soma os custos. Não bloqueia o jogo.`,
       parasite_regeneration: 'Cura 100 HP do zumbi vivo com menor percentual de HP. Não ultrapassa o HP máximo.',

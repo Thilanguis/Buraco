@@ -1,3 +1,5 @@
+export const MATRIARCH_GRAFT_PARTIAL_HEAL = 50;
+
 export function getRestorativeDewHealing(phase, cardsPlayed) {
   const count = Math.max(0, Number(cardsPlayed) || 0);
   const currentPhase = Math.max(1, Math.min(3, Number(phase) || 1));

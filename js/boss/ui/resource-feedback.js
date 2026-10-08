@@ -1,6 +1,20 @@
 // Presentation only: amounts come from resolved events, never from current buffs.
 export function resourceFeedbackSteps(boss, event) {
   if (!['nemesis', 'dimitrescu'].includes(boss.id)) return [];
+  if (boss.id === 'dimitrescu' && event.type === 'daggerTransfer') {
+    return event.amount > 0 ? [{entityId:'boss', sourceEntityId:event.sourceEntityId, metric:'ladyHp',
+      amount:-event.amount,before:event.hpBefore,after:event.hp,color:'#ef405c',label:'HP · Vínculo'}] : [];
+  }
+  if (boss.id === 'dimitrescu' && ['daughterBleed','castleItem'].includes(event.type)) {
+    const damage = event.type === 'castleItem' ? event.appliedDamage : event.amount;
+    return damage > 0 ? [{entityId:event.targetId,metric:'daughterHp',amount:-damage,
+      before:event.hp+damage,after:event.hp,color:'#ef405c',label:event.type==='daughterBleed'?'HP · Hemorragia':'HP · Item'}] : [];
+  }
+  if (boss.id === 'dimitrescu' && event.type === 'daughterRegen') {
+    return event.amount > 0 && ['bela', 'cassandra', 'daniela'].includes(event.targetId)
+      ? [{ entityId: event.targetId, metric: 'daughterHp', amount: event.amount,
+        before: event.hp - event.amount, after: event.hp, color: '#9cde4d', label: 'HP' }] : [];
+  }
   if (boss.id==='nemesis' && event.type==='bossHeal' && event.sourceEntityId==='devourer' && event.amount>0) {
     return [{entityId:'devourer',metric:'hp',amount:event.amount,before:event.hpBefore??event.hp-event.amount,
       after:event.hp,color:'#9cde4d',label:'HP'}];
@@ -33,6 +47,7 @@ export function createResourceFeedbackPresenter({ document, reducedMotion = () =
   let scope = null, queue = [], running = false, version = 0, displayed = null, maximum = 100, metric = 'danger';
   const nodes = new Set(), animations = new Set();
   const seen = new Set();
+  const entityQueues = new Map();
   const scopeOf = boss => `${boss.id}:${boss.seed}`;
   const sync = (boss, immediate = false) => {
     if (scope !== scopeOf(boss)) { clear(); scope = scopeOf(boss); }
@@ -52,7 +67,7 @@ export function createResourceFeedbackPresenter({ document, reducedMotion = () =
     version++; queue = []; running = false; displayed = null;
     for (const animation of animations) animation.cancel();
     for (const node of nodes) node.remove();
-    animations.clear(); nodes.clear(); seen.clear();
+    animations.clear(); nodes.clear(); seen.clear(); entityQueues.clear();
   }
   async function animate(node, frames, options, allowReduced = false) {
     if (!node.animate || (reducedMotion() && !allowReduced)) return;
@@ -100,13 +115,54 @@ export function createResourceFeedbackPresenter({ document, reducedMotion = () =
     }
     if (token === version) { displayed = null; running = false; }
   }
+  async function floatOnDaughter(step) {
+    const source = step.entityId === 'boss' ? document.querySelector('#bossHud .boss-portrait')
+      : document.querySelector(`[data-entity-id="${step.entityId}"]`);
+    if (!source) return;
+    const token = version, rect = source.getBoundingClientRect();
+    if (step.sourceEntityId && !reducedMotion()) {
+      const origin = document.querySelector(`[data-entity-id="${step.sourceEntityId}"]`)?.getBoundingClientRect();
+      if (origin) {
+        const ray = document.createElement('span'); ray.className='boss-resource-transfer';
+        ray.dataset.sourceId=step.sourceEntityId;ray.dataset.metric='ladyHp';ray.style.setProperty('--resource-color',step.color);
+        ray.style.left=`${origin.left+origin.width/2}px`;ray.style.top=`${origin.top+origin.height/2}px`;
+        const dx=rect.left+rect.width/2-origin.left-origin.width/2,dy=rect.top+rect.height/2-origin.top-origin.height/2;
+        ray.style.setProperty('--resource-angle',`${Math.atan2(dy,dx)}rad`);document.body.append(ray);nodes.add(ray);
+        await animate(ray,[{transform:'translate(0,0)',opacity:0},{opacity:.65,offset:.2},{transform:`translate(${dx}px,${dy}px)`,opacity:.65}],{duration:700,easing:'ease-in',fill:'forwards'});
+        ray.remove();nodes.delete(ray);
+      }
+    }
+    if (token !== version) return;
+    const floating = document.createElement('div'); floating.className = 'boss-resource-arrival boss-daughter-regen';
+    floating.dataset.sourceId = step.entityId; floating.textContent = `${step.amount>0?'+':'−'}${Math.abs(step.amount)} ${step.label || 'HP'}`;
+    floating.setAttribute('role', 'status'); floating.setAttribute('aria-live', 'polite');
+    floating.setAttribute('aria-label', `${source.querySelector('b')?.textContent || step.entityId}: ${step.amount>0?'recuperou':'sofreu'} ${Math.abs(step.amount)} ${step.label || 'HP'}`);
+    floating.style.color = step.color;
+    document.body.append(floating); nodes.add(floating);
+    const viewport = document.defaultView;
+    const half = floating.getBoundingClientRect().width / 2;
+    floating.style.left = `${Math.max(half + 8, Math.min(viewport.innerWidth - half - 8, rect.left + rect.width / 2))}px`;
+    floating.style.top = `${Math.max(55, Math.min(viewport.innerHeight - 20, rect.top + rect.height * .55))}px`;
+    const frames = reducedMotion() ? [{opacity:1},{opacity:1,offset:.85},{opacity:0}]
+      : [{opacity:1,transform:'translate(-50%,-50%)'},{opacity:0,transform:'translate(-50%,-140%)'}];
+    await animate(floating, frames, {duration:900,easing:'ease-out'}, true);
+    if (token === version) { floating.remove(); nodes.delete(floating); }
+  }
   return { sync, clear, enqueue(boss, event) {
     sync(boss);
     const steps = resourceFeedbackSteps(boss, event);
     if (!steps.length) return false;
     if (event.actionId && seen.has(event.actionId)) return true;
     if (event.actionId) seen.add(event.actionId);
-    queue.push(...steps); void drain(boss);
+    // Independent regenerations float together, never through Lady's HP/Sede queue.
+    for (const step of steps.filter(step => ['daughterHp','ladyHp'].includes(step.metric))) {
+      const token=version, previous=entityQueues.get(step.entityId);
+      // Bleeding first, regeneration second on the same portrait; other daughters stay independent.
+      const task = previous ? previous.then(()=>token===version ? floatOnDaughter(step) : undefined) : floatOnDaughter(step);
+      entityQueues.set(step.entityId,task);
+      void task.finally(()=>{if(entityQueues.get(step.entityId)===task)entityQueues.delete(step.entityId);});
+    }
+    queue.push(...steps.filter(step => !['daughterHp','ladyHp'].includes(step.metric))); void drain(boss);
     return true;
   } };
 }
