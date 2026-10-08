@@ -38,7 +38,7 @@ async function fitBackground() {
   if (current !== revision || !dimensions) return;
   const { width, height } = table.getBoundingClientRect();
   if (!width || !height) return;
-  if (document.body.dataset.tableTheme === 'resident') {
+  if (['resident', 'dimitrescu'].includes(document.body.dataset.tableTheme)) {
     if (!preservedArt) {
       preservedArt = document.createElement('div');
       preservedArt.className = 'table-preserved-art';

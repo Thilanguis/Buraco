@@ -532,11 +532,21 @@ export const nemesisBossMechanics = Object.freeze({
     const intent = boss.currentIntent; const payload = intent?.payload;
     if (intent?.abilityId === 'horde_invasion' && payload.entryKind === 'grabber' && payload.targetPlayerId === playerId) resolveEntry(boss, intent, gameState);
     if (!intent || !objectiveIds.has(intent.abilityId) || payload.targetPlayerId !== playerId || payload.resolved) return {};
-    const { fulfilled, failed, base: amount } = getNemesisObjectiveOutcome(boss, intent);
+    const projection = getNemesisObjectiveOutcome(boss, intent);
+    const { fulfilled, failed, base: amount } = projection;
+    const dangerBefore = boss.danger;
     payload.infectionApplied = changeNemesisInfection(boss, amount, `${intent.id}:failure`, { failure: failed });
     payload.resolved = true; payload.fulfilled = fulfilled;
     payload.resolutionText = `${intent.name}: ${failed ? 'objetivo incompleto' : 'sucesso'}; Infecção +${payload.infectionApplied}.`;
-    recordBossEvent({ type: 'nemesisObjective', actionId: `${intent.id}:objective`, outcome: payload.resolutionText, fulfilled, danger: boss.danger, amount: payload.infectionApplied });
+    let remaining = payload.infectionApplied;
+    const resourceSources = [{ entityId: 'boss', amount },
+      { entityId: 'infected', amount: projection.infectedAmount + projection.reinforcedAmount },
+      { entityId: 'boss', amount: projection.omegaAmount }].map(source => {
+        const applied = Math.min(remaining, source.amount); remaining -= applied;
+        return { ...source, amount: applied };
+      }).filter(source => source.amount > 0);
+    recordBossEvent({ type: 'nemesisObjective', actionId: `${intent.id}:objective`, outcome: payload.resolutionText, fulfilled, danger: boss.danger, dangerBefore,
+      amount: payload.infectionApplied, resourceSources });
     return {};
   },
   afterRoundAdvance({ boss }) {

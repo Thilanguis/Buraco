@@ -1,3 +1,4 @@
+import { CASTLE_BALANCE, ladyBloodBalance } from '../dimitrescu-castle.js';
 const ability = (id, name, weight, phases, describe) => ({ id, name, weight, phases, describe });
 
 export const DIMITRESCU_BLOOD_RELIEF_BY_KIND = Object.freeze({
@@ -18,10 +19,10 @@ export const dimitrescuDefinition = Object.freeze({
     2: 'assets/images/boss-dimitrescu-fase2.png',
     3: 'assets/images/boss-dimitrescu-fase3.png',
   }),
-  tableTheme: 'resident',
+  tableTheme: 'dimitrescu',
   deckTheme: 'resident',
   accent: '#b91c1c',
-  maxHp: 2300,
+  maxHp: CASTLE_BALANCE.ladyHp,
   dangerType: 'blood',
   maxDanger: 100,
   daughters: Object.freeze({
@@ -30,11 +31,6 @@ export const dimitrescuDefinition = Object.freeze({
     daniela: Object.freeze({ id: 'daniela', name: 'Daniela', portrait: 'assets/images/boss-dimitrescu-daniela.png' }),
   }),
   abilityDaughters: Object.freeze({
-    bela_hunt: Object.freeze(['bela']),
-    cassandra_feast: Object.freeze(['cassandra']),
-    cassandra_dead_feast: Object.freeze(['cassandra']),
-    daniela_swarm: Object.freeze(['daniela']),
-    three_daughters: Object.freeze(['bela', 'cassandra', 'daniela']),
   }),
   phaseNames: Object.freeze({
     1: 'A Caçada',
@@ -56,29 +52,25 @@ export const dimitrescuDefinition = Object.freeze({
     defeat: 'O castelo sempre cobra de quem entra.',
   }),
   phaseIntroAbilities: Object.freeze({
-    2: Object.freeze(['cassandra_dead_feast', 'cassandra_feast', 'daniela_swarm', 'crimson_clot']),
-    3: Object.freeze(['three_daughters', 'castle_lockdown', 'red_wine', 'crimson_clot']),
+    2: Object.freeze(['cassandra_dead_feast', 'crimson_clot', 'three_daughters', 'impure_blood']),
+    3: Object.freeze(['castle_lockdown', 'red_wine', 'crimson_clot', 'three_daughters', 'impure_blood']),
   }),
   abilities: Object.freeze([
-    ability('bela_hunt', 'Caçada de Bela', 5, [1, 2, 3], ({ phase = 1 }) =>
-      `Bela marca uma carta jogável. Use-a até o fim do turno do alvo ou a Sede aumenta ${phase === 3 ? 16 : 14}. Cumprir evita a punição.`),
     ability('blood_tithe', 'Tributo de Sangue', 4, [1, 2, 3], ({ phase = 1 }) =>
-      `No fim da rodada, mãos grandes alimentam a Sede: 8–10 cartas +${phase === 3 ? 6 : 4}; 11+ cartas +${phase === 3 ? 10 : 8}, por jogador.`),
+      `No fim da rodada, mãos grandes alimentam a Sede: 8–10 cartas +${ladyBloodBalance(phase).mediumTithe}; 11+ cartas +${ladyBloodBalance(phase).heavyTithe}, por jogador.`),
     ability('red_wine', 'Vinho Carmesim', 2, [1, 2, 3], ({ phase = 1 }) =>
       `Se estiver ferida e tiver ao menos 20 de Sede, Lady Dimitrescu consome 15 de Sede para se curar ${phase === 1 ? 140 : phase === 2 ? 200 : 260} HP.`),
     ability('crimson_brand', 'Marca Carmesim', 4, [1, 2, 3], ({ phase = 1 }) =>
-      `Lady marca uma carta de cada cooperador. Cada carta marcada usada legalmente evita a punição; cada marca que sobreviver à rodada aumenta a Sede em ${phase === 3 ? 9 : 7}.`),
-    ability('cassandra_feast', 'Banquete de Cassandra', 5, [2, 3], ({ phase = 2 }) =>
-      `Cassandra marca um jogo. Alimente esse jogo nesta rodada ou a Sede aumenta ${phase === 3 ? 18 : 16}. Cumprir evita a punição.`),
+      `Lady marca uma carta de cada cooperador. Cada carta marcada usada legalmente evita a punição; cada marca que sobreviver à rodada aumenta a Sede em ${ladyBloodBalance(phase).crimsonBrand}.`),
     ability('cassandra_dead_feast', 'Banquete dos Mortos', 3, [2, 3], ({ phase = 2 }) =>
-      `Cassandra profana o próximo Morto. Quando ele for tomado, Lady ganha ${phase === 3 ? 16 : 12} de Sede e cura ${phase === 3 ? 130 : 90} HP; uma Canastra Real ou Ás-a-Ás reduz a profanação a apenas +4 de Sede e anula a cura.`),
-    ability('daniela_swarm', 'Enxame de Daniela', 4, [2, 3], ({ phase = 2 }) =>
-      `Daniela contamina o lixo. Pegá-lo nesta rodada aumenta a Sede em ${phase === 3 ? 15 : 12}; evitar o lixo não altera a Sede.`),
+      `Lady profana o próximo Morto. Quando ele for tomado, ganha ${ladyBloodBalance(phase).deadFeast} de Sede e cura ${phase === 3 ? 130 : 90} HP, com bônus de Fúria; uma Canastra Real ou Ás-a-Ás reduz a profanação a +4 de Sede base e anula a cura.`),
     ability('crimson_clot', 'Coágulo Carmesim', 3, [2, 3], ({ phase = 2 }) =>
       `Lady solidifica a própria Sede em uma barreira de ${phase === 3 ? 260 : 180} de proteção. Se a equipe romper o Coágulo, evita a cura; se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.`),
     ability('castle_lockdown', 'Portas do Castelo', 3, [3], () =>
       'O lixo fica bloqueado durante toda a rodada. Os cooperadores precisam sobreviver usando o monte.'),
-    ability('three_daughters', 'As Três Filhas', 5, [3], () =>
-      'Bela, Cassandra e Daniela atacam juntas. Cada objetivo falho aumenta a Sede em 8; cada objetivo cumprido evita sua punição.'),
+    ability('three_daughters', 'As Três Filhas', 3, [2, 3], () =>
+      'Nesta rodada, todas as filhas vivas usam suas passivas. Cada falha ou reação custa +3 Sede.'),
+    ability('impure_blood', 'Sangue Impuro', 3, [1, 2, 3], () =>
+      'Nesta rodada, o primeiro Joker ou 2 usado como coringa por cada cooperador causa +3 Sede. 2 natural não conta. Máximo +6.'),
   ]),
 });

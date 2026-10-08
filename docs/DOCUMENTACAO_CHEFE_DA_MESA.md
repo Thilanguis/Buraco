@@ -4,7 +4,7 @@
 ## Status da documentação
 
 
-**Revisada contra o workspace local atual — 07/10/2026, incluindo durabilidade do Nemesis, ajuda opcional do Lixo e o pacote de compatibilidade/passiva/batida.**
+**Revisada contra o workspace local atual — 07/10/2026, incluindo o rework experimental da Dimitrescu, durabilidade do Nemesis, ajuda opcional do Lixo e compatibilidade/passiva/batida.**
 
 ### Compatibilidade de estados — 07/10/2026
 
@@ -1960,300 +1960,98 @@ Vitória da Matriarca:
 
 # 7. Lady Dimitrescu
 
+Rework experimental de 07/10/2026. Contrato detalhado, itens, migração e validação: [REWORK_DIMITRESCU_2026-10-07.md](REWORK_DIMITRESCU_2026-10-07.md).
 
-## 7.1 Identidade
+## 7.1 Identidade e Vínculo de Sangue
 
+Lady tem **2000 HP** e Sede 0–100. Sede 100 ou fim dos recursos com Lady viva derrota a equipe. Bela, Cassandra e Daniela estão presentes desde o início, com **450/450 HP cada**; nunca revivem.
 
-Chefe vampírica de pressão progressiva. A **Sede de Sangue** não funciona apenas como uma barra de derrota: ela também é combustível para cura e proteção, o que diferencia a Dimitrescu do Banqueiro. Usa a mesa e o baralho `resident`.
+Lady começa com 2000 HP e **1500 PROT. adicionais consumíveis**. Cada filha viva sustenta capacidade de 500 PROT. Todo dano direcionado à Lady, humano/BOT/Ataque Final de 100, passa primeiro pelo Coágulo, depois pela PROT.; o excedente atinge a vida. Morte de filha retira até 500 da PROT. restante e limita ao novo teto de `500 × filhas vivas`, sem dano automático à vida. PROT. consumida não recarrega: zerá-la expõe os 2000 HP mesmo com filhas vivas. Não existe mais piso de HP. `boss.bloodLinkProtection` persiste em snapshot/reload/undo; saves sem o campo inicializam uma vez pelo número de filhas vivas, preservando HP e os demais recursos.
 
+O jogador escolhe Lady ou uma filha viva como alvo do próximo dano. Cada fonte tem um alvo único e não transborda. Filhas têm lifecycle próprio, sem invasão/reanimação do Nemesis.
 
-```text
-HP: 2300
-Sede de Sangue: 0..100
-```
+## 7.2 Sede e canastras
 
-
-A equipe perde imediatamente se a Sede chegar a **100**. Se os recursos da partida acabarem e Lady Dimitrescu ainda estiver viva, ela também vence.
-
-
-## 7.2 Redução de Sede
-
-
-Evoluções de canastra removem Sede apenas quando o jogo alcança um tier novo:
-
-
-| Evolução | Sede removida |
+| Tier novo | Sede removida |
 |---|---:|
 | Simples / Suja | 0 |
 | Limpa | 4 |
 | Real | 8 |
 | Ás-a-Ás | 12 |
 
+Evoluções descontam apenas a diferença entre tiers. Cumprir habilidade/passiva nunca reduz Sede: apenas evita a punição. Vinho Carmesim continua sendo gasto interno da Lady por cura.
 
-A Sede também pode cair ao cumprir objetivos das filhas, romper a Marca Carmesim ou destruir o Coágulo Carmesim.
+## 7.3 Fases e Fúria
 
+As fases continuam A Caçada / As Filhas / Banquete Carmesim. As imagens e os áudios de transformação continuam determinados pelas fases:
 
-## 7.3 Fases
+- F1: `boss-dimitrescu.png`;
+- F2: `boss-dimitrescu-fase2.png` e `transformacao-dimitrescu-fase2.mp3`;
+- F3: `boss-dimitrescu-fase3.png` e `transformacao-dimitrescu-fase3.mp3`.
 
+Fúria é independente da fase e aparece como chip/aura.
 
-| Fase | Nome | Identidade |
-|---:|---|---|
-| 1 | A Caçada | Bela caça cartas; Lady cobra sangue, marca vítimas e pode gastar Sede para se curar |
-| 2 | As Filhas | Cassandra passa a atacar jogos e o Morto; Daniela contamina o lixo; o Coágulo cria proteção |
-| 3 | Banquete Carmesim | as três filhas podem agir juntas e Lady combina bloqueio, cura e defesa vampírica |
+| Filhas mortas | Estado | Cura da Lady | Sede ofensiva da Lady |
+|---:|---|---:|---:|
+| 0 | NORMAL | ×1,00 | +0 por evento positivo |
+| 1 | FÚRIA I | ×1,10 | +2 por evento positivo |
+| 2 | FÚRIA II | ×1,20 | +4 por evento positivo |
+| 3 | FÚRIA FINAL | ×1,30 | +6 por evento positivo |
 
+Cura arredondada para baixo, limitada ao HP máximo. Fúria aplica-se a Vinho, Banquete dos Mortos e conversão do Coágulo. Não altera passivas +3 das filhas, regeneração das filhas, custo do Vinho, máximos de HP nem sucesso de objetivo.
 
-### Transformação visual por fase
+## 7.4 Passivas permanentes
 
+Rodada normal escolhe exatamente uma filha viva com RNG/seed canônico, evitando a última escolha normal quando existe alternativa. Com uma viva, sempre ela; com nenhuma, nenhuma passiva. As outras ficam vivas/atacáveis, regeneram, sustentam Vínculo e aceitam itens, mas sem objetivo. As Três Filhas (F2/F3) substitui essa escolha por todas as vivas. Escolha e objetivo persistem no snapshot/reload/undo; render não sorteia. Entidade continua apenas `alive`/`dead`, sem lifecycle artificial. A filha escolhida executa:
 
-O retrato principal da Dimitrescu muda junto com a fase e permanece nessa forma até a próxima transição:
+- **Bela — mão:** marca uma carta realmente jogável de um cooperador. Colocá-la legalmente em jogo até o fim do turno desse alvo evita a punição; falha +3 Sede. Sem candidato legal, não marca nem pune.
+- **Cassandra — mesa:** marca jogo existente com contribuição legal concreta disponível à equipe. Qualquer cooperador pode alimentá-lo até o fim da rodada; falha +3 Sede. Sem candidato, não marca nem pune.
+- **Daniela — Lixo:** primeira retirada efetiva da equipe na rodada, protegida ou completa, +3 Sede uma vez. Monte ou ausência de retirada não punem.
 
+No fim da rodada, obrigações pendentes resolvem antes da regeneração. Cada filha viva recupera até **50 HP próprios**, nunca HP da Lady. Frio bloqueia exatamente a próxima regeneração; Anticoagulante reduz permanentemente para 25, sem acumular.
 
-- **Fase 1:** `assets/images/boss-dimitrescu.png` — forma humana atual;
-- **Fase 2:** `assets/images/boss-dimitrescu-fase2.png` — semi-transformação;
-- **Fase 3:** `assets/images/boss-dimitrescu-fase3.png` — forma dragão.
+Morte cancela obrigação, encerra regeneração, impede alvo/item e atualiza Vínculo/Fúria imediatamente. Cada morte individual gera flash na Lady e toca `what-have-you-done-to-my-daughter.mp3`, sem repetição em reload.
 
+## 7.5 Cartas-item
 
-Ao entrar na Fase 2, o sistema toca `assets/sfx/transformacao-dimitrescu-fase2.mp3` e apresenta a fala: **“Vocês queriam conhecer a dona do castelo? Então olhem bem.”**
+Exatamente **15 IDs físicos distintos**, **3 de cada tipo**, associados uma única vez antes do embaralhamento/distribuição. Qualquer carta, inclusive Joker, pode receber item. Não há garantia de mão inicial, favoritismo de zona ou rerrolagem.
 
+Usar carta normalmente ou sacrificar a partir da mão, após comprar, em filha viva. Sacrifício não é jogo/descarte, não encerra turno nem permite batida; preserva descarte legal e topo obrigatório. Carta real fica anexada à filha. Na morte, retorna ao fundo do Lixo com item permanentemente consumido.
 
-Ao entrar na Fase 3, toca `assets/sfx/transformacao-dimitrescu-fase3.mp3` e apresenta: **“Chega de elegância. Agora verão a verdadeira dona deste castelo.”**
+Todo item reduz HP máximo em 100, com piso 200, e limita HP atual ao novo máximo. Efeito especial continua funcionando no piso.
 
+| Item | Efeito adicional |
+|---|---|
+| Adaga | 50 de dano imediato |
+| Frasco de Frio | Bloqueia a próxima regeneração |
+| Anticoagulante | Regen 50→25 permanente, sem acumular |
+| Explosivo | 100 de dano imediato |
+| Relíquia | Suprime uma janela da passiva da filha: atual se ainda pendente, senão próxima |
 
-Os áudios são disparados pelo evento real de transição de fase e não repetem em reload. Se uma nova imagem ainda não estiver disponível, o retrato base `boss-dimitrescu.png` é usado como fallback.
+PNGs reais centralizados em `ITEM_DEFINITIONS`, sobrepostos à face sem ocultar cantos nem interceptar clique. HUD oferece “ITENS DO CASTELO”, cinco artes e ajuda opcional oficial. Filhas mostram HP/máximo, barra, regen, efeitos, obrigação e cartas sacrificadas reais.
 
+## 7.6 Habilidades ativas da Lady
 
-## 7.4 Caçada de Bela
+Valores abaixo são **bases**; Fúria soma ao evento ofensivo positivo e multiplica curas. Exceção: Sangue Impuro mantém +3 por cooperador e teto +6 na rodada, sem acréscimo de Fúria.
 
+| Habilidade | Peso | Fases | Regra base |
+|---|---:|---|---|
+| Tributo de Sangue | 4 | 1/2/3 | Mão 0–7: 0; 8–10: +3/+4/+6; 11+: +6/+8/+10 por jogador; resolução coletiva |
+| Vinho Carmesim | 2 | 1/2/3 | Lady ferida com Sede 20+: consome 15 e cura até 140/200/260 |
+| Marca Carmesim | 4 | 1/2/3 | Uma carta jogável por cooperador; falha +5/+7/+9 por marca |
+| Banquete dos Mortos | 3 | 2/3 | Habilidade da Lady mesmo com Cassandra morta; tomar Morto profanado: +10/+14 e cura 90/130; Real/Ás-a-Ás: base +4, sem cura |
+| Coágulo Carmesim | 3 | 2/3 | Proteção 180/260; absorve antes do Vínculo; metade restante vira cura ao fim da rodada; romper evita cura, sem alívio de Sede |
+| Portas do Castelo | 3 | 3 | Lixo fechado durante a rodada |
+| As Três Filhas (versão 2) | 3 | 2/3 | Todas as vivas usam a passiva padrão; +3 por falha/reação, sem duplicação ou cobrança extra; mortas não participam |
+| Sangue Impuro | 3 | 1/2/3 | Primeiro Joker ou 2 como coringa de cada cooperador +3; máximo +6, inclusive com Fúria. 2 natural não conta; nenhum coringa = 0. Uso legal e flags/validador canônicos, não posição visual. Gatilho por jogador salvo no payload |
 
-```text
-id: bela_hunt
-peso: 5
-fases: 1, 2 e 3
-```
+`bela_hunt`, `cassandra_feast` e `daniela_swarm` permanecem fora do sorteio/catálogo/introduções. `three_daughters` retorna versão 2, substituindo o payload antigo +8; snapshots da versão antiga cancelam com segurança, sem punição retroativa. Introduções F2: Banquete dos Mortos/Coágulo/Três Filhas/Sangue Impuro; F3: Portas/Vinho/Coágulo/Três Filhas/Sangue Impuro. Demais pesos/números antigos preservados.
 
+## 7.7 Persistência e calibração
 
-Bela marca **uma carta exata** de um cooperador; somente essa carta recebe a mancha de sangue da Caçada.
+IDs de item, consumo, anexos, HP/regen, passivas, Frio/Relíquia, alvo e eventos persistem em snapshot/reload/undo. Normalização não sorteia itens nem regenera/ressuscita filhas. Saves anteriores ao rework recebem o modelo das filhas e limite de HP da Lady, mas não inventam distribuição retroativa de itens; para testar a distribuição completa, iniciar nova partida ou cenário do Laboratório.
 
-
-- usar a carta legalmente até o fim do turno: **Sem punição**;
-- falhar nas Fases 1–2: **Sede +14**;
-- falhar na Fase 3: **Sede +16**.
-
-
-## 7.5 Tributo de Sangue
-
-
-```text
-id: blood_tithe
-peso: 4
-fases: 1, 2 e 3
-```
-
-
-No fechamento da rodada, cada mão é avaliada separadamente:
-
-
-| Cartas na mão | Fases 1–2 | Fase 3 |
-|---:|---:|---:|
-| 0–7 | +0 | +0 |
-| 8–10 | +4 | +6 |
-| 11+ | +8 | +10 |
-
-
-## 7.6 Vinho Carmesim
-
-
-```text
-id: red_wine
-peso: 2
-fases: 1, 2 e 3
-```
-
-
-Elegível quando Lady está ferida e possui Sede suficiente. Ela **consome 15 de Sede** para se regenerar:
-
-
-- Fase 1: até **140 HP**;
-- Fase 2: até **200 HP**;
-- Fase 3: até **260 HP**.
-
-
-A cura deixa de ser gratuita: o jogador pode ver a Sede cair, mas em troca a luta é prolongada.
-
-
-## 7.7 Marca Carmesim
-
-
-```text
-id: crimson_brand
-peso: 4
-fases: 1, 2 e 3
-```
-
-
-Lady marca uma carta jogável de **cada cooperador**. O HUD usa o mesmo padrão amarelo de objetivos múltiplos já adotado pelos outros chefes e mostra cada marca separadamente.
-
-
-- cada carta marcada usada legalmente: **Sem punição**;
-- cada marca que sobreviver à rodada: **Sede +7** nas Fases 1–2 ou **+9** na Fase 3.
-
-
-A Marca Carmesim usa uma mancha de sangue diferente da Caçada de Bela para que as duas mecânicas sejam reconhecíveis visualmente.
-
-
-## 7.8 Banquete de Cassandra
-
-
-```text
-id: cassandra_feast
-peso: 5
-fases: 2 e 3
-```
-
-
-Cassandra marca um jogo existente e ele recebe uma moldura/mancha própria de sangue.
-
-
-- alimentar o jogo na rodada: **Sem punição**;
-- falhar na Fase 2: **Sede +16**;
-- falhar na Fase 3: **Sede +18**.
-
-
-## 7.9 Banquete dos Mortos
-
-
-```text
-id: cassandra_dead_feast
-peso: 3
-fases: 2 e 3
-```
-
-
-Cassandra profana o próximo Morto disponível. A maldição permanece visível no próprio monte do Morto até ele ser tomado.
-
-
-Quando o Morto profanado é conquistado:
-
-
-- Fase 2: **Sede +12** e Lady cura até **90 HP**;
-- Fase 3: **Sede +16** e Lady cura até **130 HP**;
-- se a equipe já possui Canastra **Real ou Ás-a-Ás**, o Morto é purificado: apenas **Sede +4** e a cura é anulada.
-
-
-## 7.10 Enxame de Daniela
-
-
-```text
-id: daniela_swarm
-peso: 4
-fases: 2 e 3
-```
-
-
-Daniela contamina **uma carta real do lixo**. A pilha e a própria carta-alvo recebem sangue visual quando ela está no topo.
-
-
-- evitar o lixo durante a rodada: **Sem punição**;
-- retirar o lixo na Fase 2: **Sede +12**;
-- retirar o lixo na Fase 3: **Sede +15**.
-
-
-## 7.11 Coágulo Carmesim
-
-
-```text
-id: crimson_clot
-peso: 3
-fases: 2 e 3
-```
-
-
-Lady solidifica o sangue em uma proteção própria, distinta do Casulo da Matriarca:
-
-
-- Fase 2: **180** de proteção;
-- Fase 3: **260** de proteção;
-- o dano atinge primeiro o Coágulo;
-- romper o Coágulo: **evita a cura sem alterar a Sede**;
-- se ele sobreviver até o fim da rodada, **50% da proteção restante vira cura**.
-
-
-O HUD reutiliza a área de proteção, mas com identidade visual de sangue/coágulo e estados de integridade próprios.
-
-
-## 7.12 Portas do Castelo
-
-
-```text
-id: castle_lockdown
-peso: 3
-fase: 3
-```
-
-
-Bloqueia o lixo durante toda a rodada. Os cooperadores precisam comprar do monte até o efeito terminar.
-
-
-## 7.13 As Três Filhas
-
-
-```text
-id: three_daughters
-peso: 5
-fase: 3
-```
-
-
-Cria até três objetivos válidos, um por filha:
-
-
-- **Bela:** usar a carta marcada;
-- **Cassandra:** alimentar o jogo marcado;
-- **Daniela:** evitar a carta contaminada do lixo.
-
-
-O HUD lista cada objetivo numa linha separada com o padrão de feedback amarelo (`☐`, `☑`, `✕`). Os retratos de Bela, Cassandra e Daniela aparecem simultaneamente e mudam de estado conforme cada objetivo é concluído ou falha.
-
-
-No fechamento:
-
-
-- cada objetivo cumprido: **Sem punição**;
-- cada objetivo falho: **Sede +8**.
-
-
-## 7.14 Filhas, marcas de sangue e áudio
-
-
-Lady permanece no retrato principal. Bela, Cassandra e Daniela aparecem em uma faixa independente sob o HUD, em três posições fixas de 1/3 da largura. Cada filha aparece somente quando participa da habilidade ativa ou de um efeito persistente ligado a ela.
-
-
-Os retratos preservam proporção com `object-fit: cover`: **184×116** no desktop, **134×86** em tablet e **112×76** no mobile. Estados: ativa em amarelo, concluída em verde e falha em vermelho.
-
-
-A linguagem visual de sangue é aplicada ao **alvo real**, não à zona inteira: carta de Bela, carta da Marca Carmesim, jogo de Cassandra, carta contaminada de Daniela e Morto profanado. A barra de Sede usa bordô/vinho escuro com textura e gotas em CSS; animações pesadas ficam desativadas em touch e `prefers-reduced-motion`.
-
-
-O áudio `ganho-sangue-dimitresco.mp3` toca sempre que a Sede aumenta. As transições de Fase 2 e Fase 3 usam, respectivamente, `transformacao-dimitrescu-fase2.mp3` e `transformacao-dimitrescu-fase3.mp3`, sincronizados com a troca persistente do retrato. A risada eventual da Dimitrescu continua reservada para uma implementação futura.
-
-
-## 7.15 Habilidades e pesos
-
-
-| Habilidade | Peso | Fases |
-|---|---:|---|
-| Caçada de Bela | 5 | 1, 2 e 3 |
-| Tributo de Sangue | 4 | 1, 2 e 3 |
-| Vinho Carmesim | 2 | 1, 2 e 3 |
-| Marca Carmesim | 4 | 1, 2 e 3 |
-| Banquete de Cassandra | 5 | 2 e 3 |
-| Banquete dos Mortos | 3 | 2 e 3 |
-| Enxame de Daniela | 4 | 2 e 3 |
-| Coágulo Carmesim | 3 | 2 e 3 |
-| Portas do Castelo | 3 | 3 |
-| As Três Filhas | 5 | 3 |
-
+Números centralizados em `js/boss/dimitrescu-castle.js`. Este é um experimento de troca de poder, não win rate comprovado. Meta geral 65–75% (aproximadamente 70%) permanece apenas alvo de calibração.
 
 ---
 
@@ -2329,12 +2127,13 @@ Prioriza:
 Prioriza:
 
 
-- carta exata marcada pela Caçada de Bela;
+- carta exata marcada pela passiva de Bela;
 - as duas cartas da Marca Carmesim;
 - jogo marcado por Cassandra;
 - risco do Morto profanado;
-- evitar o lixo durante Daniela;
-- objetivos correspondentes em `As Três Filhas`;
+- evitar a primeira retirada do Lixo durante a passiva de Daniela;
+- Vínculo: consumir PROT. diretamente ou priorizar golpe letal na filha; Lady exposta continua atacável mesmo com filhas vivas;
+- itens da mão: preservar cartas de alto valor e marcas, evitar efeitos redundantes e usar apenas sacrifício legal;
 - urgência maior quando a Sede chega a 75 ou mais e quando o Coágulo está ativo.
 
 
@@ -2443,11 +2242,16 @@ Mostrar:
 - objetivo ativo e consequência;
 - marca de Bela somente na carta-alvo;
 - Marca Carmesim individual por cooperador;
-- marca de Cassandra no jogo e no Morto profanado;
-- contaminação de Daniela na carta real do lixo;
+- marca de Cassandra no jogo e maldição da Lady no Morto profanado;
+- passiva de Daniela no chip da filha quando selecionada (não exige carta específica e não ativa a marcação legada de Enxame no Lixo);
 - Coágulo Carmesim e proteção restante;
-- faixa contextual das filhas sob o HUD, com estado por objetivo;
+- três filhas permanentes sob o HUD, com HP/máximo, regen, efeitos e cartas reais anexadas;
+- Vínculo consumível anexado à direita na mesma barra de vida, com restante/preenchimento e `i` interno: total HP + PROT. restante (3500/3500 inicialmente), máximo 2000 + capacidade das filhas vivas. Não há piso de HP; Fúria clicável explica +10% cura/+2 Sede própria por filha morta;
+- filhas em três cards: arte integral, vida/450 visual, barra verde/amarelo/vermelho com fundo escuro como Nemesis e parte petrificada por itens; ↓ MÁX/ajuda esclarecem máximo recuperável real. Sacrifícios laterais sem painel; ícones do castelo ampliados na largura sem aumentar HUD; itens maiores na mão com contraste e cantos preservados;
 - barra de Sede visualmente distinta da barra de HP.
+- Retrato da Lady selecionável por clique/toque/teclado como Nemesis, sem botão abaixo das filhas. Sem REGEN +50 permanente: regeneração na ajuda. Um chip de passiva por filha viva à direita: CAÇADA / BANQUETE / LIXO +3, neutro quando não age e destacado com carta/jogo concreto quando selecionada. As Três Filhas destaca os três. O próprio chip abre a regra completa, consequência e contexto da rodada; sem chips adicionais de falha, CUMPRIDA ou APLICADO. Debuffs de item permanecem separados. PNG do item clicável/focável na mão; marca de Bela somente periférica, sem cobrir o centro nem a ação.
+
+Chips dos capangas/filhas de Nemesis, Nehelenia e Dimitrescu seguem o mesmo contrato visual baseado no Nemesis: fonte 8px (7px em celular), altura mínima 16px, cantos 3px e padding consistente. Status/contexto ativo usa dourado; estados de sucesso/falha/inativo continuam distintos. Debuffs azuis com seta e ajuda do efeito continuam exclusivos da Dimitrescu. A padronização não altera regras nem posições de cartas/objetivos.
 
 
 ## 9.6 Animações
@@ -2504,7 +2308,7 @@ Persistir:
 - IDs de dano;
 - marcadores por jogo;
 - Sede de Sangue e objetivos das filhas;
-- estado contextual da faixa das filhas;
+- estado persistente das filhas, passivas, regen, anexos, associação/consumo de itens e alvo;
 - IDs de eventos.
 
 
@@ -2626,13 +2430,13 @@ Em touch, tablet e `prefers-reduced-motion`:
 
 | Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu | Rainha Nehelenia | Nemesis |
 |---|---|---|---|---|---|---|
-| HP | 2650 | 2600 | 2000 | 2300 | 2400 | 2200 |
+| HP | 2650 | 2600 | 2000 | 2000 | 2400 | 2200 |
 | Perigo | Dívida coletiva | Dominação individual | Florescimento | Sede de Sangue | Mundo do Espelho (0–100) | Infecção (0–100) |
 | Derrota especial | Dívida 100 | ambos em 50/50 de Dominação | 5 Flores | Sede 100 | 5 Espelhos | Infecção 100 |
 | Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas | Infecção, zumbis persistentes e redirecionamento de dano |
 | Recuperação da equipe | redução de Dívida | Dominação -4/-8/-12 | poda por evolução | redução de Sede por canastra | Mundo do Espelho -4/-8/-12 | Infecção -4/-8/-12 por canastra |
 | Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Dominação e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo | Zona Contaminada e Agarrador após compra |
-| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Banquete de Cassandra, Coágulo e Marca Carmesim | Jogo Espelhado, Laço do Tigre, Presa Marcada e Vigilância | Caçada, Tentáculos, Lança-Foguetes e Devorador |
+| Jogos | Penhora e Limite | Posse e Mãos Atadas | Raiz, Enxerto, Casulo | Passiva de Cassandra, Coágulo e Marca Carmesim | Jogo Espelhado, Laço do Tigre, Presa Marcada e Vigilância | Caçada, Tentáculos, Lança-Foguetes e Devorador |
 
 
 ---
@@ -2965,6 +2769,10 @@ Pressões de teste: Jogo Espelhado erro/ignorar +18; Siga o Reflexo falha +16; E
 
 
 O HUD mostra o preenchimento parcial da Dominação/Espelhos e o progresso numérico para tornar o risco legível.
+
+### Dimitrescu — rework experimental de 07/10/2026
+
+Lady 2000 / filhas 450 cada / regen 50 / 15 itens / Vínculo 1500–0 / Fúria progressiva. Substitui a rotação forte antiga das filhas, não a acumula. Não há percentual atual medido; meta 65–75% é só alvo. Contrato e centralização: `REWORK_DIMITRESCU_2026-10-07.md` e `js/boss/dimitrescu-castle.js`. Demais chefes não foram rebalanceados por esse rework.
 
 ### Nemesis — revisão experimental de 06/10/2026
 

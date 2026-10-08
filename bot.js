@@ -301,6 +301,10 @@ export class BuracoBot {
           me = state.players[botIndex];
         }
         engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
+        if (state.mode === 'boss_dimitrescu') {
+          await engine.executeCastleItems?.(me.id);
+          this.assertActive(engine, signal);
+        }
 
         if (!engine.shouldSkipMelds?.(me.id)) {
           await this.processMelds(botIndex, ctx, engine, signal);

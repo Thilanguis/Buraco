@@ -177,4 +177,11 @@ Comparação anterior à revisão: 504 testes, 452 passaram, 52 falharam. As fal
 - Um plano legal no anúncio pode deixar de funcionar se os jogadores consumirem as cartas/alterarem a mesa depois. Não há troca silenciosa de exigência.
 - O comprovador de Zona é conservador: pode deixar de escolher a habilidade em extensões muito longas que exigem mais cartas simultâneas que o planejador examina. Nunca é autorizado retirar o Lixo fora das regras oficiais.
 - Ataque final direcionado a zumbi pode perder a batalha; mantém aviso, sem overflow.
-- Deploy/cache não foram publicados nem alterados nesta rodada.
+- Deploy/cache não foram publicados nem alterados naquela rodada de 06/10.
+
+### Apresentação de Infecção e auxiliares no laboratório — 07/10/2026
+
+- Ganhos de Infecção entram em fila: base da habilidade, bônus efetivamente aplicado do Infectado (incluindo Mutado/Reforçado) e Ômega. Um traço verde liga o Infectado à barra antes do seu número. Os componentes vêm da projeção canônica usada pela resolução, registrados no evento; não se recalculam com buffs futuros. Perto de 100, só se anima a parte aplicada. Sem mudança de Infecção, cadência, HP ou pesos.
+- Render/reload não repetem histórico; undo e troca de mesa cancelam transferências. Reduced motion elimina voo/pulso. Nenhum novo som ou asset; efeitos usam elementos CSS/WAAPI temporários.
+- DevTools → Laboratório → Auxiliares permite trazer/retirar/derrotar zumbis, ajustar vida e preparar Mutado/Reforçado, independente da habilidade ou do teto de invasão. Exceder o teto só é permitido na fixture manual, não no combate normal. Fase 3 continua normalizando Mutado; só um zumbi pode receber o reforço vigente. Retirar Agarrador libera travas; ajustar Devorador reinicia seus créditos de teste sem premiar cartas antigas. Snapshot/undo preservam as edições.
+- Cache local atualizado para v285 para carregar o módulo novo; nenhum deploy ou push.

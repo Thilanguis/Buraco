@@ -1,4 +1,75 @@
 /*  dimitrescu — estilos exclusivos. Regra: todo seletor deve permanecer escopado por body[data-boss-id='dimitrescu'].  */
+body[data-boss-id='dimitrescu'] #castleItemRibbon { display:flex; align-items:center; gap:4px; min-width:0; flex-wrap:nowrap; padding:3px 0; }
+body[data-boss-id='dimitrescu'] #castleItemRibbon > b { flex:0 1 75px; min-width:55px; font-size:9px; color:#eeb9aa; }
+body[data-boss-id='dimitrescu'] #castleItemRibbon button:has(img) { position:relative; display:flex; flex:1 1 0; min-width:0; gap:2px; align-items:center; width:auto; height:55px; border:0; background:none; border-radius:5px; padding:0; margin:0; }
+body[data-boss-id='dimitrescu'] #castleItemRibbon img { flex:1 1 0; min-width:0; width:calc(100% - 20px); height:43px; object-fit:contain; pointer-events:none; }
+body[data-boss-id='dimitrescu'] .castle-item-count { flex:0 0 auto; font-size:9px; line-height:12px; color:#f5dbb5; text-shadow:0 1px 2px #000; }
+body[data-boss-id='dimitrescu'] .boss-hp-meter .boss-meter-track { position:relative; height:18px; }
+body[data-boss-id='dimitrescu'] #castleBloodLink { position:absolute; top:0; bottom:0; right:0; z-index:4; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; padding:0 3px; color:#ffe5b2; background:repeating-linear-gradient(125deg,#67472a 0 5px,#795835 5px 6px); border-left:1px solid #edc780; font-size:8px; font-weight:900; }
+body[data-boss-id='dimitrescu'] #castleBloodLink[hidden] { display:none; }
+body[data-boss-id='dimitrescu'] #castleBloodLink { isolation:isolate; background:#211912; }
+body[data-boss-id='dimitrescu'] .castle-link-fill { position:absolute; inset:0 auto 0 0; z-index:-1; background:repeating-linear-gradient(125deg,#67472a 0 5px,#795835 5px 6px); transition:width .45s ease; }
+body[data-boss-id='dimitrescu'] .castle-link-label { white-space:nowrap; }
+body[data-boss-id='dimitrescu'] #castleBloodLink button { flex:0 0 auto; width:14px; height:14px; min-width:0; padding:0; margin:0; font-size:9px; }
+body[data-boss-id='dimitrescu'] #castleFury { position:absolute; right:10px; top:10px; z-index:5; width:auto; height:auto; margin:0; font-size:10px; font-weight:900; color:#ffddad; background:#2d080ce6; border:1px solid #d39962; border-radius:5px; padding:4px 7px; }
+body[data-boss-id='dimitrescu'] #bossHud[data-fury='1'] .boss-portrait { box-shadow:0 0 15px #ca183844; }
+body[data-boss-id='dimitrescu'] #bossHud[data-fury='2'] .boss-portrait { box-shadow:0 0 22px #eb254a66; }
+body[data-boss-id='dimitrescu'] #bossHud[data-fury='3'] .boss-portrait { box-shadow:0 0 30px #ff365a99; }
+body[data-boss-id='dimitrescu'] #dimitrescuCastlePanel { width:var(--boss-stage-width); position:relative; z-index:31; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:6px auto 10px; }
+body[data-boss-id='dimitrescu'] .castle-daughter { box-sizing:border-box; position:relative; width:100%; min-width:0; min-height:150px; height:auto; overflow:hidden; aspect-ratio:8/3; color:#ffe5dc; }
+body[data-boss-id='dimitrescu'] .castle-daughter > .boss-combat-portrait { position:absolute; inset:0; width:100%; min-height:0; height:100%; object-fit:cover; object-position:center; }
+body[data-boss-id='dimitrescu'] .castle-daughter > b { position:absolute; top:auto; bottom:0; left:0; right:0; z-index:2; padding:7px 28px 7px 8px; background:#13070ed9; color:#fff; text-shadow:0 1px 4px #000; font-size:10px; }
+body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-chips { position:absolute; top:6px; right:6px; z-index:5; display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; max-width:90%; pointer-events:none; }
+body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-card-target { box-sizing:border-box; position:absolute; inset:0; min-width:0; max-width:100%; width:100%; height:100%; padding:0; border:0; transform:none; margin:0; opacity:0; z-index:3; }
+body[data-boss-id='dimitrescu'] .castle-daughter .castle-debuff { pointer-events:auto; color:#d6eafa; background:#132638e8; border:1px solid #89a9c3; border-radius:4px; height:auto; min-width:0; padding:2px 5px; line-height:1.2; }
+body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-card-target:focus-visible { opacity:1; background:transparent; outline:2px solid #ffdcab; }
+body[data-boss-id='dimitrescu'] .castle-daughter > .boss-combat-help { position:absolute; bottom:8px; right:8px; z-index:6; }
+body[data-boss-id='dimitrescu'] .castle-daughter.is-selected { outline:2px solid #ffcf96; outline-offset:-2px; }
+body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-content { position:absolute; bottom:29px; left:7px; right:7px; width:auto; z-index:3; box-sizing:border-box; background:linear-gradient(transparent,#100609b3); display:flex; flex-direction:column; gap:3px; padding:8px 0 0; font-size:10px; text-align:left; text-shadow:0 1px 3px #000; pointer-events:none; }
+body[data-boss-id='dimitrescu'] .castle-passive-chips { display:flex; flex-wrap:wrap; justify-content:flex-end; flex-basis:100%; gap:3px; }
+/* Same shared chip geometry as Nemesis; only a dormant passive's palette changes. */
+body.boss-mode[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-chips :is(.castle-passive-chip, .castle-passive-indicator):not(.is-highlighted) { color:#d1ced2; border-color:#77717c; background:#201c27e6; }
+body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-chips button { pointer-events:auto; }
+body[data-boss-id='dimitrescu'] .castle-daughter .boss-daughter-state { position:static; flex:0 0 auto; width:auto; max-width:none; font-size:9px; letter-spacing:0; }
+body[data-boss-id='dimitrescu'] .carta .castle-item-overlay { height:auto; border:0; border-radius:30%; background:radial-gradient(ellipse,#eecb8e66,transparent 70%); filter:drop-shadow(0 1px 1px #000) drop-shadow(0 0 2px #f5dabd); }
+body[data-boss-id='dimitrescu'] #handContainer .carta .castle-item-overlay,
+body[data-boss-id='dimitrescu'] #sampleHand .carta .castle-item-overlay { box-sizing:border-box; width:64%; max-height:55%; top:47%; padding:2px; background:radial-gradient(ellipse,#182e45f5 35%,#152435db 68%,#bd9b65 72%,transparent 76%); filter:drop-shadow(0 1px 2px #000); }
+body[data-boss-id='dimitrescu'] .castle-daughter-health { position:relative; display:grid; align-items:center; height:9px; }
+body[data-boss-id='dimitrescu'] .castle-hp-petrified { position:absolute; top:50%; height:3px; transform:translateY(-50%); right:0; box-sizing:border-box; background:linear-gradient(165deg,transparent 46%,#323942 47% 50%,transparent 51%),linear-gradient(25deg,#747d86,#a8afb6 40%,#5e6872 70%,#8c969e); background-size:17px 100%,100% 100%; border-left:1px solid #b5c0cb; border-radius:0 3px 3px 0; }
+body[data-boss-id='dimitrescu'] .castle-hp-petrified[hidden] { display:none; }
+body[data-boss-id='dimitrescu'] .castle-max-loss { color:#edcabb; background:#39212ae0; border:1px solid #b78b78; border-radius:4px; padding:2px 5px; font-size:9px; }
+body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-content meter { width:100%; height:9px; }
+body[data-boss-id='dimitrescu'] .castle-daughter meter { --combat-hp-color:#73ce54; --combat-hp-light:#b5ee80; }
+body[data-boss-id='dimitrescu'] .castle-daughter meter[data-health='tension'] { --combat-hp-color:#e7a622; --combat-hp-light:#ffe16c; }
+body[data-boss-id='dimitrescu'] .castle-daughter meter[data-health='danger'] { --combat-hp-color:#ef2944; --combat-hp-light:#ff7378; }
+body[data-boss-id='dimitrescu'] .castle-daughter meter::-webkit-meter-bar { background:#16181de6; border:1px solid #ffffff38; border-radius:4px; }
+body[data-boss-id='dimitrescu'] .castle-daughter meter::-webkit-meter-optimum-value,
+body[data-boss-id='dimitrescu'] .castle-daughter meter::-webkit-meter-suboptimum-value,
+body[data-boss-id='dimitrescu'] .castle-daughter meter::-webkit-meter-even-less-good-value { background:linear-gradient(90deg,var(--combat-hp-color),var(--combat-hp-light)); }
+body[data-boss-id='dimitrescu'] .castle-daughter meter::-moz-meter-bar { background:linear-gradient(90deg,var(--combat-hp-color),var(--combat-hp-light)); }
+body[data-boss-id='dimitrescu'] .castle-daughter.is-dead > img { filter:grayscale(1); opacity:.4; }
+body[data-boss-id='dimitrescu'] .boss-combat-main-target { position:absolute; inset:0; z-index:2; width:100%; height:100%; margin:0; padding:0; background:transparent; border:0; border-radius:inherit; cursor:crosshair; }
+body[data-boss-id='dimitrescu'] .boss-combat-main-target:focus-visible { outline:2px solid #ffe19f; outline-offset:-3px; }
+body[data-boss-id='dimitrescu'] .boss-portrait.is-selected { outline:2px solid #ffd38a; outline-offset:-2px; }
+body[data-boss-id='dimitrescu'] .castle-sacrifice-stack { position:absolute; top:8px; left:7px; z-index:6; display:flex; align-items:center; flex-wrap:wrap; max-width:35%; max-height:calc(100% - 90px); padding:5px; overflow:auto; background:none; border:0; border-radius:0; }
+body[data-boss-id='dimitrescu'] .castle-sacrifice-card { position:relative; flex:0 0 34px; width:34px; height:48px; margin:0 0 0 -10px; transform:rotate(calc((var(--stack-index) - 1) * 3deg)); }
+body[data-boss-id='dimitrescu'] .castle-sacrifice-card:first-child { margin-left:0; }
+body[data-boss-id='dimitrescu'] .castle-sacrifice-label { flex-basis:100%; font-size:9px; color:#e6c3ab; line-height:1.2; }
+body[data-boss-id='dimitrescu'] .castle-use-item { position:absolute; top:47%; left:50%; transform:translate(-50%,-50%); z-index:16; width:64%; height:55%; min-width:0; margin:0; padding:0; border-radius:30%; background:transparent; border:0; }
+body[data-boss-id='dimitrescu'] .castle-use-item:focus-visible { outline:2px solid #ffe19f; }
+body.boss-mode[data-boss-id='dimitrescu'] .carta.boss-card-dimitrescu-hunt::before,
+body.boss-mode[data-boss-id='dimitrescu'] .carta.boss-card-dimitrescu-hunt::after { content:none; background:none; }
+body[data-boss-id='dimitrescu'] .castle-item-targets { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+body[data-boss-id='dimitrescu'] .castle-item-targets button { padding:9px; border:1px solid #d39962; border-radius:5px; background:#28101a; color:#fff; }
+@media(max-width:600px) {
+  body[data-boss-id='dimitrescu'] #dimitrescuCastlePanel { gap:4px; }
+  body[data-boss-id='dimitrescu'] .castle-daughter { min-height:180px; }
+  body[data-boss-id='dimitrescu'] .castle-daughter > b { font-size:9px; }
+  body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-content { left:4px; right:4px; font-size:9px; }
+  body[data-boss-id='dimitrescu'] .castle-sacrifice-stack { top:45px; left:4px; max-width:55%; padding:3px; }
+  body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-chips { gap:2px; }
+  body[data-boss-id='dimitrescu'] .castle-daughter .boss-daughter-state { font-size:7px; padding:2px; }
+}
 body[data-boss-id='dimitrescu'] .boss-hud {
   border-color: rgba(185, 28, 28, 0.82);
   background: linear-gradient(180deg, rgba(35, 7, 10, 0.985), rgba(12, 5, 9, 0.975));

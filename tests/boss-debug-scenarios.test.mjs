@@ -94,7 +94,7 @@ test('controle de recurso do laboratorio avanca os cinco chefes sem disparar der
   assert.equal(matriarch.boss.bloom, 4);
   assert.equal(matriarch.boss.danger, 4);
 
-  const dimitrescu = build('dimitrescu', 'bela_hunt').state;
+  const dimitrescu = build('dimitrescu', 'crimson_brand').state;
   adjustBossDebugResource(dimitrescu, { bossId: 'dimitrescu', action: 'near' });
   assert.equal(dimitrescu.boss.danger, 90);
 

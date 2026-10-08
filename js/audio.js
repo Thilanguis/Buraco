@@ -34,6 +34,7 @@ export const BOSS_SFX = Object.freeze({
     victory: createBossSfx('assets/sfx/fim-de-jogo-matriarca.mp3', 0.9, 2),
   }),
   dimitrescu: Object.freeze({
+    daughterDeath: createBossSfx('assets/sfx/what-have-you-done-to-my-daughter.mp3', 0.95),
     blood: createBossSfx('assets/sfx/ganho-sangue-dimitresco.mp3', 0.92),
     phase2: createBossSfx('assets/sfx/transformacao-dimitrescu-fase2.mp3', 0.95),
     phase3: createBossSfx('assets/sfx/transformacao-dimitrescu-fase3.mp3', 0.95),
@@ -52,11 +53,13 @@ export const DECK_MOVE_SFX = Object.freeze({
 });
 export const TABLE_ASAS_SFX = Object.freeze({
   resident: createBossSfx('assets/sfx/canastra-as-a-as-resident.mp3', 0.45),
+  get dimitrescu() { return this.resident; },
   lunar: createBossSfx('assets/sfx/canastra-as-a-as-lunar.mp3', 0.9),
   // Legacy supplied filename was inverted; this is the WWE counting effect.
   wwe: createBossSfx('assets/sfx/asas-lunar.mp3', 1),
 });
 export const TABLE_CANASTRA_SFX = Object.freeze({
+  get dimitrescu() { return this.resident; },
   resident: Object.freeze({
     // Supplied masters have different levels; balance without rewriting audio.
     suja: createBossSfx('assets/sfx/canastra-suja-resident.mp3', 0.45),
@@ -100,6 +103,8 @@ sfxHeartbeat.loop = true;
 
 export const TABLE_AMBIENT_MUSIC = Object.freeze({
   resident: { src: 'assets/music/mesa-resident.mp3', volume: 0.35, intro: 'assets/sfx/abertura-resident.mp3' },
+  // Changing the castle artwork does not replace the existing soundtrack.
+  get dimitrescu() { return this.resident; },
   feltro: { src: 'assets/music/mesa-feltro.mp3', volume: 0.35 },
   cassino: { src: 'assets/music/mesa-cassino.mp3', volume: 0.32 },
   masmorra: { src: 'assets/music/mesa-masmorra.mp3', volume: 0.31 },

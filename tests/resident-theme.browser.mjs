@@ -13,8 +13,10 @@ assert.equal(new Set(cards.map(lunarCardAsset)).size, 54);
 assert.equal(lunarCardAsset({ rank: '../oops', suit: '♠' }), '');
 assert.equal(normalizeDeckTheme('resident'), 'resident');
 assert.equal(normalizeTableTheme('resident'), 'resident');
+assert.equal(normalizeTableTheme('dimitrescu'), 'dimitrescu');
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 assert.equal((index.match(/<option value="resident">/g) || []).length, 4);
+assert.equal((index.match(/<option value="dimitrescu">(?:🩸 )?Castelo da Dimitrescu<\/option>/g) || []).length, 2);
 const styles = ['base-menu', 'game', 'table-themes', 'domination', 'cards', 'hud', 'responsive', 'effects', 'boss-mode', 'lunar', 'wwe', 'resident', 'card-readability'];
 const fixture = `<!doctype html><html><head>${styles.map(n => `<link rel="stylesheet" href="/styles/${n}.css">`).join('')}</head>
 <body data-deck-theme="classico"><main id="gameSection" style="display:block;min-height:100vh;padding:30px">
@@ -79,6 +81,21 @@ try {
     assert.match(result.backs[4], /back-blue.webp/);
     assert.equal(result.empty, 'none');
     assert.match(result.table, /table.webp/);
+    await page.evaluate(() => { document.body.dataset.tableTheme = 'dimitrescu'; });
+    await page.waitForFunction(() => {
+      const image = getComputedStyle(document.getElementById('gameSection')).backgroundImage;
+      return image.startsWith('url(') && image.includes('dimitrescu-table.webp');
+    });
+    const castle = await page.locator('#gameSection').evaluate(async el => {
+      const image = getComputedStyle(el).backgroundImage;
+      const art = new Image(); art.src = image.match(/url\("?(.*?)"?\)/)[1]; await art.decode();
+      return { image, width: art.naturalWidth, height: art.naturalHeight };
+    });
+    assert.match(castle.image, /dimitrescu-table.webp/);
+    assert.deepEqual([castle.width, castle.height], [1774, 887]);
+    assert.deepEqual(await dimensions(), before, 'castle background does not resize cards');
+    assert.deepEqual((await semanticColors()).slice(0, 2), ['#d6ae67', '#d76b70']);
+    assert.equal(await page.locator('.resident-card-art').first().evaluate(e => getComputedStyle(e).display), 'block', 'deck is independent of the castle table');
     if (process.env.RESIDENT_SCREENSHOT) await page.screenshot({ path: process.env.RESIDENT_SCREENSHOT, fullPage: true });
     await page.evaluate(() => { document.body.dataset.deckTheme = 'classico'; });
     assert.equal(await page.locator('.resident-card-art').first().evaluate(e => getComputedStyle(e).display), 'none');
@@ -87,5 +104,5 @@ try {
     assert.equal(await page.locator('#gameSection').evaluate(e => getComputedStyle(e).getPropertyValue('--hud-accent').trim()), '#4ade80', 'other table palettes remain independent');
     await page.close();
   }
-  console.log('Resident Evil: 54 faces + 2 backs + table decode; theme switching, empty stock and geometry pass on desktop/tablet.');
+  console.log('Resident Evil / Castelo da Dimitrescu: all assets decode; independent deck, theme switching, empty stock and geometry pass on desktop/tablet.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

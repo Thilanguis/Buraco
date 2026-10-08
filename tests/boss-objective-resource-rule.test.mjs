@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { createBossState, applyBossMeldTransition } from '../js/boss/boss-engine.js';
+import { createBossState, applyBossMeldTransition, completeBossPlayerTurn } from '../js/boss/boss-engine.js';
 import { buildBossAbilityHelp, buildBossActionPresentation } from '../js/boss/boss-presentation.js';
 import { nemesisBossMechanics } from '../js/boss/mechanics/nemesis.js';
 import { bankerBossPresentation } from '../js/boss/presentation/banker.js';
 import { buildBossDebugScenario, getBossDebugCatalog } from '../js/boss/boss-debug-scenarios.js';
 import { selectNextBossIntent, normalizeBossState, getBossChains } from '../js/boss/boss-engine.js';
+import { damageDaughter, bloodLinkRemaining } from '../js/boss/dimitrescu-castle.js';
+import { createUndoTransaction, restoreUndoTransaction } from '../js/game/undo-transaction.js';
 
 // Exercise real state transitions without adding production exports for tests.
 const url = new URL('../js/boss/boss-engine.js', import.meta.url);
@@ -23,6 +25,109 @@ function game(abilityId, payload, phase = 2, bossId = 'dimitrescu') {
     players: [{ id: 0, name: 'Biel', teamId: 0, hand: [] }, { id: 1, name: 'Luana', teamId: 0, hand: [] }],
     teams: [{ id: 0, playerIndexes: [0, 1], melds: [[]] }, { id: 1, playerIndexes: [], melds: [] }], boss };
 }
+
+for (const phase of [1, 2, 3]) {
+  const [medium, heavy, brand] = { 1: [3, 6, 5], 2: [4, 8, 7], 3: [6, 10, 9] }[phase];
+  for (const deaths of [0, 1, 2, 3]) {
+    const prepare = (id, payload) => {
+      const state = game(id, payload, phase);
+      state.boss.danger = 0;
+      for (const d of state.boss.combatEntities.slice(0, deaths)) { d.hp = 0; d.status = 'dead'; }
+      return state;
+    };
+    test(`Sede Lady F${phase}, ${deaths} mortes: Tributo/faixas, marcas, Fúria e HUD usam valores aprovados`, () => {
+      for (const [cards, base] of [[7, 0], [8, medium], [10, medium], [11, heavy]]) {
+        const state = prepare('blood_tithe', {});
+        state.players[0].hand = Array.from({ length: cards }, (_, i) => ({ id: `c${i}` }));
+        const expected = base ? base + deaths * 2 : 0;
+        assert.match(buildBossActionPresentation(state).consequence, new RegExp(`\\+${expected} Sede`));
+        assert.equal(resolveIntent(state).dangerDelta, expected);
+      }
+      const state = prepare('crimson_brand', { marks: [{ status: 'active' }, { status: 'active' }] });
+      const expected = brand * 2 + deaths * 2;
+      assert.match(buildBossAbilityHelp(state).text, new RegExp(`Cada carta não usada causa \\+${brand} Sede`));
+      assert.match(buildBossActionPresentation(state).consequence, new RegExp(`\\+${expected} Sede`));
+      assert.equal(resolveIntent(state).dangerDelta, expected, 'Fúria uma vez por resolução, não por marca');
+      const success = prepare('crimson_brand', { marks: [{ status: 'success' }] });
+      assert.equal(resolveIntent(success).dangerDelta, 0, 'sucesso não gera Fúria nem recuperação');
+      const both = prepare('blood_tithe', {});
+      both.players[0].hand = Array.from({ length: 8 }, (_, i) => ({ id: `a${i}` }));
+      both.players[1].hand = Array.from({ length: 11 }, (_, i) => ({ id: `b${i}` }));
+      assert.equal(resolveIntent(both).dangerDelta, medium + heavy + deaths * 2, 'Fúria uma vez, não por jogador');
+    });
+  }
+}
+
+for (const isBot of [false, true]) {
+  for (const protection of [1500,40,0]) test(`Vínculo ${protection}: absorção/excedente e alvo Lady ${isBot?'BOT':'humano'}`,()=>{
+    const state=game('blood_tithe',{});state.players[0].isBot=isBot;
+    state.boss.combatTargetsByPlayer[0]='boss';state.boss.bloodLinkProtection=protection;
+    const result=applyDamageToBoss(state,100,{playerId:0,sourceActionId:'direct'});
+    assert.equal(result.bloodLinkAbsorbed,Math.min(protection,100));
+    assert.equal(state.boss.hp,2000-Math.max(0,100-protection));
+    assert.equal(state.boss.bloodLinkProtection,Math.max(0,protection-100));
+    assert.deepEqual(state.boss.combatEntities.map(d=>d.hp),[450,450,450]);
+  });
+  test(`Coágulo -> Vínculo -> vida no mesmo golpe ${isBot?'BOT':'humano'}`,()=>{
+    const state=game('blood_tithe',{});state.players[0].isBot=isBot;state.boss.combatTargetsByPlayer[0]='boss';
+    state.boss.crimsonClot={status:'active',max:60,remaining:60};state.boss.bloodLinkProtection=30;
+    const result=applyDamageToBoss(state,100,{playerId:0,sourceActionId:'three-layers'});
+    assert.equal(result.bloodClotAbsorbed,60);assert.equal(result.bloodLinkAbsorbed,30);
+    assert.equal(result.hpDamage,10);assert.equal(state.boss.hp,1990);assert.equal(state.boss.bloodLinkProtection,0);
+    const daughter=state.boss.combatEntities[0];state.boss.combatTargetsByPlayer[0]=daughter.id;
+    applyDamageToBoss(state,10,{playerId:0,sourceActionId:'daughter'});
+    assert.equal(daughter.hp,440);assert.equal(state.boss.hp,1990);
+  });
+  for (const protection of [180, 60]) test(`Lady: Coágulo absorve antes da vida, ${isBot ? 'BOT' : 'humano'}, proteção ${protection}`, () => {
+    const state = game('blood_tithe', {});
+    state.players[0].isBot = isBot;
+    state.boss.crimsonClot = { status: 'active', remaining: protection, max: protection };
+    const result = applyDamageToBoss(state, 100, { playerId: 0, sourceActionId: 'shield-regression' });
+    assert.equal(result.absorbed, 100);
+    assert.equal(result.bloodClotAbsorbed, Math.min(protection, 100));
+    assert.equal(state.boss.hp, 2000);
+    assert.equal(state.boss.bloodLinkProtection,1500-Math.max(0,100-protection));
+    assert.equal(state.boss.crimsonClot.remaining, Math.max(0, protection - 100));
+    assert.deepEqual(state.boss.combatEntities.map(d => d.hp), [450, 450, 450]);
+  });
+  test(`Lady: Vínculo consumível, ${isBot ? 'BOT' : 'humano'} usa o mesmo pipeline`, () => {
+    const state = game('blood_tithe', {}); state.players[0].isBot = isBot;
+    const result = applyDamageToBoss(state, 100, { playerId: 0, sourceActionId: 'link-regression' });
+    assert.equal(result.hpDamage, 0); assert.equal(state.boss.hp, 2000);assert.equal(state.boss.bloodLinkProtection,1400);
+    assert.deepEqual(state.boss.combatEntities.map(d => d.hp), [450, 450, 450]);
+  });
+}
+
+test('Proteção consumida: morte retira 500 restantes, sem cura, duplicação ou piso de vida',()=>{
+  const state=game('blood_tithe',{});
+  applyDamageToBoss(state,300,{playerId:0,sourceActionId:'consume'});
+  assert.equal(bloodLinkRemaining(state.boss),1200);
+  const d=state.boss.combatEntities[0];damageDaughter(state,d,500,'death',()=>{});
+  assert.equal(state.boss.bloodLinkProtection,700);assert.equal(state.boss.hp,2000);
+  damageDaughter(state,d,500,'death',()=>{});assert.equal(state.boss.bloodLinkProtection,700);
+  damageDaughter(state,state.boss.combatEntities[1],500,'second',()=>{});
+  assert.equal(state.boss.bloodLinkProtection,200);
+  damageDaughter(state,state.boss.combatEntities[2],500,'third',()=>{});
+  assert.equal(state.boss.bloodLinkProtection,0);assert.equal(state.boss.hp,2000);
+});
+
+test('Vínculo: migração única, cap por filhas e snapshot/reload/undo preservam consumo e zero',()=>{
+  const state=game('blood_tithe',{});delete state.boss.bloodLinkProtection;
+  normalizeBossState(state);assert.equal(state.boss.bloodLinkProtection,1500);
+  const undo=createUndoTransaction(state);
+  applyDamageToBoss(state,1500,{playerId:0,sourceActionId:'exhaust'});
+  assert.equal(state.boss.bloodLinkProtection,0);assert.equal(state.boss.hp,2000);
+  const loaded=JSON.parse(JSON.stringify(state));normalizeBossState(loaded);normalizeBossState(loaded);
+  assert.equal(loaded.boss.bloodLinkProtection,0);
+  applyDamageToBoss(loaded,1900,{playerId:0,sourceActionId:'exposed'});
+  assert.equal(loaded.boss.hp,100,'vida exposta mesmo com três filhas vivas');
+  const restored=restoreUndoTransaction(undo).state;normalizeBossState(restored);
+  assert.equal(restored.boss.bloodLinkProtection,1500);assert.equal(restored.boss.hp,2000);
+  restored.boss.combatEntities[0].hp=0;restored.boss.combatEntities[0].status='dead';
+  delete restored.boss.bloodLinkProtection;normalizeBossState(restored);
+  assert.equal(restored.boss.bloodLinkProtection,1000);
+  restored.boss.bloodLinkProtection=9999;normalizeBossState(restored);assert.equal(restored.boss.bloodLinkProtection,1000);
+});
 
 for (const phase of [2, 3]) {
   for (const chains of [{ 0: 2, 1: 1 }, { 0: 1, 1: 2 }]) {
@@ -95,7 +200,7 @@ for (const phase of [1, 2, 3]) {
     ['bela_hunt', { targetPlayerId: 0, used: true }],
     ['crimson_brand', { marks: [{ status: 'success' }, { status: 'success' }] }],
     ...(phase >= 2 ? [['cassandra_feast', { fed: true, meldIndex: 0 }], ['daniela_swarm', { triggered: false }]] : []),
-    ...(phase === 3 ? [['three_daughters', { objectives: ['bela', 'cassandra', 'daniela'].map(type => ({ type, status: 'success' })) }]] : []),
+    ...(phase === 3 ? [['three_daughters', { passiveVersion:2 }]] : []),
   ]) test(`${id} F${phase}: sucesso não reduz Sede, inclusive após reload`, () => {
     const state = JSON.parse(JSON.stringify(game(id, payload, phase)));
     const event = resolveIntent(state);
@@ -104,24 +209,25 @@ for (const phase of [1, 2, 3]) {
   });
   test(`Marca Carmesim F${phase}: sucesso parcial não desconta falha`, () => {
     const state = game('crimson_brand', { marks: [{ status: 'success' }, { status: 'active' }] }, phase);
-    assert.equal(resolveIntent(state).dangerDelta, phase === 3 ? 9 : 7);
+    assert.equal(resolveIntent(state).dangerDelta, { 1: 5, 2: 7, 3: 9 }[phase]);
   });
   test(`Caçada de Bela F${phase}: punição preservada`, () => {
     assert.equal(resolveIntent(game('bela_hunt', { used: false }, phase)).dangerDelta, phase === 3 ? 16 : 14);
   });
 }
 test('As Três Filhas: dois sucessos não descontam a falha restante', () => {
-  const state = game('three_daughters', { objectives: [
-    { type: 'bela', status: 'success' }, { type: 'cassandra', status: 'active' }, { type: 'daniela', status: 'active' },
-  ] }, 3);
-  assert.equal(resolveIntent(state).dangerDelta, 8); assert.equal(state.boss.danger, 48);
+  const state = game('three_daughters', { passiveVersion:2 }, 3);
+  state.boss.combatEntities.forEach(d=>d.passive={round:1,status:d.id==='cassandra'?'active':'success'});
+  completeBossPlayerTurn(state,0);completeBossPlayerTurn(state,1);
+  assert.equal(state.boss.danger,43,'two successes never reduce the standard +3 failure');
 });
 for (const phase of [2, 3]) {
   test(`Coágulo F${phase}: romper não reduz Sede nem altera dano excedente`, () => {
     const state = game('crimson_clot', { amount: phase === 3 ? 260 : 180 }, phase);
     resolveIntent(state);
     const damage = applyDamageToBoss(state, state.boss.crimsonClot.max + 10, { sourceActionId: 'break' });
-    assert.equal(damage.bloodClotBroken, true); assert.equal(damage.hpDamage, 10);
+    assert.equal(damage.bloodClotBroken, true); assert.equal(damage.hpDamage, 0);
+    assert.equal(damage.bloodLinkAbsorbed,10);assert.equal(state.boss.bloodLinkProtection,1490);
     assert.equal(state.boss.danger, 40);
   });
   test(`Banquete F${phase}: punição preservada`, () => {

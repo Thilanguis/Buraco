@@ -50,12 +50,12 @@ test('ajuda usa explicacao editorial e nao duplica a descricao oficial', () => {
   assert.ok(help);
   assert.equal(help.title, 'Coágulo Carmesim');
   assert.doesNotMatch(help.text, /DESCRICAO OFICIAL LONGA/);
-  assert.match(help.text, /dano antes de Lady/i);
-  assert.match(help.text, /metade da proteção restante vira cura/i);
+  assert.match(help.text, /ataques atingem o Coágulo antes da Lady/i);
+  assert.match(help.text, /Se sobrar proteção, metade vira cura/i);
 });
 
 test('ajuda detalhada cobre também regras curtas que escondem consequência importante', () => {
-  assert.match(buildBossAbilityHelp(state('dimitrescu', 'crimson_brand', {}))?.text || '', /cada marca é resolvida separadamente/i);
+  assert.match(buildBossAbilityHelp(state('dimitrescu', 'crimson_brand', {}))?.text || '', /Cada carta não usada causa \+7 Sede/i);
   assert.match(buildBossAbilityHelp(state('banker', 'credit_block', {}))?.text || '', /ninguém pode recolher o Lixo/i);
   assert.match(buildBossAbilityHelp(state('matriarca_esmeralda', 'restorative_dew', {}))?.text || '', /cura prevista/i);
 });
@@ -95,7 +95,9 @@ test('Marca Carmesim fica curta na mesa e detalhada na ajuda', () => {
   const game = state('dimitrescu', 'crimson_brand', { marks: [] }, { name: 'Marca Carmesim', phase: 1 });
   const action = buildBossActionPresentation(game);
   assert.equal(action.instruction, 'Use cada carta marcada em um jogo.');
-  assert.match(buildBossAbilityHelp(game)?.text || '', /Cada cooperador recebe uma carta marcada/i);
+  const help=buildBossAbilityHelp(game)?.text || '';
+  assert.match(help, /Jogue as cartas marcadas até o fim da rodada/i);
+  assert.match(help, /Descartar não vale; usar a carta evita sua punição/i);
 });
 
 test('Cofre recebe ajuda porque o termo tem regra propria', () => {

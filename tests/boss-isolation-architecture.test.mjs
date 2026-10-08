@@ -154,8 +154,10 @@ test('URLs locais dos CSS de chefe resolvem para assets existentes e ficam preca
   for (const [label, relativeFile] of cssFiles) {
     const cssUrl = new URL(relativeFile, import.meta.url);
     const css = fs.readFileSync(cssUrl, 'utf8');
-    for (const match of css.matchAll(/url\(\s*(['"]?)([^'"\)]+)\1\s*\)/g)) {
-      const ref = match[2].trim();
+    // A quoted data SVG can contain nested url(%23gradient). Consume the whole
+    // quoted URL before looking for another CSS URL, rather than parsing SVG as CSS.
+    for (const match of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)]+))\s*\)/g)) {
+      const ref = (match[1] ?? match[2] ?? match[3]).trim();
       if (!ref || /^(?:data:|https?:|#)/i.test(ref)) continue;
       const resolvedUrl = new URL(ref, cssUrl);
       const resolvedPath = fileURLToPath(resolvedUrl);

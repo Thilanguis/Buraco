@@ -1,7 +1,7 @@
 /* Image skins only: card sizes, selection, stacking and flights stay unchanged. */
 /* Responsive composition: untouched foreground plus a soft fill behind it.
    Both layers are decorative and never participate in the game layout. */
-body[data-table-theme='resident'] #gameSection > .table-preserved-art {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #gameSection > .table-preserved-art {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -26,7 +26,7 @@ body[data-table-theme='resident'] #gameSection > .table-preserved-art {
    acima/abaixo da mesa. Nesses formatos usamos o background base em `cover`,
    que já existe em #gameSection, e removemos somente a camada auxiliar. */
 @media (any-pointer: coarse), (max-aspect-ratio: 8 / 5) {
-  body[data-table-theme='resident'] #gameSection > .table-preserved-art {
+  body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #gameSection > .table-preserved-art {
     display: none !important;
   }
 }
@@ -61,7 +61,7 @@ body[data-deck-theme='resident'] :is(.back-red, .back-blue, .fly-card.back, .opp
 body[data-deck-theme='resident'] :is(.back-red, .back-blue, .fly-card.back, .opponent-card-back, .morto-card-back, .carta.back)::after {
   content: none !important;
 }
-body[data-table-theme='resident'] #gameSection {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #gameSection {
   background: #171313 url('../assets/resident/table.webp') center / cover no-repeat;
   --table-light-layer: none;
   --table-flash-layer: none;
@@ -116,8 +116,15 @@ body[data-table-theme='resident'] .table-preview-icon {
   border-color: #d5aa59;
 }
 
+/* Independent table artwork; the Resident Evil deck remains unchanged. */
+body[data-table-theme='dimitrescu'] #gameSection,
+body[data-table-theme='dimitrescu'] .table-preview-icon {
+  background: #211408 url('../assets/resident/dimitrescu-table.webp') center / cover no-repeat;
+  border-color: #d5aa59;
+}
+
 /* Shield the HUD from the ornamental mansion border without moving the table layout. */
-body[data-table-theme='resident'] #gameSection .board-status {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #gameSection .board-status {
   background: rgba(22, 17, 17, .96);
   border-radius: 8px;
   box-shadow:
@@ -127,29 +134,29 @@ body[data-table-theme='resident'] #gameSection .board-status {
   color: #f1f5f9;
   text-shadow: 0 1px 2px #090505;
 }
-body[data-table-theme='resident'] .board-status .current-player-chip {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) .board-status .current-player-chip {
   background: #24262c;
   color: #f1f5f9;
 }
-body[data-table-theme='resident'] .board-status .current-player-chip.is-my-turn {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) .board-status .current-player-chip.is-my-turn {
   background: #51351e;
   border-color: #d9b775;
 }
-body[data-table-theme='resident'] #gameModeBadge {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #gameModeBadge {
   color: #ecd3a2 !important;
   text-shadow: 0 1px 2px #090505;
 }
-body[data-table-theme='resident'] .board-status .match-duration {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) .board-status .match-duration {
   color: #f5eeee;
 }
 /* Keep the existing critical timer color and pulse unchanged. */
-body[data-table-theme='resident'] #turnTimerLabel:not(.timer-critical) {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #turnTimerLabel:not(.timer-critical) {
   color: #ffe38a !important;
   font-weight: 700;
 }
 
 /* Protect feedback from the detailed table background without reserving more height. */
-body[data-table-theme='resident'] #message {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #message {
   align-self: center;
   width: fit-content;
   max-width: 100%;
@@ -163,12 +170,12 @@ body[data-table-theme='resident'] #message {
   text-shadow: 0 1px 2px #000;
   box-shadow: 0 0 0 1px #d6ae67, 0 2px 5px rgba(0, 0, 0, .65);
 }
-body[data-table-theme='resident'] #message:empty {
+body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #message:empty {
   background: transparent;
   box-shadow: none;
 }
 @media (max-width: 768px), (max-height: 600px) {
-  body[data-table-theme='resident'] #message {
+  body:is([data-table-theme='resident'], [data-table-theme='dimitrescu']) #message {
     font-size: 11px;
     line-height: 12px;
   }

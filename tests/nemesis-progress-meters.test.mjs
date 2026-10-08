@@ -62,7 +62,7 @@ test('HUD/help project the actual resolution for every offensive objective and a
           }
           assert.equal(JSON.stringify(boss), before, 'presentation is read-only');
           boss.currentIntent = intent;
-          nemesisBossMechanics.onPlayerTurnEnd({ boss, playerId: 0, recordBossEvent: () => {} });
+          nemesisBossMechanics.onPlayerTurnEnd({ boss, gameState: state, playerId: 0, recordBossEvent: () => {} });
           assert.equal(payload.infectionApplied, projected.applied, 'HUD equals the actual turn resolution');
           assert.equal(boss.danger - danger, projected.applied);
           assert.equal(changeNemesisInfection(boss, projected.base, 'objective:failure', { failure: projected.failed }), 0, 'reload/event replay remains deduplicated');

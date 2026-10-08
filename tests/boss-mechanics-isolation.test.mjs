@@ -73,16 +73,15 @@ test('Marca Carmesim altera somente a marca ativa do jogador e carta usados', ()
 test('Três Filhas resolve Bela e Cassandra sem tocar no objetivo de Daniela', () => {
   const boss = bossWith({
     abilityId: 'three_daughters',
-    payload: {
-      objectives: [
-        { type: 'bela', status: 'active', targetPlayerId: 0, cardId: 'bela' },
-        { type: 'cassandra', status: 'active', meldId: 'm7', meldIndex: 7 },
-        { type: 'daniela', status: 'active', discardCardId: 'discard' },
-      ],
-    },
+    payload: { passiveVersion:2 },
   });
+  boss.combatEntities=[
+    { id:'bela',status:'alive',passive:{status:'active',targetPlayerId:0,cardId:'bela'} },
+    { id:'cassandra',status:'alive',passive:{status:'active',meldId:'m7',meldIndex:7} },
+    { id:'daniela',status:'alive',passive:{status:'active'} },
+  ];
   applyBossMeldMechanics('dimitrescu', { boss, playerId: 0, meldId: 'm7', meldIndex: 2, cardsAdded: [{ id: 'bela' }] });
-  assert.deepEqual(boss.currentIntent.payload.objectives.map((objective) => objective.status), ['success', 'success', 'active']);
+  assert.deepEqual(boss.combatEntities.map(d=>d.passive.status), ['success', 'success', 'active']);
 });
 
 test('applyBossMeldTransition delega mecanica da Dimitrescu e nao contem suas habilidades', () => {
@@ -617,7 +616,9 @@ test('hooks de fechamento de rodada permanecem isolados por chefe', () => {
   assert.equal(nehelenia.neheleniaDiscardSealRound, 0);
 
   const fallback = { actionId: 'blood_round' };
-  const dimResult = finalizeBossTurnResolutionMechanics('dimitrescu', { allPlayersActed: true, resolveBloodRound: () => [fallback] });
+  const dimBoss = { roundNumber: 1, combatEntities: [], castleRegeneratedRound: 0 };
+  const dimResult = finalizeBossTurnResolutionMechanics('dimitrescu', { boss: dimBoss, gameState: { boss: dimBoss },
+    changeBlood: () => {}, recordBossEvent: () => {}, allPlayersActed: true, resolveBloodRound: () => [fallback] });
   assert.equal(dimResult.fallbackEvent, fallback);
 });
 
@@ -646,4 +647,3 @@ test('completeBossPlayerTurn fica agnostico as regras especificas dos cinco chef
   assert.match(source, /advanceBossRoundMechanics\(boss\.id/);
   assert.match(source, /confirmBossTurnDefeatMechanics\(boss\.id/);
 });
-

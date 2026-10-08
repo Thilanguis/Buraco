@@ -3311,6 +3311,45 @@ body:not([data-boss-id='dimitrescu']):not([data-boss-id='nehelenia']) .boss-daug
   letter-spacing: 0.45px;
   text-transform: uppercase;
 }
+/* Contrato visual dos chips: referência Nemesis, compartilhado por capangas/filhas.
+   Posição continua no renderer de cada chefe; debuffs azuis só na Dimitrescu. */
+body.boss-mode:is([data-boss-id='nemesis'], [data-boss-id='nehelenia'], [data-boss-id='dimitrescu']) .boss-daughter-card :is(.boss-daughter-state, .boss-attendant-context-line, .castle-max-loss) {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  min-height: 16px;
+  margin: 0;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 1000;
+  line-height: 10px;
+  letter-spacing: .45px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+body.boss-mode[data-boss-id='nehelenia'] .boss-daughter-card .boss-attendant-context-line {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid rgba(250, 204, 21, .74);
+  color: #fef3c7;
+  background: rgba(66, 32, 6, .9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .48), 0 0 10px rgba(245, 158, 11, .12);
+}
+body.boss-mode:is([data-boss-id='nemesis'], [data-boss-id='nehelenia'], [data-boss-id='dimitrescu']) .boss-daughter-card :is(button.boss-daughter-state, button.castle-max-loss):focus-visible {
+  outline: 2px solid #fff0b3;
+  outline-offset: 2px;
+}
+@media (max-width: 650px) {
+  body.boss-mode:is([data-boss-id='nemesis'], [data-boss-id='nehelenia'], [data-boss-id='dimitrescu']) .boss-daughter-card :is(.boss-daughter-state, .boss-attendant-context-line, .castle-max-loss) {
+    font-size: 7px;
+    letter-spacing: .25px;
+    padding: 2px 4px;
+  }
+}
 .boss-daughter-card.is-active {
   position: relative;
   box-shadow:
@@ -7611,3 +7650,8 @@ body.boss-mode #bossHpBar[data-health].is-empty { animation: none; }
   body.boss-mode #bossHpBar::after,
   body.boss-mode .boss-phase-progress-bar > span { animation: none; transition: none; }
 }
+/* One resolved resource gain at a time; fixed overlays never intercept cards. */
+.boss-resource-transfer, .boss-resource-arrival { position:fixed; pointer-events:none; z-index:20000; }
+.boss-resource-transfer { width:1px; height:1px; }
+.boss-resource-transfer::after { content:''; position:absolute; width:22px; height:2px; left:-11px; top:-1px; border-radius:2px; background:var(--resource-color); box-shadow:0 0 5px var(--resource-color); transform:rotate(var(--resource-angle)); }
+.boss-resource-arrival { font-size:13px; font-weight:900; text-shadow:0 1px 3px #000,0 0 4px #000; white-space:nowrap; transform:translate(-50%,-50%); }

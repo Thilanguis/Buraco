@@ -138,6 +138,9 @@ test('full quoted pickup includes buried Pollen and triggers only its actual car
 for (const score of [0, 1000, 2000, 5000]) test(`fixed finish damage ignores projected score ${score}`, () => {
   for (const id of ['banker', 'dominadora', 'dimitrescu', 'nehelenia', 'nemesis']) {
     const s = game(id); s.boss.hp = 101;
+    // This test isolates the fixed amount with no protected blood bands.
+    // Blood Link and daughter targeting have their own rework regressions.
+    if (id === 'dimitrescu') s.boss.combatEntities.forEach(d => { d.hp = 0; d.status = 'dead'; });
     const event = applyBossFinalStrike(s, score); assert.equal(event.damage, 100);
     assert.equal(s.boss.hp, 1); assert.equal(s.boss.result.reason, 'insufficient_final_strike');
     assert.equal(s.boss.stats.finalStrike, 100);

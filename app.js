@@ -55,6 +55,10 @@ import {
   getBossNeheleniaPriorities,
   getBossCombatPriorities,
   setBossDamageTarget,
+  distributeCastleItems,
+  canUseCastleItem,
+  useCastleItem,
+  getCastleBotItem,
   getBossNaturePriorities,
   getBossNatureThreatSummaries,
   getBossDiscardSurcharge,
@@ -118,6 +122,9 @@ import {
 import { renderDominationFriend, presentDominationFriend, playDominationFriendTimeline, createFriendNoticeTracker, showDominationFriendNotice } from './js/game/domination-friend-ui.js';
 import { opponentSeats, OPPONENT_SEAT_IDS, renderOpponentBacks } from './js/game/opponent-seats.js';
 import { cardFrontHTML, suitClass, deckFaceClass } from './js/game/card-face.js';
+import { ITEM_DEFINITIONS } from './js/boss/dimitrescu-castle.js';
+import { renderCastleHud, castleItemHelp } from './js/boss/ui/dimitrescu-castle-view.js';
+import { createResourceFeedbackPresenter } from './js/boss/ui/resource-feedback.js';
 import { createVisionHintEvaluator } from './js/game/domination-vision-hint.js';
 import { createVisionAlert } from './js/game/domination-vision-alert.js';
 import { createVisionFocus } from './js/game/domination-vision-focus.js';
@@ -543,6 +550,7 @@ let lastRenderedBossEventId = null;
 let lastAnimatedBossSwapId = null;
 let renderedBossFeedbackCount = null;
 let renderedBossFeedbackEventIds = null;
+let bossResourceFeedbackPresenter = null;
 let lastRenderedBossBloom = null;
 let lastRenderedBossBloomEventId = null;
 let lastSeenBossLogKey = null;
@@ -675,6 +683,12 @@ function syncBossResourceSounds(boss) {
   if (newEvents.some((event) => bossEventIsDimitrescuPhaseChange(boss, event))) {
     triggerDimitrescuPhasePortraitVisual();
   }
+  for (const event of newEvents.filter(e => e.type === 'daughterDeath')) {
+    const portrait = document.getElementById('bossPortraitImage');
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) portrait?.animate?.(
+      [{ filter: 'brightness(1)' }, { filter: 'brightness(2) sepia(.6) saturate(2)' }, { filter: 'brightness(1)' }],
+      { duration: 700, easing: 'ease-out' });
+  }
 
   if (!audioUnlocked) return;
 
@@ -693,6 +707,7 @@ function syncBossResourceSounds(boss) {
   const sequencedHealIds = new Set([...pairedHealByKey].filter(([key]) => pairedResourceKeys.has(key)).map(([, event]) => event.actionId));
 
   for (const event of newEvents) {
+    if (event.type === 'daughterDeath' && BOSS_SFX.dimitrescu?.daughterDeath) playSfxClone(BOSS_SFX.dimitrescu.daughterDeath, { audioContext: audioCtx });
     if (bossEventIsDimitrescuPhaseChange(boss, event)) {
       const phaseSound = Number(event.phase) === 2 ? BOSS_SFX.dimitrescu?.phase2 : BOSS_SFX.dimitrescu?.phase3;
       playSfxClone(phaseSound, { audioContext: audioCtx });
@@ -1024,6 +1039,8 @@ window.executeUndo = async () => {
     ts: Date.now(),
   };
   state = previousState;
+  bossResourceFeedbackPresenter?.clear();
+  renderedBossFeedbackEventIds = null;
   restoreUndoUiState(restored.ui);
   ignoreOwnActionId = state.lastAction.id;
 
@@ -3681,7 +3698,10 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
     // O PIX AGORA PERTENCE AO TIME, NÃO AO JOGADOR!
     teams.push({ id: t, name: tName, playerIndexes, melds: [], pix: pixKeys[t] || '' });
   }
-  const preparedDeck = shuffle(createDeck(SUITS, RANKS));
+  const physicalDeck = createDeck(SUITS, RANKS);
+  const initialBoss = isBossMode(mode) ? createBossStateForMode(mode, Date.now()) : null;
+  if (initialBoss?.id === 'dimitrescu') distributeCastleItems(initialBoss, physicalDeck);
+  const preparedDeck = shuffle(physicalDeck);
   const HAND_SIZE = 11;
   const initialDeal = dealInitialDeck(preparedDeck, players.length, HAND_SIZE, DEAD_CHUNK_SIZE);
   const { stock, discard, deadPiles } = initialDeal;
@@ -3749,7 +3769,7 @@ async function startGame(mode, names, variant, pixKeys = [], dominationOptions =
     newState.friendGameId = crypto.randomUUID();
   }
   if (isBossMode(mode)) {
-    newState.boss = createBossStateForMode(mode, Date.now());
+    newState.boss = initialBoss;
     beginBossTurn(newState, { first: true, now: Date.now() });
   }
   const battleDetails = document.getElementById('bossBattleDetails');
@@ -5991,7 +6011,7 @@ function renderBossDaughterStrip(definition, boss) {
   if (!strip) return;
   const isDimitrescu = definition?.id === 'dimitrescu';
   const isNehelenia = definition?.id === 'nehelenia';
-  if (!isDimitrescu && !isNehelenia) {
+  if (isDimitrescu || !isNehelenia) {
     strip.hidden = true;
     strip.replaceChildren();
     strip.dataset.signature = '';
@@ -6170,7 +6190,7 @@ function renderBossDaughterStrip(definition, boss) {
         contextBox.className = 'boss-attendant-context';
         // CRÍTICO: apresentação 100% fora do fluxo. Mesmo se o CSS estiver
         // desatualizado, esta label nunca pode alterar altura/alinhamento do card.
-        contextBox.style.cssText = ['position:absolute', 'right:7px', 'top:25px', 'z-index:5', 'max-width:86px', 'display:flex', 'flex-direction:column', 'align-items:flex-end', 'gap:2px', 'pointer-events:none'].join(';');
+        contextBox.style.cssText = ['position:absolute', 'right:7px', 'top:27px', 'z-index:5', 'max-width:calc(100% - 14px)', 'display:flex', 'flex-direction:column', 'align-items:flex-end', 'gap:3px', 'pointer-events:none'].join(';');
         context.lines.forEach((line) => {
           line.text
             .split(/\s*·\s*/)
@@ -6179,25 +6199,6 @@ function renderBossDaughterStrip(definition, boss) {
               const badge = document.createElement('small');
               badge.className = `boss-attendant-context-line is-${line.kind}`;
               badge.textContent = part;
-              const persistent = line.kind === 'persistent';
-              badge.style.cssText = [
-                'max-width:86px',
-                'box-sizing:border-box',
-                'padding:2px 5px',
-                'overflow:hidden',
-                `border:1px solid ${persistent ? 'rgba(196,181,253,.72)' : 'rgba(255,255,255,.55)'}`,
-                'border-radius:999px',
-                `color:${persistent ? '#ede9fe' : '#fff'}`,
-                `background:${persistent ? 'rgba(46,16,101,.90)' : 'rgba(4,7,18,.90)'}`,
-                'box-shadow:0 2px 7px rgba(0,0,0,.45)',
-                'font-size:5px',
-                'font-weight:1000',
-                'line-height:1',
-                'letter-spacing:.15px',
-                'text-overflow:ellipsis',
-                'text-transform:uppercase',
-                'white-space:nowrap',
-              ].join(';');
               contextBox.appendChild(badge);
             });
         });
@@ -7298,6 +7299,44 @@ function syncBossIntentHelp(gameState) {
   });
 }
 
+function castleItemUseButton(card) {
+  const definition = ITEM_DEFINITIONS[state.boss?.castleItems?.[card.id]?.type];
+  if (!definition || state.boss.castleItems[card.id].consumed) return null;
+  const button = createBossCombatHelp(`Usar ${definition.label} da carta ${card.rank}${card.suit}`, definition.label,
+    `${castleItemHelp(state.boss.castleItems[card.id].type)}\nEscolha uma filha. Guarde uma carta para descartar.`, '');
+  button.classList.add('castle-use-item');
+  const open = button.onclick;
+  button.onclick = event => {
+    open(event);
+    const popover = document.getElementById('bossIntentHelpPopover');
+    if (popover.hidden || popover._extraTrigger !== button) return;
+    const choices = document.createElement('div'); choices.className = 'castle-item-targets';
+    for (const daughter of state.boss.combatEntities.filter(d => d.hp > 0)) {
+      const target = document.createElement('button'); target.type = 'button'; target.textContent = daughter.name;
+      target.disabled = !canUseCastleItem(state, state.players[myPlayerIndex]?.id, card.id, daughter.id);
+      target.onclick = () => localActionGate.run(async () => {
+        const playerId = state.players[myPlayerIndex]?.id;
+        if (committing || !canPerformCommonGameAction() || !canUseCastleItem(state, playerId, card.id, daughter.id)) return;
+        const origin = document.querySelector(`#handContainer [data-card-id="${CSS.escape(card.id)}"]`)?.getBoundingClientRect();
+        const destination = document.querySelector(`#dimitrescuCastlePanel [data-entity-id="${daughter.id}"]`)?.getBoundingClientRect();
+        saveStateForUndo('castleItem', [card.id]);
+        const used = useCastleItem(state, playerId, card.id, daughter.id);
+        if (!used) return;
+        closeBossIntentHelp(); selectedHandIndexes.clear();
+        state.lastAction = { id: newActionId(), type: 'castleItem', playerId, cardId: card.id, daughterId: daughter.id, bossEvent: used };
+        if (origin && destination && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          await flyRectToRect({ ...card, castleItem: { ...card.castleItem, consumed: false } }, origin, destination, 'front');
+        }
+        renderAll(); await commitState();
+      });
+      choices.append(target);
+    }
+    document.getElementById('bossIntentHelpText').append(choices);
+    positionBossHelpPopover(button, popover);
+  };
+  return button;
+}
+
 function createBossCombatHelp(label, title, text, caption = '?') {
   const button = document.createElement('button');
   button.type = 'button'; button.className = 'boss-intent-help-button boss-combat-help';
@@ -7373,9 +7412,17 @@ function syncBossDiscardHelp(bossMode) {
 }
 
 function renderBossCombatPanel(hud, boss) {
+  renderCastleHud({ document, hud, state, createHelp: createBossCombatHelp, cardFrontHTML,
+    viewerId: state.players[myPlayerIndex]?.id,
+    disabled: state.currentPlayer !== myPlayerIndex || isBossTurnActive(state) || !!boss.result || pauseBlocksPlay(state),
+    selectTarget: id => localActionGate.run(async () => {
+      if (committing || !canPerformCommonGameAction() || !setBossDamageTarget(state, state.players[myPlayerIndex]?.id, id)) return;
+      renderBossHud(); await commitState();
+    }),
+  });
   let panel = document.getElementById('bossCombatPanel');
   const model = getBossUiAdapter(boss.id)?.combatHud?.({ gameState: state, playerId: state.players[myPlayerIndex]?.id });
-  if (!model) { if (panel) panel.hidden = true; if (document.getElementById('bossIntentHelpPopover')?._extraTrigger) closeBossIntentHelp(); document.getElementById('nemesisStarsOverlay')?.remove(); hud.querySelector('.boss-combat-targets')?.remove(); hud.querySelector('.boss-combat-main-target')?.remove(); document.getElementById('nemesisEffectSummary')?.remove(); hud.querySelector('.boss-portrait')?.setAttribute('aria-hidden', 'true'); return; }
+  if (!model) { if (panel) panel.hidden = true; if (document.getElementById('bossIntentHelpPopover')?._extraTrigger) closeBossIntentHelp(); document.getElementById('nemesisStarsOverlay')?.remove(); hud.querySelector('.boss-combat-targets')?.remove(); if (boss.id !== 'dimitrescu') { hud.querySelector('.boss-combat-main-target')?.remove(); hud.querySelector('.boss-portrait')?.setAttribute('aria-hidden', 'true'); } document.getElementById('nemesisEffectSummary')?.remove(); return; }
   if (!panel) { panel = document.createElement('section'); panel.id = 'bossCombatPanel'; panel.className = 'boss-combat-panel'; }
   // Helpers occupy their own strip below the HUD, just like daughters/attendants.
   if (panel.previousElementSibling !== hud) hud.insertAdjacentElement('afterend', panel);
@@ -7495,6 +7542,7 @@ function renderBossHud() {
   document.body.classList.toggle('boss-mode', bossMode);
   syncBossDiscardHelp(bossMode);
   if (!bossMode) {
+    bossResourceFeedbackPresenter?.clear();
     closeBossIntentHelp(); closeBossRuleHelp();
     const combatPanel = document.getElementById('bossCombatPanel');
     if (combatPanel) combatPanel.hidden = true;
@@ -8091,11 +8139,13 @@ function renderBossHud() {
     discardButton.classList.toggle('boss-locked', isBossDiscardBlocked(state) && !state.hasDrawnThisTurn);
     const pollen = getBossUiAdapter('matriarca_esmeralda')?.pollenDiscard?.({ gameState: state });
     const pollenActive = pollen?.pollenOnTop;
-    discardButton.classList.toggle('boss-pollen-discard', pollenActive);
+    discardButton.classList.toggle('boss-pollen-discard', !!pollenActive);
     discardButton.classList.toggle('boss-pollen-buried', !!pollen?.pollenBuried);
     const dimitrescuIntent = boss.id === 'dimitrescu' ? boss.currentIntent : null;
     const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
     const danielaActive = (dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered) || danielaObjective?.status === 'active';
+    // The permanent daughter's passive is explained on her chip, not the legacy swarm marker.
+    const danielaPassiveActive = boss.id === 'dimitrescu' && boss.combatEntities?.some(d => d.id === 'daniela' && d.status === 'alive' && d.passive?.status === 'active');
     const castleLockdownActive = boss.id === 'dimitrescu' && dimitrescuIntent?.abilityId === 'castle_lockdown' && !state.finished;
     discardButton.classList.toggle('boss-daniela-discard', !!danielaActive);
     discardButton.classList.toggle('boss-castle-lockdown-discard', castleLockdownActive);
@@ -8103,7 +8153,7 @@ function renderBossHud() {
     else if (castleLockdownActive) discardButton.setAttribute('aria-label', 'Lixo bloqueado por Portas do Castelo');
     else if (pollenActive) discardButton.setAttribute('aria-label', 'Lixo contaminado por Pólen da Matriarca');
     else if (pollen?.pollenBuried) discardButton.setAttribute('aria-label', 'Há Pólen enterrado no Lixo; a carta do topo não está contaminada');
-    else if (danielaActive) discardButton.setAttribute('aria-label', 'Lixo cercado pelo Enxame de Daniela');
+    else if (danielaActive || danielaPassiveActive) discardButton.setAttribute('aria-label', 'Daniela: primeira compra do Lixo nesta rodada adiciona 3 de Sede');
     else discardButton.removeAttribute('aria-label');
     discardButton.classList.toggle('boss-surcharge-discard', boss.id === 'banker' && boss.discardSurcharge?.status === 'active');
   }
@@ -8117,6 +8167,7 @@ function renderBossHud() {
   const feedbackEvents = boss.eventLog || [];
   syncBossResourceSounds(boss);
   if (renderedBossFeedbackEventIds == null) {
+    bossResourceFeedbackPresenter?.clear();
     renderedBossFeedbackEventIds = new Set(feedbackEvents.map((event) => event.actionId).filter(Boolean));
     renderedBossFeedbackCount = feedbackEvents.length;
   } else {
@@ -8134,19 +8185,26 @@ function renderBossHud() {
       if (feedback.type === 'bossAbility' && feedback.abilityId === 'forced_swap' && feedback.actionId !== lastAnimatedBossSwapId && feedback.receivedCards?.length === 2) {
         void animateBossForcedSwap(feedback);
       }
+      let resourceFeedbackHandled = false;
+      if (['nemesis', 'dimitrescu'].includes(boss.id)) {
+        bossResourceFeedbackPresenter ||= createResourceFeedbackPresenter({ document,
+          reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+        resourceFeedbackHandled = bossResourceFeedbackPresenter.enqueue(boss, feedback);
+      }
       const isChain = feedback.type === 'chainChange' && feedback.amount;
-      const isDebt = feedback.dangerChangeLabel && (feedback.type === 'bossAbility' || feedback.type === 'bossDamage' || feedback.type === 'debtReduction');
+      const isDebt = !resourceFeedbackHandled && feedback.dangerChangeLabel && (feedback.type === 'bossAbility' || feedback.type === 'bossDamage' || feedback.type === 'debtReduction');
       const isHeal = feedback.type === 'bossHeal' && feedback.amount;
       const isDimitrescuHeal = boss.id === 'dimitrescu' && feedback.type === 'bossAbility' && feedback.abilityId === 'red_wine' && Number(feedback.healAmount) > 0;
       const isBloom = feedback.type === 'bloomChange' && feedback.amount;
-      const isBlood = boss.id === 'dimitrescu' && feedback.dangerChangeLabel && ['bossAbility', 'bossDamage', 'bloodChange'].includes(feedback.type);
+      const isBlood = !resourceFeedbackHandled && boss.id === 'dimitrescu' && feedback.dangerChangeLabel && ['bossAbility', 'bossDamage', 'bloodChange'].includes(feedback.type);
       const isMirrorFragment = boss.id === 'nehelenia' && feedback.type === 'dreamMirror' && Number(feedback.dangerDelta);
       const isMirrorStore = boss.id === 'nehelenia' && feedback.type === 'bossDamage' && Number(feedback.mirrorStoredDamage) > 0 && !feedback.mirrorBroken;
       const isMirrorBreak = boss.id === 'nehelenia' && feedback.type === 'bossDamage' && feedback.mirrorBroken;
       const isRebirth = feedback.type === 'rebirth';
       const isCocoonAbsorb = boss.id === 'matriarca_esmeralda' && feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
       const isCocoonBreak = boss.id === 'matriarca_esmeralda' && feedback.type === 'bossDamage' && feedback.cocoonBroken;
-      const isBloodClotAbsorb = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && Number(feedback.absorbedDamage) > 0;
+      const isBloodClotAbsorb = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && Number(feedback.bloodClotAbsorbed ?? feedback.absorbedDamage) > 0;
+      const isBloodLinkAbsorb = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && Number(feedback.bloodLinkAbsorbed) > 0;
       const isBloodClotBreak = boss.id === 'dimitrescu' && feedback.type === 'bossDamage' && feedback.bloodClotBroken;
       const isNatureCreated = feedback.type === 'bossAbility' && Array.isArray(feedback.threatIds) && feedback.threatIds.length > 0;
       if (isCocoonAbsorb || isBloodClotAbsorb || isMirrorStore || isMirrorBreak) {
@@ -8186,6 +8244,7 @@ function renderBossHud() {
         !isCocoonAbsorb &&
         !isCocoonBreak &&
         !isBloodClotAbsorb &&
+        !isBloodLinkAbsorb &&
         !isBloodClotBreak &&
         !isNatureCreated
       )
@@ -8215,6 +8274,8 @@ function renderBossHud() {
                     ? 'mirror-absorb'
                     : isRebirth
                       ? 'nature-rebirth'
+                      : isBloodLinkAbsorb
+                        ? `PROT. ABSORVEU ${feedback.bloodLinkAbsorbed}`
                       : isBloodClotBreak
                         ? 'blood-clot-break'
                         : isBloodClotAbsorb
@@ -8248,7 +8309,7 @@ function renderBossHud() {
                       : isBloodClotBreak
                         ? `COÁGULO ROMPIDO · CURA EVITADA`
                         : isBloodClotAbsorb
-                          ? `COÁGULO ABSORVEU ${feedback.absorbedDamage}`
+                          ? `COÁGULO ABSORVEU ${feedback.bloodClotAbsorbed ?? feedback.absorbedDamage}`
                           : isCocoonBreak
                             ? `CASULO ROMPIDO · ${feedback.absorbedDamage || 0} ABSORVIDO`
                             : isCocoonAbsorb
@@ -8274,6 +8335,7 @@ function renderBossHud() {
       setTimeout(() => floating.remove(), isRebirth || isCocoonBreak ? 2500 : 2600);
     });
   }
+  bossResourceFeedbackPresenter?.sync(boss);
   scheduleBossTurnAdvance();
 }
 
@@ -9048,6 +9110,10 @@ function renderHand() {
     }
 
     div.innerHTML = cardFrontHTML(card);
+    if (state.boss?.id === 'dimitrescu') {
+      const itemButton = castleItemUseButton(card);
+      if (itemButton) div.append(itemButton);
+    }
     if (financedCard) {
       div.insertAdjacentHTML('beforeend', '<span class="boss-financed-marker" role="img" aria-label="Carta financiada: use em um jogo neste turno"><span aria-hidden="true">FINANCIADA</span></span>');
     } else if (div.classList.contains('just-bought')) {
@@ -11029,6 +11095,14 @@ const botEngine = {
   getNaturePriorities: (playerId) => getBossNaturePriorities(state, playerId),
   getDominatrixPriorities: (playerId) => getBossDominatrixPriorities(state, playerId),
   getDimitrescuPriorities: (playerId) => getBossDimitrescuPriorities(state, playerId),
+  async executeCastleItems(playerId) {
+    for (let count = 0; count < 15; count++) {
+      const choice = getCastleBotItem(state, playerId);
+      if (!choice || !useCastleItem(state, playerId, choice.cardId, choice.daughterId)) break;
+      state.lastAction = { id: newActionId(), type: 'castleItem', playerId, ...choice };
+      renderAll(); await this.commitState();
+    }
+  },
   getNeheleniaPriorities: (playerId) => getBossNeheleniaPriorities(state, playerId),
   getCombatPriorities: (playerId) => getBossCombatPriorities(state, playerId),
   shouldTakeBossDiscard: (playerId, intent, naturePlan) => shouldBossBotTakeDiscard(state, playerId, { intent, naturePlan }),
@@ -13024,6 +13098,7 @@ if (isDebugMode) {
     if (!value) return;
 
     const module = await loadBossDebugLabModule();
+    refreshBossLabCombatControls(module);
     const info = module.getBossDebugResourceState(state, {
       bossId: selectedBossId,
       target: currentBossLabResourceTarget(),
@@ -13054,6 +13129,47 @@ if (isDebugMode) {
       setBossLabError(error.message || String(error));
       await refreshBossLabResourceControls();
     }
+  }
+
+  function refreshBossLabCombatControls(module) {
+    const group=bossLabElement('debugBossLabCombat');
+    const bossId=bossLabElement('debugBossLabBoss')?.value;
+    if (!group) return;
+    group.hidden=!['nemesis','dimitrescu'].includes(bossId);
+    group.style.display=group.hidden?'none':'flex';
+    const info=module.getBossDebugCombatState(state,{bossId});
+    bossLabElement('debugBossLabCombatInfo').textContent=info.available
+      ? 'Independe da habilidade e do teto de invasão. Só altera este teste.' : 'Prepare este chefe para ajustar.';
+    const select=bossLabElement('debugBossLabCombatEntity');
+    setBossLabOptions(select,info.entities.map(e=>({id:e.id,label:e.name})),select.value);
+    const entity=info.entities.find(e=>e.id===select.value);
+    const nemesis=bossId==='nemesis';
+    setBossLabOptions(bossLabElement('debugBossLabCombatStatus'),nemesis
+      ? [{id:'persistent',label:'Na mesa'},{id:'absent',label:'Fora da mesa'},{id:'corpse',label:'Derrotado'}]
+      : [{id:'alive',label:'Viva'},{id:'dead',label:'Derrotada'}],entity?.status);
+    const hp=bossLabElement('debugBossLabCombatHp');hp.max=entity?.maxHp||1;hp.value=entity?.hp||entity?.maxHp||1;
+    bossLabElement('debugBossLabCombatModifiers').hidden=!nemesis;
+    bossLabElement('debugBossLabCombatMutated').checked=!!entity?.mutated;
+    bossLabElement('debugBossLabCombatReinforced').checked=!!entity?.reinforced;
+    for(const control of group.querySelectorAll('input,select,button')) control.disabled=!info.available;
+    bossLabElement('debugBossLabCombatMutated').disabled=!info.available||info.phase>=3;
+  }
+
+  async function applyBossLabCombatEntity() {
+    setBossLabError('');
+    try {
+      const module=await loadBossDebugLabModule();
+      const config={bossId:bossLabElement('debugBossLabBoss').value,entityId:bossLabElement('debugBossLabCombatEntity').value,
+        status:bossLabElement('debugBossLabCombatStatus').value,hp:Number(bossLabElement('debugBossLabCombatHp').value),
+        mutated:bossLabElement('debugBossLabCombatMutated').checked,reinforced:bossLabElement('debugBossLabCombatReinforced').checked};
+      // Validate a clone before reserving an undo entry; invalid inputs change nothing.
+      module.setBossDebugCombatEntity(module.restoreBossDebugSnapshot(module.createBossDebugSnapshot(state)),config);
+      saveStateForUndo('bossDebugEntity',[]);
+      module.setBossDebugCombatEntity(state,config);
+      renderAll();await commitState();
+      await refreshBossLabObserved();await refreshBossLabResourceControls();
+      showMessage('Laboratório: auxiliar atualizado.');
+    } catch(error) {setBossLabError(error.message||String(error));}
   }
 
   async function refreshBossLabObserved() {
@@ -13318,9 +13434,12 @@ if (isDebugMode) {
     bossLabElement('debugBossLabResourceNear')?.addEventListener('click', () => adjustBossLabResource('near'));
     bossLabElement('debugBossLabResourceZero')?.addEventListener('click', () => adjustBossLabResource('zero'));
     bossLabElement('debugBossLabResourceTarget')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
+    bossLabElement('debugBossLabCombatEntity')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
+    bossLabElement('debugBossLabCombatApply')?.addEventListener('click', () => localActionGate.run(applyBossLabCombatEntity));
     bossLabElement('debugBossLabUndo')?.addEventListener('click', async () => {
       await window.executeUndo();
       await refreshBossLabObserved();
+      await refreshBossLabResourceControls();
     });
     bossLabElement('debugBossLabReset')?.addEventListener('click', resetBossLabScenario);
     bossLabElement('debugBossLabSweep')?.addEventListener('click', sweepBossLab);

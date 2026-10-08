@@ -27,6 +27,8 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8">${styles.map((
 <script type="module">
 import { buildBossDebugScenario } from '/js/boss/boss-debug-scenarios.js';
 import { getBossUiAdapter } from '/js/boss/ui/boss-ui-registry.js';
+import { renderCastleHud } from '/js/boss/ui/dimitrescu-castle-view.js';
+import { cardFrontHTML } from '/js/game/card-face.js';
 import { nemesisBossPresentation } from '/js/boss/presentation/nemesis.js';
 import { createActionGate } from '/js/game/match-control.js';
 import { setBossDamageTarget, isBossTurnActive, getBossCardEffect, beginBossTurn, advanceBossTurn, notifyBossPurchaseCompleted, completeBossPlayerTurn } from '/js/boss/boss-engine.js';

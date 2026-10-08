@@ -1,4 +1,5 @@
 import { createDeck } from '../deck.js';
+import { distributeCastleItems, killDaughter } from './dimitrescu-castle.js';
 import { advanceBossTurn, applyBossMeldTransition, beginBossTurn, completeBossPlayerTurn, createBossState, getBossAbilityPhases, getBossCombatPriorities, inspectBossAbilityEligibility, isValidBossSequence, normalizeBossState, notifyBossCardDiscarded, queueDebugBossAbility, resolveBossChoice, resolveBossDebugSpringCrownThreat, selectNextBossIntent } from './boss-engine.js';
 import { getBossDefinition, listBossDefinitions } from './boss-registry.js';
 import { getBossMechanicsAdapter } from './mechanics/boss-mechanics-registry.js';
@@ -367,6 +368,9 @@ function moveCardsToStock(state, cards = []) {
 }
 
 function configureNoTargetState(state, abilityId) {
+  if (abilityId === 'three_daughters') {
+    state.boss.combatEntities.forEach(d => { d.hp=0; d.status='dead'; });
+  }
   if (TARGETED_MELD_ABILITIES.has(abilityId) || ['collar', 'exposure', 'living_seed', 'twin_vines', 'graft', 'royal_bloom', 'bela_hunt', 'three_daughters', 'crimson_brand', 'false_image', 'mirrored_meld', 'dream_theft', 'shattered_mirror', 'mirror_prison', 'eternal_nightmare'].includes(abilityId)) {
     state.teams[0].melds.forEach((meld) => moveCardsToStock(state, meld));
     state.teams[0].melds = [];
@@ -552,6 +556,7 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
   }
 
   const eligibility = findSeedForTarget(state, ability.id, target);
+  if (definition.id === 'dimitrescu') distributeCastleItems(state.boss, collectCardsWithZones(state).map(entry => entry.card));
   const expectsNoTarget = variant === 'no_target' || variant === 'phase_cap' || (variant === 'persistent_corpse' && phase === 1);
   if (!expectsNoTarget && !eligibility.eligible) throw new Error(eligibility.reason);
   if (expectsNoTarget && eligibility.eligible) throw new Error(`${ability.name} ainda encontrou um alvo no cenario sem alvo.`);
@@ -718,6 +723,49 @@ export function canContinueBossDebugScenario(state, config = {}) {
     && !state.finished;
 }
 
+export function getBossDebugCombatState(state, { bossId = null } = {}) {
+  const boss = normalizeBossState(state);
+  const supported = ['nemesis', 'dimitrescu'].includes(bossId || boss?.id);
+  if (!supported || !boss || (bossId && boss.id !== bossId)) return { available:false, entities:[] };
+  return { available:!boss.result && !state.finished, bossId:boss.id, phase:boss.phase,
+    entities:boss.combatEntities.map(entity => ({ id:entity.id, name:entity.name, hp:entity.hp, maxHp:entity.maxHp,
+      status:entity.status, mutated:!!entity.mutated,
+      reinforced:boss.hordeBuff?.entityId === entity.id && boss.roundNumber <= boss.hordeBuff.expiresRound })) };
+}
+
+// Manual laboratory fixture edits, never called by normal turns/BOT or ability selection.
+export function setBossDebugCombatEntity(state, { bossId, entityId, status, hp, mutated = false, reinforced = false } = {}) {
+  const info = getBossDebugCombatState(state, { bossId });
+  if (!info.available) throw new Error('Prepare este chefe antes de ajustar os auxiliares.');
+  const boss=state.boss, entity=boss.combatEntities.find(entry=>entry.id===entityId);
+  const statuses=boss.id==='nemesis' ? ['persistent','absent','corpse'] : ['alive','dead'];
+  if (!entity || !statuses.includes(status)) throw new Error('Auxiliar ou estado inválido.');
+  const alive=status==='persistent' || status==='alive';
+  const value=Number(hp);
+  if (alive && (!Number.isInteger(value) || value<1 || value>entity.maxHp)) throw new Error(`Vida deve estar entre 1 e ${entity.maxHp}.`);
+  const actionId=`boss_debug_entity_${++boss.actionSequence}`;
+  const record=event=>{boss.eventLog.push(event);boss.lastEvent=event;};
+  if (boss.id==='dimitrescu') {
+    if (!alive) killDaughter(state,entity,actionId,record);
+    else { entity.hp=value;entity.status='alive';entity.deathRecorded=false;entity.diedAt=null; }
+  } else {
+    entity.status=status;entity.hp=status==='corpse'?0:alive?value:entity.maxHp;
+    entity.mutated=alive && (!!mutated || boss.phase>=3);
+    entity.entryIntentId=null;entity.transitionEventId=actionId;entity.transitionAt=Date.now();
+    if (reinforced && alive) boss.hordeBuff={entityId,expiresRound:boss.roundNumber+1,sourceIntentId:actionId};
+    else if (boss.hordeBuff?.entityId===entityId) boss.hordeBuff=null;
+    if (entityId==='grabber' && !alive) boss.grabbedByPlayer={};
+    if (entityId==='devourer') boss.devourerFeed=null;
+    if (boss.currentIntent?.abilityId==='horde_invasion' && boss.currentIntent.payload.entityId===entityId) {
+      boss.currentIntent.payload.resolved=true;
+    }
+  }
+  record({type:'bossDebugEntity',actionId,targetId:entityId,outcome:`Laboratório: ${entity.name} — ${status}.`});
+  normalizeBossState(state);
+  state.lastAction={id:actionId,type:'bossDebugEntity',bossId:boss.id,entityId};
+  return getBossDebugCombatState(state,{bossId:boss.id});
+}
+
 export function listBossDebugScenarios({ bossId, abilityId }) {
   return [...(bossDebugScenarioRegistry[`${bossId}:${abilityId}`]?.variants || [])];
 }
@@ -881,7 +929,7 @@ function executeMinimalSuccess(state, preferredPlayerId = null) {
     };
   }
   if (intent.abilityId === 'three_daughters') {
-    const objectives = intent.payload?.objectives || [];
+    const objectives = (state.boss.combatEntities || []).filter(d => d.status === 'alive' && d.passive).map(d => ({ type:d.id, ...d.passive }));
     const moves = [];
     const bela = objectives.find((objective) => objective.type === 'bela' && objective.status === 'active');
     if (bela?.targetPlayerId != null && bela.cardId) {

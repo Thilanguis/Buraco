@@ -1,4 +1,4 @@
-export const TABLE_THEME_IDS = Object.freeze(['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom', 'lunar', 'wwe', 'resident']);
+export const TABLE_THEME_IDS = Object.freeze(['feltro', 'cassino', 'masmorra', 'ostentacao', 'submissao', 'findom', 'lunar', 'wwe', 'resident', 'dimitrescu']);
 export const DECK_THEME_IDS = Object.freeze(['classico', 'cassino', 'minimal', 'dominacao', 'arcade', 'mythic', 'holografico', 'lunar', 'wwe', 'resident']);
 
 export function normalizeTableTheme(theme) {

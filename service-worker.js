@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v282';
+const CACHE_NAME = 'buraco-v285';
 const ASSETS = [
   './js/history-totals.js',
   './js/history-comparison.js',
@@ -15,6 +15,7 @@ const ASSETS = [
   './js/game/match-control.js',
   './js/game/table-background.js',
   './styles/resident.css',
+  './assets/resident/dimitrescu-table.webp',
   ...['spades', 'hearts', 'clubs', 'diamonds'].flatMap((suit) => ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map((rank) => `./assets/resident/${suit}-${rank}.webp`)),
   ...['joker-red', 'joker-blue', 'back-red', 'back-blue', 'table'].map((name) => `./assets/resident/${name}.webp`),
   './styles/card-readability.css',
@@ -52,6 +53,15 @@ const ASSETS = [
   './js/game/domination-friend-sound.js',
   './js/boss/boss-engine.js',
   './js/boss/boss-combat.js',
+  './js/boss/dimitrescu-castle.js',
+  './assets/sfx/what-have-you-done-to-my-daughter.mp3',
+  './js/boss/ui/dimitrescu-castle-view.js',
+  './js/boss/ui/resource-feedback.js',
+  './assets/images/items/adaga.png',
+  './assets/images/items/frasco-frio.png',
+  './assets/images/items/anticoagulante.png',
+  './assets/images/items/explosivo.png',
+  './assets/images/items/reliquia.png',
   './js/boss/bosses/nemesis.js',
   './js/boss/mechanics/nemesis.js',
   './js/boss/presentation/nemesis.js',

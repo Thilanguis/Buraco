@@ -1,3 +1,4 @@
+import { ladyBloodBalance, furyHealing, furyBlood, furyLevel, CASTLE_BALANCE } from '../dimitrescu-castle.js';
 const SPEECHES = Object.freeze({
   bela_hunt: 'Bela está entediada. Seja gentil e entretenha minha filha.',
   cassandra_feast: 'Cassandra já escolheu onde servir o jantar. Não a façam esperar.',
@@ -5,10 +6,11 @@ const SPEECHES = Object.freeze({
   blood_tithe: 'Uma casa cheia de convidados… e nenhum deles trouxe um presente para mim.',
   red_wine: 'Ah… isso sim é uma safra digna da casa Dimitrescu.',
   crimson_brand: 'Gosto de saber exatamente a quem cada gota pertence.',
-  cassandra_dead_feast: 'Cassandra, minha querida… guarde esse banquete para quando eles estiverem mais famintos.',
+  cassandra_dead_feast: 'Eu guardarei esse banquete para quando vocês estiverem mais famintos.',
   crimson_clot: 'Vocês realmente acharam que meu próprio sangue permitiria que eu caísse tão facilmente?',
   castle_lockdown: 'As portas estão fechadas. Meus convidados só saem quando eu decidir.',
   three_daughters: 'Meninas… nossos convidados começaram a ficar confortáveis demais.',
+  impure_blood: 'Não contaminem minha safra com esses coringas.',
 });
 
 function dialogueTarget(context = {}) {
@@ -32,6 +34,7 @@ const RESULT_CATEGORIES = Object.freeze({
   crimson_clot: 'Proteção formada',
   castle_lockdown: 'Restrição encerrada',
   three_daughters: 'Caçada conjunta resolvida',
+  impure_blood: 'Sangue Impuro encerrado',
 });
 
 const ACTION_CATEGORIES = Object.freeze({
@@ -44,6 +47,7 @@ const ACTION_CATEGORIES = Object.freeze({
   crimson_clot: 'Efeito natural ativo',
   castle_lockdown: 'Restricao ativa agora',
   three_daughters: 'Objetivo da rodada',
+  impure_blood: 'Efeito ativo nesta rodada',
 });
 
 export const dimitrescuBossPresentation = Object.freeze({
@@ -83,8 +87,7 @@ export const dimitrescuBossPresentation = Object.freeze({
       case 'daniela_swarm': return detailFields([['Filha', 'Daniela'], ['Carta contaminada', cardLabelAnywhere(gameState, payload.discardCardId)], ['Prazo', 'esta rodada'], ['Evitar o lixo', 'Sem punição'], ['Recolher o lixo', `Sede +${Number(intent.announcedPhase) === 3 ? 15 : 12}`]]);
       case 'blood_tithe': {
         const phase = Number(intent.announcedPhase) || 1;
-        const medium = phase === 3 ? 6 : 4;
-        const heavy = phase === 3 ? 10 : 8;
+        const { mediumTithe: medium, heavyTithe: heavy } = ladyBloodBalance(phase);
         const players = (gameState?.players || []).map((player) => {
           const cards = player.hand?.length || 0;
           const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
@@ -92,12 +95,13 @@ export const dimitrescuBossPresentation = Object.freeze({
         });
         return detailFields([['Cobrança', 'cada jogador é avaliado separadamente no fim da rodada'], ...players, ['0–7 cartas', 'sem efeito'], ['8–10 cartas', `Sede +${medium} por jogador`], ['11+ cartas', `Sede +${heavy} por jogador`]]);
       }
-      case 'red_wine': return detailFields([['Requisito', 'Lady ferida e Sede 20+'], ['Cura', `${payload.healAmount || 0} HP`], ['Custo', `${payload.bloodCost || 15} de Sede`]]);
-      case 'crimson_brand': return detailFields([...(payload.marks || []).map((mark, index) => [`Marca ${index + 1}`, `${playerName(gameState, mark.playerId)} — ${cardLabelAnywhere(gameState, mark.cardId)}`]), ['Sucesso por marca', 'Sem punição'], ['Falha por marca', `Sede +${Number(intent.announcedPhase) === 3 ? 9 : 7}`]]);
-      case 'cassandra_dead_feast': return detailFields([['Filha', 'Cassandra'], ['Alvo', `Morto ${Number(payload.deadIndex) + 1}`], ['Ao tomar', `Sede +${payload.bloodAmount || 0} e cura ${payload.healAmount || 0} HP`], ['Purificação', 'Canastra Real ou Ás-a-Ás: apenas +4 Sede, sem cura']]);
+      case 'red_wine': return detailFields([['Requisito', 'Lady ferida e Sede 20+'], ['Cura com Fúria', `${furyHealing(gameState.boss, payload.healAmount || 0)} HP`], ['Custo', `${payload.bloodCost || 15} de Sede`]]);
+      case 'crimson_brand': return detailFields([...(payload.marks || []).map((mark, index) => [`Marca ${index + 1}`, `${playerName(gameState, mark.playerId)} — ${cardLabelAnywhere(gameState, mark.cardId)}`]), ['Sucesso por marca', 'Sem punição'], ['Falha por marca', `Sede +${ladyBloodBalance(intent.announcedPhase).crimsonBrand}`]]);
+      case 'cassandra_dead_feast': return detailFields([['Autora', 'Lady Dimitrescu'], ['Alvo', `Morto ${Number(payload.deadIndex) + 1}`], ['Ao tomar', `Sede +${furyBlood(gameState.boss, payload.bloodAmount || 0)} e cura ${furyHealing(gameState.boss, payload.healAmount || 0)} HP`], ['Purificação', `Canastra Real ou Ás-a-Ás: +${furyBlood(gameState.boss, 4)} Sede, sem cura`]]);
       case 'crimson_clot': return detailFields([['Proteção', `${payload.amount || 0}`], ['Romper', 'Sem punição'], ['Sobreviver', 'metade da proteção restante vira cura']]);
       case 'castle_lockdown': return detailFields([['Duração', 'rodada completa'], ['Restrição', 'ninguém pode pegar o lixo'], ['Compra permitida', 'somente do monte']]);
-      case 'three_daughters': return detailFields([...(payload.objectives || []).map((objective, index) => [`Objetivo ${index + 1}`, objectiveLabel(objective)]), ['Cada sucesso', 'Sem punição'], ['Cada falha', 'Sede +8']]);
+      case 'three_daughters': return detailFields([['Participam', (gameState.boss.combatEntities || []).filter(d => d.status === 'alive').map(d => d.name).join(', ') || 'nenhuma filha viva'], ['Bela', 'Use a carta marcada até o fim do turno do alvo: falha +3 Sede'], ['Cassandra', 'Alimente o jogo marcado até o fim da rodada: falha +3 Sede'], ['Daniela', 'Primeira compra efetiva do Lixo: +3 Sede'], ['Sem candidato legal', 'Bela/Cassandra não criam objetivo nem punem']]);
+      case 'impure_blood': return detailFields([['Gatilho', 'Primeiro Joker ou 2 como coringa de cada cooperador nesta rodada'], ['Custo', '+3 Sede por jogador, máximo +6'], ['2 natural', 'Não ativa'], ['Já ativaram', (payload.triggeredPlayerIds || []).map(id => playerName(gameState, id)).join(', ') || 'ninguém']]);
       default: return detailFields([['Efeito', intent.description || 'habilidade ativa']]);
     }
   },
@@ -140,20 +144,19 @@ export const dimitrescuBossPresentation = Object.freeze({
       case 'daniela_swarm': return { instruction: '☣️ Não pegue o Lixo.', progress: payload.triggered ? '❌ Ativado' : '⬜ Seguro', consequence: payload.triggered ? 'Sede aumentou' : `Evitar: sem punição · Pegar +${Number(intent.announcedPhase) === 3 ? 15 : 12} Sede` };
       case 'blood_tithe': {
         const phase = Number(intent.announcedPhase) || 1;
-        const medium = phase === 3 ? 6 : 4;
-        const heavy = phase === 3 ? 10 : 8;
+        const { mediumTithe: medium, heavyTithe: heavy } = ladyBloodBalance(phase);
         const projected = (gameState?.players || []).reduce((sum, player) => {
           const cards = player.hand?.length || 0;
           return sum + (cards >= 11 ? heavy : cards >= 8 ? medium : 0);
         }, 0);
-        return { instruction: 'Reduza as duas mãos antes do fim da rodada.', progress: '', consequence: `Previsto: +${projected} Sede` };
+        return { instruction: 'Reduza as duas mãos antes do fim da rodada.', progress: '', consequence: `Previsto: +${furyBlood(gameState.boss, projected)} Sede` };
       }
-      case 'red_wine': return { instruction: `Troca ${payload.bloodCost || 15} Sede por cura.`, progress: `Sede ${gameState?.boss?.danger || 0}/100`, consequence: `Até +${payload.healAmount || 0} HP` };
-      case 'crimson_brand': return { instruction: 'Use cada carta marcada em um jogo.', progress: brandProgress(), consequence: `Sucesso: sem punição · Falha +${Number(intent.announcedPhase) === 3 ? 9 : 7} Sede` };
+      case 'red_wine': return { instruction: `Troca ${payload.bloodCost || 15} Sede por cura.`, progress: `Sede ${gameState?.boss?.danger || 0}/100`, consequence: `Até +${furyHealing(gameState.boss, payload.healAmount || 0)} HP` };
+      case 'crimson_brand': return { instruction: 'Use cada carta marcada em um jogo.', progress: brandProgress(), consequence: `Falha agora: +${furyBlood(gameState.boss, (payload.marks || []).filter(m => m.status === 'active').length * ladyBloodBalance(intent.announcedPhase).crimsonBrand)} Sede` };
       case 'cassandra_dead_feast': {
         const curse = gameState?.boss?.bloodiedDead;
         const active = curse?.status === 'active';
-        return { instruction: `Morto ${Number(payload.deadIndex) + 1} amaldiçoado.`, progress: active ? '🩸 Maldição ativa' : 'Preparado', consequence: `Tomar: +${payload.bloodAmount || 0} Sede · +${payload.healAmount || 0} HP` };
+        return { instruction: `Morto ${Number(payload.deadIndex) + 1} amaldiçoado.`, progress: active ? '🩸 Maldição ativa' : 'Preparado', consequence: `Tomar: +${furyBlood(gameState.boss, payload.bloodAmount || 0)} Sede · +${furyHealing(gameState.boss, payload.healAmount || 0)} HP` };
       }
       case 'crimson_clot': {
         const clot = gameState?.boss?.crimsonClot;
@@ -162,7 +165,8 @@ export const dimitrescuBossPresentation = Object.freeze({
         return { instruction: 'Quebre o Coágulo.', progress: clot?.status === 'active' ? `🩸 ${remaining}/${maximum}` : 'Preparado', consequence: 'Falha: 50% restante vira cura' };
       }
       case 'castle_lockdown': return { instruction: '🔒 Lixo fechado.', progress: '', consequence: 'Use o Monte' };
-      case 'three_daughters': return { instruction: 'Cumpra os 3 objetivos das Filhas.', progress: multiProgress(payload.objectives || []), consequence: 'Falha: +8 Sede por objetivo' };
+      case 'three_daughters': return { instruction: 'Todas as filhas vivas usam suas passivas.', progress: multiProgress((gameState.boss.combatEntities || []).filter(d => d.passive?.round === gameState.boss.roundNumber && ['active', 'success', 'failed', 'triggered'].includes(d.passive.status)).map(d => ({ type:d.id, status:d.passive.status }))), consequence: '+3 Sede por falha/reação' };
+      case 'impure_blood': return { instruction: 'Primeiro coringa de cada jogador: +3 Sede.', progress: `${(payload.triggeredPlayerIds || []).length}/2 ativaram`, consequence: '2 natural não conta · máximo +6 Sede' };
       default: return null;
     }
   },
@@ -170,15 +174,14 @@ export const dimitrescuBossPresentation = Object.freeze({
   rangeMeters({ gameState, intent } = {}) {
     if (intent?.abilityId !== 'blood_tithe') return null;
     const phase = Number(intent.announcedPhase) || 1;
-    const medium = phase === 3 ? 6 : 4;
-    const heavy = phase === 3 ? 10 : 8;
+    const { mediumTithe: medium, heavyTithe: heavy } = ladyBloodBalance(phase);
     const players = (gameState?.players || []).map((player) => {
       const cards = player.hand?.length || 0;
       const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
       return { label: player.name || 'Jogador', value: cards, amount, tone: cards >= 11 ? 'danger' : cards >= 8 ? 'warning' : 'safe' };
     });
     const maxCards = Math.max(0, ...players.map((player) => player.value));
-    const projectedBlood = players.reduce((sum, player) => sum + player.amount, 0);
+    const projectedBlood = furyBlood(gameState.boss, players.reduce((sum, player) => sum + player.amount, 0));
     const maximum = Math.max(14, maxCards);
     const worstTone = players.some((player) => player.tone === 'danger') ? 'danger' : players.some((player) => player.tone === 'warning') ? 'warning' : 'safe';
     const playerSummary = players.map((player) => `${player.label} ${player.value}`).join(' · ');
@@ -198,30 +201,25 @@ export const dimitrescuBossPresentation = Object.freeze({
       case 'bela_hunt':
         return `${playerName(gameState, payload.targetPlayerId)}: jogue ${cardLabelAnywhere(gameState, payload.cardId)} legalmente até o fim do seu turno. Descartar não vale. Sucesso: sem punição; falha: +${phase === 3 ? 16 : 14} Sede.`;
       case 'blood_tithe':
-        return `No fim da rodada, cada mão é avaliada separadamente. Nesta fase: 0–7 cartas não cobram; 8–10 acrescentam ${phase === 3 ? 6 : 4} de Sede por jogador; 11+ acrescentam ${phase === 3 ? 10 : 8}. O medidor mostra a cobrança projetada.`;
+        return `Baixe cartas antes do fim da rodada! Cada mão paga:\n0–7 cartas: nada\n8–10: +${ladyBloodBalance(phase).mediumTithe} Sede\n11+: +${ladyBloodBalance(phase).heavyTithe} Sede\n${furyLevel(gameState.boss) ? `Fúria: +${furyLevel(gameState.boss) * CASTLE_BALANCE.furyBloodStep} ao total quando houver cobrança.` : 'Os dois jogadores são avaliados separadamente.'}`;
       case 'red_wine':
-        return `Vinho Carmesim só entra quando Lady está ferida e possui Sede suficiente. Ela consome ${payload.bloodCost || 15} de Sede para recuperar até ${payload.healAmount || 0} HP; a cura nunca ultrapassa o HP que falta.`;
+        return `Lady consome ${payload.bloodCost || 15} de Sede para curar até ${furyHealing(gameState.boss, payload.healAmount || 0)} HP, já com Fúria. Não ultrapassa o HP máximo.`;
       case 'crimson_brand':
-        return `Cada cooperador recebe uma carta marcada. Cada marca é resolvida separadamente: colocar a carta legalmente em um jogo evita a punição; deixar a carta sem uso até o prazo acrescenta ${phase === 3 ? 9 : 7}.`;
+        return `Jogue as cartas marcadas até o fim da rodada. Cada carta não usada causa +${ladyBloodBalance(phase).crimsonBrand} Sede.${furyLevel(gameState.boss) ? `\nFúria: +${furyLevel(gameState.boss) * CASTLE_BALANCE.furyBloodStep} ao total se alguma marca falhar.` : ''}\nDescartar não vale; usar a carta evita sua punição.`;
       case 'cassandra_feast':
         return `Adicione 1 carta legal ao Jogo ${Number(payload.meldIndex) + 1} nesta rodada. Sucesso: sem punição; falha: +${phase === 3 ? 18 : 16} Sede.`;
       case 'daniela_swarm':
         return `Daniela contaminou ${cardLabelAnywhere(gameState, payload.discardCardId)} no Lixo. Evitar essa carta durante a rodada não altera a Sede. Recolhê-la acrescenta ${phase === 3 ? 15 : 12}.`;
       case 'cassandra_dead_feast':
-        return 'A maldição permanece no próximo Morto até ele ser tomado. Normalmente isso aumenta a Sede e cura Lady. Se a equipe já tiver Canastra Real ou Ás-a-Ás quando conquistar o Morto, ele é purificado: a Sede sobe apenas +4 e a cura é anulada.';
+        return `Pegar o Morto ${Number(payload.deadIndex) + 1}: +${furyBlood(gameState.boss, payload.bloodAmount || 0)} Sede e até ${furyHealing(gameState.boss, payload.healAmount || 0)} HP para a Lady.\nUma canastra Real ou Ás-a-Ás purifica a maldição: +${furyBlood(gameState.boss, 4)} Sede, sem cura.`;
       case 'crimson_clot':
-        return 'O Coágulo recebe o dano antes de Lady. Romper toda a proteção evita a cura, sem alterar a Sede. Se ele sobreviver até o fim da rodada, metade da proteção restante vira cura.';
+        return 'Seus ataques atingem o Coágulo antes da Lady. Quebre-o nesta rodada para impedir a cura.\nSe sobrar proteção, metade vira cura para ela, aumentada pela Fúria.';
       case 'castle_lockdown':
-        return 'Portas do Castelo bloqueia o Lixo durante a rodada inteira. Os jogadores continuam podendo comprar normalmente do Monte; não existe punição extra por usar o Monte.';
+        return 'O Lixo fica fechado até o fim desta rodada. Compre do Monte normalmente.';
       case 'three_daughters': {
-        const objectiveLabel = (objective) => {
-          if (objective?.type === 'bela') return `Bela: ${playerName(gameState, objective.targetPlayerId)} usa ${cardLabelAnywhere(gameState, objective.cardId)}`;
-          if (objective?.type === 'cassandra') return `Cassandra: alimentar o Jogo ${Number(objective.meldIndex) + 1}`;
-          if (objective?.type === 'daniela') return `Daniela: não recolher ${cardLabelAnywhere(gameState, objective.discardCardId)} do Lixo`;
-          return 'objetivo pendente';
-        };
-        return `${(payload.objectives || []).map(objectiveLabel).join(' · ')}. Cada falha: +8 Sede. Sucesso evita apenas sua própria punição.`;
+        return 'Todas as filhas vivas agem nesta rodada:\nBela: jogue a carta marcada no turno do alvo.\nCassandra: adicione cartas ao jogo marcado até o fim da rodada.\nCada falha: +3 Sede. Sem carta/jogo válido, não pune.\nDaniela: primeira retirada do Lixo causa +3 Sede.';
       }
+      case 'impure_blood': return 'Nesta rodada, seu primeiro Joker ou 2 como coringa causa +3 Sede.\nSó uma vez por jogador: máximo +6 para a equipe, sem bônus de Fúria.\nO 2 natural não ativa.';
       default:
         return null;
     }
@@ -246,7 +244,7 @@ export const dimitrescuBossPresentation = Object.freeze({
     if (clot?.status === 'active') {
       const maximum = Math.max(1, Number(clot.max) || 1);
       const remaining = Math.max(0, Number(clot.remaining) || 0);
-      const projectedHeal = Math.floor(remaining / 2);
+      const projectedHeal = furyHealing(boss, Math.floor(remaining / 2));
       return { category: 'Proteção vampírica ativa', name: 'Coágulo Carmesim', speech: '', description: '', details: detailFields([['Proteção restante', `${remaining}/${maximum}`], ['Prazo', `fim da rodada ${boss.roundNumber}`], ['Se romper', 'Sem punição'], ['Se sobreviver', `${projectedHeal} HP de cura com o valor atual`]]), instruction: 'Rompa o Coágulo Carmesim antes do fim da rodada.', progress: `🩸 COÁGULO ${remaining}/${maximum}`, consequence: `Romper: Sem punição · Sobreviver agora: +${projectedHeal} HP` };
     }
     if (event?.type === 'bossHeal' && event.origin === 'Coágulo Carmesim') return { category: 'Proteção convertida em cura', name: 'Coágulo Carmesim', speech: '', description: '', details: detailFields([['Cura aplicada', `+${event.amount || 0} HP`]]), instruction: event.outcome || `O Coágulo sobrevivente restaurou ${event.amount || 0} HP.`, progress: 'Coágulo consumido', consequence: `Lady Dimitrescu recuperou ${event.amount || 0} HP` };

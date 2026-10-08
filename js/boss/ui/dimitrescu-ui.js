@@ -14,9 +14,9 @@ export const dimitrescuBossUi = Object.freeze({
     const intent = boss?.currentIntent;
     const cassandraObjective = intent?.abilityId === 'three_daughters' ? intent.payload?.objectives?.find((objective) => objective.type === 'cassandra') : null;
     const cassandraMarked =
-      intent?.abilityId === 'cassandra_feast'
+      boss?.combatEntities?.some(d => d.id === 'cassandra' && d.status === 'alive' && d.passive?.status === 'active' && matchesMeld(d.passive, meldId, meldIndex)) || (intent?.abilityId === 'cassandra_feast'
         ? !intent.payload?.fed && matchesMeld(intent.payload, meldId, meldIndex)
-        : cassandraObjective?.status === 'active' && matchesMeld(cassandraObjective, meldId, meldIndex);
+        : cassandraObjective?.status === 'active' && matchesMeld(cassandraObjective, meldId, meldIndex));
 
     return {
       divClasses: cassandraMarked ? ['feasted-by-cassandra'] : [],

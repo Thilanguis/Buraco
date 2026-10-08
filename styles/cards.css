@@ -1663,3 +1663,5 @@ body[data-deck-theme] #handContainer .carta.just-bought {
     filter: none !important;
   }
 }
+/* Face-only ornament: hidden backs never render this markup. */
+.carta .castle-item-overlay { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:46%; max-height:40%; object-fit:contain; z-index:12; pointer-events:none; }

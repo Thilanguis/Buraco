@@ -1,4 +1,5 @@
 // Shared face markup for hands, discard piles and card flights.
+import { ITEM_DEFINITIONS } from '../boss/dimitrescu-castle.js';
 export function suitClass(card) {
   return card.joker ? 'joker-card' : card.suit === '♥' || card.suit === '♦' ? 'hearts' : 'spades';
 }
@@ -23,7 +24,9 @@ export function cardFrontHTML(card) {
   // No image requests for other decks; ordinary rank/suit markup remains available.
   const asset = lunarCardAsset(card);
   // URLs in this custom property resolve relative to styles/lunar.css.
-  const art = asset ? ['lunar', 'wwe', 'resident'].map(theme => `<span class="${theme}-card-art" data-card-art="${asset.split('/').pop().replace('.webp', '')}" aria-hidden="true" style="--${theme}-face: url('../${asset.replace('assets/lunar/', `assets/${theme}/`)}')"></span>`).join('') : '';
+  const item = !card.castleItem?.consumed && ITEM_DEFINITIONS[card.castleItem?.type];
+  const overlay = item ? `<img class="castle-item-overlay" src="${item.image}" alt="${item.label}" draggable="false">` : '';
+  const art = (asset ? ['lunar', 'wwe', 'resident'].map(theme => `<span class="${theme}-card-art" data-card-art="${asset.split('/').pop().replace('.webp', '')}" aria-hidden="true" style="--${theme}-face: url('../${asset.replace('assets/lunar/', `assets/${theme}/`)}')"></span>`).join('') : '') + overlay;
   if (card.joker) {
     return `${art}<div class="carta-canto top joker-label"><span class="card-rank">JOKER</span></div><div class="carta-meio joker-symbol">★</div><div class="carta-canto bottom joker-label"><span class="card-rank">JOKER</span></div>`;
   }

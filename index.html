@@ -273,7 +273,8 @@
                       <option value="findom">Dominação Financeira (Grafite & Ouro Verde)</option>
                       <option value="lunar">🌙 Reino Lunar</option>
                       <option value="wwe">👑 WWE — Arena</option>
-                      <option value="resident">☣ Resident Evil — Mansão</option>
+                      <option value="resident">☣ Resident Evil 3 — R.P.D.</option>
+                      <option value="dimitrescu">🩸 Castelo da Dimitrescu</option>
                     </select>
                   </div>
                 </div>
@@ -544,7 +545,8 @@
               <option value="findom">Findom</option>
               <option value="lunar">Reino Lunar</option>
               <option value="wwe">WWE — Arena</option>
-              <option value="resident">Resident Evil — Mansão</option>
+              <option value="resident">Resident Evil 3 — R.P.D.</option>
+              <option value="dimitrescu">Castelo da Dimitrescu</option>
             </select>
           </label>
 
@@ -607,6 +609,19 @@
                   <button id="debugBossLabResourceZero" type="button">Zerar</button>
                 </div>
               </div>
+
+              <fieldset id="debugBossLabCombat" hidden style="flex-direction:column;gap:6px;padding:8px;border:1px solid #64748b;border-radius:8px">
+                <legend>Auxiliares — ajuste manual de teste</legend>
+                <span id="debugBossLabCombatInfo" style="font-size:10px">Prepare este chefe para ajustar.</span>
+                <label>Auxiliar <select id="debugBossLabCombatEntity"></select></label>
+                <label>Estado <select id="debugBossLabCombatStatus"></select></label>
+                <label>Vida <input id="debugBossLabCombatHp" type="number" min="1" step="1" /></label>
+                <div id="debugBossLabCombatModifiers">
+                  <label><input id="debugBossLabCombatMutated" type="checkbox" /> Mutado</label>
+                  <label><input id="debugBossLabCombatReinforced" type="checkbox" /> Reforçado</label>
+                </div>
+                <button id="debugBossLabCombatApply" type="button">Aplicar no auxiliar</button>
+              </fieldset>
 
               <div class="debug-boss-lab-actions">
                 <button id="debugBossLabBotSuccess" type="button">BOT: executar sucesso</button>

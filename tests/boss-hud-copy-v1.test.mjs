@@ -36,14 +36,23 @@ test('explicações longas ficam no botão de ajuda, não no objetivo principal'
   assert.match(mirroredHelp, /fundo do Monte/i);
   assert.doesNotMatch(mirrored.presentation.consequence, /carta ao monte/i);
 
-  const daughters = preparedPresentation('dimitrescu', 'three_daughters');
+  const daughters = preparedPresentation('dimitrescu', 'crimson_clot');
   const daughtersHelp = buildBossAbilityHelp(daughters.state)?.text || '';
-  assert.match(daughtersHelp, /Bela:/);
-  assert.match(daughtersHelp, /Cassandra:/);
-  assert.match(daughtersHelp, /Daniela:/);
+  assert.match(daughtersHelp, /Coágulo/);
+  assert.match(daughtersHelp, /Coágulo antes da Lady/);
   assert.ok(String(daughters.presentation.progress || '').length <= 40);
 });
 
+
+test('ajudas atuais da Dimitrescu cabem em blocos curtos sem linguagem de implementação', () => {
+  const boss=getBossDebugCatalog().find(b=>b.id==='dimitrescu');
+  for(const ability of boss.abilities) {
+    const {state}=preparedPresentation('dimitrescu',ability.id);
+    const help=buildBossAbilityHelp(state)?.text;
+    assert.ok(help,ability.id);assert.ok(help.length<=300,`${ability.id}: ${help.length}`);
+    assert.doesNotMatch(help,/payload|janela|resolvid[ao] separadamente|não existe punição extra/);
+  }
+});
 
 test('referências de carta recebem destaque visual sem transformar o resto do texto em HTML', async () => {
   const [app, css] = await Promise.all([
