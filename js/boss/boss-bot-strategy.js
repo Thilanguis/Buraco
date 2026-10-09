@@ -1,5 +1,5 @@
 // Strategy only. All legality, damage and deadline outcomes stay in the engine.
-import { bossObservableState, cooperativeHandValue, cooperativeHandMarginals, planPairIndexesWithTop } from '../game/bot-planner.js';
+import { bossObservableState, bossStockOpportunityValue, cooperativeHandValue, cooperativeHandMarginals, planPairIndexesWithTop } from '../game/bot-planner.js';
 import { applyBossMeldTransition, classifyBossMeldKind, isValidBossSequence,
   isBossCardNaturalInSequence, completeBossPlayerTurn, notifyBossCardDiscarded,
   quoteBossDiscardPickup, notifyBossDiscardTaken, notifyBossPurchaseCompleted,
@@ -73,10 +73,10 @@ export function simulateBossMove(state, botIndex, move) {
     oldKind:classifyBossMeldKind(before),newKind:classifyBossMeldKind(next),cardsAdded:cards,isNewMeld:move.meldIndex==null});
   return s;
 }
-function deadlineValue(s, botIndex) {
+function deadlineProjection(s, botIndex) {
   // app.js ends immediately on this canonical flag. Do not invent a later
   // punishment/heal after a contribution has already won the match.
-  if(s.boss?.defeated&&!s.boss?.result)return strategyValue(s,botIndex);
+  if(s.boss?.defeated&&!s.boss?.result)return {value:strategyValue(s,botIndex),state:s};
   const probe = copy(s);
   const round=probe.boss.roundNumber;
   completeBossPlayerTurn(probe,probe.players[botIndex].id,{deferNextBossTurn:true});
@@ -84,7 +84,14 @@ function deadlineValue(s, botIndex) {
   // still help, but we cannot assume unseen hands solve the remaining work.
   for (const p of probe.players) if (probe.boss.roundNumber===round
     && !(probe.boss.playersActedThisRound || []).includes(p.id)) completeBossPlayerTurn(probe,p.id,{deferNextBossTurn:true});
-  return strategyValue(probe,botIndex);
+  return {value:strategyValue(probe,botIndex),state:probe};
+}
+const deadlineValue=(s,i)=>deadlineProjection(s,i).value;
+function objectiveDiagnostic(before,after,abilityId) {
+  const resource=s=>Number(s.boss.id==='matriarca_esmeralda'?s.boss.bloom:s.boss.danger)||0;
+  return {abilityId:abilityId||null,resourceWithoutAction:resource(before),
+    resourceAfterAction:resource(after),lossWithoutAction:before.boss.result?.victory===false,
+    lossAfterAction:after.boss.result?.victory===false,weightedEnemyHealthDelta:health(before)-health(after)};
 }
 
 function wildcardCost(s,botIndex,move,cards,after) {
@@ -93,18 +100,45 @@ function wildcardCost(s,botIndex,move,cards,after) {
   const dirtying=base.length && !base.some(c=>wild(c,base)) && after.some(c=>wild(c,after));
   const noClean=s.teams[s.players[botIndex].teamId].melds.every(m=>!['limpa','real','asas'].includes(classifyBossMeldKind(m)));
   const sacrifice=dirtying&&base.length>=4?(noClean?180:100)*reserveWeight(s):0;
-  // Preserve the first review's calibrated cost. A stronger universal reserve
-  // made fewer wild spends but also fewer clean canastras in the expanded A/B.
-  // Canonical natural twos pay none; lethal objectives can outweigh this cost.
+  // Same calibrated reserve for hand plays AND the final pickup score. This is
+  // not a ban: acquired cards, canastras and canonical deadline outcomes compete.
   const reserve=move.meldIndex==null&&after.length<7?wildSpent*100*Math.max(.65,reserveWeight(s)):0;
-  return sacrifice+reserve;
+  const cleanOpportunity=cleanReplacementOpportunity(s,botIndex,base,after,wildSpent);
+  return {total:sacrifice+reserve+cleanOpportunity,wildSpent,sacrifice,reserve,cleanOpportunity};
+}
+
+function cleanReplacementOpportunity(s,botIndex,base,after,wildSpent) {
+  if (wildSpent!==1 || after.length>=7 || base.some(c=>wild(c,base))) return 0;
+  const index=after.findIndex(c=>wild(c,after)), suit=after.find(c=>!wild(c,after))?.suit;
+  if (!suit) return 0;
+  const known=[...s.players[botIndex].hand,...s.discard,...s.teams.flatMap(t=>t.melds.flat())];
+  const dead=(s.deadPiles || []).reduce((n,p)=>n+p.length,0);
+  const unseen=s.stock.length+dead+s.players.filter((_,i)=>i!==botIndex).reduce((n,p)=>n+p.hand.length,0);
+  const window=Math.min(6,s.stock.length+dead*.5);
+  let opportunity=0;
+  for(const rank of ['A','2','3','4','5','6','7','8','9','10','J','Q','K']) {
+    const replacement={id:'strategy:replacement',rank,suit,forceNatural:true};
+    const clean=after.map((c,i)=>i===index?replacement:{...c});
+    if (!isValidBossSequence(clean) || clean.some(c=>wild(c,clean))) continue;
+    const copies=Math.max(0,2-known.filter(c=>!c.joker&&c.suit===suit&&String(c.rank)===rank).length);
+    // Public unseen-pool estimate, not a peek at Monte/Morto/partner identities.
+    const chance=unseen?1-(1-Math.min(1,copies/unseen))**window:0;
+    opportunity+=Math.max(0,teamFutureValue([clean])-teamFutureValue([after]))*chance;
+  }
+  return opportunity*reserveWeight(s);
+}
+
+function contributionTerms(s,botIndex,move) {
+  const p=s.players[botIndex],base=s.teams[p.teamId].melds[move.meldIndex] || [];
+  const cards=move.cardIds.map(id=>p.hand.find(c=>c.id===id)).filter(Boolean),after=[...base,...cards];
+  return {wildcard:wildcardCost(s,botIndex,move,cards,after),naturalBonus:cards.filter(c=>!wild(c,after)).length*12};
 }
 
 // Rank a bounded shortlist by actual engine outcomes. Checking deadline cost on
 // clones replaces stale hand-written punishment tables, including partials.
 export function rankBossMoves(state, botIndex, moves, {limit=20}={}) {
   const publicState = bossObservableState(state,botIndex);
-  const baseline = deadlineValue(publicState,botIndex);
+  const baseline = deadlineProjection(publicState,botIndex);
   const rough = moves.map(move => {
     const p = publicState.players[botIndex], base = publicState.teams[p.teamId].melds[move.meldIndex] || [];
     const cards = p.hand.filter(c => move.cardIds.includes(c.id));
@@ -116,17 +150,21 @@ export function rankBossMoves(state, botIndex, moves, {limit=20}={}) {
   return unique.map(({move}) => {
     let next = simulateBossMove(publicState,botIndex,move);
     if (!next) return {move,score:-Infinity};
+    const terms=contributionTerms(publicState,botIndex,move);
+    let wildcardPenalty=terms.wildcard.total;
     for (const follow of move.followups || []) {
       const step=simulateBossMove(next,botIndex,follow);
       if (!step) break;
+      wildcardPenalty+=contributionTerms(next,botIndex,follow).wildcard.total;
       next=step;
     }
-    const played=move.cardIds.map(id=>publicState.players[botIndex].hand.find(c=>c.id===id)).filter(Boolean);
-    const base=publicState.teams[publicState.players[botIndex].teamId].melds[move.meldIndex] || [];
-    const after=[...base,...played];
-    const score = deadlineValue(next,botIndex)-baseline + played.filter(c=>!c.joker&&String(c.rank)!=='2').length*12
-      - wildcardCost(publicState,botIndex,move,played,after);
-    return {move,score,next};
+    const projected=deadlineProjection(next,botIndex),deadlineDelta=projected.value-baseline.value;
+    const score = deadlineDelta+terms.naturalBonus-wildcardPenalty;
+    return {move,score,next,diagnostics:{deadlineDelta,naturalBonus:terms.naturalBonus,wildcardPenalty,
+      ...terms.wildcard,objective:objectiveDiagnostic(baseline.state,projected.state,publicState.boss.currentIntent?.abilityId),
+      followupWildcardPenalty:wildcardPenalty-terms.wildcard.total,
+      cleanPotentialDelta:teamFutureValue(next.teams[publicState.players[botIndex].teamId].melds)
+        -teamFutureValue(publicState.teams[publicState.players[botIndex].teamId].melds)}};
   }).sort((a,b)=>b.score-a.score || a.move.cardIds.join().localeCompare(b.move.cardIds.join()));
 }
 
@@ -141,7 +179,7 @@ export function rankBossDiscardPickups(state,botIndex,{maxCandidates=64}={}) {
     for (const c of p.hand) destinations.push({meldIndex:m,handCardIds:[c.id]});
   }
   for (const [a,b] of planPairIndexesWithTop(p.hand,top)) destinations.push({meldIndex:null,handCardIds:[p.hand[a].id,p.hand[b].id]});
-  const baseline = deadlineValue(s,botIndex);
+  const baseline = deadlineProjection(s,botIndex);
   const results = [], candidates=[];
   for (const destination of destinations) {
     const quote = quoteBossDiscardPickup(s,p.id,destination);
@@ -150,7 +188,7 @@ export function rankBossDiscardPickups(state,botIndex,{maxCandidates=64}={}) {
     const base=team.melds[destination.meldIndex] || [],after=[...base,...cards];
     const held=[...p.hand.filter(c=>!destination.handCardIds.includes(c.id)),...s.discard.slice(-quote.count,-1)];
     const rough=teamFutureValue([after])-teamFutureValue([base])+cooperativeHandValue(held,[...team.melds,after])
-      - wildcardCost(s,botIndex,{meldIndex:destination.meldIndex},cards,after);
+      - wildcardCost(s,botIndex,{meldIndex:destination.meldIndex},cards,after).total;
     candidates.push({destination,quote,rough,key:JSON.stringify(destination),group:`${quote.protected?'top':'full'}:${destination.meldIndex==null?'new':'extend'}`});
   }
   const budget=Math.max(0,Math.floor(maxCandidates));
@@ -178,13 +216,29 @@ export function rankBossDiscardPickups(state,botIndex,{maxCandidates=64}={}) {
     const marginals=cooperativeHandMarginals(after.hand,board);
     const useful=after.hand.filter(c=>c.joker || marginals.get(c.id)>0).length;
     const isolated=Math.max(0,after.hand.length-useful);
-    const score=deadlineValue(played,botIndex)-baseline-isolated*(s.stock.length<=15?2:1)
-      + move.cardIds.map(id=>next.players[botIndex].hand.find(c=>c.id===id)).filter(c=>c && !c.joker&&String(c.rank)!=='2').length*12;
+    const terms=contributionTerms(next,botIndex,move),projected=deadlineProjection(played,botIndex);
+    const deadlineDelta=projected.value-baseline.value;
+    const isolationPenalty=isolated*(s.stock.length<=15?2:1);
+    const score=deadlineDelta-isolationPenalty+terms.naturalBonus-terms.wildcard.total;
     results.push({intent:destination.meldIndex==null?{wants:true,action:'new',handIndexes:destination.handCardIds.map(id=>p.hand.findIndex(c=>c.id===id))}
       :{wants:true,action:'extend',meldIndex:destination.meldIndex,handIndexes:destination.handCardIds.map(id=>p.hand.findIndex(c=>c.id===id))},
-      quote,score, useful, isolated});
+      quote,score, useful, isolated,diagnostics:{deadlineDelta,isolationPenalty,naturalBonus:terms.naturalBonus,
+        wildcardPenalty:terms.wildcard.total,...terms.wildcard,objective:objectiveDiagnostic(baseline.state,projected.state,s.boss.currentIntent?.abilityId),acquiredCount:quote.count,
+        acquiredHandValue:cooperativeHandValue(after.hand,board)-cooperativeHandValue(p.hand.filter(c=>!destination.handCardIds.includes(c.id)),board),
+        cleanPotentialDelta:teamFutureValue(board)-teamFutureValue(team.melds)}});
   }
   return results.sort((a,b)=>b.score-a.score);
+}
+
+// Read-only console/DevTools diagnostic. Only own hand and public information;
+// no logs, persistent state, hidden card identities or normal UI additions.
+export function inspectBossBotDecision(state,botIndex,moves=[]) {
+  const s=bossObservableState(state,botIndex);
+  const stockScore=bossStockOpportunityValue(s,botIndex);
+  const pickups=rankBossDiscardPickups(s,botIndex);
+  const ranked=rankBossMoves(s,botIndex,moves);
+  return {stockScore,holdScore:0,pickups:pickups.map(({intent,quote,score,diagnostics})=>({intent,quote,score,diagnostics})),
+    moves:ranked.map(({move,score,diagnostics})=>({move,score,diagnostics}))};
 }
 
 // Conservative cooperation: a visible partner contribution demonstrates suit

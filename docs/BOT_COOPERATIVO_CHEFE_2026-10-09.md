@@ -2,6 +2,8 @@
 
 As seções iniciais registram a primeira revisão. A segunda revisão, suas
 medições e as correções do experimento estão registradas ao final.
+Inclui também a revisão de preservação de coringas, após a auditoria de
+elegibilidade dos seis chefes; as comparações anteriores permanecem históricas.
 
 ## Escopo e problemas encontrados
 
@@ -390,3 +392,169 @@ push ou deploy realizado.
   `scripts/boss-baseline-loader.mjs`, `scripts/boss-hand-profile.mjs`,
   `scripts/boss-tail-profile.mjs`.
 - Documentação: este relatório e `CHECKLIST_REGRESSOES_E_ATUALIZACOES.md`.
+
+## Preservação de coringas — terceira revisão, 09/10/2026
+
+### Causa comprovada e limites da reprodução
+
+`rankBossDiscardPickups()` descontava `wildcardCost()` na pré-seleção, mas não
+no score final comparado com o Monte. O custo influenciava quem era avaliado,
+não se valia a pena executar a retirada. A abertura direta já descontava o
+custo. Também faltava cobrar coringas nas continuações simuladas dos planos.
+O bônus de cartas naturais excluía todos os 2, inclusive o 2 natural legal.
+
+As duas imagens mostram o resultado, não a origem da compra/obrigação nem a
+mão completa do BOT. Não permitem afirmar que aquelas jogadas específicas
+vieram do Lixo. Reproduções usam A♠–Joker–3♠ e 10♠–J♠–2♥–K♠, sem Morto,
+Monte59/61/80 e Infecção0/8. Nas mãos controladas sem benefício adicional, a
+política antiga **já recusava** a abertura direta; o defeito comprovado está
+no score final da compra. A reprodução do Lixo do segundo caso forma o trio
+sujo inicial, não garante que a contribuição real fotografada tenha seguido
+esse caminho. Estados mais complexos ainda podem justificar uma abertura.
+
+### Política entregue
+
+- Mesmo custo compartilhado na pré-seleção e no placar final do Lixo, nas
+  jogadas da mão e em continuações efetivamente simuladas. Conservado o custo
+  calibrado anterior de reserva (100, modulado pela escassez) e sacrifício da
+  limpa; não adicionado um veto nem uma penalidade universal maior.
+- Pequeno custo de oportunidade para jogo curto ainda limpo que fica sujo:
+  substitui o único coringa por candidatos naturais, usando o validador
+  canônico. Estima a chance de reposição pelo conjunto público não visto,
+  cópias expostas e até seis compras futuras; não olha cartas do Monte,
+  Mortos ou parceiro. Peso é a diferença do potencial já existente, não uma
+  nova tabela de canastras. Zero quando as cópias já estão expostas; nenhuma
+  promessa de obter a carta. É uma aproximação de curto horizonte.
+- Joker/2 coringa pagam reserva. 2 canonicamente natural não paga e recebe o
+  mesmo bônus das outras naturais. Dano efetivo/proteção, cura, punição,
+  vitória/derrota, potencial de mão/mesa e escassez com Mortos continuam
+  calculados pelas avaliações e simulações existentes.
+- Guardar cartas continua uma alternativa com score incremental0; jogada
+  da mão precisa superar0, retirada precisa superar a expectativa pública do
+  Monte. Lixo útil, canastra e consequência letal podem superar a reserva.
+- Sem alteração de elegibilidade/habilidades, números de combate, regras do
+  Lixo/Mortos/canastras, BOT clássico, fronteira pública, Worker, orçamento,
+  cancelamento ou fingerprint. Cache local passa a `buraco-v292`.
+
+### Diagnóstico sem poluir o jogo
+
+Resultados do ranking expõem `diagnostics`: score do prazo, bônus natural,
+reserva, sacrifício, oportunidade limpa, custo de continuações, isolamento,
+quantidade/valor das cartas adquiridas e efeito previsto da habilidade
+(recurso/derrota com e sem ação, variação ponderada de vida inimiga).
+`cleanPotentialDelta` inclui evolução de canastra/comprimento, não é chance
+garantida de completar uma Limpa. Valores são estratégicos, não dano extra.
+
+No console do DevTools existente, sem novo botão/aviso na interface:
+
+```js
+const { inspectBossBotDecision } = await import('./js/boss/boss-bot-strategy.js');
+const s = window.getState();
+const botIndex = s.players.findIndex(p => p.isBot);
+inspectBossBotDecision(s, botIndex);
+// Opcional: terceiro argumento com jogadas {meldIndex, cardIds, followups}.
+```
+
+O diagnóstico é somente leitura, não executa ações e usa a mão do BOT e dados
+públicos. Sem terceiro argumento, mostra Monte/guardar e as compras do Lixo;
+não afirma enumerar todas as aberturas da mão. Nenhum log de carta oculta ou
+novo dado persistido em snapshot/Firebase.
+
+### Comparação dirigida antes/depois
+
+Baseline isolada: `946c2addcf1b5392e568a93d366d33791bf46b03`, incluindo a
+auditoria de elegibilidade. 48 estados (Joker/2 × seis situações × sementes
+41/73/901/7307), 96 avaliações antiga/nova; compras legais e execução da mão.
+Os mesmos critérios de segurança do adaptador são usados nas duas versões.
+
+Scores da semente73, Monte61, Infecção8, Lixo de uma carta:
+
+| Situação | Joker antes→depois | 2 coringa antes→depois | Decisão nova |
+|---|---:|---:|---|
+| Sem obrigação, Lixo pequeno | 23→−78,61 | 27,75→−73,86 | Monte; guardar coringa |
+| Caçada, falha barata | 47,49→−54,12 | 52,24→−49,37 | Aceitar falha; guardar |
+| Caçada, falha letal (Infecção99) | 98957,52→98855,92 | 98962,27→98860,67 | Usar coringa |
+| Lixo útil com21 cartas | 303→201,39 | 307,75→206,14 | Adquirir Lixo completo |
+| Contribuição vence agora | 100018,68→99917,08 | 100018,68→99917,08 | Vencer, sem hesitação |
+
+Monte esperado8,97 no caso Joker e10,71 no 2; Lixo rico tem outra expectativa
+pública. 2 natural em A–2–3: custo0 e score de compra21,75→33,75. A reserva
+total dos trios sujos é101,61 (100 já calibrados +1,61 de oportunidade), não
+um novo peso enorme. Guardar/baixar da mão já era preferível nos casos baratos.
+Scores podem ser positivos mesmo quando o guard de batida impede execução;
+o executor continua validando descarte/Mortos/vitória canonicamente.
+
+### Batalhas com as mesmas sementes
+
+16 execuções: antiga/nova × Nemesis/Matriarca × BOT+BOT/parceiro roteirizado
+fixo × sementes7300/7301. Mesmo baralho108IDs, Mortos e seed; até100 turnos.
+Parceiro roteirizado usa a baseline com `isBot=false`, não representa um
+humano competente. Worker desativado no experimento; testado no browser.
+
+Cada coluna agrega quatro partidas:
+
+| Indicador | Nemesis antes | Depois | Matriarca antes | Depois |
+|---|---:|---:|---:|---:|
+| Canastras limpas | 6 | 12 | 2 | 9 |
+| Coringas gastos (Joker + 2 coringa) | 35 | 25 | 24 | 24 |
+| 2 como coringa | 20 | 11 | 16 | 13 |
+| 2 como natural | 9 | 15 | 0 | 11 |
+| Dano aplicado ao chefe | 5665 | 7385 | 2480 | 5590 |
+| Dano aplicado nos auxiliares | 1730 | 660 | 0 | 0 |
+| Lixo completo | 37 | 31 | 32 | 24 |
+| Turnos sem contribuição/dano | 56 | 51 | 34 | 43 |
+| Turnos totais | 187 | 170 | 104 | 143 |
+| Vitórias | 0 | 1 | 0 | 0 |
+
+Limitações/regressões: dano nos auxiliares do Nemesis diminuiu. Gasto total
+de coringas não diminuiu na Matriarca e houve mais turnos sem contribuição.
+Antes, quatro derrotas dela eram por Flores; depois, três por esgotamento e
+uma por Flores. Uma vitória nova no Nemesis **não é taxa de vitória estimada**.
+Nemesis continua com três derrotas por esgotamento. Não declarar melhora
+uniforme nem rebalancear números com base nesta amostra pequena.
+
+### Regressões e reprodução
+
+- 28 regressões novas: duas sequências, Joker/2, Monte59/61/80, Infecção0/8,
+  guardar/Monte, custo final do Lixo, obrigação barata/letal, Lixo rico,
+  vitória, canastra útil, 2 natural, continuações, reposições públicas e
+  invariância a cartas ocultas/reload, sem mutar o estado.
+- Focados: **1219/1219**; suíte ampla: **1283/1283**, sem falhas.
+- Edge headless desktop1920/tablet1376/mobile390, CPU1×/4×/6×: Worker real,
+  token obsoleto, fallback MessageChannel/cancelamento, natural longa e Lixo
+  útil após muitos destinos. Emulação não equivale a aparelho físico ou rede.
+- `git diff --check` sem erro. Sem stage/commit/push/deploy.
+
+Browser comparativo: 324 medições (nove por versão/cenário/perfil). Média /
+P95 (= pior, pois são nove amostras), ms arredondados, baseline946c2ad:
+
+| Perfil / cenário | Antes | Depois |
+|---|---:|---:|
+| Desktop,20 jogos/Lixo50 | 12/13 | 13/15 |
+| Desktop,mão50 | 92/102 | 95/105 |
+| Tablet,20 jogos/Lixo50 | 105/117 | 111/134 |
+| Tablet,mão50 | 568/673 | 589/660 |
+| Mobile,20 jogos/Lixo50 | 184/202 | 202/250 |
+| Mobile,mão50 | 1057/1174 | 1088/1235 |
+
+Há custo adicional nas avaliações/diagnósticos: não foi uma otimização de
+latência. Stress móvel ainda supera um segundo; Worker/pausas/cancelamento
+passarem não significa ausência de long tasks. Sem promessa de melhoria de
+desempenho ou extrapolação das emulações para aparelhos físicos.
+
+```sh
+node scripts/boss-wildcard-preservation-audit.mjs 946c2ad
+node scripts/boss-cooperative-experiment.mjs 946c2ad 2 7300 .cache/bot-wildcard-preservation-battles.jsonl
+node --test tests/boss-wildcard-preservation.test.mjs
+node --test tests/*.test.mjs
+# Browser: configurar PLAYWRIGHT_PATH e BOT_BASELINE=946c2ad.
+node tests/boss-cooperative-performance.browser.mjs
+git diff --check
+```
+
+Evidências locais regeneráveis/ignoradas: `.cache/bot-wildcard-preservation-*`.
+Arquivos: estratégia e versão do Service Worker; novo script de auditoria,
+fixture e teste `boss-wildcard-preservation`; este documento e checklist.
+Busca permanece limitada; reposição de uma natural não é planejamento ótimo
+multiturno. Batalhas dos outros quatro chefes, humanos competentes, aparelhos
+físicos e sincronização Firebase real continuam pendentes.

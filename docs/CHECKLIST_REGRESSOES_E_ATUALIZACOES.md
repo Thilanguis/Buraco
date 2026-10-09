@@ -1,5 +1,15 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+### Preservação de coringas pelo BOT Chefe — 09/10/2026
+
+- [x] Mesmo custo compartilhado na pré-seleção E score final do Lixo, jogadas da mão e continuações simuladas; não esconder gasto em followup. Reserva calibrada anterior preservada, sem veto universal. Cotação canônica pelo destino real intacta.
+- [x] A–Joker–3 e10–J–2 coringa–K: pouca pressão/Monte59/61/80/Lixo unitário/sem Morto preservam recurso; falha barata não obriga gastar. Falha letal, vitória imediata, canastra útil e Lixo rico continuam permitindo coringa. 2 natural tem custo0 e bônus natural.
+- [x] Pequena oportunidade limpa estimada por reposição validada canonicamente/cópias públicas/recursos restantes. Não olhar cartas de Monte/Mortos/parceiro; cartas ocultas/reload não alteram diagnóstico. Não confundir estimativa com garantia de futura Limpa.
+- [x] Diagnóstico somente leitura disponível no módulo/console existente: alternativas, scores, custo coringa, valor adquirido e efeito canônico do prazo. Nenhuma nova mensagem normal ou persistência de dados privados.
+- [x] A/B946c2ad isolado, 48 estados dirigidos/96 avaliações e16 batalhas com mesmas seeds7300/7301: Nemesis35→25 coringas/6→12 limpas; Matriarca24→24 coringas/2→9 limpas, mas mais turnos ociosos/esgotamento. Não interpretar como melhora uniforme ou win rate humano.
+- [x] 28 novas regressões; focados1219/1219, ampla1283/1283; Edge1920/1376/390 com Worker/stale/fallback/cancelamento. Cachev292; regras/elegibilidade recém-auditadas, balanceamento e BOT clássico preservados. Sem stage/commit/push/deploy.
+- [ ] Ampliar partidas/sementes e testar humanos competentes, aparelhos físicos, quatro outros chefes em batalhas completas e dois clientes Firebase. Fotos não comprovam origem exata das jogadas reais; shortlist/estimativa não são solução ótima.
+
 ### Elegibilidade e variedade dos seis chefes — 09/10/2026
 
 - [x] Classificar cada habilidade como A (alvo/segurança obrigatórios), B (prova excessiva) ou C (alvo real sem garantia de sucesso). Relatório `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md` substitui exigências históricas de solução pronta no anúncio do Nemesis.
