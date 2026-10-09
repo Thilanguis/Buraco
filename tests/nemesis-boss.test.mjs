@@ -166,19 +166,36 @@ test('death immediately removes grab passive even with outstanding serialized lo
   dead(state, 'grabber'); assert.equal(isBossCardBlocked(state, 0, id), false);
 });
 
-test('F3 mutates living zombies; revived corpses are mutated and quota is one per phase', () => {
+test('F3 mutates living zombies; each zombie revives only once per match, in addition to phase quota', () => {
   const state = game('viral_reanimation', 2); activate(state);
   assert.equal(entity(state, 'grabber').hp, 110); assert.equal(entity(state, 'grabber').revivals, 1);
   dead(state, 'grabber'); assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
   state.boss.phase = 3; normalizeBossState(state);
   assert.equal(entity(state, 'devourer').mutated, true);
   assert.equal(entity(state, 'grabber').status, 'corpse');
+  // F3 doesn't reset the lifetime limit. A different zombie remains eligible.
+  assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
+  dead(state, 'infected');
   state.boss.currentIntent = null; state.boss.bossFlow = null;
   selectNextBossIntent(state, { debug: true, forcedAbilityId: 'viral_reanimation' });
   const intent = state.boss.currentIntent;
+  assert.equal(intent.payload.entityId, 'infected');
   nemesisBossMechanics.resolveIntent({ boss: state.boss, gameState: state, intent });
-  assert.equal(entity(state, 'grabber').mutated, true); assert.equal(entity(state, 'grabber').hp, 110);
-  dead(state, 'grabber'); assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
+  assert.equal(entity(state, 'infected').mutated, true); assert.equal(entity(state, 'infected').hp, 120);
+  assert.equal(entity(state, 'infected').revivals, 1);
+  assert.equal(entity(state, 'grabber').status, 'corpse');
+  dead(state, 'infected');
+  assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
+  // Even a stale announced F3 intent can't resurrect the same corpse twice.
+  state.boss.reanimationsByPhase[3] = undefined;
+  nemesisBossMechanics.resolveIntent({ boss: state.boss, gameState: state,
+    intent: { id: 'stale-second', name: 'Reanimação Viral', announcedPhase: 3, abilityId: 'viral_reanimation', payload: { entityId: 'grabber' } } });
+  assert.equal(entity(state, 'grabber').status, 'corpse');
+  assert.equal(entity(state, 'grabber').revivals, 1);
+  assert.equal(state.boss.reanimationsByPhase[3], undefined);
+  normalizeBossState(state);
+  assert.equal(entity(state, 'infected').revivals, 1);
+  assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
 });
 
 test('Regeneration selects lowest percentage, caps HP, and excludes corpses/full health', () => {

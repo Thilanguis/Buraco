@@ -3,6 +3,9 @@ import { createCombatEntities, normalizeCombatEntities, damageCombatEntity, heal
 
 const persistent = (entry) => entry.status === 'persistent' && entry.hp > 0;
 const alive = (boss, id) => boss.combatEntities.find((entry) => entry.id === id && persistent(entry));
+// A zombie may return from death only once in an entire match, even if it
+// dies again in a later phase. The persisted `revivals` field tracks this.
+const canReanimateZombie = (entry) => entry?.status === 'corpse' && (entry.revivals || 0) < 1;
 export const nemesisPersistentCount = (boss) => boss.combatEntities.filter(persistent).length;
 const hand = (state, id) => state.players.find((player) => player.id === id)?.hand || [];
 const turnKey = (state, playerId) => `${state.turnNumber || 0}:${playerId}`;
@@ -329,7 +332,7 @@ function buildPayload({ gameState: state, helpers }, abilityId) {
     return entity ? { ...base, entityId: entity.id } : null;
   }
   if (abilityId === 'viral_reanimation') {
-    const entity = boss.combatEntities.find((entry) => entry.status === 'corpse');
+    const entity = boss.combatEntities.find(canReanimateZombie);
     return entity && nemesisPersistentCount(boss) < boss.phase && !boss.reanimationsByPhase[boss.phase] ? { ...base, entityId: entity.id } : null;
   }
   if (abilityId === 'rocket_launcher') {
@@ -440,7 +443,8 @@ export const nemesisBossMechanics = Object.freeze({
     if (intent.abilityId === 'parasite_regeneration') payload.healed = healCombatEntity(alive(boss, payload.entityId), 100);
     if (intent.abilityId === 'viral_reanimation' && nemesisPersistentCount(boss) < boss.phase && !boss.reanimationsByPhase[intent.announcedPhase]) {
       const entity = boss.combatEntities.find((entry) => entry.id === payload.entityId);
-      if (reviveCombatEntity(entity, boss.phase)) {
+      // An already announced intent must also honor the per-zombie limit.
+      if (canReanimateZombie(entity) && reviveCombatEntity(entity, boss.phase)) {
         boss.reanimationsByPhase[intent.announcedPhase] = intent.id;
         if (entity.id === 'devourer') resetDevourerFeed(boss, gameState);
       }

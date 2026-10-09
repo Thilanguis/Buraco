@@ -2835,7 +2835,7 @@ No Buraco Fechado, a restrição acontece depois da jogada obrigatória da compr
 
 A migração mantém HP restante abaixo dos novos máximos, limitando apenas valores acima deles, sem reiniciar a batalha ou restaurar HP perdido. Reanimação usa metade dos máximos atuais: Agarrador 110, Infectado 120, Devorador 130; quota, teto e retorno Mutado na F3 permanecem. Decisão de balanceamento: `BALANCEAMENTO_NEMESIS.md`.
 
-Ao morrer, o zumbi perde sua passiva imediatamente, fica como cadáver no estado e deixa de aparecer nas escolhas de ataque. **Não há transbordamento de dano nem alívio de Infecção pela morte**. Cadáveres continuam visíveis para a Reanimação Viral.
+Ao morrer, o zumbi perde sua passiva imediatamente, fica como cadáver no estado e deixa de aparecer nas escolhas de ataque. **Não há transbordamento de dano nem alívio de Infecção pela morte**. Cadáveres continuam visíveis; só os que ainda não foram reanimados nesta partida podem ser alvo da Reanimação Viral.
 
 ## 16.2 Direcionamento de dano e S.T.A.R.S.
 
@@ -2862,7 +2862,7 @@ Pesos são relativos às habilidades elegíveis da fase, não percentuais fixos.
 | Comando da Horda (`horde_command`) | 1/2/3 | 3 | Reforça apenas persistente vivo: Agarrador prende +1; Infectado cobra +2 por falha; Devorador cura +30. Soma à versão normal/Mutada. Não coloca zumbis na mesa. Dura até o fim da rodada seguinte, inclusive (`expiresRound = rodada atual + 1`). |
 | Lança-Foguetes (`rocket_launcher`) | 2/3 | 4 | Marca por ID estável um jogo válido e alimentável. Cada carta nova nele custa +10/+12 durante a rodada; três cartas juntas custam +30/+36. Cartas já contabilizadas não cobram novamente. A ação não é proibida. |
 | Regeneração Parasita (`parasite_regeneration`) | 2/3 | 2 | Cura até 100 HP do persistente vivo e ferido com menor percentual de HP. Não cura outras etapas do lifecycle. |
-| Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Revive somente cadáver com 50% do HP máximo. Uma utilização por fase e espaço no teto 1/2/3. Repelido nunca é alvo. |
+| Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Revive somente cadáver com 50% do HP máximo. **Cada zumbi revive no máximo uma vez na partida**, além da quota de uma utilização por fase e do teto 1/2/3. Repelido ou cadáver já reanimado nunca é alvo. |
 | Barragem de Tentáculos (`tentacle_barrage`) | 3 | 4 | Marca 3 cartas; 2 precisam sair legalmente no mesmo turno. Falha base +16. |
 | Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Na rodada, S.T.A.R.S. causa dano direto positivo ao Nemesis e parceiro contribui legalmente ao jogo existente congelado no anúncio. Ambos/um/nenhum: base +0/+8/+16. |
 | Surto Ômega (`omega_outbreak`) | 3 | 3 | Só falhas reais recebem +2 abaixo de 50, +4 entre 50–74 ou +6 entre 75–99, usando a Infecção no instante da falha. Ativar não gera Infecção. |

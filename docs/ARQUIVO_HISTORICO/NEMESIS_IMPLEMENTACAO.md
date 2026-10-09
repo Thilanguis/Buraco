@@ -105,7 +105,7 @@ Comando da Horda continua separado da Invasão: não traz zumbis, exige persiste
 | Infectado | +2 Infecção em falha positiva real | +4 | +2 |
 | Devorador | Cura Nemesis 40 HP a cada 3 cartas novas acumuladas pela equipe; 1x/turno, excedentes pendentes | 70 HP | +30 HP |
 
-Os totais aparecem diretamente em chips clicáveis: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado mostra 2/4/70. O mesmo helper calcula a passiva aplicada e o total exibido; MUTADO e REFORÇADO abrem ajuda específica. Comando usa `expiresRound = roundNumber + 1`, válido até essa rodada inclusive; não reforça entering/repelled/corpse. Regeneração só cura persistente ferido. Reanimação só revive cadáver com 50% HP, uma vez por fase e com espaço no teto; em F3 retorna Mutado. A entrada da F3 muta todos os persistentes vivos.
+Os totais aparecem diretamente em chips clicáveis: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado mostra 2/4/70. O mesmo helper calcula a passiva aplicada e o total exibido; MUTADO e REFORÇADO abrem ajuda específica. Comando usa `expiresRound = roundNumber + 1`, válido até essa rodada inclusive; não reforça entering/repelled/corpse. Regeneração só cura persistente ferido. Reanimação só revive cadáver com 50% HP, **no máximo uma vez por zumbi durante a partida**, uma vez por fase e com espaço no teto; em F3 retorna Mutado. Mortes posteriores do mesmo zumbi não permitem nova Reanimação. O campo persistido `revivals` garante esse limite mesmo após reload, snapshot e undo. A entrada da F3 muta todos os persistentes vivos.
 
 BOT executa planos legais para impedir entradas, respeita guard de batida segura e seleciona apenas persistentes vivos; mantém avaliação de Infecção/letalidade/cura, sem simplificação para menor HP.
 

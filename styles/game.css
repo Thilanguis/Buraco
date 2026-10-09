@@ -1,3 +1,39 @@
+/* Three-state audio button: speaker / single slash / full mute X. */
+#ambientMusicIcon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3em;
+  height: 1.3em;
+  line-height: 1;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+#ambientMusicToggle[data-audio-mode='music_off'] #ambientMusicIcon::after,
+#ambientMusicToggle[data-audio-mode='muted'] #ambientMusicIcon::after,
+#ambientMusicToggle[data-audio-mode='muted'] #ambientMusicIcon::before {
+  content: '';
+  position: absolute;
+  top: calc(50% - 1px);
+  left: 7%;
+  width: 86%;
+  height: 2px;
+  border-radius: 2px;
+  background: #fb7185;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+#ambientMusicToggle[data-audio-mode='music_off'] #ambientMusicIcon::after,
+#ambientMusicToggle[data-audio-mode='muted'] #ambientMusicIcon::after {
+  transform: rotate(-45deg);
+}
+
+#ambientMusicToggle[data-audio-mode='muted'] #ambientMusicIcon::before {
+  transform: rotate(45deg);
+}
 /* ================= JOGO MESA ================= */
 @keyframes smoothTableReveal {
   0% {

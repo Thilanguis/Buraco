@@ -118,6 +118,124 @@ export const TABLE_AMBIENT_MUSIC = Object.freeze({
 
 export const TABLE_AMBIENT_MAX_VOLUME = 0.35;
 export const TABLE_AMBIENT_STORAGE_KEY = 'buraco_table_ambient_enabled';
+export const SYSTEM_AUDIO_STORAGE_KEY = 'buraco_system_audio_mode';
+export const SYSTEM_AUDIO_MODES = Object.freeze({
+  ALL: 'all',
+  MUSIC_OFF: 'music_off',
+  MUTED: 'muted',
+});
+
+function savedSystemAudioMode() {
+  try {
+    const saved = localStorage.getItem(SYSTEM_AUDIO_STORAGE_KEY);
+    if (Object.values(SYSTEM_AUDIO_MODES).includes(saved)) return saved;
+    // Existing two-state preference is respected on first load after upgrade.
+    return localStorage.getItem(TABLE_AMBIENT_STORAGE_KEY) === 'false'
+      ? SYSTEM_AUDIO_MODES.MUSIC_OFF
+      : SYSTEM_AUDIO_MODES.ALL;
+  } catch {
+    return SYSTEM_AUDIO_MODES.ALL;
+  }
+}
+
+let systemAudioMode = savedSystemAudioMode();
+const activeMedia = new Set();
+const observedMedia = new WeakSet();
+const videosMutedBySystem = new Set();
+
+export function getSystemAudioMode() { return systemAudioMode; }
+export function isSystemMuted() { return systemAudioMode === SYSTEM_AUDIO_MODES.MUTED; }
+
+function observeMedia(media) {
+  if (observedMedia.has(media)) return;
+  observedMedia.add(media);
+  media.addEventListener('pause', () => activeMedia.delete(media));
+  media.addEventListener('ended', () => activeMedia.delete(media));
+  media.addEventListener('error', () => activeMedia.delete(media));
+}
+
+function silenceMediaNow() {
+  // Audio created with `new Audio()` usually isn't in the document.
+  // Track those elements as well as any media played through DOM markup.
+  const domMedia = typeof document === 'undefined' ? [] : document.querySelectorAll('audio, video');
+  for (const media of [...activeMedia, ...domMedia]) {
+    if (media.tagName?.toLowerCase() === 'video') {
+      // Preserve video animations (e.g. muted menu backgrounds).
+      if (!media.muted) {
+        media.muted = true;
+        videosMutedBySystem.add(media);
+      }
+      continue;
+    }
+    try {
+      media.pause();
+      media.currentTime = 0;
+    } catch { /* A detached element may no longer be usable. */ }
+    activeMedia.delete(media);
+  }
+}
+
+// Covers native HTML audio played directly by the app, boss effects, cloned SFX,
+// and the friend queue, without changing each source's volume setting.
+if (typeof HTMLMediaElement !== 'undefined') {
+  const nativePlay = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function (...args) {
+    const isVideo = this.tagName?.toLowerCase() === 'video';
+    if (isSystemMuted()) {
+      if (isVideo) {
+        if (!this.muted) {
+          this.muted = true;
+          videosMutedBySystem.add(this);
+        }
+      } else {
+        try { this.pause(); this.currentTime = 0; } catch { /* noop */ }
+        return Promise.resolve();
+      }
+    }
+    if (!isVideo) {
+      observeMedia(this);
+      activeMedia.add(this);
+    }
+    return nativePlay.apply(this, args);
+  };
+  if (typeof document !== 'undefined') {
+    document.addEventListener('play', (event) => {
+      const media = event.target;
+      if (!(media instanceof HTMLMediaElement)) return;
+      if (isSystemMuted()) {
+        if (media.tagName?.toLowerCase() === 'video') {
+          if (!media.muted) { media.muted = true; videosMutedBySystem.add(media); }
+        } else {
+          try { media.pause(); media.currentTime = 0; } catch { /* noop */ }
+        }
+      } else if (media.tagName?.toLowerCase() !== 'video') {
+        observeMedia(media);
+        activeMedia.add(media);
+      }
+    }, true);
+  }
+}
+
+export function setSystemAudioMode(mode, persist = true) {
+  if (!Object.values(SYSTEM_AUDIO_MODES).includes(mode)) return systemAudioMode;
+  systemAudioMode = mode;
+  if (persist) {
+    try {
+      localStorage.setItem(SYSTEM_AUDIO_STORAGE_KEY, mode);
+      // Legacy consumers continue to see the correct music preference.
+      localStorage.setItem(TABLE_AMBIENT_STORAGE_KEY, String(mode === SYSTEM_AUDIO_MODES.ALL));
+    } catch { /* Storage may be unavailable in private browsing. */ }
+  }
+  if (isSystemMuted()) {
+    stopAllGameSfx();
+    silenceMediaNow();
+    try { window.speechSynthesis?.cancel(); } catch { /* Speech API optional. */ }
+  } else {
+    for (const video of videosMutedBySystem) video.muted = false;
+    videosMutedBySystem.clear();
+  }
+  return mode;
+}
 
 const BOSS_AUDIO_ELEMENTS = Object.values(BOSS_SFX).flatMap((sounds) => Object.values(sounds));
 const GAME_SFX = [...ALL_CANASTRA_SFX, ...Object.values(DECK_MOVE_SFX), ...BOSS_AUDIO_ELEMENTS, sfxCardMove, sfxMyTurn, sfxSearch, sfxSteal, sfxHeartbeat];
@@ -137,7 +255,7 @@ function disconnectTransientSfx(audio) {
 }
 
 export function playSfxClone(source, options = {}) {
-  if (!source) return null;
+  if (!source || isSystemMuted()) return null;
 
   const clone = source.cloneNode();
   const requestedGain = Number(source.dataset?.systemGain || options.gain || 1);

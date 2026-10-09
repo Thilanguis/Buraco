@@ -179,7 +179,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 | Comando da Horda (`horde_command`) | 1/2/3 | 3 | Só reforça persistente vivo, não traz zumbis: até fim da próxima rodada, Agarrador +1 carta presa; Infectado +2/falha; Devorador +30 cura. |
 | Lança-Foguetes (`rocket_launcher`) | 2/3 | 4 | Cada carta nova no jogo marcado por ID custa +10/+12 nesta rodada; cartas juntas somam o custo, sem proibir a jogada. |
 | Regeneração Parasita (`parasite_regeneration`) | 2/3 | 2 | Cura até 100 HP no persistente vivo ferido com menor HP percentual. |
-| Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Somente cadáver: 50% HP, 1x/fase, respeitando teto. Na F3 volta Mutado. Repelido não é morto. |
+| Reanimação Viral (`viral_reanimation`) | 2/3 | 2 | Somente cadáver: 50% HP, **1x por zumbi em toda a partida**, 1x/fase, respeitando teto. Na F3 volta Mutado. Repelido não é morto. |
 | Barragem de Tentáculos (`tentacle_barrage`) | 3 | 4 | 2 das 3 marcadas saem legalmente no turno; falha base +16. |
 | Extermínio S.T.A.R.S. (`stars_extermination`) | 3 | 4 | Na rodada, S.T.A.R.S. ataca Nemesis e parceiro alimenta jogo existente escolhido. Ambos/um/nenhum: base +0/+8/+16. |
 | Surto Ômega (`omega_outbreak`) | 3 | 3 | Até fim da próxima rodada: somente falhas recebem +2/+4/+6 conforme Infecção <50/50–74/75–99. |

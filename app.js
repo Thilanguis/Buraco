@@ -8,6 +8,10 @@ import {
   TABLE_AMBIENT_MAX_VOLUME,
   TABLE_AMBIENT_MUSIC,
   TABLE_AMBIENT_STORAGE_KEY,
+  SYSTEM_AUDIO_MODES,
+  getSystemAudioMode,
+  isSystemMuted,
+  setSystemAudioMode,
   clampMediaVolume,
   playSfxClone,
   sfxCardMove,
@@ -495,7 +499,7 @@ let friendPlayback = null;
 const friendActionPresentations = new Map();
 const friendNoticeTracker = createFriendNoticeTracker();
 const friendSoundQueue = createFriendSoundQueue({
-  enabled: () => audioUnlocked && !window.isClosingGame && document.visibilityState !== 'hidden',
+  enabled: () => audioUnlocked && !isSystemMuted() && !window.isClosingGame && document.visibilityState !== 'hidden',
   waitForCanastras: () => waitForPlayingCanastras(ALL_CANASTRA_SFX),
   onBusy: () => {
     if (state && !window.isClosingGame) syncTableAmbientMusic();
@@ -1276,42 +1280,65 @@ let tableAmbientTheme = null;
 let tableAmbientFadeId = 0;
 let ambientIntroSession = null;
 const playedTableIntros = new Set();
-let tableAmbientEnabled = (() => {
-  try {
-    return localStorage.getItem(TABLE_AMBIENT_STORAGE_KEY) !== 'false';
-  } catch (e) {
-    return true;
-  }
-})();
+let tableAmbientEnabled = getSystemAudioMode() === SYSTEM_AUDIO_MODES.ALL;
 
 function updateAmbientMusicToggle() {
   const btn = document.getElementById('ambientMusicToggle');
   const icon = document.getElementById('ambientMusicIcon');
   if (!btn || !icon) return;
 
-  btn.classList.toggle('muted', !tableAmbientEnabled);
-  icon.innerHTML = tableAmbientEnabled ? '&#128266;' : '&#128263;';
-  const label = tableAmbientEnabled ? 'Desligar música da mesa' : 'Ligar música da mesa';
+  const mode = getSystemAudioMode();
+  btn.dataset.audioMode = mode;
+  btn.classList.toggle('muted', mode !== SYSTEM_AUDIO_MODES.ALL);
+  icon.textContent = mode === SYSTEM_AUDIO_MODES.ALL ? '🔊' : '🔈';
+  const label = mode === SYSTEM_AUDIO_MODES.ALL
+    ? 'Som completo. Clique para desligar somente a música.'
+    : mode === SYSTEM_AUDIO_MODES.MUSIC_OFF
+      ? 'Música desligada, efeitos ligados. Clique para desligar todo o som.'
+      : 'Som totalmente desligado. Clique para ligar todos os sons.';
   btn.title = label;
   btn.setAttribute('aria-label', label);
-  btn.setAttribute('aria-pressed', String(tableAmbientEnabled));
+  btn.setAttribute('aria-pressed', mode === SYSTEM_AUDIO_MODES.MUSIC_OFF ? 'mixed' : String(mode === SYSTEM_AUDIO_MODES.MUTED));
 }
 
-function setTableAmbientEnabled(enabled, persist = true) {
-  tableAmbientEnabled = enabled !== false;
-  if (persist) {
+function changeSystemAudioMode(mode, persist = true) {
+  const previous = getSystemAudioMode();
+  setSystemAudioMode(mode, persist);
+  tableAmbientEnabled = getSystemAudioMode() === SYSTEM_AUDIO_MODES.ALL;
+  if (mode === SYSTEM_AUDIO_MODES.MUTED && previous !== SYSTEM_AUDIO_MODES.MUTED) {
+    // Cancel queued voices and already-running effects immediately. No stale
+    // Web Audio tones should resume after unmuting.
+    friendSoundQueue.cancel();
+    stopTableAmbientMusic(true);
+    if (audioCtx) {
+      const previousContext = audioCtx;
+      audioCtx = null;
+      void previousContext.close().catch(() => {});
+    }
+  } else if (previous === SYSTEM_AUDIO_MODES.MUTED && mode !== SYSTEM_AUDIO_MODES.MUTED && audioUnlocked && !audioCtx) {
     try {
-      localStorage.setItem(TABLE_AMBIENT_STORAGE_KEY, String(tableAmbientEnabled));
-    } catch (e) {}
+      const Context = window.AudioContext || window.webkitAudioContext;
+      if (Context) audioCtx = new Context();
+    } catch { /* Web Audio is optional. */ }
   }
   updateAmbientMusicToggle();
   if (tableAmbientEnabled) syncTableAmbientMusic();
-  else stopTableAmbientMusic(false);
+  else stopTableAmbientMusic(true);
+}
+
+function setTableAmbientEnabled(enabled, persist = true) {
+  changeSystemAudioMode(enabled === false ? SYSTEM_AUDIO_MODES.MUSIC_OFF : SYSTEM_AUDIO_MODES.ALL, persist);
 }
 
 function toggleTableAmbientMusic() {
-  if (!audioUnlocked) unlockAudio();
-  setTableAmbientEnabled(!tableAmbientEnabled);
+  const mode = getSystemAudioMode();
+  const next = mode === SYSTEM_AUDIO_MODES.ALL
+    ? SYSTEM_AUDIO_MODES.MUSIC_OFF
+    : mode === SYSTEM_AUDIO_MODES.MUSIC_OFF
+      ? SYSTEM_AUDIO_MODES.MUTED
+      : SYSTEM_AUDIO_MODES.ALL;
+  changeSystemAudioMode(next);
+  if (next !== SYSTEM_AUDIO_MODES.MUTED && !audioUnlocked) unlockAudio();
 }
 
 function getSafeAmbientVolume(theme) {
@@ -1413,7 +1440,7 @@ function stopTableAmbientMusic(immediate = false) {
 function syncTableAmbientMusic() {
   const gameSection = document.getElementById('gameSection');
   const gameVisible = !!gameSection && gameSection.style.display === 'flex';
-  const shouldPlay = tableAmbientEnabled && audioUnlocked && state && !window.isClosingGame && gameVisible && document.visibilityState !== 'hidden';
+  const shouldPlay = tableAmbientEnabled && !isSystemMuted() && audioUnlocked && state && !window.isClosingGame && gameVisible && document.visibilityState !== 'hidden';
 
   if (!shouldPlay) {
     stopTableAmbientMusic(false);
@@ -1481,7 +1508,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function playCardMove() {
-  if (!audioUnlocked) return;
+  if (!audioUnlocked || isSystemMuted()) return;
   try {
     const themed = DECK_MOVE_SFX[normalizeDeckTheme(state?.deckTheme || document.body.dataset.deckTheme)];
     if (themed) {
@@ -1497,7 +1524,7 @@ function playCardMove() {
 }
 
 function syncHeartbeatAudio(active) {
-  if (active && audioUnlocked) {
+  if (active && audioUnlocked && !isSystemMuted()) {
     if (sfxHeartbeat.paused) sfxHeartbeat.play().catch((error) => console.log('Erro ao tocar som do coracao:', error));
 
     if (tableAmbientAudio && state) {
@@ -1520,6 +1547,7 @@ ALL_CANASTRA_SFX.forEach((a) => {
 function unlockAudio() {
   if (audioUnlocked) return;
   audioUnlocked = true;
+  if (isSystemMuted()) return;
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (AudioContext) audioCtx = new AudioContext();
@@ -1787,7 +1815,7 @@ async function movePickedWildToSelectedMeld() {
 }
 
 function playCanastraSfx(kind) {
-  if (!audioUnlocked) return;
+  if (!audioUnlocked || isSystemMuted()) return;
   if (kind === 'asas') {
     // Do not let the preceding card-movement jingle cover the celebration.
     for (const sound of Object.values(DECK_MOVE_SFX)) {
@@ -1816,7 +1844,7 @@ function playCanastraSfx(kind) {
 }
 
 function playTone(freq, t0, dur, vol = 0.12, type = 'sine') {
-  if (!audioUnlocked || !audioCtx) return;
+  if (!audioUnlocked || !audioCtx || isSystemMuted()) return;
   const o = audioCtx.createOscillator();
   const g = audioCtx.createGain();
   o.type = type;

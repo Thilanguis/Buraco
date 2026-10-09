@@ -15,7 +15,9 @@ Agarrador deixa de depender de cartas adquiridas do Lixo. Após a compra de cada
 
 Objetivo: cada zumbi deve ser uma ameaça que mereça consideração como alvo, sem transformar o pacote em milhares de HP obrigatórios adicionais. O envelope de durabilidade deve ser testado antes de alterar outros números.
 
-Preservados: Infecção 0–100 e valores das habilidades; Infectado +2/+4, reforço +2; Devorador 40/70, reforço +30; Regeneração 100; Reanimação 50% (110/120/130), uma vez por fase, teto 1/2/3 e Mutado na F3; lifecycle, pesos, alívio por canastras, S.T.A.R.S., dano sem overflow e regra global do Lixo. Nenhum outro chefe foi rebalanceado.
+Preservados na revisão histórica de 07/10: Infecção 0–100 e valores das habilidades; Infectado +2/+4, reforço +2; Devorador 40/70, reforço +30; Regeneração 100; Reanimação 50% (110/120/130), uma vez por fase, teto 1/2/3 e Mutado na F3; lifecycle, pesos, alívio por canastras, S.T.A.R.S., dano sem overflow e regra global do Lixo. Nenhum outro chefe foi rebalanceado.
+
+**Regra atual (08/10/2026):** cada Agarrador, Infectado e Devorador só pode ser reanimado **uma vez por partida**, mesmo se morrer novamente em outra fase. Continua também o limite de uma Reanimação Viral por fase, com espaço no teto. O contador `combatEntities[].revivals` já serializado permanece em save, undo e reload; só cadáveres com `revivals < 1` são elegíveis. A Infecção, pesos, cura e HP não mudaram nesta alteração.
 
 ## Estimativa histórica, não resultado atual
 

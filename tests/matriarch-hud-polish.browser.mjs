@@ -58,6 +58,10 @@ try{
   const button=page.locator('#bossIntentHelpButton');if(width<1920)await button.tap();else await button.click();
   assert.match(await page.locator('#bossIntentHelpText').innerText(),/Dois jogos.*Só um.*50 HP/s);await page.keyboard.press('Escape');
   await page.waitForTimeout(800);
+  const flowerLayout=await page.locator('#bossBloomFlowers').evaluate(el=>({row:el.getBoundingClientRect().toJSON(),flowers:[...el.children].map(f=>f.getBoundingClientRect().toJSON()),phase:document.getElementById('bossPhaseProgress').getBoundingClientRect().toJSON()}));
+  assert.ok(flowerLayout.flowers[0].width>=39,'Flowers should be larger than the old 32px icons');
+  assert.ok(flowerLayout.flowers.at(-1).right>=flowerLayout.row.right-7,'Flowers should span the available row');
+  assert.ok(flowerLayout.flowers.every(f=>f.bottom<=flowerLayout.phase.top),'Flowers must not overlap phase progress');
   await page.screenshot({path:resolve(root,'.cache/hud-polish/matriarch-'+width+'.png'),fullPage:true});
   const overflow=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,
     nodes:[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(el=>[el.tagName,el.id,el.className,el.getBoundingClientRect().right])}));
