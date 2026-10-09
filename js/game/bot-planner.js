@@ -169,25 +169,35 @@ export function bossObservableState(state, botIndex) {
   return result;
 }
 
-// Cheap, bounded two-turn potential. This ranks options, NEVER validates a meld.
-export function cooperativeHandValue(hand, melds = []) {
-  const orders = [RANK_LOW, RANK_HIGH];
-  let value = 0;
-  for (const card of hand || []) {
-    if (card.joker || card.forceWild || (isTwo(card) && !card.forceNatural)) { value += 28; continue; }
-    const neighbours = (hand || []).filter(c => c.id !== card.id && !c.joker && c.suit === card.suit
-      && orders.some(order => Math.abs(order.indexOf(rankOf(c)) - order.indexOf(rankOf(card))) === 1));
-    value += Math.min(2, neighbours.length) * 7;
-    for (const meld of melds) {
-      if (meld.some(c => c.joker || c.forceWild) || meld.length >= 14) continue;
-      if (meld.some(c => c.suit === card.suit && orders.some(order =>
-        Math.abs(order.indexOf(rankOf(c)) - order.indexOf(rankOf(card))) === 1))) {
-        value += meld.length >= 5 ? 18 : 8; break;
-      }
+// Same potential as before, indexed by suit/rank rather than repeatedly filtering
+// the hand. This is valuation only; legality still belongs to the engine.
+const rankNeighbours = new Map(RANK_LOW.map(rank => [rank, [...new Set([RANK_LOW, RANK_HIGH]
+  .flatMap(order => { const i=order.indexOf(rank); return [order[i-1],order[i+1]].filter(Boolean); }))]]));
+const handKey = (suit,rank) => `${suit}:${rank}`;
+function handPotential(hand = [], melds = []) {
+  const counts=new Map(), affected=new Map(), entries=[];
+  for(const c of hand) if(!c.joker) {const key=handKey(c.suit,rankOf(c));counts.set(key,(counts.get(key)||0)+1);}
+  const boards=melds.filter(m=>m.length<14&&!m.some(c=>c.joker||c.forceWild));
+  let total=0;
+  for(const c of hand) {
+    const neighbours=rankNeighbours.get(rankOf(c)) || [];
+    const reserved=c.joker||c.forceWild||(isTwo(c)&&!c.forceNatural);
+    const degree=neighbours.reduce((n,r)=>n+(counts.get(handKey(c.suit,r))||0),0);
+    let value=reserved?28:Math.min(2,degree)*7;
+    if(!reserved) {
+      const board=boards.find(m=>m.some(o=>o.suit===c.suit&&neighbours.includes(rankOf(o))));
+      if(board)value+=board.length>=5?18:8;
+      if(degree>0&&degree<=2) {const key=handKey(c.suit,rankOf(c));affected.set(key,(affected.get(key)||0)+1);}
     }
+    total+=value;entries.push({c,value,neighbours});
   }
-  return value;
+  // Removing a neighbour changes another card's capped score only at degree 1/2.
+  const marginals=new Map(entries.map(({c,value,neighbours})=>[c.id,value+(c.joker?0:
+    7*neighbours.reduce((n,r)=>n+(affected.get(handKey(c.suit,r))||0),0))]));
+  return {total,marginals};
 }
+export function cooperativeHandValue(hand, melds = []) { return handPotential(hand || [],melds).total; }
+export function cooperativeHandMarginals(hand, melds = []) { return handPotential(hand || [],melds).marginals; }
 
 export function bossStockOpportunityValue(state,botIndex) {
   if (!state.stock?.length) return -Infinity;

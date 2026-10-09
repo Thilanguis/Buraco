@@ -3,6 +3,21 @@ import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } 
 import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint, observeBossPublicAction, bossStockOpportunityValue } from './js/game/bot-planner.js';
 import { rankBossMoves, rankBossDiscardPickups, rankBossDiscards, cooperativeBossPriorities, prepareBossStrategyState, canFinishBossAfterMeld } from './js/boss/boss-bot-strategy.js';
 
+// Main-thread scheduling only, never game information or a persistent plan.
+let bossYieldChannel=null;
+const bossYieldWaiters=[];
+function yieldBossTask() {
+  if(typeof globalThis.scheduler?.yield==='function')return globalThis.scheduler.yield();
+  if(typeof window!=='undefined'&&typeof MessageChannel==='function') {
+    if(!bossYieldChannel) {
+      bossYieldChannel=new MessageChannel();
+      bossYieldChannel.port1.onmessage=()=>bossYieldWaiters.shift()?.();
+    }
+    return new Promise(resolve=>{bossYieldWaiters.push(resolve);bossYieldChannel.port2.postMessage(null);});
+  }
+  return new Promise(resolve=>setTimeout(resolve,0));
+}
+
 export class BossBuracoBot {
   static _turnLocks = new Set();
   static _plannerWorker = null;
@@ -142,7 +157,9 @@ export class BossBuracoBot {
   }
 
   static async cooperativeYield(engine, signal) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Scheduler/MessageChannel avoid nested timer clamping on mobile. Node and
+    // browsers without either API retain the timer and cancellation guard.
+    await yieldBossTask();
     this.assertActive(engine, signal);
   }
 
@@ -1043,14 +1060,19 @@ export class BossBuracoBot {
         || engine.hasPendingBossChoice?.()) return;
       prepareBossStrategyState(s);
       observeBossPublicAction(s);
-      const moves=[], keys=new Set();
+      const moves=[], keys=new Set(), previews=new Map();
       const blocked=new Set(me.hand.filter(c=>engine.isCardBlocked?.(me.id,c.id,'play')).map(c=>c.id));
+      const preview=(meldIndex,cardIds)=>{
+        const key=String(meldIndex)+':'+cardIds.slice().sort().join(',');
+        if(!previews.has(key))previews.set(key,this.simulateMeld(meldIndex==null?[]:team.melds[meldIndex],cardIds.map(id=>me.hand.find(c=>c.id===id)),engine));
+        return previews.get(key);
+      };
       const add=(meldIndex,cardIds,objective=false,followups=[])=>{
         const key=String(meldIndex)+':'+cardIds.slice().sort().join(',');
         if (keys.has(key)) return;
         const cards=cardIds.map(id=>me.hand.find(c=>c.id===id));
         if (cards.some(c=>!c || blocked.has(c.id))) return;
-        const base=meldIndex==null?[]:team.melds[meldIndex],after=this.simulateMeld(base,cards,engine);
+        const after=preview(meldIndex,cardIds);
         if (!objective && !engine.isValidSequenceMeld(after)) return;
         if (!this.canMeldSafely(me,team,cards.length,engine,after,{})) return;
         keys.add(key);moves.push({meldIndex,cardIds,objective,followups});
@@ -1070,13 +1092,13 @@ export class BossBuracoBot {
           // Extend clean candidates with other natural cards before ranking.
           // This builds a canastra in one contribution rather than fragmenting
           // same-suit runs or consuming a wildcard ahead of natural bridges.
-          let ids=[card.id], base=this.simulateMeld(team.melds[m],[card],engine);
+          let ids=[card.id], base=preview(m,[card.id]);
           if (!engine.isValidSequenceMeld(base) || this.isMeldDirty(base)) continue;
           for (let pass=0;pass<14;pass++) {
             const extra=me.hand.find(c=>!ids.includes(c.id) && !c.joker && !blocked.has(c.id)
-              && engine.isValidSequenceMeld(this.simulateMeld(base,[c],engine))
-              && !this.isMeldDirty(this.simulateMeld(base,[c],engine)));
-            if (!extra) break;ids.push(extra.id);base=this.simulateMeld(base,[extra],engine);
+              && engine.isValidSequenceMeld(preview(m,[...ids,c.id]))
+              && !this.isMeldDirty(preview(m,[...ids,c.id])));
+            if (!extra) break;ids.push(extra.id);base=preview(m,ids);
             add(m,ids.slice(),ids.some(id=>marked.has(id))||targeted.has(m));
           }
         }
@@ -1092,15 +1114,16 @@ export class BossBuracoBot {
         // Worker only produces plausible candidates; the engine remains the
         // authority. Prefer clean, longer runs in the bounded scoring shortlist.
         for (const indexes of plan.indexes.slice(0,180)) {
+          if(++checked%16===0) {await this.cooperativeYield(engine,signal);this.assertPlanCurrent(token,engine,botIndex);}
           let cards=indexes.map(i=>me.hand[i]);
           add(null,cards.map(c=>c.id),cards.some(c=>marked.has(c.id)));
-          let base=this.simulateMeld([],cards,engine);
+          let base=preview(null,cards.map(c=>c.id));
           if (!engine.isValidSequenceMeld(base) || this.isMeldDirty(base)) continue;
           for (let pass=0;pass<11;pass++) {
             const extra=me.hand.find(c=>!cards.some(o=>o.id===c.id) && !c.joker && !blocked.has(c.id)
-              && engine.isValidSequenceMeld(this.simulateMeld(base,[c],engine))
-              && !this.isMeldDirty(this.simulateMeld(base,[c],engine)));
-            if (!extra) break;cards=[...cards,extra];base=this.simulateMeld(base,[extra],engine);
+              && engine.isValidSequenceMeld(preview(null,[...cards.map(o=>o.id),c.id]))
+              && !this.isMeldDirty(preview(null,[...cards.map(o=>o.id),c.id])));
+            if (!extra) break;cards=[...cards,extra];base=preview(null,cards.map(c=>c.id));
             add(null,cards.map(c=>c.id),cards.some(c=>marked.has(c.id)));
           }
         }

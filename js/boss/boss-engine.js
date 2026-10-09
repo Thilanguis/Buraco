@@ -5944,7 +5944,9 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
   return recorded;
 }
 
-export function completeBossPlayerTurn(gameState, playerId) {
+// Analysis copies may stop after the current round's canonical consequences.
+// Gameplay callers keep the default and announce the next boss turn normally.
+export function completeBossPlayerTurn(gameState, playerId, { deferNextBossTurn = false } = {}) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.result || boss.pendingChoices.length || isBossTurnActive(gameState)) return null;
   detectPendingPhase(gameState);
@@ -6042,7 +6044,7 @@ export function completeBossPlayerTurn(gameState, playerId) {
   if (allPlayersActed && !boss.result) {
     const resultEvent = boss.eventLog.find((entry) => entry.actionId === boss.resolvedRoundEventActionId) || event;
     boss.resolvedRoundEventActionId = null;
-    if (boss.pendingChoices.length) {
+    if (boss.pendingChoices.length || deferNextBossTurn) {
       boss.awaitingBossTurn = { first: false, phaseChanged: !!phaseEvent, resultActionId: resultEvent?.actionId || null };
     } else {
       beginBossTurn(gameState, { phaseChanged: !!phaseEvent, resultEvent });

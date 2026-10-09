@@ -1,5 +1,5 @@
 // Strategy only. All legality, damage and deadline outcomes stay in the engine.
-import { bossObservableState, cooperativeHandValue, planPairIndexesWithTop } from '../game/bot-planner.js';
+import { bossObservableState, cooperativeHandValue, cooperativeHandMarginals, planPairIndexesWithTop } from '../game/bot-planner.js';
 import { applyBossMeldTransition, classifyBossMeldKind, isValidBossSequence,
   isBossCardNaturalInSequence, completeBossPlayerTurn, notifyBossCardDiscarded,
   quoteBossDiscardPickup, notifyBossDiscardTaken, notifyBossPurchaseCompleted,
@@ -49,7 +49,7 @@ function reserveWeight(s) {
   return .25 + .75 * Math.min(1, (s.stock.length + dead * .5) / 30);
 }
 export function strategyValue(s, botIndex) {
-  if (s.boss?.result?.victory === true) return 100000;
+  if (s.boss?.result?.victory === true || (s.boss?.defeated&&!s.boss?.result)) return 100000;
   const p = s.players[botIndex], melds = s.teams[p.teamId].melds;
   return -health(s) * .65 - dangerCost(s) + teamFutureValue(melds)
     + cooperativeHandValue(p.hand, melds) * reserveWeight(s);
@@ -74,14 +74,30 @@ export function simulateBossMove(state, botIndex, move) {
   return s;
 }
 function deadlineValue(s, botIndex) {
+  // app.js ends immediately on this canonical flag. Do not invent a later
+  // punishment/heal after a contribution has already won the match.
+  if(s.boss?.defeated&&!s.boss?.result)return strategyValue(s,botIndex);
   const probe = copy(s);
   const round=probe.boss.roundNumber;
-  completeBossPlayerTurn(probe,probe.players[botIndex].id);
+  completeBossPlayerTurn(probe,probe.players[botIndex].id,{deferNextBossTurn:true});
   // Evaluate announced collective obligations conservatively: teammates may
   // still help, but we cannot assume unseen hands solve the remaining work.
   for (const p of probe.players) if (probe.boss.roundNumber===round
-    && !(probe.boss.playersActedThisRound || []).includes(p.id)) completeBossPlayerTurn(probe,p.id);
+    && !(probe.boss.playersActedThisRound || []).includes(p.id)) completeBossPlayerTurn(probe,p.id,{deferNextBossTurn:true});
   return strategyValue(probe,botIndex);
+}
+
+function wildcardCost(s,botIndex,move,cards,after) {
+  const base=s.teams[s.players[botIndex].teamId].melds[move.meldIndex] || [];
+  const wildSpent=cards.filter(c=>wild(c,after)).length;
+  const dirtying=base.length && !base.some(c=>wild(c,base)) && after.some(c=>wild(c,after));
+  const noClean=s.teams[s.players[botIndex].teamId].melds.every(m=>!['limpa','real','asas'].includes(classifyBossMeldKind(m)));
+  const sacrifice=dirtying&&base.length>=4?(noClean?180:100)*reserveWeight(s):0;
+  // Preserve the first review's calibrated cost. A stronger universal reserve
+  // made fewer wild spends but also fewer clean canastras in the expanded A/B.
+  // Canonical natural twos pay none; lethal objectives can outweigh this cost.
+  const reserve=move.meldIndex==null&&after.length<7?wildSpent*100*Math.max(.65,reserveWeight(s)):0;
+  return sacrifice+reserve;
 }
 
 // Rank a bounded shortlist by actual engine outcomes. Checking deadline cost on
@@ -107,22 +123,14 @@ export function rankBossMoves(state, botIndex, moves, {limit=20}={}) {
     }
     const played=move.cardIds.map(id=>publicState.players[botIndex].hand.find(c=>c.id===id)).filter(Boolean);
     const base=publicState.teams[publicState.players[botIndex].teamId].melds[move.meldIndex] || [];
-    const after=[...base,...played],wasClean=base.length && !base.some(c=>wild(c,base));
-    const dirtying=wasClean && after.some(c=>wild(c,after));
-    const noClean=publicState.teams[publicState.players[botIndex].teamId].melds.every(m=>!['limpa','real','asas'].includes(classifyBossMeldKind(m)));
-    const sacrifice=dirtying && base.length>=4 ? (noClean?180:100)*reserveWeight(publicState) : 0;
-    const wildSpent=played.filter(c=>wild(c,after)).length;
-    // An announced objective is not a free pass to spend a wildcard: its real
-    // avoided consequence is already in deadlineValue. Keep the option for a
-    // lethal deadline, but charge the lost clean route even at low stock.
-    const wildReserve=move.meldIndex==null && after.length<7
-      ? wildSpent*100*Math.max(.65,reserveWeight(publicState)) : 0;
-    const score = deadlineValue(next,botIndex)-baseline + played.filter(c=>!c.joker && String(c.rank)!=='2').length*12-sacrifice-wildReserve;
+    const after=[...base,...played];
+    const score = deadlineValue(next,botIndex)-baseline + played.filter(c=>!c.joker&&String(c.rank)!=='2').length*12
+      - wildcardCost(publicState,botIndex,move,played,after);
     return {move,score,next};
   }).sort((a,b)=>b.score-a.score || a.move.cardIds.join().localeCompare(b.move.cardIds.join()));
 }
 
-export function rankBossDiscardPickups(state,botIndex,{maxCandidates=32}={}) {
+export function rankBossDiscardPickups(state,botIndex,{maxCandidates=64}={}) {
   const s = bossObservableState(state,botIndex), p=s.players[botIndex], team=s.teams[p.teamId], top=s.discard.at(-1);
   if (!top) return [];
   const destinations = [];
@@ -134,12 +142,30 @@ export function rankBossDiscardPickups(state,botIndex,{maxCandidates=32}={}) {
   }
   for (const [a,b] of planPairIndexesWithTop(p.hand,top)) destinations.push({meldIndex:null,handCardIds:[p.hand[a].id,p.hand[b].id]});
   const baseline = deadlineValue(s,botIndex);
-  const results = [];
-  let legal=0;
+  const results = [], candidates=[];
   for (const destination of destinations) {
     const quote = quoteBossDiscardPickup(s,p.id,destination);
     if (!quote.allowed) continue;
-    if (++legal>maxCandidates) break;
+    const cards=[...destination.handCardIds.map(id=>p.hand.find(c=>c.id===id)),top];
+    const base=team.melds[destination.meldIndex] || [],after=[...base,...cards];
+    const held=[...p.hand.filter(c=>!destination.handCardIds.includes(c.id)),...s.discard.slice(-quote.count,-1)];
+    const rough=teamFutureValue([after])-teamFutureValue([base])+cooperativeHandValue(held,[...team.melds,after])
+      - wildcardCost(s,botIndex,{meldIndex:destination.meldIndex},cards,after);
+    candidates.push({destination,quote,rough,key:JSON.stringify(destination),group:`${quote.protected?'top':'full'}:${destination.meldIndex==null?'new':'extend'}`});
+  }
+  const budget=Math.max(0,Math.floor(maxCandidates));
+  // Keep the old 32 incumbents as a conservative control; otherwise a cheap
+  // rough score can crowd out an objective whose deadline only the engine sees.
+  const selected=new Set(candidates.slice(0,Math.floor(budget/2)));
+  candidates.sort((a,b)=>b.rough-a.rough||a.group.localeCompare(b.group)
+    || a.key.localeCompare(b.key));
+  // Separate opportunity budgets for new/existing and full/protected pickups.
+  // Quality ranks each group; generation order cannot consume the whole budget.
+  const groups=[...new Set(candidates.map(c=>c.group))];
+  const reserved=Math.floor((budget-selected.size)/Math.max(1,groups.length));
+  for(const group of groups) for(const c of candidates.filter(c=>c.group===group).slice(0,reserved)) selected.add(c);
+  for(const c of candidates) {if(selected.size>=budget)break;selected.add(c);}
+  for (const {destination,quote} of selected) {
     const next=copy(s), held=next.players[botIndex];
     const taken=next.discard.splice(next.discard.length-quote.count,quote.count);
     held.hand.push(...taken); next.hasDrawnThisTurn=true;
@@ -149,11 +175,11 @@ export function rankBossDiscardPickups(state,botIndex,{maxCandidates=32}={}) {
     if (!played) continue;
     notifyBossPurchaseCompleted(played,p.id);
     const after=played.players[botIndex], board=played.teams[p.teamId].melds;
-    const useful=after.hand.filter(c=>c.joker || cooperativeHandValue([c,...after.hand.filter(o=>o.id!==c.id)],board)
-      > cooperativeHandValue(after.hand.filter(o=>o.id!==c.id),board)).length;
+    const marginals=cooperativeHandMarginals(after.hand,board);
+    const useful=after.hand.filter(c=>c.joker || marginals.get(c.id)>0).length;
     const isolated=Math.max(0,after.hand.length-useful);
     const score=deadlineValue(played,botIndex)-baseline-isolated*(s.stock.length<=15?2:1)
-      + move.cardIds.map(id=>next.players[botIndex].hand.find(c=>c.id===id)).filter(c=>c && !c.joker && String(c.rank)!=='2').length*12;
+      + move.cardIds.map(id=>next.players[botIndex].hand.find(c=>c.id===id)).filter(c=>c && !c.joker&&String(c.rank)!=='2').length*12;
     results.push({intent:destination.meldIndex==null?{wants:true,action:'new',handIndexes:destination.handCardIds.map(id=>p.hand.findIndex(c=>c.id===id))}
       :{wants:true,action:'extend',meldIndex:destination.meldIndex,handIndexes:destination.handCardIds.map(id=>p.hand.findIndex(c=>c.id===id))},
       quote,score, useful, isolated});

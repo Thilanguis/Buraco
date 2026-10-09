@@ -1,5 +1,15 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+### Segunda revisão cooperativa do BOT Chefe — 09/10/2026
+
+- [x] Starvation do Lixo comprovada antes da correção: 32 extensões podem esconder retirada completa em jogo novo. Cotação canônica, 32 incumbentes e espaço por categoria até 64 simulações; testar Lixo20/50, muitos destinos, permutações e orçamento0/1. Sem mudar Lixo Fechado nem confundir shortlist com busca exaustiva.
+- [x] Potencial indexado/marginais equivalentes à política anterior; previews somente na iteração atual. Pausas no scan de trincas via scheduler/MessageChannel/timer, com fingerprint e cancelamento após pausa; Worker real e token obsoleto. Sem cache de planos em Firebase/snapshot nem alteração do BOT clássico.
+- [x] Projeção resolve somente as consequências da rodada atual: `deferNextBossTurn:true` apenas em cópias, padrão false no jogo real. Não gerar a próxima habilidade com mão oculta em todo candidato; pico do Nemesis reproduzido no perfil. Vitória canônica letal não recebe punição futura. Seis chefes preservam fechamento/fluxo padrão.
+- [x] Auditoria de coringas distingue 2 natural, alternativa natural legal dominadora, benefício observado e não comprovado. Testar desperdício dirigido e coringa útil, sem proibição universal; rejeitada penalidade mais forte que reduziu progresso. Cooperação continua pública, sem sacrificar sequência própria por pista fraca.
+- [x] A/B isolado de toda a árvore JS da primeira revisão f0d4551, 64 execuções/8 sementes. Adaptador espelha vitória imediata da aplicação; completa/protegida segue cotação, inclusive Lixo unitário. Resultados de jogo iguais na amostra, zero vitórias em ambas; nenhum ganho de vitória/preservação comprovado. Não comparar com o encerramento incompleto do experimento histórico.
+- [x] Focados174/174, ampla1228/1228. Edge1920/1376/390px CPU1×/4×/6×, 324 medições e fallback real: mão50 móvel1196→774ms média, mas muitos destinos ficaram mais lentos e P95 desktop piorou. Média/P95/pior, desperdício limitado e derrotas registrados em `BOT_COOPERATIVO_CHEFE_2026-10-09.md`; não ocultar regressões nem declarar UI sem bloqueio.
+- [ ] Esgotamento continua na amostra; validar humano competente, aparelhos físicos, partidas completas dos demais chefes e dois clientes Firebase reais. Não transformar zero dominados em prova de eficiência nem usar o parceiro roteirizado como win rate humano. Sem commit/push/deploy automático.
+
 ### Inteligência cooperativa do BOT Chefe — 09/10/2026
 
 - [x] Planejador único com informação pública: mão do parceiro e cartas futuras ocultas inclusive BOT+BOT; histórico público curto, reserva de cartas e oportunidade cooperativa conservadora. Lixo usa cotação canônica por destino real, sem veto automático por pilha grande.

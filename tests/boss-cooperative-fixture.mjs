@@ -1,4 +1,5 @@
 import * as rules from '../js/boss/boss-engine.js';
+import {auditWildcardMove} from './boss-wildcard-audit.mjs';
 function random(seed) {
   return () => {seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);
     t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};
@@ -31,8 +32,9 @@ export function advance(s) {
     rules.advanceBossTurn(s,(s.boss.bossFlow?.endsAt || 0)+1);
   }
 }
-export function fixtureEngine(s) {
-  const metrics={clean:0,damage:0,bossDamage:0,minionDamage:0,fullPickups:0,wasted:0,moves:0,stockDraws:0};
+export function fixtureEngine(s,{auditWildcards=false}={}) {
+  const metrics={clean:0,damage:0,bossDamage:0,minionDamage:0,fullPickups:0,partialPickups:0,wasted:0,moves:0,stockDraws:0,
+    wildcardSpent:0,wildcardDominated:0,wildcardUseful:0,wildcardUnproved:0,twosWild:0,naturalTwos:0,auditMs:0};
   const recordDamage=event=>{const applied=Number(event?.appliedDamage || 0);metrics.damage+=applied;
     metrics[event?.targetId==='boss'?'bossDamage':'minionDamage']+=applied;};
   const canDead=()=>s.deadChunksTaken[0]<s.deadChunksMax[0] && s.deadPiles.some(p=>p.length);
@@ -61,7 +63,8 @@ export function fixtureEngine(s) {
       const p=s.players[i],ids=(intent.handIndexes||[]).map(j=>p.hand[j]?.id),m=intent.action==='extend'?intent.meldIndex:null;
       const quote=rules.quoteBossDiscardPickup(s,p.id,{meldIndex:m,handCardIds:ids});if(!quote.allowed)return false;
       const top=s.discard.at(-1),taken=s.discard.splice(-quote.count);p.hand.push(...taken);
-      rules.notifyBossDiscardTaken(s,p.id,taken);s.hasDrawnThisTurn=true;if(quote.count>1)metrics.fullPickups++;
+      rules.notifyBossDiscardTaken(s,p.id,taken);s.hasDrawnThisTurn=true;
+      if(quote.protected)metrics.partialPickups++;else metrics.fullPickups++;
       const ok=play(i,m,[...ids,top.id].map(id=>p.hand.findIndex(c=>c.id===id)));
       rules.notifyBossPurchaseCompleted(s,p.id);return ok;},
     executeDiscard:async(i,index)=>{
@@ -76,10 +79,17 @@ export function fixtureEngine(s) {
     const p=s.players[i],team=s.teams[p.teamId],cards=indexes.map(j=>p.hand[j]);
     if(cards.some(c=>!c||rules.isBossCardBlocked(s,p.id,c.id,'play'))||new Set(indexes).size!==indexes.length)return false;
     if(m==null?!rules.canBossCreateMeld(s,p.id):engine.isMeldLocked(team.id,m))return false;
+    const auditState=auditWildcards?structuredClone(s):null;
     const before=m==null?[]:team.melds[m],after=[...before,...cards];normalize(after);
     if(!rules.isValidBossSequence(after))return false;
     const left=p.hand.length-cards.length;
     if(left<=1&&!canDead()&&!(good(0)||['limpa','real','asas'].includes(rules.classifyBossMeldKind(after))))return false;
+    if(auditState) {
+      const start=performance.now(),a=auditWildcardMove(auditState,i,{meldIndex:m,cardIds:cards.map(c=>c.id)});
+      metrics.wildcardSpent+=a.spent;metrics.wildcardDominated+=a.dominated;metrics.wildcardUseful+=a.useful;
+      metrics.wildcardUnproved+=a.unproved;metrics.twosWild+=a.twosWild;metrics.naturalTwos+=a.naturalTwos;
+      metrics.auditMs+=performance.now()-start;
+    }
     const oldKind=rules.classifyBossMeldKind(before),newKind=rules.classifyBossMeldKind(after);
     p.hand=p.hand.filter(c=>!cards.includes(c));const index=m??team.melds.length;team.melds[index]=after;
     const event=rules.applyBossMeldTransition(s,{teamId:team.id,playerId:p.id,meldIndex:index,oldKind,newKind,cardsAdded:cards,isNewMeld:m==null});
@@ -87,6 +97,10 @@ export function fixtureEngine(s) {
     if(oldKind==='simple'&&['limpa','real','asas'].includes(newKind))metrics.clean++;
     metrics.wasted+=cards.filter(c=>c.joker&&after.length<7).length;
     s.lastAction={id:`test:${metrics.moves}`,type:m==null?'meldNew':'meldExtend',playerId:p.id,meldIndex:index,cards};
+    // Mirror app.js/applyBossMeldTransitionAndFinish: a lethal contribution
+    // ends the match immediately, not only after a later final strike.
+    if(s.boss.defeated&&!s.boss.result)s.boss.result={victory:true,reason:'boss_defeated',title:'Chefe derrotado',detail:'Contribuição letal.'};
+    if(s.boss.result){s.finished=true;return true;}
     if(!p.hand.length&&!takeDead(p)){recordDamage(rules.applyBossFinalStrike(s,0,p.id));s.finished=!!s.boss.result;}
     return true;
   }
