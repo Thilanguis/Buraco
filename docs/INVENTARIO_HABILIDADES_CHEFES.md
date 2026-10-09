@@ -1,5 +1,7 @@
 # Inventário atual de habilidades dos chefes
 
+**Elegibilidade revisada em 09/10/2026:** desafios podem ser impossíveis de cumprir com a mão atual. Preservam-se fase, recursos, alvos reais, saída legal das marcas e segurança dos bloqueios. A última habilidade só sai do sorteio se houver outra realmente elegível. Pesos e consequências não mudaram. Classificação individual dos seis chefes e comparação reproduzível: `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`.
+
 
 **Atualizado em 08/10/2026 a partir do workspace local: itens v2 da Dimitrescu e filhas 500 HP/piso 300 em partidas novas. Pesos, Sede/Fúria e os reworks anteriores de Nemesis/Enxerto permanecem. Meta de 65%–75% ainda depende de playtest competente. Relatórios: `REWORK_ITENS_DIMITRESCU_2026-10-08.md` e `REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md`.**
 
@@ -143,7 +145,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 | Jogo Espelhado | 1, 2 e 3 | 5 | Duplica fisicamente um jogo em dois reflexos idênticos. O alvo usa exatamente 1 carta legal em um reflexo. Errar ou ignorar envia a carta ao fundo do Monte, deixa o jogador **Desorientado** e acrescenta **+18** ao Mundo do Espelho. |
 | Siga o Reflexo | 1, 2 e 3 | 5 | O primeiro cooperador define, pelo turno inteiro, quantas cartas baixou; o segundo precisa terminar com a mesma quantidade, inclusive 0. Diferença acrescenta **+16**. |
 | Espelho do Lixo | 2 e 3 | 4 | Mostra dois reflexos idênticos do topo do Lixo, sem pista escondida. Errar acrescenta **+16** e sela o Lixo durante a rodada. |
-| Prisão no Espelho | 1, 2 e 3 | 2 | Só entra quando já existe pressão no Mundo do Espelho e o parceiro possui uma alimentação legal. Nehelenia prioriza prender o cooperador mais pressionado; o parceiro precisa alimentar o jogo indicado. Sucesso liberta sem alterar o recurso; falha acrescenta **+8/+10/+12** conforme a fase. |
+| Prisão no Espelho | 1, 2 e 3 | 2 | Precisa de um cooperador já pressionado, outro para resgatá-lo e um jogo existente que aceite extensão. Não exige que o parceiro já tenha a carta necessária. Prioriza o mais pressionado. Sucesso liberta; falha acrescenta **+8/+10/+12** conforme a fase. |
 | Pesadelo Eterno | 3 | 5 | Mostra a ORIGINAL, cria dois reflexos e embaralha os três. Errar acrescenta **+24**. |
 | Laço do Tigre | 1, 2 e 3 | 4 | Liga dois jogos; cada lado precisa receber carta. Falhar acrescenta **+12** e deixa garras persistentes no lado ignorado. |
 | Presa Marcada | 1, 2 e 3 | 3 | Marca um jogo; até resolvê-lo, o alvo não pode alimentar outro jogo existente. É controle puro, sem avanço direto do recurso. |
@@ -166,7 +168,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Marcação visual:** carta-alvo recebe infecção verde e selo MARCADA; restrição do Agarrador usa AGARRADA; topo do Lixo contaminado usa CONTAMINADA. Compartilham o mesmo overlay, aplicado após a arte, sem cobrir número/naipe/NOVA. Agarrada pulsa uma vez ao entrar, sem replay de render/reload/snapshot/undo; marca estática até expirar. Zona de Impacto continua laranja e envolve somente as cartas. O efeito visual não altera cobrança ou regras.
 
-**Objetivos atuais — 08/10/2026:** Caçada exige dano direto ao Nemesis; Extermínio prova ataque do S.T.A.R.S. e contribuição do parceiro ao jogo existente, na ordem real dos turnos. Alvos congelados e inelegibilidade sem solução. Tentáculo usa duas marcas com rota real de jogo, distinguindo jogo/descarte/falha; Barragem permanece com duas saídas conjuntas. INVADINDO sem HP/alvo; retrato seleciona Nemesis; ajuda/chips não mudam o alvo. Chips de zumbi, Horda, Lixo protegido, HP e pesos permanecem. Objetivos já anunciados em saves anteriores terminam sob a regra salva.
+**Objetivos atuais — 09/10/2026:** Caçada exige dano direto, mas não uma jogada pronta para entrar no sorteio. Extermínio congela S.T.A.R.S., parceiro e jogo existente extensível, sem provar os dois planos. Tentáculo/Barragem marcam cartas com saída individual legal por jogo ou descarte, sem garantir sucesso completo ou conjunto. Devorador exige jogo extensível, não a carta na mão; Infectado não exige duas contribuições prontas; Agarrador aceita marca descartável. INVADINDO sem HP/alvo; retrato seleciona Nemesis; ajuda/chips não mudam o alvo. Saves anunciados preservam o objetivo e IDs salvos.
 
 **HP:** 2200. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos F1/F2/F3: **1/2/3**. Aparecer como ameaça ≠ persistir ≠ cadáver.
 
@@ -190,7 +192,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Dano e alívio:** alvo escolhido antes da jogada entre Nemesis e zumbis vivos, inclusive no ataque final; não há transbordamento. Limpa/Real/Ás-a-Ás aliviam −4/−8/−12 no total incremental por jogo, mesmo atacando zumbi. Dano direto ao Nemesis troca S.T.A.R.S.; dano em zumbi não.
 
-**Elegibilidade:** objetivos têm solução legal conjunta antes de anunciar; S.T.A.R.S. possui fallback para o parceiro. Horda exige persistente vivo, Regeneração exige persistente ferido, Reanimação exige cadáver/carga/espaço, Impacto exige jogo alimentável. Onze habilidades, soma de pesos 39, no catálogo real do Laboratório.
+**Elegibilidade:** desafio não exige solução antecipada. S.T.A.R.S. existente permanece congelado, sem troca por um parceiro com mão melhor. Antes de existir marcador, escolhe cooperador válido. Marcas têm saída individual legal; desafios coletivos não exigem saídas conjuntas. Horda exige persistente vivo, Regeneração exige persistente ferido, Reanimação exige cadáver/carga/espaço, Impacto exige jogo estruturalmente extensível. Onze habilidades, soma de pesos 39. O BOT continua buscando planos legais durante o turno; isso é diferente da elegibilidade do sorteio.
 
 **HUD:** em faixa separada abaixo do HUD principal, cards full-bleed reutilizam o padrão de filhas/capangas, com nome integrado e chips INVADINDO, ATIVO, MUTADO, REFORÇADO e CADÁVER quando aplicáveis. Entrada mostra INVADINDO; objetivo fica no painel de Invasão, sem texto redundante. Seleção pelo próprio card; `?` interno abre o popover oficial com os números das passivas. Repelido some; ausente sem espaço permanente. Retratos fornecidos em `nemesis-agarrador.png`, `nemesis-infectado.png` e `nemesis-devorador.png`, originais preservados, cobrem o card sem distorção. S.T.A.R.S. fica sobre a arte principal com ajuda oficial. SFX canônico `ganho-infeccao-nemesis.mp3` toca só por delta positivo real, uma vez por evento; não por reload/redução/+0. Animações breves respeitam redução de movimento.
 

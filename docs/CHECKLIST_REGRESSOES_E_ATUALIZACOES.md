@@ -1,5 +1,16 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+### Elegibilidade e variedade dos seis chefes — 09/10/2026
+
+- [x] Classificar cada habilidade como A (alvo/segurança obrigatórios), B (prova excessiva) ou C (alvo real sem garantia de sucesso). Relatório `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md` substitui exigências históricas de solução pronta no anúncio do Nemesis.
+- [x] Caçada/Extermínio impossíveis podem falhar; Tentáculo/Barragem mantêm 2/3 marcas com saída individual legal, não prova de saídas conjuntas. S.T.A.R.S./papéis/jogo congelados. Agarrador continua protegendo soluções existentes após compra; não vira filtro para anunciar desafios.
+- [x] Invasão: Infectado não exige plano de duas contribuições; Devorador precisa de jogo estruturalmente extensível, não carta na mão; Agarrador pode marcar carta descartável. Falha persiste/Mutado na F3, sem Infecção adicional. Teto, cadáver, uma reanimação por zumbi e quota por fase preservados.
+- [x] Prisão/Laço preservam parceiros/pressão/jogos extensíveis, sem solução antecipada. Presa/Reflexo Invertido/Vigilância/ilusões, Coleiras/Exposição/ordens, sementes e descarte por naipe preservam validações de bloqueio e alvo realmente executável.
+- [x] Excluir a última habilidade somente depois de validar alternativas; repetir a única válida é permitido. Pesos, entradas de fase e debug-only intactos, sem rotação fixa.
+- [x] A/B local isolado do commit 675106b, mesmas sementes/estados, seis chefes e três fases. Registrar catálogo, elegíveis/exclusões por cenário, frequências, repetições, vazios e candidatos/zumbis. Não interpretar sorteio condicional como vitória, telemetria ou combate completo.
+- [x] Sucesso/parcial/falha, objetivos sem solução, cartas/bloqueios/Morto/batida, F3/lifecycle, BOT cooperativo, snapshot/reload/undo, objetivos salvos v1/v2, ajuda e interface cobertos. Baseline ampla1228/1228; resultados finais no relatório. Nenhuma mudança estratégica do BOT, HP, dano, cura, recurso ou balanceamento.
+- [ ] Validar batalhas completas, aparelhos físicos e dois clientes Firebase reais antes de calibrar pesos ou afirmar variedade/win rate em produção. Sem commit/push/deploy nesta revisão.
+
 ### Segunda revisão cooperativa do BOT Chefe — 09/10/2026
 
 - [x] Starvation do Lixo comprovada antes da correção: 32 extensões podem esconder retirada completa em jogo novo. Cotação canônica, 32 incumbentes e espaço por categoria até 64 simulações; testar Lixo20/50, muitos destinos, permutações e orçamento0/1. Sem mudar Lixo Fechado nem confundir shortlist com busca exaustiva.

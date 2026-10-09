@@ -1,5 +1,7 @@
 # Rework Nemesis/Matriarca e correções visuais Dimitrescu — 08/10/2026
 
+**Atualização de elegibilidade em 09/10/2026:** as provas antecipadas de sucesso descritas neste relatório histórico deixaram de filtrar Caçada/Extermínio e desafios da Invasão. Marcas preservam saída individual legal; jogos precisam existir e aceitar extensão. Resolução, valores e o planner de execução/BOT continuam. A ordem inversa sem solução agora pode anunciar Extermínio e aplicar a consequência existente. Dados atuais e classificação: `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`. As medições de 08/10 abaixo não representam a nova distribuição.
+
 ## Status e escopo
 
 Implementação experimental baseada exclusivamente no workspace local. Referência anterior: commit local `b1658cc8c2b3acda87db65afed4dbe43c3e37f12`. Workspace inicialmente limpo; suíte inicial nova: **1066/1066**. Sem consulta à branch remota, commit, push ou deploy.

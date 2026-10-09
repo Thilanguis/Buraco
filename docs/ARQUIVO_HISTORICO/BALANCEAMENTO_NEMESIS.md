@@ -1,5 +1,7 @@
 # Balanceamento do Nemesis
 
+**Nota posterior — 09/10/2026:** elegibilidade passou a permitir desafios sem solução pronta. Devorador exige jogo estruturalmente extensível, Infectado não exige provar duas cartas e marcas do Agarrador/Tentáculos aceitam saída legal por jogo ou descarte. Pesos/HP/cura/Infecção não mudaram; métricas antigas abaixo são históricas. Referência atual: `../AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`.
+
 ## Durabilidade — 06/10/2026; correções funcionais — 07/10/2026
 
 O modelo atual usa **batida fixa de 100 HP**, pelo pipeline oficial, sem escala por pontos nem redução percentual da Dominadora. A passiva persistente do Devorador acumula cartas novas da equipe entre jogos, jogadores e turnos; cada 3 créditos cura 40/70 HP (+30 Reforçado), no máximo uma vez por turno. Excedentes ficam pendentes e são consumidos na próxima contribuição ou no fim de um turno posterior elegível. Morte/reanimação zeram progresso. Entrada da Invasão permanece independente. Nenhum HP/peso/valor de cura/Infecção foi alterado neste pacote.

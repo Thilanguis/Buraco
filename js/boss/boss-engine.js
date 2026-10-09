@@ -49,6 +49,19 @@ function bossMechanicsContext(gameState) {
     discardBlocked: (playerId) => isBossDiscardBlocked({ ...gameState, currentPlayer: gameState.players.findIndex((player) => player.id === playerId) }),
     blocked: (playerId, cardId, action) => isCardBlockedByBossState(boss, playerId, cardId, action),
     meldId: (teamId, index) => resolveBossMeldId(gameState, teamId, index, true),
+    extendableMeldIndexes: () => eligibleMeldIndexes(gameState),
+    objectiveExitCardIds: (player) => {
+      const context = bossMechanicsContext(gameState);
+      const playable = [], discardOnly = [];
+      for (const card of player.hand || []) {
+        if (!card?.id) continue;
+        if (!isCardBlockedByBossState(boss, player.id, card.id, 'play')
+          && cardHasSafeLegalPlay(gameState, player, card, moves => context.helpers.canLeaveHand(player, moves))) playable.push(card.id);
+        else if (card.id !== gameState.pickedDiscardCardId && !isCardBlockedByBossState(boss, player.id, card.id, 'discard')
+          && (player.hand.length > 1 || context.helpers.canLeaveHand(player, [{ meldIndex: null, cardIds: [card.id] }]))) discardOnly.push(card.id);
+      }
+      return [...playable, ...discardOnly];
+    },
     pickIndex: (length) => length ? Math.floor(seededUnit(bossSeed(gameState, 173)) * length) % length : 0,
     canLeaveHand: (player, moves, preview = gameState) => {
       const playedIds = new Set(moves.flatMap((move) => move.cardIds));
@@ -1250,39 +1263,26 @@ function neheleniaFeedableMeldTargets(gameState) {
 }
 
 function neheleniaTigerLinkPairs(gameState) {
-  const targets = neheleniaFeedableMeldTargets(gameState);
-  const legalOptionsFor = (target) => {
-    const options = [];
-    for (const player of gameState.players || []) {
-      const meld = gameState.teams?.[player.teamId]?.melds?.[target.meldIndex];
-      if (!Array.isArray(meld)) continue;
-      for (const card of player.hand || []) {
-        if (!card?.id || isCardBlockedByBossState(gameState.boss, player.id, card.id, 'play')) continue;
-        if (!isValidBossSequence([...(meld || []), card])) continue;
-        if (!hasLegalDiscard(gameState, player, [card.id])) continue;
-        options.push({ playerId: player.id, cardId: card.id });
-      }
-    }
-    return options;
-  };
-  const optionsByMeld = new Map(targets.map((target) => [target.meldId, legalOptionsFor(target)]));
+  // A challenge needs real, extendable games, not a joint solution in hand.
+  // Its failure leaves claws, which never prevent discarding or playing elsewhere.
+  const targets = neheleniaExtendableMeldTargets(gameState);
   const pairs = [];
   for (let left = 0; left < targets.length; left += 1) {
     for (let right = left + 1; right < targets.length; right += 1) {
       const first = targets[left];
       const second = targets[right];
-      const firstOptions = optionsByMeld.get(first.meldId) || [];
-      const secondOptions = optionsByMeld.get(second.meldId) || [];
-      const feasible = firstOptions.some((firstOption) => secondOptions.some((secondOption) => {
-        if (firstOption.cardId === secondOption.cardId) return false;
-        if (firstOption.playerId !== secondOption.playerId) return true;
-        const player = (gameState.players || []).find((entry) => entry.id === firstOption.playerId);
-        return !!player && hasLegalDiscard(gameState, player, [firstOption.cardId, secondOption.cardId]);
-      }));
-      if (feasible) pairs.push([first, second]);
+      pairs.push([first, second]);
     }
   }
   return pairs;
+}
+
+function neheleniaExtendableMeldTargets(gameState) {
+  const feedable = neheleniaFeedableMeldTargets(gameState);
+  return eligibleMeldIndexes(gameState).map(meldIndex => ({
+    meldIndex, meldId: resolveBossMeldId(gameState, 0, meldIndex, true),
+    eligiblePlayerIds: feedable.find(target => target.meldIndex === meldIndex)?.eligiblePlayerIds || [],
+  }));
 }
 
 function neheleniaMarkedCardCandidates(gameState) {
@@ -1604,7 +1604,7 @@ function createPayload(gameState, abilityId) {
       );
       if (!trapped) return {};
       const rescuer = (gameState.players || []).find((player) => player.id !== trapped.id);
-      const pair = chooseSeeded(neheleniaFeedablePairs(gameState).filter((entry) => entry.playerId === rescuer?.id), gameState, 449);
+      const pair = chooseSeeded(neheleniaExtendableMeldTargets(gameState), gameState, 449);
       const phase = Math.max(1, Math.min(3, Number(gameState.boss.phase) || 1));
       const failureMirrorPoints = phase === 3 ? 12 : phase === 2 ? 10 : 8;
       return trapped && rescuer && pair ? {
@@ -2362,10 +2362,9 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   return boss;
 }
 
-function eligibleAbilityCandidates(gameState, entries, { avoidLast = false, debug = false } = {}) {
+function eligibleAbilityCandidates(gameState, entries, { avoidLast = false, debug = false, exclusions = null } = {}) {
   const boss = gameState.boss;
   let choices = entries.filter((entry) => getBossAbilityPhases(boss.id, entry, { debug }).includes(boss.phase));
-  if (avoidLast && boss.lastAbilityId && choices.length > 1) choices = choices.filter((entry) => entry.id !== boss.lastAbilityId);
   if (boss.phase === 3 && boss.lastMaintenanceRound === boss.roundNumber) choices = choices.filter((entry) => entry.id !== 'maintenance_fee');
   if (!eligibleMeldIndexes(gameState).length) choices = choices.filter((entry) => entry.id !== 'pledge');
   if ((boss.possessions || []).length >= 2 || !eligibleMeldIndexes(gameState, { excludePossessed: true }).length) choices = choices.filter((entry) => entry.id !== 'possession');
@@ -2383,9 +2382,20 @@ function eligibleAbilityCandidates(gameState, entries, { avoidLast = false, debu
   if (players.length < 2 || !allPlayersHaveCards) choices = choices.filter((entry) => !['forced_swap', 'double_collar'].includes(entry.id));
   if (players.length < 2 || !allPlayersHaveTwoCards || !allPlayersHaveTwoPlayableCards) choices = choices.filter((entry) => entry.id !== 'final_order');
   if (players.length < 2) choices = choices.filter((entry) => entry.id !== 'favorite');
-  return choices
+  const candidates = choices
     .map((entry) => ({ entry, payload: createPayload(gameState, entry.id) }))
-    .filter(({ entry, payload }) => hasValidAbilityPayload(gameState, entry.id, payload));
+    .filter(({ entry, payload }) => {
+      const valid = hasValidAbilityPayload(gameState, entry.id, payload);
+      if (!valid && exclusions) exclusions[entry.id] = `payload:${entry.id}`;
+      return valid;
+    });
+  if (exclusions) for (const entry of entries) {
+    if (!choices.includes(entry)) exclusions[entry.id] = !entry.phases.includes(boss.phase) ? 'phase' : `prerequisite:${entry.id}`;
+  }
+  // Exclude repetition only after validating alternatives. A sole legal ability
+  // must remain selectable even when other phase entries lack their targets.
+  return avoidLast && boss.lastAbilityId && candidates.length > 1
+    ? candidates.filter(({ entry }) => entry.id !== boss.lastAbilityId) : candidates;
 }
 
 export function getBossAbilityPhases(bossId, entry, { debug = false } = {}) {
@@ -2399,13 +2409,15 @@ export function inspectBossAbilityEligibility(gameState, abilityId, { debug = fa
   const entry = definition?.abilities?.find((ability) => ability.id === abilityId) || null;
   if (!entry) return { eligible: false, reason: `Habilidade desconhecida para ${definition?.name || boss.id}: ${abilityId}.`, entry: null, payload: null };
   if (!getBossAbilityPhases(boss.id, entry, { debug }).includes(boss.phase)) {
-    return { eligible: false, reason: `${entry.name} nao e elegivel na Fase ${boss.phase}.`, entry, payload: null };
+    return { eligible: false, reason: `${entry.name} nao e elegivel na Fase ${boss.phase}.`, reasonCode: 'phase', entry, payload: null };
   }
-  const candidate = eligibleAbilityCandidates(gameState, [entry], { debug })[0] || null;
+  const exclusions = {};
+  const candidate = eligibleAbilityCandidates(gameState, [entry], { debug, exclusions })[0] || null;
+  const details = getBossMechanicsAdapter(boss.id)?.eligibilityDetails?.(bossMechanicsContext(gameState), abilityId) || null;
   if (!candidate) {
-    return { eligible: false, reason: `${entry.name} nao encontrou um alvo legal no estado atual.`, entry, payload: null };
+    return { eligible: false, reason: `${entry.name} nao encontrou um alvo legal no estado atual.`, reasonCode: exclusions[entry.id], details, entry, payload: null };
   }
-  return { eligible: true, reason: '', entry: candidate.entry, payload: candidate.payload };
+  return { eligible: true, reason: '', details, entry: candidate.entry, payload: candidate.payload };
 }
 
 export function queueDebugBossAbility(gameState, abilityId) {

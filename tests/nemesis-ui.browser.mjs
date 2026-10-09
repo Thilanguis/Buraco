@@ -314,7 +314,7 @@ try {
   assert.equal(await page.locator('.boss-combat-card-target').count(), 0, 'entering cannot be attacked');
   assert.equal(await page.locator('.is-entering meter').count(), 0, 'entering has no combat HP');
   await page.getByLabel('Agarrador: INVADINDO', { exact: true }).click();
-  assert.match(await page.locator('#bossIntentHelpText').innerText(), /objetivo.*expulsar/);
+  assert.match(await page.locator('#bossIntentHelpText').innerText(), /objetivo.*expuls[aá]/);
   assert.equal(await page.evaluate(() => window.fixture.commits()), 0);
   await page.keyboard.press('Escape');
   assert.doesNotMatch(await page.locator('.is-entering').innerText(), /ENTRANDO|impeça a invasão/);
@@ -349,7 +349,7 @@ try {
   await page.getByRole('button', { name: 'Selecionar Infectado como alvo', exact: true }).click();
   await page.getByLabel('Passiva de Infectado').click();
   assert.equal(await page.locator('#bossIntentHelpPopover').isVisible(), true);
-  assert.match(await page.locator('#bossIntentHelpText').innerText(), /total \+4 normal \/ \+6 Mutado/);
+  assert.match(await page.locator('#bossIntentHelpText').innerText(), /mais 2; Mutado, mais 4[\s\S]*Reforçado acrescenta outros 2/);
   assert.equal(await page.evaluate(() => window.fixture.commits()), 3, 'help never selects or commits a target');
   await page.getByRole('button', { name: 'Fechar ajuda', exact: true }).click();
   assert.equal(await page.getByLabel('Passiva de Infectado').getAttribute('aria-expanded'), 'false');

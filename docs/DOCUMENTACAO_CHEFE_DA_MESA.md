@@ -1,5 +1,7 @@
 # DOCUMENTAÇÃO — CHEFE DA MESA
 
+**Auditoria de elegibilidade — 09/10/2026:** uma habilidade pode aparecer mesmo sem solução na mão dos jogadores. Falha mantém a consequência existente. Nemesis remove provas completas de Caçada/Extermínio/Invasão e provas conjuntas de Barragem; cartas marcadas continuam exigindo saída individual legal. Prisão/Laço da Nehelenia preservam jogos reais extensíveis, não solução antecipada. Bloqueios, fases, recursos e lifecycle continuam protegidos. Sorteio evita a última habilidade somente havendo outra elegível. Nenhum peso, HP, valor de recurso ou política estratégica do BOT mudou. Relatório: `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`.
+
 **Polimento visual de 08/10/2026:** Enxerto mostra jogos alimentados numa barra0–2 com as três faixas de consequência, sem lista textual compactada. As cinco Flores usam a PNG `matriarch-lotus.png`, fosca quando apagada e com cor original quando ativa. PASSIVA das filhas mostra +50HP, +25 com Anticoagulante e +0 com Frio, mantendo o destaque de turno e debuffs separados; ADAGA30% permanece no retrato da Lady enquanto houver filha viva vinculada. Nenhuma alteração de resolução, cura, duração ou balanceamento neste polimento.
 
 
@@ -2549,7 +2551,7 @@ A recuperação por canastra segue a régua comum:
 - evoluções sucessivas acrescentam `-4` por novo tier válido.
 
 
-A Prisão no Espelho participa da rotação com peso `2` nas três fases. Só fica elegível quando já existe pressão no Mundo do Espelho e o parceiro possui uma alimentação legal em um jogo existente.
+A Prisão no Espelho participa da rotação com peso `2` nas três fases. Precisa de um jogador já pressionado, um parceiro para resgatá-lo e um jogo existente estruturalmente extensível. Não exige que o parceiro já tenha a carta necessária: ele pode falhar e sofrer a consequência prevista.
 
 
 ## 15.3 Fases
@@ -2845,7 +2847,7 @@ Todos os ataques reutilizam os valores do motor atual, inclusive dano individual
 
 A redução de Infecção é independente do alvo: **Limpa −4, Real −8 e Ás-a-Ás −12 no total por jogo**. Evoluir entre tiers acrescenta apenas a diferença; repetir snapshot/ação não reaplica o alívio. Simples e Suja não aliviam.
 
-Quem causa dano efetivo diretamente ao Nemesis vira **ALVO S.T.A.R.S.**. O marcador persiste entre turnos, rodadas e reload. Dano em zumbi não altera o marcador. Caçada e Extermínio congelam esse alvo no anúncio; se não existir uma rota legal de dano para ele, são inelegíveis, sem trocar silenciosamente pelo parceiro. Antes de existir um S.T.A.R.S., escolhem um cooperador com solução legal. Os demais objetivos mantêm sua seleção atual.
+Quem causa dano efetivo diretamente ao Nemesis vira **ALVO S.T.A.R.S.**. O marcador persiste entre turnos, rodadas e reload. Dano em zumbi não altera o marcador. Caçada e Extermínio congelam esse alvo no anúncio, mesmo sem ataque disponível: a equipe pode falhar. Não trocam silenciosamente pelo parceiro. Antes de existir um S.T.A.R.S., escolhem um cooperador válido com turno restante. Extermínio também exige parceiro e jogo existente extensível, não prova conjunta.
 
 Na entrada da F3, todos os persistentes vivos ficam Mutados. Quem persistir por falha na entrada ou for reanimado na F3 já entra Mutado. Ausentes/repelidos não guardam mutação ativa. Mutação é consequência da fase, não habilidade sorteável.
 
@@ -2871,9 +2873,9 @@ Pesos são relativos às habilidades elegíveis da fase, não percentuais fixos.
 
 ## 16.4 Elegibilidade, BOT e persistência
 
-O adapter constrói uma solução com o validador oficial de sequência, cartas livres, descarte legal restante e condições de Morto/batida antes de persistir o intent. Barragem e Extermínio precisam de solução conjunta, não de duas alternativas incompatíveis. Não sorteia primeiro para tentar remediar um objetivo impossível depois.
+O adapter distingue alvo válido de solução do desafio. Caçada pode falhar sem ataque pronto; Extermínio exige papéis e jogo existentes, sem provar os dois planos. Tentáculo e Barragem exigem cartas com saída individual legal por jogo ou descarte, respeitando bloqueios, topo recém-retirado e Morto/batida. Não garantem que duas saídas sejam realizáveis no mesmo turno. Falhar não cancela o objetivo nem elimina sua punição.
 
-Caçada exige dano novo efetivo (cartas já creditadas sem evolução não bastam). Extermínio prova os dois planos na ordem real dos turnos, preservando o destino existente e os papéis congelados. O Agarrador valida essa solução conjunta no estado após as travas, tentando a quota completa antes de reduzir. Saves com objetivos já anunciados antes do rework (`objectiveVersion` ausente) concluem sob a regra anterior; anúncios novos usam versão 2. Progresso e IDs de dano seguem snapshot/undo/reload sem duplicação.
+Caçada continua exigindo dano novo efetivo para sucesso (cartas já creditadas sem evolução não bastam). Extermínio preserva destino e papéis congelados. O Agarrador continua validando o estado após as travas com o planner: protege soluções que realmente existam, tentando a quota completa antes de reduzir, mas não impede anunciar desafios sem solução. Saves com objetivos já anunciados antes do rework (`objectiveVersion` ausente) concluem sob a regra anterior; anúncios novos usam versão 2. Progresso e IDs seguem snapshot/undo/reload sem duplicação; elegibilidade nova não reconstrói objetivos salvos.
 
 O BOT usa esses planos por papel: prioriza Nemesis para cumprir seu dano direto pendente, o jogo congelado quando é parceiro e jogar a marcada para sucesso completo do Tentáculo. Fora dessas obrigações, mantém a heurística atual dos zumbis. Respeita Agarradas e batida segura; evita retirada contaminada letal e Impacto que leve a 100.
 
@@ -2887,7 +2889,7 @@ Som de ganho: `assets/sfx/ganho-infeccao-nemesis.mp3`, registrado na infraestrut
 
 Revisão de UX/objetivos de 06/10/2026: INVADINDO não mostra HP de combate nem permite seleção. A arte principal do Nemesis seleciona `boss` com as mesmas permissões dos cards; chips e ajuda não trocam o alvo. Chips clicáveis mostram o efeito final: AGARRA 1/2/3, INFECÇÃO +2/+4/+6 e CURA 40/70/100. Normal + Reforçado também é exibido corretamente (2/4/70). MUTADO explica a mudança base; REFORÇADO informa bônus e rodada final inclusiva no popover oficial.
 
-Objetivos são preparados com `findNemesisLegalPlan()`: Tentáculo escolhe duas alternativas realmente jogáveis, com descarte apenas parcial; Barragem preserva três marcas e solução conjunta para duas saídas. Caçada exige dano direto; Extermínio comprova ataque e contribuição do parceiro. Agarrador prioriza jogáveis e completa com outras cartas seguras conforme a quota aprovada. Sem plano viável, a habilidade é inelegível e usa o fallback normal. Pesos e punições completas permanecem; novas consequências parciais estão na tabela.
+Objetivos não precisam de plano viável para ser anunciados. O planner continua no BOT, no Laboratório ao executar sucesso e na proteção das travas do Agarrador, não como prova obrigatória da rotação. Tentáculo distingue jogo/descarte/falha; Barragem mantém três marcas e exigência de duas saídas; Extermínio mantém dano direto e contribuição do parceiro. Sem alvo obrigatório, a habilidade é inelegível; sem solução, pode ser sorteada e falhar. Pesos e consequências completas/parciais permanecem.
 
 Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. Registro histórico da revisão de UX anterior: HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados naquela rodada; somente a expectativa obsoleta da Prisão no Espelho foi ajustada. A revisão posterior de durabilidade desta seção passa o HP do Nemesis a 2200, sem alterar as demais regras.
 

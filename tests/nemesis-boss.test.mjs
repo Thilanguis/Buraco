@@ -319,20 +319,23 @@ for (const [infection, bonus] of [[49, 2], [50, 4], [74, 4], [75, 6], [99, 6]]) 
   });
 }
 
-test('Hunt freezes S.T.A.R.S. and is ineligible when that player has no real attack', () => {
+test('Hunt freezes S.T.A.R.S. even when that player cannot attack now', () => {
   const state = game(); state.boss.starsPlayerId = 1;
   assert.equal(inspectBossAbilityEligibility(state, 'stars_hunt').payload.targetPlayerId, 1);
   state.players[1].hand = [{ id: 'impossible', rank: 'K', suit: '♦' }];
-  assert.equal(inspectBossAbilityEligibility(state, 'stars_hunt').eligible, false);
+  assert.equal(inspectBossAbilityEligibility(state, 'stars_hunt').eligible, true);
 });
 
 for (const id of ['stars_hunt', 'infectious_tentacle', 'tentacle_barrage', 'stars_extermination']) {
-  test(`${id}: impossible objectives are rejected before intent persistence`, () => {
+  test(`${id}: missing physical marks are rejected, impossible damage challenges remain eligible`, () => {
     const phase = id.includes('barrage') || id.includes('extermination') ? 3 : 1;
     const state = game(id, phase); state.players.forEach((player) => { player.hand = [{ id: `alone-${player.id}`, rank: 'K', suit: '♦' }]; });
-    assert.equal(inspectBossAbilityEligibility(state, id).eligible, false);
-    assert.throws(() => selectNextBossIntent(state, { debug: true, forcedAbilityId: id }), /alvo legal/);
-    assert.equal(state.boss.currentIntent, null);
+    const needsMarks = ['infectious_tentacle', 'tentacle_barrage'].includes(id);
+    assert.equal(inspectBossAbilityEligibility(state, id).eligible, !needsMarks);
+    if (needsMarks) {
+      assert.throws(() => selectNextBossIntent(state, { debug: true, forcedAbilityId: id }), /alvo legal/);
+      assert.equal(state.boss.currentIntent, null);
+    } else assert.equal(selectNextBossIntent(state, { debug: true, forcedAbilityId: id }).abilityId, id);
   });
 }
 
@@ -435,7 +438,7 @@ test('impact reaching 100 is immediately fatal even if the same action evolves a
   assert.equal(state.boss.danger, 100); assert.equal(state.boss.hp, hpBefore);
 });
 
-test('Barrage is ineligible when only a discard is legal despite having three cards', () => {
+test('Barrage permits a discard-only hand to fail or make partial progress', () => {
   const state = game('tentacle_barrage', 3);
   state.players.forEach((player) => { player.hand = [
     { id: `a-${player.id}`, rank: '4', suit: '♦' },
@@ -443,7 +446,7 @@ test('Barrage is ineligible when only a discard is legal despite having three ca
     { id: `c-${player.id}`, rank: 'K', suit: '♠' },
   ]; });
   state.teams[0].melds = [];
-  assert.equal(inspectBossAbilityEligibility(state, 'tentacle_barrage').eligible, false);
+  assert.equal(inspectBossAbilityEligibility(state, 'tentacle_barrage').eligible, true);
 });
 
 test('Omega and impact expire by round, and no live zombie makes Horde ineligible', () => {
@@ -597,12 +600,12 @@ for (const phase of [1, 2, 3]) test(`phase ${phase}: persistent ceiling prevents
   if (phase >= 2) assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, true);
 });
 
-test('entry objectives exclude impossible hands without valid contributions', () => {
+test('Infectado entry remains possible without contributions or existing games', () => {
   const state = fresh(); state.teams[0].melds = [];
   state.players.forEach((player) => player.hand = [{ id: `single-${player.id}`, rank: 'K', suit: '♦' }]);
-  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false, 'discardable alone is not a playable objective');
+  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, true);
   entity(state, 'grabber').status = 'corpse'; entity(state, 'grabber').hp = 0;
-  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false);
+  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, true);
 });
 
 test('marked objectives choose actually playable cards; sacrificing one still resolves the mark', () => {
@@ -621,7 +624,7 @@ test('marked objectives choose actually playable cards; sacrificing one still re
     const payload = eligibility.payload;
     const marked = payload.cardIds || [payload.secondCardId];
     assert.ok(marked.every(id => id.startsWith('legal-')), `${abilityId}: useless discard is not a mark`);
-    assert.ok(payload.solution.playedCardIds.length >= (abilityId === 'tentacle_barrage' ? 2 : 1));
+    assert.equal(payload.solution, undefined, 'eligibility does not persist a precomputed success plan');
     queueDebugBossAbility(state, abilityId);
     const intent = activate(state);
     assert.equal(intent.abilityId, abilityId);
@@ -631,22 +634,23 @@ test('marked objectives choose actually playable cards; sacrificing one still re
   }
 });
 
-test('tentacle/barrage/extermination reject a useless hand even when every card can be discarded', () => {
+test('marks accept legal discards; Extermination still requires a real existing game', () => {
   for (const id of ['infectious_tentacle', 'tentacle_barrage', 'stars_extermination']) {
     const state = fresh(); state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3]; state.teams[0].melds = [];
     state.players.forEach((player) => { player.hand = ['4', '8', 'K'].map((rank, index) => ({ id: `${player.id}:${rank}`, rank, suit: ['♠', '♥', '♦'][index] })); });
-    assert.equal(inspectBossAbilityEligibility(state, id).eligible, false);
-    assert.throws(() => selectNextBossIntent(state, { debug: true, forcedAbilityId: id }), /alvo legal/);
-    assert.equal(state.boss.currentIntent, null);
+    const eligible = id !== 'stars_extermination';
+    assert.equal(inspectBossAbilityEligibility(state, id).eligible, eligible);
+    if (eligible) assert.equal(selectNextBossIntent(state, { debug:true, forcedAbilityId:id }).abilityId, id);
+    else assert.throws(() => selectNextBossIntent(state, { debug:true, forcedAbilityId:id }), /alvo legal/);
   }
 });
 
-test('Barrage and Extermination require joint use routes, not one playable card plus one discard', () => {
+test('Barrage and Extermination do not require joint success routes', () => {
   for (const id of ['tentacle_barrage', 'stars_extermination']) {
     const state = fresh(); state.boss.phase = 3;
     state.teams[0].melds = [[{ id: 'm3', rank: '3', suit: '♥' }, { id: 'm4', rank: '4', suit: '♥' }, { id: 'm5', rank: '5', suit: '♥' }]];
     state.players.forEach(player => { player.hand = [{ id: `${player.id}:6`, rank: '6', suit: '♥' }, { id: `${player.id}:Q`, rank: 'Q', suit: '♠' }, { id: `${player.id}:K`, rank: 'K', suit: '♦' }]; });
-    assert.equal(inspectBossAbilityEligibility(state, id).eligible, false);
+    assert.equal(inspectBossAbilityEligibility(state, id).eligible, true);
   }
 });
 
@@ -679,6 +683,7 @@ test('Devorador eligibility requires one legal contribution, not a complete expu
 
 test('Agarrador never marks an illegal last-card discard without Morto or good canastra', () => {
   const state = fresh(); state.deadPiles = []; state.deadChunksTaken = [1]; state.deadChunksMax = [1];
+  dead(state, 'infected'); dead(state, 'devourer');
   state.teams[0].melds = [];
   state.players.forEach((player) => player.hand = [{ id: `last-${player.id}`, rank: 'K', suit: '♠' }]);
   assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false);
@@ -691,10 +696,10 @@ test('Infectado accepts two actual cooperative contributions from different play
   state.players[1].hand = [{ id: 'p1-eight', rank: '8', suit: '♦' }, { id: 'p1-keep', rank: 'K', suit: '♥' }];
   const eligibility = inspectBossAbilityEligibility(state, 'horde_invasion');
   assert.equal(eligibility.eligible, true);
-  assert.deepEqual(eligibility.payload.solution.teamPlans.map((plan) => plan.playerId), [0, 1]);
+  assert.equal(eligibility.payload.solution, undefined);
   state.boss.roundFirstPlayerId = 1;
-  // Eight cannot be played before seven; no impossible round-order objective.
-  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false);
+  // Eight cannot be played before seven; this is difficulty, not an invalid target.
+  assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, true);
 });
 
 for (const kind of ['grabber', 'infected', 'devourer']) test(`BOT plays real legal actions to repel entering ${kind}`, async () => {

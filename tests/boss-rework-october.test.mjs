@@ -5,7 +5,7 @@ import { beginBossTurn, advanceBossTurn, applyBossMeldTransition, completeBossPl
   inspectBossAbilityEligibility, getBossCombatPriorities, notifyBossCardDiscarded,
   notifyBossPurchaseCompleted, classifyBossMeldKind, normalizeBossState, getBossNatureThreats,
   getBossMeldContribution, applyBossFinalStrike, isValidBossSequence, quoteBossPlanDamage } from '../js/boss/boss-engine.js';
-import { getNemesisObjectiveOutcome } from '../js/boss/mechanics/nemesis.js';
+import { getNemesisObjectiveOutcome, nemesisBossMechanics } from '../js/boss/mechanics/nemesis.js';
 import { nemesisBossPresentation } from '../js/boss/presentation/nemesis.js';
 import { matriarchBossPresentation } from '../js/boss/presentation/matriarch.js';
 import { daughterRegenerationHelp } from '../js/boss/ui/dimitrescu-castle-view.js';
@@ -48,7 +48,7 @@ test('Caçada: cartas já creditadas sem evolução não provam dano; BOT escolh
   const s=fixture('nemesis','stars_hunt');s.boss.damagedCardIds=s.players.flatMap(p=>p.hand.map(c=>c.id));
   // Only simple extensions and new triples, with every card already credited.
   s.players.forEach(p=>p.hand=p.hand.slice(0,3));
-  assert.equal(inspectBossAbilityEligibility(s,'stars_hunt').eligible,false);
+  assert.equal(inspectBossAbilityEligibility(s,'stars_hunt').eligible,true,'damage accounting remains strict, but eligibility no longer promises damage');
   const bot=fixture('nemesis','stars_hunt');bot.boss.starsPlayerId=1;bot.currentPlayer=1;
   const p=activate(bot).payload;for(const z of bot.boss.combatEntities)z.status='persistent';
   const event=play(bot,1,getBossCombatPriorities(bot,1).plan.moves[0]);
@@ -78,7 +78,7 @@ for(const phase of [1,2,3])for(const outcome of ['play','discard','none'])test(`
 for(const first of [0,1])for(const stars of [0,1])for(const count of [0,1,2])test(`Extermínio: primeiro ${first}, S.T.A.R.S. ${stars}, ${count} objetivos`,()=>{
   const s=fixture('nemesis','stars_extermination',3);s.currentPlayer=first;s.boss.roundFirstPlayerId=first;s.boss.starsPlayerId=stars;
   const intent=activate(s),p=intent.payload;assert.equal(intent.duration,'full_round');assert.equal(p.targetPlayerId,stars);
-  const plans=p.solution.teamPlans;
+  const plans=nemesisBossMechanics.debugSuccessPlan(s,getBossCombatPriorities).teamPlans;
   for(const id of [first,1-first]) {
     s.currentPlayer=id;
     if(count===2||count===1&&id===stars) {
@@ -116,7 +116,7 @@ test('Extermínio/Agarrador: preservar solução conjunta, sem reservar cegament
   assert.ok(p.partnerContributed);assert.ok(p.directDamage>0);assert.equal(s.boss.danger,0);
 });
 
-test('Extermínio: parceiro primeiro cria a ponte legal do ataque S.T.A.R.S.; ordem inversa é inelegível',()=>{
+test('Extermínio: parceiro primeiro pode criar ponte; ordem inversa continua elegível mesmo sem solução',()=>{
   const s=fixture('nemesis','stars_extermination',3);
   const card=(rank,suit='♠')=>({id:`bridge:${rank}${suit}`,rank,suit});
   s.teams[0].melds=[[card('3'),card('4'),card('5')]];
@@ -124,9 +124,9 @@ test('Extermínio: parceiro primeiro cria a ponte legal do ataque S.T.A.R.S.; or
   s.players[1].hand=[card('7'),card('Q','♥'),card('10','♦')];
   s.currentPlayer=0;s.boss.roundFirstPlayerId=0;s.boss.starsPlayerId=1;
   const quote=inspectBossAbilityEligibility(s,'stars_extermination');assert.equal(quote.eligible,true);
-  assert.deepEqual(quote.payload.solution.teamPlans.map(p=>p.playerId),[0,1]);
+  assert.equal(quote.payload.solution,undefined);
   s.currentPlayer=1;s.boss.roundFirstPlayerId=1;
-  assert.equal(inspectBossAbilityEligibility(s,'stars_extermination').eligible,false);
+  assert.equal(inspectBossAbilityEligibility(s,'stars_extermination').eligible,true);
 });
 
 test('Extermínio: só o parceiro cumpre, base parcial +8 e bônus aplicados uma vez',()=>{

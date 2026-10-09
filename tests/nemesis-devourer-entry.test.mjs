@@ -36,9 +36,9 @@ test('Devorador is eligible with one feedable game, even if three cards are not 
   assert.equal(inspectBossAbilityEligibility(s, 'horde_invasion').eligible, true);
   const p = announce(s); assert.equal(p.entryMeldIds.length, 1); assert.deepEqual(p.devourerCardIds, []);
 });
-test('Devorador is ineligible without any legal existing-game contribution', () => {
+test('Devorador needs a structurally extendable existing game, not a matching card in hand', () => {
   const s = fixture(); s.players[0].hand = [card('no-play', 'K', '♥')];
-  assert.equal(inspectBossAbilityEligibility(s, 'horde_invasion').eligible, false);
+  assert.equal(inspectBossAbilityEligibility(s, 'horde_invasion').eligible, true);
   s.teams[0].melds = []; assert.equal(inspectBossAbilityEligibility(s, 'horde_invasion').eligible, false);
 });
 for (const batches of [[['7','8','9']], [['7'], ['8'], ['9']]]) test(`Three cards in one existing game repel: ${JSON.stringify(batches)}`, () => {

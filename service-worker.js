@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v290';
+const CACHE_NAME = 'buraco-v291';
 const ASSETS = [
   './js/boss/ui/matriarch-bloom-view.js',
   './assets/images/matriarch-lotus.png',

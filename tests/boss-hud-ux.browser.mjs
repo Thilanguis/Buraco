@@ -112,7 +112,7 @@ try {
     if (viewport.width < 1920) await button.tap(); else { await button.focus(); await page.keyboard.press('Enter'); }
     const popover = page.locator('#bossIntentHelpPopover');
     assert.ok(await popover.isVisible());
-    assert.match(await popover.innerText(), /Basta 1 gatilho[\s\S]*70%[\s\S]*40 cartas[\s\S]*1 morto/);
+    assert.match(await popover.innerText(), /70%[\s\S]*40 cartas[\s\S]*1 Morto[\s\S]*Basta uma dessas condições/);
     const box = await popover.boundingBox();
     assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height);
     const anchor = await button.boundingBox();
@@ -121,7 +121,7 @@ try {
     await button.click(); await page.mouse.click(viewport.width - 5, viewport.height - 5);
     assert.equal(await popover.isVisible(), false);
     await page.evaluate(() => window.renderSample('nemesis', .5, 2));
-    await button.click(); assert.match(await popover.innerText(), /35%[\s\S]*18 cartas[\s\S]*2 morto/);
+    await button.click(); assert.match(await popover.innerText(), /35%[\s\S]*18 cartas[\s\S]*2 Mortos?/);
     await page.keyboard.press('Escape');
     await page.evaluate(() => window.renderSample('nemesis', .2, 3));
     assert.doesNotMatch(await page.locator('#bossPhaseProgress').innerText(), /MONTE|MORTO/);
