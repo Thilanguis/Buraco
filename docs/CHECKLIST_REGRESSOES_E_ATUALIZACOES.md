@@ -1,5 +1,13 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+### Inteligência cooperativa do BOT Chefe — 09/10/2026
+
+- [x] Planejador único com informação pública: mão do parceiro e cartas futuras ocultas inclusive BOT+BOT; histórico público curto, reserva de cartas e oportunidade cooperativa conservadora. Lixo usa cotação canônica por destino real, sem veto automático por pilha grande.
+- [x] Compara consequências canônicas em cópias com custo de coringas/limpas; preserva descarte/Mortos e verifica Ataque Final após contribuição. Guarda assíncrona inclui chefe/restrições/recursos/ações e token do Worker. Mecânicas, balanceamento e BOT clássico intactos.
+- [x] Suíte ampla 1204/1204; cenários determinísticos Lixo20/50, Monte30/15/8/0, informação oculta/cancelamento e regressões. Edge com Worker real em 1920/1376/390px e CPU1×/4×/6×; stress de 50 cartas chega a1163ms mobile emulado.
+- [x] Comparação antiga/nova com mesmas sementes e 108IDs, incluindo ganhos e regressões: mais dano/limpas no agregado, mas gasto de Joker maior e uma derrota extra por esgotamento na Matriarca. Método, métricas e comandos em `BOT_COOPERATIVO_CHEFE_2026-10-09.md`.
+- [ ] Playtest humano competente, aparelhos físicos, outros chefes em batalhas completas e dois clientes Firebase reais. Não declarar win rate nem superioridade uniforme com base no parceiro roteirizado/amostra pequena.
+
 ### Polimento HUD — Enxerto, Flores e PASSIVA — 08/10/2026
 
 - [x] Enxerto usa o medidor de faixas compartilhado: jogos alimentados0/1/2, preenchimento0/50/100%, consequência atual e legendas separadas. Sem sequência textual de regras no HUD; save legado respeita sua consequência salva. Nenhuma mudança de resolução.

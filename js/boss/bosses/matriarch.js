@@ -37,9 +37,9 @@ export const matriarchDefinition = Object.freeze({
     ability('graft', 'Enxerto', 3, [2, 3], () => `Alimente os dois jogos ligados nesta rodada: dois evitam tudo; apenas um cura até ${MATRIARCH_GRAFT_PARTIAL_HEAL} HP, sem Flor; nenhum gera +1 Flor e pode propagar uma Raiz.`),
     ability('discard_pollen', 'Polen do Lixo', 3, [2, 3], () => 'Se o topo contaminado for pego, ganho +1 Flor e curo ate 30 HP.'),
     ability('harvest', 'Colheita', 2, [2, 3], () => 'A quantidade de cartas na mao do alvo sera avaliada no fim do turno.'),
-    ability('royal_bloom', 'Florescimento Real', 4, [3], ({ targetCount = 0 }) => `${targetCount} objetivo(s) naturais precisam ser cumpridos separadamente. Falhas desta ativação: máximo +1 Flor no total.`),
+    ability('royal_bloom', 'Florescimento Real', 4, [3], ({ targetCount = 0 }) => `Cumpra os ${targetCount} objetivos marcados. Falhar em um ou mais dá apenas 1 Flor à Matriarca.`),
     ability('emerald_cocoon', 'Casulo Esmeralda', 3, [3], () => 'Um casulo de 180 pontos absorvera o dano ate ser rompido.'),
-    ability('spring_crown', 'Coroa da Primavera', 3, [3], ({ markedThreatName = 'uma ameaca natural' }) => `A Coroa marca ${markedThreatName}; somente a falha dela prepara uma Raiz Fortalecida. A raiz criada pela propagação não inicia outra propagação comum.`),
-    Object.freeze({ id: 'rebirth', name: 'Renascimento', weight: 0, phases: Object.freeze([3]), debugOnly: true, describe: () => 'PASSIVA F3: 0 HP + 1 Flor → volta com 300 HP (1x).' }),
+    ability('spring_crown', 'Coroa da Primavera', 3, [3], ({ markedThreatName = 'uma ameaça' }) => `A Coroa reforça ${markedThreatName}. Se esse objetivo falhar, nasce uma Raiz Fortalecida na próxima rodada. Essa nova Raiz não cria outras.`),
+    Object.freeze({ id: 'rebirth', name: 'Renascimento', weight: 0, phases: Object.freeze([3]), debugOnly: true, describe: () => 'Na fase final, se morrer e tiver pelo menos uma Flor, a Matriarca consome 1 Flor e volta com 300 HP. Só pode renascer uma vez por batalha.' }),
   ]),
 });

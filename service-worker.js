@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v288';
+const CACHE_NAME = 'buraco-v289';
 const ASSETS = [
   './js/boss/ui/matriarch-bloom-view.js',
   './assets/images/matriarch-lotus.png',
@@ -42,6 +42,7 @@ const ASSETS = [
   './js/game/domination-friend.js',
   './js/game/domination-strategy.js',
   './js/game/bot-planner.js',
+  './js/boss/boss-bot-strategy.js',
   './js/game/bot-planner-worker.js',
   './js/game/domination-decree.js',
   './js/game/domination-dev-tools.js',

@@ -184,7 +184,7 @@ test('Devorador counts different existing games and new games', () => {
   s.turnNumber++; add(s, ['new1','new2','new3'], { isNewMeld: true }); assert.equal(s.boss.devourerHealingTotal, 80);
 });
 
-test('real BOT meld execution feeds the same collective hook without forcing a three-card move', async () => {
+test('BOT may defer a small contribution that would heal Devorador more than its damage', async () => {
   const s = feeding(); add(s, ['human-a', 'human-b']);
   s.turnNumber++; s.currentPlayer = 1;
   s.players[1].hand = [card('bot-new', '7', '♥'), card('bot-keep', 'K', '♦')];
@@ -201,7 +201,7 @@ test('real BOT meld execution feeds the same collective hook without forcing a t
       return true;
     }, executeMeldNew: async () => { assert.fail('this hand cannot open a new game'); } };
   await BossBuracoBot.processMelds(1, {}, engine);
-  assert.equal(contributions, 1); assert.equal(s.boss.devourerHealingTotal, 40); assert.equal(feed(s).credits, 0);
+  assert.equal(contributions, 0); assert.equal(s.boss.devourerHealingTotal || 0, 0); assert.equal(feed(s).credits, 2);
 });
 test('Devorador deduplicates cards, existing table/reorganization, replay and reload', () => {
   const s = feeding(); add(s, ['a', 'b']); const restored = JSON.parse(JSON.stringify(s));

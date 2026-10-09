@@ -1,6 +1,7 @@
 // bot.js
 import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './js/game/domination-strategy.js';
-import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint } from './js/game/bot-planner.js';
+import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint, observeBossPublicAction, bossStockOpportunityValue } from './js/game/bot-planner.js';
+import { rankBossMoves, rankBossDiscardPickups, rankBossDiscards, cooperativeBossPriorities, prepareBossStrategyState, canFinishBossAfterMeld } from './js/boss/boss-bot-strategy.js';
 
 export class BossBuracoBot {
   static _turnLocks = new Set();
@@ -50,6 +51,7 @@ export class BossBuracoBot {
         if (!pending) return;
         this._plannerPending.delete(message.requestId);
         pending.cleanup?.();
+        if (message.token !== pending.token) { pending.reject(this.createStalePlanError()); return; }
         if (message.ok) pending.resolve(message.result || []);
         else pending.reject(new Error(message.error || 'Falha no planner do bot.'));
       });
@@ -110,7 +112,7 @@ export class BossBuracoBot {
           signal?.removeEventListener?.('abort', onAbort);
           if (watchdog != null) clearTimeout(watchdog);
         };
-        this._plannerPending.set(requestId, { resolve, reject, cleanup });
+        this._plannerPending.set(requestId, { resolve, reject, cleanup, token });
         signal?.addEventListener?.('abort', onAbort, { once: true });
         // Alguns navegadores móveis já deixaram Workers vivos sem devolver
         // mensagem. Não deixamos um turno inteiro depender indefinidamente disso.
@@ -163,6 +165,7 @@ export class BossBuracoBot {
   }
 
   static async playTurn(stateIgnored, botIndex, engine, options = {}) {
+    observeBossPublicAction(engine.getState());
     const signal = options.signal;
     this.assertActive(engine, signal);
     let state = engine.getState();
@@ -437,6 +440,23 @@ export class BossBuracoBot {
   }
 
   static evaluateDiscard(state, hand, team, engine, ctx) {
+    if (state.mode?.startsWith('boss_') && state.boss) {
+      const choices=rankBossDiscardPickups(state,state.currentPlayer);
+      const stockValue=bossStockOpportunityValue(state,state.currentPlayer);
+      for (const choice of choices) {
+        if (choice.score < stockValue) continue;
+        const used=choice.intent.handIndexes.length;
+        const pending=choice.intent.action==='extend' ? [...team.melds[choice.intent.meldIndex],
+          ...choice.intent.handIndexes.map(i=>hand[i]),state.discard.at(-1)]
+          : [...choice.intent.handIndexes.map(i=>hand[i]),state.discard.at(-1)];
+        // Include only the actual quote's leftovers, never hypothetical draws.
+        const me={...state.players[state.currentPlayer],hand:[...hand,...state.discard.slice(-choice.quote.count)]};
+        if (!this.canMeldSafely(me,team,used+1,engine,pending,{})) continue;
+        if (engine.shouldTakeBossDiscard?.(me.id,choice.intent,engine.getNaturePriorities?.(me.id))===false) continue;
+        return choice.intent;
+      }
+      return false;
+    }
     const pileSize = state.discard.length;
     if (pileSize === 0) return false;
 
@@ -982,7 +1002,7 @@ export class BossBuracoBot {
     if (cardsLeft > 1) return true;
 
     // 🚨 PANIC DUMP: Se a partida vai acabar a qualquer segundo, ignora restrições e desova tudo.
-    if (ctx && ctx.isPanicDump) return true;
+    if (ctx && ctx.isPanicDump && !engine.getState?.()?.mode?.startsWith('boss_')) return true;
 
     // 🛑 TRAVA DE FARMING: Se o bot quer humilhar, ele recusa fazer jogadas que deixem ele com 1 carta (força descarte final) ou 0 cartas (batida direta).
     if (ctx && ctx.isFarming && cardsLeft <= 1) return false;
@@ -990,7 +1010,8 @@ export class BossBuracoBot {
     if (engine.canTeamTakeDeadNow(team.id)) return true;
     const bossState = engine.getState?.();
     const bossMode = !!bossState?.mode?.startsWith('boss_');
-    const safeBossFinish = !bossMode || typeof engine.canSafelyFinishBoss !== 'function' || engine.canSafelyFinishBoss();
+    const safeBossFinish = !bossMode || typeof engine.canSafelyFinishBoss !== 'function' || engine.canSafelyFinishBoss()
+      || (pendingMeld && canFinishBossAfterMeld(bossState,bossState.players.findIndex(p=>p.id===me.id),pendingMeld));
     if (engine.teamHasGoodCanastra(team.id)) return safeBossFinish;
 
     // Se ele for zerar a mão, mas o jogo que ele está montando FORMAR a canastra,
@@ -1007,14 +1028,99 @@ export class BossBuracoBot {
       const myTookMorto = (s.deadChunksTaken[team.id] || 0) > 0;
       if (myTookMorto && engine.teamHasGoodCanastra(team.id)) {
         const partnerAboutToWin = s.players.filter((p) => p.teamId === team.id && p.id !== me.id).some((p) => p.hand.length <= 2);
-        if (partnerAboutToWin) return true;
+        if (partnerAboutToWin && safeBossFinish) return true;
       }
     }
 
     return false;
   }
 
+  static async processCooperativeBossMelds(botIndex,engine,signal) {
+    for (let loop=0;loop<25;loop++) {
+      this.assertActive(engine,signal);
+      const s=engine.getState(), me=s?.players?.[botIndex], team=s?.teams?.[me?.teamId];
+      if (!me || !team || s.finished || s.currentPlayer!==botIndex || engine.shouldSkipMelds?.(me.id)
+        || engine.hasPendingBossChoice?.()) return;
+      prepareBossStrategyState(s);
+      observeBossPublicAction(s);
+      const moves=[], keys=new Set();
+      const blocked=new Set(me.hand.filter(c=>engine.isCardBlocked?.(me.id,c.id,'play')).map(c=>c.id));
+      const add=(meldIndex,cardIds,objective=false,followups=[])=>{
+        const key=String(meldIndex)+':'+cardIds.slice().sort().join(',');
+        if (keys.has(key)) return;
+        const cards=cardIds.map(id=>me.hand.find(c=>c.id===id));
+        if (cards.some(c=>!c || blocked.has(c.id))) return;
+        const base=meldIndex==null?[]:team.melds[meldIndex],after=this.simulateMeld(base,cards,engine);
+        if (!objective && !engine.isValidSequenceMeld(after)) return;
+        if (!this.canMeldSafely(me,team,cards.length,engine,after,{})) return;
+        keys.add(key);moves.push({meldIndex,cardIds,objective,followups});
+      };
+      const publicPriorities=cooperativeBossPriorities(s,botIndex);
+      const combat=publicPriorities.combat?.plan?.moves || [];
+      if (combat.length) add(combat[0].meldIndex,combat[0].cardIds,true,combat.slice(1));
+      const priorities=publicPriorities.other;
+      const marked=new Set(priorities.flatMap(p=>p.markedCardIds || []));
+      const targeted=new Set(priorities.flatMap(p=>p.meldIndexes || []));
+      const token=plannerFingerprint(s,botIndex);
+      let checked=0;
+      for (let m=0;m<team.melds.length;m++) {
+        if (engine.isMeldLocked?.(team.id,m)) continue;
+        for (const card of me.hand) {
+          add(m,[card.id],marked.has(card.id)||targeted.has(m));
+          // Extend clean candidates with other natural cards before ranking.
+          // This builds a canastra in one contribution rather than fragmenting
+          // same-suit runs or consuming a wildcard ahead of natural bridges.
+          let ids=[card.id], base=this.simulateMeld(team.melds[m],[card],engine);
+          if (!engine.isValidSequenceMeld(base) || this.isMeldDirty(base)) continue;
+          for (let pass=0;pass<14;pass++) {
+            const extra=me.hand.find(c=>!ids.includes(c.id) && !c.joker && !blocked.has(c.id)
+              && engine.isValidSequenceMeld(this.simulateMeld(base,[c],engine))
+              && !this.isMeldDirty(this.simulateMeld(base,[c],engine)));
+            if (!extra) break;ids.push(extra.id);base=this.simulateMeld(base,[extra],engine);
+            add(m,ids.slice(),ids.some(id=>marked.has(id))||targeted.has(m));
+          }
+        }
+        // A bridge may require two cards at once; keep this scan bounded.
+        for (let a=0;a<me.hand.length-1 && checked<400;a++) for (let b=a+1;b<me.hand.length && checked<400;b++) {
+          checked++;add(m,[me.hand[a].id,me.hand[b].id]);
+          if (checked%48===0) { await this.cooperativeYield(engine,signal);this.assertPlanCurrent(token,engine,botIndex); }
+        }
+      }
+      if (engine.canCreateMeld?.(me.id)!==false && me.hand.length>=3) {
+        const plan=await this.planTriples(s,botIndex,engine,signal);
+        this.assertPlanCurrent(plan.token,engine,botIndex);
+        // Worker only produces plausible candidates; the engine remains the
+        // authority. Prefer clean, longer runs in the bounded scoring shortlist.
+        for (const indexes of plan.indexes.slice(0,180)) {
+          let cards=indexes.map(i=>me.hand[i]);
+          add(null,cards.map(c=>c.id),cards.some(c=>marked.has(c.id)));
+          let base=this.simulateMeld([],cards,engine);
+          if (!engine.isValidSequenceMeld(base) || this.isMeldDirty(base)) continue;
+          for (let pass=0;pass<11;pass++) {
+            const extra=me.hand.find(c=>!cards.some(o=>o.id===c.id) && !c.joker && !blocked.has(c.id)
+              && engine.isValidSequenceMeld(this.simulateMeld(base,[c],engine))
+              && !this.isMeldDirty(this.simulateMeld(base,[c],engine)));
+            if (!extra) break;cards=[...cards,extra];base=this.simulateMeld(base,[extra],engine);
+            add(null,cards.map(c=>c.id),cards.some(c=>marked.has(c.id)));
+          }
+        }
+      }
+      this.assertActive(engine,signal);this.assertPlanCurrent(token,engine,botIndex);
+      const best=rankBossMoves(s,botIndex,moves).find(p=>p.score>0);
+      if (!best) return;
+      this.assertActive(engine,signal);this.assertPlanCurrent(token,engine,botIndex);
+      const indexes=best.move.cardIds.map(id=>me.hand.findIndex(c=>c.id===id));
+      const ok=best.move.meldIndex==null ? await engine.executeMeldNew(botIndex,indexes)
+        : await engine.executeMeldExtend(botIndex,best.move.meldIndex,indexes);
+      if (ok===false) return;
+      await this.paceBetweenActions(engine,signal);
+    }
+  }
+
   static async processMelds(botIndex, ctx, engine, signal) {
+    if (engine.getState()?.mode?.startsWith('boss_') && engine.getState()?.boss) {
+      return this.processCooperativeBossMelds(botIndex,engine,signal);
+    }
     const perfStartedAt = this.perfNow();
     let plannedCandidates = 0;
     let workerPlans = 0;
@@ -1505,6 +1611,9 @@ export class BossBuracoBot {
   }
 
   static async playImmediateNaturalExtensions(botIndex, ctx, engine, signal) {
+    // The ranked Chefe planner already compares every legal natural extension.
+    // An unconditional second pass would undo its intentional reservations.
+    if (engine.getState()?.mode?.startsWith('boss_') && engine.getState()?.boss) return false;
     let movedAny = false;
     let safety = 0;
 
@@ -1583,6 +1692,17 @@ export class BossBuracoBot {
     }
 
     if (me.hand.length === 0) return typeof engine.recoverBotTurn === 'function' ? engine.recoverBotTurn(botIndex) : false;
+
+    if (state.mode?.startsWith('boss_') && state.boss) {
+      const token=plannerFingerprint(state,botIndex);
+      const choices=rankBossDiscards(state,botIndex);
+      for (const choice of choices) {
+        this.assertActive(engine,signal);this.assertPlanCurrent(token,engine,botIndex);
+        const index=me.hand.findIndex(c=>c.id===choice.cardId);
+        if (index>=0 && await engine.executeDiscard(botIndex,index)!==false) return true;
+      }
+      return false;
+    }
 
     const labDiscardIndex = engine.selectBossLabDiscardIndex?.(me.id, me.hand);
     if (Number.isInteger(labDiscardIndex) && labDiscardIndex >= 0 && labDiscardIndex < me.hand.length) {

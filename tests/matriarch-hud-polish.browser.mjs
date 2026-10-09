@@ -14,7 +14,7 @@ const ranges=source.slice(source.indexOf('function renderBossRangeMeters('),sour
 const fixture=`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${['base-menu','game','cards','hud','responsive','boss-mode','boss/matriarch'].map(n=>`<link rel="stylesheet" href="/styles/${n}.css">`).join('')}
 <body class="boss-mode" data-boss-id="matriarca_esmeralda"><main style="padding:14px">${markup}</main><script type="module">
 import {buildBossDebugScenario} from '/js/boss/boss-debug-scenarios.js';
-import {beginBossTurn,advanceBossTurn,getBossPhaseProgress} from '/js/boss/boss-engine.js';
+import {beginBossTurn,advanceBossTurn,getBossPhaseProgress,selectNextBossIntent} from '/js/boss/boss-engine.js';
 import {buildBossActionPresentation,buildBossAbilityHelp} from '/js/boss/boss-presentation.js';
 import {matriarchBloomFlowersHTML} from '/js/boss/ui/matriarch-bloom-view.js';
 ${help}\n${render}\n${ranges}
@@ -35,6 +35,18 @@ window.sample=(fed,bloom=0)=>{
  const flowers=document.getElementById('bossBloomFlowers');flowers.style.display='flex';flowers.innerHTML=matriarchBloomFlowersHTML({bloom});
  document.getElementById('bossDebtText').textContent=bloom+' / 5';
  renderBossPhaseAndHealth(state,getBossPhaseProgress(state));syncBossIntentHelp(state);
+};
+window.copySample=(bossId,abilityId)=>{
+ closeBossIntentHelp();
+ state=buildBossDebugScenario(null,{bossId,abilityId,phase:'auto',variant:'interactive',target:'auto'}).state;
+ selectNextBossIntent(state,{debug:true});
+ if(abilityId==='rebirth')state.boss.currentIntent={id:'saved-rebirth',abilityId,name:'Renascimento',payload:{},description:'PASSIVA F3: 0 HP + 1 Flor → volta com 300 HP (1x).'};
+ const action=buildBossActionPresentation(state);
+ document.getElementById('bossIntentName').textContent=action.name;
+ document.getElementById('bossIntentDescription').textContent=action.instruction;
+ renderBossRangeMeters(document.getElementById('bossIntentDescription'),action.rangeMeters);
+ syncBossIntentHelp(state);
+ return buildBossAbilityHelp(state).text;
 };window.sample(0);</script>`;
 const server=createServer(async(req,res)=>{try {
  const path=new URL(req.url,'http://localhost').pathname;if(path==='/fixture'){res.setHeader('Content-Type','text/html');return res.end(fixture);}
@@ -56,7 +68,7 @@ try{
   assert.ok(await page.locator('.boss-lotus-flower img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
   const filters=await page.locator('.boss-lotus-flower img').evaluateAll(imgs=>imgs.map(img=>getComputedStyle(img).filter));assert.equal(filters[0],'none');assert.match(filters[2],/grayscale/);
   const button=page.locator('#bossIntentHelpButton');if(width<1920)await button.tap();else await button.click();
-  assert.match(await page.locator('#bossIntentHelpText').innerText(),/Dois jogos.*Só um.*50 HP/s);await page.keyboard.press('Escape');
+  assert.match(await page.locator('#bossIntentHelpText').innerText(),/dois jogos.*só um.*50 HP/is);await page.keyboard.press('Escape');
   await page.waitForTimeout(800);
   const flowerLayout=await page.locator('#bossBloomFlowers').evaluate(el=>({row:el.getBoundingClientRect().toJSON(),flowers:[...el.children].map(f=>f.getBoundingClientRect().toJSON()),phase:document.getElementById('bossPhaseProgress').getBoundingClientRect().toJSON()}));
   assert.ok(flowerLayout.flowers[0].width>=39,'Flowers should be larger than the old 32px icons');
@@ -67,6 +79,15 @@ try{
     nodes:[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(el=>[el.tagName,el.id,el.className,el.getBoundingClientRect().right])}));
   assert.ok(overflow.scroll<=overflow.width,JSON.stringify(overflow));
   await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.boss-lotus-flower img').first().evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
-  assert.deepEqual(errors,[]);console.log('PASS Matriarch '+width+'px: Enxerto fill, PNG states, help, reduced motion, no overflow');await context.close();
+  for(const [bossId,abilityId] of [['banker','fixed_interest'],['dominadora','forced_choice'],['matriarca_esmeralda','rebirth'],['matriarca_esmeralda','spring_crown'],['dimitrescu','three_daughters'],['nehelenia','eternal_nightmare'],['nemesis','omega_outbreak']]){
+   const expected=await page.evaluate(([bossId,abilityId])=>window.copySample(bossId,abilityId),[bossId,abilityId]);
+   if(width<1920)await button.tap();else await button.click();
+   assert.equal(await page.locator('#bossIntentHelpText').innerText(),expected);
+   assert.doesNotMatch(await page.locator('#bossIntentDescription').innerText(),/PASSIVA F3|0 HP \+/);
+   const bounds=await page.locator('#bossIntentHelpPopover').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1);
+   if(abilityId==='rebirth')await page.screenshot({path:resolve(root,'.cache/hud-polish/rebirth-copy-'+width+'.png'),fullPage:true});
+   await page.keyboard.press('Escape');assert.equal(await page.locator('#bossIntentHelpPopover').isVisible(),false);
+  }
+  assert.deepEqual(errors,[]);console.log('PASS Matriarch '+width+'px: Enxerto, PNG, help dos seis chefes e Renascimento, reduced motion, no overflow');await context.close();
  }
 }finally{await browser?.close();await new Promise(done=>server.close(done));}

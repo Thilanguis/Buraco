@@ -5,11 +5,11 @@ export function castleItemHelp(type, boss = {castleItemRulesVersion:2}) {
   const effect = !modern && ['dagger','explosive'].includes(type)
     ? `Causa ${type === 'dagger' ? rules.daggerDamage : rules.explosiveDamage} de dano imediato.`
     : !modern && type === 'cold_flask' ? 'Bloqueia a próxima regeneração.' : type === 'dagger'
-      ? `Vínculo Sangrento: ${rules.daggerTransfer * 100}% do dano dos seus ataques à filha também atinge a vida da Lady, ignorando PROT. e Coágulo. Outra Adaga petrifica mais HP, sem aumentar a porcentagem.`
-      : type === 'explosive' ? `Causa ${rules.explosiveDamage} de dano e hemorragia: ${Math.round(rules.daughterHp * rules.bleedPercent)} HP antes da regeneração nos próximos ${rules.bleedRounds} fins de rodada. Reaplicar renova; não soma sangramentos.` : type === 'relic'
+      ? `Ao atacar esta filha, ${rules.daggerTransfer * 100}% do dano também atinge a vida da Lady, atravessando suas proteções. Outra Adaga não aumenta essa porcentagem.`
+      : type === 'explosive' ? `Causa ${rules.explosiveDamage} de dano agora. Nos próximos ${rules.bleedRounds} finais de rodada, ela perde mais ${Math.round(rules.daughterHp * rules.bleedPercent)} HP antes de regenerar. Outro Explosivo renova a duração, sem dobrar o sangramento.` : type === 'relic'
     ? 'Cancela uma passiva da filha: a desta rodada, se ainda pendente, ou a próxima vez que ela agir.'
     : ITEM_DEFINITIONS[type].special;
-  return `${effect}\nPetrifica ${castleItemHpLoss(boss,type)} HP: essa parte não regenera (mínimo de ${rules.daughterHpFloor} HP recuperáveis).`;
+  return `${effect}\nPetrifica ${castleItemHpLoss(boss,type)} HP: essa parte da vida não pode ser recuperada. A filha mantém um mínimo de ${rules.daughterHpFloor} HP recuperáveis.`;
 }
 
 export function daughterPassiveHelp(d, state) {
@@ -24,7 +24,7 @@ export function daughterPassiveHelp(d, state) {
   if (p?.status === 'suppressed') context = 'Relíquia: passiva suspensa nesta rodada.';
   else if (p?.status === 'success') context = 'Objetivo cumprido nesta rodada: sem punição.';
   else if (p?.status === 'failed' || p?.status === 'triggered') context = '+3 Sede já aplicada nesta rodada.';
-  else if (p?.status === 'idle') context = 'Sem candidato válido nesta rodada: não pune.';
+  else if (p?.status === 'idle') context = 'Não havia como cumprir a tarefa: sem punição nesta rodada.';
   else if (p?.status === 'active') {
     if (d.id === 'bela') {
       const player = state.players.find(player => player.id === p.targetPlayerId);
@@ -160,9 +160,9 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     const name = document.createElement('b'); name.textContent = d.name.toUpperCase(); card.append(name);
     const chips = document.createElement('div'); chips.className = 'boss-combat-chips';
     const debuffs = [
-      d.cold && ['FRIO', boss.castleItemRulesVersion === 2 ? `Bloqueia ${d.coldCharges || 1} regeneração(ões) que recuperariam HP. Vida completa não gasta a carga.` : 'Não regenera no próximo fim de rodada. Depois, o efeito acaba.'],
+      d.cold && ['FRIO', boss.castleItemRulesVersion === 2 ? `Impede as próximas ${d.coldCharges || 1} curas da filha. Se a vida estiver completa, guarda o efeito para quando ela se ferir.` : 'Não regenera no próximo fim de rodada. Depois, o efeito acaba.'],
       d.daggerLink && ['VÍNCULO ' + castleRules(boss).daggerTransfer * 100 + '%', castleItemHelp('dagger',boss)],
-      d.hemorrhage?.remaining && [`HEMORRAGIA · ${d.hemorrhage.remaining}`, `${d.hemorrhage.amount} HP antes da regeneração, por mais ${d.hemorrhage.remaining} fim(ns) de rodada. Não aciona a Adaga.`],
+      d.hemorrhage?.remaining && [`HEMORRAGIA · ${d.hemorrhage.remaining}`, `Perde ${d.hemorrhage.amount} HP antes de regenerar, durante mais ${d.hemorrhage.remaining} ${d.hemorrhage.remaining === 1 ? 'rodada' : 'rodadas'}. Esse sangramento não transfere dano pela Adaga.`],
       d.regeneration === CASTLE_BALANCE.anticoagulantRegeneration && ['ANTICOAGULANTE', `Regenera ${CASTLE_BALANCE.anticoagulantRegeneration} HP por rodada, em vez de ${CASTLE_BALANCE.regeneration}. Dura até ser derrotada; não acumula.`],
       d.relicRound != null && ['RELÍQUIA', d.passive?.status === 'suppressed' ? 'Passiva suspensa nesta rodada. Não bloqueia a regeneração.' : 'Suspende a passiva na próxima oportunidade. Não bloqueia a regeneração.'],
     ];

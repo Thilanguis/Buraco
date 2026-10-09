@@ -156,22 +156,26 @@ export const dominatrixBossPresentation = Object.freeze({
     const payload = intent.payload || {};
     const target = playerName(gameState, payload.targetPlayerId);
     switch (intent.abilityId) {
-      case 'collar': return 'A Coleira prioriza cartas que realmente poderiam ser usadas. As cartas presas não podem ser jogadas nem descartadas até o fim do turno do alvo.';
-      case 'forced_choice': return 'A ordem sempre nasce de uma tarefa viável. Aceitar cobra Dominação menor imediatamente; falhar cobra a punição adicional da fase. Se a mesa tornar a ordem impossível sem culpa do alvo, ela é cancelada.';
+      case 'collar': return 'As cartas com Coleira não podem ser jogadas nem descartadas até o fim do turno do jogador marcado.';
+      case 'forced_choice': {
+        const pressure = dominatrixPressureText(intent.announcedPhase).forcedChoice;
+        return `Recusar aumenta a Dominação em ${pressure.direct}. Aceitar aumenta em ${pressure.obey}: cumpra a ordem até o fim do seu turno para evitar mais ${pressure.fail}. Se a mesa tornar a tarefa impossível sem culpa sua, ela é cancelada.`;
+      }
       case 'exposure': return `Usar a carta exposta ainda causa Dominação +1. Falhar causa +${dominatrixPressureText(intent.announcedPhase).exposure.fail}. A carta precisa entrar em jogo; simplesmente descartá-la não resolve a Exposição.`;
-      case 'forced_swap': return 'A troca prioriza cartas úteis/jogáveis. A carta recebida fica presa durante o próximo turno para a troca realmente alterar o plano dos dois jogadores.';
-      case 'possession': return 'Dano antigo do jogo fica suspenso; cartas novas causam dano normal. Para libertar: cada cooperador adiciona 1 carta OU o jogo evolui de categoria. Só o dano antigo suspenso é reaplicado.';
+      case 'forced_swap': return 'Os jogadores trocam uma carta entre si. A carta recebida não pode ser jogada nem descartada durante o próximo turno de quem a recebeu.';
+      case 'possession': return 'A chefe anula o dano que esse jogo já causou. Para recuperá-lo, cada jogador deve adicionar uma carta ao jogo, ou vocês devem melhorar sua categoria de canastra. Cartas novas continuam causando dano normalmente.';
       case 'hands_tied': return 'Cada cooperador fica vinculado ao primeiro jogo que alimentar ou criar naquela rodada e não pode tocar outro. A equipe inteira ainda compartilha somente 1 criação de jogo novo.';
       case 'separation': return 'Nesta rodada, o primeiro cooperador que alimentar um jogo fica vinculado a ele: o parceiro não pode alimentar esse mesmo jogo. Os outros jogos continuam livres.';
       case 'favorite': return 'Nas Fases 2 e 3, o cooperador menos dominado recebe +8 Dominação. A protegida fica inalterada: ser poupada não recupera Dominação.';
-      case 'double_collar': return 'A Dupla Coleira prioriza 1 carta útil/jogável de cada cooperador. As duas ficam presas durante a rodada.';
+      case 'double_collar': return 'Uma carta de cada jogador fica presa até o fim da rodada. As cartas com Coleira não podem ser jogadas nem descartadas.';
       case 'iron_etiquette': {
         const pressure = dominatrixPressureText(intent.announcedPhase).etiquette;
-        return `O naipe é escolhido entre descartes legais e com poucas opções. Cumprir ainda custa Dominação +${pressure.obey}; falhar custa +${pressure.fail}.`;
+        return `Encerre seu turno descartando ${payload.suitLabel || 'o naipe indicado'}. Obedecer aumenta a Dominação em ${pressure.obey}; descartar outro naipe aumenta em ${pressure.fail}.`;
       }
       case 'absolute_control': return `Neste efeito, ${target} é tratado como Dominado durante o próximo turno: não pode pegar o Lixo nem criar jogo novo, mas pode comprar do Monte e alimentar jogos existentes. Também recebe Dominação +5.`;
-      case 'break_will': return 'Quebra de Vontade só aparece se houver um jogador com 25+ de Dominação e a chefe puder recuperar ao menos 120 HP. Ela mira quem está mais dominado. A escolha é +8 de Dominação ou cura de até 180 HP.';
-      case 'final_order': return 'Escolha às cegas: recusar +7 Dominação; aceitar +2 e revela 2 cartas jogáveis sorteadas. Use-as em jogos. Cada carta não usada: +6. Descartar não cumpre.';
+      case 'break_will': return 'Escolha o preço: aumentar sua Dominação em 8 ou deixar a Dominadora recuperar até 180 HP.';
+      case 'final_order': return 'Recusar aumenta sua Dominação em 7. Aceitar aumenta em 2 e revela duas cartas: jogue-as até o fim do seu turno. Cada carta não usada acrescenta mais 6 de Dominação. Descartar não cumpre a ordem.';
+      case 'interdict': return 'Adicionar cartas continua permitido, mas melhorar a categoria desta canastra exige uma escolha: cancelar essa jogada ou aceitar a Dominação. Se desobedecer, essa evolução não concede Resistência.';
       default: return null;
     }
   },
@@ -232,7 +236,7 @@ export const dominatrixBossPresentation = Object.freeze({
         const required = Math.max(1, Number(current.required) || gameState.players?.length || 2);
         const playerProgress = (gameState.players || []).slice(0, required).map((player) => (contributors.has(player.id) ? `✅ ${player.name}` : `⬜ ${player.name}`));
         const count = Math.min(contributors.size, required);
-        return { category: 'Objetivo ativo', name: 'Posse', speech: '', description: '', details: detailFields([['Jogo', `#${Number(current.meldIndex) + 1}`], ['Dano suspenso', `${current.suppressedDamage || 0}`], ['Progresso', `${count}/${required}`]]), instruction: `O Jogo ${Number(current.meldIndex) + 1} está possuído. Cada cooperador precisa adicionar uma carta, ou o jogo precisa evoluir.`, progress: `${playerProgress.join(' · ')} · ${count}/${required}`, consequence: 'A Posse termina com uma contribuição de cada jogador ou com evolução de tier' };
+        return { category: 'Objetivo ativo', name: 'Posse', speech: '', description: '', details: detailFields([['Jogo', `#${Number(current.meldIndex) + 1}`], ['Dano suspenso', `${current.suppressedDamage || 0}`], ['Progresso', `${count}/${required}`]]), instruction: `Libertem o Jogo ${Number(current.meldIndex) + 1}: cada jogador adiciona uma carta, ou vocês melhoram a categoria da canastra.`, progress: `${playerProgress.join(' · ')} · ${count}/${required}`, consequence: 'Libertar devolve o dano retido' };
       }
       const releaseEvent = boss.lastEvent?.type === 'possessionReleased' ? boss.lastEvent : null;
       if (!releaseEvent) return null;
@@ -269,8 +273,8 @@ export const dominatrixBossPresentation = Object.freeze({
       const entry = currentInterdict || activeInterdict || resolvedInterdict;
       if (!entry) return null;
       const gameNumber = Number(entry.meldIndex) + 1;
-      const base = { category: entry.status === 'active' ? 'Restrição ativa agora' : 'Restrição resolvida', name: 'Interdito', speech: '', description: '', details: detailFields([['Jogo marcado', `#${gameNumber}`], ['Gatilho', 'mudar o tier da canastra'], ['Exemplo', 'Limpa → Real'], ['Prazo', 'fim da rodada']]) };
-      if (entry.status === 'active') return { ...base, instruction: `O Jogo ${gameNumber} está marcado. Apenas a jogada que transformar a canastra em um tier superior ativa a escolha; adicionar cartas e continuar no mesmo tipo não conta.`, progress: '', consequence: 'Obedecer: cancelar só a tentativa · Desobedecer: evoluir e terminar com Dominação; esta evolução não concede Resistência' };
+      const base = { category: entry.status === 'active' ? 'Restrição ativa agora' : 'Restrição resolvida', name: 'Interdito', speech: '', description: '', details: detailFields([['Jogo marcado', `#${gameNumber}`], ['Quando acontece', 'melhorar a categoria da canastra'], ['Exemplo', 'Limpa para Real'], ['Prazo', 'fim da rodada']]) };
+      if (entry.status === 'active') return { ...base, instruction: `Jogo ${gameNumber}: adicionar cartas é permitido. Melhorar a canastra exige uma escolha.`, progress: '', consequence: 'Cancele a jogada ou aceite Dominação, sem Resistência' };
       if (entry.status === 'obeyed') return { ...base, instruction: `✅ O Interdito do Jogo ${gameNumber} foi obedecido.`, progress: 'Evolução cancelada', consequence: 'A canastra não evoluiu e nenhuma Dominação foi aplicada' };
       if (entry.status === 'disobeyed') return { ...base, instruction: `❌ O Interdito do Jogo ${gameNumber} foi desobedecido.`, progress: 'Evolução concluída', consequence: 'Dominação aplicado · Resistência não foi concedida nesta evolução' };
       if (entry.status === 'expired') return { ...base, instruction: `O Interdito do Jogo ${gameNumber} expirou sem tentativa de evolução.`, progress: 'Expirou sem ativar', consequence: 'Dominação não aumentou' };

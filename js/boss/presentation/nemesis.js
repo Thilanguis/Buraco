@@ -11,12 +11,12 @@ function hordeCommandPresentation(boss, intent) {
   const expiresRound = active ? boss.hordeBuff.expiresRound : boss.roundNumber + 1;
   const effect = getNemesisZombieEffect(active ? boss : { ...boss, hordeBuff: { entityId: entity.id, expiresRound } }, entity);
   const instruction = `${entity.name}${active ? ' reforçado' : ': reforço'} até fim da rodada ${expiresRound}.`;
-  const consequence = entity.id === 'grabber' ? `Após compra: até ${effect.value} cartas presas.`
+  const consequence = entity.id === 'grabber' ? `Após compra: prende ${effect.value} cartas.`
     : entity.id === 'infected' ? `Falha: +${effect.value} Infecção extra.`
       : `A cada 3 cartas da equipe: cura até ${effect.value} HP.`;
-  const rule = entity.id === 'grabber' ? 'Após comprar do Monte ou Lixo, prioriza cartas jogáveis e completa com outras seguras da mão. Só prende menos por falta de cartas ou proteção necessária. Impede jogo, não descarte, até o fim do turno. Preserva uma solução dos objetivos.'
+  const rule = entity.id === 'grabber' ? 'Após cada compra do Monte ou Lixo, bloqueia cartas até o fim daquele turno: não pode jogar, mas pode descartar. Prefere jogáveis; reduz a quantidade só se faltarem cartas ou para manter um objetivo possível.'
     : entity.id === 'infected' ? 'Uma falha que já aumenta Infecção recebe esse adicional uma vez. Falhar na Invasão não gera esse bônus.'
-      : 'Soma cartas novas entre jogos, jogadores e turnos. Máximo 1 cura por turno; créditos excedentes ficam pendentes. Morte zera o contador. Sem ultrapassar o HP máximo.';
+      : 'Cada 3 cartas novas que a equipe adiciona aos jogos curam o Nemesis. Pode juntar contribuições de jogos, jogadores e turnos diferentes. Cura uma vez por turno; cartas extras ficam para a próxima cura. Derrotar o Devorador zera essa contagem.';
   return { instruction, consequence, help: `${instruction}\n${consequence}\n${rule}\nSó ${entity.name} recebe este reforço.` };
 }
 function compact({ gameState, intent, helpers = {} }) {
@@ -39,7 +39,7 @@ function compact({ gameState, intent, helpers = {} }) {
     rocket_launcher: `Jogo ${payload.meldIndex + 1}: +${payload.infectionCost} Infecção por carta nova.`,
     parasite_regeneration: 'Cura de 100 HP em um zumbi vivo e ferido.',
     viral_reanimation: 'Um cadáver retorna com 50% do HP.',
-    omega_outbreak: 'Falhas futuras recebem +2/+4/+6 Infecção.',
+    omega_outbreak: 'O Surto aumenta a Infecção causada por falhas.',
   }[intent.abilityId] || 'Efeito do Nemesis ativo.';
   const progress = intent.abilityId === 'horde_invasion' ? `${gameState.boss.combatEntities.find((entity) => entity.id === payload.entityId)?.name || ''} · ${payload.entryKind === 'grabber' ? `${payload.exitedCardIds.length}/1 saída` : payload.entryKind === 'infected' ? `${payload.contributionCardIds.length}/2 cartas` : `${(payload.devourerCardIds || []).length}/3 cartas`}`
     : intent.abilityId === 'infectious_tentacle' && current ? payload.playedMarkedCardIds?.length ? 'Marcada jogada · completo' : payload.exitedCardIds?.length ? 'Marcada descartada · parcial' : 'Nenhuma marcada resolvida'
@@ -55,7 +55,7 @@ function compact({ gameState, intent, helpers = {} }) {
     viral_reanimation: 'Retorna com 50% do HP',
     rocket_launcher: `Cada carta: +${payload.infectionCost || 0} Infecção`,
     contaminated_zone: 'Lixo: +6 Infecção por retirada',
-    omega_outbreak: 'Falhas: +2/+4/+6 conforme Infecção',
+    omega_outbreak: 'Quanto maior a Infecção, pior a punição',
   }[intent.abilityId] || (offensiveIds.has(intent.abilityId) ? `Falha: +${getNemesisObjectiveOutcome(gameState.boss, intent).applied} Infecção` : '');
   return { instruction, progress: names ? `${names}\n${progress}` : progress, consequence };
 }
@@ -97,18 +97,18 @@ export const nemesisBossPresentation = Object.freeze({
     const labels = [...(payload.cardIds || []), payload.secondCardId].filter(Boolean).map((id) => helpers.cardLabelAnywhere?.(gameState, id) || id).join(' · ');
     if (intent.abilityId === 'horde_invasion') {
       const goal = payload.entryKind === 'grabber' ? `${target}: jogue ou descarte a carta marcada neste turno.` : payload.entryKind === 'infected' ? 'Equipe: adicione 2 cartas legais aos jogos nesta rodada.' : 'Alimente jogos existentes com 3 cartas nesta rodada. Pode ser no mesmo jogo, por um jogador ou pelos dois. Só cartas novas nos jogos que existiam no início; reorganizar não conta.';
-      return `${goal}\nSucesso: expulsa o zumbi. Falha: ele fica ATIVO com HP cheio, sem Infecção extra.\nINVADINDO: sem dano/passiva. Repelido não é cadáver e pode voltar. Teto: 1/2/3 ativos nas fases 1/2/3.`;
+      return `${goal}\nCumpra o objetivo para expulsar o zumbi. Se falhar, ele entra na mesa com vida cheia, sem aumentar a Infecção. Enquanto invade, não pode ser atacado nem usa sua passiva. Um zumbi expulso pode tentar invadir novamente.`;
     }
     const goal = {
       stars_hunt: current ? `${target}: cause qualquer dano positivo à vida do Nemesis até o fim do seu turno. Selecione Nemesis como alvo; dano em zumbis não conta. Este alvo S.T.A.R.S. fica fixo até a resolução.` : `${target}: adicione 1 carta legal a um jogo neste turno. Descarte não vale.`,
-      infectious_tentacle: current ? `${target}: jogue 1 das 2 marcadas neste turno para evitar toda a punição. Só descartar uma custa +${payload.partialFailure} Infecção; não resolver nenhuma custa +${payload.failure}. Bônus ativos são somados uma vez aos custos.` : `${target}: jogue ou descarte 1 das 2 marcadas neste turno.`,
+      infectious_tentacle: current ? `${target}: jogue uma das duas cartas marcadas até o fim do turno para evitar a punição. Se apenas descartar uma, a punição será menor. Deixar as duas na mão custa mais Infecção. A barra mostra os valores com os efeitos ativos.` : `${target}: jogue ou descarte uma das duas cartas marcadas neste turno.`,
       tentacle_barrage: `${target}: jogue ou descarte 2 das 3 marcadas neste turno.`,
       stars_extermination: current ? `Até o fim da rodada: ${target} causa dano direto ao Nemesis; ${partner} adiciona uma carta legal ao Jogo ${payload.partnerMeldIndex + 1}, que já existia no anúncio. Os papéis não mudam. Ambos: sem punição; só um: +8; nenhum: +16 Infecção, mais os bônus ativos uma vez. Zumbis e descarte não cumprem esses objetivos.` : `${target}: adicione 1 carta a um jogo E jogue/descarte a segunda marcada neste turno.`,
       contaminated_zone: `${target}: cada retirada legal do Lixo custa +6 Infecção neste turno. Agarrador continua valendo.`,
       rocket_launcher: `Cada carta nova adicionada à Zona de Impacto custa +${payload.infectionCost || (gameState.boss.phase === 3 ? 12 : 10)} Infecção nesta rodada. Jogar várias juntas soma os custos. Não bloqueia o jogo.`,
       parasite_regeneration: 'Cura 100 HP do zumbi vivo com menor percentual de HP. Não ultrapassa o HP máximo.',
-      viral_reanimation: 'Um cadáver volta com 50% do HP; na fase 3, Mutado. Uma vez por fase, respeitando o teto de ativos. Repelidos não voltam por esta habilidade.',
-      omega_outbreak: 'Até o fim da próxima rodada: falhas recebem +2/+4/+6 com Infecção <50/50–74/75+. Ativar não aumenta Infecção.',
+      viral_reanimation: 'Um zumbi derrotado volta com metade da vida; na fase final, volta Mutado. Acontece uma vez por fase, e cada zumbi só pode reviver uma vez na batalha. Zumbis expulsos não são revividos.',
+      omega_outbreak: 'Até o fim da próxima rodada, cada falha causa Infecção extra: 2 se a barra estiver abaixo de 50, 4 entre 50 e 74, ou 6 a partir de 75. O Surto não aumenta a barra ao ser anunciado.',
     }[intent.abilityId] || intent.description;
     let composition = '';
     if (offensiveIds.has(intent.abilityId)) {

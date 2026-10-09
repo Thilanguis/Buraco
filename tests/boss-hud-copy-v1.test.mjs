@@ -5,7 +5,7 @@ import { buildBossDebugScenario, getBossDebugCatalog } from '../js/boss/boss-deb
 import { buildBossActionPresentation, buildBossAbilityHelp } from '../js/boss/boss-presentation.js';
 import { selectNextBossIntent } from '../js/boss/boss-engine.js';
 
-const MANUAL_ONLY = new Set(['rebirth', 'mirror_prison']);
+const MANUAL_ONLY = new Set(['mirror_prison']);
 
 function preparedPresentation(bossId, abilityId) {
   const prepared = buildBossDebugScenario(null, { bossId, abilityId, phase: 'auto', variant: 'interactive', target: 'auto' });

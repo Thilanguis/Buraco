@@ -188,7 +188,7 @@ test('Enxerto parcial respeita teto de cura/HP e preserva saves antigos já anun
   }
   const s=fixture('matriarca_esmeralda','graft',2);activate(s);
   const t=s.boss.natureThreats.find(t=>t.type==='graft');delete t.partialHeal;t.fedMeldIds=[t.meldIds[0]];
-  assert.match(matriarchBossPresentation.help({gameState:s,intent:s.boss.currentIntent}),/Só um: \+1 Flor, sem cura/);
+  assert.match(matriarchBossPresentation.help({gameState:s,intent:s.boss.currentIntent}),/Se alimentar só um: \+1 Flor, sem cura/);
   normalizeBossState(s);end(s,0);end(s,1);assert.equal(t.bloomApplied,1,'saved v1 objective resolves once under its announced rule');
 });
 
@@ -199,7 +199,7 @@ test('Enxerto antigo anunciado antes da aplicação conserva regra e ajuda após
   assert.equal(s.boss.currentIntent.payload.partialHeal,50);
   delete s.boss.currentIntent.payload.partialHeal;
   const restored=restoreBossDebugSnapshot(createBossDebugSnapshot(s));
-  assert.match(matriarchBossPresentation.help({gameState:restored,intent:restored.boss.currentIntent}),/Só um: \+1 Flor, sem cura/);
+  assert.match(matriarchBossPresentation.help({gameState:restored,intent:restored.boss.currentIntent}),/Se alimentar só um: \+1 Flor, sem cura/);
   for(let i=0;i<20&&restored.boss.bossFlow.stage!=='players';i++)advanceBossTurn(restored,restored.boss.bossFlow.endsAt+1);
   const t=restored.boss.natureThreats.find(t=>t.type==='graft');assert.equal(t.partialHeal,undefined);
   t.fedMeldIds=[t.meldIds[0]];end(restored,0);end(restored,1);assert.equal(t.bloomApplied,1);

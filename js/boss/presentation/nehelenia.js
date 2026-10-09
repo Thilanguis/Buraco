@@ -113,7 +113,7 @@ export const neheleniaBossPresentation = Object.freeze({
   feminine: true,
   ruleSummary(gameState) {
     const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 5));
-    return `100/100 = derrota · cada novo tier de canastra reduz 4 no Mundo do Espelho.`;
+    return 'Ao chegar a 100 no Mundo do Espelho, a equipe perde. Cada evolução de canastra reduz esse valor em 4.';
   },
   speech(abilityId, context = {}) {
     const target = dialogueTarget(context);
@@ -177,16 +177,16 @@ export const neheleniaBossPresentation = Object.freeze({
     const payload = intent.payload || {};
     const target = playerName(gameState, payload.targetPlayerId);
     switch (intent.abilityId) {
-      case 'mirrored_meld': return `${target}: use exatamente 1 carta legal no jogo espelhado e escolha o reflexo verdadeiro. Errar/ignorar: +18 Mundo do Espelho; carta ao fundo do Monte. Desorientado: só pode descartar, sem novas baixadas neste turno. Presa Marcada anterior volta após resolver o espelho.`;
-      case 'follow_reflection': return `${playerName(gameState, payload.secondPlayerId)}: termine o turno baixando o mesmo TOTAL de cartas que ${playerName(gameState, payload.firstPlayerId)}; zero também conta. Compara só no fim, sem bloquear jogadas antes. Diferença: +16 Mundo do Espelho.`;
-      case 'discard_mirror': return 'Os dois reflexos do topo do Lixo são visualmente idênticos e não existe pista escondida: a escolha é realmente 50/50. Errar acrescenta 16 ao Mundo do Espelho e sela o Lixo durante a rodada.';
-      case 'mirror_prison': return 'A Prisão só entra na rotação quando existe pressão no Mundo do Espelho e o parceiro possui uma jogada legal em um jogo existente. Nehelenia prioriza prender quem estiver com mais pressão. Libertar não reduz o recurso; falhar acrescenta +8/+10/+12 conforme a fase.';
-      case 'eternal_nightmare': return 'Primeiro a carta ORIGINAL aparece sozinha. Depois surgem dois reflexos, o rótulo some e os três se embaralham. Nenhum deles recebe pista de verdadeiro ou falso: é preciso acompanhar visualmente a posição da original. Errar acrescenta 24 ao Mundo do Espelho.';
-      case 'tiger_link': return 'Tiger liga dois jogos e cada lado precisa receber ao menos 1 carta. Se algum lado ficar sem alimentação, o Mundo do Espelho sobe 12 e as garras permanecem no lado ignorado até um turno futuro. A carta usada para romper essas garras não causa o dano individual normal.';
+      case 'mirrored_meld': return `${target}: jogue uma carta no reflexo verdadeiro. Errar ou ignorar acrescenta 18 ao Mundo do Espelho. Ao errar, sua carta vai ao fundo do Monte e você fica Desorientado: só pode descartar neste turno. Se havia uma Presa Marcada, ela continua depois do espelho.`;
+      case 'follow_reflection': return `${playerName(gameState, payload.secondPlayerId)} precisa terminar o turno tendo jogado tantas cartas quanto ${playerName(gameState, payload.firstPlayerId)}. Se o primeiro não jogar nenhuma, o segundo também não deve jogar. Quantidades diferentes acrescentam 16 ao Mundo do Espelho.`;
+      case 'discard_mirror': return 'Escolha um dos dois reflexos do Lixo. Eles são iguais: não há pista para distinguir o verdadeiro. Errar acrescenta 16 ao Mundo do Espelho e fecha o Lixo até o fim da rodada.';
+      case 'mirror_prison': return `${playerName(gameState, payload.rescuerPlayerId)}: adicione uma carta ao Jogo ${Number(payload.meldIndex) + 1} até o fim da rodada para libertar ${playerName(gameState, payload.trappedPlayerId)}. Se falhar, o Mundo do Espelho aumenta ${Math.max(0, Number(payload.failureMirrorPoints) || 8)}. Libertar evita a punição, mas não reduz a barra.`;
+      case 'eternal_nightmare': return 'Memorize a carta original e acompanhe sua posição enquanto as três cartas se misturam. Depois, toque nela. Escolher um reflexo falso acrescenta 24 ao Mundo do Espelho.';
+      case 'tiger_link': return 'Adicione uma carta a cada jogo ligado nesta rodada. Se faltar em algum, o Mundo do Espelho aumenta 12 e as garras ficam nesse jogo. Depois, adicionar uma carta rompe as garras, mas essa carta não causa seu dano individual.';
       case 'tiger_prey': return `A Presa prende somente ${target}. Até esse jogador alimentar o jogo marcado, ele não pode alimentar outro jogo existente. O parceiro continua livre e a Presa atravessa rodadas até ser resolvida. Jogo Espelhado tem precedência temporária, mas não apaga a Presa.`;
       case 'hawk_suit': return `Se ${target} descartar outro naipe, Hawk passa a vigiar exatamente a carta descartada. Enquanto ela continuar no topo do Lixo, ninguém pode recolher a pilha. Um novo descarte tira a carta vigiada do topo e encerra o bloqueio.`;
       case 'hawk_watch': return `Vigilância vale somente para ${target} e somente sobre o jogo marcado durante esse turno. O parceiro e os outros jogos continuam livres.`;
-      case 'fish_marked_card': return 'Se a carta marcada continuar na mão no fim do prazo, ela vira Reflexo Morto: continua na mão, não pode entrar em jogo e só é libertada quando for descartada.';
+      case 'fish_marked_card': return 'Jogue ou descarte a carta marcada até o fim do seu turno. Se ficar na mão, vira Reflexo Morto: não pode mais ser jogada e só sai pelo descarte.';
       case 'fish_inverted': return `A restrição fica somente em ${target}: antes de abrir jogo novo, esse jogador precisa alimentar um jogo existente. Se não resolver neste turno, o efeito continua nos próximos turnos até ser cumprido.`;
       default: return null;
     }

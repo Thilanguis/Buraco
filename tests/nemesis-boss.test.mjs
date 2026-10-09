@@ -373,15 +373,16 @@ test('BOT chooses its actual damage target through the real engine and avoids le
   assert.equal(entity(state, 'infected').status, 'corpse'); assert.equal(state.boss.hp, 2200);
 });
 
-test('BOT priority plans and discard execute legal marked exits for Tentacle', async () => {
+test('BOT uses a legal marked Tentacle exit when full failure would be lethal', async () => {
   const state = game('infectious_tentacle', 1, 'bot', 'bot'); activate(state);
+  state.boss.danger = 91;
   const priorities = getBossCombatPriorities(state, 1); assert.equal(priorities.active, true);
   let discarded;
   const engine = { getState: () => state, isActive: () => true, isCardBlocked: (player, id, action) => isBossCardBlocked(state, player, id, action),
     isValidSequenceMeld: () => false, getCombatPriorities: (id) => getBossCombatPriorities(state, id),
     executeDiscard: async (_index, handIndex) => { discarded = state.players[1].hand.splice(handIndex, 1)[0]; state.discard.push(discarded); notifyBossCardDiscarded(state, 1, discarded); completeBossPlayerTurn(state, 1); state.currentPlayer = 0; return true; } };
   await BossBuracoBot.processDiscard(1, 1, engine);
-  assert.ok(priorities.markedCardIds.includes(discarded.id)); assert.equal(state.boss.danger, 6, 'discard-only partial: base 4 + Infectado 2');
+  assert.ok(priorities.markedCardIds.includes(discarded.id)); assert.equal(state.boss.danger, 97, 'discard-only partial: base 4 + Infectado 2; full failure would reach 100');
 });
 
 test('reload, snapshot and actual undo preserve all combat fields and duplicate-event guards', () => {
@@ -465,7 +466,7 @@ test('BOT executes a real contribution then legal discard to solve S.T.A.R.S. Hu
   let contributions = 0;
   const engine = { getState: () => state, isActive: () => true, getCombatPriorities: (id) => getBossCombatPriorities(state, id),
     canTeamTakeDeadNow: () => true, teamHasGoodCanastra: () => false, canCreateMeld: () => false,
-    isCardBlocked: (id, cardId, action) => isBossCardBlocked(state, id, cardId, action), isValidSequenceMeld: () => false,
+    isCardBlocked: (id, cardId, action) => isBossCardBlocked(state, id, cardId, action), isValidSequenceMeld: isValidBossSequence,
     paceBetweenActions: async () => {},
     executeMeldExtend: async (_index, meldIndex, indexes) => {
       const cards = indexes.map((index) => bot.hand[index]);
@@ -706,7 +707,7 @@ for (const kind of ['grabber', 'infected', 'devourer']) test(`BOT plays real leg
   const engine = {
     getState: () => state, isActive: () => true, getCombatPriorities: (id) => getBossCombatPriorities(state, id),
     canTeamTakeDeadNow: () => true, teamHasGoodCanastra: () => false, canCreateMeld: () => false,
-    isCardBlocked: (id, cardId, action) => isBossCardBlocked(state, id, cardId, action), isValidSequenceMeld: () => false,
+    isCardBlocked: (id, cardId, action) => isBossCardBlocked(state, id, cardId, action), isValidSequenceMeld: isValidBossSequence,
     paceBetweenActions: async () => {},
     executeMeldExtend: async (playerIndex, meldIndex, indexes) => {
       const player = state.players[playerIndex]; const cards = indexes.map((index) => player.hand[index]);
@@ -763,9 +764,9 @@ test('new combat HUD is empty, entering is contextual, help contains exact passi
   entity(state, 'grabber').status = 'persistent'; state.boss.hordeBuff = { entityId: 'grabber', expiresRound: 9, sourceIntentId: 'buff' };
   model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
   assert.equal(model.entities[0].stateLabel, 'DEBUFF REFORÇADO');
-  assert.match(model.entities[0].help, /Normal: 1; Mutado: 2; Reforçado: 2; ambos: 3/);
-  assert.match(model.entities[0].help, /Prioriza jogáveis e completa com outras seguras/);
-  assert.match(model.entities[0].help, /Só prende menos por falta de cartas ou para preservar uma solução obrigatória/);
+  assert.match(model.entities[0].help, /Prende 1 carta; Mutado ou Reforçado prende 2; com ambos, 3/);
+  assert.match(model.entities[0].help, /Prefere cartas jogáveis e completa com outras da mão/);
+  assert.match(model.entities[0].help, /Só prende menos se faltarem cartas ou para manter um objetivo possível/);
   assert.deepEqual(model.choices.map((entry) => entry.id), ['boss']);
   dead(state, 'grabber'); model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
   assert.equal(model.entities[0].stateLabel, 'CADÁVER'); assert.equal(model.entities[0].selectable, false);

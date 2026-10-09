@@ -5840,13 +5840,13 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   hungry_root: 'Alimente o jogo marcado. Falha = +1 Flor e pode criar nova Raiz.',
   restorative_dew: 'Baixe cartas novas para reduzir a cura. Com 6+, a cura zera.',
   twin_vines: 'Alimente todos os jogos marcados. Uma ou duas falhas: +1 Flor no total.',
-  graft: 'Alimente os 2 jogos ligados. Falha parcial ou total: +1 Flor.',
+  graft: 'Alimente os dois jogos ligados para evitar o efeito. Só um alimentado permite uma cura; nenhum dá uma Flor à Matriarca.',
   discard_pollen: 'Não recolha a carta contaminada do Lixo. Se pegar: +1 Flor e cura.',
   harvest: 'Termine o turno com até 7 cartas. Mãos maiores fortalecem a Matriarca.',
-  royal_bloom: 'Vários objetivos ao mesmo tempo. Falhas desta ativação: máximo +1 Flor.',
-  emerald_cocoon: '180 de proteção. Canastra Limpa+ rompe; o restante pode virar cura.',
+  royal_bloom: 'Cumpra todos os objetivos marcados. Falhar em um ou mais dá apenas uma Flor à Matriarca.',
+  emerald_cocoon: 'Absorve 180 de dano. Uma canastra Limpa ou melhor o rompe; proteção restante pode virar cura.',
   spring_crown: 'A Coroa marca uma ameaça. Se ela falhar, nasce uma Raiz Fortalecida.',
-  rebirth: 'Fase 3: ao cair a 0 HP, gasta 1 Flor e volta com 300 HP. Uma vez.',
+  rebirth: 'Na fase final, se morrer e tiver pelo menos uma Flor, consome 1 Flor e volta com 300 HP. Só pode renascer uma vez por batalha.',
 
   // Lady Dimitrescu.
   bela_hunt: 'Use a carta caçada no turno. Sucesso evita punição; falha aumenta Sede.',
@@ -5864,7 +5864,7 @@ const BOSS_GUIDE_OVERRIDES = Object.freeze({
   mirrored_meld: 'Use 1 carta e escolha o jogo verdadeiro. Errar = +18 no Mundo do Espelho e Desorientado.',
   follow_reflection: 'O 1º define a quantidade; o 2º precisa igualar. Falha = +16 no Mundo do Espelho.',
   discard_mirror: 'Escolha entre 2 reflexos do Lixo. Errar = +16 no Mundo do Espelho e sela o Lixo.',
-  mirror_prison: 'Liberte o parceiro alimentando o jogo indicado. Sucesso: sem penalidade. Falha: +8/+10/+12 no Mundo do Espelho.',
+  mirror_prison: 'Alimente o jogo indicado até o fim da rodada para libertar o parceiro. Se falhar, o Mundo do Espelho aumenta.',
   eternal_nightmare: 'Memorize a original e siga-a no embaralhamento. Errar = +24 no Mundo do Espelho.',
   tiger_link: 'Alimente os 2 jogos ligados. Falha = +12 no Mundo do Espelho e garras persistentes.',
   tiger_prey: 'O alvo deve alimentar o jogo marcado antes dos outros jogos existentes.',
@@ -7407,8 +7407,8 @@ function renderBossPhaseAndHealth(gameState, progress) {
         document.getElementById('bossPhaseHelpSlot').append(button);
       }
       button._phaseHelpText = progress.final
-        ? 'Fase final: não há outra transição. Monte e Morto mostram os recursos atuais da mesa.'
-        : `Basta 1 gatilho para liberar a Fase ${progress.nextPhase}:\n• HP do chefe em ${progress.hp.targetPercent}% ou menos.\n• Monte com ${progress.stock.target} cartas ou menos.\n• ${progress.dead.target} morto(s) retirado(s).\n\nA barra acompanha o HP até o próximo marco. A transição segue o fluxo da batalha; não exige cumprir todos os gatilhos.`;
+        ? 'Esta é a fase final: o chefe não mudará de fase novamente.'
+        : `O chefe passa para a Fase ${progress.nextPhase} quando uma destas condições acontecer:\n• Sua vida chegar a ${progress.hp.targetPercent}% ou menos.\n• O Monte ficar com ${progress.stock.target} cartas ou menos.\n• A equipe retirar ${progress.dead.target} ${progress.dead.target === 1 ? 'Morto' : 'Mortos'}.\n\nBasta uma dessas condições. A barra acompanha a vida do chefe até o próximo marco.`;
       const popover = document.getElementById('bossIntentHelpPopover');
       if (!popover?.hidden && popover?._extraTrigger === button) {
         document.getElementById('bossIntentHelpText').textContent = button._phaseHelpText;

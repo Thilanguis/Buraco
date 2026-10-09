@@ -43,9 +43,9 @@ export const nemesisDefinition = Object.freeze({
     ability('horde_command', 'Comando da Horda', 3, [1, 2, 3], 'full_round', () => 'Reforça 1 zumbi até o fim da próxima rodada: Agarrador +1 carta; Infectado +2 por falha; Devorador +30 HP de cura.'),
     ability('rocket_launcher', 'Lança-Foguetes', 4, [2, 3], 'full_round', ({ phase }) => `Alimentar a Zona de Impacto é permitido e custa +${phase === 3 ? 12 : 10} Infecção por carta nova nesta rodada.`),
     ability('parasite_regeneration', 'Regeneração Parasita', 2, [2, 3], 'immediate', () => 'Cura 100 HP do zumbi vivo com menor percentual de HP, sem superar seu máximo.'),
-    ability('viral_reanimation', 'Reanimação Viral', 2, [2, 3], 'immediate', () => 'Reanima 1 cadáver com 50% do HP. Cada zumbi só pode reviver uma vez na partida; no máximo 1 Reanimação por fase. Na F3, volta Mutado.'),
+    ability('viral_reanimation', 'Reanimação Viral', 2, [2, 3], 'immediate', () => 'Um zumbi derrotado volta com metade da vida; na fase final, volta Mutado. Cada zumbi só pode reviver uma vez na batalha, e só há uma Reanimação por fase.'),
     ability('tentacle_barrage', 'Barragem de Tentáculos', 4, [3], 'target_turn', () => 'Faça 2 das 3 cartas marcadas sair legalmente da mão neste turno. Falha: +16 Infecção, mais modificadores.'),
-    ability('stars_extermination', 'Extermínio S.T.A.R.S.', 4, [3], 'full_round', () => 'Nesta rodada, S.T.A.R.S. causa dano direto ao Nemesis e o parceiro alimenta o jogo escolhido. Dois/um/nenhum objetivos: +0/+8/+16 Infecção, mais modificadores de falha.'),
-    ability('omega_outbreak', 'Surto Ômega', 3, [3], 'full_round', () => 'Até o fim da próxima rodada, falhas reais recebem +2/+4/+6 com Infecção abaixo de 50/50–74/75–99. Ativar não aumenta Infecção.'),
+    ability('stars_extermination', 'Extermínio S.T.A.R.S.', 4, [3], 'full_round', () => 'Nesta rodada, S.T.A.R.S. deve atacar o Nemesis e o parceiro deve alimentar o jogo escolhido. Cumprir ambos evita a punição; cumprir só um custa 8 Infecção; nenhum custa 16. Efeitos ativos podem aumentar esses custos.'),
+    ability('omega_outbreak', 'Surto Ômega', 3, [3], 'full_round', () => 'Até o fim da próxima rodada, as falhas causam Infecção extra: 2 abaixo de 50, 4 entre 50 e 74, ou 6 a partir de 75. Anunciar o Surto não aumenta a barra.'),
   ],
 });

@@ -296,6 +296,7 @@ export const matriarchBossPresentation = Object.freeze({
     const target = playerName(gameState, payload.targetPlayerId);
     const card = cardLabel(gameState, payload.targetPlayerId, payload.cardId);
     switch (intent.abilityId) {
+      case 'rebirth': return { instruction: 'Se morrer, consome 1 Flor e volta com 300 HP.', progress: '', consequence: 'Uma vez por batalha, na fase final' };
       case 'living_seed': return { instruction: `${target}: use ${card}.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falha: +1 Flor' };
       case 'hungry_root': return { instruction: `Alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falha: +1 Flor' };
       case 'restorative_dew': {
@@ -311,8 +312,8 @@ export const matriarchBossPresentation = Object.freeze({
         const contaminatedCard = cardLabelAnywhere(gameState, threat?.discardCardId || payload.discardCardId);
         return { instruction: `☣️ Não recolha ${contaminatedCard}.`, progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Se vier: +1 Flor · cura até 30 HP' };
       }
-      case 'harvest': return { instruction: `${target}: termine com até 7 cartas.`, progress: '', consequence: 'Mais cartas = efeito pior' };
-      case 'royal_bloom': return { instruction: 'Cumpra cada objetivo marcado.', progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Falhas: máximo +1 Flor nesta ativação' };
+      case 'harvest': return { instruction: `${target}: termine com até 7 cartas.`, progress: '', consequence: 'Mão maior permite cura e Flores' };
+      case 'royal_bloom': return { instruction: 'Cumpra cada objetivo marcado.', progress: compactNatureProgress(gameState, intent, helpers), consequence: 'Uma ou mais falhas: apenas +1 Flor' };
       case 'emerald_cocoon': {
         const boss = gameState?.boss;
         const cocoon = boss?.emeraldCocoon;
@@ -326,7 +327,7 @@ export const matriarchBossPresentation = Object.freeze({
         const wasBroken = cocoon?.status === 'broken' || Boolean(breakEvent);
         const absorbed = Math.max(0, amount - (cocoon?.remaining ?? (wasBroken ? 0 : amount)));
         const progress = wasBroken ? '💥 Casulo rompido · proteção encerrada' : cocoon?.status === 'expired' ? `— Casulo encerrado · ${absorbed} de dano absorvido` : cocoon?.status === 'active' ? `Proteção ativa · ${cocoon.remaining}/${amount}` : '— Casulo encerrado';
-        return { instruction: 'Dano comum vai para o Casulo.', progress, consequence: wasBroken ? 'Proteção encerrada' : 'Canastra Limpa+ rompe' };
+        return { instruction: 'O Casulo absorve seus ataques.', progress, consequence: wasBroken ? 'Proteção encerrada' : 'Canastra Limpa ou melhor rompe' };
       }
       case 'spring_crown': {
         const crown = gameState?.boss?.springCrown;
@@ -378,29 +379,30 @@ export const matriarchBossPresentation = Object.freeze({
     if (!intent) return null;
     const helpers = helpersFor(context);
     switch (intent.abilityId) {
+      case 'rebirth': return 'Na fase final, a Matriarca pode renascer uma vez. Se morrer e tiver pelo menos uma Flor, consome 1 Flor e volta com 300 HP. Sem Flores, não renasce.';
       case 'living_seed':
         return 'A carta marcada precisa entrar legalmente em um jogo antes do fim do próximo turno do alvo. Se isso não acontecer, a Semente floresce e acrescenta 1 Flor. Descartar a carta não cumpre o objetivo.';
       case 'hungry_root':
-        return 'Adicione 1 carta legal ao jogo nesta rodada. Falha: +1 Flor e pode nascer outra Raiz na próxima rodada. A Raiz propagada não se propaga de novo.';
+        return 'Adicione uma carta ao jogo marcado até o fim da rodada. Se falhar, ela ganha 1 Flor e pode criar outra Raiz na rodada seguinte. Essa nova Raiz não cria outras.';
       case 'restorative_dew':
         return 'Cada carta nova colocada legalmente na mesa reduz a cura prevista do Orvalho por faixas. O medidor mostra a faixa atual; com 6 ou mais cartas novas, a cura cai a zero.';
       case 'twin_vines':
-        return 'Os jogos marcados são objetivos separados: cada um precisa receber ao menos 1 carta legal nesta rodada. Uma ou duas raízes sem alimentação geram +1 Flor no total nesta ativação. Falha dupla ainda pode propagar uma Raiz.';
+        return 'Adicione uma carta a cada jogo marcado nesta rodada. Se faltar em um ou nos dois, ela ganha apenas 1 Flor. Se faltar nos dois, também pode nascer outra Raiz.';
       case 'graft':
-        return `Dois jogos alimentados evitam tudo. Só um: ${graftPartialHelp(gameState, intent)}, sem propagação comum. Nenhum: +1 Flor e pode propagar uma Raiz. A cura respeita os limites da rodada e de HP. A Coroa, se estiver ligada ao Enxerto, mantém sua reação própria à falha.`;
+        return `Adicione cartas aos dois jogos ligados para evitar o efeito. Se alimentar só um: ${graftPartialHelp(gameState, intent)}. Se não alimentar nenhum, ela ganha 1 Flor e pode criar outra Raiz. Se houver uma Coroa neste Enxerto, também cumpra o objetivo dela.`;
       case 'discard_pollen':
-        return 'A carta contaminada é o topo atual do Lixo. Se alguém recolher esse topo enquanto o Pólen estiver ativo, a Matriarca ganha 1 Flor e cura; comprar do Monte ou deixar o topo passar evita o gatilho.';
+        return 'Não pegue o topo contaminado do Lixo. Se alguém pegar, a Matriarca ganha 1 Flor e recupera até 30 HP. Comprar do Monte evita esse efeito.';
       case 'harvest':
         return 'A Colheita olha a quantidade de cartas na mão do alvo no fim do turno. 0–7 não gera efeito; 8–10 cura 50 HP; 11 ou mais acrescenta 1 Flor e cura 80 HP.';
       case 'royal_bloom':
-        return 'Florescimento Real combina vários objetivos naturais, mas cada um é resolvido separadamente. Uma ou várias falhas geram no máximo +1 Flor nesta ativação. Cumprir todos evita a punição; raízes falhas ainda podem propagar.';
+        return 'Cumpra todos os objetivos marcados. Se falhar em um ou mais, ela ganha apenas 1 Flor. Uma Raiz não alimentada também pode criar outra Raiz na próxima rodada.';
       case 'emerald_cocoon':
-        return 'Casulo absorve 180 de dano; o excesso atinge o HP. Limpa ou superior rompe imediatamente. Se sobreviver à rodada, metade da proteção restante vira cura.';
+        return 'O Casulo absorve 180 de dano; o excesso atinge a vida. Uma canastra Limpa, Real ou Ás-a-Ás o rompe imediatamente. Se sobrar proteção no fim da rodada, metade vira cura.';
       case 'spring_crown': {
         const threat = springCrownMarkedThreat(gameState);
         const name = crownThreatName(gameState);
         const objective = crownThreatObjective(gameState, threat, helpers);
-        return `Coroa: ${name}. Faça: ${objective}. Falha: Raiz Fortalecida na próxima rodada; cada cooperador precisa contribuir. Essa Raiz não se propaga de novo.`;
+        return `A Coroa reforçou ${name}: ${objective}. Se esse objetivo falhar, nasce uma Raiz Fortalecida na próxima rodada. Os dois jogadores precisam alimentá-la. Essa Raiz não cria outras.`;
       }
       default:
         return null;

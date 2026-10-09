@@ -219,21 +219,21 @@ export const bankerBossPresentation = Object.freeze({
     if (!intent) return null;
     switch (intent.abilityId) {
       case 'fixed_interest':
-        return 'Integral: paga toda a Dívida agora. Cofre: paga menos, mas prende 1 carta; resgatá-la substitui a compra normal. Adiar comprando do Monte: resgate +2/turno nas Fases 1–2, +3 na Fase 3. No teto integral, resgate obrigatório.';
+        return `Integral: paga toda a Dívida agora. Cofre: paga menos, mas prende 1 carta; resgatá-la substitui a compra normal. Cada compra do Monte adia o resgate e o encarece em ${intent.payload?.interestStep ?? (Number(intent.announcedPhase) === 3 ? 3 : 2)}. Ao chegar ao valor integral, resgatar é obrigatório.`;
       case 'maintenance_fee':
-        return 'FINANCIADA é a carta extra criada pela Tarifa. Ela só quita a cobrança se entrar legalmente em um jogo naquele turno. Descartá-la ou terminar o turno ainda com ela na mão gera a cobrança uma única vez.';
+        return 'Você recebe cartas extras marcadas como FINANCIADAS. Jogue-as até o fim do seu turno para evitar a cobrança. Se descartar uma ou deixá-la na mão, paga a Dívida indicada por essa carta.';
       case 'credit_block':
         return 'Enquanto o Bloqueio de Crédito estiver ativo, ninguém pode recolher o Lixo. A compra normal do Monte continua disponível e o bloqueio termina quando a rodada vira.';
       case 'suit_audit':
-        return 'Equipe: baixe o total indicado do naipe sorteado nesta rodada. Coringas e cartas repetidas não contam. Falha: cobra a Dívida indicada uma única vez. Sucesso: sem cobrança.';
+        return 'Joguem a quantidade indicada de cartas do naipe sorteado até o fim da rodada. Coringas não contam, e cada carta só conta uma vez. Cumprir evita a cobrança; faltar cartas custa a Dívida indicada.';
       case 'pledge':
         return 'O jogo marcado fica penhorado temporariamente: ele não pode receber cartas enquanto a Penhora estiver ativa. A restrição termina na próxima cobrança do Banqueiro.';
       case 'compound_interest':
         return 'Juros Compostos olha o total das duas mãos no fechamento da rodada. A cobrança usa a faixa mostrada no medidor; reduzir as mãos antes do fechamento pode diminuir a Dívida aplicada.';
       case 'credit_limit':
-        return 'A franquia é compartilhada pela equipe e conta somente cartas que vieram da mão e permaneceram legalmente na mesa. Cartas trazidas pelo Lixo, reorganização e cartas que já estavam em jogo não entram na conta. Só o excedente gera Dívida, até o teto mostrado.';
+        return 'A equipe divide um limite de cartas da mão que pode jogar sem cobrança. Cada carta acima dele aumenta a Dívida, até o máximo mostrado. Cartas vindas do Lixo e reorganizar cartas já na mesa não gastam esse limite.';
       case 'discard_surcharge':
-        return 'O Ágio cobra somente a primeira retirada válida do Lixo naquela rodada. Comprar do Monte evita a cobrança; tentativa cancelada, retirada inválida ou uma segunda retirada não cobram de novo.';
+        return 'A primeira compra do Lixo nesta rodada aumenta a Dívida. As próximas não cobram novamente. Comprar do Monte evita esse custo.';
       default:
         return null;
     }
@@ -264,8 +264,8 @@ export const bankerBossPresentation = Object.freeze({
     }
     return {
       category: 'Escolha obrigatoria agora', name: 'Garantia do Cofre', speech: '', description: '',
-      details: detailFields([['Titular', target], ['Compatibilidade', 'etapa antiga de escolha manual da carta'], ['Resgate', 'substitui uma compra e cobra a Dívida acumulada']]),
-      instruction: `${target}: concluindo uma garantia salva na versão anterior.`,
+      details: detailFields([['Titular', target], ['Resgate', 'substitui sua compra e cobra a Dívida acumulada']]),
+      instruction: `${target}: escolha a carta que ficará no Cofre.`,
       progress: 'A carta escolhida ficará no Cofre',
       consequence: `O resgate começa em +${choice.collateralAmount} Dívida`,
     };

@@ -126,5 +126,82 @@ export function plannerFingerprint(state, botIndex) {
     discard.at?.(-1)?.id || '',
     ids(player?.hand),
     melds,
+    ...(state?.mode?.startsWith('boss_') ? [JSON.stringify({
+      boss: state.boss, action: state.lastAction?.id, finished: state.finished,
+      dead: (state.deadPiles || []).map(p => p?.length || 0), taken: state.deadChunksTaken,
+      hands: (state.players || []).map(p => p.hand?.length || 0),
+    })] : []),
   ].join('|');
+}
+
+// Public-information boundary: neither partner identities nor future draws are
+// copied. Hand counts are public; a bot partner gets no special permission.
+const bossPublicHistory = new WeakMap();
+export function observeBossPublicAction(state) {
+  const a=state?.lastAction;
+  if (!state?.mode?.startsWith('boss_') || !['meldNew','meldExtend','discard'].includes(a?.type)) return;
+  const entry={id:a.id || JSON.stringify([a.type,a.playerId,(a.cards || [a.card]).map(c=>c?.id)]),
+    type:a.type,playerId:a.playerId,cards:(a.cards || (a.card?[a.card]:[])).map(c=>({id:c.id,rank:c.rank,suit:c.suit,joker:c.joker}))};
+  const history=bossPublicHistory.get(state) || [];
+  if (history.some(e=>e.id===entry.id)) return;
+  bossPublicHistory.set(state,[...history.slice(-15),entry]);
+}
+export function bossObservableState(state, botIndex) {
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const hidden = (cards, prefix) => Array.from({length: cards?.length || 0}, (_, i) => ({id: `${prefix}:${i}`}));
+  const result = {};
+  for (const key of ['mode', 'variant', 'currentPlayer', 'turnNumber', 'hasDrawnThisTurn', 'partialDraw',
+    'pickedDiscardCardId', 'deadChunksTaken', 'deadChunksMax', 'finished', 'boss']) {
+    if (state[key] !== undefined) result[key] = clone(state[key]);
+  }
+  result.players = (state.players || []).map((p, i) => ({id:p.id, teamId:p.teamId, name:p.name,
+    ...(i === botIndex ? {isBot:!!p.isBot} : {}),
+    hand:i === botIndex ? clone(p.hand || []) : hidden(p.hand, `hidden:${p.id}`)}));
+  result.teams = clone(state.teams || []);
+  result.discard = clone(state.discard || []);
+  result.stock = hidden(state.stock, 'stock');
+  result.deadPiles = (state.deadPiles || []).map((p, i) => hidden(p, `dead:${i}`));
+  if (['meldNew','meldExtend','discard'].includes(state.lastAction?.type)) {
+    const a=state.lastAction;
+    result.lastAction=clone({type:a.type,playerId:a.playerId,meldIndex:a.meldIndex,cards:a.cards,card:a.card});
+  }
+  result.publicActions=clone(bossPublicHistory.get(state) || state.publicActions || []);
+  return result;
+}
+
+// Cheap, bounded two-turn potential. This ranks options, NEVER validates a meld.
+export function cooperativeHandValue(hand, melds = []) {
+  const orders = [RANK_LOW, RANK_HIGH];
+  let value = 0;
+  for (const card of hand || []) {
+    if (card.joker || card.forceWild || (isTwo(card) && !card.forceNatural)) { value += 28; continue; }
+    const neighbours = (hand || []).filter(c => c.id !== card.id && !c.joker && c.suit === card.suit
+      && orders.some(order => Math.abs(order.indexOf(rankOf(c)) - order.indexOf(rankOf(card))) === 1));
+    value += Math.min(2, neighbours.length) * 7;
+    for (const meld of melds) {
+      if (meld.some(c => c.joker || c.forceWild) || meld.length >= 14) continue;
+      if (meld.some(c => c.suit === card.suit && orders.some(order =>
+        Math.abs(order.indexOf(rankOf(c)) - order.indexOf(rankOf(card))) === 1))) {
+        value += meld.length >= 5 ? 18 : 8; break;
+      }
+    }
+  }
+  return value;
+}
+
+export function bossStockOpportunityValue(state,botIndex) {
+  if (!state.stock?.length) return -Infinity;
+  const p=state.players[botIndex],melds=state.teams[p.teamId].melds;
+  const known=[...p.hand,...state.discard,...state.teams.flatMap(t=>t.melds.flat())];
+  const base=cooperativeHandValue(p.hand,melds);
+  let total=0,count=0;
+  for (const suit of ['♠','♥','♦','♣']) for (const rank of RANK_LOW) {
+    const copies=Math.max(0,2-known.filter(c=>!c.joker&&c.suit===suit&&String(c.rank)===rank).length);
+    const potential=cooperativeHandValue([...p.hand,{id:'possible',rank,suit}],melds)-base;
+    total+=copies*potential;count+=copies;
+  }
+  const jokers=Math.max(0,4-known.filter(c=>c.joker).length);total+=jokers*28;count+=jokers;
+  // Unknown cards are not promised to be in the Monte: use the public unseen
+  // pool as an expectation, never actual stock/partner identities.
+  return Math.max(3,Math.min(18,2*total/Math.max(1,count)));
 }

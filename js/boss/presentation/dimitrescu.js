@@ -55,7 +55,7 @@ export const dimitrescuBossPresentation = Object.freeze({
   feminine: true,
   ruleSummary(gameState) {
     const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 100));
-    return `${limit} de Sede = derrota · Limpa/Real/Ás-a-Ás: −4/−8/−12 Sede.`;
+    return `A equipe perde ao chegar a ${limit} de Sede. Canastra Limpa reduz 4, Real reduz 8 e Ás-a-Ás reduz 12.`;
   },
   speech(abilityId, context = {}) {
     const target = dialogueTarget(context);
@@ -165,7 +165,7 @@ export const dimitrescuBossPresentation = Object.freeze({
         return { instruction: 'Quebre o Coágulo.', progress: clot?.status === 'active' ? `🩸 ${remaining}/${maximum}` : 'Preparado', consequence: 'Falha: 50% restante vira cura' };
       }
       case 'castle_lockdown': return { instruction: '🔒 Lixo fechado.', progress: '', consequence: 'Use o Monte' };
-      case 'three_daughters': return { instruction: 'Todas as filhas vivas usam suas passivas.', progress: multiProgress((gameState.boss.combatEntities || []).filter(d => d.passive?.round === gameState.boss.roundNumber && ['active', 'success', 'failed', 'triggered'].includes(d.passive.status)).map(d => ({ type:d.id, status:d.passive.status }))), consequence: '+3 Sede por falha/reação' };
+      case 'three_daughters': return { instruction: 'Todas as filhas vivas usam suas passivas.', progress: multiProgress((gameState.boss.combatEntities || []).filter(d => d.passive?.round === gameState.boss.roundNumber && ['active', 'success', 'failed', 'triggered'].includes(d.passive.status)).map(d => ({ type:d.id, status:d.passive.status }))), consequence: 'Cada passiva pode acrescentar 3 Sede' };
       case 'impure_blood': return { instruction: 'Primeiro coringa de cada jogador: +3 Sede.', progress: `${(payload.triggeredPlayerIds || []).length}/2 ativaram`, consequence: '2 natural não conta · máximo +6 Sede' };
       default: return null;
     }
@@ -217,7 +217,7 @@ export const dimitrescuBossPresentation = Object.freeze({
       case 'castle_lockdown':
         return 'O Lixo fica fechado até o fim desta rodada. Compre do Monte normalmente.';
       case 'three_daughters': {
-        return 'Todas as filhas vivas agem nesta rodada:\nBela: jogue a carta marcada no turno do alvo.\nCassandra: adicione cartas ao jogo marcado até o fim da rodada.\nCada falha: +3 Sede. Sem carta/jogo válido, não pune.\nDaniela: primeira retirada do Lixo causa +3 Sede.';
+        return 'Todas as filhas vivas agem nesta rodada.\nBela: jogue a carta marcada no turno do alvo.\nCassandra: alimente o jogo marcado até o fim da rodada.\nFalhar custa 3 Sede. Sem carta ou jogo possível, não há punição.\nDaniela: a primeira compra do Lixo acrescenta 3 Sede.';
       }
       case 'impure_blood': return 'Nesta rodada, seu primeiro Joker ou 2 como coringa causa +3 Sede.\nSó uma vez por jogador: máximo +6 para a equipe, sem bônus de Fúria.\nO 2 natural não ativa.';
       default:

@@ -67,8 +67,8 @@ test('regra permanente do HUD fica isolada por chefe', () => {
   assert.equal(buildBossRuleSummary('banker', { boss: { maxDanger: 100 } }), '100 de Dívida = derrota imediata.');
   assert.match(buildBossRuleSummary('dominadora', { boss: {} }), /37,5 fica Sob Controle.*50 fica Dominado/);
   assert.match(buildBossRuleSummary('matriarca_esmeralda', { boss: { maxDanger: 5 } }), /5 Flores = derrota/);
-  assert.match(buildBossRuleSummary('dimitrescu', { boss: { maxDanger: 100 } }), /Limpa\/Real\/Ás-a-Ás: −4\/−8\/−12 Sede/);
-  assert.match(buildBossRuleSummary('nehelenia', { boss: { maxDanger: 5 } }), /100\/100 = derrota.*novo tier de canastra reduz 4/);
+  assert.match(buildBossRuleSummary('dimitrescu', { boss: { maxDanger: 100 } }), /100 de Sede.*Limpa reduz 4, Real reduz 8 e Ás-a-Ás reduz 12/);
+  assert.match(buildBossRuleSummary('nehelenia', { boss: { maxDanger: 5 } }), /100 no Mundo do Espelho.*equipe perde.*evolução de canastra reduz esse valor em 4/);
   assert.equal(buildBossRuleSummary('inexistente', { boss: {} }), '');
 });
 
