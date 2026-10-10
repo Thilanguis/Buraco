@@ -20,6 +20,7 @@ import { buildBossDebugScenario, executeBossDebugScenarioVariant, simulateBossDe
 const game = (ability = 'stars_hunt', phase = 1, variant = 'interactive', target = 'auto') => {
   const state = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: ability, phase, variant, target }).state;
   if (!['horde_invasion', 'viral_reanimation'].includes(ability) && variant !== 'no_target') for (const entry of state.boss.combatEntities) if (entry.status === 'absent') entry.status = 'persistent';
+  state.boss.grabberPursuit = {version:1,playerIds:[0,1]};
   return state;
 };
 function activate(state) {
@@ -210,17 +211,17 @@ test('Regeneration selects lowest percentage, caps HP, and excludes corpses/full
   assert.equal(inspectBossAbilityEligibility(state, 'parasite_regeneration').eligible, false);
 });
 
-test('Devorador heals once per turn, caps boss HP, mutation/buff stack, death removes passive', () => {
+test('Devorador heals for every three contributions, caps boss HP, mutation/buff stack, death removes passive', () => {
   const state = game(); state.boss.hp = 2000;
   const cards = [1, 2, 3].map((id) => ({ id: `dev-${id}`, rank: '3' }));
-  hit(state, { cards, targetId: 'grabber' }); assert.equal(state.boss.hp, 2040);
+  hit(state, { cards, targetId: 'grabber' }); assert.equal(state.boss.hp, 2020);
   hit(state, { cards: cards.map((card) => ({ ...card, id: `${card.id}-2` })), targetId: 'grabber' }); assert.equal(state.boss.hp, 2040);
   state.turnNumber++; state.boss.phase = 3; normalizeBossState(state);
   state.boss.hordeBuff = { entityId: 'devourer', expiresRound: 9 };
-  hit(state, { cards: cards.map((card) => ({ ...card, id: `${card.id}-3` })), targetId: 'infected' }); assert.equal(state.boss.hp, 2140);
+  hit(state, { cards: cards.map((card) => ({ ...card, id: `${card.id}-3` })), targetId: 'infected' }); assert.equal(state.boss.hp, 2090);
   dead(state, 'devourer'); state.turnNumber++;
-  hit(state, { cards: cards.map((card) => ({ ...card, id: `${card.id}-4` })), targetId: 'infected' }); assert.equal(state.boss.hp, 2140);
-  assert.equal(state.boss.devourerHealingTotal, 140);
+  hit(state, { cards: cards.map((card) => ({ ...card, id: `${card.id}-4` })), targetId: 'infected' }); assert.equal(state.boss.hp, 2090);
+  assert.equal(state.boss.devourerHealingTotal, 90);
 });
 
 test('Horde buffs normal/mutated passives and expires after the next round, through reload', () => {
@@ -230,6 +231,7 @@ test('Horde buffs normal/mutated passives and expires after the next round, thro
   nemesisBossMechanics.afterRoundAdvance({ boss: state.boss });
   assert.ok(state.boss.hordeBuff, 'command remains active through the final round, inclusive');
   state.boss.hordeBuff.entityId = 'grabber';
+  state.boss.grabberPursuit = {version:1,playerIds:state.boss.roundNumber % 2 ? [0,1] : [1,0]};
   state.hasDrawnThisTurn = true; notifyBossPurchaseCompleted(state, 0);
   assert.equal(state.boss.grabbedByPlayer[0].cardIds.length, 3);
   const restored = simulateBossDebugReload(state); assert.deepEqual(restored.boss.hordeBuff, state.boss.hordeBuff);
@@ -608,7 +610,7 @@ test('Infectado entry remains possible without contributions or existing games',
   assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, true);
 });
 
-test('marked objectives choose actually playable cards; sacrificing one still resolves the mark', () => {
+test('marked objectives randomly choose legal exits; discarding one still resolves the mark', () => {
   for (const abilityId of ['infectious_tentacle', 'tentacle_barrage', 'horde_invasion']) {
     const state = fresh(); state.boss.phase = 3; state.boss.phaseTransitions = [1, 2, 3];
     if (abilityId === 'horde_invasion') { dead(state, 'infected'); dead(state, 'devourer'); }
@@ -623,7 +625,7 @@ test('marked objectives choose actually playable cards; sacrificing one still re
     assert.equal(eligibility.eligible, true, abilityId);
     const payload = eligibility.payload;
     const marked = payload.cardIds || [payload.secondCardId];
-    assert.ok(marked.every(id => id.startsWith('legal-')), `${abilityId}: useless discard is not a mark`);
+    assert.ok(marked.every(id => state.players[0].hand.some(c => c.id === id)), `${abilityId}: individually legal discards are candidates too`);
     assert.equal(payload.solution, undefined, 'eligibility does not persist a precomputed success plan');
     queueDebugBossAbility(state, abilityId);
     const intent = activate(state);
@@ -656,20 +658,20 @@ test('Barrage and Extermination do not require joint success routes', () => {
 
 test('zombie chips show final passive amounts and specific mutation/command duration help', () => {
   const state = fresh(); state.boss.roundNumber = 4;
-  for (const [id, labels] of [['grabber', ['AGARRA 1', 'AGARRA 2', 'AGARRA 3']], ['infected', ['INFECÇÃO +2', 'INFECÇÃO +4', 'INFECÇÃO +6']], ['devourer', ['CURA 40', 'CURA 70', 'CURA 100']]]) {
+  for (const [id, labels] of [['grabber', ['AGARRA 1', 'AGARRA 2', 'AGARRA 3']], ['infected', ['INFECÇÃO +2', 'INFECÇÃO +4', 'INFECÇÃO +6']], ['devourer', ['CURA 20', 'CURA 35', 'CURA 50']]]) {
     const zombie = entity(state, id); zombie.status = 'persistent';
     for (let stage = 0; stage < 3; stage++) {
       zombie.mutated = stage >= 1;
       state.boss.hordeBuff = stage === 2 ? { entityId: id, expiresRound: 5 } : null;
       const model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id);
-      assert.equal(model.chips.at(-1).label, labels[stage]);
+      assert.equal(model.chips.find(chip => /^(AGARRA|INFECÇÃO|CURA) /.test(chip.label)).label, labels[stage]);
       if (stage === 2) assert.match(model.chips.find(chip => chip.label === 'REFORÇADO').text, /fim da rodada 5, inclusive/);
     }
     state.boss.roundNumber = 6;
-    assert.equal(nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id).chips.at(-1).label, labels[1]);
+    assert.equal(nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id).chips.find(chip => /^(AGARRA|INFECÇÃO|CURA) /.test(chip.label)).label, labels[1]);
     state.boss.roundNumber = 4;
     zombie.mutated = false;
-    assert.equal(nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id).chips.at(-1).label, labels[1], 'normal + reforço has the same total as mutation alone');
+    assert.equal(nemesisBossUi.combatHud({ gameState: state, playerId: 0 }).entities.find(entry => entry.id === id).chips.find(chip => /^(AGARRA|INFECÇÃO|CURA) /.test(chip.label)).label, labels[1], 'normal + reforço has the same total as mutation alone');
   }
 });
 
@@ -769,9 +771,9 @@ test('new combat HUD is empty, entering is contextual, help contains exact passi
   entity(state, 'grabber').status = 'persistent'; state.boss.hordeBuff = { entityId: 'grabber', expiresRound: 9, sourceIntentId: 'buff' };
   model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
   assert.equal(model.entities[0].stateLabel, 'DEBUFF REFORÇADO');
-  assert.match(model.entities[0].help, /Prende 1 carta; Mutado ou Reforçado prende 2; com ambos, 3/);
-  assert.match(model.entities[0].help, /Prefere cartas jogáveis e completa com outras da mão/);
-  assert.match(model.entities[0].help, /Só prende menos se faltarem cartas ou para manter um objetivo possível/);
+  assert.match(model.entities[0].help, /sorteia até 2 cartas/);
+  assert.match(model.entities[0].help, /Persegue um jogador por rodada/);
+  assert.match(model.entities[0].help, /Só prende menos se faltarem cartas ou para preservar uma saída legal/);
   assert.deepEqual(model.choices.map((entry) => entry.id), ['boss']);
   dead(state, 'grabber'); model = nemesisBossUi.combatHud({ gameState: state, playerId: 0 });
   assert.equal(model.entities[0].stateLabel, 'CADÁVER'); assert.equal(model.entities[0].selectable, false);

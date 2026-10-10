@@ -5,7 +5,7 @@ import { changeNemesisInfection, getNemesisObjectiveOutcome, nemesisBossMechanic
 const meters = (abilityId, payload = {}) => nemesisBossPresentation.rangeMeters({ intent: { abilityId, payload } });
 
 test('Comando da Horda explains only its reinforced zombie, with no progress bar', () => {
-  for (const [id, name, normal, mutated] of [['grabber', 'Agarrador', 2, 3], ['infected', 'Infectado', 4, 6], ['devourer', 'Devorador', 70, 100]]) {
+  for (const [id, name, normal, mutated] of [['grabber', 'Agarrador', 2, 3], ['infected', 'Infectado', 4, 6], ['devourer', 'Devorador', 35, 50]]) {
     for (const mutation of [false, true]) {
       const entity = { id, name, status: 'persistent', hp: 300, mutated: mutation };
       const gameState = { players: [], boss: { roundNumber: 1, combatEntities: [entity], hordeBuff: { entityId: id, expiresRound: 2 }, combatTargetsByPlayer: { 0: 'boss' } } };

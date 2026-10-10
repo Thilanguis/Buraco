@@ -49,8 +49,9 @@ test('Nemesis: real human and BOT stock handlers apply one Grabber restriction b
     const f = fixture({ origin: false });
     Object.assign(f.state, { mode: 'boss_nemesis', turnNumber: 9, boss: createBossState('nemesis', 123),
       teams: [{ id: 0, melds: [] }], deadChunksTaken: [0] });
-    f.state.boss.combatEntities[0].status = 'persistent';
+    f.state.boss.combatEntities[0].status = 'persistent'; f.state.boss.grabberPursuit={version:1,playerIds:[1,0]};
     f.state.players[1].id = 1; f.state.players[1].teamId = 0;
+    Object.assign(f.state.players[0],{id:0,teamId:0,hand:[]});
     f.state.players[1].hand = ['3','4','5','K'].map(rank => ({ id: 'old-' + rank, rank, suit: '♥' }));
     f.state.stock = [{ id: 'new-card', rank: 'Q', suit: '♠' }];
     if (bot) {
@@ -62,7 +63,7 @@ test('Nemesis: real human and BOT stock handlers apply one Grabber restriction b
     } else await f.context.drawFromStock();
     assert.equal(f.state.hasDrawnThisTurn, true);
     assert.equal(f.state.boss.grabbedByPlayer[1].cardIds.length, 1);
-    assert.ok(f.state.boss.grabbedByPlayer[1].cardIds[0].startsWith('old-'));
+    assert.ok(f.state.players[1].hand.some(c=>c.id===f.state.boss.grabbedByPlayer[1].cardIds[0]),'newly drawn card is equally eligible');
     assert.equal(f.state.boss.eventLog.filter(e => e.type === 'nemesisGrab').length, 1);
     assert.equal(f.commits(), 1);
   }

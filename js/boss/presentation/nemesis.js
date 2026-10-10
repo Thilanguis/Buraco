@@ -14,9 +14,9 @@ function hordeCommandPresentation(boss, intent) {
   const consequence = entity.id === 'grabber' ? `Após compra: prende ${effect.value} cartas.`
     : entity.id === 'infected' ? `Falha: +${effect.value} Infecção extra.`
       : `A cada 3 cartas da equipe: cura até ${effect.value} HP.`;
-  const rule = entity.id === 'grabber' ? 'Após cada compra do Monte ou Lixo, bloqueia cartas até o fim daquele turno: não pode jogar, mas pode descartar. Prefere jogáveis; reduz a quantidade só se faltarem cartas ou para manter um objetivo possível.'
+  const rule = entity.id === 'grabber' ? 'Persegue um jogador nesta rodada e troca na próxima. Após a compra do alvo, sorteia cartas da mão: não pode jogar, mas pode descartar até o fim do turno. Só prende menos por falta de cartas ou para preservar uma saída legal.'
     : entity.id === 'infected' ? 'Uma falha que já aumenta Infecção recebe esse adicional uma vez. Falhar na Invasão não gera esse bônus.'
-      : 'Cada 3 cartas novas que a equipe adiciona aos jogos curam o Nemesis. Pode juntar contribuições de jogos, jogadores e turnos diferentes. Cura uma vez por turno; cartas extras ficam para a próxima cura. Derrotar o Devorador zera essa contagem.';
+      : 'Cada 3 cartas novas que a equipe adiciona aos jogos curam o Nemesis. Pode juntar contribuições de jogos, jogadores e turnos diferentes. Cada grupo de 3 cura imediatamente, mesmo na mesma jogada. Só o progresso parcial fica para depois. Derrotar o Devorador zera essa contagem.';
   return { instruction, consequence, help: `${instruction}\n${consequence}\n${rule}\nSó ${entity.name} recebe este reforço.` };
 }
 function compact({ gameState, intent, helpers = {} }) {

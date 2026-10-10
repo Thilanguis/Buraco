@@ -108,7 +108,7 @@ test('Extermínio/Agarrador: preservar solução conjunta, sem reservar cegament
   const grabber=s.boss.combatEntities.find(z=>z.id==='grabber');grabber.status='persistent';grabber.mutated=true;
   for(const id of [s.currentPlayer,1-s.currentPlayer]) {
     s.currentPlayer=id;s.hasDrawnThisTurn=true;notifyBossPurchaseCompleted(s,id);
-    assert.equal(s.boss.grabbedByPlayer[id].cardIds.length,2);
+    assert.equal(s.boss.grabbedByPlayer[id]?.cardIds.length || 0,s.boss.grabberPursuit.playerIds[(s.boss.roundNumber-1)%2]===id?2:0);
     const plan=getBossCombatPriorities(s,id).plan;assert.ok(plan);
     for(const move of plan.moves)play(s,id,move);
     end(s,id);

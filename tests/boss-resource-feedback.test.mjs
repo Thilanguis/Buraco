@@ -8,7 +8,7 @@ import { triggerBossDebugZombie } from '../js/boss/boss-debug-scenarios.js';
 
 const fixture=id=>buildBossDebugScenario(null,{bossId:id,abilityId:id==='nemesis'?'stars_hunt':'blood_tithe',phase:1,variant:'interactive',target:'auto'}).state;
 
-for(const [mutated,reinforced,infection,healing,grabs] of [[false,false,2,40,1],[true,false,4,70,2],[false,true,4,70,2],[true,true,6,100,3]]) {
+for(const [mutated,reinforced,infection,healing,grabs] of [[false,false,2,20,1],[true,false,4,35,2],[false,true,4,35,2],[true,true,6,50,3]]) {
   test(`laboratório dispara passivas reais; Mutado ${mutated}, Reforçado ${reinforced}`,()=>{
     const s=fixture('nemesis'),b=s.boss,turn=s.turnNumber,round=b.roundNumber,cards=JSON.stringify(s.players);
     for(const id of ['infected','devourer','grabber'])setBossDebugCombatEntity(s,{entityId:id,status:'persistent',hp:50,mutated,reinforced});
@@ -22,7 +22,7 @@ for(const [mutated,reinforced,infection,healing,grabs] of [[false,false,2,40,1],
     const [heal]=triggerBossDebugZombie(s,{entityId:'devourer',playerId:0});assert.equal(heal.type,'bossHeal');assert.equal(heal.amount,healing);
     assert.equal(b.devourerFeed.credits,2);
     triggerBossDebugZombie(s,{entityId:'devourer',playerId:0});assert.equal(b.hp,b.maxHp-150+Math.min(150,healing*2));
-    assert.equal(b.devourerTurnIds.includes(`${turn}:0`),false);
+    assert.equal(b.devourerTurnIds,undefined);
     buff('grabber');b.currentIntent=null;
     const [grab]=triggerBossDebugZombie(s,{entityId:'grabber',playerId:0});assert.equal(grab.type,'nemesisGrab');assert.equal(grab.cardIds.length,grabs);
     assert.equal(b.grabbedTurnIds.includes(`${turn}:0`),false);
@@ -56,7 +56,7 @@ test('laboratório: passiva exige cenário Nemesis, zumbi vivo e jogador válido
   }
   delete s.debugScenario;assert.throws(()=>triggerBossDebugCombatEffect(s,'devourer',0));
   const [manualHeal]=triggerBossDebugZombie(s,{entityId:'devourer',playerId:0,prepareHeal:true});
-  assert.equal(manualHeal.amount,40,'explicit DevTools action works in an existing local battle');
+  assert.equal(manualHeal.amount,20,'explicit DevTools action works in an existing local battle');
 });
 
 test('clique direto prepara zumbi ausente e gera evento real; cura prepara ferimento só quando solicitado',()=>{
@@ -66,7 +66,7 @@ test('clique direto prepara zumbi ausente e gera evento real; cura prepara ferim
   assert.equal(infection.amount,6);assert.equal(infection.sourceEntityId,'infected');
   assert.equal(s.boss.combatEntities.find(e=>e.id==='infected').status,'persistent');
   const [heal]=triggerBossDebugZombie(s,{entityId:'devourer',playerId:0,setup:{status:'persistent',hp:100},prepareHeal:true});
-  assert.equal(heal.type,'bossHeal');assert.equal(heal.amount,40);assert.equal(s.boss.hp,s.boss.maxHp);
+  assert.equal(heal.type,'bossHeal');assert.equal(heal.amount,20);assert.equal(s.boss.hp,s.boss.maxHp);
   assert.equal(restoreBossDebugSnapshot(original).boss.combatEntities.find(e=>e.id==='infected').status,'absent');
   const snapshot=JSON.stringify(s);
   assert.throws(()=>triggerBossDebugZombie(s,{entityId:'devourer',playerId:99,setup:{status:'persistent',hp:100},prepareHeal:true}));

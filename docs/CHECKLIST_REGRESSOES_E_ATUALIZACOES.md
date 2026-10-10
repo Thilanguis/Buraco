@@ -1,5 +1,20 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+### Ajuste final Nemesis — 09/10/2026
+
+- [x] Agarrador persegue um jogador por rodada canônica, alternando em todas as rodadas; ordem inicial determinística salva. Sorteio de 3.000 seeds: 1.490/1.510. Fase/morte/reentrada/reanimação/reload/undo/sync não reiniciam a alternância; locks vigentes não são sorteados novamente.
+- [x] Fisher–Yates por evento e IDs ordenados substitui prioridade jogável/rotação da mão e primeiras marcas de Tentáculo/Barragem/Invasão. Não reintroduzir prova antecipada de sucesso; preservar saídas individuais e proteção anterior das travas.
+- [x] Devorador 20/35/35/50, reforço +15. Cada 3 IDs novos cura agora; 6/9/12 dão 2/3/4, inclusive mesma jogada/turno. NENHUM limite por turno, cooldown ou teto compensatório. Consome todos os grupos mesmo com HP cheio. Só 0–2 créditos continuam.
+- [x] Ambos jogadores, jogo novo/extensão, IDs repetidos/reorganização, morte/reanimação, resultado/HP zero, snapshots/reload/undo. `devourerHealSequence` persistida distingue curas; fim de turno não drena fila. Feed v1 mantém resto módulo 3, descarta grupos legados sem curar no load.
+- [x] AGARRA + ALVO em chips distintos; CURA20/35/50 sem x/3 no rótulo e três segmentos. Ajuda sem quota antiga. Eventos reais separados na fila visual existente, sem replay por render/reload. Desktop/tablet/mobile e reduced motion.
+
+Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINAL_NEMESIS_2026-10-09.md).
+
+### Carga visível do Devorador — histórico anterior ao ajuste final
+
+- [x] Chip e preenchimento verde em três segmentos aprovados; contagem numérica só no help. A revisão final acima substitui valores e quota antigos. Não confundir contagem de cura com objetivo de repelir a Invasão.
+- [x] Oito regressões específicas e suíte ampla1291/1291; browser real em cinco viewports, ajuda clicável, progressos0–3, encaixe dos chips e retratos. Cachev293. Sem commit/push.
+
 ### Preservação de coringas pelo BOT Chefe — 09/10/2026
 
 - [x] Mesmo custo compartilhado na pré-seleção E score final do Lixo, jogadas da mão e continuações simuladas; não esconder gasto em followup. Reserva calibrada anterior preservada, sem veto universal. Cotação canônica pelo destino real intacta.
@@ -854,7 +869,7 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 - [ ] Somente o `?` explica a retirada; não adicionar feedback contextual durante seleção/compra. Humano/BOT usam a mesma consulta e quantidade real para mão final, Morto/batida e limites. Bloqueio/erro não move cartas; rerender/snapshot/reload não duplica retirada.
 - [ ] Ajuda opcional `?` junto ao contador do Lixo somente no modo Chefe: não disparar retirada, não duplicar controle nem criar avisos adicionais. Validar mouse/toque/Enter/Escape, compra bloqueada, saída do modo e popover dentro dos cinco viewports. O componente oficial precisa inicializar fechar/teclado mesmo sem habilidade ativa. Fixture do HUD deve incluir a seção externa inteira, não encerrar na seção aninhada oculta do registro.
 - [ ] Nemesis INVADINDO: explica expulsão, sem HP de combate nem alvo. Arte principal seleciona boss; chip/help não seleciona. Testar teclado e permissões de turno/observador.
-- [ ] Chip final calculado com a passiva real: Agarrador 1/2/3, Infectado 2/4/6, Devorador 40/70/100; incluir Normal + Reforçado 2/4/70. Ajuda específica de Mutado e reforço, prazo inclusivo (`roundNumber + 1`). Comando apenas persistent vivo.
+- [ ] Chip final calculado com a passiva real: Agarrador 1/2/3, Infectado 2/4/6, Devorador 20/35/50; incluir Normal + Reforçado 2/4/35. Ajuda específica de Mutado e reforço, prazo inclusivo (`roundNumber + 1`). Comando apenas persistent vivo.
 - [ ] MARCADA / AGARRADA / CONTAMINADA na carta exata; mesma identidade verde. Pulso de Agarrada só em evento novo, sem replay, depois marca estática; limpar no término/morte, respeitar redução de movimento.
 - [ ] Comparar contorno, espessura e brilho reais da mão/Invasão com o Lixo: um único overlay compartilhado, sem somar bordas/glows no contêiner e na face. Pulso altera apenas opacidade, sem engrossar ou ampliar a marca. A fixture deve decorar a face real do Lixo, não apenas ativar a classe do contêiner.
 - [ ] Comparar contorno, espessura e brilho reais da mão/Invasão com o Lixo: um único overlay compartilhado, sem somar bordas/glows no contêiner e na face. Pulso altera apenas opacidade, sem engrossar ou ampliar a marca. A fixture deve decorar a face real do Lixo, não apenas ativar a classe do contêiner.
@@ -873,7 +888,7 @@ Relatório e limitações: `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Sem novo bal
 
 - [ ] Elegibilidade exige só um jogo existente alimentável, sem exigir plano completo de expulsão. Objetivo: 3 cartas novas acumuladas na rodada nos IDs dos jogos do início, no mesmo jogo ou em vários, por um ou dois jogadores.
 - [ ] Reorganização, jogos novos, cartas repetidas e replay/reload/snapshot/undo não duplicam progresso. Aos 3 repele imediatamente; menos de 3 ao fim da rodada persiste, Mutado na F3. BOT e Laboratório usam planos incrementais dos jogos válidos.
-- [ ] Entrada é distinta da passiva persistente: a passiva soma cartas novas em qualquer jogo da equipe, inclusive jogo novo, entre jogadores e turnos. A cada 3 créditos cura 40/70 HP, Reforçado +30; máximo 1x/turno sem perder créditos excedentes. Morte/reanimação zeram créditos.
+- [ ] Entrada é distinta da passiva persistente: a passiva soma cartas novas em qualquer jogo da equipe, inclusive jogo novo, entre jogadores e turnos. A cada 3 créditos cura 20/35 HP, Reforçado +15; sem limite por jogada/turno, consumindo todos os grupos completos. Morte/reanimação zeram créditos.
 
 ### Pacote de compatibilidade e batida — 07/10/2026 (regressões permanentes)
 
@@ -881,8 +896,8 @@ Relatório e limitações: `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Sem novo bal
 - [ ] Espelho do Lixo inelegível com Hawk/bloqueio canônico; volta após desbloqueio. Snapshot incompatível cancela objetivo sem punição, remove escolha e ajusta HUD/ajuda.
 - [ ] Pólen no topo marca a carta exata; enterrado indica só a pilha. Cotação protegida não dispara punição ao adquirir topo normal; retirada completa com a carta contaminada dispara uma vez. Render/reload preservam identidade. Browser desktop/tablet/mobile.
 - [ ] Batida = 100 em qualquer pontuação e mesmo com Dominação. Preservar absorção, Renascimento, alvo Nemesis, eventos/estatísticas e derrota por chefe sobrevivente; BOT simula o mesmo pipeline em clone, sem mutar partida real. Fora de Chefe não muda.
-- [ ] Devorador: 3 juntas e 1+1+1 equivalentes; contador da equipe atravessa jogadores/turnos/jogos, inclusive novos. Mesma carta/reorganização/replay não soma. 6 cartas geram uma cura e 3 créditos pendentes, consumidos em turno posterior. Morte/reanimação zeram; entering/repelled/corpse não somam. 40/70/+30 pelo helper, HP máximo respeitado.
-- [ ] Save antigo inicia contador zero sem contar mesa antiga; reload/render não cura; undo restaura contador/IDs/quota. Humano e BOT usam o mesmo hook sem exigir jogada artificial de 3 cartas.
+- [ ] Devorador: 3 juntas e 1+1+1 equivalentes; contador da equipe atravessa jogadores/turnos/jogos, inclusive novos. Mesma carta/reorganização/replay não soma. 6/9/12 cartas geram 2/3/4 curas imediatamente, inclusive na mesma ação; fim de turno vazio não cura. Morte/reanimação zeram; entering/repelled/corpse não somam. 20/35/+15 pelo helper, HP máximo respeitado.
+- [ ] Save antigo inicia contador zero sem contar mesa antiga; reload/render não cura; undo restaura contador/IDs/sequência de curas. Humano e BOT usam o mesmo hook sem exigir jogada artificial de 3 cartas.
 
 Regressões: `tests/boss-october-package.test.mjs`; fixture visual real do Lixo: `tests/nemesis-ui.browser.mjs`. Rodar suítes focadas e ampla, sem skip/todo para esconder falhas. Preservar HEADER e alterações manuais fora do pacote.
 

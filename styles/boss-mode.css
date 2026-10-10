@@ -7655,3 +7655,10 @@ body.boss-mode #bossHpBar[data-health].is-empty { animation: none; }
 .boss-resource-transfer { width:1px; height:1px; }
 .boss-resource-transfer::after { content:''; position:absolute; width:22px; height:2px; left:-11px; top:-1px; border-radius:2px; background:var(--resource-color); box-shadow:0 0 5px var(--resource-color); transform:rotate(var(--resource-angle)); }
 .boss-resource-arrival { font-size:13px; font-weight:900; text-shadow:0 1px 3px #000,0 0 4px #000; white-space:nowrap; transform:translate(-50%,-50%); }
+/* Three charge segments, no extra overlay, animation or HUD height. */
+body.boss-mode[data-boss-id='nemesis'] .boss-daughter-card button.boss-devourer-charge {
+  background:
+    linear-gradient(to right, transparent calc(33.333% - .5px), #a5d9b8 calc(33.333% - .5px), #a5d9b8 calc(33.333% + .5px), transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), #a5d9b8 calc(66.666% - .5px), #a5d9b8 calc(66.666% + .5px), transparent calc(66.666% + .5px)),
+    linear-gradient(to right, #157443 var(--devourer-charge, 0%), #17241c var(--devourer-charge, 0%));
+  color: #fff; border-color: #6eac88; text-shadow: 0 1px 2px #000;
+}

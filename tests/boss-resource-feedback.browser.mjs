@@ -22,6 +22,8 @@ const fixture=`<!doctype html><meta charset="utf-8"><meta name="viewport" conten
 <script type="module">
 import {createResourceFeedbackPresenter} from '/js/boss/ui/resource-feedback.js';
 import * as module from '/js/boss/boss-debug-scenarios.js';
+import {normalizeBossState} from '/js/boss/boss-engine.js';
+import {nemesisBossMechanics} from '/js/boss/mechanics/nemesis.js';
 let state,undos=[],renderedBossFeedbackEventIds=null;const bossLabElement=id=>document.getElementById(id);
 ${options}
 const loadBossDebugLabModule=async()=>module,setBossLabError=text=>document.getElementById('error').textContent=text;
@@ -47,6 +49,19 @@ window.transfer=id=>{presenter.clear();window.transferHistory=[];selectTransferB
     :[{type:'bloodChange',actionId:'daughter_bela_1',sourceEntityId:'bela',amount:3,dangerBefore:0,danger:3},{type:'bossAbility',actionId:'d',dangerDelta:8,dangerBefore:3,danger:11}];
   for(const e of events){presenter.enqueue(boss,e);presenter.enqueue(boss,e);} };
 window.clearTransfer=()=>presenter.clear();window.setupLab('nemesis');
+window.multipleHeals=()=>{
+  presenter.clear();window.transferHistory=[];selectTransferBoss('nemesis');
+  const sample=module.buildBossDebugScenario(null,{bossId:'nemesis',abilityId:'stars_hunt',phase:1}).state;
+  const boss=sample.boss;boss.currentIntent=null;boss.hp=2000;
+  const e=boss.combatEntities.find(e=>e.id==='devourer');e.status='persistent';e.hp=e.maxHp;
+  normalizeBossState(sample);const events=[];
+  nemesisBossMechanics.onMeldTransition({boss,gameState:sample,teamId:0,playerId:0,meldId:'feed',
+    cardsAdded:Array.from({length:12},(_,i)=>({id:'multi-'+i})),previousDangerReliefValue:0,nextDangerReliefValue:0,
+    recordBossEvent:event=>{events.push(event);return event;}});
+  for(const event of events){presenter.enqueue(boss,event);presenter.enqueue(boss,event);}
+  window.replayMultiple=()=>{for(const event of JSON.parse(JSON.stringify(events)))presenter.enqueue(boss,event);};
+  return {credits:boss.devourerFeed.credits,hp:boss.hp,events:events.map(e=>e.actionId)};
+};
 window.transferFrom19=id=>{presenter.clear();window.transferHistory=[];selectTransferBoss(id);
   const amount=id==='nemesis'?6:3,boss={id,seed:1,maxDanger:100,danger:19+amount};
   // Reproduce the HUD writing the resolved value before the presenter holds it.
@@ -146,7 +161,7 @@ try {
     await page.waitForFunction(()=>window.labState().boss.lastEvent.type==='bossHeal');
     await page.waitForFunction(()=>!!document.querySelector('.boss-resource-transfer[data-source-id="devourer"]'));
     await page.evaluate(()=>document.querySelector('.boss-resource-transfer[data-source-id="devourer"]').getAnimations()[0].pause());
-    assert.equal(await page.locator('#bossHpText').textContent(),'2160 / 2200');
+    assert.equal(await page.locator('#bossHpText').textContent(),'2180 / 2200');
     const hpEdge=await page.locator('#bossHpBar').evaluate(el=>el.getBoundingClientRect().right);
     await page.evaluate(()=>{const a=document.querySelector('.boss-resource-transfer[data-source-id="devourer"]').getAnimations()[0];a.currentTime=690;});
     const rayX=await page.locator('.boss-resource-transfer[data-source-id="devourer"]').evaluate(el=>el.getBoundingClientRect().x+el.getBoundingClientRect().width/2);
@@ -154,8 +169,16 @@ try {
     await page.evaluate(()=>document.querySelector('.boss-resource-transfer[data-source-id="devourer"]').getAnimations()[0].play());
     await page.waitForFunction(()=>!document.querySelector('.boss-resource-transfer,.boss-resource-arrival'));
     assert.equal(await page.locator('#bossHpText').textContent(),'2200 / 2200');
-    assert.equal(await page.evaluate(()=>window.labState().boss.lastEvent.amount),40);
+    assert.equal(await page.evaluate(()=>window.labState().boss.lastEvent.amount),20);
     assert.equal(await page.evaluate(()=>window.labState().boss.hp),await page.evaluate(()=>window.labState().boss.maxHp));
+    await page.waitForFunction(()=>!document.querySelector('.boss-resource-arrival,.boss-resource-transfer'));
+    const multiple=await page.evaluate(()=>window.multipleHeals());
+    assert.equal(multiple.credits,0);assert.equal(multiple.hp,2080);assert.equal(new Set(multiple.events).size,4);
+    await page.waitForFunction(()=>window.transferHistory.length===4&&!document.querySelector('.boss-resource-arrival,.boss-resource-transfer'),null,{timeout:12000});
+    assert.deepEqual(await page.evaluate(()=>window.transferHistory.map(e=>e.text)),['+20 HP','+20 HP','+20 HP','+20 HP']);
+    assert.equal(await page.locator('#bossHpText').textContent(),'2080 / 2200');
+    await page.evaluate(()=>window.replayMultiple());
+    assert.equal(await page.locator('.boss-resource-transfer').count(),0);assert.equal(await page.evaluate(()=>window.transferHistory.length),4);
     await page.evaluate(()=>window.undo());
     await page.evaluate(()=>window.setupLab('dimitrescu'));assert.ok(await page.locator('#debugBossLabCombatModifiers').isHidden());
     assert.ok(await page.locator('#debugBossLabZombieActions').isVisible());

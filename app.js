@@ -7500,6 +7500,11 @@ function renderBossCombatPanel(hud, boss) {
     const chips = document.createElement('span'); chips.className = 'boss-combat-chips';
     for (const entry of entity.chips || []) {
       const chip = createBossCombatHelp(`${entity.name}: ${entry.label}`, `${entity.name} · ${entry.label}`, entry.text, entry.label);
+      if (entry.charge != null) {
+        chip.classList.add('boss-devourer-charge');
+        chip.style.setProperty('--devourer-charge', `${Math.min(3, Math.max(0, entry.charge)) / 3 * 100}%`);
+        chip.dataset.charge = String(entry.charge);
+      }
       chip.classList.add('boss-daughter-state'); chips.append(chip);
     }
     item.append(chips);

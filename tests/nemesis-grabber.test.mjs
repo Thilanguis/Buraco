@@ -11,10 +11,12 @@ import { nemesisBossUi } from '../js/boss/ui/nemesis-ui.js';
 const fixture = () => {
   const state = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'horde_command', phase: 1 }).state;
   state.boss.currentIntent = null; state.boss.bossFlow = null; state.currentPlayer = 0;
+  state.boss.grabberPursuit = {version:1,playerIds:[0,1]};
   return state;
 };
 const grabber = s => s.boss.combatEntities.find(e => e.id === 'grabber');
 function buy(s, playerId, source = 'stock') {
+  s.boss.grabberPursuit = {version:1,playerIds:s.boss.roundNumber % 2 ? [playerId,1-playerId] : [1-playerId,playerId]};
   s.currentPlayer = s.players.findIndex(p => p.id === playerId);
   if (source === 'discard') {
     const acquired = s.discard.splice(0); s.players[s.currentPlayer].hand.push(...acquired);
@@ -153,7 +155,7 @@ for (const [mutated, reinforced, count] of [[false,false,1],[true,false,2],[fals
       buy(s, playerId, source);
       const ids = s.boss.grabbedByPlayer[playerId].cardIds;
       assert.equal(ids.length, count); assert.equal(new Set(ids).size, count);
-      assert.ok(ids.includes('playable'), 'real legal play has priority over fallback');
+      assert.ok(ids.every(id => s.players[playerId].hand.some(c => c.id === id)), 'random eligible hand cards, no playable priority');
       assert.equal(getNemesisZombieEffect(s.boss,grabber(s)).label, `AGARRA ${count}`);
       assert.equal(s.boss.eventLog.at(-1).cardIds.length, count);
       for (const restored of [simulateBossDebugReload(s), restoreBossDebugSnapshot(createBossDebugSnapshot(s)),
@@ -296,7 +298,7 @@ test('Cooperative protection only counts the Devorador games present at announce
   assert.equal(s.boss.currentIntent.payload.entryMeldIds.length, 2);
   s.teams[0].melds.push(['4','5','6'].map(rank => ({ id: `new-${rank}`, rank, suit: '♣' })));
   s.stock = [{ id: 'draw', rank: 'Q', suit: '♠' }]; buy(s, 0);
-  assert.deepEqual(s.boss.grabbedByPlayer[0].cardIds, ['unrelated']);
+  assert.ok(['unrelated','keep','draw'].includes(s.boss.grabbedByPlayer[0].cardIds[0]));
   assert.equal(isBossCardBlocked(s, 0, 'needed'), false);
 });
 

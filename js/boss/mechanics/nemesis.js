@@ -12,31 +12,59 @@ const turnKey = (state, playerId) => `${state.turnNumber || 0}:${playerId}`;
 const boosted = (boss, id) => boss.hordeBuff?.entityId === id && boss.roundNumber <= boss.hordeBuff.expiresRound;
 const objectiveIds = new Set(['stars_hunt', 'infectious_tentacle', 'tentacle_barrage', 'stars_extermination']);
 
+// Stateless event RNG: canonical ID order makes hand reordering irrelevant.
+function eventRandom(boss, event) {
+  let seed = 2166136261;
+  for (const char of `${boss.seed}:${event}`) seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
+  return () => {
+    seed += 0x6D2B79F5;
+    let value = Math.imul(seed ^ seed >>> 15, seed | 1);
+    value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+    return ((value ^ value >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffledIds(boss, event, ids) {
+  const result = [...new Set(ids)].sort(), random = eventRandom(boss, event);
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+export function getNemesisGrabberTarget(gameState) {
+  const { boss, players } = gameState;
+  const ids = players.map(p => p.id).sort((a,b) => String(a).localeCompare(String(b)));
+  const saved = boss.grabberPursuit;
+  const order = saved?.version === 1 && saved.playerIds?.length === ids.length && ids.every(id => saved.playerIds.includes(id))
+    ? saved.playerIds : shuffledIds(boss, 'grabber:first-player', ids);
+  return order[(Math.max(1, boss.roundNumber || 1) - 1) % order.length] ?? null;
+}
+
 function resetDevourerFeed(boss, gameState = null) {
-  boss.devourerFeed = { version: 1, active: !!alive(boss, 'devourer'), credits: 0,
+  boss.devourerFeed = { version: 2, active: !!alive(boss, 'devourer'), credits: 0,
     countedCardIds: [...new Set([...(boss.damagedCardIds || []), ...(gameState?.teams?.[0]?.melds || []).flat().map(card => card.id)])] };
 }
 
 function healFromDevourerFeed(boss, gameState, playerId, recordBossEvent) {
   const entity = alive(boss, 'devourer'), feed = boss.devourerFeed;
-  if (!entity || boss.result || !feed?.active || feed.credits < 3) return;
-  const key = turnKey(gameState, playerId);
-  if (boss.devourerTurnIds.includes(key)) return;
-  feed.credits -= 3;
-  boss.devourerTurnIds.push(key);
-  const amount = Math.min(boss.maxHp - boss.hp, getNemesisZombieEffect(boss, entity).value);
-  const hpBefore = boss.hp;
-  boss.hp += amount;
-  boss.devourerHealingTotal = (boss.devourerHealingTotal || 0) + amount;
-  if (amount) recordBossEvent({ type: 'bossHeal', actionId: `devourer:${key}`, sourceEntityId: 'devourer', amount, hpBefore, hp: boss.hp,
-    outcome: `Devorador: Nemesis recuperou ${amount} HP.` });
+  if (!entity || gameState.finished || boss.result || boss.defeated || boss.hp <= 0 || !feed?.active) return;
+  while (feed.credits >= 3) {
+    feed.credits -= 3;
+    const sequence = ++boss.devourerHealSequence;
+    const amount = Math.min(boss.maxHp - boss.hp, getNemesisZombieEffect(boss, entity).value);
+    const hpBefore = boss.hp;
+    boss.hp += amount;
+    boss.devourerHealingTotal = (boss.devourerHealingTotal || 0) + amount;
+    if (amount) recordBossEvent({ type: 'bossHeal', actionId: `devourer:v2:${sequence}`, sourceEntityId: 'devourer', playerId, turnId: turnKey(gameState, playerId), amount, hpBefore, hp: boss.hp,
+      outcome: `Devorador: Nemesis recuperou ${amount} HP.` });
+  }
 }
 
 export function getNemesisZombieEffect(boss, entity) {
   const reinforced = boosted(boss, entity.id);
-  const normal = entity.id === 'grabber' ? 1 : entity.id === 'infected' ? 2 : 40;
-  const mutated = entity.id === 'grabber' ? 2 : entity.id === 'infected' ? 4 : 70;
-  const bonus = entity.id === 'grabber' ? 1 : entity.id === 'infected' ? 2 : 30;
+  const normal = entity.id === 'grabber' ? 1 : entity.id === 'infected' ? 2 : 20;
+  const mutated = entity.id === 'grabber' ? 2 : entity.id === 'infected' ? 4 : 35;
+  const bonus = entity.id === 'grabber' ? 1 : entity.id === 'infected' ? 2 : 15;
   const value = (entity.mutated ? mutated : normal) + (reinforced ? bonus : 0);
   return { normal, mutated, bonus, value, reinforced,
     label: entity.id === 'grabber' ? `AGARRA ${value}` : entity.id === 'infected' ? `INFECÇÃO +${value}` : `CURA ${value}` };
@@ -228,7 +256,7 @@ function entryCandidates(state, helpers) {
   return boss.combatEntities.filter((entity) => ['absent', 'repelled'].includes(entity.status)).flatMap((entity) => {
     if (entity.id === 'grabber') {
       for (const player of preferredPlayers(state).filter((player) => entryPlayers(state).some((entry) => entry.id === player.id))) {
-        const cardIds = helpers.objectiveExitCardIds(player);
+        const cardIds = shuffledIds(boss, `mark:invasion:${boss.roundNumber}:${boss.actionSequence}:${player.id}`, helpers.objectiveExitCardIds(player));
         if (cardIds.length) return [{ entityId: entity.id, entryKind: entity.id, duration: 'target_turn', targetPlayerId: player.id, targetPlayerName: player.name,
           cardIds: [cardIds[0]], required: 1, exitedCardIds: [] }];
       }
@@ -341,12 +369,12 @@ function buildPayload({ gameState: state, helpers }, abilityId) {
     if (abilityId === 'contaminated_zone') {
       if (canLegallyTakeDiscard(state, player, helpers)) return { ...base, targetPlayerId: player.id };
     } else if (abilityId === 'infectious_tentacle' && cards.length >= 2) {
-      const cardIds = objectiveExitCards(player, helpers, 2);
+      const cardIds = objectiveExitCards(state, player, helpers, 2, abilityId);
       if (!cardIds) continue;
       return { ...base, objectiveVersion: 2, partialFailure: NEMESIS_OBJECTIVE_BALANCE.tentaclePartial[boss.phase],
         targetPlayerId: player.id, cardIds, required: 1, playedMarkedCardIds: [], exitedCardIds: [] };
     } else if (abilityId === 'tentacle_barrage' && cards.length >= 3) {
-      const cardIds = objectiveExitCards(player, helpers, 3);
+      const cardIds = objectiveExitCards(state, player, helpers, 3, abilityId);
       if (!cardIds) continue;
       return { ...base, targetPlayerId: player.id, cardIds, required: 2, failure: 16, exitedCardIds: [] };
     }
@@ -354,8 +382,8 @@ function buildPayload({ gameState: state, helpers }, abilityId) {
   return null;
 }
 
-function objectiveExitCards(player, helpers, count) {
-  const ids = helpers.objectiveExitCardIds(player);
+function objectiveExitCards(state, player, helpers, count, abilityId) {
+  const ids = shuffledIds(state.boss, `mark:${abilityId}:${state.boss.roundNumber}:${state.boss.actionSequence}:${player.id}`, helpers.objectiveExitCardIds(player));
   return ids.length >= count ? ids.slice(0, count) : null;
 }
 
@@ -379,24 +407,34 @@ export function chooseNemesisDamageTarget(state, damage, playerId = state.player
 
 export const nemesisBossMechanics = Object.freeze({
   id: 'nemesis',
-  createState: () => ({ combatLifecycleVersion: 1, combatEntities: createCombatEntities(NEMESIS_ZOMBIES, { initialStatus: 'absent' }), lastRepelledZombieId: null, combatTargetsByPlayer: {}, starsPlayerId: null, grabbedByPlayer: {}, grabbedTurnIds: [], reanimationsByPhase: {}, infectionEventIds: [], devourerTurnIds: [], devourerFeed: { version: 1, active: false, credits: 0, countedCardIds: [] }, devourerHealingTotal: 0, hordeBuff: null, omegaBuff: null, impactZone: null }),
+  createState: () => ({ combatLifecycleVersion: 1, combatEntities: createCombatEntities(NEMESIS_ZOMBIES, { initialStatus: 'absent' }), lastRepelledZombieId: null, combatTargetsByPlayer: {}, starsPlayerId: null, grabbedByPlayer: {}, grabbedTurnIds: [], grabberPursuit: null, reanimationsByPhase: {}, infectionEventIds: [], devourerHealSequence: 0, devourerFeed: { version: 2, active: false, credits: 0, countedCardIds: [] }, devourerHealingTotal: 0, hordeBuff: null, omegaBuff: null, impactZone: null }),
   normalize({ boss, gameState }) {
     normalizeCombatEntities(boss, NEMESIS_ZOMBIES, { lifecycle: true });
     boss.combatTargetsByPlayer ||= {}; boss.grabbedByPlayer ||= {}; boss.reanimationsByPhase ||= {};
     boss.maxHp = nemesisDefinition.maxHp; boss.hp = Math.max(0, Math.min(boss.maxHp, boss.hp));
     boss.grabbedTurnIds ||= [];
+    const first = getNemesisGrabberTarget({ ...gameState, boss: { ...boss, roundNumber: 1 } });
+    boss.grabberPursuit = { version: 1, playerIds: [first, ...gameState.players.filter(p => p.id !== first).map(p => p.id)] };
     for (const [playerId, lock] of Object.entries(boss.grabbedByPlayer)) {
       const key = turnKey(gameState, playerId);
       if (lock.turnId && lock.turnId !== key) delete boss.grabbedByPlayer[playerId];
       else if (!boss.grabbedTurnIds.includes(key)) boss.grabbedTurnIds.push(key);
     }
     if (!alive(boss, 'grabber')) boss.grabbedByPlayer = {};
-    boss.infectionEventIds ||= []; boss.devourerTurnIds ||= [];
-    // Old live saves start at zero without crediting the existing table. Reload
-    // never consumes pending credits: only gameplay hooks can heal.
-    if (!boss.devourerFeed || boss.devourerFeed.version !== 1 || !alive(boss, 'devourer')
+    boss.infectionEventIds ||= [];
+    delete boss.devourerTurnIds; // v1 per-turn quota is no longer a gameplay rule.
+    boss.devourerHealSequence = Math.max(0, Math.floor(Number(boss.devourerHealSequence) || 0),
+      ...(boss.eventLog || []).map(e => Number(/^devourer:v2:(\d+)$/.exec(e.actionId)?.[1]) || 0));
+    // Keep the partial group, discard legacy queued full groups, never heal on
+    // load. Preserve counted IDs so the old table cannot be credited again.
+    if (!boss.devourerFeed || !alive(boss, 'devourer')
       || !boss.devourerFeed.active) resetDevourerFeed(boss, gameState);
     boss.devourerFeed.credits = Math.max(0, Math.floor(Number(boss.devourerFeed.credits) || 0));
+    if (boss.devourerFeed.version !== 2) {
+      boss.devourerFeed.discardedLegacyCredits = boss.devourerFeed.credits - boss.devourerFeed.credits % 3;
+      boss.devourerFeed.credits %= 3;
+      boss.devourerFeed.version = 2;
+    }
     boss.devourerFeed.countedCardIds = [...new Set(boss.devourerFeed.countedCardIds || [])];
     boss.danger = Math.max(0, Math.min(100, Number(boss.danger) || 0));
     if (boss.starsPlayerId != null && !gameState.players.some((player) => player.id === boss.starsPlayerId)) boss.starsPlayerId = null;
@@ -482,19 +520,20 @@ export const nemesisBossMechanics = Object.freeze({
   onDebugCombatEffect(context) {
     const { boss, gameState, entityId, playerId, action, recordBossEvent } = context;
     const actionId = `nemesis_debug_passive_${++boss.actionSequence}`;
-    // Repeat animation tests without moving the real turn or consuming its quota.
+    // Repeat laboratory tests without moving the real turn. Grab's purchase
+    // dedup remains real-game only; Devorador has no turn quota.
     const previewTurn = { ...gameState, turnNumber: actionId };
     const events = [];
     const record = event => { events.push(recordBossEvent(event)); return events.at(-1); };
     if (action === 'objective') this.onPlayerTurnEnd({ ...context, recordBossEvent: record });
     else if (entityId === 'grabber') {
       delete boss.grabbedByPlayer[playerId];
-      this.onPurchaseCompleted({ ...context, gameState: previewTurn, recordBossEvent: event => record({ ...event, turnId: turnKey(gameState, playerId) }) });
+      this.onPurchaseCompleted({ ...context, debugPursuit: true, gameState: previewTurn, recordBossEvent: event => record({ ...event, turnId: turnKey(gameState, playerId) }) });
       if (boss.grabbedByPlayer[playerId]) boss.grabbedByPlayer[playerId].turnId = turnKey(gameState, playerId);
     }
     else if (entityId === 'devourer') {
       const credits = boss.devourerFeed.credits;
-      boss.devourerFeed.credits = Math.max(3, credits);
+      boss.devourerFeed.credits = 3;
       healFromDevourerFeed(boss, previewTurn, playerId, record);
       boss.devourerFeed.credits = credits;
     } else {
@@ -504,9 +543,9 @@ export const nemesisBossMechanics = Object.freeze({
     }
     return events;
   },
-  onPurchaseCompleted({ boss, gameState, playerId, helpers, recordBossEvent }) {
+  onPurchaseCompleted({ boss, gameState, playerId, helpers, recordBossEvent, debugPursuit = false }) {
     const grabber = alive(boss, 'grabber'), key = turnKey(gameState, playerId);
-    if (!grabber || boss.result || boss.grabbedTurnIds.includes(key)) return [];
+    if (!grabber || boss.result || (!debugPursuit && getNemesisGrabberTarget(gameState) !== playerId) || boss.grabbedTurnIds.includes(key)) return [];
     boss.grabbedTurnIds.push(key);
     if (boss.grabbedTurnIds.length > 100) boss.grabbedTurnIds.splice(0, boss.grabbedTurnIds.length - 100);
     const player = gameState.players.find(entry => entry.id === playerId);
@@ -533,20 +572,9 @@ export const nemesisBossMechanics = Object.freeze({
       if (!hasDiscard && !findNemesisLegalPlan(preview, player, trialHelpers)) return false;
       return true;
     };
-    const count = getNemesisZombieEffect(boss, grabber).value, playableIds = new Set();
-    findNemesisLegalPlan(gameState, player, helpers, plan => {
-      plan.playedCardIds.forEach(id => playableIds.add(id));
-      return playableIds.size >= count;
-    });
+    const count = getNemesisZombieEffect(boss, grabber).value;
     const eligible = player.hand.filter(card => card?.id && !helpers.blocked(playerId, card.id, 'play'));
-    const rotate = cards => {
-      if (!cards.length) return [];
-      const offset = helpers.pickIndex(cards.length);
-      return [...cards.slice(offset), ...cards.slice(0, offset)].map(card => card.id);
-    };
-    const playable = eligible.filter(card => playableIds.has(card.id));
-    const fallback = eligible.filter(card => !playableIds.has(card.id));
-    const ordered = [...rotate(playable), ...rotate(fallback)];
+    const ordered = shuffledIds(boss, `grab:${boss.roundNumber}:${key}`, eligible.map(card => card.id));
     const checked = new Map();
     const valid = (ids) => {
       const signature = JSON.stringify([...ids].sort());
@@ -595,6 +623,7 @@ export const nemesisBossMechanics = Object.freeze({
   },
   onMeldTransition({ boss, gameState, teamId, playerId, meldId, cardsAdded, previousDangerReliefValue, nextDangerReliefValue, recordBossEvent }) {
     const fresh = cardsAdded.filter((card) => !boss.damagedCardIds.includes(card.id));
+    let credited = 0;
     if (fresh.length) {
       this.markExit(boss, playerId, fresh.map((card) => card.id), true);
       const payload = boss.currentIntent?.payload;
@@ -616,6 +645,7 @@ export const nemesisBossMechanics = Object.freeze({
         const ids = [...new Set(fresh.map(card => card.id))].filter(id => !feed.countedCardIds.includes(id));
         feed.countedCardIds.push(...ids);
         feed.credits += ids.length;
+        credited = ids.length;
       }
       if (boss.impactZone?.meldId === meldId && boss.roundNumber <= boss.impactZone.expiresRound) {
         const eventId = `${boss.impactZone.sourceIntentId}:impact:${fresh.map((card) => card.id).join(',')}`;
@@ -623,7 +653,7 @@ export const nemesisBossMechanics = Object.freeze({
         if (applied) recordBossEvent({ type: 'infection', actionId: eventId, danger: boss.danger, amount: applied, outcome: `Zona de Impacto: Infecção +${applied}.` });
       }
     }
-    healFromDevourerFeed(boss, gameState, playerId, recordBossEvent);
+    if (credited) healFromDevourerFeed(boss, gameState, playerId, recordBossEvent);
     // Shared engine progress tracks total tier relief; only the increment applies.
     return { resourceReduction: boss.result ? 0 : Math.max(0, nextDangerReliefValue - previousDangerReliefValue) };
   },
@@ -633,8 +663,6 @@ export const nemesisBossMechanics = Object.freeze({
   },
   onPlayerTurnEnd({ boss, gameState, playerId, recordBossEvent }) {
     delete boss.grabbedByPlayer[playerId];
-    // A later turn can consume queued credits even without a new contribution.
-    healFromDevourerFeed(boss, gameState, playerId, recordBossEvent);
     const intent = boss.currentIntent; const payload = intent?.payload;
     if (intent?.abilityId === 'horde_invasion' && payload.entryKind === 'grabber' && payload.targetPlayerId === playerId) resolveEntry(boss, intent, gameState);
     if (!intent || !objectiveIds.has(intent.abilityId) || payload.resolved) return {};

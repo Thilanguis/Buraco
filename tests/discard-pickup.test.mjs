@@ -72,7 +72,7 @@ test('modo Chefe: jogador e BOT retiram o mesmo conjunto, sem duplicar após sna
     ['2', ['8', '10'], [], 1], ['2', ['3', '4'], [], 2],
   ]) for (const bot of [false, true]) {
     const f = fixture('boss_nemesis');
-    f.state.boss = createBossState('nemesis', 123);
+    f.state.boss = createBossState('nemesis', 123); f.state.boss.grabberPursuit={version:1,playerIds:[1,0]};
     f.state.players[1].hand = cards([...handRanks, 'Q', 'K']);
     f.state.teams[1].melds = existing.length ? [cards(existing)] : [];
     f.state.discard = cards([...lowerRanks, rank]); f.state.discard.at(-1).joker = rank === 'JOKER';

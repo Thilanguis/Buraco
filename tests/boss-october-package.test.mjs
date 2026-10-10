@@ -171,17 +171,17 @@ test('real BOT finish simulation uses the canonical fixed strike, including rebi
 });
 for (const chunks of [[['a','b','c']], [['a'],['b'],['c']]]) test(`Devorador same-turn contributions ${chunks.map(c => c.length).join('+')} heal once`, () => {
   const s = feeding(); for (const ids of chunks) add(s, ids);
-  assert.equal(s.boss.devourerHealingTotal, 40); assert.equal(feed(s).credits, 0);
+  assert.equal(s.boss.devourerHealingTotal, 20); assert.equal(feed(s).credits, 0);
 });
 for (const player of [0, 1]) test(`Devorador credits cross turns and player ${player}`, () => {
   const s = feeding(); add(s, ['a', 'b']); assert.equal(feed(s).credits, 2);
   s.turnNumber++; add(s, ['c'], { player, meldIndex: player });
-  assert.equal(s.boss.devourerHealingTotal, 40); assert.equal(feed(s).credits, 0);
+  assert.equal(s.boss.devourerHealingTotal, 20); assert.equal(feed(s).credits, 0);
 });
 test('Devorador counts different existing games and new games', () => {
   const s = feeding(); add(s, ['one'], { meldIndex: 0 }); add(s, ['two'], { meldIndex: 1 }); add(s, ['three']);
-  assert.equal(s.boss.devourerHealingTotal, 40);
-  s.turnNumber++; add(s, ['new1','new2','new3'], { isNewMeld: true }); assert.equal(s.boss.devourerHealingTotal, 80);
+  assert.equal(s.boss.devourerHealingTotal, 20);
+  s.turnNumber++; add(s, ['new1','new2','new3'], { isNewMeld: true }); assert.equal(s.boss.devourerHealingTotal, 40);
 });
 
 test('BOT may defer a small contribution that would heal Devorador more than its damage', async () => {
@@ -208,15 +208,15 @@ test('Devorador deduplicates cards, existing table/reorganization, replay and re
   for (let i = 0; i < 3; i++) normalizeBossState(restored);
   add(restored, ['a', 'b']); add(restored, ['base-4']);
   assert.equal(feed(restored).credits, 2); assert.equal(restored.boss.devourerHealingTotal, 0);
-  add(restored, ['c']); assert.equal(restored.boss.devourerHealingTotal, 40);
-  normalizeBossState(restored); add(restored, ['c']); assert.equal(restored.boss.devourerHealingTotal, 40);
+  add(restored, ['c']); assert.equal(restored.boss.devourerHealingTotal, 20);
+  normalizeBossState(restored); add(restored, ['c']); assert.equal(restored.boss.devourerHealingTotal, 20);
 });
-test('six cards rate-limit one heal without losing pending credits; later empty turn drains them', () => {
-  const s = feeding(); add(s, ['a','b','c','d','e','f']);
-  assert.equal(s.boss.devourerHealingTotal, 40); assert.equal(feed(s).credits, 3);
-  completeBossPlayerTurn(s, 0); assert.equal(feed(s).credits, 3);
-  s.turnNumber++; s.currentPlayer = 1; completeBossPlayerTurn(s, 1);
-  assert.equal(s.boss.devourerHealingTotal, 80); assert.equal(feed(s).credits, 0);
+test('six cards heal twice now; later empty turns never heal', () => {
+  const s=feeding();add(s,['a','b','c','d','e','f']);
+  assert.equal(s.boss.devourerHealingTotal,40);assert.equal(feed(s).credits,0);
+  const events=s.boss.eventLog.filter(e=>e.type==='bossHeal');assert.equal(events.length,2);
+  completeBossPlayerTurn(s,0);s.turnNumber++;s.currentPlayer=1;completeBossPlayerTurn(s,1);
+  assert.equal(s.boss.devourerHealingTotal,40);assert.equal(feed(s).credits,0);
 });
 test('death clears partial and queued credits; reanimation starts zero', () => {
   for (const ids of [['a','b'], ['a','b','c','d','e','f']]) {
@@ -233,14 +233,14 @@ for (const status of ['absent','entering','repelled','corpse']) test(`Devorador 
   if (status === 'corpse') d.hp = 0;
   add(s, ['a','b','c']); assert.equal(feed(s).credits, 0); assert.equal(s.boss.devourerHealingTotal, 0);
 });
-for (const [mutated, reinforced, expected] of [[false,false,40],[true,false,70],[false,true,70],[true,true,100]]) test(`Devorador canonical heal ${expected}, mutated=${mutated}, reinforced=${reinforced}`, () => {
+for (const [mutated, reinforced, expected] of [[false,false,20],[true,false,35],[false,true,35],[true,true,50]]) test(`Devorador canonical heal ${expected}, mutated=${mutated}, reinforced=${reinforced}`, () => {
   const s = feeding({ mutated, reinforced }); add(s, ['a','b','c']); assert.equal(s.boss.devourerHealingTotal, expected);
 });
-test('Devorador caps HP and undo restores credits/dedup/turn limit together', () => {
+test('Devorador caps HP and undo restores credits/dedup/event sequence together', () => {
   const s = feeding(); s.boss.hp = s.boss.maxHp - 10; add(s, ['a','b']);
   const before = createUndoTransaction(s); add(s, ['c']); const after = JSON.parse(JSON.stringify(s));
   assert.ok(s.boss.hp <= s.boss.maxHp);
-  assert.equal(s.boss.devourerHealingTotal, 25, 'healing cannot exceed missing HP after canonical contribution damage');
+  assert.equal(s.boss.devourerHealingTotal, 20, 'healing cannot exceed missing HP after canonical contribution damage');
   const restored = restoreUndoTransaction(before).state; add(restored, ['c']);
   assert.deepEqual(restored.boss.devourerFeed, after.boss.devourerFeed);
   assert.equal(restored.boss.devourerHealingTotal, after.boss.devourerHealingTotal);

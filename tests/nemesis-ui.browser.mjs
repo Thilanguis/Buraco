@@ -179,6 +179,7 @@ window.fixture.dualStatus = () => {
 window.fixture.grabPulse = (reducedMotion = false) => {
   const sample = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'stars_hunt', phase: 1 }).state;
   sample.boss.currentIntent = null; sample.boss.bossFlow = null; sample.boss.combatEntities[0].status = 'persistent';
+  sample.boss.grabberPursuit={version:1,playerIds:[0,1]};
   const ui = getBossUiAdapter('nemesis'), root = document.createElement('div');
   const acquired = [{ id: 'grab-a', rank: '7', suit: '♥' }, { id: 'free-b', rank: 'K', suit: '♠' }];
   sample.players[0].hand = acquired.slice();
@@ -303,8 +304,12 @@ try {
   assert.ok(dualLayout.fits && dualLayout.inside && dualLayout.below, `both compact labels fit a small card and do not cover NOVA: ${JSON.stringify(dualLayout)}`);
   await mkdir(resolve(root, '.cache/nemesis-ui'), {recursive:true});
   await combinedCard.screenshot({path:resolve(root, '.cache/nemesis-ui/nemesis-dual-status.png')});
-  assert.deepEqual(await page.evaluate(() => window.fixture.grabPulse()), { first: 1, repeat: 1, pulses: 1, marked: ['grab-a'], label: '☣ AGARRADA', remaining: 0 });
-  assert.deepEqual(await page.evaluate(() => window.fixture.grabPulse(true)), { first: 0, repeat: 0, pulses: 0, marked: ['grab-a'], label: '☣ AGARRADA', remaining: 0 });
+  for(const reduced of [false,true]) {
+    const pulse=await page.evaluate(reduced=>window.fixture.grabPulse(reduced),reduced);
+    assert.equal(pulse.first,reduced?0:1);assert.equal(pulse.repeat,pulse.first);assert.equal(pulse.pulses,pulse.first);
+    assert.equal(pulse.marked.length,1);assert.ok(['grab-a','free-b'].includes(pulse.marked[0]));
+    assert.equal(pulse.label,'☣ AGARRADA');assert.equal(pulse.remaining,0);
+  }
   await page.evaluate(() => window.fixture.decorate(null));
   assert.equal(await page.locator('#infectionTestCard .nemesis-infection-overlay, #infectionTestCard .boss-card-status-nemesis').count(), 0, 'clearing the effect removes infection decoration');
   await page.evaluate(() => window.fixture.decorate('nemesis-marked'));
@@ -426,6 +431,24 @@ try {
     }
     await page.evaluate(() => window.fixture.command());
     await page.setViewportSize({ width, height });
+    const grabTarget=page.locator('[data-entity-id="grabber"] .boss-daughter-state').filter({hasText:/^ALVO:/});
+    assert.equal(await grabTarget.count(),1);
+    await grabTarget.click();assert.match(await page.locator('#bossIntentHelpPopover').innerText(),/próxima rodada/);
+    await page.keyboard.press('Escape');
+    for (const charge of [0,1,2]) {
+      await page.evaluate(charge => {
+        const s=window.fixture.state(),e=s.boss.combatEntities.find(e=>e.id==='devourer');
+        e.status='persistent';e.hp=e.maxHp;s.boss.devourerFeed.credits=charge;window.fixture.render();
+      },charge);
+      const chip=page.locator('[data-entity-id="devourer"] .boss-devourer-charge');
+      assert.equal(await chip.getAttribute('data-charge'),String(charge));
+      assert.match(await chip.innerText(),/^CURA \d+$/);
+      assert.equal(await chip.evaluate(n=>n.style.getPropertyValue('--devourer-charge')),`${charge / 3 * 100}%`);
+      assert.ok((await chip.evaluate(n=>getComputedStyle(n).backgroundImage)).includes('linear-gradient'));
+      await chip.click();assert.match(await page.locator('#bossIntentHelpPopover').innerText(),/jogos e turnos diferentes/);
+      await page.keyboard.press('Escape');
+    }
+    await page.screenshot({path:resolve(root,`.cache/nemesis-ui/final-chips-${width}.png`)});
     for (const label of ['Explicar Lixo no modo Chefe', 'Passiva de Agarrador', 'Passiva de Infectado', 'Infectado: MUTADO', 'Infectado: REFORÇADO', 'Infectado: INFECÇÃO +6', 'Explicar alvo S.T.A.R.S.', 'Explicar alvo do dano', 'Explicar esta habilidade', 'Explicar a regra deste chefe']) {
       await page.getByLabel(label, { exact: true }).click();
       const anchored = await page.locator(label === 'Explicar a regra deste chefe' ? '#bossRule' : '#bossIntentHelpPopover').evaluate(node => {
