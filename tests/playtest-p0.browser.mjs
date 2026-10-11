@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { runSpecialPresentationCases } from './cooperative-special-presentation.browser-cases.mjs';
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_PATH || 'playwright');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const baseline=process.env.P0_BASELINE==='1';
@@ -35,6 +36,7 @@ import { cardFrontHTML, suitClass, deckFaceClass } from '/js/game/card-face.js';
 import { createDeck } from '/js/deck.js';
 import { createActionGate } from '/js/game/match-control.js';
 import { renderCooperativeSpecial, presentCooperativeSpecial } from '/js/boss/ui/cooperative-special-ui.js';
+import { createCooperativeSpecialPresenter, SPECIAL_PROTECTED_SELECTOR } from '/js/boss/ui/cooperative-special-presentation.js';
 import { saveBossSpecialTransaction, sameBossRevision, bossStateRevision } from '/js/game/boss-state-transaction.js';
 import { createUndoTransaction } from '/js/game/undo-transaction.js';
 const { createBossState, distributeCastleItems, getBossPhaseProgress, canUseCastleItem, useCastleItem, getCastleItemUseStatus,
@@ -44,7 +46,7 @@ const prepareMatchHistory=async()=>()=>{};
 const game=document.getElementById('gameSection');document.body.replaceChildren(game);game.style.display='flex';game.style.height='100vh';game.style.animation='none';
 for(const el of game.children)if(!el.matches('.board'))el.style.display='none';
 document.body.classList.add('boss-mode');document.body.dataset.deckTheme='resident';document.body.dataset.tableTheme='dimitrescu';
-let state,myPlayerIndex=0,committing=false,selectedMeldTarget=null,selectedBossCollateralChoiceId,selectedBossCollateralCardId;
+let state,myPlayerIndex=0,committing=false,selectedMeldTarget=null,selectedBossCollateralChoiceId,selectedBossCollateralCardId,matchSequence=0;
 let turnTimerId=null,turnTimerRemaining=60,timeoutCalls=0,watchdogCalls=0,undo;
 let pendingCommit=false,localUndoStack=[],ignoreOwnActionId,actionSequence=0;
 const db={},gameRef={};window.gameSessionId=1;
@@ -99,20 +101,22 @@ function renderAll(){
   syncBossDiscardHelp(true);
 }
 function reset(bossId='dimitrescu'){
+  cooperativeSpecialPresenter.cancel();
   const deck=createDeck(['♠','♥','♦','♣'],['A','2','3','4','5','6','7','8','9','10','J','Q','K']);
   const boss=createBossState(bossId,834);if(bossId==='dimitrescu')distributeCastleItems(boss,deck);boss.bossFlow={stage:'players'};
   const chosen=bossId==='dimitrescu'?Object.keys(ITEM_DEFINITIONS).flatMap(type=>deck.filter(c=>c.castleItem?.type===type).slice(0,2)):deck.slice(0,10);
   const remaining=deck.filter(c=>!chosen.includes(c));
-  state={mode:getBossDefinition(bossId).mode,currentPlayer:0,turnNumber:1,hasDrawnThisTurn:true,finished:false,boss,
+  state={mode:getBossDefinition(bossId).mode,matchStartedAt:++matchSequence,currentPlayer:0,turnNumber:1,hasDrawnThisTurn:true,finished:false,boss,
     players:[{id:0,name:'Biel',teamId:0,hand:chosen.filter((c,i)=>i%2===0).concat(remaining.splice(0,5))},{id:1,name:'Luana',teamId:0,hand:chosen.filter((c,i)=>i%2===1).concat(remaining.splice(0,5))}],
     teams:[{id:0,melds:[]},{id:1,melds:[]}],stock:remaining,discard:[],deadPiles:[],deadChunksTaken:[0,0]};
-  selectedHandIndexes.clear();renderAll();return state;
+  cooperativeSpecialPresenter.observe(state,{initial:true});selectedHandIndexes.clear();renderAll();return state;
 }
 window.p0={reset,state:()=>state,render:renderAll,observer:i=>{myPlayerIndex=i;renderAll();},
-  special:useCooperativeSpecial,specialUndo:()=>{state=structuredClone(localUndoStack.at(-1).state);renderAll();},
+  special:useCooperativeSpecial,specialUndo:()=>{cooperativeSpecialPresenter.cancel();state=structuredClone(localUndoStack.at(-1).state);state.lastAction={id:'test-undo',type:'undoMove'};renderAll();},
+  specialCancel:()=>cooperativeSpecialPresenter.cancel(),specialReplay:()=>animateCooperativeSpecial(state.lastAction),
   catalog:()=>getBossDebugCatalog().flatMap(b=>getBossDefinition(b.id).abilities.flatMap(a=>a.phases.map(phase=>({bossId:b.id,abilityId:a.id,phase})))),
   sample:options=>{state=buildBossDebugScenario(null,{...options,variant:'interactive',target:'auto'}).state;engine.selectNextBossIntent(state,{debug:true});renderAll();},
-  receive:s=>{state=JSON.parse(s);selectedHandIndexes.clear();renderAll();},undo:()=>{state=structuredClone(undo);renderAll();},
+  receive:s=>{const next=JSON.parse(s),event=observeCooperativeSpecialSnapshot(next);state=next;selectedHandIndexes.clear();renderAll();if(event)void animateCooperativeSpecial(event);},undo:()=>{state=structuredClone(undo);renderAll();},
   selected:()=>[...selectedHandIndexes],timer:()=>({turnTimerId,turnTimerRemaining,timeoutCalls,watchdogCalls}),
   close:closeBossIntentHelp,resetTimer:resetTurnTimer,
   chip:caption=>{const button=createBossCombatHelp('Teste de referência','Carta', 'Use Q♥ em um jogo. · Falha: +3 Sede.',caption);const parent=[...document.querySelectorAll('.boss-combat-chips, .boss-attendant-context')].find(el=>el.getBoundingClientRect().width>0);button.classList.add(parent.classList.contains('boss-attendant-context')?'boss-attendant-context-line':'boss-daughter-state');parent.append(button);return button;},
@@ -148,6 +152,8 @@ try{
       await page.exposeFunction('specialRead',()=>specialJson);
       await page.exposeFunction('specialWrite',(previous,next)=>{if(specialJson!==previous)return false;specialJson=next;return true;});
     }
+    await runSpecialPresentationCases({a,b,width,height,evidence,setSnapshot:json=>{specialJson=json;},getSnapshot:()=>specialJson});
+    if(process.env.SPECIAL_VISUAL_ONLY==='1'){assert.deepEqual(errors,[]);await context.close();continue;}
     for(const bossId of ['banker','dominadora','matriarca_esmeralda','dimitrescu','nehelenia','nemesis']){
       specialJson=await a.evaluate(id=>{const s=p0.reset(id);s.discard.push(...s.stock.splice(-15));s.boss.cooperativeSpecial.points=200;s.hasDrawnThisTurn=false;p0.render();return JSON.stringify(s);},bossId);
       await b.evaluate(json=>p0.receive(json),specialJson);

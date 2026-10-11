@@ -29,7 +29,8 @@ import { profileInLobby, teamForSeat } from './js/account-profile.js';
 import { buildMatchSummary, prepareHistoryWrites } from './js/match-history.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { saveBossSpecialTransaction, sameBossRevision, bossStateRevision } from './js/game/boss-state-transaction.js';
-import { renderCooperativeSpecial, presentCooperativeSpecial } from './js/boss/ui/cooperative-special-ui.js';
+import { renderCooperativeSpecial } from './js/boss/ui/cooperative-special-ui.js';
+import { createCooperativeSpecialPresenter, SPECIAL_PROTECTED_SELECTOR } from './js/boss/ui/cooperative-special-presentation.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
 import {
   BOSS_MODE_DOMINATRIX,
@@ -766,6 +767,7 @@ let localUndoStack = []; // Pilha para o botão voltar
 window.isStealModeActive = false; // Controle da visão da mesa
 
 function cancelGameAnimations() {
+  cooperativeSpecialPresenter.cancel();
   if (bossPresentationTimer) {
     clearTimeout(bossPresentationTimer);
     bossPresentationTimer = null;
@@ -1006,6 +1008,7 @@ window.executeUndo = async () => {
   }
 
   localUndoStack.pop();
+  cooperativeSpecialPresenter.cancel();
   const restored = restoreUndoTransaction(transaction);
   const previousState = restored.state;
   if (isBossMode(state)) previousState.bossStateRevision = bossStateRevision(state);
@@ -3151,6 +3154,9 @@ async function commitState() {
 }
 
 window.bossSpecialOperationPending = false;
+const cooperativeSpecialPresenter = createCooperativeSpecialPresenter({ storage: (() => {
+  try { return window.sessionStorage; } catch { return null; }
+})() });
 function canActivateCooperativeSpecial() {
   const player = state?.players?.[myPlayerIndex];
   return isBossMode(state) && !!player && !player.isBot && !player.name?.toUpperCase().includes('BOT') && player.teamId === 0
@@ -3196,12 +3202,26 @@ async function useCooperativeSpecial(recipientId) {
 }
 
 function animateCooperativeSpecial(action) {
-  const origin = document.getElementById('drawDiscardBtn');
-  const hand = action.recipientId === state.players?.[myPlayerIndex]?.id
-    ? document.getElementById('handContainer') : null;
-  return presentCooperativeSpecial({ document, from: origin ? getRect(origin) : null,
-    to: hand ? getRect(hand) : opponentAnchorRect(action.recipientId), count: action.count,
-    bossId: state.boss.id, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches });
+  const sessionId = window.gameSessionId, startedAt = state?.matchStartedAt;
+  const getGeometry = () => {
+    const origin = document.getElementById('drawDiscardBtn');
+    const hand = action.recipientId === state?.players?.[myPlayerIndex]?.id
+      ? document.getElementById('handContainer') : null;
+    return { from: origin ? getRect(origin) : null, to: hand ? getRect(hand) : opponentAnchorRect(action.recipientId),
+      viewport: { width: innerWidth, height: innerHeight },
+      obstacles: [...document.querySelectorAll(SPECIAL_PROTECTED_SELECTOR)]
+        .map(el => getRect(el)) };
+  };
+  return cooperativeSpecialPresenter.playConfirmed(state, action, { document, getGeometry,
+    reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    isCurrent: () => sessionId === window.gameSessionId && !window.isClosingGame && state?.matchStartedAt === startedAt &&
+      state?.boss?.cooperativeSpecial?.resolvedActionIds?.includes(action.id) });
+}
+
+function observeCooperativeSpecialSnapshot(next) {
+  return cooperativeSpecialPresenter.observe(next, {
+    initial: !state || window.isClosingGame || state.matchStartedAt !== next.matchStartedAt || pauseBlocksPlay(next),
+  });
 }
 
 function passTurn({ preserveUndo = false } = {}) {
@@ -10793,7 +10813,8 @@ function renderRemoteHandEmptyBeforeDeadPickup(playerId) {
 async function playRemoteAction(a) {
   if (!state || !a) return;
   if (a.type === 'bossSpecial') {
-    void animateCooperativeSpecial(a).catch(error => console.warn('Animação do Especial:', error));
+    // Special presentation is dispatched after the accepted snapshot is applied,
+    // independently of this generic pre-render animation pipeline.
     return;
   }
   if (a.type === 'friendTurn') return playFriendTurnPresentation(a);
@@ -12277,6 +12298,7 @@ onSnapshot(gameRef, async (snap) => {
   // Compatibilidade com partidas salvas enquanto existia o modal de posicao do coringa.
   delete newState.pendingWildcardChoice;
   newState.variant = normalizeVariantForMode(newState.mode, newState.variant);
+  const specialPresentationAction = observeCooperativeSpecialSnapshot(newState);
   const wasPaused = pauseBlocksPlay(state);
   if (pauseBlocksPlay(newState)) {
     state = newState;
@@ -12324,7 +12346,7 @@ onSnapshot(gameRef, async (snap) => {
 
     // 1. Executa a animação de voo com os elementos gráficos e cartas atuais ainda fixados na mão
     try {
-      await playRemoteAction(a);
+      if (a.type !== 'bossSpecial') await playRemoteAction(a);
     } catch (error) {
       if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
       throw error;
@@ -12354,6 +12376,9 @@ onSnapshot(gameRef, async (snap) => {
   syncTableAmbientMusic();
 
   renderAll();
+  if (specialPresentationAction) {
+    void animateCooperativeSpecial(specialPresentationAction).catch(error => console.warn('Animação do Especial:', error));
+  }
   if (arrivingFriends.length) {
     try {
       await playFriendInvitationPresentation(arrivingFriends);

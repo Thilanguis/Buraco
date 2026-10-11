@@ -1,4 +1,5 @@
 import { bossSpecialView, SPECIAL_HELP } from '../boss-special.js';
+export { presentCooperativeSpecial } from './cooperative-special-presentation.js';
 
 export function renderCooperativeSpecial({ document, state, canActivate, onActivate, getUseStatus = () => ({allowed:true}) }) {
   const slot = document.getElementById('bossSpecialSlot');
@@ -57,28 +58,4 @@ export function renderCooperativeSpecial({ document, state, canActivate, onActiv
     document.getElementById('bossSpecialPopover')?.remove();
     button.setAttribute('aria-expanded', 'false'); button.focus();
   }
-}
-
-// Provisional animatic: five physical-card silhouettes travel together, tinted
-// by universe. No new art, timers, canvas loops or permanent DOM nodes.
-export async function presentCooperativeSpecial({ document, from, to, count, bossId, reducedMotion }) {
-  if (!from || !to || reducedMotion || !count) return;
-  const colors = { nemesis: '#99e37c', dimitrescu: '#dc697b', nehelenia: '#c5a3f5',
-    matriarca_esmeralda: '#60e9b5', dominadora: '#e8b6ec', banker: '#e8c775' };
-  const flights = [];
-  for (let i = 0; i < Math.min(5, count); i++) {
-    const card = document.createElement('span'); card.className = 'boss-special-flight';
-    card.setAttribute('aria-hidden', 'true');
-    Object.assign(card.style, { left: `${from.left + from.width / 2}px`, top: `${from.top + from.height / 2}px`,
-      '--special-color': colors[bossId] || '#e8c775' });
-    document.body.append(card);
-    const dx = to.left + to.width / 2 - (from.left + from.width / 2) + (i - 2) * 8;
-    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-    const animation = card.animate([{ transform: 'translate(-50%, -50%) scale(.7)', opacity: 0 },
-      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, offset: .12 },
-      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${(i - 2) * 7}deg)`, opacity: 0 }],
-    { duration: 420, delay: i * 45, easing: 'cubic-bezier(.2,.7,.3,1)' });
-    flights.push(animation.finished.catch(() => {}).finally(() => card.remove()));
-  }
-  await Promise.all(flights);
 }

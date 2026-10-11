@@ -8,6 +8,7 @@ import { bossStateRevision, sameBossRevision } from '../js/game/boss-state-trans
 import { getBossDefinitionForMode } from '../js/boss/boss-registry.js';
 import { BuracoBot } from '../bot.js';
 import { BossBuracoBot } from '../boss-bot.js';
+import { createCooperativeSpecialPresenter } from '../js/boss/ui/cooperative-special-presentation.js';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const slice = (start, end) => app.slice(app.indexOf(start), app.indexOf(end, app.indexOf(start)));
@@ -24,7 +25,7 @@ function harness(bossId, abilityId) {
   const writes = [];
   let persisted = null;
   const ctx = {
-    ...bossEngine, bossStateRevision, sameBossRevision, console, Date, JSON, URL, structuredClone, AbortController,
+    ...bossEngine, bossStateRevision, sameBossRevision, console, Date, JSON, URL, structuredClone, AbortController, createCooperativeSpecialPresenter,
     document: { getElementById: element },
     window: { location: 'http://localhost/?debug=1', history: { replaceState() {} }, updateMenuDynamic() {}, toggleDebugPanel() {}, gameSessionId: 0 },
     localStorage: { setItem() {} }, gameId: 'offline-test', gameRef: {}, db: {}, myPlayerIndex: 0,

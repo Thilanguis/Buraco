@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { isBossMode } from '../js/boss/boss-engine.js';
 import { bossStateRevision, sameBossRevision } from '../js/game/boss-state-transaction.js';
+import { createCooperativeSpecialPresenter } from '../js/boss/ui/cooperative-special-presentation.js';
 import { buildMatchSummary, historyIdentity, historyStats, resultFor, prepareHistoryWrites, recordedDominationOptions } from '../js/match-history.js';
 
 const state = { finished: true, matchStartedAt: 1000, matchFinishedAt: 61000, mode: '1x1', variant: 'aberto', winnerTeamId: 0, players: [{id:0,name:'Maria',accountUid:'u1',teamId:0},{id:1,name:'João',accountUid:'u2',teamId:1}] };
@@ -67,7 +68,7 @@ test('commit final integra escrita do histórico na mesma transação', async ()
   const app = readFileSync(new URL('../app.js',import.meta.url),'utf8');
   const source = app.slice(app.indexOf('async function commitState()'),app.indexOf('function passTurn('));
   const writes=[];
-  const ctx = {isBossMode,bossStateRevision,sameBossRevision,state:{...state,stock:[{}],lastAction:{},pauseControlRevision:0},window:{isClosingGame:false},pendingCommit:false,committing:false,structuredClone,db:{},gameRef:'game',pauseBlocksPlay:()=>false,localUndoStack:[],console,
+  const ctx = {createCooperativeSpecialPresenter,isBossMode,bossStateRevision,sameBossRevision,state:{...state,stock:[{}],lastAction:{},pauseControlRevision:0},window:{isClosingGame:false},pendingCommit:false,committing:false,structuredClone,db:{},gameRef:'game',pauseBlocksPlay:()=>false,localUndoStack:[],console,
     prepareMatchHistory: async tx => () => tx.set('history',{finished:true}),
     runTransaction: async (_db,fn) => fn({get:async()=>({exists:()=>true,data:()=>({stateJson:JSON.stringify(ctx.state)})}),update:(...args)=>writes.push(['update',...args]),set:(...args)=>writes.push(['set',...args])})};
   vm.createContext(ctx); vm.runInContext(source,ctx); await ctx.commitState();
