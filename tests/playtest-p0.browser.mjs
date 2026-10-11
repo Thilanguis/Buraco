@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { runSpecialPresentationCases } from './cooperative-special-presentation.browser-cases.mjs';
+import { runCastleItemSelectionCases } from './dimitrescu-item-selection.browser-cases.mjs';
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_PATH || 'playwright');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const baseline=process.env.P0_BASELINE==='1';
@@ -79,6 +80,7 @@ ${duration}
 ${blood}
 ${rich}
 ${specialHandlers}
+function renderBossHud() { renderAll(); }
 function renderAll(){
   const boss=state.boss,hud=document.getElementById('bossHud');document.body.dataset.bossId=boss.id;
   hud.style.display='grid';document.getElementById('bossName').textContent=getBossDefinition(boss.id).name;
@@ -116,13 +118,14 @@ window.p0={reset,state:()=>state,render:renderAll,observer:i=>{myPlayerIndex=i;r
   specialCancel:()=>cooperativeSpecialPresenter.cancel(),specialReplay:()=>animateCooperativeSpecial(state.lastAction),
   catalog:()=>getBossDebugCatalog().flatMap(b=>getBossDefinition(b.id).abilities.flatMap(a=>a.phases.map(phase=>({bossId:b.id,abilityId:a.id,phase})))),
   sample:options=>{state=buildBossDebugScenario(null,{...options,variant:'interactive',target:'auto'}).state;engine.selectNextBossIntent(state,{debug:true});renderAll();},
-  receive:s=>{const next=JSON.parse(s),event=observeCooperativeSpecialSnapshot(next);state=next;selectedHandIndexes.clear();renderAll();if(event)void animateCooperativeSpecial(event);},undo:()=>{state=structuredClone(undo);renderAll();},
+  receive:s=>{const next=JSON.parse(s),event=observeCooperativeSpecialSnapshot(next);state=next;selectedHandIndexes.clear();renderAll();if(event)void animateCooperativeSpecial(event);},undo:()=>{clearCastleItemSelection();state=structuredClone(undo);renderAll();},
+  itemSelection:()=>castleItemSelectionModel(),applyItem:applySelectedCastleItem,
   selected:()=>[...selectedHandIndexes],timer:()=>({turnTimerId,turnTimerRemaining,timeoutCalls,watchdogCalls}),
   close:closeBossIntentHelp,resetTimer:resetTurnTimer,
   chip:caption=>{const button=createBossCombatHelp('Teste de referência','Carta', 'Use Q♥ em um jogo. · Falha: +3 Sede.',caption);const parent=[...document.querySelectorAll('.boss-combat-chips, .boss-attendant-context')].find(el=>el.getBoundingClientRect().width>0);button.classList.add(parent.classList.contains('boss-attendant-context')?'boss-attendant-context-line':'boss-daughter-state');parent.append(button);return button;},
   effectChip:caption=>{const group=document.getElementById('bossEffects');document.getElementById('bossHud').append(group);group.style.display='flex';const chip=document.createElement('span');chip.className='boss-effect-chip';chip.textContent=caption;group.append(chip);renderBossEffectChipReferences();return chip;},
   clockStart:()=>{state.matchStartedAt=Date.now();renderMatchDuration();},
-  reload:()=>{state=structuredClone(state);renderAll();},share:()=>commitState()};
+  reload:()=>{clearCastleItemSelection();state=structuredClone(state);renderAll();},share:()=>commitState()};
 reset();
 </script></body>`);
 const browser=await chromium.launch({channel:'msedge',headless:true});
@@ -147,13 +150,16 @@ try{
     await b.evaluate(()=>p0.observer(1));
     await a.exposeFunction('deliverSnapshot',s=>b.evaluate(s=>p0.receive(s),s));
     await b.exposeFunction('deliverSnapshot',s=>a.evaluate(s=>p0.receive(s),s));
+    if (!baseline) await runCastleItemSelectionCases({a,b,width,evidence});
+    if (process.env.CASTLE_ITEM_ONLY==='1') { assert.deepEqual(errors,[]); await context.close(); continue; }
     let specialJson=null;
     for(const page of[a,b]){
       await page.exposeFunction('specialRead',()=>specialJson);
       await page.exposeFunction('specialWrite',(previous,next)=>{if(specialJson!==previous)return false;specialJson=next;return true;});
     }
-    await runSpecialPresentationCases({a,b,width,height,evidence,setSnapshot:json=>{specialJson=json;},getSnapshot:()=>specialJson});
+    if (process.env.P0_SKIP_SPECIAL_PRESENTATION!=='1' && process.env.P0_UI_ONLY!=='1') await runSpecialPresentationCases({a,b,width,height,evidence,setSnapshot:json=>{specialJson=json;},getSnapshot:()=>specialJson});
     if(process.env.SPECIAL_VISUAL_ONLY==='1'){assert.deepEqual(errors,[]);await context.close();continue;}
+    if (process.env.P0_UI_ONLY!=='1') {
     for(const bossId of ['banker','dominadora','matriarca_esmeralda','dimitrescu','nehelenia','nemesis']){
       specialJson=await a.evaluate(id=>{const s=p0.reset(id);s.discard.push(...s.stock.splice(-15));s.boss.cooperativeSpecial.points=200;s.hasDrawnThisTurn=false;p0.render();return JSON.stringify(s);},bossId);
       await b.evaluate(json=>p0.receive(json),specialJson);
@@ -210,6 +216,7 @@ try{
     });
     assert.equal(animatic.before,animatic.after);assert.equal(animatic.peak,5);assert.equal(animatic.residual,0);
     console.log('Animatic desktop/tablet/mobile emulated, 20 cycles:',width,JSON.stringify(animatic));
+    }
     await a.evaluate(()=>p0.reset());await b.evaluate(()=>p0.reset());
     await a.screenshot({path:resolve(evidence,(baseline?'before':'after')+'-'+width+'.png'),fullPage:true});
     const geometry=await a.evaluate(()=>{
@@ -249,7 +256,7 @@ try{
         const selector='#handContainer .castle-use-item[data-item-type="'+type+'"]';
         if(!await a.locator(selector).count())continue;
         const expected={explosive:'100 DANO · SANGRA 15',relic:'DANO +20%',cold_flask:'CONGELA AS 3',dagger:'VÍNCULO 80%',anticoagulant:'REGEN 20→10'};
-        assert.ok((await a.locator(selector+' .castle-use-caption').allTextContents()).every(t=>t===expected[type]));
+        assert.ok((await a.locator(selector+' .castle-use-caption').evaluateAll(labels=>labels.map(el=>el.getAttribute('aria-label')))).every(t=>t===expected[type]));
         const captionGeometry=await a.locator(selector+' .castle-use-caption').evaluateAll(labels=>labels.map(el=>{
           const r=el.getBoundingClientRect(),c=el.closest('.carta').getBoundingClientRect();
           const text=document.createRange();text.selectNodeContents(el);
@@ -262,41 +269,45 @@ try{
         }));
         assert.ok(captionGeometry.every(r=>r.inside&&r.scroll<=r.client+1&&r.visible), 'caption remains below rank/suit, contained and readable at zoom 1: '+JSON.stringify(captionGeometry));
         await a.locator(selector+' .castle-use-caption').first().tap();
-        assert.equal(await a.locator('#bossIntentHelpPopover').isVisible(),true);assert.deepEqual(await a.evaluate(()=>p0.selected()),[]);await a.keyboard.press('Escape');
+        assert.equal(await a.locator('.castle-use-item.is-applying').count(),1);assert.deepEqual(await a.evaluate(()=>p0.selected()),[]);await a.keyboard.press('Escape');
         for(const method of ['click','tap']){
-          await a.locator(selector).first()[method]();assert.equal(await a.locator('#bossIntentHelpPopover').isVisible(),true);
-          assert.match(await a.locator('#bossIntentHelpText').innerText(),/Petrifica/);assert.deepEqual(await a.evaluate(()=>p0.selected()),[]);
+          await a.locator(selector).first()[method]();assert.equal(await a.locator('.castle-use-item.is-applying').count(),1);
+          assert.equal(await a.locator('#bossIntentHelpPopover').isVisible(),false);assert.deepEqual(await a.evaluate(()=>p0.selected()),[]);
           await a.keyboard.press('Escape');
         }
+        await a.locator(selector).first().locator('..').locator('.castle-item-info').tap();
+        assert.match(await a.locator('#bossIntentHelpText').innerText(),/Petrifica/);await a.keyboard.press('Escape');
       }
       const card=a.locator('#handContainer .carta').first();
       await card.scrollIntoViewIfNeeded();
-      await card.tap({position:{x:4,y:4}});
+      // Use viewport coordinates: relative tap offsets are scaled by the mobile card's CSS zoom.
+      const tapCardCorner=async()=>{const r=await card.boundingBox();await a.touchscreen.tap(r.x+4,r.y+4);};
+      await tapCardCorner();
       assert.equal((await a.evaluate(()=>p0.selected())).length,1);
-      await card.tap({position:{x:4,y:4}});assert.deepEqual(await a.evaluate(()=>p0.selected()),[]);
+      await tapCardCorner();assert.deepEqual(await a.evaluate(()=>p0.selected()),[]);
       // Interleave item and ordinary cards, then reverse physical order. Even a
       // selected neighbour must not intercept the other card's item control.
       await a.evaluate(()=>{const s=p0.state(),hand=s.players[0].hand,items=hand.filter(c=>c.castleItem),plain=hand.filter(c=>!c.castleItem);s.players[0].hand=items.flatMap((c,i)=>[c,plain[i]]);p0.render();});
       const plain=a.locator('#handContainer .carta:not(:has(.castle-use-item))').first();await plain.tap({position:{x:4,y:4}});
       for(const type of ['explosive','relic','cold_flask','dagger','anticoagulant']){
-        await a.locator('#handContainer [data-item-type="'+type+'"]').tap();assert.equal(await a.locator('#bossIntentHelpPopover').isVisible(),true);await a.keyboard.press('Escape');
+        await a.locator('#handContainer [data-item-type="'+type+'"]').tap();assert.equal(await a.locator('.castle-use-item.is-applying').count(),1);await a.keyboard.press('Escape');
       }
       await a.evaluate(()=>{p0.state().players[0].hand.reverse();p0.render();});
-      for(const type of ['explosive','relic']){await a.locator('#handContainer [data-item-type="'+type+'"]').click();assert.equal(await a.locator('#bossIntentHelpPopover').isVisible(),true);await a.keyboard.press('Escape');}
+      for(const type of ['explosive','relic']){await a.locator('#handContainer [data-item-type="'+type+'"]').click();assert.equal(await a.locator('.castle-use-item.is-applying').count(),1);await a.keyboard.press('Escape');}
       await a.evaluate(()=>p0.reset());
       // A marker change on a reused card must retain the live item listener.
       await a.evaluate(()=>{const s=p0.state();s.boughtCardIds=[s.players[0].hand.find(c=>c.castleItem?.type==='explosive').id];p0.render();});
-      await a.locator('#handContainer [data-item-type="explosive"]').tap();assert.equal(await a.locator('#bossIntentHelpPopover').isVisible(),true);
-      await a.locator('.castle-item-targets button').filter({hasText:'Bela'}).click();
+      await a.locator('#handContainer [data-item-type="explosive"]').tap();assert.equal(await a.locator('.castle-use-item.is-applying').count(),1);
+      await a.locator('[data-entity-id="bela"] .boss-combat-card-target').click();
       await b.waitForFunction(()=>p0.state().boss.combatEntities[0].sacrificedCards.length===1);
       assert.equal(await b.evaluate(()=>p0.state().boss.combatEntities[0].hp),350);
       await a.evaluate(async()=>{p0.undo();await p0.share();});
       assert.equal(await b.evaluate(()=>p0.state().boss.combatEntities[0].hp),500);
       // Both humans use a flask on Cassandra on successive turns.
-      await a.locator('#handContainer [data-item-type="cold_flask"]').tap();await a.locator('.castle-item-targets button').filter({hasText:'Cassandra'}).tap();
+      await a.locator('#handContainer [data-item-type="cold_flask"]').tap();await a.locator('[data-entity-id="cassandra"] .boss-combat-card-target').tap();
       await b.waitForFunction(()=>p0.state().boss.castleFreeze?.remainingTurns===2);
       await a.evaluate(async()=>{p0.state().currentPlayer=1;p0.state().turnNumber++;p0.render();await p0.share();});
-      await b.locator('#handContainer [data-item-type="cold_flask"]').click();await b.locator('.castle-item-targets button').filter({hasText:'Cassandra'}).tap();
+      await b.locator('#handContainer [data-item-type="cold_flask"]').click();await b.locator('[data-entity-id="cassandra"] .boss-combat-card-target').tap();
       await a.waitForFunction(()=>p0.state().boss.castleFreeze?.remainingTurns===2);
       assert.equal(await a.locator('.castle-daughter.is-frozen').count(),3);
       assert.equal(await b.locator('.castle-freeze-chip').count(),3);
@@ -313,8 +324,8 @@ try{
       // Legitimate disablement is explained; it must not select/consume a card.
       await b.evaluate(()=>{p0.state().hasDrawnThisTurn=false;p0.render();});
       await b.locator('#handContainer [data-item-type="relic"]').tap();
-      assert.match(await b.locator('.castle-item-targets').innerText(),/Termine a compra/);
-      assert.equal(await b.locator('.castle-item-targets button:disabled').count(),3);
+      assert.match(await b.locator('#castleItemSelectionHint').innerText(),/Termine a compra/);
+      assert.equal(await b.locator('.castle-use-item.is-applying').count(),0);
       await b.evaluate(()=>p0.close());
       // Trash face uses the same item art styling, including after reload.
       await a.evaluate(()=>{p0.reset();const s=p0.state(),c=s.players[0].hand.pop();s.discard.push(c);const item=s.players[0].hand.find(c=>c.castleItem?.type==='explosive');s.players[0].hand.splice(s.players[0].hand.indexOf(item),1);s.discard.push(item);p0.reload();});

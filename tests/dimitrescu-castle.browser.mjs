@@ -31,7 +31,9 @@ let renderedBossFeedbackEventIds=null,renderedBossFeedbackCount=0,bossResourceFe
 const syncBossResourceSounds=()=>{};
 const getBossUiAdapter=()=>null, isBossDiscardBlocked=()=>false;
 const selectedHandIndexes=new Set(), localActionGate={run:fn=>fn()}, canPerformCommonGameAction=()=>true, saveStateForUndo=()=>{}, commitState=async()=>{}, newActionId=()=>Date.now().toString(), flyRectToRect=async()=>{};
+const pauseBlocksPlay=()=>false;
 ${functions}
+function renderBossCombatPanel(hud) { renderCastleHud({document,hud,state,createHelp:createBossCombatHelp,cardFrontHTML,disabled:false,itemSelection:castleItemSelectionModel(),applyItem:applySelectedCastleItem,selectTarget:id=>{state.boss.combatTargetsByPlayer[0]=id;renderAll();}}); }
 function renderAll() {
   const boss=state.boss;
   ${discardHud}
@@ -46,7 +48,7 @@ function renderAll() {
   document.getElementById('bossIntentDescription').textContent='Use cada carta marcada em um jogo.';
   document.getElementById('bossIntentProgress').textContent='Sem punição no sucesso';
   renderBossPhaseAndHealth(state,getBossPhaseProgress(state));
-  renderCastleHud({document,hud:document.getElementById('bossHud'),state,createHelp:createBossCombatHelp,cardFrontHTML,disabled:false,selectTarget:id=>{state.boss.combatTargetsByPlayer[0]=id;renderAll();}});
+  renderBossCombatPanel(document.getElementById('bossHud'));
   ${feedbackGate}
   const hand=document.getElementById('sampleHand'); hand.replaceChildren();
   for(const c of state.players[0].hand) {
@@ -55,7 +57,7 @@ function renderAll() {
     if(getBossCardEffect(state,0,c.id)==='dimitrescu-hunt') {
       el.classList.add('boss-card-dimitrescu-hunt');el.insertAdjacentHTML('beforeend','<span class="boss-card-status boss-card-status-blood-hunt"><b>BELA</b></span>');
     }
-    const button=castleItemUseButton(c);if(button)el.append(button);hand.append(el);
+    const button=castleItemUseButton(c);if(button)el.append(button);const info=castleItemInfoButton(c);if(info)el.append(info);hand.append(el);
   }
 }
 window.resetSample=(normal=false)=>{
@@ -225,7 +227,7 @@ try {
     assert.ok(await page.locator('.castle-daughter').evaluateAll(cards=>cards.every(card=>card.querySelector('.boss-combat-card-target').getBoundingClientRect().width<=card.getBoundingClientRect().width)), 'target hitboxes stay inside their own card');
     await activate('.castle-daughter [aria-label="Atacar Bela"]');assert.equal(await page.evaluate(()=>window.sampleState.boss.combatTargetsByPlayer[0]),'bela');
     if(width<1920)await page.locator('#sampleHand .castle-use-item').first().tap();else await page.locator('#sampleHand .castle-use-item').first().click();
-    if(width<1920)await page.locator('.castle-item-targets button').first().tap();else await page.locator('.castle-item-targets button').first().click();
+    if(width<1920)await page.locator('.is-item-eligible .boss-combat-card-target').first().tap();else await page.locator('.is-item-eligible .boss-combat-card-target').first().click();
     assert.equal(await page.locator('.castle-sacrifice-card').count(),1);assert.equal(await page.locator('#sampleHand .castle-item-overlay').count(),4);
     assert.equal(await page.evaluate(()=>window.sampleState.boss.combatEntities[0].hp),300);
     assert.match(await page.locator('.castle-daughter .boss-combat-content').first().innerText(),/300 \/ 450 HP/);

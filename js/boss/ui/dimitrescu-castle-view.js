@@ -94,7 +94,7 @@ export function castleItemInventory(boss, type) {
     attached: boss.combatEntities.flatMap(d => d.sacrificedCards).filter(card => card.castleItem.type === type).length };
 }
 
-export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTML, disabled, selectTarget, viewerId = state.players[state.currentPlayer]?.id }) {
+export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTML, disabled, selectTarget, itemSelection = null, applyItem, viewerId = state.players[state.currentPlayer]?.id }) {
   const boss = state.boss;
   let panel = document.getElementById('dimitrescuCastlePanel');
   let ribbon = document.getElementById('castleItemRibbon');
@@ -175,13 +175,16 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     daggerChip.textContent = `ADAGA · ${castleRules(boss).daggerTransfer * 100}%`;
     daggerChip._help = `${linked.map(d => d.name).join(' e ')}: parte do dano dos ataques também atinge a vida da Lady, ignorando as proteções.\n${castleItemHelp('dagger',boss).split('\n')[0]}`;
   }
-  const signature = JSON.stringify([boss.combatEntities, boss.castleFreeze, boss.roundNumber, boss.castlePassiveRound, boss.castleSelectedDaughterIds, disabled, target, state.players.map(p => p.name)]);
+  const signature = JSON.stringify([boss.combatEntities, boss.castleFreeze, boss.roundNumber, boss.castlePassiveRound, boss.castleSelectedDaughterIds, disabled, target, itemSelection, state.players.map(p => p.name)]);
   if (panel.dataset.signature === signature) return;
   panel.dataset.signature = signature; panel.replaceChildren();
   for (const d of boss.combatEntities) {
     const card = document.createElement('article'); card.dataset.entityId = d.id;
     card.className = `boss-daughter-card boss-combat-entity castle-daughter ${d.hp ? '' : 'is-dead'}`;
     card.classList.toggle('is-selected', d.id === target);
+    const itemStatus = itemSelection?.statuses[d.id];
+    card.classList.toggle('is-item-eligible', !!itemStatus?.allowed && !disabled);
+    card.classList.toggle('is-item-blocked', !!itemSelection && (!itemStatus?.allowed || disabled));
     const frozen = d.hp > 0 && castleFrozen(boss);
     card.classList.toggle('is-frozen', frozen);
     const portrait = document.createElement('img'); portrait.src = d.portrait; portrait.alt = d.name; portrait.className = 'boss-combat-portrait'; card.append(portrait);
@@ -258,8 +261,11 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     }
     card.append(content);
     const select = document.createElement('button'); select.type = 'button'; select.className = 'boss-combat-card-target';
-    select.disabled = disabled || !d.hp; select.setAttribute('aria-label', `Atacar ${d.name}`); select.setAttribute('aria-pressed', String(d.id === target));
-    select.onclick = () => selectTarget(d.id); card.append(select);
+    select.disabled = disabled || !d.hp || (!!itemSelection && !itemStatus?.allowed);
+    select.setAttribute('aria-label', itemSelection ? `Usar ${itemSelection.label} em ${d.name}` : `Atacar ${d.name}`);
+    select.setAttribute('aria-pressed', String(!itemSelection && d.id === target));
+    select.title = itemSelection ? (itemStatus?.allowed ? `Aplicar ${itemSelection.label}` : itemStatus?.reason || 'Item indisponível') : '';
+    select.onclick = () => itemSelection ? applyItem(d.id) : selectTarget(d.id); card.append(select);
     card.append(createHelp(`Explicar ${d.name}`, d.name, `${daughterPassiveHelp(d, state)}\n\n${daughterRegenerationHelp(d,boss)} Depois de derrotada, não volta.`));
     panel.append(card);
   }

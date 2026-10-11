@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v304';
+const CACHE_NAME = 'buraco-v305';
 const ASSETS = [
   './js/boss/ui/cooperative-special-presentation.js',
   './assets/images/special/ada-wong.png',

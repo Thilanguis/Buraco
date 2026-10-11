@@ -768,6 +768,7 @@ window.isStealModeActive = false; // Controle da visão da mesa
 
 function cancelGameAnimations() {
   cooperativeSpecialPresenter.cancel();
+  clearCastleItemSelection();
   if (bossPresentationTimer) {
     clearTimeout(bossPresentationTimer);
     bossPresentationTimer = null;
@@ -7467,52 +7468,153 @@ function syncBossIntentHelp(gameState) {
   });
 }
 
+// Local presentation state only: never persisted into snapshots or undo saves.
+let castleItemSelection = null;
+let castleItemSelectionListeners = false;
+
+function castleItemSelectionScope() {
+  return JSON.stringify([window.gameSessionId, state?.matchStartedAt, state?.boss?.id,
+    state?.boss?.seed, state?.turnNumber, state?.currentPlayer, myPlayerIndex,
+    state?.boss?.combatEntities?.filter(d => d.hp > 0).map(d => d.id)]);
+}
+
+function clearCastleItemSelection() {
+  castleItemSelection = null;
+  document.getElementById('castleItemSelectionHint')?.remove();
+  document.querySelectorAll('.castle-use-item.is-applying').forEach(el => {
+    el.classList.remove('is-applying'); el.setAttribute('aria-pressed', 'false');
+  });
+}
+
+function castleItemSelectionModel() {
+  const hint = document.getElementById('castleItemSelectionHint');
+  if (hint && hint.dataset.scope !== castleItemSelectionScope()) hint.remove();
+  if (!castleItemSelection) return null;
+  const playerId = state?.players[myPlayerIndex]?.id;
+  const statuses = Object.fromEntries((state?.boss?.combatEntities || []).map(d =>
+    [d.id, getCastleItemUseStatus(state, playerId, castleItemSelection.cardId, d.id)]));
+  if (castleItemSelection.scope !== castleItemSelectionScope() ||
+      castleItemSelection.undoId !== (state?.lastAction?.type === 'undoMove' ? state.lastAction.id : null) ||
+      pauseBlocksPlay(state) || !Object.values(statuses).some(s => s.allowed)) {
+    clearCastleItemSelection(); return null;
+  }
+  return { ...castleItemSelection, statuses };
+}
+
+function refreshCastleItemSelection() {
+  renderBossCombatPanel(document.getElementById('bossHud'), state.boss);
+  document.querySelectorAll('.castle-use-item').forEach(el => {
+    const selected = el.closest('[data-card-id]')?.dataset.cardId === castleItemSelection?.cardId;
+    el.classList.toggle('is-applying', selected); el.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function showCastleItemSelectionHint(text) {
+  let hint = document.getElementById('castleItemSelectionHint');
+  if (!hint) {
+    hint = document.createElement('p'); hint.id = 'castleItemSelectionHint';
+    hint.setAttribute('role', 'status'); hint.setAttribute('aria-live', 'polite');
+    document.getElementById('dimitrescuCastlePanel')?.insertAdjacentElement('afterend', hint);
+  }
+  hint.textContent = text;
+  hint.dataset.scope = castleItemSelectionScope();
+}
+
+function selectCastleItem(cardId) {
+  closeBossIntentHelp();
+  if (!castleItemSelectionListeners) {
+    castleItemSelectionListeners = true;
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && castleItemSelection) { clearCastleItemSelection(); refreshCastleItemSelection(); }
+    });
+    document.addEventListener('click', event => {
+      if (castleItemSelection && !event.target.closest('.castle-use-item, .castle-item-info, .castle-daughter, #bossIntentHelpPopover')) {
+        clearCastleItemSelection(); refreshCastleItemSelection();
+      }
+    }, true);
+  }
+  if (castleItemSelection?.cardId === cardId) {
+    clearCastleItemSelection(); refreshCastleItemSelection(); return;
+  }
+  clearCastleItemSelection();
+  const statuses = state.boss.combatEntities.map(d => getCastleItemUseStatus(state, state.players[myPlayerIndex]?.id, cardId, d.id));
+  if (committing || !canPerformCommonGameAction() || pauseBlocksPlay(state) || !statuses.some(s => s.allowed)) {
+    showCastleItemSelectionHint(committing ? 'Aguarde a ação anterior terminar.' : pauseBlocksPlay(state) ? 'Retome a partida para usar o item.' :
+      statuses.find(s => s.code !== 'target')?.reason || 'Nenhuma filha pode receber este item agora.');
+    refreshCastleItemSelection(); return;
+  }
+  castleItemSelection = { cardId, scope: castleItemSelectionScope(),
+    undoId: state.lastAction?.type === 'undoMove' ? state.lastAction.id : null,
+    label: ITEM_DEFINITIONS[state.boss.castleItems[cardId].type].label };
+  refreshCastleItemSelection();
+  showCastleItemSelectionHint(`Escolha uma filha para usar ${castleItemSelection.label}.`);
+}
+
+function applySelectedCastleItem(daughterId) {
+  const selection = castleItemSelectionModel();
+  if (!selection) return;
+  // Take the selection out before entering the gate: repeated taps cannot queue a second use.
+  clearCastleItemSelection(); refreshCastleItemSelection();
+  return localActionGate.run(async () => {
+    const playerId = state.players[myPlayerIndex]?.id;
+    if (selection.scope !== castleItemSelectionScope() || committing || !canPerformCommonGameAction() || pauseBlocksPlay(state)) return;
+    const status = getCastleItemUseStatus(state, playerId, selection.cardId, daughterId);
+    if (!status.allowed || !canUseCastleItem(state, playerId, selection.cardId, daughterId)) {
+      showCastleItemSelectionHint(status.reason); return;
+    }
+    const card = state.players[myPlayerIndex].hand.find(c => c.id === selection.cardId);
+    const origin = document.querySelector(`#handContainer [data-card-id="${CSS.escape(card.id)}"]`)?.getBoundingClientRect();
+    const destination = document.querySelector(`#dimitrescuCastlePanel [data-entity-id="${daughterId}"]`)?.getBoundingClientRect();
+    saveStateForUndo('castleItem', [card.id]);
+    const used = useCastleItem(state, playerId, card.id, daughterId);
+    if (!used) return;
+    closeBossIntentHelp(); selectedHandIndexes.clear();
+    state.lastAction = { id: newActionId(), type: 'castleItem', playerId, cardId: card.id, daughterId, bossEvent: used };
+    if (origin && destination && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      await flyRectToRect({ ...card, castleItem: { ...card.castleItem, consumed: false } }, origin, destination, 'front');
+    }
+    renderAll(); await commitState();
+  });
+}
+
+function castleItemInfoButton(card) {
+  const type = state.boss?.castleItems?.[card.id]?.type, definition = ITEM_DEFINITIONS[type];
+  if (!definition || state.boss.castleItems[card.id].consumed) return null;
+  const button = createBossCombatHelp(`Explicar ${definition.label} da carta ${card.rank}${card.suit}`,
+    definition.label, `${castleItemHelp(type, state.boss)}\nToque no ícone do item e depois na filha para aplicar. Toque no mesmo item novamente, fora das filhas ou pressione Escape para cancelar. Guarde uma carta para descartar.`);
+  button.classList.add('castle-item-info');
+  return button;
+}
+
 function castleItemUseButton(card) {
   const definition = ITEM_DEFINITIONS[state.boss?.castleItems?.[card.id]?.type];
   if (!definition || state.boss.castleItems[card.id].consumed) return null;
-  const button = createBossCombatHelp(`Usar ${definition.label} da carta ${card.rank}${card.suit}`, definition.label,
-    `${castleItemHelp(state.boss.castleItems[card.id].type, state.boss)}\nEscolha uma filha. Guarde uma carta para descartar.`, '');
+  const button = document.createElement('button'); button.type = 'button';
+  button.setAttribute('aria-label', `Usar ${definition.label} da carta ${card.rank}${card.suit}`);
+  button.setAttribute('aria-pressed', String(castleItemSelection?.cardId === card.id));
+  button.classList.toggle('is-applying', castleItemSelection?.cardId === card.id);
   button.classList.add('castle-use-item');
   button.dataset.itemType = state.boss.castleItems[card.id].type;
   const caption = document.createElement('span'); caption.className = 'castle-use-caption';
   caption.textContent = castleItemChip(button.dataset.itemType, state.boss); button.append(caption);
-  const open = button.onclick;
+  const label = caption.textContent;
+  caption.setAttribute('aria-label', label);
+  button.setAttribute('aria-label', `${button.getAttribute('aria-label')}: ${label}`);
+  const lines = label.includes(' · ') ? label.split(' · ') : label === 'CONGELA AS 3' ? ['CONGELA', 'AS 3'] :
+    /^(VÍNCULO|REGEN|DANO) /.test(label) ? [label.slice(0, label.indexOf(' ')), label.slice(label.indexOf(' ') + 1)] : [label];
+  if (lines.length > 1) {
+    caption.replaceChildren();
+    lines.forEach((line, index) => {
+      const row = document.createElement('span'); row.className = 'castle-caption-line';
+      const full = document.createElement('span'); full.className = 'castle-caption-full'; full.textContent = line; row.append(full);
+      const compactText = line.replace(' DANO', ' HP').replace('SANGRA ', '').replace('VÍNCULO', 'VÍNC.').replace('CONGELA', 'GELA');
+      const compact = document.createElement('span'); compact.className = 'castle-caption-compact';
+      compact.textContent = line.startsWith('SANGRA ') ? `${compactText}/ROD` : compactText;
+      compact.setAttribute('aria-hidden', 'true'); row.append(compact); caption.append(row);
+    });
+  }
   button.onclick = event => {
-    open(event);
-    const popover = document.getElementById('bossIntentHelpPopover');
-    if (popover.hidden || popover._extraTrigger !== button) return;
-    const choices = document.createElement('div'); choices.className = 'castle-item-targets';
-    if (!state.boss.combatEntities.some(d => d.hp > 0)) {
-      const reason = document.createElement('small'); reason.className = 'castle-item-unavailable';
-      reason.textContent = 'As três filhas já morreram. Não há uma filha viva para receber este item.'; choices.append(reason);
-    }
-    for (const daughter of state.boss.combatEntities.filter(d => d.hp > 0)) {
-      const target = document.createElement('button'); target.type = 'button'; target.textContent = daughter.name;
-      const status = getCastleItemUseStatus(state, state.players[myPlayerIndex]?.id, card.id, daughter.id);
-      target.disabled = !status.allowed;
-      if (!status.allowed) {
-        const reason = document.createElement('small'); reason.className = 'castle-item-unavailable';
-        reason.textContent = `${daughter.name}: ${status.reason}`; choices.append(reason);
-      }
-      target.onclick = () => localActionGate.run(async () => {
-        const playerId = state.players[myPlayerIndex]?.id;
-        if (committing || !canPerformCommonGameAction() || !canUseCastleItem(state, playerId, card.id, daughter.id)) return;
-        const origin = document.querySelector(`#handContainer [data-card-id="${CSS.escape(card.id)}"]`)?.getBoundingClientRect();
-        const destination = document.querySelector(`#dimitrescuCastlePanel [data-entity-id="${daughter.id}"]`)?.getBoundingClientRect();
-        saveStateForUndo('castleItem', [card.id]);
-        const used = useCastleItem(state, playerId, card.id, daughter.id);
-        if (!used) return;
-        closeBossIntentHelp(); selectedHandIndexes.clear();
-        state.lastAction = { id: newActionId(), type: 'castleItem', playerId, cardId: card.id, daughterId: daughter.id, bossEvent: used };
-        if (origin && destination && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          await flyRectToRect({ ...card, castleItem: { ...card.castleItem, consumed: false } }, origin, destination, 'front');
-        }
-        renderAll(); await commitState();
-      });
-      choices.append(target);
-    }
-    document.getElementById('bossIntentHelpText').append(choices);
-    positionBossHelpPopover(button, popover);
+    event.stopPropagation(); selectCastleItem(card.id);
   };
   return button;
 }
@@ -7594,6 +7696,7 @@ function syncBossDiscardHelp(bossMode) {
 function renderBossCombatPanel(hud, boss) {
   renderCastleHud({ document, hud, state, createHelp: createBossCombatHelp, cardFrontHTML,
     viewerId: state.players[myPlayerIndex]?.id,
+    itemSelection: castleItemSelectionModel(), applyItem: applySelectedCastleItem,
     disabled: state.currentPlayer !== myPlayerIndex || isBossTurnActive(state) || !!boss.result || pauseBlocksPlay(state),
     selectTarget: id => localActionGate.run(async () => {
       if (committing || !canPerformCommonGameAction() || !setBossDamageTarget(state, state.players[myPlayerIndex]?.id, id)) return;
@@ -9105,6 +9208,7 @@ function activeMatriarchTargetPlayerIds() {
 }
 
 function renderHand() {
+  castleItemSelectionModel();
   const handRoot = document.getElementById('handContainer');
   // Replacing the DOM under a stationary cursor must not lift a different
   // card after a discard. Re-enable PC hover only after genuine mouse motion.
@@ -9310,6 +9414,8 @@ function renderHand() {
     if (state.boss?.id === 'dimitrescu') {
       const itemButton = castleItemUseButton(card);
       if (itemButton) div.append(itemButton);
+      const itemInfo = castleItemInfoButton(card);
+      if (itemInfo) div.append(itemInfo);
     }
     if (financedCard) {
       div.insertAdjacentHTML('beforeend', '<span class="boss-financed-marker" role="img" aria-label="Carta financiada: use em um jogo neste turno"><span aria-hidden="true">FINANCIADA</span></span>');
