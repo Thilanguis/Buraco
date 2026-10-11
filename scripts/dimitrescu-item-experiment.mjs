@@ -7,9 +7,15 @@ import { createBossState, distributeCastleItems, normalizeBossState, beginBossTu
   completeBossPlayerTurn, applyBossMeldTransition, applyBossDeadTaken, applyBossFinalStrike,
   applyBossResourceDefeat, quoteBossDiscardPickup, isValidBossSequence, classifyBossMeldKind,
   isBossCardBlocked, notifyBossPurchaseCompleted, notifyBossDiscardTaken, notifyBossCardDiscarded,
-  getBossDimitrescuPriorities, quoteBossPlanDamage, canUseCastleItem, useCastleItem, getCastleBotItem } from '../js/boss/boss-engine.js';
+  getBossDimitrescuPriorities, quoteBossPlanDamage, canUseCastleItem, useCastleItem, getCastleBotItem,
+  canBossCreateMeld, canBossUseMeld, isBossMeldLocked } from '../js/boss/boss-engine.js';
 import { findNemesisLegalPlan } from '../js/boss/mechanics/nemesis.js';
-import { CASTLE_BALANCE, LEGACY_CASTLE_BALANCE, livingDaughters, furyLevel, chooseCastleDamageTarget, regenerateDaughters } from '../js/boss/dimitrescu-castle.js';
+import { CASTLE_BALANCE, LEGACY_CASTLE_BALANCE, livingDaughters, furyLevel, chooseCastleDamageTarget, regenerateDaughters, hasCastleHemorrhage } from '../js/boss/dimitrescu-castle.js';
+
+// Freeze the pre-approval baseline: historical reports must remain reproducible
+// after the game's defaults change to package B.
+export const EXPERIMENT_BASELINE = Object.freeze({ ...CASTLE_BALANCE, regeneration:50, anticoagulantRegeneration:25,
+  itemEffectsVersion:1, daggerTransfer:.3, explosiveDamage:60, bleedAmount:null, bleedPercent:.1, bleedPermanent:false, bleedRounds:2 });
 
 export const STRATEGIES = ['direct','kill_one','kill_two','kill_three','dagger','explosive_anti','cold_bleed','hybrid'];
 export const CANDIDATES = {
@@ -22,12 +28,12 @@ export const CANDIDATES = {
 };
 export function castleDeal(seed,{legacy=false,...overrides}={}) {
   const rng=random(seed),deck=createDeck(['♠','♥','♦','♣'],['A','2','3','4','5','6','7','8','9','10','J','Q','K']);
-  const boss=createBossState('dimitrescu',seed),rules={...CASTLE_BALANCE,...overrides};
+  const boss=createBossState('dimitrescu',seed),rules={...EXPERIMENT_BASELINE,...overrides};
   rules.maxHpLossPercent={...CASTLE_BALANCE.maxHpLossPercent,...overrides.maxHpLossPercent};
   if(legacy){boss.castleItemRulesVersion=1;delete boss.castleItemRules;boss.castleDaughterBalanceVersion=2;}
   else boss.castleItemRules=rules;
   const hp=legacy?LEGACY_CASTLE_BALANCE.daughterHp:rules.daughterHp;
-  for(const d of boss.combatEntities)d.hp=d.maxHp=d.originalMaxHp=hp;
+  for(const d of boss.combatEntities){d.hp=d.maxHp=d.originalMaxHp=hp;d.regeneration=legacy?LEGACY_CASTLE_BALANCE.regeneration:rules.regeneration;}
   distributeCastleItems(boss,deck); // Association independent of shuffled location or strategy.
   for(let i=deck.length-1;i;i--){const j=Math.floor(rng()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];}
   const deal=dealInitialDeck(deck,2,11,11);
@@ -52,6 +58,8 @@ export function castleComboProbe(types,options={}) {
 }
 function helpers(state){return {validSequence:isValidBossSequence,blocked:(p,c,a)=>isBossCardBlocked(state,p,c,a),
   canLeaveHand:(player,moves)=>{
+    if(moves.some(m=>m.meldIndex==null?!canBossCreateMeld(state,player.id):
+      isBossMeldLocked(state,player.teamId,m.meldIndex)||!canBossUseMeld(state,player.id,m.meldIndex)))return false;
     // Reorganisation/new triples can reset a dirty canastra's classification;
     // evaluate the resulting entire table, not each single extension separately.
     const remaining=player.hand.length-new Set(moves.flatMap(m=>m.cardIds)).size;
@@ -74,7 +82,7 @@ function plan(state,player){
 function chooseTarget(state,strategy,damage){
   const ds=livingDaughters(state.boss),deaths=furyLevel(state.boss),quota={direct:0,kill_one:1,kill_two:2,kill_three:3}[strategy];
   if(quota!=null)return deaths>=quota?'boss':[...ds].sort((a,b)=>a.hp-b.hp||a.id.localeCompare(b.id))[0]?.id||'boss';
-  const linked=ds.filter(d=>d.daggerLink),bleeding=ds.filter(d=>d.hemorrhage?.remaining);
+  const linked=ds.filter(d=>d.daggerLink),bleeding=ds.filter(hasCastleHemorrhage);
   const selected=strategy==='dagger'?linked:strategy==='explosive_anti'||strategy==='cold_bleed'?bleeding:[];
   return selected.sort((a,b)=>a.hp-b.hp||a.id.localeCompare(b.id))[0]?.id||chooseCastleDamageTarget(state,damage);
 }
@@ -112,9 +120,11 @@ function emptyHand(state,player){
 const flow=state=>{for(let i=0;i<20&&state.boss.bossFlow?.stage!=='players'&&!state.boss.result;i++)advanceBossTurn(state,state.boss.bossFlow.endsAt+1);};
 export function castleBattle(seed,strategy='hybrid',options={}){
   if(!STRATEGIES.includes(strategy))throw Error('Unknown strategy');
-  const state=castleDeal(seed,options),seen=new Set(),used=[],events=new Map();
+  const {observe:telemetry,fixedItemPolicy,...rules}=options;
+  const state=castleDeal(seed,rules),seen=new Set(),used=[],events=new Map();
   const observe=()=>{for(const p of state.players)for(const c of p.hand)if(state.boss.castleItems[c.id])seen.add(c.id);
-    for(const e of state.boss.eventLog)if(e.actionId)events.set(e.actionId,e);};
+    for(const e of state.boss.eventLog)if(e.actionId)events.set(e.actionId,e);
+    telemetry?.(state);};
   observe();const initialItems=seen.size;let earlyItems=initialItems,turns=0,pickups=0;
   beginBossTurn(state,{first:true,now:1000});flow(state);
   while(!state.boss.result&&turns<180){
@@ -138,7 +148,7 @@ export function castleBattle(seed,strategy='hybrid',options={}){
     if(state.boss.result)break;
     state.hasDrawnThisTurn=true;notifyBossPurchaseCompleted(state,player.id);observe();
     // Item cost is a real hand card removed before planning, never free damage.
-    for(let i=0;i<5;i++){const choice=itemChoice(state,player,strategy);if(!choice)break;
+    for(let i=0;i<5;i++){const choice=itemChoice(state,player,fixedItemPolicy&&strategy==='hybrid'?'dagger':strategy);if(!choice)break;
       const event=useCastleItem(state,player.id,choice.cardId,choice.daughterId);if(!event)throw Error('Invalid item');used.push(event.itemType);}
     for(let i=0;i<12&&!state.boss.result;i++){const chosen=plan(state,player);if(!chosen)break;
       for(const move of chosen.moves){if(state.boss.result)break;play(state,player,move,strategy);}emptyHand(state,player);observe();}

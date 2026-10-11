@@ -226,7 +226,7 @@ for(const scenario of ['three','cold','full','dead'])test(`daughterRegen ${scena
   const hp=s.boss.hp,danger=s.boss.danger,events=[];
   regenerateDaughters(s,()=>assert.fail('offensive passives must not run in this fixture'),e=>events.push(e));
   const steps=events.flatMap(e=>resourceFeedbackSteps(s.boss,e));
-  assert.deepEqual(steps.map(e=>[e.entityId,e.amount]),[...(scenario==='three'?[['bela',50]]:[]),['cassandra',20],['daniela',25]]);
+  assert.deepEqual(steps.map(e=>[e.entityId,e.amount]),[...(scenario==='three'?[['bela',20]]:[]),['cassandra',20],['daniela',25]]);
   assert.ok(steps.every(e=>e.metric==='daughterHp'));assert.equal(s.boss.hp,hp);assert.equal(s.boss.danger,danger);
   const previous=events.length;regenerateDaughters(s,()=>{},e=>events.push(e));assert.equal(events.length,previous);
 });

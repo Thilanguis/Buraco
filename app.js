@@ -28,10 +28,14 @@ import { activeAccount } from './js/account-auth.js';
 import { profileInLobby, teamForSeat } from './js/account-profile.js';
 import { buildMatchSummary, prepareHistoryWrites } from './js/match-history.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
+import { saveBossSpecialTransaction, sameBossRevision, bossStateRevision } from './js/game/boss-state-transaction.js';
+import { renderCooperativeSpecial, presentCooperativeSpecial } from './js/boss/ui/cooperative-special-ui.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
 import {
   BOSS_MODE_DOMINATRIX,
   applyBossDeadTaken,
+  activateBossSpecial,
+  getBossSpecialUseStatus,
   applyBossFinalStrike,
   applyBossMeldTransition,
   applyBossResourceDefeat,
@@ -61,6 +65,7 @@ import {
   setBossDamageTarget,
   distributeCastleItems,
   canUseCastleItem,
+  getCastleItemUseStatus,
   useCastleItem,
   getCastleBotItem,
   getBossNaturePriorities,
@@ -127,7 +132,7 @@ import { renderDominationFriend, presentDominationFriend, playDominationFriendTi
 import { opponentSeats, OPPONENT_SEAT_IDS, renderOpponentBacks } from './js/game/opponent-seats.js';
 import { cardFrontHTML, suitClass, deckFaceClass } from './js/game/card-face.js';
 import { ITEM_DEFINITIONS } from './js/boss/dimitrescu-castle.js';
-import { renderCastleHud, castleItemHelp } from './js/boss/ui/dimitrescu-castle-view.js';
+import { renderCastleHud, castleItemHelp, castleItemChip, danielaDiscardActive } from './js/boss/ui/dimitrescu-castle-view.js';
 import { matriarchBloomFlowersHTML } from './js/boss/ui/matriarch-bloom-view.js';
 import { createResourceFeedbackPresenter } from './js/boss/ui/resource-feedback.js';
 import { createVisionHintEvaluator } from './js/game/domination-vision-hint.js';
@@ -817,6 +822,7 @@ function invalidateGameSession({ stopMedia = true } = {}) {
   }
   window.lastBotTurnPlayed = null;
   stopTurnTimer();
+  clearBossBotWatchdog();
   cancelGameAnimations();
 
   if (stopMedia) {
@@ -1002,6 +1008,7 @@ window.executeUndo = async () => {
   localUndoStack.pop();
   const restored = restoreUndoTransaction(transaction);
   const previousState = restored.state;
+  if (isBossMode(state)) previousState.bossStateRevision = bossStateRevision(state);
   if (state.mode === '1x1_dominacao') previousState.friendRevision = state.friendRevision || 0;
   const actionToUndo = state.lastAction; // Pega a ação que estamos revertendo
 
@@ -1924,7 +1931,8 @@ function ensureCardId(card) {
 
 function applyDimitrescuBloodScatter(element, key = '', profile = 'card') {
   if (!element) return;
-  const seedText = `${profile}:${String(key || 'blood')}`;
+  const marking = profile === 'card' ? `${state?.boss?.roundNumber || 0}:${state?.boss?.currentIntent?.id || state?.boss?.currentIntent?.abilityId || ''}:${element.className}` : '';
+  const seedText = `${profile}:${String(key || 'blood')}${profile === 'card' ? `:${marking}` : ''}`;
   let seed = 23;
   for (let i = 0; i < seedText.length; i += 1) seed = (seed * 33 + seedText.charCodeAt(i)) % 2147483647;
   const next = () => {
@@ -1939,9 +1947,9 @@ function applyDimitrescuBloodScatter(element, key = '', profile = 'card') {
       blobR: [5.4, 12.8],
       dripCount: 3,
       dripX: [14, 82],
-      dripTop: [58, 76],
-      dripW: [6, 14],
-      dripH: [16, 30],
+      dripTop: [24, 70],
+      dripW: [3, 7],
+      dripH: [12, 24],
       dripBulge: [34, 58],
       mistOpacity: [0.16, 0.3],
     },
@@ -1995,8 +2003,12 @@ function applyDimitrescuBloodScatter(element, key = '', profile = 'card') {
   };
 
   for (let i = 1; i <= 6; i += 1) {
-    element.style.setProperty(`--blood-blob-x${i}`, `${pick(spec.blobX[0], spec.blobX[1])}%`);
-    element.style.setProperty(`--blood-blob-y${i}`, `${pick(spec.blobY[0], spec.blobY[1])}%`);
+    // Jittered regions spread hand marks without a uniform grid or per-frame random work.
+    const x = profile === 'card' ? [(i % 2) ? 18 : 52, (i % 2) ? 48 : 84] : spec.blobX;
+    const row = Math.floor((i - 1) / 2);
+    const y = profile === 'card' ? [18 + row * 21, 36 + row * 21] : spec.blobY;
+    element.style.setProperty(`--blood-blob-x${i}`, `${pick(x[0], x[1])}%`);
+    element.style.setProperty(`--blood-blob-y${i}`, `${pick(y[0], y[1])}%`);
     element.style.setProperty(`--blood-blob-r${i}`, `${pick(spec.blobR[0], spec.blobR[1])}%`);
     element.style.setProperty(`--blood-blob-o${i}`, pick(0.48, 0.96, 3));
   }
@@ -2164,7 +2176,7 @@ function meldDropRect(key, offset = 0) {
 function updateTimerLabel() {
   const el = document.getElementById('turnTimerLabel');
   if (!el) return;
-  if (!state || state.finished) {
+  if (!state || state.finished || isBossMode(state)) {
     el.textContent = '';
     el.classList.remove('timer-critical');
     return;
@@ -2198,6 +2210,7 @@ function stopTurnTimer() {
 }
 
 function resetTurnTimer() {
+  if (isBossMode(state)) { stopTurnTimer(); updateTimerLabel(); return; }
   if (state && hasPendingBossChoices(state)) {
     stopTurnTimer();
     updateTimerLabel();
@@ -3103,17 +3116,24 @@ async function commitState() {
         }
         if (state === localState) state.friendRevision = saved.state.friendRevision;
       } else {
+        const localState = state;
         const proposal = structuredClone(state);
+        const expectedBossRevision = bossStateRevision(proposal);
         const saved = await runTransaction(db, async (transaction) => {
           const snapshot = await transaction.get(gameRef);
           if (!snapshot.exists() || !snapshot.data().stateJson) return null;
           const latest = JSON.parse(snapshot.data().stateJson);
           if (latest.matchStartedAt !== proposal.matchStartedAt || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return latest;
+          if (isBossMode(proposal)) {
+            if (!sameBossRevision(latest, { ...proposal, bossStateRevision: expectedBossRevision })) return latest;
+            proposal.bossStateRevision = bossStateRevision(latest) + 1;
+          }
           const saveHistory = proposal.finished ? await prepareMatchHistory(transaction, proposal) : () => {};
           transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
           saveHistory();
           return null;
         });
+        if (!saved && isBossMode(proposal) && state === localState) state.bossStateRevision = proposal.bossStateRevision;
         if (saved) {
           state = saved;
           pendingCommit = false;
@@ -3128,6 +3148,60 @@ async function commitState() {
   } finally {
     committing = false;
   }
+}
+
+window.bossSpecialOperationPending = false;
+function canActivateCooperativeSpecial() {
+  const player = state?.players?.[myPlayerIndex];
+  return isBossMode(state) && !!player && !player.isBot && !player.name?.toUpperCase().includes('BOT') && player.teamId === 0
+    && !window.bossSpecialOperationPending && !committing && !pendingCommit && !state.finished
+    && !window.activeBotTurn
+    && !state.surrender?.active && !pauseBlocksPlay(state) && canBossPerformCommonAction(state);
+}
+
+async function useCooperativeSpecial(recipientId) {
+  if (!canActivateCooperativeSpecial()) return;
+  return localActionGate.run(async () => {
+    const expectedState = structuredClone(state), sessionId = window.gameSessionId;
+    const request = { actorId: state.players[myPlayerIndex].id, recipientId, actionId: newActionId() };
+    window.bossSpecialOperationPending = true;
+    renderAll();
+    try {
+      const saved = await saveBossSpecialTransaction({ runTransaction, db, gameRef, expectedState, request,
+        activate: activateBossSpecial, prepareHistory: prepareMatchHistory,
+        blocked: latest => latest.finished || latest.surrender?.active || pauseBlocksPlay(latest) });
+      if (!saved || window.isClosingGame || sessionId !== window.gameSessionId) return;
+      if (state && bossStateRevision(state) > bossStateRevision(saved.state)) return;
+      state = saved.state;
+      localUndoStack = [];
+      if (saved.accepted) {
+        localUndoStack.push(createUndoTransaction(saved.before, captureUndoUiState(), { actorPlayerId: myPlayerIndex, actionType: 'bossSpecial' }));
+        ignoreOwnActionId = saved.action.id;
+      }
+      renderAll();
+      if (saved.accepted) {
+        // Cosmetic only: background-tab animation throttling must not hold the
+        // action gate or delay the next legal move after the transaction commits.
+        void animateCooperativeSpecial(saved.action).catch(error => console.warn('Animação do Especial:', error));
+        showMessage(`${state.players.find(p => p.id === recipientId)?.name || 'Jogador'} recebeu ${saved.action.count} cartas do Lixo.`);
+      } else showMessage('O estado mudou ou o Especial não está disponível. Nenhum ponto extra foi gasto.');
+    } catch (error) {
+      console.error('Especial cooperativo não confirmado:', error);
+      showMessage('Não foi possível confirmar o Especial. Confira a conexão antes de tentar novamente.');
+    } finally {
+      window.bossSpecialOperationPending = false;
+      if (sessionId === window.gameSessionId && state && !window.isClosingGame) renderAll();
+    }
+  });
+}
+
+function animateCooperativeSpecial(action) {
+  const origin = document.getElementById('drawDiscardBtn');
+  const hand = action.recipientId === state.players?.[myPlayerIndex]?.id
+    ? document.getElementById('handContainer') : null;
+  return presentCooperativeSpecial({ document, from: origin ? getRect(origin) : null,
+    to: hand ? getRect(hand) : opponentAnchorRect(action.recipientId), count: action.count,
+    bossId: state.boss.id, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches });
 }
 
 function passTurn({ preserveUndo = false } = {}) {
@@ -3170,6 +3244,7 @@ async function autoPlayTimeout() {
   }
 }
 async function autoPlayTimeoutOnce() {
+  if (isBossMode(state)) return; // Boss humans never lose their turn to a clock, including a queued old callback.
   if (!canPerformCommonGameAction(state)) {
     window.isAutoPlaying = false;
     if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
@@ -3389,7 +3464,33 @@ function classifyMeldPreview(meld) {
 }
 
 let activeTurnNumber = -1;
+let bossBotWatchdogId = null;
+let bossBotWatchdogKey = '';
+function clearBossBotWatchdog() {
+  if (bossBotWatchdogId !== null) clearTimeout(bossBotWatchdogId);
+  bossBotWatchdogId = null; bossBotWatchdogKey = '';
+}
+function syncBossBotWatchdog() {
+  const player = state?.players?.[state.currentPlayer];
+  const host = state?.players?.findIndex(p => p && !/BOT/i.test(p.name || ''));
+  const eligible = isBossMode(state) && !state.finished && !window.isClosingGame && host === myPlayerIndex && /BOT/i.test(player?.name || '') &&
+    canPerformCommonGameAction(state) && !pauseBlocksPlay(state) && !state.debugPaused && !isBossLabAutomationPaused();
+  const key = eligible ? `${window.gameSessionId}:${state.turnNumber}:${state.currentPlayer}` : '';
+  if (key && key === bossBotWatchdogKey && bossBotWatchdogId !== null) return;
+  clearBossBotWatchdog(); bossBotWatchdogKey = key;
+  if (!key) return;
+  bossBotWatchdogId = setTimeout(() => {
+    bossBotWatchdogId = null; bossBotWatchdogKey = '';
+    if (!isBossMode(state) || `${window.gameSessionId}:${state.turnNumber}:${state.currentPlayer}` !== key ||
+      state.finished || window.isClosingGame || pauseBlocksPlay(state) || state.debugPaused || isBossLabAutomationPaused() || !canPerformCommonGameAction(state)) return;
+    recoverTimedOutBotTurn().catch(console.error);
+  }, 60000);
+}
 function startTurnTimerIfNeeded() {
+  syncBossBotWatchdog();
+  if (isBossMode(state)) {
+    stopTurnTimer(); activeTurnNumber = -1; updateTimerLabel(); return;
+  }
   if (pauseBlocksPlay(state)) {
     updateTimerLabel();
     return;
@@ -3423,6 +3524,7 @@ function startTurnTimerIfNeeded() {
   updateTimerLabel();
 
   turnTimerId = setInterval(() => {
+    if (isBossMode(state)) { stopTurnTimer(); updateTimerLabel(); return; }
     if (window.isAutoPlaying || localActionGate.pending || pauseBlocksPlay(state) || (state && state.debugPaused) || isBossLabAutomationPaused()) return;
 
     if (!canPerformCommonGameAction(state)) return;
@@ -3440,7 +3542,7 @@ function startTurnTimerIfNeeded() {
         document.querySelector('.board-middle').style.pointerEvents = 'none';
 
         setTimeout(() => {
-          if (!canPerformCommonGameAction(state)) {
+          if (isBossMode(state) || !canPerformCommonGameAction(state)) {
             window.isAutoPlaying = false;
             renderAll();
             return;
@@ -3828,6 +3930,7 @@ function canPerformCommonGameAction(gameState = state) {
     !pauseBlocksPlay(gameState) &&
     !gameState?.surrender?.active &&
     !discardPickupAnimating &&
+    !window.bossSpecialOperationPending &&
     !isDominationFriendBusy(gameState) &&
     !(gameState?.mode === '1x1_dominacao' && (friendOperationPending || friendPlayback)) &&
     canBossPerformCommonAction(gameState)
@@ -5664,9 +5767,9 @@ function setBackClassIfChanged(el, wantedClass, baseClass = null) {
   return true;
 }
 
-function renderBossHudRichText(element, value) {
+function renderBossHudRichText(element, value, { chip = false } = {}) {
   if (!element) return;
-  const text = String(value ?? '');
+  const text = chip ? String(value ?? '') : String(value ?? '').replace(/[ \t]*[·•][ \t]*/g, '\n');
   const pattern = /(10|[2-9AJQK])([♠♦♣♥])/g;
   const fragment = document.createDocumentFragment();
   let cursor = 0;
@@ -5675,7 +5778,7 @@ function renderBossHudRichText(element, value) {
   while ((match = pattern.exec(text))) {
     if (match.index > cursor) fragment.appendChild(document.createTextNode(text.slice(cursor, match.index)));
     const token = document.createElement('span');
-    token.className = `boss-card-ref ${match[2] === '♥' || match[2] === '♦' ? 'suit-red' : 'suit-dark'}`;
+    token.className = `${chip ? 'boss-chip-card-ref' : 'boss-card-ref'} ${match[2] === '♥' || match[2] === '♦' ? 'suit-red' : 'suit-dark'}`;
     token.setAttribute('aria-label', `${match[1]} ${match[2]}`);
     token.textContent = `${match[1]}${match[2]}`;
     fragment.appendChild(token);
@@ -5683,7 +5786,24 @@ function renderBossHudRichText(element, value) {
   }
 
   if (cursor < text.length) fragment.appendChild(document.createTextNode(text.slice(cursor)));
-  element.replaceChildren(fragment);
+  if (chip) {
+    // One flex item preserves spaces around inline card references inside compact chips.
+    const caption = document.createElement('span');
+    caption.className = 'boss-chip-caption';
+    caption.appendChild(fragment);
+    element.replaceChildren(caption);
+  } else {
+    element.replaceChildren(fragment);
+  }
+}
+
+function renderBossEffectChipReferences() {
+  document.querySelectorAll('#bossEffects .boss-effect-chip').forEach((chip) => {
+    const caption = [...chip.childNodes].map(node => node.nodeName === 'BR' ? '\n' : node.textContent).join('');
+    if (!/(10|[2-9AJQK])[♠♦♣♥]/.test(caption)) return;
+    renderBossHudRichText(chip, caption, { chip: true });
+    chip.querySelector('.boss-chip-caption').style.whiteSpace = 'pre-line';
+  });
 }
 
 function renderBossDetailFields(element, details) {
@@ -5693,12 +5813,12 @@ function renderBossDetailFields(element, details) {
     const separator = detail.indexOf(':');
     const row = document.createElement('div');
     if (separator < 0) {
-      row.textContent = detail;
+      renderBossHudRichText(row, detail);
     } else {
       const label = document.createElement('span');
       const value = document.createElement('strong');
       label.textContent = detail.slice(0, separator).trim();
-      value.textContent = detail.slice(separator + 1).trim();
+      renderBossHudRichText(value, detail.slice(separator + 1).trim());
       row.append(label, value);
     }
     element.appendChild(row);
@@ -5927,7 +6047,7 @@ function renderBossAbilityGuide(definition, boss) {
     header.append(name, phases);
 
     const description = document.createElement('p');
-    description.textContent = bossAbilityGuideDescription(definition, ability, boss.phase);
+    renderBossHudRichText(description, bossAbilityGuideDescription(definition, ability, boss.phase));
     card.append(header, description);
 
     if (activeNow) {
@@ -6096,8 +6216,13 @@ function renderBossDaughterStrip(definition, boss) {
         if (effect.id === 'nehelenia_tiger_prey') return { targetName, detail: Number.isInteger(effect.meldIndex) ? `JOGO ${effect.meldIndex + 1}` : 'PRESA MARCADA', persistent: true };
         if (effect.id === 'nehelenia_tiger_claw') return { targetName: '', detail: Number.isInteger(effect.meldIndex) ? `GARRAS: JOGO ${effect.meldIndex + 1}` : 'GARRAS NO JOGO', persistent: true };
         if (effect.id === 'nehelenia_hawk_guarded_discard') return { targetName, detail: 'LIXO VIGIADO', persistent: true };
-        if (effect.id === 'nehelenia_fish_dead_card') return { targetName, detail: 'REFLEXO MORTO', persistent: true };
-        if (effect.id === 'nehelenia_inverted_reflection') return { targetName, detail: 'JOGO ABERTO', persistent: true };
+        if (effect.id === 'nehelenia_fish_dead_card') {
+          const marked = state.players.find(p => p.id === effect.playerId)?.hand.find(c => c.id === effect.cardId);
+          const cardLabel = marked ? `${marked.rank}${marked.suit}` : 'a carta marcada';
+          return { targetName, detail: `REFLEXO MORTO${marked ? ` · ${cardLabel}` : ''}`, persistent: true,
+            help: `${targetName}: ${cardLabel} não pode entrar em um jogo. Descarte essa carta para encerrar o efeito. Ele continua mesmo quando outra habilidade começa.` };
+        }
+        if (effect.id === 'nehelenia_inverted_reflection') return { targetName, detail: 'ALIMENTE UM JOGO', persistent: true };
         return targetName ? { targetName, detail: '', persistent: true } : null;
       })
       .filter(Boolean);
@@ -6112,27 +6237,25 @@ function renderBossDaughterStrip(definition, boss) {
     if (current) {
       const currentParts = [];
       if (current.targetName) currentParts.push(current.targetName);
-      if (current.detail) currentParts.push(current.detail.replace(/^JOGO\s+/i, 'J').replace(/^DESCARTE:\s*/i, ''));
-      if (currentParts.length) lines.push({ text: currentParts.join(' · '), kind: 'current' });
+      if (current.detail) currentParts.push(current.detail.replace(/^DESCARTE:\s*/i, ''));
+      if (currentParts.length) lines.push({ text: currentParts.join(' · '), kind: 'current', help: buildBossAbilityHelp(state)?.text || current.detail });
     }
 
     const persistentLabels = persistent.map((entry) => {
-      const sameAsCurrent = !!current && current.targetName === entry.targetName && current.detail === entry.detail;
       const parts = [];
       if (entry.targetName) parts.push(entry.targetName);
-      if (entry.detail) parts.push(entry.detail.replace(/^JOGO\s+/i, 'J'));
+      if (entry.detail) parts.push(entry.detail);
       return {
-        sameAsCurrent,
         text: parts.join(' · ') || 'ATIVO',
+        help: entry.help || (memberId === 'fish'
+            ? `${entry.targetName}: precisa adicionar uma carta a um jogo existente antes de abrir um jogo novo. O efeito continua entre turnos até cumprir, mesmo com outra habilidade ativa.`
+            : `Efeito persistente de ${roster[memberId].name}: ${parts.join(' · ')}. Continua após a habilidade atual.`),
       };
     });
 
-    const sameCurrent = persistentLabels.find((entry) => entry.sameAsCurrent);
-    const otherPersistent = persistentLabels.find((entry) => !entry.sameAsCurrent);
-    if (sameCurrent) lines.push({ text: 'PERSISTENTE', kind: 'persistent' });
-    else if (otherPersistent) lines.push({ text: `PERSISTENTE · ${otherPersistent.text}`, kind: 'persistent' });
+    for (const entry of persistentLabels) lines.push({ text: entry.text, kind: 'persistent', help: entry.help });
 
-    const compact = lines.slice(0, 2);
+    const compact = lines;
     return {
       lines: compact,
       signature: compact.map((line) => `${line.kind}:${line.text}`).join('|'),
@@ -6207,8 +6330,10 @@ function renderBossDaughterStrip(definition, boss) {
 
     const name = document.createElement('b');
     name.textContent = member.name;
-    const stateBadge = document.createElement('small');
-    stateBadge.className = 'boss-daughter-state';
+    const stateBadge = isNehelenia
+      ? createBossCombatHelp(`Explicar estado de ${member.name}`, member.name, contextByMember.get(memberId)?.lines.map(line => line.help).join('\n\n') || 'Participa da habilidade indicada no HUD.', stateLabels[status] || 'ATIVO')
+      : document.createElement('small');
+    stateBadge.classList.add('boss-daughter-state');
     stateBadge.textContent = stateLabels[status] || 'ATIVO';
     card.append(image, name, stateBadge);
 
@@ -6221,15 +6346,9 @@ function renderBossDaughterStrip(definition, boss) {
         // desatualizado, esta label nunca pode alterar altura/alinhamento do card.
         contextBox.style.cssText = ['position:absolute', 'right:7px', 'top:27px', 'z-index:5', 'max-width:calc(100% - 14px)', 'display:flex', 'flex-direction:column', 'align-items:flex-end', 'gap:3px', 'pointer-events:none'].join(';');
         context.lines.forEach((line) => {
-          line.text
-            .split(/\s*·\s*/)
-            .filter(Boolean)
-            .forEach((part) => {
-              const badge = document.createElement('small');
-              badge.className = `boss-attendant-context-line is-${line.kind}`;
-              badge.textContent = part;
-              contextBox.appendChild(badge);
-            });
+          const badge = createBossCombatHelp(`Explicar ${member.name}: ${line.text}`, member.name, line.help, line.text);
+          badge.classList.add('boss-attendant-context-line', `is-${line.kind}`);
+          contextBox.appendChild(badge);
         });
         card.appendChild(contextBox);
         card.title = `${member.name} — ${context.lines.map((line) => line.text).join(' · ')}`;
@@ -7334,15 +7453,27 @@ function castleItemUseButton(card) {
   const button = createBossCombatHelp(`Usar ${definition.label} da carta ${card.rank}${card.suit}`, definition.label,
     `${castleItemHelp(state.boss.castleItems[card.id].type, state.boss)}\nEscolha uma filha. Guarde uma carta para descartar.`, '');
   button.classList.add('castle-use-item');
+  button.dataset.itemType = state.boss.castleItems[card.id].type;
+  const caption = document.createElement('span'); caption.className = 'castle-use-caption';
+  caption.textContent = castleItemChip(button.dataset.itemType, state.boss); button.append(caption);
   const open = button.onclick;
   button.onclick = event => {
     open(event);
     const popover = document.getElementById('bossIntentHelpPopover');
     if (popover.hidden || popover._extraTrigger !== button) return;
     const choices = document.createElement('div'); choices.className = 'castle-item-targets';
+    if (!state.boss.combatEntities.some(d => d.hp > 0)) {
+      const reason = document.createElement('small'); reason.className = 'castle-item-unavailable';
+      reason.textContent = 'As três filhas já morreram. Não há uma filha viva para receber este item.'; choices.append(reason);
+    }
     for (const daughter of state.boss.combatEntities.filter(d => d.hp > 0)) {
       const target = document.createElement('button'); target.type = 'button'; target.textContent = daughter.name;
-      target.disabled = !canUseCastleItem(state, state.players[myPlayerIndex]?.id, card.id, daughter.id);
+      const status = getCastleItemUseStatus(state, state.players[myPlayerIndex]?.id, card.id, daughter.id);
+      target.disabled = !status.allowed;
+      if (!status.allowed) {
+        const reason = document.createElement('small'); reason.className = 'castle-item-unavailable';
+        reason.textContent = `${daughter.name}: ${status.reason}`; choices.append(reason);
+      }
       target.onclick = () => localActionGate.run(async () => {
         const playerId = state.players[myPlayerIndex]?.id;
         if (committing || !canPerformCommonGameAction() || !canUseCastleItem(state, playerId, card.id, daughter.id)) return;
@@ -7369,7 +7500,7 @@ function castleItemUseButton(card) {
 function createBossCombatHelp(label, title, text, caption = '?') {
   const button = document.createElement('button');
   button.type = 'button'; button.className = 'boss-intent-help-button boss-combat-help';
-  button.textContent = caption; button.setAttribute('aria-label', label);
+  renderBossHudRichText(button, caption, { chip: true }); button.setAttribute('aria-label', label);
   button.setAttribute('aria-controls', 'bossIntentHelpPopover'); button.setAttribute('aria-expanded', 'false');
   button.onclick = (event) => {
     event.stopPropagation();
@@ -7378,7 +7509,7 @@ function createBossCombatHelp(label, title, text, caption = '?') {
     closeBossIntentHelp(); closeBossRuleHelp();
     if (!opening) return;
     document.getElementById('bossIntentHelpTitle').textContent = title;
-    document.getElementById('bossIntentHelpText').textContent = typeof text === 'function' ? text() : text;
+    renderBossHudRichText(document.getElementById('bossIntentHelpText'), typeof text === 'function' ? text() : text);
     popover._extraTrigger = button;
     popover.hidden = false; popover.setAttribute('aria-hidden', 'false');
     button.setAttribute('aria-expanded', 'true');
@@ -7411,7 +7542,7 @@ function renderBossPhaseAndHealth(gameState, progress) {
         : `O chefe passa para a Fase ${progress.nextPhase} quando uma destas condições acontecer:\n• Sua vida chegar a ${progress.hp.targetPercent}% ou menos.\n• O Monte ficar com ${progress.stock.target} cartas ou menos.\n• A equipe retirar ${progress.dead.target} ${progress.dead.target === 1 ? 'Morto' : 'Mortos'}.\n\nBasta uma dessas condições. A barra acompanha a vida do chefe até o próximo marco.`;
       const popover = document.getElementById('bossIntentHelpPopover');
       if (!popover?.hidden && popover?._extraTrigger === button) {
-        document.getElementById('bossIntentHelpText').textContent = button._phaseHelpText;
+        renderBossHudRichText(document.getElementById('bossIntentHelpText'), button._phaseHelpText);
         positionBossHelpPopover(button, popover);
       }
     }
@@ -7472,7 +7603,9 @@ function renderBossCombatPanel(hud, boss) {
   const starsOverlay = document.createElement('span'); starsOverlay.id = 'nemesisStarsOverlay';
   starsOverlay.className = 'nemesis-stars-overlay';
   const starsLabel = document.createElement('span'); starsLabel.textContent = `🎯 S.T.A.R.S. — ${model.stars.toLocaleUpperCase('pt-BR')}`;
-  starsOverlay.append(starsLabel, createBossCombatHelp('Explicar alvo S.T.A.R.S.', 'Alvo S.T.A.R.S.', 'Prioridade ofensiva: este jogador.\nQuem causar dano direto ao Nemesis assume S.T.A.R.S.\nDano causado aos zumbis não altera o alvo.'));
+  starsLabel.title = model.stars;
+  starsOverlay.append(starsLabel, createBossCombatHelp('Explicar alvo S.T.A.R.S.', 'Alvo S.T.A.R.S.',
+    `${model.stars} é a prioridade ofensiva.\nQuem causar dano direto ao Nemesis assume S.T.A.R.S.\nDano causado aos zumbis não altera o alvo.`));
   const mainPortrait = hud.querySelector('.boss-portrait');
   mainPortrait.removeAttribute('aria-hidden'); mainPortrait.append(starsOverlay);
   const selectTarget = (id) => localActionGate.run(async () => {
@@ -7623,7 +7756,7 @@ function renderBossHud() {
   hud.classList.toggle('boss-blood-clot-active', bloodClotActive);
   hud.classList.toggle('boss-mirror-prison-active', mirrorPrisonActive);
   hud.classList.toggle('boss-mirror-return-active', mirrorReturnActive);
-  hud.classList.toggle('boss-nehelenia-dream-stolen', isNehelenia && Number(boss.danger || 0) > 0);
+  hud.classList.remove('boss-nehelenia-dream-stolen'); // Stolen mirrors are shown in the mirror meter only.
   hud.classList.toggle('boss-nehelenia-mirror-world', isNehelenia && !!boss.mirrorWorldActive);
   hud.classList.toggle('boss-total-eclipse-active', totalEclipseActive);
   hud.dataset.cocoonStage = cocoonActive ? (cocoonRemaining <= 60 ? 'critical' : cocoonRemaining <= 120 ? 'cracked' : 'full') : '';
@@ -7748,7 +7881,7 @@ function renderBossHud() {
   renderBossRangeMeters(intentDescription, actionPresentation.rangeMeters);
   intentProgress.className = '';
   const intentProgressParts = [actionPresentation.progress, actionPresentation.consequence].filter(Boolean);
-  renderBossHudRichText(intentProgress, intentProgressParts.join(actionPresentation.progress?.includes('\n') ? '\n' : ' · '));
+  renderBossHudRichText(intentProgress, intentProgressParts.join('\n'));
 
   renderBossDetailFields(document.getElementById('bossActionDetails'), actionPresentation.details);
 
@@ -7842,6 +7975,7 @@ function renderBossHud() {
         if (effect.id === 'discard_surcharge') return `<span class="boss-effect-chip">Agio do Lixo: +${effect.amount} Divida na primeira retirada valida</span>`;
         return `<span class="boss-effect-chip">${effect.id}</span>`;
       })
+      .map((markup) => markup.replace(/[ \t]*[·•][ \t]*/g, '<br>'))
       .join('') +
     natureSummaries
       .map(
@@ -7861,6 +7995,8 @@ function renderBossHud() {
       .join('');
 
   const choicePanel = document.getElementById('bossChoicePanel');
+  // Persistent effect chips (Banker/Dominadora/etc.) share the same card-only emphasis.
+  renderBossEffectChipReferences();
   const myChoice = getBossPendingChoice(state, myPlayerIndex);
   const pendingChoice = boss.pendingChoices?.[0] || null;
   const choiceLabels = {
@@ -7919,7 +8055,7 @@ function renderBossHud() {
       : myChoice.type === 'break_will'
         ? 'Quebra de Vontade: escolha sua punição.'
         : myChoice.type === 'fixed_interest_payment'
-          ? `${choiceOwner?.name || 'Titular'}: +${myChoice.amount} agora ou Cofre (carta aleatória · resgate +${myChoice.collateralAmount} · +${myChoice.interestStep || 2} por turno adiado).`
+          ? `${choiceOwner?.name || 'Titular'}: assuma +${myChoice.amount} Dívida agora ou deixe uma carta aleatória no Cofre.\nResgate: começa em +${myChoice.collateralAmount} e sobe +${myChoice.interestStep || 2} por turno adiado.`
           : collateralChoice
             ? 'Clique em uma carta da sua mão e confirme a garantia.'
             : myChoice.type === 'final_order'
@@ -7961,7 +8097,7 @@ function renderBossHud() {
           if (option === 'full' && myChoice.type === 'fixed_interest_payment') {
             label = `Assumir +${myChoice.amount} Dívida`;
           } else if ((option === 'guarantee' || option.startsWith('guarantee:')) && myChoice.type === 'fixed_interest_payment') {
-            label = `Aceitar Cofre · começa +${myChoice.collateralAmount}`;
+            label = `Aceitar Cofre (resgate +${myChoice.collateralAmount})`;
           } else if (option.startsWith('guarantee:')) {
             const player = state.players.find((entry) => entry.id === Number(option.split(':')[1]));
             label = `Garantia: ${player?.name || 'Jogador'}`;
@@ -8090,6 +8226,8 @@ function renderBossHud() {
   const actor = state.players?.[state.currentPlayer];
   document.getElementById('bossRoundNumber').textContent = `Rodada ${boss.roundNumber}`;
   document.getElementById('bossRoundTurn').textContent = `Turno ${displayedTurn}/${playersInRound}`;
+  renderCooperativeSpecial({ document, state, canActivate: canActivateCooperativeSpecial, onActivate: useCooperativeSpecial,
+    getUseStatus: recipientId => getBossSpecialUseStatus(state,{actorId:state.players?.[myPlayerIndex]?.id,recipientId}) });
   document.getElementById('bossCurrentActor').textContent = isBossTurnActive(state) ? `Agora: ${definition?.name || 'Chefe'}` : actor ? `Agora: ${actor.name}` : 'Agora: aguardando';
 
   const kindLabels = { suja: 'Canastra suja', limpa: 'Canastra limpa', real: 'Canastra real', asas: 'Canastra Ás-a-Ás' };
@@ -8173,10 +8311,10 @@ function renderBossHud() {
     const dimitrescuIntent = boss.id === 'dimitrescu' ? boss.currentIntent : null;
     const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
     const danielaActive = (dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered) || danielaObjective?.status === 'active';
-    // The permanent daughter's passive is explained on her chip, not the legacy swarm marker.
-    const danielaPassiveActive = boss.id === 'dimitrescu' && boss.combatEntities?.some(d => d.id === 'daniela' && d.status === 'alive' && d.passive?.status === 'active');
+    // The real passive also warns at the purchase; legacy card marks are separate.
+    const danielaPassiveActive = danielaDiscardActive(state);
     const castleLockdownActive = boss.id === 'dimitrescu' && dimitrescuIntent?.abilityId === 'castle_lockdown' && !state.finished;
-    discardButton.classList.toggle('boss-daniela-discard', !!danielaActive);
+    discardButton.classList.toggle('boss-daniela-discard', !!danielaActive || danielaPassiveActive);
     discardButton.classList.toggle('boss-castle-lockdown-discard', castleLockdownActive);
     if (nemesisContaminated) discardButton.setAttribute('aria-label', 'Lixo contaminado pelo Nemesis: +6 Infecção por retirada');
     else if (castleLockdownActive) discardButton.setAttribute('aria-label', 'Lixo bloqueado por Portas do Castelo');
@@ -8677,7 +8815,7 @@ function renderAll() {
   const danielaObjective = dimitrescuIntent?.abilityId === 'three_daughters' ? dimitrescuIntent.payload?.objectives?.find((objective) => objective.type === 'daniela') : null;
   const danielaCardId = dimitrescuIntent?.abilityId === 'daniela_swarm' && !dimitrescuIntent.payload?.triggered ? dimitrescuIntent.payload?.discardCardId : danielaObjective?.status === 'active' ? danielaObjective.discardCardId : null;
   const danielaInDiscard = !!danielaCardId && discardCardIds.has(danielaCardId);
-  const danielaOnTop = danielaInDiscard && discardTop?.id === danielaCardId;
+  const danielaOnTop = (danielaInDiscard && discardTop?.id === danielaCardId) || (!!discardTop && danielaDiscardActive(state));
   const neheleniaDiscardMirror = state.boss?.id === 'nehelenia' && state.boss.currentIntent?.abilityId === 'discard_mirror' && !state.boss.currentIntent.payload?.resolved;
   const neheleniaCurrentPlayerId = state.players?.[state.currentPlayer]?.id ?? state.currentPlayer;
   const neheleniaMirrorDiscardSealed =
@@ -8690,7 +8828,7 @@ function renderAll() {
   discardButtonEl?.classList.toggle('boss-nemesis-contaminated-discard', nemesisContaminated);
   discardButtonEl?.classList.toggle('boss-pollen-discard', !!pollenThreat);
   discardButtonEl?.classList.toggle('boss-pollen-buried', !!pollen?.pollenBuried);
-  discardButtonEl?.classList.toggle('boss-daniela-discard', danielaInDiscard);
+  discardButtonEl?.classList.toggle('boss-daniela-discard', danielaInDiscard || danielaDiscardActive(state));
   discardButtonEl?.classList.toggle('boss-surcharge-discard', state.boss?.id === 'banker' && state.boss.discardSurcharge?.status === 'active');
   discardButtonEl?.classList.toggle('boss-nehelenia-discard', neheleniaDiscardMirror);
   discardButtonEl?.classList.toggle('boss-nehelenia-discard-sealed', neheleniaMirrorDiscardSealed);
@@ -8716,7 +8854,7 @@ function renderAll() {
     const discardBossStatus = pollenThreat
       ? '<span class="boss-card-status boss-card-status-pollen" aria-hidden="true"><i>&#10022;</i><b>PÓLEN</b></span>'
       : danielaOnTop
-        ? '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-daniela" aria-hidden="true"><i>🩸</i><b>DANIELA</b></span>'
+        ? '<span class="boss-card-status boss-card-status-blood-hunt boss-card-status-daniela" aria-hidden="true"><i>🩸</i><b>LIXO +3</b></span>'
         : neheleniaHawkGuardedDiscard
           ? '<span class="boss-card-status boss-card-status-nehelenia-hawk" aria-hidden="true"><i>◉</i><b>VIGIADO</b></span>'
           : neheleniaHawkDiscardDemand
@@ -8966,6 +9104,7 @@ function renderHand() {
     const orderChanged = desired.length !== container.children.length || desired.some((node, index) => node.dataset.cardId !== container.children[index]?.dataset.cardId);
     if (orderChanged) handRoot.classList.add('hand-hover-reset');
     desired.forEach((fresh, index) => {
+      const freshMarkup = fresh.innerHTML;
       const existing = oldCards.get(fresh.dataset.cardId);
       const node = existing || fresh;
       if (existing) {
@@ -8979,11 +9118,20 @@ function renderHand() {
           if (fresh.hasAttribute(name)) existing.setAttribute(name, fresh.getAttribute(name));
           else existing.removeAttribute(name);
         }
-        if (existing._faceMarkup !== fresh.innerHTML) existing.innerHTML = fresh.innerHTML;
+        // Move live children, not HTML: serializing the new item button erased
+        // its onclick after a face/marker change while preserving the old card.
+        if (existing._faceMarkup !== freshMarkup) existing.replaceChildren(...fresh.childNodes);
+        // Reused card roots also need the seeded blood variables from the new mark.
+        for (const property of [...existing.style]) {
+          if (property.startsWith('--blood-') && !fresh.style.getPropertyValue(property)) existing.style.removeProperty(property);
+        }
+        for (const property of [...fresh.style]) {
+          if (property.startsWith('--blood-')) existing.style.setProperty(property, fresh.style.getPropertyValue(property));
+        }
         if (existing._handVisibility !== fresh.style.visibility) existing.style.visibility = fresh.style.visibility;
         existing.onclick = fresh.onclick;
       }
-      node._faceMarkup = fresh.innerHTML;
+      node._faceMarkup = freshMarkup;
       node._handClasses = fresh.className;
       node._handVisibility = fresh.style.visibility;
       if (container.children[index] !== node) container.insertBefore(node, container.children[index] || null);
@@ -10644,6 +10792,10 @@ function renderRemoteHandEmptyBeforeDeadPickup(playerId) {
 
 async function playRemoteAction(a) {
   if (!state || !a) return;
+  if (a.type === 'bossSpecial') {
+    void animateCooperativeSpecial(a).catch(error => console.warn('Animação do Especial:', error));
+    return;
+  }
   if (a.type === 'friendTurn') return playFriendTurnPresentation(a);
 
   const isFriend = a.playerId === 'friend' && state.mode === '1x1_dominacao';
@@ -12117,6 +12269,7 @@ onSnapshot(gameRef, async (snap) => {
 
   const newState = normalizeDominationFriends(JSON.parse(data.stateJson));
   newState.matchStartedAt ||= data.createdAt?.toMillis?.() || Number(data.createdAt) || null;
+  if (isBossMode(newState) && state?.matchStartedAt === newState.matchStartedAt && bossStateRevision(newState) < bossStateRevision(state)) return;
   if (newState.finished) newState.matchFinishedAt ||= newState.lastAction?.ts || Number(data.updatedAt) || Date.now();
   if (newState.finished && !data.historySummary) void recoverFinishedHistory().catch((error) => console.warn('Histórico pendente: reconecte para tentar novamente.', error.code));
   normalizeLegacyDiscardPurchase(newState);
@@ -12184,6 +12337,7 @@ onSnapshot(gameRef, async (snap) => {
   }
 
   // 2. Após o término do voo, atualiza a memória com o novo estado e renderiza limpando o DOM de forma síncrona
+  if (isBossMode(newState) && state?.matchStartedAt === newState.matchStartedAt && bossStateRevision(newState) < bossStateRevision(state)) return;
   if (snapshotSequence !== gameSnapshotSequence) return;
   if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
   if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;

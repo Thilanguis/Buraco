@@ -1,5 +1,20 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
+**Ajuste final de 10/10/2026:** Explosivo/Granada causa **100 HP imediatos + 20 HP por rodada até a morte**, sem acumular sangramentos; petrificação −50 HP máximo, regen20/10 e Adaga80% preservados. Referências a impacto60 em experimentos abaixo são históricas, não valores atuais. Resultados anteriores não foram recalculados.
+
+### Pacote consolidado / Especial do Lixo — 10/10/2026
+
+- [x] Ledger físico 25/50/100; evoluções 25/50/75; ambos cooperadores, reload, reorganização e aliases legados sem crédito duplicado.
+- [x] Usos reutilizáveis a 100, saldo excedente preservado; exatamente cinco do topo do Lixo. Zero a quatro bloqueiam sem gasto; Monte não muda.
+- [x] Bloqueios do usuário e destinatário; Daniela/Pólen/Ágio/Espelho; IDs e itens preservados; compra normal separada e BOT sem gasto automático.
+- [x] Transação com revisão, requests concorrentes/retry, commit comum atrasado, undo/snapshot e derrota por reação com histórico atômico em testes locais.
+- [x] HUD compacto, mouse/toque/teclado, referências de carta com destaque focal, reduced motion e cleanup do animatic. A animação não segura a ação confirmada, inclusive em aba de fundo.
+- [x] Regressões de P0 e pacote B preservadas; nenhuma habilidade proposta adicionada à rotação.
+- [ ] Homologação Firebase autenticada com dois clientes, tablets físicos e ritmo com humanos competentes. Testes de storage substituto não comprovam Firebase real.
+- [ ] Aprovar P3-06 (barrinha e arte/animação heroica dos seis universos) e duas propostas da Lady antes de implementar esses designs.
+
+Dados e evidências atuais: [relatório consolidado](PACOTE_CONSOLIDADO_CHEFES_2026-10-10.md) e [ritmo/variedade](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md). Os resultados dos lotes abaixo são históricos.
+
 ### Ajuste final Nemesis — 09/10/2026
 
 - [x] Agarrador persegue um jogador por rodada canônica, alternando em todas as rodadas; ordem inicial determinística salva. Sorteio de 3.000 seeds: 1.490/1.510. Fase/morte/reentrada/reanimação/reload/undo/sync não reiniciam a alternância; locks vigentes não são sorteados novamente.
@@ -64,7 +79,7 @@ Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINA
 
 - [x] Partidas novas: filhas 500, regen50/Anti25, piso300; perdas originais aditivas Adaga25/Explosivo50/Frio100/Anti75/Relíquia100. Não curar nem duplicar dano ao limitar o máximo. Efeitos continuam no piso.
 - [x] Adaga30% somente em ataque efetivo à filha, inclusive humano/BOT/Ataque Final; ignora PROT./Coágulo sem consumir. Overkill limitado, duplicatas não somam porcentagem, item/hemorragia não transmitem. Morte da Lady encerra a batalha; morte da filha encerra vínculo e retira PROT. canonicamente.
-- [x] Explosivo60 + hemorragia50/2 fechamentos; antes da regen, limitada à vida, letal via morte/Fúria/PROT. Novo Explosivo renova sem empilhar. IDs/último tick/round salvo impedem replay.
+- [x] Explosivo100 + hemorragia20 permanente; antes da regen, limitada à vida, letal via morte/Fúria/PROT. Novo Explosivo aplica outro impacto sem empilhar sangramento. IDs/último tick/round salvo impedem replay.
 - [x] Frio guarda carga na vida cheia, bloqueia apenas cura efetiva, teto2. Anticoagulante permanente25 sem stack. Relíquia espera oportunidade válida, não consome sem candidato/não selecionada e não acumula supressões em duplicatas; As Três Filhas continua funcionando.
 - [x] Ajuda atual/legacy usa a regra da partida; vínculo/hemorragia separados de PASSIVA. HP original, máximo recuperável/petrificação; transferência vermelha até retrato da Lady e número no HP real; sangramento vermelho antes de regen verde na filha. Toque/teclado/Escape/clique fora/reduced motion e replay verificados em 1920/1376/390px.
 - [x] BOT escolhe item/alvo investido e golpe letal direto, preservando coringas/cartas obrigatórias/descarte. Laboratório usa versão nova e conserva 108 IDs/15 itens. `castleItemRulesVersion:2`/configuração e versão filhas3 persistem; saves sem versão continuam v1/450/piso200 sem reinterpretar consumidos.

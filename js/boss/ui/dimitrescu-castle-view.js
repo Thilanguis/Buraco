@@ -1,4 +1,4 @@
-import { CASTLE_BALANCE, ITEM_DEFINITIONS, bloodLinkCapacity, bloodLinkRemaining, furyLevel, castleRules, castleItemHpLoss, daughterOriginalHp } from '../dimitrescu-castle.js';
+import { CASTLE_BALANCE, ITEM_DEFINITIONS, bloodLinkCapacity, bloodLinkRemaining, furyLevel, castleRules, castleItemHpLoss, daughterOriginalHp, hasCastleHemorrhage, castleBleedAmount, castleFrozen, usesGlobalCastleItems } from '../dimitrescu-castle.js';
 
 export function castleItemHelp(type, boss = {castleItemRulesVersion:2}) {
   const rules = castleRules(boss), modern = boss.castleItemRulesVersion === 2;
@@ -6,10 +6,32 @@ export function castleItemHelp(type, boss = {castleItemRulesVersion:2}) {
     ? `Causa ${type === 'dagger' ? rules.daggerDamage : rules.explosiveDamage} de dano imediato.`
     : !modern && type === 'cold_flask' ? 'Bloqueia a próxima regeneração.' : type === 'dagger'
       ? `Ao atacar esta filha, ${rules.daggerTransfer * 100}% do dano também atinge a vida da Lady, atravessando suas proteções. Outra Adaga não aumenta essa porcentagem.`
-      : type === 'explosive' ? `Causa ${rules.explosiveDamage} de dano agora. Nos próximos ${rules.bleedRounds} finais de rodada, ela perde mais ${Math.round(rules.daughterHp * rules.bleedPercent)} HP antes de regenerar. Outro Explosivo renova a duração, sem dobrar o sangramento.` : type === 'relic'
-    ? 'Cancela uma passiva da filha: a desta rodada, se ainda pendente, ou a próxima vez que ela agir.'
-    : ITEM_DEFINITIONS[type].special;
+      : type === 'explosive' ? rules.bleedPermanent
+        ? `Causa ${rules.explosiveDamage} de dano agora. A filha perde ${castleBleedAmount(boss)} HP antes de regenerar no fim de cada rodada, até morrer. Outro Explosivo causa novo impacto, sem aumentar o sangramento.`
+        : `Causa ${rules.explosiveDamage} de dano agora. Nos próximos ${rules.bleedRounds} finais de rodada, ela perde mais ${castleBleedAmount(boss)} HP antes de regenerar. Outro Explosivo renova a duração, sem dobrar o sangramento.` : type === 'anticoagulant'
+    ? `Regeneração cai de ${rules.regeneration} para ${rules.anticoagulantRegeneration} HP por rodada, até morrer. Não acumula.` : type === 'relic'
+    ? usesGlobalCastleItems(boss)
+      ? `Recebe ${Math.round(rules.relicAttackBonus * 100)}% mais dano dos ataques diretos até morrer. Não aumenta Explosivo, hemorragia ou dano indireto. Outra Relíquia não acumula. Com Adaga, primeiro aumenta o ataque e só então transmite 80% do dano efetivo à Lady.`
+      : 'Cancela uma passiva da filha: a desta rodada, se ainda pendente, ou a próxima vez que ela agir.'
+    : !usesGlobalCastleItems(boss) && modern && type === 'cold_flask'
+      ? 'Bloqueia a próxima cura real. Guarda o efeito na vida cheia. Até 2 cargas.' : ITEM_DEFINITIONS[type].special;
   return `${effect}\nPetrifica ${castleItemHpLoss(boss,type)} HP: essa parte da vida não pode ser recuperada. A filha mantém um mínimo de ${rules.daughterHpFloor} HP recuperáveis.`;
+}
+
+export function castleItemChip(type, boss) {
+  const rules = castleRules(boss);
+  if (type === 'explosive') return boss.castleItemRulesVersion === 2 ? `${rules.explosiveDamage} DANO · SANGRA ${castleBleedAmount(boss)}` : `−${rules.explosiveDamage} HP`;
+  if (type === 'dagger') return boss.castleItemRulesVersion === 2 ? `VÍNCULO ${Math.round(rules.daggerTransfer * 100)}%` : `−${rules.daggerDamage} HP`;
+  if (usesGlobalCastleItems(boss)) return { anticoagulant: `REGEN ${rules.regeneration}→${rules.anticoagulantRegeneration}`,
+    cold_flask: 'CONGELA AS 3', relic: `DANO +${Math.round(rules.relicAttackBonus * 100)}%` }[type] || '';
+  return { anticoagulant: 'REGEN ↓', cold_flask: 'CURA ×', relic: 'SILENCIA' }[type] || '';
+}
+
+// Presentation only. The mechanics keep their once-per-round event guard.
+export function danielaDiscardActive(state) {
+  return state?.boss?.id === 'dimitrescu' && !castleFrozen(state.boss) && !state.finished && !state.boss.result &&
+    state.boss.combatEntities?.some(d => d.id === 'daniela' && d.status === 'alive' && d.hp > 0 &&
+      d.passive?.status === 'active' && d.passive.round === state.boss.roundNumber);
 }
 
 export function daughterPassiveHelp(d, state) {
@@ -21,7 +43,10 @@ export function daughterPassiveHelp(d, state) {
       ? 'BANQUETE: escolhe um jogo que pode receber cartas legalmente. Adicione uma contribuição legal a ele até o fim da rodada. Falha: +3 Sede. Sem jogo válido, não pune.'
       : 'LIXO +3: a primeira retirada efetiva do Lixo nesta rodada causa +3 Sede, uma única vez para a equipe. Comprar do Monte não ativa.';
   let context = 'Não foi escolhida nesta rodada.';
-  if (p?.status === 'suppressed') context = 'Relíquia: passiva suspensa nesta rodada.';
+  if (castleFrozen(state.boss)) context = 'Congelada: passiva bloqueada. Objetivos pendentes foram cancelados sem punição.';
+  else if (p?.status === 'suppressed') context = p.suppressedBy === 'freeze'
+    ? 'O congelamento cancelou este objetivo sem punição. Só recebe um novo objetivo na próxima seleção.'
+    : usesGlobalCastleItems(state.boss) ? 'Objetivo anterior cancelado sem punição.' : 'Relíquia: passiva suspensa nesta rodada.';
   else if (p?.status === 'success') context = 'Objetivo cumprido nesta rodada: sem punição.';
   else if (p?.status === 'failed' || p?.status === 'triggered') context = '+3 Sede já aplicada nesta rodada.';
   else if (p?.status === 'idle') context = 'Não havia como cumprir a tarefa: sem punição nesta rodada.';
@@ -48,17 +73,18 @@ export function daughterPassiveChips(d, state) {
   return ['LIXO +3'];
 }
 
-export function daughterRegenerationHelp(d) {
+export function daughterRegenerationHelp(d, boss = { castleItemRulesVersion: 2 }) {
   if (d.status === 'dead' || !d.hp) return 'Derrotada: não regenera.';
   const available = Math.max(0, d.maxHp - d.hp);
-  const effective = d.cold ? 0 : Math.min(d.regeneration, available);
-  const now = d.cold ? 'Frio: a próxima regeneração está bloqueada.'
+  const frozen = castleFrozen(boss), effective = frozen || d.cold ? 0 : Math.min(d.regeneration, available);
+  const now = frozen ? 'Congelada: não regenera enquanto o congelamento durar.' : d.cold ? 'Frio: a próxima regeneração está bloqueada.'
     : !available ? 'Vida completa: não há cura agora.' : `Neste estado, recupera ${effective} HP.`;
-  return `${now}\nCada filha viva regenera até ${CASTLE_BALANCE.regeneration} HP no fim da rodada, mesmo sem ser escolhida.\nAnticoagulante reduz para ${CASTLE_BALANCE.anticoagulantRegeneration}; Frio bloqueia uma vez. Itens limitam a recuperação a ${d.maxHp} HP. Filhas derrotadas não regeneram.`;
+  const rules = castleRules(boss);
+  return `${now}\nCada filha viva regenera até ${rules.regeneration} HP no fim da rodada, mesmo sem ser escolhida.\nAnticoagulante reduz para ${rules.anticoagulantRegeneration}; ${usesGlobalCastleItems(boss) ? 'Frasco bloqueia a cura das três durante dois turnos consecutivos dos cooperadores' : 'Frio bloqueia uma vez'}. Itens limitam a recuperação a ${d.maxHp} HP. Filhas mortas não regeneram.`;
 }
 
-export function daughterRegenerationChip(d) {
-  return `PASSIVA +${d.cold ? 0 : d.regeneration} HP`;
+export function daughterRegenerationChip(d, boss) {
+  return `PASSIVA +${castleFrozen(boss) || d.cold ? 0 : d.regeneration} HP`;
 }
 
 export function castleItemInventory(boss, type) {
@@ -149,26 +175,33 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     daggerChip.textContent = `ADAGA · ${castleRules(boss).daggerTransfer * 100}%`;
     daggerChip._help = `${linked.map(d => d.name).join(' e ')}: parte do dano dos ataques também atinge a vida da Lady, ignorando as proteções.\n${castleItemHelp('dagger',boss).split('\n')[0]}`;
   }
-  const signature = JSON.stringify([boss.combatEntities, boss.roundNumber, boss.castlePassiveRound, boss.castleSelectedDaughterIds, disabled, target, state.players.map(p => p.name)]);
+  const signature = JSON.stringify([boss.combatEntities, boss.castleFreeze, boss.roundNumber, boss.castlePassiveRound, boss.castleSelectedDaughterIds, disabled, target, state.players.map(p => p.name)]);
   if (panel.dataset.signature === signature) return;
   panel.dataset.signature = signature; panel.replaceChildren();
   for (const d of boss.combatEntities) {
     const card = document.createElement('article'); card.dataset.entityId = d.id;
     card.className = `boss-daughter-card boss-combat-entity castle-daughter ${d.hp ? '' : 'is-dead'}`;
     card.classList.toggle('is-selected', d.id === target);
+    const frozen = d.hp > 0 && castleFrozen(boss);
+    card.classList.toggle('is-frozen', frozen);
     const portrait = document.createElement('img'); portrait.src = d.portrait; portrait.alt = d.name; portrait.className = 'boss-combat-portrait'; card.append(portrait);
     const name = document.createElement('b'); name.textContent = d.name.toUpperCase(); card.append(name);
     const chips = document.createElement('div'); chips.className = 'boss-combat-chips';
     const debuffs = [
+      frozen && ['CONGELADA', `${boss.castleFreeze.remainingTurns} ${boss.castleFreeze.remainingTurns === 1 ? 'turno restante' : 'turnos restantes'}, incluindo o atual.\n${castleItemHelp('cold_flask',boss)}\nHemorragia e ataques continuam funcionando.`],
       d.cold && ['FRIO', boss.castleItemRulesVersion === 2 ? `Impede as próximas ${d.coldCharges || 1} curas da filha. Se a vida estiver completa, guarda o efeito para quando ela se ferir.` : 'Não regenera no próximo fim de rodada. Depois, o efeito acaba.'],
       d.daggerLink && ['VÍNCULO ' + castleRules(boss).daggerTransfer * 100 + '%', castleItemHelp('dagger',boss)],
-      d.hemorrhage?.remaining && [`HEMORRAGIA · ${d.hemorrhage.remaining}`, `Perde ${d.hemorrhage.amount} HP antes de regenerar, durante mais ${d.hemorrhage.remaining} ${d.hemorrhage.remaining === 1 ? 'rodada' : 'rodadas'}. Esse sangramento não transfere dano pela Adaga.`],
-      d.regeneration === CASTLE_BALANCE.anticoagulantRegeneration && ['ANTICOAGULANTE', `Regenera ${CASTLE_BALANCE.anticoagulantRegeneration} HP por rodada, em vez de ${CASTLE_BALANCE.regeneration}. Dura até ser derrotada; não acumula.`],
+      hasCastleHemorrhage(d) && [d.hemorrhage.permanent ? `HEMORRAGIA −${d.hemorrhage.amount}` : `HEMORRAGIA · ${d.hemorrhage.remaining}`, d.hemorrhage.permanent
+        ? `Perde ${d.hemorrhage.amount} HP antes de regenerar no fim de cada rodada, até morrer. Outro Explosivo não aumenta o sangramento. Esse dano não passa pela Adaga.`
+        : `Perde ${d.hemorrhage.amount} HP antes de regenerar, durante mais ${d.hemorrhage.remaining} ${d.hemorrhage.remaining === 1 ? 'rodada' : 'rodadas'}. Esse sangramento não transfere dano pela Adaga.`],
+      d.regeneration === castleRules(boss).anticoagulantRegeneration && ['ANTICOAGULANTE', castleItemHelp('anticoagulant',boss)],
       d.relicRound != null && ['RELÍQUIA', d.passive?.status === 'suppressed' ? 'Passiva suspensa nesta rodada. Não bloqueia a regeneração.' : 'Suspende a passiva na próxima oportunidade. Não bloqueia a regeneração.'],
+      d.relicAttackBonus && ['DANO +20%', castleItemHelp('relic',boss)],
     ];
     for (const [label, explanation] of debuffs.filter(Boolean)) {
       const chip = createHelp(`Explicar debuff ${label} de ${d.name}`, label, explanation, `↓ ${label}`);
       chip.classList.add('boss-daughter-state', 'castle-debuff'); chips.append(chip);
+      if (label === 'CONGELADA') chip.classList.add('castle-freeze-chip');
     }
     card.append(chips);
     const content = document.createElement('div'); content.className = 'boss-combat-content';
@@ -195,16 +228,16 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     const passive = document.createElement('div'); passive.className = 'castle-passive-chips';
     for (const label of daughterPassiveChips(d, state)) {
       const selectedPassive = boss.castlePassiveRound === boss.roundNumber &&
-        !!boss.castleSelectedDaughterIds?.includes(d.id) && d.passive?.status !== 'suppressed';
+        !!boss.castleSelectedDaughterIds?.includes(d.id) && !frozen && d.passive?.status !== 'suppressed';
       const chip = createHelp(`Explicar passiva de ${d.name}: ${label}`, `Passiva de ${d.name}`, daughterPassiveHelp(d, state), label);
       chip.classList.add('boss-daughter-state', 'castle-passive-chip');
       // The tint identifies whose round it is, not whether a candidate/punishment is pending.
       chip.classList.toggle('is-highlighted', selectedPassive);
       passive.append(chip);
       const indicator = createHelp(`Explicar regeneração de ${d.name}`, `Regeneração de ${d.name}`,
-        daughterRegenerationHelp(d), daughterRegenerationChip(d));
+        daughterRegenerationHelp(d, boss), daughterRegenerationChip(d, boss));
       indicator.classList.add('boss-daughter-state', 'castle-passive-indicator');
-      indicator.classList.toggle('is-debuffed', d.cold || d.regeneration < CASTLE_BALANCE.regeneration);
+      indicator.classList.toggle('is-debuffed', frozen || d.cold || d.regeneration < castleRules(boss).regeneration);
       indicator.classList.toggle('is-highlighted', selectedPassive);
       passive.append(indicator);
     }
@@ -227,7 +260,7 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     const select = document.createElement('button'); select.type = 'button'; select.className = 'boss-combat-card-target';
     select.disabled = disabled || !d.hp; select.setAttribute('aria-label', `Atacar ${d.name}`); select.setAttribute('aria-pressed', String(d.id === target));
     select.onclick = () => selectTarget(d.id); card.append(select);
-    card.append(createHelp(`Explicar ${d.name}`, d.name, `${daughterPassiveHelp(d, state)}\n\nRegenera ${d.regeneration} no fim da rodada${d.cold ? ' (bloqueado pelo Frio desta vez)' : ''}. ${d.maxHp < originalHp ? `Itens petrificaram ${originalHp - d.maxHp} HP; pode recuperar até ${d.maxHp}. ` : ''}Depois de derrotada, não volta.`));
+    card.append(createHelp(`Explicar ${d.name}`, d.name, `${daughterPassiveHelp(d, state)}\n\n${daughterRegenerationHelp(d,boss)} Depois de derrotada, não volta.`));
     panel.append(card);
   }
 }

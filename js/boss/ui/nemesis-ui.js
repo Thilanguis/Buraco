@@ -40,7 +40,7 @@ function zombieChips(boss, entity, reinforced, gameState) {
     { label: effect.label, text: rule,
       ...(entity.id==='devourer'?{charge:Math.min(3,Math.max(0,Math.floor(Number(boss.devourerFeed?.credits)||0)))}:{}) },
     ...(entity.id === 'grabber' ? [{ label: `ALVO: ${gameState.players.find(p => p.id === getNemesisGrabberTarget(gameState))?.name || '—'}`,
-      text: 'Só prende cartas deste jogador nesta rodada. Na próxima rodada, persegue o outro. O primeiro alvo é sorteado no início da batalha.' }] : []),
+      text: `Só prende cartas de ${gameState.players.find(p => p.id === getNemesisGrabberTarget(gameState))?.name || '—'} nesta rodada. Na próxima rodada, persegue o outro. O primeiro alvo é sorteado no início da batalha.` }] : []),
   ];
 }
 export const nemesisBossUi = Object.freeze({

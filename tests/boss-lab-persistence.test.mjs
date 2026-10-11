@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import * as lab from '../js/boss/boss-debug-scenarios.js';
 import * as bossEngine from '../js/boss/boss-engine.js';
+import { bossStateRevision, sameBossRevision } from '../js/game/boss-state-transaction.js';
 import { getBossDefinitionForMode } from '../js/boss/boss-registry.js';
 import { BuracoBot } from '../bot.js';
 import { BossBuracoBot } from '../boss-bot.js';
@@ -23,7 +24,7 @@ function harness(bossId, abilityId) {
   const writes = [];
   let persisted = null;
   const ctx = {
-    ...bossEngine, console, Date, JSON, URL, structuredClone, AbortController,
+    ...bossEngine, bossStateRevision, sameBossRevision, console, Date, JSON, URL, structuredClone, AbortController,
     document: { getElementById: element },
     window: { location: 'http://localhost/?debug=1', history: { replaceState() {} }, updateMenuDynamic() {}, toggleDebugPanel() {}, gameSessionId: 0 },
     localStorage: { setItem() {} }, gameId: 'offline-test', gameRef: {}, db: {}, myPlayerIndex: 0,

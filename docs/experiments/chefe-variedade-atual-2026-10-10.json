@@ -1,0 +1,539 @@
+{
+  "seeds": 64,
+  "cases": [
+    "ready",
+    "poor",
+    "empty_table",
+    "closed_table",
+    "small_hands",
+    "no_stock_dead",
+    "resources",
+    "active_zombies",
+    "corpses",
+    "repeat_only",
+    "pressure_poor",
+    "many_targets",
+    "active_threats",
+    "full_resource",
+    "spent_revives"
+  ],
+  "method": "Conditional frozen-state probes; not battle frequencies or human win rates.",
+  "bosses": {
+    "banker": {
+      "count": 8,
+      "phases": {
+        "1": {
+          "registered": 4,
+          "eligible": {
+            "fixed_interest": 15,
+            "maintenance_fee": 15,
+            "credit_block": 15,
+            "credit_limit": 15
+          },
+          "selected": {
+            "credit_limit": 278,
+            "maintenance_fee": 177,
+            "fixed_interest": 364,
+            "credit_block": 141
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 0
+        },
+        "2": {
+          "registered": 8,
+          "eligible": {
+            "fixed_interest": 15,
+            "maintenance_fee": 15,
+            "credit_block": 15,
+            "suit_audit": 15,
+            "pledge": 12,
+            "compound_interest": 15,
+            "credit_limit": 15,
+            "discard_surcharge": 15
+          },
+          "selected": {
+            "credit_limit": 155,
+            "suit_audit": 134,
+            "fixed_interest": 212,
+            "compound_interest": 128,
+            "credit_block": 100,
+            "discard_surcharge": 97,
+            "maintenance_fee": 110,
+            "pledge": 24
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 0
+        },
+        "3": {
+          "registered": 8,
+          "eligible": {
+            "fixed_interest": 15,
+            "maintenance_fee": 15,
+            "credit_block": 15,
+            "suit_audit": 15,
+            "pledge": 12,
+            "compound_interest": 15,
+            "credit_limit": 15,
+            "discard_surcharge": 15
+          },
+          "selected": {
+            "credit_limit": 155,
+            "suit_audit": 134,
+            "fixed_interest": 212,
+            "compound_interest": 128,
+            "credit_block": 100,
+            "discard_surcharge": 97,
+            "maintenance_fee": 110,
+            "pledge": 24
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 0
+        }
+      }
+    },
+    "dominadora": {
+      "count": 13,
+      "phases": {
+        "1": {
+          "registered": 4,
+          "eligible": {
+            "collar": 13,
+            "forced_choice": 13,
+            "exposure": 9,
+            "iron_etiquette": 13
+          },
+          "selected": {
+            "iron_etiquette": 210,
+            "forced_choice": 208,
+            "collar": 306,
+            "exposure": 108
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 128
+        },
+        "2": {
+          "registered": 8,
+          "eligible": {
+            "collar": 13,
+            "forced_choice": 13,
+            "exposure": 9,
+            "forced_swap": 14,
+            "hands_tied": 14,
+            "possession": 12,
+            "iron_etiquette": 13,
+            "favorite": 14
+          },
+          "selected": {
+            "favorite": 141,
+            "exposure": 81,
+            "forced_choice": 136,
+            "possession": 113,
+            "forced_swap": 103,
+            "collar": 179,
+            "iron_etiquette": 85,
+            "hands_tied": 58
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 64
+        },
+        "3": {
+          "registered": 12,
+          "eligible": {
+            "forced_choice": 13,
+            "exposure": 9,
+            "forced_swap": 14,
+            "hands_tied": 14,
+            "possession": 12,
+            "iron_etiquette": 13,
+            "favorite": 14,
+            "double_collar": 13,
+            "separation": 14,
+            "absolute_control": 14,
+            "break_will": 2,
+            "final_order": 9
+          },
+          "selected": {
+            "absolute_control": 91,
+            "possession": 60,
+            "exposure": 71,
+            "separation": 108,
+            "iron_etiquette": 79,
+            "forced_choice": 125,
+            "hands_tied": 86,
+            "double_collar": 96,
+            "final_order": 44,
+            "forced_swap": 92,
+            "favorite": 32,
+            "break_will": 12
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 64
+        }
+      }
+    },
+    "matriarca_esmeralda": {
+      "count": 10,
+      "phases": {
+        "1": {
+          "registered": 3,
+          "eligible": {
+            "living_seed": 8,
+            "hungry_root": 11,
+            "restorative_dew": 14
+          },
+          "selected": {
+            "restorative_dew": 379,
+            "hungry_root": 301,
+            "living_seed": 216
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 45,
+          "maxRun": 16,
+          "noSelection": 64
+        },
+        "2": {
+          "registered": 7,
+          "eligible": {
+            "living_seed": 9,
+            "hungry_root": 12,
+            "restorative_dew": 15,
+            "twin_vines": 12,
+            "graft": 11,
+            "discard_pollen": 13,
+            "harvest": 14
+          },
+          "selected": {
+            "discard_pollen": 144,
+            "restorative_dew": 213,
+            "living_seed": 157,
+            "graft": 116,
+            "hungry_root": 167,
+            "twin_vines": 75,
+            "harvest": 88
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 15,
+          "maxRun": 16,
+          "noSelection": 0
+        },
+        "3": {
+          "registered": 10,
+          "eligible": {
+            "living_seed": 9,
+            "hungry_root": 12,
+            "restorative_dew": 15,
+            "twin_vines": 12,
+            "graft": 11,
+            "discard_pollen": 13,
+            "harvest": 14,
+            "royal_bloom": 14,
+            "emerald_cocoon": 15,
+            "spring_crown": 1
+          },
+          "selected": {
+            "royal_bloom": 137,
+            "twin_vines": 99,
+            "hungry_root": 137,
+            "harvest": 95,
+            "living_seed": 119,
+            "restorative_dew": 145,
+            "discard_pollen": 65,
+            "emerald_cocoon": 123,
+            "graft": 35,
+            "spring_crown": 5
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 0
+        }
+      }
+    },
+    "dimitrescu": {
+      "count": 8,
+      "phases": {
+        "1": {
+          "registered": 4,
+          "eligible": {
+            "blood_tithe": 15,
+            "red_wine": 2,
+            "crimson_brand": 10,
+            "impure_blood": 14
+          },
+          "selected": {
+            "impure_blood": 286,
+            "crimson_brand": 231,
+            "blood_tithe": 423,
+            "red_wine": 20
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 0
+        },
+        "2": {
+          "registered": 7,
+          "eligible": {
+            "blood_tithe": 15,
+            "red_wine": 2,
+            "crimson_brand": 10,
+            "cassandra_dead_feast": 13,
+            "crimson_clot": 2,
+            "three_daughters": 15,
+            "impure_blood": 14
+          },
+          "selected": {
+            "impure_blood": 167,
+            "crimson_brand": 180,
+            "blood_tithe": 287,
+            "three_daughters": 210,
+            "cassandra_dead_feast": 91,
+            "crimson_clot": 12,
+            "red_wine": 13
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 0
+        },
+        "3": {
+          "registered": 8,
+          "eligible": {
+            "blood_tithe": 15,
+            "red_wine": 2,
+            "crimson_brand": 10,
+            "cassandra_dead_feast": 13,
+            "crimson_clot": 2,
+            "castle_lockdown": 15,
+            "three_daughters": 15,
+            "impure_blood": 14
+          },
+          "selected": {
+            "impure_blood": 156,
+            "cassandra_dead_feast": 130,
+            "blood_tithe": 250,
+            "three_daughters": 188,
+            "crimson_brand": 129,
+            "castle_lockdown": 88,
+            "red_wine": 11,
+            "crimson_clot": 8
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 0
+        }
+      }
+    },
+    "nehelenia": {
+      "count": 11,
+      "phases": {
+        "1": {
+          "registered": 7,
+          "eligible": {
+            "mirrored_meld": 9,
+            "follow_reflection": 14,
+            "mirror_prison": 2,
+            "tiger_link": 12,
+            "tiger_prey": 9,
+            "hawk_suit": 13,
+            "fish_marked_card": 14
+          },
+          "selected": {
+            "fish_marked_card": 157,
+            "follow_reflection": 278,
+            "mirrored_meld": 153,
+            "tiger_prey": 75,
+            "tiger_link": 97,
+            "hawk_suit": 120,
+            "mirror_prison": 16
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 64
+        },
+        "2": {
+          "registered": 10,
+          "eligible": {
+            "mirrored_meld": 9,
+            "follow_reflection": 14,
+            "discard_mirror": 13,
+            "mirror_prison": 2,
+            "tiger_link": 12,
+            "tiger_prey": 9,
+            "hawk_suit": 13,
+            "hawk_watch": 1,
+            "fish_marked_card": 14,
+            "fish_inverted": 9
+          },
+          "selected": {
+            "fish_marked_card": 123,
+            "discard_mirror": 145,
+            "mirrored_meld": 132,
+            "hawk_suit": 133,
+            "follow_reflection": 212,
+            "tiger_prey": 28,
+            "fish_inverted": 53,
+            "tiger_link": 55,
+            "mirror_prison": 9,
+            "hawk_watch": 6
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 64
+        },
+        "3": {
+          "registered": 11,
+          "eligible": {
+            "mirrored_meld": 9,
+            "follow_reflection": 14,
+            "discard_mirror": 13,
+            "mirror_prison": 2,
+            "eternal_nightmare": 14,
+            "tiger_link": 12,
+            "tiger_prey": 9,
+            "hawk_suit": 13,
+            "hawk_watch": 1,
+            "fish_marked_card": 14,
+            "fish_inverted": 9
+          },
+          "selected": {
+            "fish_marked_card": 112,
+            "eternal_nightmare": 121,
+            "follow_reflection": 180,
+            "tiger_prey": 65,
+            "mirrored_meld": 109,
+            "hawk_suit": 89,
+            "discard_mirror": 111,
+            "tiger_link": 59,
+            "fish_inverted": 37,
+            "mirror_prison": 10,
+            "hawk_watch": 3
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 64
+        }
+      }
+    },
+    "nemesis": {
+      "count": 11,
+      "phases": {
+        "1": {
+          "registered": 5,
+          "eligible": {
+            "horde_invasion": 11,
+            "stars_hunt": 14,
+            "infectious_tentacle": 13,
+            "contaminated_zone": 7,
+            "horde_command": 1
+          },
+          "selected": {
+            "contaminated_zone": 85,
+            "stars_hunt": 279,
+            "horde_invasion": 244,
+            "infectious_tentacle": 276,
+            "horde_command": 12
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 64
+        },
+        "2": {
+          "registered": 8,
+          "eligible": {
+            "horde_invasion": 11,
+            "stars_hunt": 14,
+            "infectious_tentacle": 13,
+            "contaminated_zone": 7,
+            "horde_command": 1,
+            "rocket_launcher": 12,
+            "parasite_regeneration": 1,
+            "viral_reanimation": 1
+          },
+          "selected": {
+            "rocket_launcher": 171,
+            "stars_hunt": 249,
+            "horde_invasion": 203,
+            "contaminated_zone": 68,
+            "infectious_tentacle": 186,
+            "horde_command": 8,
+            "parasite_regeneration": 5,
+            "viral_reanimation": 6
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 0,
+          "maxRun": 1,
+          "noSelection": 64
+        },
+        "3": {
+          "registered": 11,
+          "eligible": {
+            "horde_invasion": 11,
+            "stars_hunt": 14,
+            "infectious_tentacle": 13,
+            "contaminated_zone": 7,
+            "horde_command": 1,
+            "rocket_launcher": 12,
+            "parasite_regeneration": 1,
+            "viral_reanimation": 1,
+            "tentacle_barrage": 13,
+            "stars_extermination": 12,
+            "omega_outbreak": 15
+          },
+          "selected": {
+            "stars_extermination": 108,
+            "infectious_tentacle": 141,
+            "stars_hunt": 188,
+            "tentacle_barrage": 141,
+            "contaminated_zone": 40,
+            "horde_invasion": 133,
+            "rocket_launcher": 41,
+            "omega_outbreak": 158,
+            "horde_command": 8,
+            "parasite_regeneration": 1,
+            "viral_reanimation": 1
+          },
+          "probes": 15,
+          "sequenceDraws": 240,
+          "repeats": 15,
+          "maxRun": 16,
+          "noSelection": 0
+        }
+      }
+    }
+  }
+}

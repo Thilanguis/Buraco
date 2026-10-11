@@ -1,5 +1,15 @@
 # Itens v2 da Lady Dimitrescu — 08/10/2026
 
+**Estado atual de 10/10/2026:** Explosivo100+15 permanente, Relíquia+20% de ataque direto até morrer, Frasco global por duas oportunidades de turno. Regen20/10 e Adaga80% preservados. Contrato vigente: [lote final de itens](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md). As tabelas e medições abaixo permanecem históricas, não foram recalculadas.
+
+## Atualização anterior — pacote B, antes do lote final de itens
+
+No pacote B anterior, foram aplicados regen20/Anti10, Adaga80%, Explosivo100+20 permanente e Frasco de duas cargas. O lote final substituiu somente hemorragia para15 e os efeitos de Frasco/Relíquia. Não reutilizar números ou descrição antigos como regra atual.
+
+Saves v2 anteriores são atualizados uma vez, preservando ferimentos, consumo, anexos, proteção e guardas de eventos. Sangramento expirado não retorna; saves v1 mantêm o contrato legado. Contrato vigente: seção7 da `DOCUMENTACAO_CHEFE_DA_MESA.md` e `ETAPA_2_DIMITRESCU_2026-10-10.md`.
+
+**As seções abaixo são o registro histórico do experimento de 08/10**, não os números atuais. Suas tabelas/resultados não foram recalculados nem apresentados como win rate humano. A aprovação de implementação do pacote B não comprova que a dificuldade final já esteja calibrada.
+
 ## Resultado e limite da calibração
 
 Implementado no workspace local, preservando as alterações anteriores de Nemesis/Matriarca e da apresentação das filhas. Suíte inicial nova: **1112/1112**. Suíte final: **1163/1163**, zero falhas, cancelados, skips e todos. Sem commit, push ou deploy.
@@ -17,7 +27,7 @@ Implementado no workspace local, preservando as alterações anteriores de Nemes
 | Piso do máximo recuperável | 200 | 300 |
 | Adaga | Máximo −100; impacto 50 | Máximo −5% do original = 25; vínculo permanente de 30%, sem impacto |
 | Explosivo | Máximo −100; impacto 100 | Máximo −10% = 50; impacto 60; hemorragia 10% = 50 por 2 fechamentos |
-| Frasco de Frio | Máximo −100; bloqueio consumido no próximo fechamento | Máximo −20% = 100; bloqueia a próxima cura efetiva, guarda carga em vida cheia, teto 2 |
+| Frasco Congelante (`cold_flask`) | Máximo −100; bloqueio consumido no próximo fechamento | Máximo −20% = 100; bloqueia a próxima cura efetiva, guarda carga em vida cheia, teto 2 |
 | Anticoagulante | Máximo −100; regen 25 permanente | Máximo −15% = 75; regen 25 permanente, sem stack |
 | Relíquia | Máximo −100; suprimia a janela selecionada, inclusive sem candidato | Máximo −20% = 100; suprime uma oportunidade válida, atual pendente ou próxima |
 

@@ -6168,6 +6168,16 @@ body.boss-mode .boss-daughter-strip {
   inset: 0;
 }
 
+/* Hand marks: rounded wet drops, never rectangular gradient tiles.
+   Feast on the table retains its independently approved blood profile. */
+.boss-mode #handContainer .carta:is(.boss-card-dimitrescu-hunt, .boss-card-dimitrescu-blood-mark)::after {
+  background:
+    radial-gradient(ellipse at 50% 55%, #74051ce6 0 48%, #ac143b9e 64%, transparent 74%) var(--blood-drip-x1) var(--blood-drip-top1) / var(--blood-drip-w1) var(--blood-drip-h1) no-repeat,
+    radial-gradient(ellipse at 50% 55%, #650319e6 0 46%, #a111329e 63%, transparent 74%) var(--blood-drip-x2) var(--blood-drip-top2) / var(--blood-drip-w2) var(--blood-drip-h2) no-repeat,
+    radial-gradient(ellipse at 50% 55%, #880824e6 0 47%, #b31b389e 64%, transparent 74%) var(--blood-drip-x3) var(--blood-drip-top3) / var(--blood-drip-w3) var(--blood-drip-h3) no-repeat;
+  filter:none;
+}
+
 /* ============================================================
    MODO CHEFE — RÉGUA HORIZONTAL BASEADA NA MESA NORMAL
    Usa a mesma lógica já aprovada de .board-melds:
@@ -7539,13 +7549,39 @@ body[data-boss-id='dominadora'] .boss-domination-player.dominated .boss-dominati
 .boss-card-ref {
   display: inline-block;
   margin: 0 1px;
-  font-size: 1.18em;
-  line-height: 0.95;
+  font-size: 1.3em;
+  line-height: 1.15;
   font-weight: 1000;
   letter-spacing: 0.02em;
   vertical-align: -0.03em;
-  text-shadow: 0 0 6px currentColor;
+  text-shadow: none;
+  white-space:nowrap;
 }
+body.boss-mode :is(#bossIntentDescription, #bossIntentProgress, #bossActionDetails) {
+  white-space:pre-line; line-height:1.5; text-shadow:none;
+}
+body.boss-mode #bossIntentName { font-size:calc(var(--boss-fs-intent-title) * 1.08); }
+body.boss-mode #bossChoicePrompt,
+body.boss-mode .boss-ability-card p,
+body.boss-mode .boss-intent-help-popover p { white-space:pre-line; line-height:1.5; }
+body.boss-mode[data-boss-id='dimitrescu'] #bossIntentProgress { color:#ffd4db; }
+body.boss-mode[data-boss-id='dimitrescu'] :is(#bossIntentDescription, #bossIntentProgress) .boss-card-ref {
+  background:#451020; border-radius:3px; padding:1px 3px; text-shadow:none;
+}
+body.boss-mode[data-boss-id='dimitrescu'] :is(#bossIntentDescription, #bossIntentProgress) .boss-card-ref.suit-red { color:#ffb5c1; }
+body.boss-mode[data-boss-id='dimitrescu'] :is(#bossIntentDescription, #bossIntentProgress) .boss-card-ref.suit-dark { color:#e7efff; }
+body.boss-mode[data-boss-id='dimitrescu'] .boss-card-status-blood-hunt {
+  background:#70152c; color:#fff3f6; text-shadow:none; box-shadow:none;
+}
+/* Paint only the card reference larger; preserve the chip's layout and line box. */
+.boss-chip-caption { font:inherit; letter-spacing:inherit; color:inherit; white-space:inherit; }
+.boss-chip-card-ref {
+  display:inline-block; font-size:inherit; line-height:inherit; margin:0; padding:0;
+  transform:scale(1.5); transform-origin:center; font-weight:inherit;
+  white-space:nowrap; text-shadow:none; pointer-events:none;
+}
+.boss-chip-card-ref.suit-red { color:#ffc2cb; background:#451020; border-radius:2px; }
+.boss-chip-card-ref.suit-dark { color:#e7efff; background:#18263b; border-radius:2px; }
 
 .boss-card-ref.suit-red {
   color: #fb7185;
@@ -7581,6 +7617,62 @@ body.boss-mode .meld-line.boss-meld-marked > .meld-meta { margin-top: 8px; }
 
 /* Phase HUD stays in the vitals' normal flow, never over a resource meter. */
 body.boss-mode .boss-vitals { display: flex; flex-direction: column; align-self: stretch; gap: 7px; }
+
+/* Team Special belongs next to X in player actions, never in the boss HUD. */
+body.boss-mode .boss-round-summary { flex-wrap: nowrap; }
+body.boss-mode #bossCurrentActor { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boss-special-slot { display: none; }
+body.boss-mode .player-actions .boss-special-slot { display: flex; align-items: center; flex: 0 0 100px; width: 100px; pointer-events: auto; }
+body.boss-mode #gameSection .board .player-actions .boss-special-button { position: relative !important; width: 100% !important; height: 16px !important; min-height: 0 !important; padding: 0 2px !important; border: 0; margin: 0; font: inherit; box-shadow: none; }
+.boss-special-button {
+  pointer-events: auto;
+  position: relative;
+  display: flex; align-items: center; gap: 4px; width: 100%; height: 16px;
+  padding: 0 2px; border: 0; border-radius: 3px; background: #101b2b;
+  color: #dce7f4; font: inherit; cursor: pointer;
+}
+.boss-special-button strong { min-width: 30px; text-align: right; font-size: 9px; }
+.boss-special-button::before { content: ''; position: absolute; inset: -6px 0; }
+.boss-special-track { flex: 1; height: 4px; overflow: hidden; border-radius: 4px; background: #293548; }
+.boss-special-track > span { display: block; height: 100%; background: #b9cae7; }
+.boss-special-button.is-ready { color: #fff0b8; }
+.boss-special-button.is-ready .boss-special-track > span { background: #e6c15c; }
+body[data-boss-id="dimitrescu"] .boss-special-track > span { background: #d97184; }
+body[data-boss-id="nemesis"] .boss-special-track > span { background: #99d97b; }
+body[data-boss-id="nehelenia"] .boss-special-track > span { background: #c5a3f5; }
+body[data-boss-id="matriarca_esmeralda"] .boss-special-track > span { background: #60e9b5; }
+body[data-boss-id="dominadora"] .boss-special-track > span { background: #e8b6ec; }
+.boss-special-popover {
+  position: fixed; z-index: 10050; width: min(320px, calc(100vw - 32px)); box-sizing: border-box;
+  max-height: calc(100dvh - 16px); overflow: auto; padding: 12px; border: 1px solid #8595ab;
+  border-radius: 8px; background: #101827; color: #e9eef7; font-size: 13px; line-height: 1.45;
+}
+.boss-special-popover p { white-space: pre-line; margin: 8px 0; }
+.boss-special-choices { display: flex; gap: 8px; }
+.boss-special-popover button {
+  min-width: 0; min-height: 36px; padding: 6px 10px; border: 1px solid #7686a0;
+  border-radius: 5px; color: #fff; background: #25364d; cursor: pointer;
+}
+.boss-special-choices > button { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boss-special-popover button:disabled { opacity: .45; cursor: default; }
+.boss-special-popover > button { margin-top: 8px; }
+.boss-special-button:focus-visible, .boss-special-popover button:focus-visible { outline: 2px solid #fff0b8; outline-offset: 2px; }
+.boss-special-flight {
+  position: fixed; pointer-events: none; z-index: 10040; width: 22px; height: 32px;
+  border: 1px solid var(--special-color); border-radius: 4px; background: #17202e;
+  box-shadow: inset 0 0 0 3px #17202e, inset 0 0 0 4px var(--special-color);
+}
+@media (max-width: 600px) {
+  body.boss-mode .player-actions .boss-special-slot { flex-basis: 92px; width: 92px; }
+  body.boss-mode #bossRoundNumber, body.boss-mode #bossRoundTurn { white-space: nowrap; }
+}
+/* The actual board is a height-constrained flex column, unlike old fixtures.
+   Never shrink the HUD below its grid contents or draw portraits over helpers. */
+body.boss-mode .boss-hud,
+body.boss-mode .boss-daughter-strip,
+body.boss-mode #bossCombatPanel,
+body.boss-mode #dimitrescuCastlePanel { flex-shrink: 0; }
+body.boss-mode .boss-vitals > * { flex-shrink: 0; min-width:0; }
 body.boss-mode .boss-round-summary {
   position: static; width: 100%; max-width: none; margin: 0;
   padding-top: 5px; border-top: 1px solid rgba(148,163,184,.18);

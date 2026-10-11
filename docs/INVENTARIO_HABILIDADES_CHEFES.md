@@ -1,5 +1,13 @@
 # Inventário atual de habilidades dos chefes
 
+Catálogo vigente, não backlog. [Status do playtest](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md#resumo-executivo-do-checklist--estado-em-10102026) e [contexto de retomada](HANDOFF_DESENVOLVIMENTO_BURACO.md) ficam separados. Designs não aprovados não são habilidades implementadas.
+
+**Auditoria atual — 10/10/2026:** Dominadora 13, Nemesis 11, Nehelenia 11, Matriarca 10, Banqueiro 8 e Dimitrescu 8 habilidades oficiais. Elegibilidade e seleções reais por fase, cenários dirigidos e limitações estão em [BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md). Não foram adicionadas habilidades ou alterados pesos. As duas [propostas da Lady](PROPOSTAS_DIMITRESCU_2026-10-10.md) aguardam aprovação.
+
+**Especial universal não é habilidade sorteada do chefe:** saldo compartilhado por canastra 25/50/100, diferenças por evolução, custo 100 e usos repetidos. Exatamente cinco do topo do Lixo, mínimo cinco, bloqueios e reações preservados; o humano escolhe beneficiário. Não pontua novamente por render/reload. Não aumenta a contagem dos catálogos.
+
+**Números finais locais da Lady — lote final de itens:** filhas500/piso300; regen20/Anti10 permanente; Adaga80% do dano efetivo; Explosivo100+hemorragia15 por rodada até morrer, sem empilhar. Relíquia+20% somente em ataques diretos, permanente e sem acumular. Frasco congela as três por duas oportunidades consecutivas dos cooperadores, incluindo a atual; reaplicar renova para duas. Petrificação própria preservada. Lady2000, PROT.500 por filha viva, Sede/Fúria inalterados. Migração v2 e compatibilidade v1: [relatório](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md).
+
 **Elegibilidade revisada em 09/10/2026:** desafios podem ser impossíveis de cumprir com a mão atual. Preservam-se fase, recursos, alvos reais, saída legal das marcas e segurança dos bloqueios. A última habilidade só sai do sorteio se houver outra realmente elegível. Pesos e consequências não mudaram. Classificação individual dos seis chefes e comparação reproduzível: `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`.
 
 
@@ -104,7 +112,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 **Renascimento (passiva):** na Fase 3, se a Matriarca cair a 0 HP com pelo menos **1 Flor** e ainda não tiver usado o efeito, ela consome **1 Flor** e retorna com **300 HP** uma vez. Não entra no sorteio normal; aparece no DevTools com peso 0 para teste manual.
 ## Lady Dimitrescu
 
-**Itens v2 — 08/10/2026 (partidas novas):** Lady **2000 HP**, três filhas permanentes **500/500**, regen própria **50** no fim da rodada. Sede 0–100; derrota especial 100. Vínculo adiciona **1500 PROT. consumíveis** inicialmente, capacidade de 500 por filha viva. Coágulo absorve primeiro, depois PROT.; excedente atinge HP. Morte retira até 500 restantes, sem dano automático à vida. Não recarrega; zero expõe Lady mesmo com filhas vivas. Exceção nova: Adaga transmite dano direto à vida real, sem consumir as proteções. Saves v1 mantêm 450/piso 200 e efeitos antigos.
+**Itens v2 — estado atual:** Lady **2000 HP**, três filhas permanentes **500/500**, regen própria **20** no fim da rodada. Sede0–100; derrota especial100. Vínculo adiciona **1500 PROT. consumíveis** inicialmente, capacidade500 por filha viva. Coágulo absorve primeiro, depois PROT.; excedente atinge HP. Morte retira até500 restantes, sem dano automático à vida. Não recarrega; zero expõe Lady mesmo com filhas vivas. Adaga transmite dano direto à vida real, sem consumir proteções. Saves v1 mantêm450/piso200 e efeitos antigos.
 
 | Habilidade da Lady | Fases | Peso | Funcionamento base |
 |---|---:|---:|---|
@@ -121,7 +129,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Fúria:** 0/1/2/3 filhas mortas = NORMAL/I/II/FINAL. Cura da Lady ×1/1,10/1,20/1,30 (arredondada para baixo), Sede ofensiva própria +0/2/4/6 por evento positivo. Não altera passivas +3, Sangue Impuro (máximo +6), regen das filhas, custo do Vinho nem HP máximo.
 
-**Itens:** 15 cartas físicas aleatórias (incluindo Joker), três de cada PNG real. Perdas aditivas sobre os 500 HP originais: Adaga 5%/25; Explosivo 10%/50; Frio 20%/100; Anticoagulante 15%/75; Relíquia 20%/100; piso 300, sem dano extra quando a vida já está abaixo do novo máximo. Adaga transmite 30% do dano efetivo dos ataques à Lady, ignorando PROT./Coágulo, sem somar porcentagem em duplicatas. Explosivo causa 60 e hemorragia de 50 antes da regen por 2 fechamentos; renovar não empilha ticks. Frio bloqueia cura efetiva (até 2 cargas), sem gastar na vida cheia. Anticoagulante mantém regen 25. Relíquia cancela uma oportunidade realmente válida, esperando por ela quando necessário. Sacrifício não encerra turno; cartas anexadas retornam ao fundo do Lixo na morte, sem item reutilizável. Relatório: [REWORK_ITENS_DIMITRESCU_2026-10-08.md](REWORK_ITENS_DIMITRESCU_2026-10-08.md).
+**Itens:**15 cartas físicas aleatórias, três de cada tipo. Perdas aditivas sobre500 originais: Adaga25; Explosivo50; Frasco100; Anticoagulante75; Relíquia100; piso300, sem dano extra quando já ferida abaixo do máximo. Adaga transmite80% do ataque efetivo, ignorando PROT./Coágulo, sem acumular. Explosivo100+15 permanente sem stack. Anti mantém regen10. Relíquia aumenta ataques diretos em20% antes do clamp e da Adaga, sem silenciar ou acumular. Frasco congela as três, bloqueando regen e passivas por duas oportunidades de turno, cancelando objetivos pendentes sem punição; reaplicação renova a duração. Sacrifício não encerra turno; anexos voltam ao fundo do Lixo na morte, sem item reutilizável. Contrato e testes: [lote final](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md); experimentos anteriores permanecem históricos.
 
 **Retiradas da rotação:** Caçada de Bela, Banquete de Cassandra e Enxame de Daniela; identidade absorvida pelas passivas. As Três Filhas retorna reformulada, sem a antiga cobrança +8; payload antigo é cancelado com segurança. Demais pesos-base mantidos.
 

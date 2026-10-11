@@ -354,7 +354,7 @@ test('acoes humanas e cronometro consultam a trava obrigatoria de escolhas', () 
   assert.match(app, /window\.executeUndo = async \(\) => \{[\s\S]*?canRestoreUndoTransaction/);
   assert.match(app, /function passTurn\(\{ preserveUndo = false \} = \{\}\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
   assert.match(app, /async function autoPlayTimeout\(\) \{[\s\S]*?localActionGate\.run\(autoPlayTimeoutOnce\)/);
-  assert.match(app, /async function autoPlayTimeoutOnce\(\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
+  assert.match(app, /async function autoPlayTimeoutOnce\(\) \{\s*if \(isBossMode\(state\)\) return;[^\n]*\n\s*if \(!canPerformCommonGameAction\(state\)\)/);
   assert.match(app, /function resetTurnTimer\(\)[\s\S]*?hasPendingBossChoices\(state\)/);
   assert.match(app, /function startTurnTimerIfNeeded[\s\S]*?if \(!canPerformCommonGameAction\(state\)\)/);
 });

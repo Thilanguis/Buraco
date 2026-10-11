@@ -31,7 +31,7 @@ function game() {
     teams:[{id:0, melds:[['3','4','5'].map(r => c(`m${r}`,r,'♠'))]}, {id:1,melds:[]}], boss:createBossState('dimitrescu',1234) };
   // Explicit v1 save fixture: these regressions continue protecting the old matches.
   s.boss.castleItemRulesVersion=1;delete s.boss.castleItemRules;s.boss.castleDaughterBalanceVersion=2;
-  for(const d of s.boss.combatEntities)d.hp=d.maxHp=d.originalMaxHp=450;
+  for(const d of s.boss.combatEntities){d.hp=d.maxHp=d.originalMaxHp=450;d.regeneration=50;}
   s.boss.bossFlow = {stage:'players'}; return s;
 }
 const daughter = (s,id='bela') => s.boss.combatEntities.find(d=>d.id===id);

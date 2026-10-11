@@ -1,8 +1,34 @@
 # DOCUMENTAÇÃO — CHEFE DA MESA
 
+Regras vigentes neste documento; status, pendências e homologação no [checklist-mestre](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md#resumo-executivo-do-checklist--estado-em-10102026); contexto no [handoff](HANDOFF_DESENVOLVIMENTO_BURACO.md). Origem Lixo do Especial e impacto100 do Explosivo já estão aplicados, sem decisão pendente.
+
+## Itens da Dimitrescu — lote final de 10/10/2026
+
+Explosivo: 100 HP imediatos + 15 HP de sangramento por rodada até morrer, sem acumular; petrificação −50 HP máximo. Relíquia: petrifica100 e aumenta em20% somente ataques diretos, até a filha morrer. Frasco: petrifica100 somente no alvo e congela as três filhas por duas oportunidades consecutivas dos cooperadores, contando a atual. Reaplicar renova para duas, sem somar durações. Regen20/Anti10, Adaga80%, Lady/PROT./Sede/Fúria e demais itens preservados. Contrato detalhado na seção7 e [relatório deste lote](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md).
+
+## Especial cooperativo vigente — 10/10/2026
+
+Implementação local compartilhada pelos seis chefes. A correção posterior do usuário substitui a origem “Monte” do brief consolidado: **exatamente cinco cartas físicas do topo do Lixo**. Com zero a quatro cartas, não ativa nem gasta pontos. O Monte não é usado.
+
+A equipe ganha 25 por Limpa, 50 por Real e 100 por Ás-a-Ás. Um jogo físico pontua somente a categoria máxima que alcançou; evolução acrescenta apenas a diferença de 25/50/75. O saldo não tem teto: cada ativação gasta 100, guarda excedente e permite recarregar e usar novamente. Não exige fase, Mortos, Monte baixo ou mão pequena.
+
+Um humano escolhe qual cooperador recebe as cartas, inclusive o BOT. O BOT não gasta automaticamente. A compra normal continua separada. O Especial não cria obrigação nova de jogar imediatamente o topo; objetivos e restrições já existentes continuam valendo. A cotação/uso obrigatório da compra normal e o Lixo protegido não foram alterados fora do Especial.
+
+**Bloqueios e reações:** validar o usuário e o beneficiário contra os bloqueios canônicos de retirada. Daniela cobra sua primeira retirada efetiva uma única vez; Pólen reage se a carta contaminada estiver entre as cinco, mesmo enterrada; Ágio cobra a primeira retirada da rodada; Espelho acompanha as cartas físicas e suas consequências existentes. Itens permanecem nas cartas até seu uso real. Não consome financiamento nem dispara Agarrador como se fosse a compra normal; esses continuam ligados à compra normal do turno.
+
+**Persistência:** ledger por ID canônico do jogo, migration de categorias já conquistadas uma vez em saves antigos, IDs de ação resolvida e revisão autoritativa. Especial e commits comuns do modo Chefe comparam a revisão: dois pedidos da mesma revisão não podem gastar a mesma carga, e um escritor atrasado não pode apagar cartas recebidas. Rejeição não gasta nada. Undo restaura cartas, saldo e efeitos juntos; a gravação da restauração usa a revisão vigente, não volta a revisão para trás. Se uma reação encerrar a partida, resultado e histórico são gravados na mesma transação.
+
+**Apresentação:** barra funcional compacta ao lado do X, nos controles do jogador, fora do HUD/retrato do chefe; ajuda e escolha de destinatário, toque/teclado e movimento reduzido. Animatic provisório de cinco silhuetas do Lixo à mão, sem bloquear jogadas enquanto o navegador o anima. Arte heroica definitiva depende de aprovação no P3-06. Testes transacionais usam um substituto de armazenamento; **Firebase real e tablets físicos ainda precisam de homologação**.
+
+Relatórios: [pacote consolidado](PACOTE_CONSOLIDADO_CHEFES_2026-10-10.md), [comparação e variedade](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md). As notas anteriores permanecem como histórico dos respectivos lotes.
+
+**Etapa 1 do playtest — 10/10/2026:** nos seis chefes, jogadores humanos não têm limite individual de turno, autoplay ou punição por timeout. O tempo total da partida continua contando. A recuperação de BOT travado usa um watchdog separado, somente no cliente anfitrião, respeitando pausa, escolhas pendentes e sessão atual; os cronômetros dos demais modos permanecem. Itens da mão conservam seus cliques após atualização da carta, explicam impedimentos de uso e mantêm símbolo no Lixo até o consumo real. Relatório e limites da validação: `ETAPA_1_PLAYTEST_P0_2026-10-10.md`. Balanceamento e Especial Cooperativo não foram implementados neste lote.
+
 **Auditoria de elegibilidade — 09/10/2026:** uma habilidade pode aparecer mesmo sem solução na mão dos jogadores. Falha mantém a consequência existente. Nemesis remove provas completas de Caçada/Extermínio/Invasão e provas conjuntas de Barragem; cartas marcadas continuam exigindo saída individual legal. Prisão/Laço da Nehelenia preservam jogos reais extensíveis, não solução antecipada. Bloqueios, fases, recursos e lifecycle continuam protegidos. Sorteio evita a última habilidade somente havendo outra elegível. Nenhum peso, HP, valor de recurso ou política estratégica do BOT mudou. Relatório: `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`.
 
-**Polimento visual de 08/10/2026:** Enxerto mostra jogos alimentados numa barra0–2 com as três faixas de consequência, sem lista textual compactada. As cinco Flores usam a PNG `matriarch-lotus.png`, fosca quando apagada e com cor original quando ativa. PASSIVA das filhas mostra +50HP, +25 com Anticoagulante e +0 com Frio, mantendo o destaque de turno e debuffs separados; ADAGA30% permanece no retrato da Lady enquanto houver filha viva vinculada. Nenhuma alteração de resolução, cura, duração ou balanceamento neste polimento.
+**Polimento visual de 08/10/2026:** Enxerto mostra jogos alimentados numa barra0–2 com as três faixas de consequência, sem lista textual compactada. As cinco Flores usam a PNG `matriarch-lotus.png`, fosca quando apagada e com cor original quando ativa. PASSIVA e ADAGA permanecem consultáveis e refletem os valores da partida. Esse polimento não alterou balanceamento; os números foram posteriormente atualizados pelo pacote B abaixo.
+
+**Pacote B aplicado e atualizado pelo lote final de itens:** filhas500, regen20/Anti10, Adaga80%; Explosivo100+15 permanente; Relíquia+20% de ataque; Frasco global por dois turnos dos cooperadores. Lady/PROT., Sede, Fúria e petrificação preservados. Referências de carta nos chips mantêm ênfase apenas no valor+naipe. Implementação local, sem publicação. As medições anteriores na `ETAPA_2_DIMITRESCU_2026-10-10.md` são históricas; este lote não recalculou taxa de vitória.
 
 
 ## Status da documentação
@@ -1974,7 +2000,7 @@ Lady tem **2000 HP** e Sede 0–100. Sede 100 ou fim dos recursos com Lady viva 
 
 Lady começa com 2000 HP e **1500 PROT. adicionais consumíveis**. Cada filha viva sustenta capacidade de 500 PROT. Todo dano direcionado à Lady, humano/BOT/Ataque Final de 100, passa primeiro pelo Coágulo, depois pela PROT.; o excedente atinge a vida. Morte de filha retira até 500 da PROT. restante e limita ao novo teto de `500 × filhas vivas`, sem dano automático à vida. PROT. consumida não recarrega: zerá-la expõe os 2000 HP mesmo com filhas vivas. Não existe mais piso de HP. `boss.bloodLinkProtection` persiste em snapshot/reload/undo; saves sem o campo inicializam uma vez pelo número de filhas vivas, preservando HP e os demais recursos.
 
-O jogador escolhe Lady ou uma filha viva como alvo do próximo dano. Overkill da filha não transborda. Uma filha com Adaga transmite separadamente 30% do dano efetivo de ataques à vida real da Lady, ignorando Coágulo/PROT.; itens/hemorragia não transmitem. Filhas têm lifecycle próprio, sem invasão/reanimação do Nemesis.
+O jogador escolhe Lady ou uma filha viva como alvo do próximo dano. Overkill da filha não transborda. Uma filha com Adaga transmite separadamente 80% do dano efetivo de ataques à vida real da Lady, ignorando Coágulo/PROT.; itens/hemorragia não transmitem. Filhas têm lifecycle próprio, sem invasão/reanimação do Nemesis.
 
 ## 7.2 Sede e canastras
 
@@ -2014,9 +2040,9 @@ Rodada normal escolhe exatamente uma filha viva com RNG/seed canônico, evitando
 - **Cassandra — mesa:** marca jogo existente com contribuição legal concreta disponível à equipe. Qualquer cooperador pode alimentá-lo até o fim da rodada; falha +3 Sede. Sem candidato, não marca nem pune.
 - **Daniela — Lixo:** primeira retirada efetiva da equipe na rodada, protegida ou completa, +3 Sede uma vez. Monte ou ausência de retirada não punem.
 
-No fim da rodada, obrigações pendentes resolvem, depois hemorragia e, se sobreviver, regeneração. Cada filha viva recupera até **50 HP próprios**, nunca HP da Lady. Frio bloqueia a próxima regeneração que recuperaria HP, guardando a carga na vida cheia (até 2 cargas); Anticoagulante reduz permanentemente para 25, sem acumular.
+No fim da rodada, obrigações pendentes resolvem, depois hemorragia e, se sobreviver, regeneração. Cada filha viva recupera até **20 HP próprios**, nunca HP da Lady. Frio bloqueia a próxima regeneração que recuperaria HP, guardando a carga na vida cheia (até 2 cargas); Anticoagulante reduz permanentemente para 10, sem acumular.
 
-O chip **PASSIVA** explica somente essa regeneração permanente, inclusive quando a filha não foi selecionada; CAÇADA/BANQUETE/LIXO continuam com sua própria ajuda. O evento real `daughterRegen` mostra um número verde sobre o retrato correto (+50, +25 ou cura efetiva menor, como +20). Frio, vida cheia, morte e cura zero não animam. As três curas podem aparecer juntas, sem viajar para HP/Sede da Lady; `actionId` e baseline do HUD impedem replay em render/reload/reconexão/undo. Movimento reduzido mantém texto acessível sem deslocamento.
+O chip **PASSIVA** explica somente essa regeneração permanente, inclusive quando a filha não foi selecionada; CAÇADA/BANQUETE/LIXO continuam com sua própria ajuda. O evento real `daughterRegen` mostra um número verde sobre o retrato correto (+20, +10 ou cura efetiva menor). Frio, vida cheia, morte e cura zero não animam. As três curas podem aparecer juntas, sem viajar para HP/Sede da Lady; `actionId` e baseline do HUD impedem replay em render/reload/reconexão/undo. Movimento reduzido mantém texto acessível sem deslocamento.
 
 Morte cancela obrigação, encerra regeneração, impede alvo/item e atualiza Vínculo/Fúria imediatamente. Cada morte individual gera flash na Lady e toca `what-have-you-done-to-my-daughter.mp3`, sem repetição em reload.
 
@@ -2030,13 +2056,13 @@ Cada item reduz o máximo por um percentual dos **500 HP originais**, aditivamen
 
 | Item | Petrificação | Efeito adicional |
 |---|---|---|
-| Adaga | 5% / 25 HP | Vínculo permanente enquanto viva: 30% do dano efetivo de ataques também fere o HP real da Lady, sem consumir PROT./Coágulo. Duplicatas petrificam mais 25, sem somar porcentagem. |
-| Frasco de Frio | 20% / 100 HP | Bloqueia uma cura efetiva; vida cheia não gasta; duplicatas até 2 cargas. |
-| Anticoagulante | 15% / 75 HP | Regen 50→25 permanente, sem acumular. Duplicatas ainda petrificam. |
-| Explosivo | 10% / 50 HP | Impacto 60; hemorragia 50 por 2 fechamentos, antes da regen. Reaplicar causa novo impacto e renova duração, sem empilhar sangramento. Não aciona Adaga. |
-| Relíquia | 20% / 100 HP | Suprime uma oportunidade individual válida: atual se pendente, senão espera a próxima. Sem candidato ou não escolhida não consome; duplicatas não empilham supressões. Não bloqueia regen. |
+| Adaga | 5% / 25 HP | Vínculo permanente enquanto viva: 80% do dano efetivo de ataques também fere o HP real da Lady, sem consumir PROT./Coágulo. Duplicatas petrificam mais 25, sem somar porcentagem. |
+| Frasco Congelante | 20% / 100 HP no alvo | Congela as três: sem regen ou passivas individuais por duas oportunidades de turno dos cooperadores, incluindo a atual. Renova para duas, sem acumular. Cancela objetivos pendentes sem punição; As Três Filhas não contorna o congelamento. |
+| Anticoagulante | 15% / 75 HP | Regen 20→10 permanente, sem acumular. Duplicatas ainda petrificam. |
+| Explosivo | 10% / 50 HP | Impacto100; hemorragia15 antes da regen por rodada até morrer. Reaplicar causa novo impacto, sem somar sangramento nem tick extra na mesma rodada. Não aciona Adaga nem bônus de Relíquia. |
+| Relíquia | 20% / 100 HP | Recebe20% mais dano dos ataques diretos até morrer; sem acumular. Não silencia nem bloqueia regen; não amplia dano de itens/hemorragia/indireto. Duplicatas ainda petrificam e anexam carta. |
 
-Hemorragia mata pelo mesmo caminho de morte/Fúria/remoção de PROT., limitada ao HP restante. Adaga usa dano efetivo, arredonda a transmissão para baixo, não transmite overkill nem gera ciclos. A morte da Lady por transmissão encerra a batalha mesmo com PROT. restante. HUD mostra efeitos ativos, rodadas de sangramento, HP original/máximo recuperável/petrificação; feedback vermelho de Adaga chega ao retrato da Lady, hemorragia aparece na filha e regen vem depois.
+Ataque com Relíquia: dano-base→bônus20% (inteiro arredondado para baixo)→limite de HP restante→Adaga80% do efetivo (arredondado para baixo). Base100→120→96 na Lady; filha40→40→32 na Lady. Hemorragia mata pelo caminho canônico de morte/Fúria/remoção de PROT. Não transmite Adaga. A morte da Lady por transmissão encerra a batalha mesmo com PROT. restante. Congelamento não impede hemorragia, ataques, habilidades próprias da Lady ou outros itens. Expira após as consequências do segundo turno; objetivos cancelados não voltam, só recebe nova tarefa na próxima seleção normal. HUD mostra gelo azul e CONGELADA nas sobreviventes, hemorragia−15, HP/máximo recuperável/petrificação; movimento reduzido deixa o gelo estático.
 
 PNGs reais centralizados em `ITEM_DEFINITIONS`, sobrepostos à face sem ocultar cantos nem interceptar clique. HUD oferece “ITENS DO CASTELO”, cinco artes e ajuda opcional oficial. Filhas mostram HP/máximo, barra, regen, efeitos, obrigação e cartas sacrificadas reais.
 
@@ -2059,7 +2085,7 @@ Valores abaixo são **bases**; Fúria soma ao evento ofensivo positivo e multipl
 
 ## 7.7 Persistência e calibração
 
-IDs de item, consumo, anexos, HP/regen, passivas, cargas de Frio/Relíquia, vínculo de Adaga, hemorragia/último tick, alvo e eventos persistem em snapshot/reload/undo. Partidas novas salvam `castleItemRulesVersion: 2`, configuração e `castleDaughterBalanceVersion: 3`. Ausência de versão de itens significa v1: preserva 450 HP, piso 200, redução uniforme 100, Adaga 50 imediatos e Explosivo 100 imediatos; itens consumidos não adquirem novos efeitos. A migração anterior de 500/60 para 450/50 continua somente no caminho legado. Normalização não sorteia, cura ou reaplica; undo restaura a versão completa. Saves pré-castelo não recebem itens retroativos. Laboratório novo usa v2.
+IDs de item, consumo, anexos, HP/regen, passivas, congelamento compartilhado/turnos resolvidos, bônus de Relíquia, vínculo de Adaga, hemorragia/último tick, alvo e eventos persistem em snapshot/reload/undo. Partidas v2 novas salvam `castleItemEffectsVersion:1` e regras `itemEffectsVersion:2`. Saves v2 anteriores migram uma vez: hemorragia ativa passa a15, Relíquia anexada a filha viva passa a bônus permanente20%; Frio antigo ainda ativo vira congelamento global de duas oportunidades a partir da retomada, sem acumular cargas antigas. Não repete petrificação, impacto, cura ou tick; preserva HP, anexos/consumo, último tick e PROT. Objetivos anteriormente cancelados não são punidos retroativamente. Ausência de versão de itens continua v1:450/50/25, piso200, efeitos históricos; não recebe itens/vínculo/hemorragia novos retroativamente. Saves pré-castelo não sorteiam itens. Undo restaura tudo junto e normaliza a versão aprovada. Laboratório novo usa este lote; experimentos históricos pinam suas regras antigas explicitamente.
 
 Números centralizados em `js/boss/dimitrescu-castle.js`. Este é um experimento de troca de poder, não win rate comprovado. Meta geral 65–75% (aproximadamente 70%) permanece apenas alvo de calibração.
 
@@ -2885,7 +2911,7 @@ Caçada continua exigindo dano novo efetivo para sucesso (cartas já creditadas 
 
 O BOT usa esses planos por papel: prioriza Nemesis para cumprir seu dano direto pendente, o jogo congelado quando é parceiro e jogar a marcada para sucesso completo do Tentáculo. Fora dessas obrigações, mantém a heurística atual dos zumbis. Respeita Agarradas e batida segura; evita retirada contaminada letal e Impacto que leve a 100.
 
-`boss-combat.js` é uma abstração pequena para criar, normalizar, ferir, curar e reviver entidades serializáveis. Regras específicas permanecem no adapter do Nemesis. Estado novo fica dentro de `boss`, seguindo o save, snapshot, undo e sincronização existentes: HP/status/mutação/revives, seleção de ataque por jogador, S.T.A.R.S., cartas Agarradas, bônus com expiração, Zona de Impacto, quota por fase e guards de eventos. Não há timer exclusivo do Nemesis.
+`boss-combat.js` é uma abstração pequena para criar, normalizar, ferir, curar e reviver entidades serializáveis. Regras específicas permanecem no adapter do Nemesis. Estado novo fica dentro de `boss`, seguindo o save, snapshot, undo e sincronização existentes: HP/status/mutação/revives, seleção de ataque por jogador, S.T.A.R.S., cartas Agarradas, bônus com expiração, Zona de Impacto, quota por fase e guards de eventos. Nenhum dos seis chefes impõe tempo individual ao humano. O watchdog compartilhado recupera apenas BOT travado; não encerra turnos humanos.
 
 O Laboratório deriva suas onze habilidades da definição e usa o motor real. A Invasão permite escolher cada zumbi, sucesso/falha, BOT, reload/undo, reentrada, proteção contra repetição, teto da fase e persistente/cadáver. Comando sem persistente, Regeneração e Reanimação também possuem fixtures de elegibilidade/fallback.
 

@@ -7,6 +7,27 @@ const dimitrescuUi = fs.readFileSync(new URL('../js/boss/ui/dimitrescu-ui.js', i
 const coreBossCss = fs.readFileSync(new URL('../styles/boss-mode.css', import.meta.url), 'utf8');
 const dimitrescuCss = fs.readFileSync(new URL('../styles/boss/dimitrescu.css', import.meta.url), 'utf8');
 
+test('sangue da mão varia entre cartas e marcas, sem saltar no rerender; Banquete preservado', () => {
+  const source = app.slice(app.indexOf('function applyDimitrescuBloodScatter('), app.indexOf('\nfunction syncDimitrescuDeadPileVisual('));
+  const state = { boss: { roundNumber: 1, currentIntent: { id: 'marca-1' } } };
+  const scatter = new Function('state', `${source}; return applyDimitrescuBloodScatter;`)(state);
+  const draw = (key, profile='card') => {
+    const properties = {};
+    scatter({ className:'boss-card-dimitrescu-blood-mark', style:{setProperty:(key,value)=>properties[key]=value} },key,profile);
+    return properties;
+  };
+  const first = draw('carta-1'), feast = draw('jogo-1','feast');
+  assert.deepEqual(draw('carta-1'),first);
+  assert.notDeepEqual(draw('carta-2'),first);
+  state.boss.currentIntent.id='marca-2';
+  assert.notDeepEqual(draw('carta-1'),first);
+  assert.deepEqual(draw('jogo-1','feast'),feast);
+  for(let i=1;i<=6;i++) {
+    assert.ok(parseFloat(first[`--blood-blob-x${i}`])>=18);
+    assert.ok(parseFloat(first[`--blood-blob-y${i}`])<=78);
+  }
+});
+
 test('efeitos de sangue da Dimitrescu usam perfis separados por contexto', () => {
   assert.match(app, /function applyDimitrescuBloodScatter\(element, key = '', profile = 'card'\)/);
   assert.match(app, /syncDimitrescuDeadPileVisual\(container, active, key = ''\)/);

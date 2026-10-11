@@ -18,9 +18,10 @@ import {
 } from './mechanics/boss-mechanics-registry.js';
 import { quoteBankerCreditLimit } from './mechanics/banker.js';
 import { isCombatEntityAlive } from './boss-combat.js';
-import { CASTLE_BALANCE, ladyBloodBalance, absorbBloodLink, furyHealing, furyBlood, startCastleRound, resolveDaughterPassive, sacrificeCastleItem, chooseCastleItem } from './dimitrescu-castle.js';
+import { CASTLE_BALANCE, ladyBloodBalance, absorbBloodLink, furyHealing, furyBlood, startCastleRound, resolveDaughterPassive, sacrificeCastleItem, chooseCastleItem, castleFrozen } from './dimitrescu-castle.js';
 export { distributeCastleItems } from './dimitrescu-castle.js';
 import { canReceiveNeheleniaIllusionLock } from './mechanics/nehelenia.js';
+import { normalizeBossSpecial, creditBossSpecial, consumeBossSpecial } from './boss-special.js';
 
 export { getRestorativeDewHealing } from './boss-balance.js';
 
@@ -929,14 +930,28 @@ export function startDimitrescuRound(gameState, { selectedDaughterId = null, tar
   });
 }
 
-export function canUseCastleItem(gameState, playerId, cardId, daughterId) {
+// Same eligibility for humans and BOTs; the UI must explain a rejection, not
+// leave an inert target button. This deliberately adds no item-specific cap.
+export function getCastleItemUseStatus(gameState, playerId, cardId, daughterId) {
   const boss = gameState?.boss, player = gameState?.players?.find(p => p.id === playerId);
-  if (boss?.id !== 'dimitrescu' || boss.result || gameState.finished || !gameState.hasDrawnThisTurn || gameState.partialDraw
-    || gameState.players[gameState.currentPlayer]?.id !== playerId || isBossTurnActive(gameState) || boss.pendingChoices?.length) return false;
-  if (!player?.hand?.some(c => c.id === cardId) || player.hand.length <= 1 || cardId === gameState.pickedDiscardCardId
-    || isCardBlockedByBossState(boss, playerId, cardId, 'play') || !hasLegalDiscard(gameState, player, [cardId])) return false;
-  return !!boss.castleItems?.[cardId] && !boss.castleItems[cardId].consumed
-    && boss.combatEntities.some(d => d.id === daughterId && isCombatEntityAlive(d));
+  const no = (code, reason) => ({ allowed: false, code, reason });
+  if (boss?.id !== 'dimitrescu' || boss.result || gameState.finished) return no('finished', 'Esta batalha não permite usar itens agora.');
+  if (gameState.players[gameState.currentPlayer]?.id !== playerId) return no('turn', 'Espere a sua vez para usar este item.');
+  if (isBossTurnActive(gameState)) return no('boss_turn', 'Espere a Lady terminar a ação dela.');
+  if (boss.pendingChoices?.length) return no('choice', 'Resolva a escolha pendente antes de usar o item.');
+  if (!gameState.hasDrawnThisTurn || gameState.partialDraw) return no('draw', 'Termine a compra antes de usar o item.');
+  if (!player?.hand?.some(c => c.id === cardId)) return no('hand', 'Esta carta não está mais na sua mão.');
+  if (!boss.castleItems?.[cardId] || boss.castleItems[cardId].consumed) return no('consumed', 'Esta carta não tem um item disponível.');
+  if (player.hand.length <= 1) return no('last_card', 'Guarde uma carta para descartar no fim do turno.');
+  if (cardId === gameState.pickedDiscardCardId) return no('discard_pickup', 'A carta comprada do Lixo precisa entrar em um jogo; não pode ser usada como item neste turno.');
+  if (isCardBlockedByBossState(boss, playerId, cardId, 'play')) return no('blocked', 'Esta carta está bloqueada para uso neste turno.');
+  if (!hasLegalDiscard(gameState, player, [cardId])) return no('discard', 'Depois de usar o item, precisa sobrar uma carta que você possa descartar.');
+  if (!boss.combatEntities.some(d => d.id === daughterId && isCombatEntityAlive(d))) return no('target', 'Esta filha já morreu. Escolha uma filha viva.');
+  return { allowed: true, code: null, reason: '' };
+}
+
+export function canUseCastleItem(gameState, playerId, cardId, daughterId) {
+  return getCastleItemUseStatus(gameState, playerId, cardId, daughterId).allowed;
 }
 
 export function useCastleItem(gameState, playerId, cardId, daughterId) {
@@ -1984,6 +1999,7 @@ export function createBossState(id = 'banker', seed = Date.now()) {
     discardSurcharge: null,
     pendingChoices: [],
     meldProgress: {},
+    cooperativeSpecial: { version: 1, points: 0, earned: 0, ledger: {}, activations: 0, cardsReceived: 0, resolvedActionIds: [] },
     meldContributions: {},
     meldIdsByCardId: {},
     meldIdsByPosition: {},
@@ -2065,6 +2081,7 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   boss.meldIdsByCardId ||= {};
   boss.meldIdsByPosition ||= {};
   boss.meldIdSequence ||= 0;
+  normalizeBossSpecial(boss);
   boss.resolvedTurnIds ||= [];
   boss.playersActedThisRound ||= [];
   boss.roundFirstPlayerId ??= gameState.players?.[gameState.currentPlayer]?.id ?? null;
@@ -3284,7 +3301,7 @@ export function notifyBossDiscardTaken(gameState, playerId, takenCards = []) {
   if (boss.id === 'dimitrescu') {
     const intent = boss.currentIntent;
     const danielaPassive = boss.combatEntities?.find(d => d.id === 'daniela' && d.status === 'alive')?.passive;
-    if (takenCards.length && danielaPassive?.status === 'active' && danielaPassive.round === boss.roundNumber) {
+    if (!castleFrozen(boss) && takenCards.length && danielaPassive?.status === 'active' && danielaPassive.round === boss.roundNumber) {
       danielaPassive.status = 'triggered';
       const event = changeDimitrescuBlood(gameState, CASTLE_BALANCE.passiveBlood, 'Passiva de Daniela', `daughter_daniela_${boss.roundNumber}`);
       if (event) resolved.push(event);
@@ -4283,6 +4300,39 @@ export function canBossPerformCommonAction(gameState) {
   return !boss?.result && !hasPendingBossChoices(gameState) && !isBossTurnActive(gameState);
 }
 
+export function getBossSpecialUseStatus(gameState, request) {
+  if (!isBossMode(gameState) || gameState.finished || gameState.surrender?.active
+    || gameState.pause?.paused || gameState.pause?.request || gameState.debugPaused
+    || !canBossPerformCommonAction(gameState)) return { allowed: false, message: 'Aguarde a ação atual terminar.' };
+  const boss=normalizeBossState(gameState);
+  const actor=gameState.players.find(p=>p.id===request.actorId),recipient=gameState.players.find(p=>p.id===request.recipientId);
+  if (!actor || actor.isBot || actor.name?.toUpperCase().includes('BOT') || actor.teamId!==0 || !recipient || recipient.teamId!==0)
+    return { allowed: false, message: 'Um humano da equipe deve escolher quem recebe as cartas.' };
+  if (boss.cooperativeSpecial.points<100) return { allowed: false, message: 'Complete 100 pontos para usar.' };
+  if ((gameState.discard?.length || 0)<5) return { allowed: false, message: 'O Lixo precisa ter pelo menos 5 cartas.' };
+  if (discardBlockedByBossState(gameState,boss,actor.id) || discardBlockedByBossState(gameState,boss,recipient.id))
+    return { allowed: false, message: 'O chefe bloqueou a retirada do Lixo para este jogador.' };
+  return { allowed: true, message: 'Retira 5 cartas. Os efeitos do Lixo continuam valendo.' };
+}
+
+export function activateBossSpecial(gameState, request) {
+  if (!getBossSpecialUseStatus(gameState,request).allowed) return null;
+  const action=consumeBossSpecial(gameState,request);
+  if (!action)return null;
+  // The additional benefit is a real discard withdrawal. Keep source-specific
+  // reactions, but not the normal-purchase flag, financing or Grabber trigger.
+  action.bossEvents=notifyBossDiscardTaken(gameState,request.recipientId,action.cards);
+  if(gameState.boss.id==='banker') {
+    const surcharge=consumeBossDiscardSurcharge(gameState,request.recipientId);
+    if(surcharge)action.bossEvents.push(surcharge);
+  }
+  if(gameState.boss.result) {
+    gameState.finished=true;gameState.winnerTeamId=gameState.boss.result.victory?0:1;
+    gameState.matchFinishedAt=Date.now();
+  }
+  return action;
+}
+
 function drawChoiceCards(gameState, playerId, count) {
   const player = gameState.players?.find((entry) => entry.id === playerId);
   if (!player) return [];
@@ -4725,6 +4775,7 @@ export function applyBossMeldTransition(gameState, {
   const legacyKey = `${teamId}:${meldIndex}`;
   const meldId = resolveBossMeldId(gameState, teamId, meldIndex, true);
   const key = meldId || legacyKey;
+  creditBossSpecial(boss, key, newKind);
   const previous = boss.meldProgress[key] || boss.meldProgress[legacyKey] || {
     damageValue: BOSS_DAMAGE_BY_KIND[oldKind] || 0,
     debtValue: DEBT_REDUCTION_BY_KIND[oldKind] || 0,

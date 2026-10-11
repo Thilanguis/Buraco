@@ -1,4 +1,4 @@
-import { createCastleState, normalizeCastle, chooseCastleDamageTarget, damageDaughter, resolveDaughterPassive, regenerateDaughters } from '../dimitrescu-castle.js';
+import { createCastleState, normalizeCastle, chooseCastleDamageTarget, damageDaughter, resolveDaughterPassive, regenerateDaughters, completeCastleFreezeTurn } from '../dimitrescu-castle.js';
 
 function matchesMeld(target, meldId, meldIndex) {
   if (!target) return false;
@@ -85,10 +85,11 @@ export const dimitrescuBossMechanics = Object.freeze({
     };
   },
 
-  afterIntentResolve({ boss, gameState, allPlayersActed = false, resolveBloodRound = null, changeBlood, recordBossEvent } = {}) {
-    if (!allPlayersActed || typeof resolveBloodRound !== 'function') return {};
-    const bloodEvents = (resolveBloodRound() || []).filter(Boolean);
-    regenerateDaughters(gameState, changeBlood, recordBossEvent);
+  afterIntentResolve({ boss, gameState, playerId, allPlayersActed = false, resolveBloodRound = null, changeBlood, recordBossEvent } = {}) {
+    const bloodEvents = allPlayersActed && typeof resolveBloodRound === 'function' ? (resolveBloodRound() || []).filter(Boolean) : [];
+    if (allPlayersActed) regenerateDaughters(gameState, changeBlood, recordBossEvent);
+    // Expire only AFTER this opportunity's passives and end-of-round healing.
+    completeCastleFreezeTurn(gameState, playerId, recordBossEvent);
     return { bloodEvents, fallbackEvent: bloodEvents.at(-1) || null };
   },
 

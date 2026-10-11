@@ -27,13 +27,13 @@ const record=s=>e=>(s.boss.eventLog.push(e),e);
 const close=s=>regenerateDaughters(s,()=>{},record(s));
 const attack=(s,amount,id='hit',target='bela')=>damageDaughter(s,d(s,target),amount,id,record(s),{source:'attack',playerId:0});
 
-test('v2: 500/50, piso 300, Lady/PROT/Fúria inalterados e regras congeladas no snapshot',()=>{
+test('v2 pacote B: 500/20, piso 300, Lady/PROT/Fúria inalterados e regras congeladas no snapshot',()=>{
   const s=game();assert.equal(s.boss.castleItemRulesVersion,2);assert.equal(s.boss.castleDaughterBalanceVersion,3);
-  assert.deepEqual(s.boss.combatEntities.map(d=>[d.hp,d.maxHp,d.originalMaxHp,d.regeneration]),Array(3).fill([500,500,500,50]));
+  assert.deepEqual(s.boss.combatEntities.map(d=>[d.hp,d.maxHp,d.originalMaxHp,d.regeneration]),Array(3).fill([500,500,500,20]));
   assert.equal(s.boss.hp,2000);assert.equal(bloodLinkRemaining(s.boss),1500);assert.equal(furyBlood(s.boss,3),3);
   assert.deepEqual(castleRules(JSON.parse(JSON.stringify(s.boss))),CASTLE_BALANCE);
 });
-for(const [type,loss,hp] of [['dagger',25,475],['explosive',50,390],['cold_flask',100,400],['anticoagulant',75,425],['relic',100,400]]) {
+for(const [type,loss,hp] of [['dagger',25,475],['explosive',50,350],['cold_flask',100,400],['anticoagulant',75,425],['relic',100,400]]) {
   test(`${type}: perda aditiva do HP original, efeito distinto e descarte preservado`,()=>{
     const s=game(),turn=s.turnNumber;const e=sacrifice(s,type);
     assert.equal(d(s).maxHp,500-loss);assert.equal(d(s).hp,hp);assert.equal(e.itemType,type);
@@ -44,16 +44,16 @@ for(const [type,loss,hp] of [['dagger',25,475],['explosive',50,390],['cold_flask
   });
   test(`${type}: não causa dano pela redução de máximo quando já ferida`,()=>{
     const s=game();d(s).hp=180;sacrifice(s,type);
-    assert.equal(d(s).hp,type==='explosive'?120:180);
+    assert.equal(d(s).hp,type==='explosive'?80:180);
   });
   test(`${type}: efeito especial funciona também no piso`,()=>{
     const s=game();d(s).maxHp=300;d(s).hp=250;sacrifice(s,type);
     assert.equal(d(s).maxHp,300);
     if(type==='dagger')assert.equal(d(s).daggerLink,true);
-    if(type==='explosive')assert.deepEqual([d(s).hp,d(s).hemorrhage.amount,d(s).hemorrhage.remaining],[190,50,2]);
-    if(type==='cold_flask')assert.equal(d(s).coldCharges,1);
-    if(type==='anticoagulant')assert.equal(d(s).regeneration,25);
-    if(type==='relic')assert.equal(d(s).relicRound,2);
+    if(type==='explosive')assert.deepEqual([d(s).hp,d(s).hemorrhage.amount,d(s).hemorrhage.remaining,d(s).hemorrhage.permanent],[150,15,null,true]);
+    if(type==='cold_flask')assert.equal(s.boss.castleFreeze.remainingTurns,2);
+    if(type==='anticoagulant')assert.equal(d(s).regeneration,10);
+    if(type==='relic')assert.equal(d(s).relicAttackBonus,true);
   });
 }
 test('Frio + Relíquia: piso exatamente 300, nunca cura ao aplicar nem ao reload',()=>{
@@ -63,18 +63,18 @@ test('Frio + Relíquia: piso exatamente 300, nunca cura ao aplicar nem ao reload
 for(const protection of [1500,0])test(`Adaga atravessa PROT ${protection} e Coágulo sem consumir nenhum`,()=>{
   const s=game();s.boss.bloodLinkProtection=protection;s.boss.crimsonClot={status:'active',remaining:180};
   sacrifice(s,'dagger');assert.equal(attack(s,200),200);
-  assert.equal(s.boss.hp,1940);assert.equal(d(s).hp,275);assert.equal(s.boss.bloodLinkProtection,protection);assert.equal(s.boss.crimsonClot.remaining,180);
-  const e=s.boss.eventLog.find(e=>e.type==='daggerTransfer');assert.deepEqual([e.amount,e.daughterDamage,e.targetId,e.sourceEntityId],[60,200,'boss','bela']);
+  assert.equal(s.boss.hp,1840);assert.equal(d(s).hp,275);assert.equal(s.boss.bloodLinkProtection,protection);assert.equal(s.boss.crimsonClot.remaining,180);
+  const e=s.boss.eventLog.find(e=>e.type==='daggerTransfer');assert.deepEqual([e.amount,e.daughterDamage,e.targetId,e.sourceEntityId],[160,200,'boss','bela']);
   assert.equal(resourceFeedbackSteps(s.boss,e)[0].metric,'ladyHp');
 });
 test('Adaga: overkill transmite apenas dano efetivo, morte remove vínculo e até 500 PROT',()=>{
   const s=game();sacrifice(s,'dagger');d(s).hp=20;assert.equal(attack(s,999),20);
-  assert.equal(s.boss.hp,1994);assert.equal(s.boss.bloodLinkProtection,1000);assert.equal(d(s).daggerLink,false);assert.equal(furyLevel(s.boss),1);
+  assert.equal(s.boss.hp,1984);assert.equal(s.boss.bloodLinkProtection,1000);assert.equal(d(s).daggerLink,false);assert.equal(furyLevel(s.boss),1);
   assert.equal(s.boss.eventLog.filter(e=>e.type==='daughterDeath').length,1);assert.equal(s.discard.at(-1).id,'top');
 });
-test('Adagas duplicadas: máximo 450/425, mas transmissão nunca 60%/90%',()=>{
+test('Adagas duplicadas: máximo 450/425, mas transmissão nunca 160%/240%',()=>{
   const s=game();for(let i=0;i<3;i++)sacrifice(s,'dagger',`dag${i}`);
-  assert.equal(d(s).maxHp,425);attack(s,100);assert.equal(s.boss.hp,1970);
+  assert.equal(d(s).maxHp,425);attack(s,100);assert.equal(s.boss.hp,1920);
 });
 test('Adaga não transmite Explosivo, hemorragia nem outras fontes; sem ciclos',()=>{
   const s=game();sacrifice(s,'dagger');sacrifice(s,'explosive');close(s);
@@ -84,7 +84,7 @@ test('Adaga não transmite Explosivo, hemorragia nem outras fontes; sem ciclos',
 for(const isBot of [false,true])test(`pipeline ${isBot?'BOT':'humano'}: ataque/canastra e transferência`,()=>{
   const s=game();s.players[0].isBot=isBot;s.boss.combatTargetsByPlayer[0]='bela';sacrifice(s,'dagger');
   const e=applyBossMeldTransition(s,{teamId:0,playerId:0,meldIndex:0,oldKind:'simple',newKind:'suja',cardsAdded:[]});
-  assert.equal(e.targetId,'bela');assert.ok(e.appliedDamage>0);assert.equal(s.boss.hp,2000-Math.floor(e.appliedDamage*.3));
+  assert.equal(e.targetId,'bela');assert.ok(e.appliedDamage>0);assert.equal(s.boss.hp,2000-Math.floor(e.appliedDamage*.8));
   const hp=s.boss.hp;applyBossMeldTransition(s,{teamId:0,playerId:0,meldIndex:0,oldKind:'simple',newKind:'suja',cardsAdded:[]});assert.equal(s.boss.hp,hp);
 });
 test('morte da Lady via Adaga encerra a batalha, inclusive Ataque Final na filha',()=>{
@@ -97,15 +97,15 @@ test('morte da Lady via Adaga encerra a batalha, inclusive Ataque Final na filha
 for(const anti of [false,true])for(const cold of [false,true])test(`hemorragia antes de regen; Anti ${anti}, Frio ${cold}`,()=>{
   const s=game();sacrifice(s,'explosive');if(anti)sacrifice(s,'anticoagulant');if(cold)sacrifice(s,'cold_flask');
   const before=d(s).hp;close(s);
-  assert.equal(d(s).hp,before-50+(cold?0:anti?25:50));
+  assert.equal(d(s).hp,before-15+(cold?0:anti?10:20));
   const events=s.boss.eventLog;assert.ok(events.findIndex(e=>e.type==='daughterBleed')<events.findIndex(e=>e.type==='daughterRegen'));
-  const bleed=events.find(e=>e.type==='daughterBleed');assert.equal(resourceFeedbackSteps(s.boss,bleed)[0].amount,-50);
-  assert.equal(d(s).hemorrhage.remaining,1);const snapshot=JSON.stringify(s);close(s);assert.equal(JSON.stringify(s),snapshot);
-  s.boss.roundNumber++;close(s);assert.equal(d(s).hemorrhage,null);
+  const bleed=events.find(e=>e.type==='daughterBleed');assert.equal(resourceFeedbackSteps(s.boss,bleed)[0].amount,-15);
+  assert.equal(d(s).hemorrhage.permanent,true);const snapshot=JSON.stringify(s);close(s);assert.equal(JSON.stringify(s),snapshot);
+  s.boss.roundNumber++;close(s);assert.equal(d(s).hemorrhage.permanent,true);
 });
-test('Explosivo reaplica impacto, renova 2 rodadas e não empilha ticks',()=>{
+test('Explosivo reaplica impacto, mantém sangramento permanente e não empilha ticks',()=>{
   const s=game();sacrifice(s,'explosive','one');close(s);sacrifice(s,'explosive','two');
-  assert.equal(d(s).hemorrhage.remaining,2);const hp=d(s).hp;close(s);assert.equal(d(s).hp,hp);
+  assert.equal(d(s).hemorrhage.remaining,null);assert.equal(d(s).hemorrhage.permanent,true);const hp=d(s).hp;close(s);assert.equal(d(s).hp,hp);
   s.boss.roundNumber++;close(s);assert.equal(s.boss.eventLog.filter(e=>e.type==='daughterBleed').length,2);
 });
 test('hemorragia letal: clampa dano, dispara morte/Fúria, sem regen/Adaga',()=>{
@@ -115,34 +115,34 @@ test('hemorragia letal: clampa dano, dispara morte/Fúria, sem regen/Adaga',()=>
   assert.equal(s.boss.bloodLinkProtection,1000);assert.equal(furyBlood(s.boss,5),7);
   assert.ok(!s.boss.eventLog.some(e=>e.type==='daughterRegen'&&e.targetId==='bela'));
 });
-test('Frio não é desperdiçado na vida cheia, bloqueia somente cura real e tem teto 2',()=>{
-  const s=game();for(let i=0;i<3;i++)sacrifice(s,'cold_flask',`cold${i}`);
+test('compatibilidade histórica: Frio local guarda cargas na vida cheia, teto 2',()=>{
+  const s=game();s.boss.castleItemRules.itemEffectsVersion=1;for(let i=0;i<3;i++)sacrifice(s,'cold_flask',`cold${i}`);
   assert.equal(d(s).coldCharges,2);assert.equal(d(s).maxHp,300);close(s);assert.equal(d(s).coldCharges,2);
-  for(let i=1;i<=3;i++) {s.boss.roundNumber++;d(s).hp=200;close(s);assert.equal(d(s).hp,i<=2?200:250);}
+  for(let i=1;i<=3;i++) {s.boss.roundNumber++;d(s).hp=200;close(s);assert.equal(d(s).hp,i<=2?200:220);}
   assert.equal(d(s).cold,false);assert.equal(d(s).coldCharges,0);
 });
-test('Anticoagulante permanente/duplicado, sem reduzir abaixo de 25; cura no máximo recuperável',()=>{
+test('Anticoagulante permanente/duplicado, sem reduzir abaixo de 10; cura no máximo recuperável',()=>{
   const s=game();for(let i=0;i<3;i++)sacrifice(s,'anticoagulant',`anti${i}`);
-  assert.equal(d(s).maxHp,300);assert.equal(d(s).regeneration,25);d(s).hp=290;close(s);assert.equal(d(s).hp,300);
+  assert.equal(d(s).maxHp,300);assert.equal(d(s).regeneration,10);d(s).hp=290;close(s);assert.equal(d(s).hp,300);
   assert.match(daughterRegenerationHelp(d(s)),/Vida completa/);
 });
-test('Relíquia espera oportunidade válida; não some em round não selecionado ou sem candidato',()=>{
-  const s=game();sacrifice(s,'relic');s.boss.roundNumber++;
+test('compatibilidade histórica: Relíquia espera oportunidade válida',()=>{
+  const s=game();s.boss.castleItemRules.itemEffectsVersion=1;sacrifice(s,'relic');s.boss.roundNumber++;
   startDimitrescuRound(s,{selectedDaughterId:'daniela'});close(s);assert.equal(d(s).relicRound,2);
   s.boss.roundNumber++;s.players[0].hand=[c('none')];
   startDimitrescuRound(s,{selectedDaughterId:'bela'});assert.equal(d(s).passive.status,'idle');close(s);assert.equal(d(s).relicRound,2);
   s.boss.roundNumber++;s.players[0].hand.push(c('legal6','6','♠'),c('spare'));
   startDimitrescuRound(s,{selectedDaughterId:'bela'});assert.equal(d(s).passive.status,'suppressed');close(s);assert.equal(d(s).relicRound,null);
-  assert.equal(d(s).regeneration,50);
+  assert.equal(d(s).regeneration,20);
 });
-test('Relíquia cancela obrigação pendente; As Três Filhas preserva as outras e regen',()=>{
-  const s=game();s.boss.phase=2;selectNextBossIntent(s,{debug:true,forcedAbilityId:'three_daughters'});
+test('compatibilidade histórica: Relíquia cancela obrigação pendente',()=>{
+  const s=game();s.boss.castleItemRules.itemEffectsVersion=1;s.boss.phase=2;selectNextBossIntent(s,{debug:true,forcedAbilityId:'three_daughters'});
   assert.equal(d(s).passive.status,'active');sacrifice(s,'relic');assert.equal(d(s).passive.status,'suppressed');
   assert.equal(d(s,'cassandra').passive.status,'active');assert.equal(d(s,'daniela').passive.status,'active');
-  d(s).hp=300;close(s);assert.equal(d(s).hp,350);assert.equal(d(s).relicRound,null);
+  d(s).hp=300;close(s);assert.equal(d(s).hp,320);assert.equal(d(s).relicRound,null);
 });
-test('Relíquias duplicadas não acumulam supressão infinita',()=>{
-  const s=game();sacrifice(s,'relic','r1');sacrifice(s,'relic','r2');assert.equal(d(s).relicRound,2);
+test('compatibilidade histórica: Relíquias não acumulam supressão',()=>{
+  const s=game();s.boss.castleItemRules.itemEffectsVersion=1;sacrifice(s,'relic','r1');sacrifice(s,'relic','r2');assert.equal(d(s).relicRound,2);
   s.boss.roundNumber=2;startDimitrescuRound(s,{selectedDaughterId:'bela'});close(s);assert.equal(d(s).relicRound,null);
   s.boss.roundNumber++;startDimitrescuRound(s,{selectedDaughterId:'bela'});assert.equal(d(s).passive.status,'active');
 });

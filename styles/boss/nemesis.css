@@ -26,6 +26,8 @@ body[data-boss-id="nemesis"] .boss-combat-main-target:focus-visible { outline: 2
 body[data-boss-id="nemesis"] .nemesis-stars-overlay { position: absolute; top: 5px; right: 5px; z-index: 5; display: flex; align-items: center; gap: 3px; box-sizing: border-box; max-width: calc(100% - 10px); padding: 3px 4px; border-radius: 4px; background: rgba(8, 13, 23, .8); color: #fef3c7; font-size: 8px; font-weight: 800; }
 body[data-boss-id="nemesis"] .nemesis-stars-overlay > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body[data-boss-id="nemesis"] .nemesis-stars-overlay .boss-combat-help { margin: 0; }
+body[data-boss-id="nemesis"] .nemesis-stars-overlay .boss-combat-help { flex:0 0 auto; }
+body[data-boss-id="nemesis"] .boss-combat-chips .boss-daughter-state { min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
 body[data-boss-id="nemesis"] .boss-combat-entity.is-transitioning { animation: nemesisThreatArrives 550ms ease-out both; }
 body[data-boss-id="nemesis"] .boss-combat-entity.is-withdrawing { pointer-events: none; animation: nemesisThreatWithdraws 700ms ease-in both; }
 @keyframes nemesisThreatArrives { from { opacity: .35; transform: translateY(-5px); } to { opacity: 1; transform: none; } }

@@ -21,7 +21,7 @@ test('experimento: comparação legacy conserva regras450/piso200; candidatos n�
   const old=castleDeal(2000,{legacy:true});assert.equal(old.boss.castleItemRulesVersion,1);assert.equal(old.boss.combatEntities[0].maxHp,450);
   const candidate=castleDeal(2000,{daughterHp:450,daughterHpFloor:250,bleedPercent:.12});
   assert.equal(candidate.boss.castleItemRules.daughterHpFloor,250);assert.equal(candidate.boss.combatEntities[0].maxHp,450);
-  assert.equal(castleDeal(2000).boss.combatEntities[0].maxHp,500);assert.equal(CASTLE_BALANCE.bleedPercent,.1);
+  assert.equal(castleDeal(2000).boss.combatEntities[0].maxHp,500);assert.equal(CASTLE_BALANCE.bleedPercent,.03);
 });
 for(const [bleedPercent,alone,anti,cold] of [[.08,410,285,260],[.10,390,265,240],[.12,370,245,220]]) {
   test(`combos controlados de hemorragia ${bleedPercent*100}% confirmam regen/Frio/Anti canônicos`,()=>{

@@ -1,0 +1,1831 @@
+{
+  "format": 1,
+  "source": ".cache/dimitrescu-stage2.jsonl",
+  "sha256": "55b59949ad0d7646bba23710cc42ef2428615d53181057407ee5a3d17f5b1ce3",
+  "seeds": [
+    10100,
+    10163
+  ],
+  "n": 1344,
+  "controller": "scripted greedy search; NOT production BOT or human win rate",
+  "defaultsApplied": false,
+  "permanentBleedModel": "one existing hemorrhage slot, 1000 rounds > maximum battle horizon",
+  "configs": {
+    "baseline": {},
+    "A": {
+      "regeneration": 25,
+      "anticoagulantRegeneration": 10,
+      "daggerTransfer": 0.8,
+      "bleedPercent": 0.04,
+      "bleedRounds": 1000
+    },
+    "B": {
+      "regeneration": 20,
+      "anticoagulantRegeneration": 10,
+      "daggerTransfer": 0.8,
+      "bleedPercent": 0.04,
+      "bleedRounds": 1000
+    },
+    "baseline_hp450": {
+      "daughterHp": 450,
+      "bleedPercent": 0.1111111111111111
+    },
+    "A_hp450": {
+      "daughterHp": 450,
+      "regeneration": 25,
+      "anticoagulantRegeneration": 10,
+      "daggerTransfer": 0.8,
+      "bleedPercent": 0.044444444444444446,
+      "bleedRounds": 1000
+    },
+    "A_dagger60": {
+      "regeneration": 25,
+      "anticoagulantRegeneration": 10,
+      "daggerTransfer": 0.6,
+      "bleedPercent": 0.04,
+      "bleedRounds": 1000
+    },
+    "A_dagger100": {
+      "regeneration": 25,
+      "anticoagulantRegeneration": 10,
+      "daggerTransfer": 1,
+      "bleedPercent": 0.04,
+      "bleedRounds": 1000
+    }
+  },
+  "groups": [
+    {
+      "config": "baseline",
+      "route": "direct",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 61.4375,
+      "kills": 0,
+      "ladyHp": 1986.640625,
+      "protection": 502.578125,
+      "regen": 0,
+      "bleed": 0,
+      "dagger": 0,
+      "items": 0,
+      "firstDeathN": 0,
+      "firstDeathTurn": null,
+      "firstDeathAttack": null,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 55,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 15,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 2000,
+          "protection": 862.109375,
+          "turn": 28.21875,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 2000,
+          "protection": 706.0169491525423,
+          "turn": 35.271186440677965,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock20": {
+          "n": 55,
+          "hp": 1997.8181818181818,
+          "protection": 605.8181818181819,
+          "turn": 45.85454545454545,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": null,
+      "firstDeathBleed": null,
+      "firstDeathItemDamage": null
+    },
+    {
+      "config": "baseline",
+      "route": "kill_three",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.25,
+      "kills": 0.96875,
+      "ladyHp": 1967.40625,
+      "protection": 992.1875,
+      "regen": 539.765625,
+      "bleed": 97.65625,
+      "dagger": 70.3125,
+      "items": 4.8125,
+      "firstDeathN": 54,
+      "firstDeathTurn": 22.37037037037037,
+      "firstDeathAttack": 560.3703703703703,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 58,
+      "stock20N": 51,
+      "reasons": {
+        "resources_exhausted": 45,
+        "insufficient_final_strike": 16,
+        "max_blood": 3
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1980.65625,
+          "protection": 1343.75,
+          "turn": 22.609375,
+          "daughterHp": [
+            133.75,
+            476.25,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 58,
+          "hp": 1968.0862068965516,
+          "protection": 1077.5862068965516,
+          "turn": 35.58620689655172,
+          "daughterHp": [
+            54.91379310344828,
+            387.7586206896552,
+            498.44827586206895
+          ]
+        },
+        "stock20": {
+          "n": 51,
+          "hp": 1970.9803921568628,
+          "protection": 1088.235294117647,
+          "turn": 45.745098039215684,
+          "daughterHp": [
+            62.64705882352941,
+            418.921568627451,
+            498.52941176470586
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 274.0740740740741,
+      "firstDeathBleed": 77.77777777777777,
+      "firstDeathItemDamage": 57.77777777777778
+    },
+    {
+      "config": "baseline",
+      "route": "hybrid",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.453125,
+      "kills": 0.890625,
+      "ladyHp": 1967.53125,
+      "protection": 760.859375,
+      "regen": 358.28125,
+      "bleed": 88.28125,
+      "dagger": 73.5,
+      "items": 4.828125,
+      "firstDeathN": 53,
+      "firstDeathTurn": 22.60377358490566,
+      "firstDeathAttack": 485.188679245283,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 58,
+      "stock20N": 51,
+      "reasons": {
+        "resources_exhausted": 45,
+        "insufficient_final_strike": 17,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1980.65625,
+          "protection": 1216.25,
+          "turn": 22.609375,
+          "daughterHp": [
+            150.390625,
+            486.40625,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 58,
+          "hp": 1968.5,
+          "protection": 861.1206896551724,
+          "turn": 35.58620689655172,
+          "daughterHp": [
+            63.10344827586207,
+            429.2241379310345,
+            500
+          ]
+        },
+        "stock20": {
+          "n": 51,
+          "hp": 1971.1568627450981,
+          "protection": 857.3529411764706,
+          "turn": 45.745098039215684,
+          "daughterHp": [
+            67.6470588235294,
+            430.19607843137254,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 233.20754716981133,
+      "firstDeathBleed": 73.58490566037736,
+      "firstDeathItemDamage": 56.60377358490566
+    },
+    {
+      "config": "A",
+      "route": "direct",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 61.4375,
+      "kills": 0,
+      "ladyHp": 1986.640625,
+      "protection": 502.578125,
+      "regen": 0,
+      "bleed": 0,
+      "dagger": 0,
+      "items": 0,
+      "firstDeathN": 0,
+      "firstDeathTurn": null,
+      "firstDeathAttack": null,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 55,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 15,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 2000,
+          "protection": 862.109375,
+          "turn": 28.21875,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 2000,
+          "protection": 706.0169491525423,
+          "turn": 35.271186440677965,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock20": {
+          "n": 55,
+          "hp": 1997.8181818181818,
+          "protection": 605.8181818181819,
+          "turn": 45.85454545454545,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": null,
+      "firstDeathBleed": null,
+      "firstDeathItemDamage": null
+    },
+    {
+      "config": "A",
+      "route": "kill_three",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.828125,
+      "kills": 1.265625,
+      "ladyHp": 1909.21875,
+      "protection": 846.875,
+      "regen": 390.546875,
+      "bleed": 136.953125,
+      "dagger": 166.375,
+      "items": 4.796875,
+      "firstDeathN": 63,
+      "firstDeathTurn": 21.158730158730158,
+      "firstDeathAttack": 473.3333333333333,
+      "lastDeathN": 1,
+      "lastDeathTurn": 49,
+      "lastDeathAttack": 1230,
+      "bothDeadN": 64,
+      "stock30N": 60,
+      "stock20N": 53,
+      "reasons": {
+        "resources_exhausted": 46,
+        "insufficient_final_strike": 16,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1924.625,
+          "protection": 1257.8125,
+          "turn": 22.578125,
+          "daughterHp": [
+            63.828125,
+            452.421875,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 60,
+          "hp": 1918.1833333333334,
+          "protection": 950,
+          "turn": 35.46666666666667,
+          "daughterHp": [
+            11.166666666666666,
+            278.75,
+            495
+          ]
+        },
+        "stock20": {
+          "n": 53,
+          "hp": 1920.698113207547,
+          "protection": 943.3962264150944,
+          "turn": 45.64150943396226,
+          "daughterHp": [
+            9.339622641509434,
+            307.54716981132077,
+            492.7358490566038
+          ]
+        }
+      },
+      "threeDaughterDeaths": [
+        {
+          "seed": 10105,
+          "deaths": [
+            {
+              "id": "bela",
+              "turn": 37,
+              "round": 19,
+              "attacks": 180,
+              "regen": 145,
+              "bleed": 280,
+              "protection": 1000,
+              "daughterEffort": {
+                "attacks": 215,
+                "regen": 145,
+                "bleed": 280,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "cassandra",
+              "turn": 47,
+              "round": 24,
+              "attacks": 705,
+              "regen": 210,
+              "bleed": 280,
+              "protection": 500,
+              "daughterEffort": {
+                "attacks": 490,
+                "regen": 65,
+                "bleed": 15,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "daniela",
+              "turn": 49,
+              "round": 25,
+              "attacks": 1195,
+              "regen": 235,
+              "bleed": 295,
+              "protection": 0,
+              "daughterEffort": {
+                "attacks": 525,
+                "regen": 25,
+                "bleed": 0,
+                "itemDamage": 0
+              }
+            }
+          ],
+          "reason": "insufficient_final_strike",
+          "hp": 1491,
+          "protection": 0
+        }
+      ],
+      "firstDeathRegen": 154.20634920634922,
+      "firstDeathBleed": 72.85714285714286,
+      "firstDeathItemDamage": 50.63492063492063
+    },
+    {
+      "config": "A",
+      "route": "hybrid",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 60.09375,
+      "kills": 1.09375,
+      "ladyHp": 1912.265625,
+      "protection": 644.53125,
+      "regen": 268.671875,
+      "bleed": 147.109375,
+      "dagger": 166.4375,
+      "items": 4.875,
+      "firstDeathN": 61,
+      "firstDeathTurn": 21.262295081967213,
+      "firstDeathAttack": 394.8360655737705,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 60,
+      "stock20N": 52,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 16,
+        "max_blood": 1
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1924.6875,
+          "protection": 1144.296875,
+          "turn": 22.609375,
+          "daughterHp": [
+            85.78125,
+            473.28125,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 60,
+          "hp": 1912.3,
+          "protection": 759.3333333333334,
+          "turn": 35.46666666666667,
+          "daughterHp": [
+            24.916666666666668,
+            361.5,
+            498.3333333333333
+          ]
+        },
+        "stock20": {
+          "n": 52,
+          "hp": 1918.7115384615386,
+          "protection": 754.2307692307693,
+          "turn": 45.63461538461539,
+          "daughterHp": [
+            20.192307692307693,
+            368.36538461538464,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 124.34426229508196,
+      "firstDeathBleed": 73.0327868852459,
+      "firstDeathItemDamage": 48.68852459016394
+    },
+    {
+      "config": "B",
+      "route": "direct",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 61.4375,
+      "kills": 0,
+      "ladyHp": 1986.640625,
+      "protection": 502.578125,
+      "regen": 0,
+      "bleed": 0,
+      "dagger": 0,
+      "items": 0,
+      "firstDeathN": 0,
+      "firstDeathTurn": null,
+      "firstDeathAttack": null,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 55,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 15,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 2000,
+          "protection": 862.109375,
+          "turn": 28.21875,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 2000,
+          "protection": 706.0169491525423,
+          "turn": 35.271186440677965,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock20": {
+          "n": 55,
+          "hp": 1997.8181818181818,
+          "protection": 605.8181818181819,
+          "turn": 45.85454545454545,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": null,
+      "firstDeathBleed": null,
+      "firstDeathItemDamage": null
+    },
+    {
+      "config": "B",
+      "route": "kill_three",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 58.859375,
+      "kills": 1.328125,
+      "ladyHp": 1912.03125,
+      "protection": 812.5,
+      "regen": 335.625,
+      "bleed": 137.265625,
+      "dagger": 157.125,
+      "items": 4.796875,
+      "firstDeathN": 64,
+      "firstDeathTurn": 20.921875,
+      "firstDeathAttack": 459.609375,
+      "lastDeathN": 1,
+      "lastDeathTurn": 49,
+      "lastDeathAttack": 1225,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 51,
+      "reasons": {
+        "resources_exhausted": 44,
+        "insufficient_final_strike": 18,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1926,
+          "protection": 1250,
+          "turn": 22.609375,
+          "daughterHp": [
+            53.984375,
+            445.859375,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 1920.5084745762713,
+          "protection": 932.2033898305085,
+          "turn": 35.45762711864407,
+          "daughterHp": [
+            6.779661016949152,
+            254.15254237288136,
+            489.66101694915255
+          ]
+        },
+        "stock20": {
+          "n": 51,
+          "hp": 1923.1960784313726,
+          "protection": 921.5686274509804,
+          "turn": 45.588235294117645,
+          "daughterHp": [
+            1.4705882352941178,
+            276.1764705882353,
+            489.6078431372549
+          ]
+        }
+      },
+      "threeDaughterDeaths": [
+        {
+          "seed": 10105,
+          "deaths": [
+            {
+              "id": "bela",
+              "turn": 37,
+              "round": 19,
+              "attacks": 180,
+              "regen": 140,
+              "bleed": 280,
+              "protection": 1000,
+              "daughterEffort": {
+                "attacks": 215,
+                "regen": 140,
+                "bleed": 280,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "cassandra",
+              "turn": 47,
+              "round": 24,
+              "attacks": 705,
+              "regen": 195,
+              "bleed": 280,
+              "protection": 500,
+              "daughterEffort": {
+                "attacks": 490,
+                "regen": 55,
+                "bleed": 5,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "daniela",
+              "turn": 49,
+              "round": 25,
+              "attacks": 1195,
+              "regen": 215,
+              "bleed": 285,
+              "protection": 0,
+              "daughterEffort": {
+                "attacks": 520,
+                "regen": 20,
+                "bleed": 0,
+                "itemDamage": 0
+              }
+            }
+          ],
+          "reason": "insufficient_final_strike",
+          "hp": 1495,
+          "protection": 0
+        }
+      ],
+      "firstDeathRegen": 132.109375,
+      "firstDeathBleed": 70.546875,
+      "firstDeathItemDamage": 48.984375
+    },
+    {
+      "config": "B",
+      "route": "hybrid",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.5625,
+      "kills": 1.140625,
+      "ladyHp": 1911.90625,
+      "protection": 609.765625,
+      "regen": 221.171875,
+      "bleed": 140.546875,
+      "dagger": 161.1875,
+      "items": 4.84375,
+      "firstDeathN": 62,
+      "firstDeathTurn": 21.06451612903226,
+      "firstDeathAttack": 383.2258064516129,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 51,
+      "reasons": {
+        "resources_exhausted": 46,
+        "insufficient_final_strike": 17,
+        "max_blood": 1
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1926.0625,
+          "protection": 1126.09375,
+          "turn": 22.609375,
+          "daughterHp": [
+            77.109375,
+            470.859375,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 1913.7966101694915,
+          "protection": 731.5254237288135,
+          "turn": 35.50847457627118,
+          "daughterHp": [
+            20.76271186440678,
+            352.20338983050846,
+            497.96610169491527
+          ]
+        },
+        "stock20": {
+          "n": 51,
+          "hp": 1919.6274509803923,
+          "protection": 724.3137254901961,
+          "turn": 45.666666666666664,
+          "daughterHp": [
+            11.96078431372549,
+            352.45098039215685,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 107.25806451612904,
+      "firstDeathBleed": 71.20967741935483,
+      "firstDeathItemDamage": 47.66129032258065
+    },
+    {
+      "config": "baseline_hp450",
+      "route": "direct",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 61.4375,
+      "kills": 0,
+      "ladyHp": 1986.640625,
+      "protection": 502.578125,
+      "regen": 0,
+      "bleed": 0,
+      "dagger": 0,
+      "items": 0,
+      "firstDeathN": 0,
+      "firstDeathTurn": null,
+      "firstDeathAttack": null,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 55,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 15,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 2000,
+          "protection": 862.109375,
+          "turn": 28.21875,
+          "daughterHp": [
+            450,
+            450,
+            450
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 2000,
+          "protection": 706.0169491525423,
+          "turn": 35.271186440677965,
+          "daughterHp": [
+            450,
+            450,
+            450
+          ]
+        },
+        "stock20": {
+          "n": 55,
+          "hp": 1997.8181818181818,
+          "protection": 605.8181818181819,
+          "turn": 45.85454545454545,
+          "daughterHp": [
+            450,
+            450,
+            450
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": null,
+      "firstDeathBleed": null,
+      "firstDeathItemDamage": null
+    },
+    {
+      "config": "baseline_hp450",
+      "route": "kill_three",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.21875,
+      "kills": 1.046875,
+      "ladyHp": 1968.515625,
+      "protection": 953.125,
+      "regen": 543.1875,
+      "bleed": 96.78125,
+      "dagger": 69.75,
+      "items": 4.8125,
+      "firstDeathN": 57,
+      "firstDeathTurn": 21.80701754385965,
+      "firstDeathAttack": 532.6842105263158,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 58,
+      "stock20N": 51,
+      "reasons": {
+        "resources_exhausted": 45,
+        "insufficient_final_strike": 16,
+        "max_blood": 3
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1981.390625,
+          "protection": 1312.5,
+          "turn": 22.609375,
+          "daughterHp": [
+            115.359375,
+            420.171875,
+            450
+          ]
+        },
+        "stock30": {
+          "n": 58,
+          "hp": 1969.7241379310344,
+          "protection": 1034.4827586206898,
+          "turn": 35.56896551724138,
+          "daughterHp": [
+            44.01724137931034,
+            325.01724137931035,
+            446.4655172413793
+          ]
+        },
+        "stock20": {
+          "n": 51,
+          "hp": 1972.4117647058824,
+          "protection": 1039.2156862745098,
+          "turn": 45.72549019607843,
+          "daughterHp": [
+            46.431372549019606,
+            356.5686274509804,
+            446.45098039215685
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 269.0175438596491,
+      "firstDeathBleed": 73.57894736842105,
+      "firstDeathItemDamage": 54.73684210526316
+    },
+    {
+      "config": "baseline_hp450",
+      "route": "hybrid",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.4375,
+      "kills": 0.96875,
+      "ladyHp": 1967.421875,
+      "protection": 721.5625,
+      "regen": 350.390625,
+      "bleed": 87,
+      "dagger": 69.484375,
+      "items": 4.828125,
+      "firstDeathN": 56,
+      "firstDeathTurn": 21.857142857142858,
+      "firstDeathAttack": 457.7857142857143,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 58,
+      "stock20N": 51,
+      "reasons": {
+        "resources_exhausted": 46,
+        "insufficient_final_strike": 17,
+        "max_blood": 1
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1981.703125,
+          "protection": 1188.828125,
+          "turn": 22.609375,
+          "daughterHp": [
+            129.65625,
+            433.015625,
+            450
+          ]
+        },
+        "stock30": {
+          "n": 58,
+          "hp": 1971.2068965517242,
+          "protection": 820.2586206896551,
+          "turn": 35.55172413793103,
+          "daughterHp": [
+            51.98275862068966,
+            374.7931034482759,
+            450
+          ]
+        },
+        "stock20": {
+          "n": 51,
+          "hp": 1973.8823529411766,
+          "protection": 810.8823529411765,
+          "turn": 45.705882352941174,
+          "daughterHp": [
+            50.68627450980392,
+            378.11764705882354,
+            448.2352941176471
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 226.01785714285714,
+      "firstDeathBleed": 69.07142857142857,
+      "firstDeathItemDamage": 53.482142857142854
+    },
+    {
+      "config": "A_hp450",
+      "route": "direct",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 61.4375,
+      "kills": 0,
+      "ladyHp": 1986.640625,
+      "protection": 502.578125,
+      "regen": 0,
+      "bleed": 0,
+      "dagger": 0,
+      "items": 0,
+      "firstDeathN": 0,
+      "firstDeathTurn": null,
+      "firstDeathAttack": null,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 55,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 15,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 2000,
+          "protection": 862.109375,
+          "turn": 28.21875,
+          "daughterHp": [
+            450,
+            450,
+            450
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 2000,
+          "protection": 706.0169491525423,
+          "turn": 35.271186440677965,
+          "daughterHp": [
+            450,
+            450,
+            450
+          ]
+        },
+        "stock20": {
+          "n": 55,
+          "hp": 1997.8181818181818,
+          "protection": 605.8181818181819,
+          "turn": 45.85454545454545,
+          "daughterHp": [
+            450,
+            450,
+            450
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": null,
+      "firstDeathBleed": null,
+      "firstDeathItemDamage": null
+    },
+    {
+      "config": "A_hp450",
+      "route": "kill_three",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.1875,
+      "kills": 1.34375,
+      "ladyHp": 1918.21875,
+      "protection": 806.25,
+      "regen": 383.9375,
+      "bleed": 137.265625,
+      "dagger": 155.671875,
+      "items": 4.828125,
+      "firstDeathN": 64,
+      "firstDeathTurn": 20.34375,
+      "firstDeathAttack": 443.625,
+      "lastDeathN": 1,
+      "lastDeathTurn": 49,
+      "lastDeathAttack": 1180,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 52,
+      "reasons": {
+        "resources_exhausted": 45,
+        "insufficient_final_strike": 17,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1928.921875,
+          "protection": 1234.375,
+          "turn": 22.546875,
+          "daughterHp": [
+            48.421875,
+            387.203125,
+            450
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 1924.1694915254238,
+          "protection": 906.7796610169491,
+          "turn": 35.389830508474574,
+          "daughterHp": [
+            6.779661016949152,
+            224.08474576271186,
+            440.10169491525426
+          ]
+        },
+        "stock20": {
+          "n": 52,
+          "hp": 1925.8653846153845,
+          "protection": 903.8461538461538,
+          "turn": 45.57692307692308,
+          "daughterHp": [
+            1.9230769230769231,
+            249.76923076923077,
+            443.53846153846155
+          ]
+        }
+      },
+      "threeDaughterDeaths": [
+        {
+          "seed": 10105,
+          "deaths": [
+            {
+              "id": "bela",
+              "turn": 37,
+              "round": 19,
+              "attacks": 180,
+              "regen": 145,
+              "bleed": 280,
+              "protection": 1000,
+              "daughterEffort": {
+                "attacks": 215,
+                "regen": 145,
+                "bleed": 280,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "cassandra",
+              "turn": 46,
+              "round": 23,
+              "attacks": 690,
+              "regen": 210,
+              "bleed": 280,
+              "protection": 500,
+              "daughterEffort": {
+                "attacks": 475,
+                "regen": 65,
+                "bleed": 0,
+                "itemDamage": 40
+              }
+            },
+            {
+              "id": "daniela",
+              "turn": 49,
+              "round": 25,
+              "attacks": 1175,
+              "regen": 250,
+              "bleed": 280,
+              "protection": 0,
+              "daughterEffort": {
+                "attacks": 490,
+                "regen": 40,
+                "bleed": 0,
+                "itemDamage": 0
+              }
+            }
+          ],
+          "reason": "insufficient_final_strike",
+          "hp": 1629,
+          "protection": 0
+        }
+      ],
+      "firstDeathRegen": 150.59375,
+      "firstDeathBleed": 67.96875,
+      "firstDeathItemDamage": 48.75
+    },
+    {
+      "config": "A_hp450",
+      "route": "hybrid",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.5,
+      "kills": 1.171875,
+      "ladyHp": 1912.203125,
+      "protection": 595.390625,
+      "regen": 255.6875,
+      "bleed": 141.859375,
+      "dagger": 164.1875,
+      "items": 4.875,
+      "firstDeathN": 62,
+      "firstDeathTurn": 20.43548387096774,
+      "firstDeathAttack": 367.3225806451613,
+      "lastDeathN": 1,
+      "lastDeathTurn": 53,
+      "lastDeathAttack": 907,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 51,
+      "reasons": {
+        "resources_exhausted": 46,
+        "insufficient_final_strike": 17,
+        "max_blood": 1
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1928.75,
+          "protection": 1104.921875,
+          "turn": 22.515625,
+          "daughterHp": [
+            68.984375,
+            417.21875,
+            450
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 1919.5762711864406,
+          "protection": 720.9322033898305,
+          "turn": 35.47457627118644,
+          "daughterHp": [
+            19.1864406779661,
+            312.23728813559325,
+            444.8135593220339
+          ]
+        },
+        "stock20": {
+          "n": 51,
+          "hp": 1921.921568627451,
+          "protection": 714.2156862745098,
+          "turn": 45.666666666666664,
+          "daughterHp": [
+            11.215686274509803,
+            317.3137254901961,
+            449.54901960784315
+          ]
+        }
+      },
+      "threeDaughterDeaths": [
+        {
+          "seed": 10105,
+          "deaths": [
+            {
+              "id": "bela",
+              "turn": 37,
+              "round": 19,
+              "attacks": 45,
+              "regen": 120,
+              "bleed": 280,
+              "protection": 865,
+              "daughterEffort": {
+                "attacks": 80,
+                "regen": 120,
+                "bleed": 280,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "cassandra",
+              "turn": 47,
+              "round": 24,
+              "attacks": 425,
+              "regen": 145,
+              "bleed": 300,
+              "protection": 0,
+              "daughterEffort": {
+                "attacks": 350,
+                "regen": 25,
+                "bleed": 20,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "daniela",
+              "turn": 53,
+              "round": 27,
+              "attacks": 735,
+              "regen": 195,
+              "bleed": 300,
+              "protection": 0,
+              "daughterEffort": {
+                "attacks": 477,
+                "regen": 50,
+                "bleed": 0,
+                "itemDamage": 0
+              }
+            }
+          ],
+          "reason": "insufficient_final_strike",
+          "hp": 1504,
+          "protection": 0
+        }
+      ],
+      "firstDeathRegen": 120.56451612903226,
+      "firstDeathBleed": 67.7258064516129,
+      "firstDeathItemDamage": 47.41935483870968
+    },
+    {
+      "config": "A_dagger60",
+      "route": "direct",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 61.4375,
+      "kills": 0,
+      "ladyHp": 1986.640625,
+      "protection": 502.578125,
+      "regen": 0,
+      "bleed": 0,
+      "dagger": 0,
+      "items": 0,
+      "firstDeathN": 0,
+      "firstDeathTurn": null,
+      "firstDeathAttack": null,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 55,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 15,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 2000,
+          "protection": 862.109375,
+          "turn": 28.21875,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 2000,
+          "protection": 706.0169491525423,
+          "turn": 35.271186440677965,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock20": {
+          "n": 55,
+          "hp": 1997.8181818181818,
+          "protection": 605.8181818181819,
+          "turn": 45.85454545454545,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": null,
+      "firstDeathBleed": null,
+      "firstDeathItemDamage": null
+    },
+    {
+      "config": "A_dagger60",
+      "route": "kill_three",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.828125,
+      "kills": 1.265625,
+      "ladyHp": 1931.78125,
+      "protection": 846.875,
+      "regen": 390.546875,
+      "bleed": 136.953125,
+      "dagger": 124.78125,
+      "items": 4.796875,
+      "firstDeathN": 63,
+      "firstDeathTurn": 21.158730158730158,
+      "firstDeathAttack": 473.3333333333333,
+      "lastDeathN": 1,
+      "lastDeathTurn": 49,
+      "lastDeathAttack": 1230,
+      "bothDeadN": 64,
+      "stock30N": 60,
+      "stock20N": 53,
+      "reasons": {
+        "resources_exhausted": 46,
+        "insufficient_final_strike": 16,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1948.25,
+          "protection": 1257.8125,
+          "turn": 22.578125,
+          "daughterHp": [
+            63.828125,
+            452.421875,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 60,
+          "hp": 1942.1166666666666,
+          "protection": 950,
+          "turn": 35.46666666666667,
+          "daughterHp": [
+            11.166666666666666,
+            278.75,
+            495
+          ]
+        },
+        "stock20": {
+          "n": 53,
+          "hp": 1943.188679245283,
+          "protection": 943.3962264150944,
+          "turn": 45.64150943396226,
+          "daughterHp": [
+            9.339622641509434,
+            307.54716981132077,
+            492.7358490566038
+          ]
+        }
+      },
+      "threeDaughterDeaths": [
+        {
+          "seed": 10105,
+          "deaths": [
+            {
+              "id": "bela",
+              "turn": 37,
+              "round": 19,
+              "attacks": 180,
+              "regen": 145,
+              "bleed": 280,
+              "protection": 1000,
+              "daughterEffort": {
+                "attacks": 215,
+                "regen": 145,
+                "bleed": 280,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "cassandra",
+              "turn": 47,
+              "round": 24,
+              "attacks": 705,
+              "regen": 210,
+              "bleed": 280,
+              "protection": 500,
+              "daughterEffort": {
+                "attacks": 490,
+                "regen": 65,
+                "bleed": 15,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "daniela",
+              "turn": 49,
+              "round": 25,
+              "attacks": 1195,
+              "regen": 235,
+              "bleed": 295,
+              "protection": 0,
+              "daughterEffort": {
+                "attacks": 525,
+                "regen": 25,
+                "bleed": 0,
+                "itemDamage": 0
+              }
+            }
+          ],
+          "reason": "insufficient_final_strike",
+          "hp": 1522,
+          "protection": 0
+        }
+      ],
+      "firstDeathRegen": 154.20634920634922,
+      "firstDeathBleed": 72.85714285714286,
+      "firstDeathItemDamage": 50.63492063492063
+    },
+    {
+      "config": "A_dagger60",
+      "route": "hybrid",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 60.09375,
+      "kills": 1.09375,
+      "ladyHp": 1933.890625,
+      "protection": 644.53125,
+      "regen": 268.671875,
+      "bleed": 147.109375,
+      "dagger": 124.828125,
+      "items": 4.875,
+      "firstDeathN": 61,
+      "firstDeathTurn": 21.262295081967213,
+      "firstDeathAttack": 394.8360655737705,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 60,
+      "stock20N": 52,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 16,
+        "max_blood": 1
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1948.296875,
+          "protection": 1144.296875,
+          "turn": 22.609375,
+          "daughterHp": [
+            85.78125,
+            473.28125,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 60,
+          "hp": 1937.8166666666666,
+          "protection": 759.3333333333334,
+          "turn": 35.46666666666667,
+          "daughterHp": [
+            24.916666666666668,
+            361.5,
+            498.3333333333333
+          ]
+        },
+        "stock20": {
+          "n": 52,
+          "hp": 1941.75,
+          "protection": 754.2307692307693,
+          "turn": 45.63461538461539,
+          "daughterHp": [
+            20.192307692307693,
+            368.36538461538464,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 124.34426229508196,
+      "firstDeathBleed": 73.0327868852459,
+      "firstDeathItemDamage": 48.68852459016394
+    },
+    {
+      "config": "A_dagger100",
+      "route": "direct",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 61.4375,
+      "kills": 0,
+      "ladyHp": 1986.640625,
+      "protection": 502.578125,
+      "regen": 0,
+      "bleed": 0,
+      "dagger": 0,
+      "items": 0,
+      "firstDeathN": 0,
+      "firstDeathTurn": null,
+      "firstDeathAttack": null,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 59,
+      "stock20N": 55,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 15,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 2000,
+          "protection": 862.109375,
+          "turn": 28.21875,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 59,
+          "hp": 2000,
+          "protection": 706.0169491525423,
+          "turn": 35.271186440677965,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        },
+        "stock20": {
+          "n": 55,
+          "hp": 1997.8181818181818,
+          "protection": 605.8181818181819,
+          "turn": 45.85454545454545,
+          "daughterHp": [
+            500,
+            500,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": null,
+      "firstDeathBleed": null,
+      "firstDeathItemDamage": null
+    },
+    {
+      "config": "A_dagger100",
+      "route": "kill_three",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 59.828125,
+      "kills": 1.265625,
+      "ladyHp": 1885.25,
+      "protection": 846.875,
+      "regen": 390.546875,
+      "bleed": 136.953125,
+      "dagger": 207.96875,
+      "items": 4.796875,
+      "firstDeathN": 63,
+      "firstDeathTurn": 21.158730158730158,
+      "firstDeathAttack": 473.3333333333333,
+      "lastDeathN": 1,
+      "lastDeathTurn": 49,
+      "lastDeathAttack": 1230,
+      "bothDeadN": 64,
+      "stock30N": 60,
+      "stock20N": 53,
+      "reasons": {
+        "resources_exhausted": 46,
+        "insufficient_final_strike": 16,
+        "max_blood": 2
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1901,
+          "protection": 1257.8125,
+          "turn": 22.578125,
+          "daughterHp": [
+            63.828125,
+            452.421875,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 60,
+          "hp": 1892.1833333333334,
+          "protection": 950,
+          "turn": 35.46666666666667,
+          "daughterHp": [
+            11.166666666666666,
+            278.75,
+            495
+          ]
+        },
+        "stock20": {
+          "n": 53,
+          "hp": 1897.301886792453,
+          "protection": 943.3962264150944,
+          "turn": 45.64150943396226,
+          "daughterHp": [
+            9.339622641509434,
+            307.54716981132077,
+            492.7358490566038
+          ]
+        }
+      },
+      "threeDaughterDeaths": [
+        {
+          "seed": 10105,
+          "deaths": [
+            {
+              "id": "bela",
+              "turn": 37,
+              "round": 19,
+              "attacks": 180,
+              "regen": 145,
+              "bleed": 280,
+              "protection": 1000,
+              "daughterEffort": {
+                "attacks": 215,
+                "regen": 145,
+                "bleed": 280,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "cassandra",
+              "turn": 47,
+              "round": 24,
+              "attacks": 705,
+              "regen": 210,
+              "bleed": 280,
+              "protection": 500,
+              "daughterEffort": {
+                "attacks": 490,
+                "regen": 65,
+                "bleed": 15,
+                "itemDamage": 60
+              }
+            },
+            {
+              "id": "daniela",
+              "turn": 49,
+              "round": 25,
+              "attacks": 1195,
+              "regen": 235,
+              "bleed": 295,
+              "protection": 0,
+              "daughterEffort": {
+                "attacks": 525,
+                "regen": 25,
+                "bleed": 0,
+                "itemDamage": 0
+              }
+            }
+          ],
+          "reason": "insufficient_final_strike",
+          "hp": 1460,
+          "protection": 0
+        }
+      ],
+      "firstDeathRegen": 154.20634920634922,
+      "firstDeathBleed": 72.85714285714286,
+      "firstDeathItemDamage": 50.63492063492063
+    },
+    {
+      "config": "A_dagger100",
+      "route": "hybrid",
+      "n": 64,
+      "wins": 0,
+      "losses": 64,
+      "censored": 0,
+      "turns": 60.09375,
+      "kills": 1.09375,
+      "ladyHp": 1887.9375,
+      "protection": 644.53125,
+      "regen": 268.671875,
+      "bleed": 147.109375,
+      "dagger": 208.046875,
+      "items": 4.875,
+      "firstDeathN": 61,
+      "firstDeathTurn": 21.262295081967213,
+      "firstDeathAttack": 394.8360655737705,
+      "lastDeathN": 0,
+      "lastDeathTurn": null,
+      "lastDeathAttack": null,
+      "bothDeadN": 64,
+      "stock30N": 60,
+      "stock20N": 52,
+      "reasons": {
+        "resources_exhausted": 47,
+        "insufficient_final_strike": 16,
+        "max_blood": 1
+      },
+      "milestones": {
+        "bothDeadTaken": {
+          "n": 64,
+          "hp": 1901.078125,
+          "protection": 1144.296875,
+          "turn": 22.609375,
+          "daughterHp": [
+            85.78125,
+            473.28125,
+            500
+          ]
+        },
+        "stock30": {
+          "n": 60,
+          "hp": 1884.2333333333333,
+          "protection": 759.3333333333334,
+          "turn": 35.46666666666667,
+          "daughterHp": [
+            24.916666666666668,
+            361.5,
+            498.3333333333333
+          ]
+        },
+        "stock20": {
+          "n": 52,
+          "hp": 1893.423076923077,
+          "protection": 754.2307692307693,
+          "turn": 45.63461538461539,
+          "daughterHp": [
+            20.192307692307693,
+            368.36538461538464,
+            500
+          ]
+        }
+      },
+      "threeDaughterDeaths": [],
+      "firstDeathRegen": 124.34426229508196,
+      "firstDeathBleed": 73.0327868852459,
+      "firstDeathItemDamage": 48.68852459016394
+    }
+  ]
+}

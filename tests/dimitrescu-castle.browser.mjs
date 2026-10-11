@@ -9,6 +9,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const source = await readFile(resolve(root,'app.js'),'utf8'), html = await readFile(resolve(root,'index.html'),'utf8');
 const markup = html.match(/<section id="bossHud"[\s\S]*?<\/section>(?=\s*<div id="bossDaughterStrip")/)[0].replace('style="display: none"','style="display: grid"');
 const functions = source.slice(source.indexOf('function closeBossIntentHelp('),source.indexOf('\nfunction syncBossDiscardHelp('));
+const rich = source.slice(source.indexOf('function renderBossHudRichText('),source.indexOf('\nfunction renderBossDetailFields('));
 const discardHud = source.slice(source.indexOf("  const discardButton = document.getElementById('drawDiscardBtn');", source.indexOf('function renderBossHud(')), source.indexOf('\n  const event = resolvingEvent ||'));
 // Exercise the app's real baseline/reconnect/re-render actionId gate too.
 const feedbackGate = source.slice(source.indexOf('  const feedbackEvents = boss.eventLog || [];'), source.indexOf('      const isChain = feedback.type')) + '\n    });\n  }';
@@ -16,14 +17,15 @@ const fixture = `<!doctype html><meta charset="utf-8"><meta name="viewport" cont
 ${['base-menu','themes','game','cards','hud','responsive','boss-mode','resident','boss/dimitrescu','boss/nemesis','boss/nehelenia'].map(n=>`<link rel="stylesheet" href="/styles/${n}.css">`).join('')}
 <body class="boss-mode theme-resident" data-deck-theme="resident" data-boss-id="dimitrescu"><main style="padding:12px;max-width:1440px;margin:auto">${markup}<div style="display:flex;align-items:center;justify-content:center;gap:20px"><button id="sampleStock">MONTE</button><button id="drawDiscardBtn"><span class="pile-card">LIXO</span></button></div><section id="sampleHand" style="display:flex;gap:9px;margin-top:10px"></section></main>
 <script type="module">
-import { createBossState, distributeCastleItems, getBossPhaseProgress, canUseCastleItem, useCastleItem, startDimitrescuRound, getBossCardEffect, selectNextBossIntent } from '/js/boss/boss-engine.js';
+import { createBossState, distributeCastleItems, getBossPhaseProgress, canUseCastleItem, getCastleItemUseStatus, useCastleItem, startDimitrescuRound, getBossCardEffect, selectNextBossIntent } from '/js/boss/boss-engine.js';
 import { ITEM_DEFINITIONS } from '/js/boss/dimitrescu-castle.js';
 import { regenerateDaughters, damageDaughter } from '/js/boss/dimitrescu-castle.js';
 import { createResourceFeedbackPresenter } from '/js/boss/ui/resource-feedback.js';
-import { renderCastleHud, castleItemHelp } from '/js/boss/ui/dimitrescu-castle-view.js';
+import { renderCastleHud, castleItemHelp, castleItemChip, danielaDiscardActive } from '/js/boss/ui/dimitrescu-castle-view.js';
 import { cardFrontHTML } from '/js/game/card-face.js';
 import { createDeck } from '/js/deck.js';
-const buildBossAbilityHelp=()=>({title:'Ajuda',text:'Objetivo'}), renderBossHudRichText=(el,text)=>el.textContent=text;
+const buildBossAbilityHelp=()=>({title:'Ajuda',text:'Objetivo'});
+${rich}
 let state, myPlayerIndex=0, committing=false;
 let renderedBossFeedbackEventIds=null,renderedBossFeedbackCount=0,bossResourceFeedbackPresenter=null,regenUndo;
 const syncBossResourceSounds=()=>{};
@@ -61,12 +63,12 @@ window.resetSample=(normal=false)=>{
   const boss=createBossState('dimitrescu',1234);distributeCastleItems(boss,deck);
   // Replay the existing v1 HUD regressions explicitly; v2 is exercised below.
   boss.castleItemRulesVersion=1;delete boss.castleItemRules;boss.castleDaughterBalanceVersion=2;
-  for(const d of boss.combatEntities)d.hp=d.maxHp=d.originalMaxHp=450;
+  for(const d of boss.combatEntities){d.hp=d.maxHp=d.originalMaxHp=450;d.regeneration=50;}
   const chosen=Object.keys(ITEM_DEFINITIONS).map(type=>deck.find(c=>c.castleItem?.type===type));
   state={mode:'boss_dimitrescu',currentPlayer:0,hasDrawnThisTurn:true,stock:deck.filter(c=>!chosen.includes(c)),discard:[],deadChunksTaken:[0,0],players:[{id:0,name:'Biel',teamId:0,hand:chosen},{id:1,name:'BOT Luana',teamId:0,hand:[]}],teams:[{melds:[]}],boss};
   boss.combatEntities[0].passive={status:'active',targetPlayerId:0,cardId:chosen[0].id};
   boss.combatEntities[1].passive={status:'active',meldIndex:0};
-  boss.combatEntities[2].passive={status:'active'};
+  boss.combatEntities[2].passive={status:'active',round:boss.roundNumber};
   if(normal)startDimitrescuRound(state);
   boss.bossFlow={stage:'players'};window.sampleState=state; renderAll();
 }; window.renderSample=renderAll;window.resetSample();
@@ -192,13 +194,13 @@ try {
     for(const name of ['Bela','Cassandra','Daniela','Bela']) {
       await activate(`.castle-daughter button[aria-label="Atacar ${name}"]`);
       assert.deepEqual(await purchaseGeometry(),purchaseBefore,'portrait target must not move purchase area');
-      assert.equal(await page.locator('#drawDiscardBtn').evaluate(el=>el.classList.contains('boss-daniela-discard')),false,'permanent Daniela does not activate legacy swarm label');
+      assert.equal(await page.locator('#drawDiscardBtn').evaluate(el=>el.classList.contains('boss-daniela-discard')),true,'permanent Daniela announces Lixo +3 without a legacy swarm intent');
       assert.equal(await page.locator('#drawDiscardBtn').evaluate(el=>el.classList.contains('boss-pollen-discard')),false,'missing pollen stays inactive on every rerender');
     }
     const targetBefore=await page.evaluate(()=>window.sampleState.boss.combatTargetsByPlayer[0]);
     assert.equal(await page.locator('.castle-lady-target').count(),0);
     await activate('.castle-daughter[data-entity-id="bela"] > button[aria-label="Explicar Bela"]');
-    assert.match(await page.locator('#bossIntentHelpText').innerText(),/Regenera 50 no fim da rodada/);
+    assert.match(await page.locator('#bossIntentHelpText').innerText(),/regenera até 50 HP no fim da rodada/);
     assert.equal(await page.evaluate(()=>window.sampleState.boss.combatTargetsByPlayer[0]),targetBefore,'help does not select attack target');
     await page.keyboard.press('Escape');
     await page.locator('.boss-combat-main-target').focus();await page.keyboard.press('Enter');
@@ -209,7 +211,7 @@ try {
     assert.equal(await page.locator('.boss-combat-chips').evaluateAll(groups=>groups.some(group=>/REGEN \+50/.test(group.textContent))),false);
     const markedItem=page.locator('#sampleHand .boss-card-dimitrescu-hunt').first();
     assert.equal(await markedItem.locator('.castle-item-overlay').count(),1);
-    assert.equal(await markedItem.locator('.castle-use-item').innerText(),'');
+    assert.equal(await markedItem.locator('.castle-use-item').innerText(),'−50 HP');
     assert.equal(await markedItem.evaluate(el=>getComputedStyle(el,'::before').content),'none','Bela mark does not paint over the item');
     await page.locator('.castle-daughter[data-entity-id="cassandra"] .castle-passive-chips button').first().focus();
     await page.keyboard.press('Enter');assert.match(await page.locator('#bossIntentHelpText').innerText(),/Alimente o Jogo 1/);await page.keyboard.press('Escape');
@@ -238,7 +240,7 @@ try {
     }
     await page.evaluate(()=>{window.sampleState.boss.combatEntities[0].hp=300;window.renderSample();});
     assert.equal(await page.locator('#castleItemRibbon [data-item-type="dagger"] .castle-item-count').innerText(),'2/3');
-    await activate('#castleItemRibbon [data-item-type="dagger"]');assert.match(await page.locator('#bossIntentHelpText').innerText(),/2\/3 disponíveis · 1 usados · 1 nas filhas/);await page.keyboard.press('Escape');
+    await activate('#castleItemRibbon [data-item-type="dagger"]');assert.match(await page.locator('#bossIntentHelpText').innerText(),/2\/3 disponíveis\n1 usados\n1 nas filhas/);await page.keyboard.press('Escape');
     await activate('#castleFury');assert.match(await page.locator('#bossIntentHelpText').innerText(),/Cada filha derrotada acrescenta \+10%/);await page.keyboard.press('Escape');
     await page.evaluate(()=>{const d=window.sampleState.boss.combatEntities[0];d.cold=true;d.regeneration=25;d.relicRound=window.sampleState.boss.roundNumber;d.passive={status:'suppressed'};window.renderSample();});
     await activate('[aria-label="Explicar debuff FRIO de Bela"]');
@@ -289,7 +291,11 @@ try {
       }
       document.body.dataset.bossId='dimitrescu';return results;
     });
-    for(const style of chipStyles) assert.deepEqual(style,chipStyles[0], 'status/context chips share Nemesis sizing, shape and active colors');
+    for(const {color,background,...geometry} of chipStyles) {
+      const {color:baseColor,background:baseBackground,...baseGeometry}=chipStyles[0];
+      assert.deepEqual(geometry,baseGeometry,'status/context chips share Nemesis sizing and shape');
+    }
+    assert.notEqual(chipStyles[2].background,chipStyles[1].background,'persistent Nehelenia context is discreet, not painted like the current objective');
     assert.equal(chipStyles[0].font,width<=650?'7px':'8px');assert.ok(chipStyles[0].height>=16);
     await page.evaluate(()=>window.resetSample(true));
     assert.equal(await page.evaluate(()=>window.sampleState.boss.castleSelectedDaughterIds.length),1);
@@ -312,7 +318,8 @@ try {
       const s=getComputedStyle(el);return {color:s.color,height:el.getBoundingClientRect().height,font:s.fontSize};
     });
     assert.equal(neutral.color,'rgb(209, 206, 210)');assert.equal(neutral.height,16);
-    assert.equal(neutral.font,width<=650?'7px':'8px');
+    assert.equal(neutral.font,width<=650?'7px':'8px','passive label keeps the shared original font');
+    assert.equal(await page.locator('.castle-passive-chip.is-highlighted').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(100, 22, 42)');
     await page.evaluate(()=>window.forceThreeSample());
     assert.equal(await page.locator('.castle-passive-chip.is-highlighted').count(),3);
     assert.equal(await page.locator('.castle-passive-indicator.is-highlighted').count(),3,'As Três Filhas is the existing simultaneous exception');
@@ -369,37 +376,53 @@ try {
     // New matches: real v2 items and resolved feedback, alongside legacy coverage.
     await page.emulateMedia({reducedMotion:'no-preference'});await page.evaluate(()=>window.resetItemsV2());
     await activate('#castleItemRibbon [data-item-type="dagger"]');
-    assert.match(await page.locator('#bossIntentHelpText').innerText(),/30%.*vida da Lady/);await page.keyboard.press('Escape');
+    assert.match(await page.locator('#bossIntentHelpText').innerText(),/80%.*vida da Lady/);await page.keyboard.press('Escape');
     await page.evaluate(()=>window.itemV2('dagger'));
-    assert.equal(await page.locator('#castleDaggerLink').innerText(),'ADAGA · 30%');
+    assert.equal(await page.locator('#castleDaggerLink').innerText(),'ADAGA · 80%');
+    const daggerGeometry=await page.locator('#castleDaggerLink').evaluate(el=>{
+      const chip=el.getBoundingClientRect(),portrait=el.parentElement.getBoundingClientRect();
+      return {width:chip.width,height:chip.height,bottomGap:portrait.bottom-chip.bottom,
+        contained:chip.left>=portrait.left&&chip.right<=portrait.right&&chip.top>=portrait.top};
+    });
+    assert.ok(daggerGeometry.height<=22,`Adaga must remain a compact chip: ${JSON.stringify(daggerGeometry)}`);
+    assert.ok(daggerGeometry.width<=120);assert.equal(daggerGeometry.contained,true);
+    assert.ok(daggerGeometry.bottomGap>=8&&daggerGeometry.bottomGap<=12);
+    console.log(`Adaga ${width}px: ${daggerGeometry.width} × ${daggerGeometry.height}px`);
     await activate('#castleDaggerLink');
     assert.match(await page.locator('#bossIntentHelpText').innerText(),/Bela.*vida da Lady/s);await page.keyboard.press('Escape');
     assert.equal(await page.locator('.castle-daughter meter').first().getAttribute('max'),'500');
     assert.match(await page.locator('.castle-daughter .boss-combat-content').first().innerText(),/475 \/ 500 HP\s*· máx\. 475/);
-    await activate('[aria-label="Explicar debuff VÍNCULO 30% de Bela"]');
-    assert.match(await page.locator('#bossIntentHelpText').innerText(),/ignorando PROT\. e Coágulo/);await page.keyboard.press('Escape');
+    await activate('[aria-label="Explicar debuff VÍNCULO 80% de Bela"]');
+    assert.match(await page.locator('#bossIntentHelpText').innerText(),/atravessando suas proteções/);await page.keyboard.press('Escape');
     await page.evaluate(()=>window.attackLinkedSample());
     await page.waitForSelector('.boss-resource-transfer[data-metric="ladyHp"]');
-    await page.waitForFunction(()=>document.querySelector('.boss-daughter-regen[data-source-id="boss"]')?.textContent==='−30 HP · Vínculo');
-    assert.equal(await page.evaluate(()=>window.sampleState.boss.hp),1970);
+    await page.waitForFunction(()=>document.querySelector('.boss-daughter-regen[data-source-id="boss"]')?.textContent==='−80 HP · Vínculo');
+    assert.equal(await page.evaluate(()=>window.sampleState.boss.hp),1920);
     assert.equal(await page.evaluate(()=>window.sampleState.boss.bloodLinkProtection),1500);
     const linkFloat=await page.locator('.boss-daughter-regen[data-source-id="boss"]').boundingBox();assert.ok(linkFloat.x>=0&&linkFloat.x+linkFloat.width<=width);
     await page.evaluate(()=>window.reloadFeedbackSample());
+    await activate('[aria-label="Explicar Explosivo"]');
+    assert.match(await page.locator('#bossIntentHelpText').innerText(),/100 de dano.*15 HP/s);await page.keyboard.press('Escape');
     await page.evaluate(()=>window.itemV2('explosive'));
-    await activate('[aria-label="Explicar debuff HEMORRAGIA · 2 de Bela"]');
-    assert.match(await page.locator('#bossIntentHelpText').innerText(),/50 HP antes da regeneração/);await page.keyboard.press('Escape');
+    await activate('[aria-label="Explicar debuff HEMORRAGIA −15 de Bela"]');
+    assert.match(await page.locator('#bossIntentHelpText').innerText(),/15 HP antes de regenerar/);await page.keyboard.press('Escape');
     await page.waitForFunction(()=>!document.querySelector('.boss-daughter-regen'));
     await page.evaluate(()=>window.closeBleedSample());
-    assert.equal(await page.locator('.boss-daughter-regen[data-source-id="bela"]').innerText(),'−50 HP · Hemorragia');
-    await page.evaluate(()=>{const d=window.sampleState.boss.combatEntities[0];d.regeneration=25;d.cold=false;window.renderSample();});
-    assert.equal(await page.locator('[data-entity-id="bela"] .castle-passive-indicator').innerText(),'PASSIVA +25 HP');
+    assert.equal(await page.locator('.boss-daughter-regen[data-source-id="bela"]').innerText(),'−15 HP · Hemorragia');
+    await page.evaluate(()=>{const d=window.sampleState.boss.combatEntities[0];d.regeneration=10;d.cold=false;window.renderSample();});
+    assert.equal(await page.locator('[data-entity-id="bela"] .castle-passive-indicator').innerText(),'PASSIVA +10 HP');
     assert.equal(await page.locator('[data-entity-id="bela"] .castle-passive-indicator.is-debuffed').count(),1);
-    await page.evaluate(()=>{const d=window.sampleState.boss.combatEntities[0];d.cold=true;d.coldCharges=1;window.renderSample();});
+    await page.evaluate(()=>window.itemV2('cold_flask'));
     assert.equal(await page.locator('[data-entity-id="bela"] .castle-passive-indicator').innerText(),'PASSIVA +0 HP');
-    assert.equal(await page.locator('[aria-label="Explicar debuff FRIO de Bela"]').count(),1);
+    assert.equal(await page.locator('.castle-daughter.is-frozen').count(),3);
+    assert.equal(await page.locator('.castle-freeze-chip').count(),3);
+    await activate('[aria-label="Explicar debuff CONGELADA de Bela"]');
+    assert.match(await page.locator('#bossIntentHelpText').innerText(),/turnos restantes.*restante deste turno/s);await page.keyboard.press('Escape');
+    await page.evaluate(()=>window.itemV2('relic'));
+    assert.equal(await page.locator('[aria-label="Explicar debuff DANO +20% de Bela"]').count(),1);
     await page.evaluate(()=>{window.sampleState.boss.combatEntities[0].daggerLink=false;window.renderSample();});
     assert.equal(await page.locator('#castleDaggerLink').count(),0,'Lady chip ends with the last dagger link');
-    await page.waitForFunction(()=>document.querySelector('.boss-daughter-regen[data-source-id="bela"]')?.textContent==='+50 HP');
+    await page.waitForFunction(()=>document.querySelector('.boss-daughter-regen[data-source-id="bela"]')?.textContent==='+20 HP');
     assert.ok(await page.locator('.castle-daughter').evaluateAll(cards=>cards.every(card=>{
       const content=card.querySelector('.boss-combat-content'),hp=content.firstElementChild,stack=card.querySelector('.castle-sacrifice-stack');
       return hp.scrollWidth<=hp.clientWidth+1 && (!stack || stack.getBoundingClientRect().bottom<=content.getBoundingClientRect().top);
@@ -409,7 +432,9 @@ try {
     await page.evaluate(()=>window.reloadFeedbackSample());await page.emulateMedia({reducedMotion:'reduce'});
     await page.evaluate(()=>{window.sampleState.boss.roundNumber++;window.closeBleedSample();});
     assert.equal(await page.locator('.boss-resource-transfer').count(),0);
-    assert.equal(await page.locator('.boss-daughter-regen[data-source-id="bela"]').innerText(),'−50 HP · Hemorragia');
+    assert.equal(await page.locator('.boss-daughter-regen[data-source-id="bela"]').innerText(),'−15 HP · Hemorragia');
+    assert.equal(await page.locator('.castle-daughter.is-frozen').first().evaluate(el=>getComputedStyle(el,'::after').animationName),'none');
+    await page.screenshot({path:resolve(root,'.cache/dimitrescu-ux/freeze-reduced-'+width+'.png'),fullPage:true});
     assert.deepEqual(errors,[]);console.log(`PASS Dimitrescu ${width}px: legacy + v2 item help, 500/petrified HP, dagger to Lady portrait, bleed then regeneration, touch/keyboard/reduced-motion/replay`);await context.close();
   }
 }finally{await browser?.close();await new Promise(done=>server.close(done));}

@@ -25,7 +25,7 @@ test('cadência normal escolhe exatamente uma viva, sem repetir imediatamente, s
     assert.equal(a.boss.castleSelectedDaughterIds.length,1);
     const id=a.boss.castleSelectedDaughterIds[0];assert.notEqual(id,previous);previous=id;seen.add(id);
     assert.equal(a.boss.combatEntities.filter(d=>d.passive).length,1);
-    assert.ok(a.boss.combatEntities.every(d=>d.status==='alive'&&d.regeneration===50));
+    assert.ok(a.boss.combatEntities.every(d=>d.status==='alive'&&d.regeneration===20));
     for(const d of a.boss.combatEntities.filter(d=>d.id!==id)) assert.deepEqual(daughterPassiveChips(d,a),[{bela:'CAÇADA',cassandra:'BANQUETE',daniela:'LIXO +3'}[d.id]]);
   }
   assert.equal(seen.size,3);
@@ -48,16 +48,16 @@ test('reload, leitura e undo não rerrolam seleção/objetivo nem seed',()=>{
   s.boss.roundNumber++;startDimitrescuRound(s);
   const restored=restoreUndoTransaction(snapshot).state;normalizeBossState(restored);startDimitrescuRound(restored);assert.equal(JSON.stringify(restored.boss),before);
 });
-test('regeneração e itens continuam nas filhas não selecionadas; Relíquia espera oportunidade real',()=>{
+test('regeneração e Relíquia permanente continuam nas filhas não selecionadas, sem silenciar passivas',()=>{
   const s=game();startDimitrescuRound(s);
   const other=s.boss.combatEntities.find(d=>!d.passive);other.hp=300;
   s.boss.castleItems={relic:{type:'relic',consumed:false}};s.players[0].hand.push(card('relic'));
-  useCastleItem(s,0,'relic',other.id);assert.equal(other.relicRound,2);
-  regenerateDaughters(s,()=>{},()=>{});assert.equal(other.hp,350);
+  useCastleItem(s,0,'relic',other.id);assert.equal(other.relicAttackBonus,true);assert.equal(other.relicRound,null);
+  regenerateDaughters(s,()=>{},()=>{});assert.equal(other.hp,320);
   // Make the other live daughter the previous pick, so relic recipient is the only alternative.
   for(const d of s.boss.combatEntities)if(d.id!==other.id&&d.id!==s.boss.castleLastDaughterId)kill(s,d.id);
-  s.boss.roundNumber=2;startDimitrescuRound(s);assert.equal(other.passive.status,'suppressed');
-  regenerateDaughters(s,()=>{},()=>{});assert.equal(other.relicRound,null);
+  s.boss.roundNumber=2;startDimitrescuRound(s);assert.equal(other.passive.status,'active');
+  regenerateDaughters(s,()=>{},()=>{});assert.equal(other.relicAttackBonus,true);
 });
 test('As Três Filhas ativa apenas vivas e resolve passivas padrão +3 sem cobrança/duplicação extra',()=>{
   const s=game();s.boss.phase=2;force(s,'three_daughters');

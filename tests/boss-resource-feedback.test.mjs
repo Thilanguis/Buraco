@@ -107,14 +107,14 @@ for(const id of ['bela','cassandra','daniela']) test(`DevTools ${id}: preparar, 
   const [repeat]=triggerBossDebugZombie(s,{entityId:id,playerId});assert.notEqual(repeat.actionId,event.actionId);
 });
 
-test('DevTools filhas: sucesso, Relíquia e ausência de candidato não inventam punição',()=>{
+test('DevTools filhas: sucesso, congelamento e ausência de candidato não inventam punição',()=>{
   const s=fixture('dimitrescu');
   triggerBossDebugZombie(s,{entityId:'bela',playerId:0,action:'prepare'});
   const d=s.boss.combatEntities.find(e=>e.id==='bela');d.passive.status='success';
   assert.deepEqual(triggerBossDebugZombie(s,{entityId:'bela',playerId:0}),[]);
-  d.relicRound=s.boss.roundNumber;triggerBossDebugZombie(s,{entityId:'bela',playerId:0,action:'prepare'});
+  s.boss.castleFreeze={remainingTurns:2,actionId:'debug-freeze',resolvedTurnIds:[]};triggerBossDebugZombie(s,{entityId:'bela',playerId:0,action:'prepare'});
   assert.equal(d.passive.status,'suppressed');assert.deepEqual(triggerBossDebugZombie(s,{entityId:'bela',playerId:0}),[]);
-  d.relicRound=null;s.players.forEach(p=>p.hand=[]);s.teams[0].melds=[];
+  s.boss.castleFreeze.remainingTurns=0;s.players.forEach(p=>p.hand=[]);s.teams[0].melds=[];
   for(const id of ['bela','cassandra']) {triggerBossDebugZombie(s,{entityId:id,playerId:0,action:'prepare'});assert.deepEqual(triggerBossDebugZombie(s,{entityId:id,playerId:0}),[]);}
   assert.equal(s.boss.danger,0);
 });

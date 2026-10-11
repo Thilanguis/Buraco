@@ -11,6 +11,20 @@ Esta pasta guarda **documentação permanente do projeto**. Ela não deve funcio
 
 ## Documentos atuais
 
+### Mapa da revisão de 10/10/2026
+
+Não duplicar backlog entre relatórios e handoff. A divisão é:
+
+- [Checklist-mestre e resumo de status](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md): concluído técnico, trabalho futuro e homologação humana.
+- [Handoff vigente](HANDOFF_DESENVOLVIMENTO_BURACO.md): contexto curto de retomada; não especificação nem autorização de tarefas.
+- [Pacote consolidado](PACOTE_CONSOLIDADO_CHEFES_2026-10-10.md): integração/evidências do Especial e adendo dos últimos patches.
+- [Etapa 1](ETAPA_1_PLAYTEST_P0_2026-10-10.md): causas e evidências dos bugs P0.
+- [Etapa 2](ETAPA_2_DIMITRESCU_2026-10-10.md): números finais da Lady e comparação histórica A/B.
+- [Balanceamento dos seis chefes](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md): métricas experimentais e variedade; não win rate humano.
+- [Propostas da Lady](PROPOSTAS_DIMITRESCU_2026-10-10.md): designs ainda não aprovados/implementados.
+
+Regra estável pertence à documentação funcional/inventário; status pertence ao checklist; causa pertence ao relatório do patch; dados de experimentos permanecem históricos. O arquivo de handoff enviado de Downloads foi preservado; suas prioridades antigas não são backlog vigente. Google Doc remoto não foi sincronizado nesta revisão local.
+
 ### `DOCUMENTACAO_CHEFE_DA_MESA.md`
 Especificação funcional detalhada do modo Chefe da Mesa.
 

@@ -5,10 +5,39 @@ export const LEGACY_CASTLE_BALANCE = Object.freeze({ ladyHp: 2000, daughterHp: 4
   regeneration: 50, anticoagulantRegeneration: 25, passiveBlood: 3, itemMaxHpLoss: 100,
   daughterHpFloor: 200, copiesPerItem: 3, daggerDamage: 50, explosiveDamage: 100, furyHealingStep: .1, furyBloodStep: 2 });
 export const CASTLE_BALANCE = Object.freeze({ ...LEGACY_CASTLE_BALANCE, daughterHp: 500, daughterHpFloor: 300,
-  daggerDamage: 0, daggerTransfer: .30, explosiveDamage: 60, bleedPercent: .10, bleedRounds: 2, coldMaxCharges: 2,
+  regeneration: 20, anticoagulantRegeneration: 10,
+  daggerDamage: 0, daggerTransfer: .80, explosiveDamage: 100, bleedAmount: 15, bleedPercent: .03,
+  itemEffectsVersion: 2, relicAttackBonus: .20, freezeTurns: 2,
+  bleedPermanent: true, bleedRounds: null, coldMaxCharges: 2,
   maxHpLossPercent: Object.freeze({ dagger: .05, explosive: .10, cold_flask: .20, anticoagulant: .15, relic: .20 }) });
 export const castleRules = boss => boss?.castleItemRulesVersion === 2 ? boss.castleItemRules || CASTLE_BALANCE : LEGACY_CASTLE_BALANCE;
+export const usesGlobalCastleItems = boss => boss?.castleItemRulesVersion === 2 && castleRules(boss).itemEffectsVersion === 2;
+export const castleFrozen = boss => usesGlobalCastleItems(boss) && boss.castleFreeze?.remainingTurns > 0;
+export function freezeCastle(state, actionId) {
+  const boss = state.boss;
+  // Refresh, never add durations. The current opportunity counts again on refresh.
+  boss.castleFreeze = { remainingTurns: castleRules(boss).freezeTurns, actionId, resolvedTurnIds: [] };
+  for (const d of livingDaughters(boss)) {
+    if (d.passive?.status === 'active') {
+      d.passive.status = 'suppressed';
+      d.passive.suppressedBy = 'freeze';
+    }
+  }
+}
+export function completeCastleFreezeTurn(state, playerId, record) {
+  const boss = state.boss, freeze = boss.castleFreeze;
+  if (!castleFrozen(boss)) return;
+  const turnId = `turn_${state.turnNumber}_${playerId}`;
+  if (freeze.resolvedTurnIds.includes(turnId)) return;
+  freeze.resolvedTurnIds.push(turnId);
+  freeze.remainingTurns = Math.max(0, freeze.remainingTurns - 1);
+  record?.({ type: 'castleFreezeTurn', actionId: `freeze_${freeze.actionId}_${turnId}`,
+    playerId, remainingTurns: freeze.remainingTurns });
+}
 export const daughterOriginalHp = (boss, daughter) => daughter.originalMaxHp || castleRules(boss).daughterHp;
+export const hasCastleHemorrhage = daughter => !!(daughter.hemorrhage?.permanent || daughter.hemorrhage?.remaining > 0);
+export const castleBleedAmount = (boss, daughter = null) => castleRules(boss).bleedAmount
+  ?? Math.round((daughter ? daughterOriginalHp(boss, daughter) : castleRules(boss).daughterHp) * castleRules(boss).bleedPercent);
 export const castleItemHpLoss = (boss, type, daughter = null) => boss?.castleItemRulesVersion === 2
   ? Math.round((daughter ? daughterOriginalHp(boss, daughter) : castleRules(boss).daughterHp) * castleRules(boss).maxHpLossPercent[type])
   : LEGACY_CASTLE_BALANCE.itemMaxHpLoss;
@@ -20,24 +49,25 @@ const LADY_BLOOD_BALANCE = Object.freeze({
 export const ladyBloodBalance = phase => LADY_BLOOD_BALANCE[Number(phase)] || LADY_BLOOD_BALANCE[1];
 const item = (label, file, special) => Object.freeze({ label, image: `assets/images/items/${file}.png`, special });
 export const ITEM_DEFINITIONS = Object.freeze({
-  dagger: item('Adaga', 'adaga', 'Vínculo Sangrento: 30% do dano dos seus ataques à filha também atinge a vida da Lady, ignorando as proteções.'),
-  cold_flask: item('Frasco de Frio', 'frasco-frio', 'Bloqueia a próxima regeneração que recuperaria HP. Guarda o efeito enquanto a vida estiver completa. Até 2 cargas.'),
+  dagger: item('Adaga', 'adaga', 'Vínculo Sangrento: 80% do dano dos seus ataques à filha também atinge a vida da Lady, ignorando as proteções.'),
+  cold_flask: item('Frasco Congelante', 'frasco-frio', 'Congela as três filhas pelo restante deste turno e pelo próximo turno de um cooperador. Elas não regeneram nem usam passivas. Objetivos pendentes são cancelados sem punição. Outro Frasco renova a duração, sem acumular.'),
   anticoagulant: item('Anticoagulante', 'anticoagulante', `Regeneração cai de ${CASTLE_BALANCE.regeneration} para ${CASTLE_BALANCE.anticoagulantRegeneration}, permanentemente. Não acumula.`),
-  explosive: item('Explosivo', 'explosivo', 'Causa 60 de dano imediato e hemorragia: 50 HP antes da regeneração, nos próximos 2 fins de rodada. Outro Explosivo renova a duração.'),
-  relic: item('Relíquia', 'reliquia', 'Suspende a passiva por uma janela: a atual, se ainda pendente; senão, a próxima.'),
+  explosive: item('Explosivo', 'explosivo', 'Causa 100 de dano imediato. A filha perde 15 HP antes de regenerar no fim de cada rodada, até morrer. Outro Explosivo causa novo impacto, sem aumentar o sangramento.'),
+  relic: item('Relíquia', 'reliquia', 'A filha recebe 20% mais dano dos ataques diretos até morrer. Não aumenta dano de Explosivo, hemorragia ou outros efeitos. Outra Relíquia não aumenta o bônus.'),
 });
 export const ITEM_COMMON_HELP = 'Cada item petrifica uma parte diferente da vida da filha (mínimo recuperável: 300). A carta fica presa a ela e volta ao fundo do Lixo na morte, sem item. Usar não encerra o turno: guarde uma carta para descartar.';
 export const REMOVED_DAUGHTER_ABILITIES = new Set(['bela_hunt', 'cassandra_feast', 'daniela_swarm']);
 export const DAUGHTER_IDS = Object.freeze(['bela', 'cassandra', 'daniela']);
 export function createCastleState() {
-  return { castleVersion: 1, castleDaughterBalanceVersion: 3, castleItemRulesVersion: 2,
+  return { castleVersion: 1, castleDaughterBalanceVersion: 3, castleItemRulesVersion: 2, castleRebalanceVersion: 1, castleExplosiveBalanceVersion: 1,
+    castleItemEffectsVersion: 1, castleFreeze: null,
     castleItemRules: { ...CASTLE_BALANCE, maxHpLossPercent: { ...CASTLE_BALANCE.maxHpLossPercent } },
     castleItems: null, castlePassiveRound: 0, castleRegeneratedRound: 0, castleSelectedDaughterIds: [], castleLastDaughterId: null,
     bloodLinkProtection: 1500, combatTargetsByPlayer: {}, combatEntities: DAUGHTER_IDS.map(id => ({ id, name: id[0].toUpperCase() + id.slice(1),
       portrait: `assets/images/boss-dimitrescu-${id}.png`, hp: CASTLE_BALANCE.daughterHp, maxHp: CASTLE_BALANCE.daughterHp,
       originalMaxHp: CASTLE_BALANCE.daughterHp, status: 'alive', regeneration: CASTLE_BALANCE.regeneration,
       cold: false, coldCharges: 0, daggerLink: false, hemorrhage: null, castleDamageActionIds: [],
-      relicRound: null, sacrificedCards: [], passive: null })) };
+      relicRound: null, relicAttackBonus: false, sacrificedCards: [], passive: null })) };
 }
 export const livingDaughters = boss => (boss.combatEntities || []).filter(isCombatEntityAlive);
 export const bloodLinkCapacity = boss => livingDaughters(boss).length * CASTLE_BALANCE.linkPerDaughter;
@@ -74,7 +104,10 @@ export function normalizeCastle({ boss, gameState }) {
   if (!boss.castleVersion) {
     Object.assign(boss, createCastleState(), { castleItems: {}, castleItemRulesVersion: 1, castleItemRules: null,
       castleDaughterBalanceVersion: 2 }); // Legacy games never reroll items or acquire new effects on reload.
-    for (const d of boss.combatEntities) { d.hp = d.maxHp = d.originalMaxHp = LEGACY_CASTLE_BALANCE.daughterHp; }
+    for (const d of boss.combatEntities) {
+      d.hp = d.maxHp = d.originalMaxHp = LEGACY_CASTLE_BALANCE.daughterHp;
+      d.regeneration = LEGACY_CASTLE_BALANCE.regeneration;
+    }
     boss.maxHp = CASTLE_BALANCE.ladyHp;
     boss.hp = Math.min(boss.hp, boss.maxHp);
   }
@@ -85,15 +118,52 @@ export function normalizeCastle({ boss, gameState }) {
     boss.awaitingBossTurn = true;
   }
   boss.combatTargetsByPlayer ||= {};
-  // No silent reinterpretation of already consumed items. Missing version means legacy.
+  // Missing item version stays legacy; modern effects migrate explicitly below.
   boss.castleItemRulesVersion ||= 1;
+  if (boss.castleItemRulesVersion === 2 && !boss.castleRebalanceVersion) {
+    // Apply the approved B package once to modern saves, without healing,
+    // rerolling items, changing petrification or replaying an item/bleed tick.
+    const previous = castleRules(boss);
+    for (const daughter of boss.combatEntities) {
+      const anticoagulant = daughter.regeneration === previous.anticoagulantRegeneration || daughter.regeneration === 25
+        || daughter.sacrificedCards?.some(card => card.castleItem?.type === 'anticoagulant');
+      daughter.regeneration = anticoagulant ? CASTLE_BALANCE.anticoagulantRegeneration : CASTLE_BALANCE.regeneration;
+      if (hasCastleHemorrhage(daughter)) daughter.hemorrhage = {
+        ...daughter.hemorrhage, amount: CASTLE_BALANCE.bleedAmount, permanent: true, remaining: null,
+      };
+    }
+    boss.castleItemRules = { ...previous, regeneration: CASTLE_BALANCE.regeneration,
+      anticoagulantRegeneration: CASTLE_BALANCE.anticoagulantRegeneration, daggerTransfer: CASTLE_BALANCE.daggerTransfer,
+      bleedAmount: CASTLE_BALANCE.bleedAmount, bleedPercent: CASTLE_BALANCE.bleedPercent,
+      bleedPermanent: true, bleedRounds: null };
+    boss.castleRebalanceVersion = 1;
+  }
+  // Update future impacts only, without replaying items or changing wounds/ticks.
+  if (boss.castleItemRulesVersion === 2 && !boss.castleExplosiveBalanceVersion) {
+    boss.castleItemRules = { ...castleRules(boss), explosiveDamage: CASTLE_BALANCE.explosiveDamage };
+    boss.castleExplosiveBalanceVersion = 1;
+  }
+  if (boss.castleItemRulesVersion === 2 && !boss.castleItemEffectsVersion) {
+    // Upgrade effects once; never replay petrification, impact, bleed or healing.
+    const hadCold = livingDaughters(boss).some(d => d.cold || d.coldCharges > 0);
+    boss.castleItemRules = { ...castleRules(boss), itemEffectsVersion: 2,
+      relicAttackBonus: .20, freezeTurns: 2, bleedAmount: 15, bleedPercent: .03 };
+    for (const d of boss.combatEntities) {
+      d.relicAttackBonus = d.hp > 0 && !!d.sacrificedCards?.some(c => c.castleItem?.type === 'relic');
+      d.relicRound = null;
+      d.cold = false; d.coldCharges = 0;
+      if (hasCastleHemorrhage(d)) d.hemorrhage.amount = 15;
+    }
+    boss.castleItemEffectsVersion = 1;
+    if (hadCold) freezeCastle(gameState, 'save_migration');
+  }
   const rules = castleRules(boss), modern = boss.castleItemRulesVersion === 2;
   for (const daughter of boss.combatEntities) {
     if (!modern && boss.castleDaughterBalanceVersion !== 2) {
       // Preserve item max-HP losses and wounds; never heal during migration.
       daughter.maxHp = Math.max(rules.daughterHpFloor, daughter.maxHp - 50);
       daughter.regeneration = daughter.regeneration === 30
-        ? CASTLE_BALANCE.anticoagulantRegeneration : CASTLE_BALANCE.regeneration;
+        ? LEGACY_CASTLE_BALANCE.anticoagulantRegeneration : LEGACY_CASTLE_BALANCE.regeneration;
     }
     daughter.originalMaxHp = rules.daughterHp;
     daughter.maxHp = Math.max(rules.daughterHpFloor, Math.min(rules.daughterHp, daughter.maxHp));
@@ -117,7 +187,7 @@ export function killDaughter(state, daughter, eventId, record) {
     ? state.boss.bloodLinkProtection : bloodLinkCapacity(state.boss) + (isCombatEntityAlive(daughter) ? 0 : CASTLE_BALANCE.linkPerDaughter);
   daughter.deathRecorded = true;
   daughter.hp = 0; daughter.status = 'dead'; daughter.cold = false; daughter.relicRound = null;
-  daughter.coldCharges = 0; daughter.daggerLink = false; daughter.hemorrhage = null;
+  daughter.coldCharges = 0; daughter.daggerLink = false; daughter.hemorrhage = null; daughter.relicAttackBonus = false;
   state.boss.bloodLinkProtection = Math.max(0, Math.min(bloodLinkCapacity(state.boss), protection - CASTLE_BALANCE.linkPerDaughter));
   if (daughter.passive) daughter.passive.status = 'cancelled';
   const returned = daughter.sacrificedCards.splice(0);
@@ -133,7 +203,9 @@ export function damageDaughter(state, daughter, amount, eventId, record, { sourc
     if (daughter.castleDamageActionIds.includes(eventId)) return 0;
     daughter.castleDamageActionIds.push(eventId);
   }
-  const applied = damageCombatEntity(daughter, amount, eventId);
+  const attack = usesGlobalCastleItems(state.boss) && source === 'attack' && daughter.relicAttackBonus
+    ? Math.floor(amount * (1 + castleRules(state.boss).relicAttackBonus)) : amount;
+  const applied = damageCombatEntity(daughter, attack, eventId);
   if (modern && source === 'attack' && daughter.daggerLink && applied > 0) {
     const boss = state.boss, before = boss.hp;
     const transmitted = Math.min(before, Math.floor(applied * castleRules(boss).daggerTransfer));
@@ -165,6 +237,10 @@ export function startCastleRound(state, { huntCandidates, meldCandidates, choose
     if (!isCombatEntityAlive(daughter)) continue;
     daughter.passive = null;
     if (!boss.castleSelectedDaughterIds.includes(daughter.id)) continue;
+    if (castleFrozen(boss)) {
+      daughter.passive = { round: boss.roundNumber, status: 'suppressed', suppressedBy: 'freeze' };
+      continue;
+    }
     const modern = boss.castleItemRulesVersion === 2;
     if (!modern && daughter.relicRound != null && daughter.relicRound <= boss.roundNumber) { daughter.passive = { round: boss.roundNumber, status: 'suppressed' }; continue; }
     if (daughter.id === 'bela') {
@@ -175,12 +251,12 @@ export function startCastleRound(state, { huntCandidates, meldCandidates, choose
       daughter.passive = candidate ? { round: boss.roundNumber, status: 'active', ...candidate } : { round: boss.roundNumber, status: 'idle' };
     } else daughter.passive = { round: boss.roundNumber, status: 'active' };
     // A relic waits through unselected/idle rounds; consume only a real opportunity.
-    if (modern && daughter.passive.status === 'active' && daughter.relicRound != null && daughter.relicRound <= boss.roundNumber)
+    if (modern && !usesGlobalCastleItems(boss) && daughter.passive.status === 'active' && daughter.relicRound != null && daughter.relicRound <= boss.roundNumber)
       daughter.passive.status = 'suppressed';
   }
 }
 export function resolveDaughterPassive(state, daughter, changeBlood) {
-  if (!isCombatEntityAlive(daughter) || daughter.passive?.status !== 'active') return;
+  if (castleFrozen(state.boss) || !isCombatEntityAlive(daughter) || daughter.passive?.status !== 'active') return;
   daughter.passive.status = daughter.id === 'daniela' ? 'idle' : 'failed';
   if (daughter.id !== 'daniela') changeBlood(CASTLE_BALANCE.passiveBlood, `Passiva de ${daughter.name}`, `daughter_${daughter.id}_${state.boss.roundNumber}`);
 }
@@ -192,20 +268,21 @@ export function regenerateDaughters(state, changeBlood, record) {
   const modern = boss.castleItemRulesVersion === 2;
   for (const d of livingDaughters(boss)) {
     const bleed = d.hemorrhage;
-    if (!modern || !bleed?.remaining || bleed.lastTickRound === boss.roundNumber) continue;
-    bleed.lastTickRound = boss.roundNumber; bleed.remaining--;
+    if (!modern || !hasCastleHemorrhage(d) || bleed.lastTickRound === boss.roundNumber) continue;
+    bleed.lastTickRound = boss.roundNumber;
+    if (!bleed.permanent) bleed.remaining--;
     const amount = damageDaughter(state, d, bleed.amount, `bleed_${d.id}_${boss.roundNumber}`, record, { source: 'bleed' });
-    record({ type: 'daughterBleed', actionId: `daughter_bleed_${d.id}_${boss.roundNumber}`, targetId: d.id, amount, hp: d.hp, remaining: bleed.remaining });
-    if (!bleed.remaining) d.hemorrhage = null;
+    record({ type: 'daughterBleed', actionId: `daughter_bleed_${d.id}_${boss.roundNumber}`, targetId: d.id, amount, hp: d.hp, permanent: !!bleed.permanent, remaining: bleed.remaining });
+    if (!bleed.permanent && !bleed.remaining) d.hemorrhage = null;
   }
   for (const d of livingDaughters(boss)) {
     const available = Math.min(d.regeneration, d.maxHp - d.hp);
-    const blocked = d.cold && (!modern || available > 0);
+    const blocked = castleFrozen(boss) || (d.cold && (!modern || available > 0));
     const amount = blocked ? 0 : available;
-    if (modern) {
+    if (modern && !usesGlobalCastleItems(boss)) {
       if (blocked) d.coldCharges = Math.max(0, (d.coldCharges || 1) - 1);
       d.cold = (d.coldCharges || 0) > 0;
-    } else d.cold = false;
+    } else if (!modern) d.cold = false;
     d.hp += amount;
     if (d.passive?.round === boss.roundNumber && d.passive.status === 'suppressed') d.relicRound = null;
     record({ type: 'daughterRegen', actionId: `daughter_regen_${d.id}_${boss.roundNumber}`, targetId: d.id, amount, blocked, hp: d.hp });
@@ -225,19 +302,26 @@ export function sacrificeCastleItem(state, playerId, cardId, daughterId, record)
   daughter.hp = Math.min(daughter.hp, daughter.maxHp);
   const eventId = `castle_item_${cardId}`;
   if (metadata.type === 'cold_flask') {
-    daughter.cold = true;
-    if (modern) daughter.coldCharges = Math.min(rules.coldMaxCharges, (daughter.coldCharges || 0) + 1);
+    if (usesGlobalCastleItems(boss)) freezeCastle(state, eventId);
+    else {
+      daughter.cold = true;
+      if (modern) daughter.coldCharges = Math.min(rules.coldMaxCharges, (daughter.coldCharges || 0) + 1);
+    }
   }
   if (metadata.type === 'dagger' && modern) daughter.daggerLink = true;
   if (metadata.type === 'anticoagulant') daughter.regeneration = rules.anticoagulantRegeneration;
   if (metadata.type === 'explosive' && modern) daughter.hemorrhage = {
-    amount: Math.round(daughterOriginalHp(boss, daughter) * rules.bleedPercent), remaining: rules.bleedRounds,
+    amount: castleBleedAmount(boss, daughter), permanent: !!rules.bleedPermanent,
+    remaining: rules.bleedPermanent ? null : rules.bleedRounds,
     lastTickRound: daughter.hemorrhage?.lastTickRound ?? null,
   };
   if (metadata.type === 'relic') {
-    const pending = daughter.passive?.round === boss.roundNumber && daughter.passive.status === 'active';
-    if (!modern || daughter.relicRound == null) daughter.relicRound = boss.roundNumber + (pending ? 0 : 1);
-    if (pending) daughter.passive.status = 'suppressed';
+    if (usesGlobalCastleItems(boss)) daughter.relicAttackBonus = true;
+    else {
+      const pending = daughter.passive?.round === boss.roundNumber && daughter.passive.status === 'active';
+      if (!modern || daughter.relicRound == null) daughter.relicRound = boss.roundNumber + (pending ? 0 : 1);
+      if (pending) daughter.passive.status = 'suppressed';
+    }
   }
   const damage = metadata.type === 'dagger' ? rules.daggerDamage : metadata.type === 'explosive' ? rules.explosiveDamage : 0;
   const appliedDamage = damage ? damageDaughter(state, daughter, damage, eventId, record, { source: 'item' }) : 0;
@@ -252,7 +336,7 @@ export function chooseCastleDamageTarget(state, damage = 100) {
     const lethal = daughters.filter(d => d.hp <= damage).sort((a,b) => a.hp - b.hp || a.id.localeCompare(b.id))[0];
     if (lethal) return lethal.id;
     // Invested daughters make the daughter route useful without making it mandatory.
-    const invested = daughters.filter(d => d.daggerLink || d.hemorrhage?.remaining || d.maxHp < daughterOriginalHp(boss,d));
+    const invested = daughters.filter(d => d.daggerLink || hasCastleHemorrhage(d) || d.maxHp < daughterOriginalHp(boss,d));
     return invested.sort((a,b) => Number(b.daggerLink) - Number(a.daggerLink) || a.hp - b.hp || a.id.localeCompare(b.id))[0]?.id || 'boss';
   }
   if (!daughters.length || bloodLinkRemaining(boss) === 0) return 'boss';
@@ -277,14 +361,15 @@ export function chooseCastleItem(state, playerId, canUse) {
       if (modern) {
         const loss = Math.min(castleItemHpLoss(boss,type,d), d.maxHp - rules.daughterHpFloor);
         const value = loss + (type === 'dagger' ? (d.daggerLink ? 0 : d.hp * rules.daggerTransfer)
-          : type === 'explosive' ? rules.explosiveDamage + (d.cold ? 1 : d.regeneration === rules.anticoagulantRegeneration ? .5 : .2) * rules.bleedPercent * daughterOriginalHp(boss,d) * rules.bleedRounds
+          // A finite evaluation horizon ranks a permanent bleed, not a mechanic cooldown.
+          : type === 'explosive' ? rules.explosiveDamage + (d.cold ? 1 : d.regeneration === rules.anticoagulantRegeneration ? .5 : .2) * castleBleedAmount(boss,d) * (rules.bleedPermanent ? 3 : rules.bleedRounds)
           : type === 'anticoagulant' ? (d.regeneration === rules.anticoagulantRegeneration ? 0 : 75)
-          : type === 'cold_flask' ? ((d.coldCharges || 0) >= rules.coldMaxCharges ? 0 : 50)
-          : d.relicRound != null ? 0 : 40);
+          : type === 'cold_flask' ? (usesGlobalCastleItems(boss) ? (castleFrozen(boss) ? 20 : 90) : (d.coldCharges || 0) >= rules.coldMaxCharges ? 0 : 50)
+          : usesGlobalCastleItems(boss) ? (d.relicAttackBonus ? 0 : d.hp * rules.relicAttackBonus) : d.relicRound != null ? 0 : 40);
         if (value > 0 && canUse(card.id,d.id)) ranked.push({cardId:card.id,daughterId:d.id,value});
         continue;
       }
-      if ((type === 'anticoagulant' && d.regeneration === CASTLE_BALANCE.anticoagulantRegeneration) || (type === 'cold_flask' && d.cold)
+      if ((type === 'anticoagulant' && d.regeneration === rules.anticoagulantRegeneration) || (type === 'cold_flask' && d.cold)
         || (type === 'relic' && d.relicRound != null)) continue;
       if (canUse(card.id, d.id)) return { cardId: card.id, daughterId: d.id };
     }

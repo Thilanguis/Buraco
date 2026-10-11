@@ -360,7 +360,7 @@ body[data-boss-id='nehelenia'] .boss-dream-mirror-slot.stolen b {
   }
 }
 body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portrait::before {
-  content: '';
+  content: none;
   position: absolute;
   z-index: 8;
   inset: 0;
@@ -373,7 +373,7 @@ body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portr
   animation: neheleniaFalseReflection 3.1s ease-in-out infinite alternate;
 }
 body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portrait::after {
-  content: 'REFLEXO ROUBADO';
+  content: none;
   position: absolute;
   z-index: 9;
   right: 5px;
@@ -388,6 +388,10 @@ body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portr
   letter-spacing: 0.7px;
   pointer-events: none;
 }
+body[data-boss-id='nehelenia'] .boss-daughter-strip :is(.boss-daughter-state, .boss-attendant-context-line) { pointer-events:auto; cursor:pointer; }
+body.boss-mode[data-boss-id='nehelenia'] .boss-daughter-card .boss-attendant-context-line.is-persistent { border-color:#78839b; color:#d8deea; background:#172033eb; box-shadow:none; }
+body.boss-mode[data-boss-id='nehelenia'] .boss-daughter-card .boss-attendant-context-line.is-current { border-color:#facc15; color:#fff3bf; background:#69450a; }
+body[data-boss-id='nehelenia'] .boss-attendant-context { max-height:calc(100% - 60px); overflow:auto; }
 @media (prefers-reduced-motion: reduce) {
   body[data-boss-id='nehelenia'] .boss-hud.boss-nehelenia-dream-stolen .boss-portrait::before {
     animation: none;
@@ -482,6 +486,14 @@ body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-seal-preview {
   position: relative;
   overflow: visible;
 }
+/* Reserve only the frame's existing overhang; never resize its carefully fitted PNG. */
+body.boss-mode[data-boss-id='nehelenia'] .board-middle:has(#drawDiscardBtn:is(.boss-nehelenia-discard-sealed, .boss-nehelenia-seal-preview)) {
+  margin-top:calc(var(--readable-pile-width, 55px) * .551);
+}
+body.boss-mode[data-boss-id='nehelenia'] #drawDiscardBtn:is(.boss-nehelenia-discard-sealed, .boss-nehelenia-seal-preview) .pile-info {
+  visibility:hidden;
+}
+body.boss-mode[data-boss-id='nehelenia'] #drawDiscardBtn:is(.boss-nehelenia-discard-sealed, .boss-nehelenia-seal-preview) #bossDiscardHelpButton { visibility:visible; }
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-discard-sealed::before,
 body[data-boss-id='nehelenia'] #drawDiscardBtn.boss-nehelenia-seal-preview::before {
   content: '';
