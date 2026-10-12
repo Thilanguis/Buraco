@@ -1,4 +1,5 @@
 // Optional files supplied by the game owner. Missing MP3s never block gameplay.
+import { getAudioBalance } from '../audio-balance.js';
 export const FRIEND_MP3 = Object.freeze({
   arrival: 'assets/sfx/amiga-entrada.mp3',
   departure: 'assets/sfx/amiga-saida.mp3',
@@ -45,7 +46,8 @@ export function createFriendSoundQueue({
     if (!source || !enabled() || signal?.aborted) { resolve(); return; }
     const audio = createAudio(typeof source === 'string' ? source : source.src);
     audio.loop = loop;
-    audio.volume = typeof source === 'string' ? 0.9 : source.volume;
+    const balance = getAudioBalance(audio.src || (typeof source === 'string' ? source : source.src));
+    audio.volume = balance ? Math.min(1, balance.gain) : typeof source === 'string' ? 0.9 : source.volume;
     audio.preload = 'auto';
     let done = false;
     let timer;

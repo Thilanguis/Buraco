@@ -184,7 +184,7 @@ test('commitState real rejeita writer antigo mesmo quando SDK repete callback ap
 test('animatic limitado a cinco nós; término/cancelamento não deixa nós e reduced motion não cria nada',async()=>{
   const nodes=new Set();let peak=0,created=0,cancel=false;
   const document={body:{append:node=>{nodes.add(node);peak=Math.max(peak,nodes.size);}},createElement:()=>{
-    created++;const node={style:{},setAttribute(){},remove(){nodes.delete(node);},animate:()=>({finished:cancel?Promise.reject(Error('cancelled')):Promise.resolve()})};return node;
+    created++;const node={style:{setProperty(name,value){this[name]=value;}},setAttribute(){},remove(){nodes.delete(node);},animate:()=>({finished:cancel?Promise.reject(Error('cancelled')):Promise.resolve()})};return node;
   }};
   const rect={left:0,top:0,width:30,height:50};
   for(let i=0;i<60;i++){cancel=i%2===0;await presentCooperativeSpecial({document,from:rect,to:rect,count:20,bossId:'nemesis'});assert.equal(nodes.size,0);}

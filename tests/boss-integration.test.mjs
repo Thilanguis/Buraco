@@ -352,7 +352,8 @@ test('acoes humanas e cronometro consultam a trava obrigatoria de escolhas', () 
   assert.match(app, /async function discardSelectedCard\(\) \{[\s\S]*?localActionGate\.run\(discardSelectedCardOnce\)/);
   assert.match(app, /async function discardSelectedCardOnce\(\) \{\s*if \(!ensureMyTurn\(\)\) return/);
   assert.match(app, /window\.executeUndo = async \(\) => \{[\s\S]*?canRestoreUndoTransaction/);
-  assert.match(app, /function passTurn\(\{ preserveUndo = false \} = \{\}\) \{\s*if \(!canPerformCommonGameAction\(state\)\)/);
+  assert.match(app, /function passTurn\(\{ preserveUndo = false, debugExecution = false \} = \{\}\)[\s\S]*?if \(!manualLabBot && !canPerformCommonGameAction\(state\)\)/);
+  assert.match(app, /const manualLabBot = debugExecution && isDebugMode && window\.devToolsMutationActive && !state\?\.surrender\?\.active && !hasPendingBossChoices\(state\) && !isBossTurnActive\(state\)/);
   assert.match(app, /async function autoPlayTimeout\(\) \{[\s\S]*?localActionGate\.run\(autoPlayTimeoutOnce\)/);
   assert.match(app, /async function autoPlayTimeoutOnce\(\) \{\s*if \(isBossMode\(state\)\) return;[^\n]*\n\s*if \(!canPerformCommonGameAction\(state\)\)/);
   assert.match(app, /function resetTurnTimer\(\)[\s\S]*?hasPendingBossChoices\(state\)/);

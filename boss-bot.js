@@ -1911,7 +1911,7 @@ export class BossBuracoBot {
     this.assertActive(engine, signal);
     let s = engine.getState();
       // Segura a execução do bot em loop enquanto o jogo estiver congelado no DevTools
-    while (s && s.debugPaused && !s.finished) {
+    while (s && s.debugPaused && !s.finished && !engine.canRunDuringDebugPause?.()) {
       await this.sleep(500, engine, signal);
       s = engine.getState();
     }

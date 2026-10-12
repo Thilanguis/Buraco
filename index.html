@@ -514,8 +514,9 @@
             </div>
             <small>Entrada imediata, sem roleta. Mantém as cartas das amigas presentes.</small>
           </div>
-          <label for="debugMeldActor">Quem faz a canastra?</label>
-          <select id="debugMeldActor"><option value="current">Jogador do turno</option></select>
+          <label for="debugMeldActor">Mão / jogador do cenário</label>
+          <select id="debugMeldActor"><option value="local">Minha mão</option><option value="current">Jogador do turno</option></select>
+          <small style="color:#cbd5e1;max-width:300px">Compras, descarte e canastras usam este jogador, em qualquer turno. Só Congelar Jogo mantém a partida pausada; os outros comandos preservam o estado anterior.</small>
           <button onclick="debugMeld('suja')" style="font-size: 10px; padding: 6px; background: #ef4444">Canastra Suja</button>
           <button onclick="debugMeld('limpa')" style="font-size: 10px; padding: 6px; background: #22c55e">Canastra Limpa</button>
           <button onclick="debugMeld('real')" style="font-size: 10px; padding: 6px; background: #eab308; color: #000">Canastra Real</button>

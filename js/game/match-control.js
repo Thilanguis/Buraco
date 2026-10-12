@@ -33,14 +33,27 @@ export function applyPauseVote(state, playerId, action, now = Date.now()) {
 
 export function createActionGate() {
   let pending = null;
+  let releasePending = null;
   return {
     get pending() { return pending; },
+    cancel() {
+      const release = releasePending;
+      pending = null;
+      releasePending = null;
+      release?.();
+    },
     async run(action) {
       if (pending) return;
       let release;
       pending = new Promise(resolve => { release = resolve; });
+      const ownPending = pending;
+      releasePending = release;
       try { return await action(); }
-      finally { pending = null; release(); }
+      catch (error) { if (error?.name !== 'AbortError') throw error; }
+      finally {
+        if (pending === ownPending) { pending = null; releasePending = null; }
+        release();
+      }
     },
   };
 }

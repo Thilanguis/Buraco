@@ -1,50 +1,61 @@
+import { SPECIAL_CHARACTER_ASSETS } from './boss/ui/cooperative-special-assets.js';
+import { getAudioBalance } from './audio-balance.js';
+
 export const CANASTRA_SFX = {
-  suja: new Audio('assets/sfx/canastra-suja.mp3'),
-  limpa: new Audio('assets/sfx/canastra-limpa.mp3'),
-  real: new Audio('assets/sfx/canastra-real.mp3'),
-  asas: new Audio('assets/sfx/canastra-as-a-as.mp3'),
+  suja: createBossSfx('assets/sfx/canastra-suja.mp3'),
+  limpa: createBossSfx('assets/sfx/canastra-limpa.mp3'),
+  real: createBossSfx('assets/sfx/canastra-real.mp3'),
+  asas: createBossSfx('assets/sfx/canastra-as-a-as.mp3'),
 };
 
+// Legacy arguments are fallback only; every measured master uses its central profile.
 function createBossSfx(src, volume = 0.9, systemGain = 1) {
   const audio = new Audio(src);
   audio.preload = 'auto';
-  audio.volume = volume;
-  audio.dataset.systemGain = String(systemGain);
+  const balance = getAudioBalance(src);
+  audio.volume = balance ? Math.min(1, balance.gain) : volume;
+  audio.dataset.systemGain = String(balance ? Math.max(1, balance.gain) : systemGain);
   return audio;
 }
 
 export const BOSS_SFX = Object.freeze({
   nemesis: Object.freeze({
+    special: createBossSfx(SPECIAL_CHARACTER_ASSETS.nemesis.audioSrc, 0.8),
     resource: createBossSfx('assets/sfx/ganho-infeccao-nemesis.mp3'),
   }),
   banker: Object.freeze({
+    special: createBossSfx(SPECIAL_CHARACTER_ASSETS.banker.audioSrc, 0.8),
     resource: createBossSfx('assets/sfx/habilidade-banqueiro.mp3'),
     vaultClose: createBossSfx('assets/audio/cofre-fechando.mp3'),
     vaultOpen: createBossSfx('assets/audio/cofre-abrindo.mp3'),
     victory: createBossSfx('assets/sfx/fim-de-jogo-banqueiro.mp3'),
   }),
   dominadora: Object.freeze({
+    special: createBossSfx(SPECIAL_CHARACTER_ASSETS.dominadora.audioSrc, 0.8),
     resource: createBossSfx('assets/sfx/habilidade-dominadora.mp3'),
     victory: createBossSfx('assets/sfx/fim-de-jogo-dominadora.mp3'),
   }),
   matriarca_esmeralda: Object.freeze({
+    special: createBossSfx(SPECIAL_CHARACTER_ASSETS.matriarca_esmeralda.audioSrc, 0.8),
     resource: createBossSfx('assets/sfx/habilidade-matriarca.mp3', 0.9, 2),
     heal: createBossSfx('assets/sfx/cura-matriarca.mp3', 0.9, 2),
     rebirth: createBossSfx('assets/sfx/renascimento-matriarca.mp3', 0.9, 2),
     victory: createBossSfx('assets/sfx/fim-de-jogo-matriarca.mp3', 0.9, 2),
   }),
   dimitrescu: Object.freeze({
+    special: createBossSfx(SPECIAL_CHARACTER_ASSETS.dimitrescu.audioSrc, 0.8),
     daughterDeath: createBossSfx('assets/sfx/what-have-you-done-to-my-daughter.mp3', 0.95),
     blood: createBossSfx('assets/sfx/ganho-sangue-dimitresco.mp3', 0.92),
     phase2: createBossSfx('assets/sfx/transformacao-dimitrescu-fase2.mp3', 0.95),
     phase3: createBossSfx('assets/sfx/transformacao-dimitrescu-fase3.mp3', 0.95),
   }),
   nehelenia: Object.freeze({
+    special: createBossSfx(SPECIAL_CHARACTER_ASSETS.nehelenia.audioSrc, 0.8),
     laugh: createBossSfx('assets/sfx/risada-nehelenia.mp3', 0.95),
   }),
 });
 
-export const sfxCardMove = new Audio('assets/sfx/barulho-cartas.mp3');
+export const sfxCardMove = createBossSfx('assets/sfx/barulho-cartas.mp3');
 // All card movement sounds follow the deck; celebrations and intros follow the table.
 export const DECK_MOVE_SFX = Object.freeze({
   resident: createBossSfx('assets/sfx/compra-resident.mp3', 0.18),
@@ -84,21 +95,17 @@ export const TABLE_CANASTRA_SFX = Object.freeze({
 });
 export const ALL_CANASTRA_SFX = [...Object.values(CANASTRA_SFX), ...Object.values(TABLE_CANASTRA_SFX).flatMap(Object.values)];
 sfxCardMove.preload = 'auto';
-sfxCardMove.volume = 0.5;
 
-export const sfxMyTurn = new Audio('assets/sfx/seu-turno.mp3');
+export const sfxMyTurn = createBossSfx('assets/sfx/seu-turno.mp3');
 export const sfxSearch = createBossSfx('assets/sfx/procurar-carta.mp3', 0.9);
 sfxMyTurn.preload = 'auto';
-sfxMyTurn.volume = 0.8;
 
-export const sfxSteal = window.sfxSteal || new Audio('assets/sfx/roubo-mao.mp3');
+export const sfxSteal = window.sfxSteal || createBossSfx('assets/sfx/roubo-mao.mp3');
 sfxSteal.preload = 'auto';
-sfxSteal.volume = 0.95;
 window.sfxSteal = sfxSteal;
 
-export const sfxHeartbeat = new Audio('assets/sfx/coracao-batendo.mp3');
+export const sfxHeartbeat = createBossSfx('assets/sfx/coracao-batendo.mp3');
 sfxHeartbeat.preload = 'auto';
-sfxHeartbeat.volume = 1;
 sfxHeartbeat.loop = true;
 
 export const TABLE_AMBIENT_MUSIC = Object.freeze({
@@ -241,6 +248,7 @@ const BOSS_AUDIO_ELEMENTS = Object.values(BOSS_SFX).flatMap((sounds) => Object.v
 const GAME_SFX = [...ALL_CANASTRA_SFX, ...Object.values(DECK_MOVE_SFX), ...BOSS_AUDIO_ELEMENTS, sfxCardMove, sfxMyTurn, sfxSearch, sfxSteal, sfxHeartbeat];
 const transientSfx = new Set();
 const transientSfxNodes = new Map();
+const transientSfxReleases = new WeakMap();
 
 function disconnectTransientSfx(audio) {
   const nodes = transientSfxNodes.get(audio);
@@ -255,56 +263,73 @@ function disconnectTransientSfx(audio) {
 }
 
 export function playSfxClone(source, options = {}) {
-  if (!source || isSystemMuted()) return null;
+  if (!source || isSystemMuted() || options.signal?.aborted || options.isCurrent?.() === false) return null;
 
   const clone = source.cloneNode();
-  const requestedGain = Number(source.dataset?.systemGain || options.gain || 1);
+  const balance = getAudioBalance(source.src);
+  const requestedGain = Number(balance ? Math.max(1, balance.gain) : source.dataset?.systemGain || options.gain || 1);
   const systemGain = Number.isFinite(requestedGain) && requestedGain > 0
     ? requestedGain
     : 1;
   const audioContext = options.audioContext || null;
 
-  clone.volume = source.volume;
+  clone.volume = balance ? Math.min(1, balance.gain) : source.volume;
   transientSfx.add(clone);
 
-  if (systemGain !== 1 && audioContext?.createMediaElementSource) {
+  if ((balance || systemGain !== 1) && audioContext?.createMediaElementSource) {
     try {
       const sourceNode = audioContext.createMediaElementSource(clone);
       const gainNode = audioContext.createGain();
-      gainNode.gain.value = systemGain;
+      gainNode.gain.value = balance ? balance.gain : systemGain;
       sourceNode.connect(gainNode);
       gainNode.connect(audioContext.destination);
       transientSfxNodes.set(clone, { sourceNode, gainNode });
+      if (balance) clone.volume = 1; // One calibrated gain, never gain × an old hand-tuned volume.
     } catch (error) {
       // Fallback do elemento HTML quando Web Audio não estiver disponível.
-      clone.volume = clampMediaVolume(source.volume * systemGain);
+      clone.volume = clampMediaVolume(clone.volume * systemGain);
     }
   } else if (systemGain !== 1) {
-    clone.volume = clampMediaVolume(source.volume * systemGain);
+    clone.volume = clampMediaVolume(clone.volume * systemGain);
   }
 
+  let stopped = false;
   const release = () => {
+    stopped = true;
     transientSfx.delete(clone);
     disconnectTransientSfx(clone);
+    options.signal?.removeEventListener('abort', abort);
+    transientSfxReleases.delete(clone);
   };
+  const abort = () => { stopSfxClone(clone); release(); };
+  transientSfxReleases.set(clone, release);
+  options.signal?.addEventListener('abort', abort, { once: true });
   clone.addEventListener('ended', release, { once: true });
   clone.addEventListener('error', release, { once: true });
 
   const startPlayback = async () => {
     if (audioContext?.state === 'suspended') await audioContext.resume();
+    if (stopped || options.signal?.aborted || options.isCurrent?.() === false || isSystemMuted()) { abort(); return; }
     await clone.play();
   };
-  startPlayback().catch(release);
+  startPlayback().catch(() => {
+    release();
+    try { options.onPlaybackFailure?.(); } catch { /* Cosmetic failure callback. */ }
+  });
   return clone;
+}
+
+export function stopSfxClone(audio) {
+  if (!audio) return;
+  try { audio.pause(); audio.currentTime = 0; } catch { /* Optional/failed media. */ }
+  transientSfxReleases.get(audio)?.();
+  transientSfx.delete(audio);
+  disconnectTransientSfx(audio);
 }
 
 export function stopAllGameSfx() {
   for (const audio of [...GAME_SFX, ...transientSfx]) {
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-    } catch (error) {}
-    disconnectTransientSfx(audio);
+    stopSfxClone(audio);
   }
   transientSfx.clear();
 }

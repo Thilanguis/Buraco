@@ -357,7 +357,7 @@ test('laboratorio usa o bot real e limpa seu unico timer ao fechar ou resetar', 
   assert.match(appSource, /async function executeBossLabBotAction[\s\S]*?BuracoBot\.playTurn/);
   assert.match(appSource, /executeBossLabBotAction\(outcome\)[\s\S]*?if \(!module\.canContinueBossDebugScenario\(state, activeConfig\) && !\(await prepareBossLab\(overrides\)\)\) return;/);
   assert.match(appSource, /advanceBossLabPresentationToPlayers/);
-  assert.match(appSource, /createBotEngineForSession\(sessionId, signal, \{ delayScale: 0\.12, bossLabOutcome: outcome \}\)/);
+  assert.match(appSource, /createBotEngineForSession\(sessionId, signal, \{ delayScale: 0\.001, bossLabOutcome: outcome, debugExecution: true \}\)/);
   assert.match(appSource, /applyBossDebugBotOutcome\(state, outcome, botPlayer\.id\)/);
   assert.match(appSource, /completeBossDebugBotOutcome\(state, outcome, botPlayer\.id, preparedResult\)/);
   assert.match(appSource, /completedBotTurnsAfter > completedBotTurnsBefore/);

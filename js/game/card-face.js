@@ -25,7 +25,7 @@ export function cardFrontHTML(card) {
   const asset = lunarCardAsset(card);
   // URLs in this custom property resolve relative to styles/lunar.css.
   const item = !card.castleItem?.consumed && ITEM_DEFINITIONS[card.castleItem?.type];
-  const overlay = item ? `<img class="castle-item-overlay" src="${item.image}" alt="${item.label}" draggable="false">` : '';
+  const overlay = item ? `<img class="castle-item-overlay" src="${item.image}" alt="${item.label}" title="${item.label}" draggable="false">` : '';
   const art = (asset ? ['lunar', 'wwe', 'resident'].map(theme => `<span class="${theme}-card-art" data-card-art="${asset.split('/').pop().replace('.webp', '')}" aria-hidden="true" style="--${theme}-face: url('../${asset.replace('assets/lunar/', `assets/${theme}/`)}')"></span>`).join('') : '') + overlay;
   if (card.joker) {
     return `${art}<div class="carta-canto top joker-label"><span class="card-rank">JOKER</span></div><div class="carta-meio joker-symbol">★</div><div class="carta-canto bottom joker-label"><span class="card-rank">JOKER</span></div>`;

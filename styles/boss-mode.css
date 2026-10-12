@@ -2771,6 +2771,10 @@ body.boss-mode #gameSection > svg.boss-graft-links {
 }
 
 #debugPanel {
+  position: fixed !important;
+  z-index: 2147483646 !important;
+  pointer-events: auto !important;
+  box-sizing: border-box;
   width: min(320px, calc(100vw - 24px));
   max-height: calc(100vh - 78px);
   overflow-y: auto;
@@ -7660,7 +7664,8 @@ body[data-boss-id="dominadora"] .boss-special-track > span { background: #e8b6ec
 .boss-special-flight {
   position: fixed; pointer-events: none; z-index: 10040; width: 22px; height: 32px;
   border: 1px solid var(--special-color); border-radius: 4px; background: #17202e;
-  box-shadow: inset 0 0 0 3px #17202e, inset 0 0 0 4px var(--special-color);
+  box-shadow: inset 0 0 0 3px #17202e, inset 0 0 0 4px var(--special-color), 0 3px 10px #0009;
+  background-image: repeating-linear-gradient(45deg, transparent 0 5px, #ffffff12 5px 6px);
 }
 .boss-special-stage {
   position:fixed; inset:0; z-index:10039; pointer-events:none;

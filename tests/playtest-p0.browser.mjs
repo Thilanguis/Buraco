@@ -37,7 +37,9 @@ import { cardFrontHTML, suitClass, deckFaceClass } from '/js/game/card-face.js';
 import { createDeck } from '/js/deck.js';
 import { createActionGate } from '/js/game/match-control.js';
 import { renderCooperativeSpecial, presentCooperativeSpecial } from '/js/boss/ui/cooperative-special-ui.js';
-import { createCooperativeSpecialPresenter, SPECIAL_PROTECTED_SELECTOR } from '/js/boss/ui/cooperative-special-presentation.js';
+import { createCooperativeSpecialPresenter, SPECIAL_PROTECTED_SELECTOR, SPECIAL_STAGE_SELECTOR } from '/js/boss/ui/cooperative-special-presentation.js';
+import { createSpecialAudioCue } from '/js/boss/ui/cooperative-special-audio.js';
+import { BOSS_SFX, playSfxClone, stopSfxClone, setSystemAudioMode } from '/js/audio.js';
 import { saveBossSpecialTransaction, sameBossRevision, bossStateRevision } from '/js/game/boss-state-transaction.js';
 import { createUndoTransaction } from '/js/game/undo-transaction.js';
 const { createBossState, distributeCastleItems, getBossPhaseProgress, canUseCastleItem, useCastleItem, getCastleItemUseStatus,
@@ -66,7 +68,7 @@ const pauseBlocksPlay=s=>!!s.pauseControl?.paused,isBossLabAutomationPaused=()=>
 const hasPendingBossChoices=s=>!!s?.boss?.pendingChoices?.length;
 const canPerformCommonGameAction=()=>!state.finished&&!isBossTurnActive(state)&&!hasPendingBossChoices(state);
 const ensureCardId=()=>{},activeMatriarchTargetPlayerIds=()=>new Set(),renderMelds=()=>{},showPendingBossChoiceMessage=()=>{};
-const audioCtx=null,playTone=()=>{},autoPlayTimeout=async()=>{timeoutCalls++;},recoverTimedOutBotTurn=async()=>{watchdogCalls++;};
+const audioCtx=new AudioContext(),playTone=()=>{},autoPlayTimeout=async()=>{timeoutCalls++;},recoverTimedOutBotTurn=async()=>{watchdogCalls++;};
 const showMessage=()=>{};
 const saveStateForUndo=()=>{undo=structuredClone(state);},newActionId=()=>String(++actionSequence),flyRectToRect=async()=>{};
 const commitState=async()=>{await window.deliverSnapshot?.(JSON.stringify(state));};
@@ -116,6 +118,8 @@ function reset(bossId='dimitrescu'){
 window.p0={reset,state:()=>state,render:renderAll,observer:i=>{myPlayerIndex=i;renderAll();},
   special:useCooperativeSpecial,specialUndo:()=>{cooperativeSpecialPresenter.cancel();state=structuredClone(localUndoStack.at(-1).state);state.lastAction={id:'test-undo',type:'undoMove'};renderAll();},
   specialCancel:()=>cooperativeSpecialPresenter.cancel(),specialReplay:()=>animateCooperativeSpecial(state.lastAction),
+  specialAudioMode:mode=>setSystemAudioMode(mode,false),specialAudioSource:bossId=>BOSS_SFX[bossId].special,
+  specialAudioContext:()=>audioCtx,
   catalog:()=>getBossDebugCatalog().flatMap(b=>getBossDefinition(b.id).abilities.flatMap(a=>a.phases.map(phase=>({bossId:b.id,abilityId:a.id,phase})))),
   sample:options=>{state=buildBossDebugScenario(null,{...options,variant:'interactive',target:'auto'}).state;engine.selectNextBossIntent(state,{debug:true});renderAll();},
   receive:s=>{const next=JSON.parse(s),event=observeCooperativeSpecialSnapshot(next);state=next;selectedHandIndexes.clear();renderAll();if(event)void animateCooperativeSpecial(event);},undo:()=>{clearCastleItemSelection();state=structuredClone(undo);renderAll();},
@@ -142,7 +146,7 @@ try{
         const start=range?Number(range[1]):0,end=range&&range[2]?Number(range[2]):bytes.length-1;
         return route.fulfill({status:range?206:200,contentType:'video/mp4',headers:{'accept-ranges':'bytes',...(range?{'content-range':`bytes ${start}-${end}/${bytes.length}`}:{})},body:bytes.subarray(start,end+1)});
       }
-      try{return route.fulfill({body:baseline&&u.pathname.endsWith('.css')?execFileSync('git',['show','HEAD:'+u.pathname.slice(1)],{cwd:root}):await readFile(resolve(root,'.'+decodeURIComponent(u.pathname))),contentType:u.pathname.endsWith('.js')?'text/javascript':u.pathname.endsWith('.css')?'text/css':'image/png'});}catch{return route.abort();}
+      try{return route.fulfill({body:baseline&&u.pathname.endsWith('.css')?execFileSync('git',['show','HEAD:'+u.pathname.slice(1)],{cwd:root}):await readFile(resolve(root,'.'+decodeURIComponent(u.pathname))),contentType:u.pathname.endsWith('.js')?'text/javascript':u.pathname.endsWith('.css')?'text/css':u.pathname.endsWith('.mp3')?'audio/mpeg':'image/png'});}catch{return route.abort();}
     });
     const a=await context.newPage(),b=await context.newPage(),errors=[];for(const page of[a,b])page.on('pageerror',e=>errors.push({message:e.message,stack:e.stack,name:e.name,string:String(e)}));
     await a.goto('http://p0.test/');await b.goto('http://p0.test/');
@@ -207,7 +211,7 @@ try{
       const before=document.querySelectorAll('*').length;
       const heapBefore=performance.memory?.usedJSHeapSize ?? null;
       for(let i=0;i<20;i++){
-        const start=performance.now(),flight=presentCooperativeSpecial({document,from:rect,to:{...rect,left:250,top:500},count:5,bossId:p0.state().boss.id,reducedMotion:false});
+        const start=performance.now(),flight=presentCooperativeSpecial({document,from:rect,to:{...rect,left:250,top:500},count:5,bossId:p0.state().boss.id,reducedMotion:false,assets:{}});
         peak=Math.max(peak,document.querySelectorAll('.boss-special-flight').length);await flight;durations.push(performance.now()-start);
       }
       await presentCooperativeSpecial({document,from:rect,to:rect,count:5,reducedMotion:true});
@@ -392,7 +396,13 @@ try{
           s.boss.grabberTargetPlayerId=0;p0.render();},length);
         assert.equal(await a.locator('#nemesisStarsOverlay').evaluate(el=>el.getBoundingClientRect().right<=el.parentElement.getBoundingClientRect().right+1),true);
         await a.locator('#nemesisStarsOverlay button').tap();assert.match(await a.locator('#bossIntentHelpText').innerText(),new RegExp('J'.repeat(length)));await a.keyboard.press('Escape');
-        assert.equal(await a.locator('.boss-combat-chips .boss-daughter-state').evaluateAll(chips=>chips.every(el=>el.getBoundingClientRect().width<=el.parentElement.getBoundingClientRect().width+1)),true);
+        // Measure normal layout, not the existing 1.06 help-button focus/hover
+        // transform retained after the preceding touch + Escape sequence.
+        await a.evaluate(()=>document.activeElement?.blur());
+        await a.mouse.move(0,0);
+        await a.waitForTimeout(140);
+        const chipWidths=await a.locator('.boss-combat-chips .boss-daughter-state').evaluateAll(chips=>chips.map(el=>({text:el.textContent,width:el.getBoundingClientRect().width,parent:el.parentElement.getBoundingClientRect().width})));
+        assert.ok(chipWidths.every(chip=>chip.width<=chip.parent+1),JSON.stringify({width,length,chipWidths}));
         await a.getByRole('button',{name:/Agarrador: ALVO:/}).tap();assert.match(await a.locator('#bossIntentHelpText').innerText(),new RegExp('J'.repeat(length)));await a.keyboard.press('Escape');
       }
       await a.screenshot({path:resolve(evidence,'nemesis-'+width+'.png'),fullPage:true});

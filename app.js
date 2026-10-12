@@ -14,6 +14,7 @@ import {
   setSystemAudioMode,
   clampMediaVolume,
   playSfxClone,
+  stopSfxClone,
   sfxCardMove,
   sfxHeartbeat,
   sfxMyTurn,
@@ -30,7 +31,9 @@ import { buildMatchSummary, prepareHistoryWrites } from './js/match-history.js';
 import { createDeck, dealInitialDeck } from './js/deck.js';
 import { saveBossSpecialTransaction, sameBossRevision, bossStateRevision } from './js/game/boss-state-transaction.js';
 import { renderCooperativeSpecial } from './js/boss/ui/cooperative-special-ui.js';
-import { createCooperativeSpecialPresenter, SPECIAL_PROTECTED_SELECTOR } from './js/boss/ui/cooperative-special-presentation.js';
+import { createCooperativeSpecialPresenter, SPECIAL_PROTECTED_SELECTOR, SPECIAL_STAGE_SELECTOR } from './js/boss/ui/cooperative-special-presentation.js';
+import { createSpecialAudioCue } from './js/boss/ui/cooperative-special-audio.js';
+import { getAudioBalance } from './js/audio-balance.js';
 import { TABLE_THEME_IDS, normalizeDeckTheme, normalizeTableTheme } from './js/themes.js';
 import {
   BOSS_MODE_DOMINATRIX,
@@ -597,7 +600,7 @@ const renderedBossMeldContributions = new Map();
 const bossSwapReceivedHighlights = new Map();
 
 function isBossLabAutomationPaused(gameState = state) {
-  return gameState?.debugScenario?.active === true && gameState.debugScenario.pauseAutomation === true;
+  return gameState?.debugPaused === true || (gameState?.debugScenario?.active === true && gameState.debugScenario.pauseAutomation === true);
 }
 
 function bossEventAddsResource(boss, event) {
@@ -792,7 +795,7 @@ function cancelGameAnimations() {
   const gameSection = document.getElementById('gameSection');
   (document.getAnimations?.() || []).forEach((animation) => {
     const target = animation.effect?.target;
-    if (target && (gameSection?.contains(target) || target.classList?.contains('dice-scene'))) animation.cancel();
+    if (target && (gameSection?.contains(target) || target.matches?.('.fly-card, .impact-ring, .spark, .dice-scene, .boss-floating-number, .domination-decree-lock-flight'))) animation.cancel();
   });
   document.querySelectorAll('.fly-card, .impact-ring, .spark, .dice-scene, .boss-floating-number, .domination-decree-lock-flight, .domination-decree-lock-frame').forEach((element) => element.remove());
   dominationDecreeLockAnimating = false;
@@ -845,7 +848,7 @@ function activateGameSession() {
 }
 
 function isGameSessionActive(sessionId, signal) {
-  return !signal?.aborted && !window.isClosingGame && !localExitPending && !!state && !pauseBlocksPlay(state) && window.gameSessionId === sessionId && document.getElementById('gameSection')?.style.display === 'flex';
+  return !signal?.aborted && !window.isClosingGame && !localExitPending && !!state && !state.debugPaused && !pauseBlocksPlay(state) && window.gameSessionId === sessionId && document.getElementById('gameSection')?.style.display === 'flex';
 }
 
 function isCurrentBossMode() {
@@ -1354,6 +1357,8 @@ function toggleTableAmbientMusic() {
 
 function getSafeAmbientVolume(theme) {
   const cfg = TABLE_AMBIENT_MUSIC[normalizeTableTheme(theme)] || TABLE_AMBIENT_MUSIC.feltro;
+  const calibrated = getAudioBalance(tableAmbientAudio?.src || cfg.src);
+  if (calibrated) return Math.min(1, calibrated.gain);
   const requested = tableAmbientAudio?.dataset.intro === 'true' ? 0.35 : Number(cfg.volume) || 0.1;
   // Mantém a música sempre bem abaixo dos efeitos mais baixos da mesa.
   return Math.min(requested, TABLE_AMBIENT_MAX_VOLUME, sfxCardMove.volume * 0.7);
@@ -1402,7 +1407,8 @@ function fadeTableAmbientTo(targetVolume, duration = 850, onDone = null) {
   const audio = tableAmbientAudio;
   const fadeId = ++tableAmbientFadeId;
   const startVolume = clampMediaVolume(audio.volume);
-  const safeTarget = clampMediaVolume(Math.min(targetVolume, TABLE_AMBIENT_MAX_VOLUME));
+  const calibratedCeiling = getAudioBalance(audio.src)?.gain ?? TABLE_AMBIENT_MAX_VOLUME;
+  const safeTarget = clampMediaVolume(Math.min(targetVolume, calibratedCeiling));
   const startedAt = performance.now();
 
   function step(now) {
@@ -1552,7 +1558,7 @@ function syncHeartbeatAudio(active) {
 
 ALL_CANASTRA_SFX.forEach((a) => {
   a.preload = 'auto';
-  if (Object.values(CANASTRA_SFX).includes(a)) a.volume = 0.9;
+  if (!getAudioBalance(a.src) && Object.values(CANASTRA_SFX).includes(a)) a.volume = 0.9;
 });
 
 function unlockAudio() {
@@ -1565,7 +1571,8 @@ function unlockAudio() {
   } catch (e) {}
 
   // Injeta o novo som de coração na lista global para garantir que o navegador libere o autoplay
-  const bossAudios = Object.values(BOSS_SFX).flatMap((sounds) => Object.values(sounds));
+  // Special speech plays only on a confirmed cue, never on the first page click.
+  const bossAudios = Object.values(BOSS_SFX).flatMap((sounds) => Object.entries(sounds).filter(([name]) => name !== 'special').map(([, sound]) => sound));
   const allAudios = [...ALL_CANASTRA_SFX, ...Object.values(DECK_MOVE_SFX), ...bossAudios, sfxCardMove, sfxMyTurn, sfxSearch, sfxSteal, sfxHeartbeat];
   for (const a of allAudios) {
     try {
@@ -1924,7 +1931,9 @@ function newActionId() {
 function packCard(c) {
   if (!c) return null;
   ensureCardId(c);
-  return { id: c.id, rank: c.rank, suit: c.suit, joker: !!c.joker, back: c.back || 'red' };
+  const packed = { id: c.id, rank: c.rank, suit: c.suit, joker: !!c.joker, back: c.back || 'red' };
+  if (ITEM_DEFINITIONS[c.castleItem?.type]) packed.castleItem = { type: c.castleItem.type, consumed: !!c.castleItem.consumed };
+  return packed;
 }
 
 function ensureCardId(card) {
@@ -2057,7 +2066,8 @@ function makeFlyEl(card, face = 'front') {
     el.classList.add('back');
     el.classList.add(card.back === 'blue' ? 'back-blue' : 'back-red');
   }
-  el.innerHTML = cardFrontHTML(card);
+  // A hidden flight must not expose the item's emblem or the card's face.
+  if (face !== 'back') el.innerHTML = cardFrontHTML(card);
   document.body.appendChild(el);
   return el;
 }
@@ -2070,6 +2080,7 @@ function setBox(el, rect) {
 }
 
 async function flyRectToRect(card, fromRect, toRect, face = 'front', silent = false) {
+  const gameplayEpoch = window.devToolsGameplayEpoch || 0;
   if (!silent && !card?._silentAsAsBonus) playCardMove();
   const fly = makeFlyEl(card, face);
 
@@ -2103,6 +2114,7 @@ async function flyRectToRect(card, fromRect, toRect, face = 'front', silent = fa
   );
   try {
     await anim.finished;
+    if (gameplayEpoch !== (window.devToolsGameplayEpoch || 0)) throw Object.assign(new Error('Animação interrompida pelo DevTools.'), { name: 'AbortError' });
   } finally {
     fly.remove();
   }
@@ -2580,7 +2592,7 @@ function renderDominationTools() {
   if (control) control.hidden = state.mode !== '1x1_dominacao';
   const select = document.getElementById('debugMeldActor');
   if (select) {
-    const options = [['current', 'Jogador do turno'], ...state.players.map((p) => [`player:${p.id}`, p.name])];
+    const options = [['local', 'Minha mão'], ['current', 'Jogador do turno'], ...state.players.map((p) => [`player:${p.id}`, p.name])];
     if (state.mode === '1x1_dominacao')
       for (const [i, seat] of ['left', 'right'].entries()) {
         const friend = activeDominationFriends(state).find((f) => f.seat === seat);
@@ -2755,7 +2767,7 @@ async function waitForDominationDecreeReaction(botIndex) {
 }
 
 async function performDominationDevOperation(operation) {
-  if (!isDebugMode || state?.mode !== '1x1_dominacao' || state.finished || friendOperationPending || committing || isDominationFriendBusy(state) || document.querySelector('.fly-card')) return;
+  if (!isDebugMode || !window.devToolsMutationActive || state?.mode !== '1x1_dominacao' || state.finished) return;
   const session = window.gameSessionId;
   const id = newActionId();
   friendOperationPending = true;
@@ -2764,7 +2776,6 @@ async function performDominationDevOperation(operation) {
   try {
     const saved = await saveFriendOperation(
       (latest) => {
-        if (isDominationFriendBusy(latest)) return null;
         const result = operation(latest);
         if (!result) return null;
         latest.historyTest = true;
@@ -2775,11 +2786,8 @@ async function performDominationDevOperation(operation) {
     );
     if (!saved || session !== window.gameSessionId || window.isClosingGame) return;
     localUndoStack = [];
-    try {
-      await playRemoteAction(saved.state.lastAction);
-    } finally {
-      if (session === window.gameSessionId && !window.isClosingGame && (state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
-    }
+    if ((state.friendRevision || 0) <= saved.state.friendRevision) state = saved.state;
+    void playRemoteAction(saved.state.lastAction).catch(() => {});
     showMessage('🔧 Cenário atualizado. Os bônus seguem as opções Plus da partida.');
   } catch (error) {
     console.error('Dev amigas:', error);
@@ -2808,16 +2816,18 @@ function friendHostIndex(gameState) {
 async function saveFriendOperation(operation, { allowDebugPause = false } = {}) {
   const gameIdentity = state?.friendGameId;
   const sessionId = window.gameSessionId;
+  const gameplayEpoch = window.devToolsGameplayEpoch || 0;
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(gameRef);
-    if (sessionId !== window.gameSessionId || window.isClosingGame) return null;
+    if (sessionId !== window.gameSessionId || gameplayEpoch !== (window.devToolsGameplayEpoch || 0) || window.isClosingGame) return null;
     if (!snapshot.exists() || !snapshot.data().stateJson) return null;
     const latest = normalizeDominationFriends(JSON.parse(snapshot.data().stateJson));
-    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity || latest.finished || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.debugPaused && !(allowDebugPause && isDebugMode))) return null;
+    if (latest.mode !== '1x1_dominacao' || latest.friendGameId !== gameIdentity || latest.finished || latest.surrender?.active || (pauseBlocksPlay(latest) && !(allowDebugPause && isDebugMode && window.devToolsMutationActive)) || (latest.debugPaused && !(allowDebugPause && isDebugMode))) return null;
     const result = operation(latest);
     if (!result) return null;
     latest.friendRevision = (latest.friendRevision || 0) + 1;
     const saveHistory = latest.finished ? await prepareMatchHistory(transaction, latest) : () => {};
+    if (gameplayEpoch !== (window.devToolsGameplayEpoch || 0) || sessionId !== window.gameSessionId || window.isClosingGame) return null;
     transaction.update(gameRef, { stateJson: JSON.stringify(latest), updatedAt: Date.now() });
     saveHistory();
     return { state: latest, result };
@@ -3063,6 +3073,9 @@ function scheduleDominationFriend() {
 
 async function commitState() {
   if (!state || window.isClosingGame) return;
+  const commitEpoch = window.devToolsGameplayEpoch || 0;
+  const commitSession = window.gameSessionId;
+  const currentCommit = () => commitEpoch === (window.devToolsGameplayEpoch || 0) && commitSession === window.gameSessionId && !window.isClosingGame;
   if (state.finished && !state.matchFinishedAt) state.matchFinishedAt = Date.now();
 
   // Gatilho Universal de Reciclagem (Travado se o jogo já acabou)
@@ -3070,6 +3083,7 @@ async function commitState() {
     const hasDead = state.deadPiles && state.deadPiles.some((p) => p && p.length > 0);
     if (hasDead) {
       await recycleDeadToStockIfPossible();
+      if (!currentCommit()) return;
     }
   }
 
@@ -3085,6 +3099,7 @@ async function commitState() {
   committing = true;
   try {
     while (pendingCommit) {
+      if (!currentCommit()) return;
       if (!state || window.isClosingGame) {
         pendingCommit = false;
         break;
@@ -3097,16 +3112,19 @@ async function commitState() {
         const sessionId = window.gameSessionId;
         const saved = await runTransaction(db, async (transaction) => {
           const snapshot = await transaction.get(gameRef);
+          if (!currentCommit()) return null;
           if (!snapshot.exists() || !snapshot.data().stateJson) return null;
           const latest = JSON.parse(snapshot.data().stateJson);
           if (latest.mode !== proposal.mode || latest.friendGameId !== proposal.friendGameId) return null;
-          if ((latest.friendRevision || 0) !== expectedRevision || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return { accepted: false, state: latest };
+          if ((latest.friendRevision || 0) !== expectedRevision || latest.surrender?.active || ((pauseBlocksPlay(latest) || latest.debugPaused) && !(isDebugMode && window.devToolsMutationActive)) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return { accepted: false, state: latest };
           proposal.friendRevision = (latest.friendRevision || 0) + 1;
           const saveHistory = proposal.finished ? await prepareMatchHistory(transaction, proposal) : () => {};
+          if (!currentCommit()) return null;
           transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
           saveHistory();
           return { accepted: true, state: proposal };
         });
+        if (!currentCommit()) return;
         if (!saved?.accepted) {
           pendingCommit = false;
           localUndoStack = [];
@@ -3125,18 +3143,21 @@ async function commitState() {
         const expectedBossRevision = bossStateRevision(proposal);
         const saved = await runTransaction(db, async (transaction) => {
           const snapshot = await transaction.get(gameRef);
+          if (!currentCommit()) return null;
           if (!snapshot.exists() || !snapshot.data().stateJson) return null;
           const latest = JSON.parse(snapshot.data().stateJson);
-          if (latest.matchStartedAt !== proposal.matchStartedAt || latest.surrender?.active || pauseBlocksPlay(latest) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return latest;
+          if (latest.matchStartedAt !== proposal.matchStartedAt || latest.surrender?.active || ((pauseBlocksPlay(latest) || latest.debugPaused) && !(isDebugMode && window.devToolsMutationActive)) || (latest.pauseControlRevision || 0) !== (proposal.pauseControlRevision || 0)) return latest;
           if (isBossMode(proposal)) {
             if (!sameBossRevision(latest, { ...proposal, bossStateRevision: expectedBossRevision })) return latest;
             proposal.bossStateRevision = bossStateRevision(latest) + 1;
           }
           const saveHistory = proposal.finished ? await prepareMatchHistory(transaction, proposal) : () => {};
+          if (!currentCommit()) return null;
           transaction.update(gameRef, { stateJson: JSON.stringify(proposal), updatedAt: Date.now() });
           saveHistory();
           return null;
         });
+        if (!currentCommit()) return;
         if (!saved && isBossMode(proposal) && state === localState) state.bossStateRevision = proposal.bossStateRevision;
         if (saved) {
           state = saved;
@@ -3147,10 +3168,11 @@ async function commitState() {
       }
     }
   } catch (err) {
+    if (!currentCommit()) return;
     console.error('commitState failed:', err);
     if (state?.finished) showMessage('Não foi possível salvar o resultado. Confira a conexão antes de sair ou pedir revanche.');
   } finally {
-    committing = false;
+    if (currentCommit()) committing = false;
   }
 }
 
@@ -3210,10 +3232,14 @@ function animateCooperativeSpecial(action) {
       ? document.getElementById('handContainer') : null;
     return { from: origin ? getRect(origin) : null, to: hand ? getRect(hand) : opponentAnchorRect(action.recipientId),
       viewport: { width: innerWidth, height: innerHeight },
+      characterObstacles: [...document.querySelectorAll(SPECIAL_STAGE_SELECTOR)].map(el => getRect(el)),
       obstacles: [...document.querySelectorAll(SPECIAL_PROTECTED_SELECTOR)]
         .map(el => getRect(el)) };
   };
   return cooperativeSpecialPresenter.playConfirmed(state, action, { document, getGeometry,
+    onCue: createSpecialAudioCue({ bossId: state?.boss?.id, getSource: id => BOSS_SFX[id]?.special,
+      play: (source, options) => playSfxClone(source, { ...options, audioContext: audioCtx }), stop: stopSfxClone,
+      isCurrent: () => sessionId === window.gameSessionId && !window.isClosingGame && state?.matchStartedAt === startedAt && state?.boss?.cooperativeSpecial?.resolvedActionIds?.includes(action.id) }),
     reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
     isCurrent: () => sessionId === window.gameSessionId && !window.isClosingGame && state?.matchStartedAt === startedAt &&
       state?.boss?.cooperativeSpecial?.resolvedActionIds?.includes(action.id) });
@@ -3225,8 +3251,9 @@ function observeCooperativeSpecialSnapshot(next) {
   });
 }
 
-function passTurn({ preserveUndo = false } = {}) {
-  if (!canPerformCommonGameAction(state)) {
+function passTurn({ preserveUndo = false, debugExecution = false } = {}) {
+  const manualLabBot = debugExecution && isDebugMode && window.devToolsMutationActive && !state?.surrender?.active && !hasPendingBossChoices(state) && !isBossTurnActive(state);
+  if (!manualLabBot && !canPerformCommonGameAction(state)) {
     if (hasPendingBossChoices(state)) showPendingBossChoiceMessage();
     return false;
   }
@@ -3620,6 +3647,7 @@ function shuffle(array) {
 
 async function recycleDeadToStockIfPossible() {
   if (!state || state.stock.length > 0) return null;
+  const gameplayEpoch = window.devToolsGameplayEpoch || 0;
   if (!state.deadPiles || !state.deadPiles.length) return null;
 
   const idx = state.deadPiles.findIndex((pile) => pile && pile.length);
@@ -3635,7 +3663,8 @@ async function recycleDeadToStockIfPossible() {
   if (pi) pi.style.pointerEvents = 'none';
   if (bm) bm.style.pointerEvents = 'none';
 
-  await new Promise((r) => setTimeout(r, 2000));
+  if (!window.devToolsMutationActive) await new Promise((r) => setTimeout(r, 2000));
+  if (gameplayEpoch !== (window.devToolsGameplayEpoch || 0)) throw Object.assign(new Error('Reciclagem interrompida pelo DevTools.'), { name: 'AbortError' });
 
   const collected = state.deadPiles[idx];
   state.deadPiles[idx] = [];
@@ -3645,7 +3674,7 @@ async function recycleDeadToStockIfPossible() {
   // Animação do Morto subindo
   const fromEl = document.getElementById(idx === 0 ? 'mortoSlot0' : 'mortoSlot1');
   const toEl = document.querySelector('#drawStockBtn .pile-card');
-  if (fromEl && toEl) {
+  if (fromEl && toEl && !window.devToolsMutationActive) {
     const fakeCard = { rank: '★', suit: '★', joker: true, id: `recycle_${Date.now()}`, back: 'red' };
     fromEl.style.opacity = '0'; // Esconde a pilha original na hora do voo
     await flyRectToRect(fakeCard, getRect(fromEl), getRect(toEl), 'back');
@@ -3948,6 +3977,7 @@ function showPendingBossChoiceMessage(playerId = myPlayerIndex) {
 }
 function canPerformCommonGameAction(gameState = state) {
   return (
+    !gameState?.debugPaused &&
     !pauseBlocksPlay(gameState) &&
     !gameState?.surrender?.active &&
     !discardPickupAnimating &&
@@ -6388,7 +6418,7 @@ function bossFlowHostIndex() {
 function scheduleBossTurnAdvance() {
   const flow = state?.boss?.bossFlow;
   const heldDebugResult = state?.debugScenario?.active && state.debugScenario.heldResultActionId;
-  const active = !heldDebugResult && !pauseBlocksPlay(state) && isCurrentBossMode() && isBossTurnActive(state) && flow && !hasPendingBossChoices(state);
+  const active = !heldDebugResult && !state?.debugPaused && !pauseBlocksPlay(state) && isCurrentBossMode() && isBossTurnActive(state) && flow && !hasPendingBossChoices(state);
   const isHost = active && myPlayerIndex === bossFlowHostIndex();
   const key = active ? `${flow.id}:${flow.stage}:${flow.endsAt}` : '';
   if (!isHost) {
@@ -9169,7 +9199,9 @@ function renderAll() {
     document.getElementById('gameSection').appendChild(pauseWatermark);
   }
 
-  if (state.debugPaused) {
+  // A short DEV transaction lock is not the user's "Congelar Jogo" choice.
+  // Do not flash the paused overlay/button while applying a tool.
+  if (state.debugPaused && !state.debugMutationFreezeId) {
     if (boardEl) {
       boardEl.style.pointerEvents = 'none'; // Impede qualquer clique na mesa
       boardEl.style.filter = 'grayscale(0.7) brightness(0.5)'; // Deixa a mesa com aspecto "pausado"
@@ -11911,7 +11943,7 @@ const botEngine = {
 
   async executeDiscard(botIndex, cardIndex) {
     const s = this.getState();
-    if (!s || s.finished || s.currentPlayer !== botIndex || !s.hasDrawnThisTurn || !canPerformCommonGameAction(s)) return false;
+    if (!s || s.finished || s.currentPlayer !== botIndex || !s.hasDrawnThisTurn || (!(this.canRunDuringDebugPause?.() && !hasPendingBossChoices(s) && !isBossTurnActive(s)) && !canPerformCommonGameAction(s))) return false;
     const me = s.players[botIndex];
     if (!me?.hand?.[cardIndex]) return false;
     if (isBossCardBlocked(s, me.id, me.hand[cardIndex]?.id, 'discard')) {
@@ -11939,7 +11971,7 @@ const botEngine = {
       await finishGame(null);
       return true;
     }
-    passTurn({ preserveUndo: true });
+    passTurn({ preserveUndo: true, debugExecution: this.canRunDuringDebugPause?.() === true });
 
     const freshS = this.getState();
     if (freshS) {
@@ -11966,11 +11998,16 @@ const botEngine = {
   },
 };
 
-function createBotEngineForSession(sessionId, signal, { delayScale = 1, bossLabOutcome = null } = {}) {
+function createBotEngineForSession(sessionId, signal, { delayScale = 1, bossLabOutcome = null, debugExecution = false } = {}) {
   const engine = Object.create(botEngine);
+  const gameplayEpoch = window.devToolsGameplayEpoch || 0;
   engine.botDelayScale = delayScale;
-  engine.isActive = () => isGameSessionActive(sessionId, signal);
+  engine.isActive = () => gameplayEpoch === (window.devToolsGameplayEpoch || 0) && (
+    debugExecution && isDebugMode && window.devToolsMutationActive
+      ? !signal?.aborted && !window.isClosingGame && !!state && sessionId === window.gameSessionId
+      : isGameSessionActive(sessionId, signal));
   engine.getState = () => (engine.isActive() ? state : null);
+  engine.canRunDuringDebugPause = () => debugExecution && isDebugMode && window.devToolsMutationActive && engine.isActive();
   engine.commitState = async () => {
     if (!engine.isActive()) {
       const error = new Error('Commit do bot cancelado para uma sessao antiga.');
@@ -12106,6 +12143,7 @@ window.isFirstLobbyLoad = true;
 let gameSnapshotSequence = 0;
 onSnapshot(gameRef, async (snap) => {
   const snapshotSequence = ++gameSnapshotSequence;
+  let snapshotGameplayEpoch = window.devToolsGameplayEpoch || 0;
   if (!snap.exists()) {
     document.getElementById('pauseVoteOverlay')?.remove();
     resultPresented = false;
@@ -12391,8 +12429,18 @@ onSnapshot(gameRef, async (snap) => {
 
   if (!data.stateJson) return;
 
+  // A remote DEV freeze has priority over an unfinished local gesture too.
+  // Discard stale revisions before cancelling; never interrupt our own DEV save.
+  const prioritySnapshot = JSON.parse(data.stateJson);
+  const samePriorityMatch = state?.matchStartedAt === (prioritySnapshot.matchStartedAt || data.createdAt?.toMillis?.() || Number(data.createdAt) || null);
+  const currentPriorityRevision = !isBossMode(prioritySnapshot) || bossStateRevision(prioritySnapshot) >= bossStateRevision(state);
+  const currentPriorityFriend = prioritySnapshot.mode !== '1x1_dominacao' || prioritySnapshot.friendGameId !== state?.friendGameId || (prioritySnapshot.friendRevision || 0) >= (state?.friendRevision || 0);
+  if (samePriorityMatch && currentPriorityRevision && currentPriorityFriend && prioritySnapshot.debugPaused && !state?.debugPaused && !window.devToolsMutationActive) {
+    interruptDevToolsGameplay();
+    snapshotGameplayEpoch = window.devToolsGameplayEpoch;
+  }
   if (localActionGate.pending) await localActionGate.pending;
-  if (snapshotSequence !== gameSnapshotSequence) return;
+  if (snapshotSequence !== gameSnapshotSequence || snapshotGameplayEpoch !== (window.devToolsGameplayEpoch || 0)) return;
 
   const newState = normalizeDominationFriends(JSON.parse(data.stateJson));
   newState.matchStartedAt ||= data.createdAt?.toMillis?.() || Number(data.createdAt) || null;
@@ -12405,9 +12453,8 @@ onSnapshot(gameRef, async (snap) => {
   delete newState.pendingWildcardChoice;
   newState.variant = normalizeVariantForMode(newState.mode, newState.variant);
   const specialPresentationAction = observeCooperativeSpecialSnapshot(newState);
-  const wasPaused = pauseBlocksPlay(state);
-  if (pauseBlocksPlay(newState)) {
-    state = newState;
+  const wasPaused = pauseBlocksPlay(state) || state?.debugPaused;
+  if (pauseBlocksPlay(newState) || newState.debugPaused) {
     if (!wasPaused) {
       botTurnController.abort();
       botTurnController = new AbortController();
@@ -12416,8 +12463,13 @@ onSnapshot(gameRef, async (snap) => {
     window.lastBotTurnPlayed = null;
     if (window.botPlayTimeoutId) clearTimeout(window.botPlayTimeoutId);
     window.botPlayTimeoutId = null;
-    renderAll();
-    return;
+    if (pauseBlocksPlay(newState)) {
+      state = newState;
+      renderAll();
+      return;
+    }
+    // Debug freezes automation, not snapshot adoption or cosmetic feedback from
+    // tools. Keep the normal previous/next-state rendering path below.
   }
   if (wasPaused) window.lastBotTurnPlayed = null;
   if (newState.surrender?.active) {
@@ -12466,7 +12518,7 @@ onSnapshot(gameRef, async (snap) => {
 
   // 2. Após o término do voo, atualiza a memória com o novo estado e renderiza limpando o DOM de forma síncrona
   if (isBossMode(newState) && state?.matchStartedAt === newState.matchStartedAt && bossStateRevision(newState) < bossStateRevision(state)) return;
-  if (snapshotSequence !== gameSnapshotSequence) return;
+  if (snapshotSequence !== gameSnapshotSequence || snapshotGameplayEpoch !== (window.devToolsGameplayEpoch || 0)) return;
   if (snapshotSessionId !== window.gameSessionId || window.isClosingGame) return;
   if (newState.mode === '1x1_dominacao' && state?.friendGameId === newState.friendGameId && (newState.friendRevision || 0) < (state?.friendRevision || 0)) return;
   const previousFriends = activeDominationFriends(state);
@@ -13222,6 +13274,9 @@ if (isDebugMode) {
     exitDevTools.addEventListener('click', leaveDevTools);
     document.body.append(exitDevTools);
   }
+  // Escape game-section stacking/animation contexts and paused board ancestors.
+  const panel = document.getElementById('debugPanel');
+  if (panel) document.body.append(panel);
   window.toggleDebugPanel(true);
   // 🔥 Exibe o painel de atalhos rápidos do menu principal
   const menuPanel = document.getElementById('menuDebugPanel');
@@ -13562,7 +13617,12 @@ if (isDebugMode) {
     selectedHandIndexes.clear();
     selectedMeldTarget = null;
     movingWild = null;
+    const debugPaused = state?.debugPaused;
+    const debugFreeze = state?.debugMutationFreezeId;
     state = prepared.state;
+    state.debugPaused = !!debugPaused;
+    if (debugFreeze) state.debugMutationFreezeId = debugFreeze;
+    else delete state.debugMutationFreezeId;
     state.debugScenario.pauseAutomation = true;
     renderedBossFeedbackCount = null;
     renderedBossFeedbackEventIds = null;
@@ -13678,7 +13738,7 @@ if (isDebugMode) {
       const preparedResult = module.applyBossDebugBotOutcome(state, outcome, botPlayer.id);
       const sessionId = window.gameSessionId;
       const signal = botTurnController.signal;
-      const sessionEngine = createBotEngineForSession(sessionId, signal, { delayScale: 0.12, bossLabOutcome: outcome });
+      const sessionEngine = createBotEngineForSession(sessionId, signal, { delayScale: 0.001, bossLabOutcome: outcome, debugExecution: true });
 
       let resolvedChoice = false;
       while (state.boss?.pendingChoices?.some((choice) => choice.playerId === botPlayer.id)) {
@@ -13713,6 +13773,7 @@ if (isDebugMode) {
       const turnBefore = state.turnNumber || 0;
       const completedBotTurnsBefore = (state.boss?.eventLog || []).filter((event) => event.type === 'playerTurn' && event.playerId === botPlayer.id).length;
       await BossBuracoBot.playTurn(state, botIndex, sessionEngine, { signal, sessionId });
+      if (signal.aborted || sessionId !== window.gameSessionId) throw Object.assign(new Error('Teste do BOT interrompido pelo DevTools.'), { name: 'AbortError' });
       const completedBotTurnsAfter = (state.boss?.eventLog || []).filter((event) => event.type === 'playerTurn' && event.playerId === botPlayer.id).length;
       const turnFinished = state.finished || (state.turnNumber || 0) > turnBefore || state.currentPlayer !== botIndex || completedBotTurnsAfter > completedBotTurnsBefore;
       if (!turnFinished && !resolvedChoice) {
@@ -13751,6 +13812,27 @@ if (isDebugMode) {
     }
   }
 
+  async function undoBossLabScenario() {
+    const transaction = localUndoStack.at(-1);
+    if (!transaction || transaction.state?.matchStartedAt !== state?.matchStartedAt) {
+      setBossLabError('Não há uma alteração deste cenário para desfazer.'); return;
+    }
+    const restored = restoreUndoTransaction(transaction);
+    restored.state.bossStateRevision = bossStateRevision(state);
+    restored.state.friendRevision = state.friendRevision;
+    restored.state.debugPaused = state.debugPaused;
+    if (state.debugMutationFreezeId) restored.state.debugMutationFreezeId = state.debugMutationFreezeId;
+    else delete restored.state.debugMutationFreezeId;
+    restored.state.historyTest = true;
+    localUndoStack.pop();
+    state = restored.state;
+    state.lastAction = { id: newActionId(), type: 'undoMove', playerId: myPlayerIndex, ts: Date.now() };
+    restoreUndoUiState(restored.ui);
+    renderedBossFeedbackEventIds = null;
+    renderAll(); await commitState();
+    await refreshBossLabObserved(); await refreshBossLabResourceControls();
+  }
+
   async function sweepBossLab() {
     const module = await loadBossDebugLabModule();
     const report = module.runBossDebugSweep();
@@ -13759,7 +13841,9 @@ if (isDebugMode) {
       return `${boss.name}: ${entries.filter((entry) => entry.ok).length}/${entries.length}`;
     });
     const failures = report.failed.map((entry) => `${entry.abilityId}: ${entry.reason}`);
-    bossLabElement('debugBossLabObserved').textContent = ['VARREDURA DE CENARIOS', ...byBoss, '', failures.length ? failures.join('\n') : `OK - ${report.passed}/${report.total} habilidades preparadas`].join('\n');
+    const observed = bossLabElement('debugBossLabObserved');
+    if (observed) observed.textContent = ['VARREDURA DE CENARIOS', ...byBoss, '', failures.length ? failures.join('\n') : `OK - ${report.passed}/${report.total} habilidades preparadas`].join('\n');
+    showMessage(`Laboratório: ${report.passed}/${report.total} cenários verificados.`);
   }
 
   async function initBossDebugLab() {
@@ -13774,27 +13858,23 @@ if (isDebugMode) {
     bossLabElement('debugBossLabBoss')?.addEventListener('change', syncBossLabBossControls);
     bossLabElement('debugBossLabAbility')?.addEventListener('change', () => syncBossLabAbilityControls({ preservePhase: false }));
     bossLabElement('debugBossLabPhase')?.addEventListener('change', validateBossLabSelection);
-    bossLabElement('debugBossLabPrepare')?.addEventListener('click', () => prepareBossLab());
-    document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => button.addEventListener('click', () => executeBossLabVariant(button.dataset.bossLabVariant)));
-    bossLabElement('debugBossLabBotSuccess')?.addEventListener('click', () => executeBossLabBotAction('success').catch((error) => setBossLabError(error.message || String(error))));
-    bossLabElement('debugBossLabBotFailure')?.addEventListener('click', () => executeBossLabBotAction('failure').catch((error) => setBossLabError(error.message || String(error))));
-    bossLabElement('debugBossLabResourceMinus')?.addEventListener('click', () => adjustBossLabResource('decrease'));
-    bossLabElement('debugBossLabResourcePlus')?.addEventListener('click', () => adjustBossLabResource('increase'));
-    bossLabElement('debugBossLabResourceNear')?.addEventListener('click', () => adjustBossLabResource('near'));
-    bossLabElement('debugBossLabResourceZero')?.addEventListener('click', () => adjustBossLabResource('zero'));
+    bossLabElement('debugBossLabPrepare')?.addEventListener('click', () => queueDevToolsMutation(prepareBossLab, [], { replaceMatch: true }));
+    document.querySelectorAll('[data-boss-lab-variant]').forEach((button) => button.addEventListener('click', () => queueDevToolsMutation(executeBossLabVariant, [button.dataset.bossLabVariant])));
+    bossLabElement('debugBossLabBotSuccess')?.addEventListener('click', () => queueDevToolsMutation(executeBossLabBotAction, ['success']));
+    bossLabElement('debugBossLabBotFailure')?.addEventListener('click', () => queueDevToolsMutation(executeBossLabBotAction, ['failure']));
+    bossLabElement('debugBossLabResourceMinus')?.addEventListener('click', () => queueDevToolsMutation(adjustBossLabResource, ['decrease']));
+    bossLabElement('debugBossLabResourcePlus')?.addEventListener('click', () => queueDevToolsMutation(adjustBossLabResource, ['increase']));
+    bossLabElement('debugBossLabResourceNear')?.addEventListener('click', () => queueDevToolsMutation(adjustBossLabResource, ['near']));
+    bossLabElement('debugBossLabResourceZero')?.addEventListener('click', () => queueDevToolsMutation(adjustBossLabResource, ['zero']));
     bossLabElement('debugBossLabResourceTarget')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
     bossLabElement('debugBossLabCombatEntity')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
-    bossLabElement('debugBossLabCombatApply')?.addEventListener('click', () => localActionGate.run(applyBossLabCombatEntity));
+    bossLabElement('debugBossLabCombatApply')?.addEventListener('click', () => queueDevToolsMutation(applyBossLabCombatEntity));
     bossLabElement('debugBossLabZombiePlayer')?.addEventListener('change', () => refreshBossLabResourceControls().catch(console.error));
-    bossLabElement('debugBossLabZombiePassive')?.addEventListener('click', () => localActionGate.run(() => triggerBossLabZombie('passive')));
-    bossLabElement('debugBossLabZombieObjective')?.addEventListener('click', () => localActionGate.run(() => triggerBossLabZombie('objective')));
-    bossLabElement('debugBossLabDaughterPrepare')?.addEventListener('click', () => localActionGate.run(() => triggerBossLabZombie('prepare')));
-    bossLabElement('debugBossLabUndo')?.addEventListener('click', async () => {
-      await window.executeUndo();
-      await refreshBossLabObserved();
-      await refreshBossLabResourceControls();
-    });
-    bossLabElement('debugBossLabReset')?.addEventListener('click', resetBossLabScenario);
+    bossLabElement('debugBossLabZombiePassive')?.addEventListener('click', () => queueDevToolsMutation(triggerBossLabZombie, ['passive']));
+    bossLabElement('debugBossLabZombieObjective')?.addEventListener('click', () => queueDevToolsMutation(triggerBossLabZombie, ['objective']));
+    bossLabElement('debugBossLabDaughterPrepare')?.addEventListener('click', () => queueDevToolsMutation(triggerBossLabZombie, ['prepare']));
+    bossLabElement('debugBossLabUndo')?.addEventListener('click', () => queueDevToolsMutation(undoBossLabScenario, [], { allowFinished: true }));
+    bossLabElement('debugBossLabReset')?.addEventListener('click', () => queueDevToolsMutation(resetBossLabScenario, [], { allowFinished: true }));
     bossLabElement('debugBossLabSweep')?.addEventListener('click', sweepBossLab);
     bossLabElement('debugBossLab')?.addEventListener('toggle', () => {
       if (bossLabElement('debugBossLab')?.open) {
@@ -13810,9 +13890,21 @@ if (isDebugMode) {
   initBossDebugLab().catch((error) => setBossLabError(`Falha ao carregar laboratorio: ${error.message}`));
 }
 
+function ensureDevToolsAction({ allowFinished = false } = {}) {
+  return !!(isDebugMode && state && (allowFinished || !state.finished) && !window.isClosingGame && !state.surrender?.active);
+}
+
+function debugTargetPlayer() {
+  const target = document.getElementById('debugMeldActor')?.value || 'local';
+  if (target.startsWith('friend:')) return null;
+  if (target.startsWith('player:')) return state.players.find(p => p.id === Number(target.slice(7)));
+  return state.players[target === 'current' ? state.currentPlayer : myPlayerIndex] || currentPlayer();
+}
+
 window.debugDraw5 = async () => {
-  if (!ensureMyTurn()) return;
-  const me = currentPlayer();
+  if (!ensureDevToolsAction()) return;
+  const me = debugTargetPlayer();
+  if (!me) { showMessage('Escolha uma mão de jogador para comprar cartas.'); return; }
   const limit = Math.min(5, state.stock.length);
   for (let i = 0; i < limit; i++) {
     const c = state.stock.pop();
@@ -13825,8 +13917,9 @@ window.debugDraw5 = async () => {
 };
 
 window.debugDraw30 = async () => {
-  if (!ensureMyTurn()) return;
-  const me = currentPlayer();
+  if (!ensureDevToolsAction()) return;
+  const me = debugTargetPlayer();
+  if (!me) { showMessage('Escolha uma mão de jogador para comprar cartas.'); return; }
   // Compra 30 ou o que sobrar no monte
   const limit = Math.min(30, state.stock.length);
   for (let i = 0; i < limit; i++) {
@@ -13840,8 +13933,9 @@ window.debugDraw30 = async () => {
 };
 
 window.debugDiscard5 = async () => {
-  if (!ensureMyTurn()) return;
-  const me = currentPlayer();
+  if (!ensureDevToolsAction()) return;
+  const me = debugTargetPlayer();
+  if (!me) { showMessage('Escolha uma mão de jogador para descartar cartas.'); return; }
   const limit = Math.min(5, me.hand.length);
   if (limit === 0) return;
 
@@ -13861,7 +13955,7 @@ window.debugDiscard5 = async () => {
     return;
   }
 
-  if (tookDead) await animateDeadToHandLocal(tookDead.deadIndex);
+  if (tookDead) void animateDeadToHandLocal(tookDead.deadIndex).catch(() => {});
 
   renderAll();
   await commitState();
@@ -13933,13 +14027,16 @@ function replayDebugBossTerminalPresentation() {
 }
 
 window.debugEndGame = async () => {
-  if (!ensureMyTurn()) return;
-  await finishGame(currentTeam().id);
+  if (!ensureDevToolsAction()) return;
+  const me = debugTargetPlayer();
+  if (!me) return;
+  await finishGame(me.teamId);
   replayDebugBossTerminalPresentation();
 };
 
 window.debugTogglePause = async () => {
-  if (!state) return;
+  if (!ensureDevToolsAction()) return;
+  delete state.debugMutationFreezeId; // An explicit choice owns the pause now.
   state.debugPaused = !state.debugPaused; // Inverte o estado atual
   renderAll();
   await commitState(); // Salva no Firebase para paralisar a sala inteira
@@ -13962,10 +14059,10 @@ function showDebugBossDamageReaction() {
 }
 
 window.debugMeld = async (type) => {
-  if (!isDebugMode || !state || state.finished || friendOperationPending || committing || isDominationFriendBusy(state) || document.querySelector('.fly-card')) return;
-  const target = document.getElementById('debugMeldActor')?.value || 'current';
+  if (!ensureDevToolsAction()) return;
+  const target = document.getElementById('debugMeldActor')?.value || 'local';
   const friendId = target.startsWith('friend:') ? target.slice(7) : null;
-  const actor = target.startsWith('player:') ? state.players.find((p) => p.id === Number(target.slice(7))) : currentPlayer();
+  const actor = friendId ? currentPlayer() : debugTargetPlayer();
   if (!actor) return;
   const team = state.teams.find((t) => t.id === actor.teamId);
   let meld = [];
@@ -14027,12 +14124,12 @@ window.debugMeld = async (type) => {
         if (toEl) toEl.style.visibility = '';
       });
     });
-    await Promise.all(anims);
+    void Promise.all(anims).catch(() => {});
   }
-  await friendDraw;
+  void friendDraw.catch(() => {});
 
   if (domReward?.tookDead) {
-    await animateDeadToHandLocal(domReward.tookDead.deadIndex);
+    void animateDeadToHandLocal(domReward.tookDead.deadIndex).catch(() => {});
   }
 
   renderAll();
@@ -14042,12 +14139,12 @@ window.debugMeld = async (type) => {
 window.debugSetupVision = debugSetupVision;
 async function debugSetupVision(count) {
   if (!isDebugMode || !state || state.mode !== '1x1_dominacao' || myPlayerIndex !== 1) return;
-  if (![1, 2].includes(count) || !ensureMyTurn()) return;
+  if (![1, 2].includes(count) || !ensureDevToolsAction()) return;
   if (!dominationFeatureEnabled(state, 'vision')) {
     showMessage('Ative a Visão no menu para testar seu aviso.');
     return;
   }
-  const team = currentTeam();
+  const team = state.teams.find(t => t.id === state.players[1].teamId);
   const enemy = state.players[0];
   const prefix = `debug-vision-${newActionId()}`;
   let serial = 0;
@@ -14073,8 +14170,9 @@ async function debugSetupVision(count) {
 }
 
 window.debugSetupDead = async () => {
-  if (!ensureMyTurn()) return;
-  const me = currentPlayer();
+  if (!ensureDevToolsAction()) return;
+  const me = debugTargetPlayer();
+  if (!me) return;
   const teamId = me.teamId;
 
   // Trava para respeitar as regras do jogo fora do debug
@@ -14094,9 +14192,10 @@ window.debugSetupDead = async () => {
 };
 
 window.debugSetupWin = async () => {
-  if (!ensureMyTurn()) return;
-  const me = currentPlayer();
-  const team = currentTeam();
+  if (!ensureDevToolsAction()) return;
+  const me = debugTargetPlayer();
+  if (!me) return;
+  const team = state.teams.find(t => t.id === me.teamId);
 
   // 1. Trava o sistema dizendo que a equipe já pegou o morto máximo permitido
   state.deadChunksTaken[team.id] = state.deadChunksMax[team.id];
@@ -14742,12 +14841,108 @@ window.voteRematch = async () => {
   }
 };
 
+// DEV cancels gameplay immediately. Never drain a BOT or wait for table gestures.
+// Old commits/engines are fenced by this epoch; their cached state is detached.
+function interruptDevToolsGameplay() {
+  const interrupted = !!(window.activeBotTurn || localActionGate.pending || committing || friendOperationPending || friendPlayback);
+  window.devToolsGameplayEpoch = (window.devToolsGameplayEpoch || 0) + 1;
+  botTurnController.abort();
+  cancelPendingBotTurns();
+  window.activeBotTurn?.promise?.catch(() => {});
+  window.activeBotTurn = null;
+  localActionGate.cancel();
+  committing = false;
+  pendingCommit = false;
+  friendOperationPending = false;
+  friendPlayback = null;
+  friendAutomationRunning = false;
+  clearTimeout(window.botPlayTimeoutId);
+  window.botPlayTimeoutId = null;
+  clearTimeout(friendAutomationTimer);
+  friendAutomationTimer = null;
+  stopTurnTimer();
+  clearBossBotWatchdog();
+  cancelGameAnimations();
+  if (interrupted && state) state = structuredClone(state);
+  botTurnController = new AbortController();
+  window.lastBotTurnPlayed = null;
+  window.isAutoPlaying = false;
+  window.isMelding = false;
+}
+
+// Debug owns a serialized lane, not a bypass in ordinary player actions. A brief
+// transaction freeze prevents BOT races; only the explicit pause stays frozen.
+let debugOperationQueue = Promise.resolve();
+const debugRawActions = Object.create(null);
+async function runDevToolsMutation(action, args, { replaceMatch = false, allowFinished = false } = {}) {
+  if (!isDebugMode || (!replaceMatch && !ensureDevToolsAction({ allowFinished }))) {
+    if (isDebugMode) showMessage('DevTools: reinicie ou prepare um cenário para editar esta partida encerrada.');
+    return;
+  }
+  const session = window.gameSessionId, match = state?.matchStartedAt;
+  const current = () => session === window.gameSessionId && state?.matchStartedAt === match && !window.isClosingGame;
+  interruptDevToolsGameplay();
+  if (!current() && !replaceMatch) return;
+  const wasDebugPaused = !!state?.debugPaused;
+  const freezeId = !replaceMatch && !state?.finished && action !== 'debugTogglePause' && !wasDebugPaused ? newActionId() : null;
+  window.devToolsMutationActive = true;
+  window.devToolsActiveCommand = typeof action === 'function' ? action.name : action;
+  try {
+    if (state) state.historyTest = true;
+    if (freezeId) {
+      // Another client's BOT can have committed between the click and our CAS.
+      // Adopt the newer revision and retry the freeze, never force-write it.
+      for (let attempt = 0; attempt < 3 && current(); attempt++) {
+        state.historyTest = true;
+        state.debugPaused = true;
+        state.debugMutationFreezeId = freezeId;
+        renderAll();
+        await commitState();
+        if (state.debugPaused) break;
+      }
+      if (!current()) return;
+      if (!state.debugPaused) { showMessage('Não foi possível congelar o cenário com segurança. Tente novamente.'); return; }
+    }
+    return await (typeof action === 'function' ? action : debugRawActions[action])(...args);
+  } finally {
+    try {
+      // Never resume an existing/manual pause, a different match, or another
+      // client's explicit pause. CAS conflicts adopt the latest state as usual.
+      if (freezeId) {
+        for (let attempt = 0; attempt < 3 && current() && state.debugMutationFreezeId === freezeId; attempt++) {
+          state.debugPaused = false;
+          delete state.debugMutationFreezeId;
+          await commitState();
+        }
+        if (current() && state.debugMutationFreezeId === freezeId)
+          showMessage('A alteração terminou, mas não foi possível retomar o jogo. Use Descongelar.');
+      }
+    } finally {
+      window.devToolsMutationActive = false;
+      window.devToolsActiveCommand = null;
+      if (current() || (replaceMatch && state && !window.isClosingGame)) { renderAll(); startTurnTimerIfNeeded(); scheduleDominationFriend(); }
+    }
+  }
+}
+
+function queueDevToolsMutation(action, args = [], options = {}) {
+  const session = window.gameSessionId;
+  if (isDebugMode && window.devToolsActiveCommand === 'executeBossLabBotAction') interruptDevToolsGameplay();
+  debugOperationQueue = debugOperationQueue.catch(() => {}).then(() => {
+    if (session === window.gameSessionId) return runDevToolsMutation(action, args, options);
+  }).catch(error => { if (error?.name !== 'AbortError') { console.error('DevTools:', error); showMessage(`DevTools: ${error.message || error}`); } });
+  return debugOperationQueue;
+}
+
 // Usar uma ferramenta que altera a partida torna seu resultado um teste, não uma vitória válida.
-for (const name of ['debugDraw5', 'debugDraw30', 'debugDiscard5', 'debugMeld', 'debugSetupDead', 'debugSetupWin', 'debugEndGame', 'debugSetFriends', 'debugSetupVision', 'debugTogglePause']) {
+for (const name of ['debugDraw5', 'debugDraw30', 'debugDiscard5', 'debugMeld', 'debugSetupDead', 'debugSetupWin', 'debugEndGame', 'debugSetFriends', 'debugSetupVision', 'debugTogglePause', 'debugSetTableTheme', 'debugSetDeckTheme', 'debugRestartGame']) {
   const action = window[name];
   if (typeof action !== 'function') continue;
+  debugRawActions[name] = action;
   window[name] = function (...args) {
-    if (state && !state.finished) state.historyTest = true;
-    return action.apply(this, args);
+    if (name === 'debugRestartGame' && args[0] === true) return action(...args); // Normal rematch is not DEV.
+    if (!isDebugMode) return Promise.resolve();
+    if (!state && name.startsWith('debugSet')) return action(...args);
+    return queueDevToolsMutation(name, args, { replaceMatch: name === 'debugRestartGame', allowFinished: name === 'debugSetTableTheme' || name === 'debugSetDeckTheme' });
   };
 }

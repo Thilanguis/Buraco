@@ -16,7 +16,7 @@ const helpSource = source.slice(source.indexOf('function closeBossIntentHelp('),
 const frameSource = source.slice(source.indexOf('function applyBossMeldEffectFrame('), source.indexOf('\nfunction applyBossMeldCardDecoration('));
 const meterSource = source.slice(source.indexOf('function renderBossRangeMeters('), source.indexOf('\nconst BOSS_GUIDE_CORE'));
 const discardRenderSource = source.slice(source.indexOf('  const discardCount = state.discard.length;'), source.indexOf('  // 3. Aplica o 3D nos Mortos'));
-const snapshotGuard = source.match(/if \(localActionGate\.pending\) await localActionGate\.pending;\s*if \(snapshotSequence !== gameSnapshotSequence\) return;/)[0];
+const snapshotGuard = source.match(/if \(localActionGate\.pending\) await localActionGate\.pending;\s*if \(snapshotSequence !== gameSnapshotSequence[^\n]*\) return;/)[0];
 assert.ok(panelSource.endsWith('}\r\n') || panelSource.trimEnd().endsWith('}'));
 // Include the outer section, not the nested hidden battle-log section.
 const hudMarkup = index.match(/<section id="bossHud"[\s\S]*?<\/section>(?=\s*<div id="bossDaughterStrip")/)[0].replace('style="display: none"', 'style="display: grid"');
@@ -80,6 +80,7 @@ window.fixture.targetRace = async () => {
   let gameSnapshotSequence = 0;
   const snapshot = async (incoming) => {
     const snapshotSequence = ++gameSnapshotSequence;
+    const snapshotGameplayEpoch = window.devToolsGameplayEpoch || 0;
     ${snapshotGuard}
     state = incoming; renderBossCombatPanel(hud, state.boss);
   };

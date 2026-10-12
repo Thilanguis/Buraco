@@ -8,11 +8,13 @@ const game = (ids=[],lastAction=null,revision=0,start=1) => ({mode:'boss_nemesis
   boss:{id:'nemesis',cooperativeSpecial:{resolvedActionIds:ids}},lastAction});
 const action = (id='real-action',recipientId=1) => ({id,type:'bossSpecial',count:5,recipientId,playerId:0});
 const options={};
-test('assets supplied: Ada replaces Leon; no imagined files for other universes; central 3000 ms',()=>{
+test('six supplied PNG/MP3 pairs and central 3000 ms preserve the original frame',()=>{
   assert.equal(SPECIAL_PRESENTATION.durationMs,3000);
-  assert.deepEqual(Object.values(SPECIAL_CHARACTER_ASSETS).filter(Boolean).map(a=>a.name),['Ada Wong','Jill Valentine','Sailor Moon']);
-  for(const asset of Object.values(SPECIAL_CHARACTER_ASSETS).filter(Boolean))assert.ok(readFileSync(new URL('../'+asset.src,import.meta.url)).length>1000);
-  assert.equal(SPECIAL_CHARACTER_ASSETS.banker,null);
+  assert.deepEqual(Object.values(SPECIAL_CHARACTER_ASSETS).map(a=>a.name),['Ada Wong','Jill Valentine','Sailor Moon','Banqueiro','Matriarca Esmeralda','Dominadora']);
+  for(const asset of Object.values(SPECIAL_CHARACTER_ASSETS)){
+    assert.ok(readFileSync(new URL('../'+asset.src,import.meta.url)).length>1000);
+    assert.ok(readFileSync(new URL('../'+asset.audioSrc,import.meta.url)).length>1000);
+  }
 });
 test('two independent humans see each accepted ID once with local/remote/BOT beneficiary',async()=>{
   for(const recipient of [0,1,2]){
@@ -56,6 +58,14 @@ test('safe responsive placement preserves ratio, right entry space and protected
     for(const r of obstacles)assert.ok(p.left+p.width<=r.left||p.left>=r.left+r.width||p.top+p.height<=r.top||p.top>=r.top+r.height);
   }
   assert.equal(specialCharacterPlacement({width:390,height:844},{width:941,height:1672},[{left:0,top:0,width:390,height:844}]),null);
+});
+test('Ada and Sailor use the identical Jill frame, independent of PNG proportions',()=>{
+  for(const [width,height] of [[1920,1080],[1376,1032],[1024,768],[390,844]]) {
+    const viewport={width,height}, obstacles=[{left:0,top:height*.83,width,height:height*.17}];
+    const jill=specialCharacterPlacement(viewport,{width:1200,height:1800},obstacles);
+    for(const image of [{width:1024,height:1536},{width:941,height:1672}])
+      assert.deepEqual(specialCharacterPlacement(viewport,image,obstacles),jill);
+  }
 });
 test('reduced motion and already aborted/stale effects produce no DOM or image load',async()=>{
   const document={createElement(){throw Error('must not create');}};

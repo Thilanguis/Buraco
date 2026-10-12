@@ -39,7 +39,7 @@ body.boss-mode[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-chips :i
 }
 body[data-boss-id='dimitrescu'] .castle-daughter .boss-combat-chips button { pointer-events:auto; }
 body[data-boss-id='dimitrescu'] .castle-daughter .boss-daughter-state { position:static; flex:0 0 auto; width:auto; max-width:none; font-size:9px; letter-spacing:0; }
-body[data-boss-id='dimitrescu'] .carta .castle-item-overlay { height:auto; border:0; border-radius:30%; background:radial-gradient(ellipse,#eecb8e66,transparent 70%); filter:drop-shadow(0 1px 1px #000) drop-shadow(0 0 2px #f5dabd); }
+body[data-boss-id='dimitrescu'] :is(.carta, .discard-face) .castle-item-overlay { box-sizing:border-box; width:64%; height:auto; max-height:55%; top:47%; padding:2px; border:0; border-radius:30%; background:radial-gradient(ellipse,#182e45f5 35%,#152435db 68%,#bd9b65 72%,transparent 76%); filter:drop-shadow(0 1px 2px #000); }
 body[data-boss-id='dimitrescu'] #handContainer .carta .castle-item-overlay,
 body[data-boss-id='dimitrescu'] #sampleHand .carta .castle-item-overlay { box-sizing:border-box; width:64%; max-height:55%; top:47%; padding:2px; background:radial-gradient(ellipse,#182e45f5 35%,#152435db 68%,#bd9b65 72%,transparent 76%); filter:drop-shadow(0 1px 2px #000); }
 /* Reserve separate vertical bands for item art, two-line caption and bottom card markers. */

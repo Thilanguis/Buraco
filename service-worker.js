@@ -1,9 +1,15 @@
-const CACHE_NAME = 'buraco-v305';
+const CACHE_NAME = 'buraco-v306';
 const ASSETS = [
+  './js/audio-balance.js',
   './js/boss/ui/cooperative-special-presentation.js',
+  './js/boss/ui/cooperative-special-assets.js',
+  './js/boss/ui/cooperative-special-audio.js',
   './assets/images/special/ada-wong.png',
   './assets/images/special/jill-valentine.png',
   './assets/images/special/sailor-moon.png',
+  './assets/images/special/banker.png',
+  './assets/images/special/dominadora.png',
+  './assets/images/special/matriarca-esmeralda.png',
   './js/boss/ui/matriarch-bloom-view.js',
   './assets/images/matriarch-lotus.png',
   './js/history-totals.js',
