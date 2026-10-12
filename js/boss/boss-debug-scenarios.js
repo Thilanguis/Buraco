@@ -653,7 +653,7 @@ export function getBossDebugResourceState(state, { bossId = null, target = 'huma
   }
 
   if (boss.id === 'matriarca_esmeralda') {
-    return { available: true, targetable: false, step: 1, label: `Flores ${formatBossDebugNumber(boss.bloom)}/5` };
+    return { available: true, targetable: false, step: 1, label: `Flores ${formatBossDebugNumber(boss.bloom)}/${boss.maxDanger}` };
   }
 
   if (boss.id === 'dimitrescu') {
@@ -689,7 +689,7 @@ export function adjustBossDebugResource(state, { bossId = null, action = 'increa
     const nextPoints = nextLinear(currentPoints, 5, 45);
     boss.chainsByPlayer[player.id] = nextPoints / 12.5;
   } else if (boss.id === 'matriarca_esmeralda') {
-    boss.bloom = nextLinear(Number(boss.bloom) || 0, 1, 4);
+    boss.bloom = nextLinear(Number(boss.bloom) || 0, 1, boss.maxDanger - 1);
     boss.danger = boss.bloom;
   } else if (boss.id === 'nehelenia') {
     const player = bossDebugResourcePlayer(state, target) || state.players?.[0];

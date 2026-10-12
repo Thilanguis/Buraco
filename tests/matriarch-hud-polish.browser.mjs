@@ -14,7 +14,7 @@ const ranges=source.slice(source.indexOf('function renderBossRangeMeters('),sour
 const fixture=`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${['base-menu','game','cards','hud','responsive','boss-mode','boss/matriarch'].map(n=>`<link rel="stylesheet" href="/styles/${n}.css">`).join('')}
 <body class="boss-mode" data-boss-id="matriarca_esmeralda"><main style="padding:14px">${markup}</main><script type="module">
 import {buildBossDebugScenario} from '/js/boss/boss-debug-scenarios.js';
-import {beginBossTurn,advanceBossTurn,getBossPhaseProgress,selectNextBossIntent} from '/js/boss/boss-engine.js';
+import {beginBossTurn,advanceBossTurn,getBossPhaseProgress,selectNextBossIntent,normalizeBossState} from '/js/boss/boss-engine.js';
 import {buildBossActionPresentation,buildBossAbilityHelp} from '/js/boss/boss-presentation.js';
 import {matriarchBloomFlowersHTML} from '/js/boss/ui/matriarch-bloom-view.js';
 ${help}\n${render}\n${ranges}
@@ -33,8 +33,11 @@ window.sample=(fed,bloom=0)=>{
  document.getElementById('bossIntentDescription').textContent=action.instruction;
  renderBossRangeMeters(document.getElementById('bossIntentDescription'),action.rangeMeters);
  const flowers=document.getElementById('bossBloomFlowers');flowers.style.display='flex';flowers.innerHTML=matriarchBloomFlowersHTML({bloom});
- document.getElementById('bossDebtText').textContent=bloom+' / 5';
+ state.boss.bloom=state.boss.danger=bloom;normalizeBossState(state);
+ document.getElementById('bossDebtText').textContent=bloom+' / '+state.boss.maxDanger;
+ document.getElementById('bossDebtBar').style.width=bloom/state.boss.maxDanger*100+'%';
  renderBossPhaseAndHealth(state,getBossPhaseProgress(state));syncBossIntentHelp(state);
+ return {bloom:state.boss.bloom,maxDanger:state.boss.maxDanger,lost:state.boss.result?.victory===false};
 };
 window.copySample=(bossId,abilityId)=>{
  closeBossIntentHelp();
@@ -56,14 +59,14 @@ const server=createServer(async(req,res)=>{try {
 await new Promise(done=>server.listen(0,'127.0.0.1',done));let browser;
 try{
  browser=await chromium.launch({channel:'msedge',headless:true});await mkdir(resolve(root,'.cache/hud-polish'),{recursive:true});
- for(const width of [1920,1376,390]){
+ for(const width of [1920,1376,1024,390]){
   const context=await browser.newContext({viewport:{width,height:1000},hasTouch:width<1920}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port+'/fixture');await page.waitForFunction(()=>window.sample);
   for(let fed=0;fed<=2;fed++){
    await page.evaluate(x=>window.sample(x,2),fed);
    const bar=page.locator('#bossRangeMeters [role="progressbar"]');assert.equal(await bar.getAttribute('aria-valuenow'),String(fed));
    assert.equal(await page.locator('.boss-range-meter-fill').evaluate(el=>el.style.width),fed*50+'%');
-   assert.equal(await page.locator('.boss-lotus-flower img').count(),5);assert.equal(await page.locator('.boss-lotus-flower.open').count(),2);
+   assert.equal(await page.locator('.boss-lotus-flower img').count(),10);assert.equal(await page.locator('.boss-lotus-flower.open').count(),2);
   }
   assert.ok(await page.locator('.boss-lotus-flower img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
   const filters=await page.locator('.boss-lotus-flower img').evaluateAll(imgs=>imgs.map(img=>getComputedStyle(img).filter));assert.equal(filters[0],'none');assert.match(filters[2],/grayscale/);
@@ -71,10 +74,21 @@ try{
   assert.match(await page.locator('#bossIntentHelpText').innerText(),/dois jogos.*só um.*50 HP/is);await page.keyboard.press('Escape');
   await page.waitForTimeout(800);
   const flowerLayout=await page.locator('#bossBloomFlowers').evaluate(el=>({row:el.getBoundingClientRect().toJSON(),flowers:[...el.children].map(f=>f.getBoundingClientRect().toJSON()),phase:document.getElementById('bossPhaseProgress').getBoundingClientRect().toJSON()}));
-  assert.ok(flowerLayout.flowers[0].width>=39,'Flowers should be larger than the old 32px icons');
+  assert.ok(flowerLayout.flowers[0].width>=20,'Ten flowers must remain legible in the existing responsive row');
   assert.ok(flowerLayout.flowers.at(-1).right>=flowerLayout.row.right-7,'Flowers should span the available row');
   assert.ok(flowerLayout.flowers.every(f=>f.bottom<=flowerLayout.phase.top),'Flowers must not overlap phase progress');
   await page.screenshot({path:resolve(root,'.cache/hud-polish/matriarch-'+width+'.png'),fullPage:true});
+  for(const bloom of [4,5,8,9,10]) {
+   const actual=await page.evaluate(bloom=>window.sample(0,bloom),bloom);
+   assert.deepEqual(actual,{bloom,maxDanger:10,lost:bloom===10});
+   assert.equal(await page.locator('.boss-lotus-flower.open').count(),bloom);
+   assert.equal(await page.locator('#bossDebtText').innerText(),bloom+' / 10');
+   assert.equal(await page.locator('#bossDebtBar').evaluate(el=>el.style.width),bloom*10+'%');
+   await page.waitForTimeout(500);
+   const fillRatio=await page.locator('#bossDebtBar').evaluate(el=>el.getBoundingClientRect().width/el.parentElement.clientWidth);
+   assert.ok(Math.abs(fillRatio-bloom/10)<.01,'Rendered bar must match the real 0–10 flower count');
+   await page.screenshot({path:resolve(root,'.cache/hud-polish/matriarch-'+width+'-'+bloom+'-flowers.png'),fullPage:true});
+  }
   const overflow=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,
     nodes:[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(el=>[el.tagName,el.id,el.className,el.getBoundingClientRect().right])}));
   assert.ok(overflow.scroll<=overflow.width,JSON.stringify(overflow));

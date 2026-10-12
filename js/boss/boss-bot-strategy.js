@@ -39,6 +39,15 @@ function health(s) {
 }
 function dangerCost(s) {
   if (s.boss?.result?.victory === false) return 100000;
+  if (s.boss?.id === 'dominadora') {
+    // Public fractional bars: four legacy chains = 50 points per cooperador.
+    // Penalties/overflow are applied by the engine, never estimated here.
+    const ratios = s.players.map(p => Math.max(0, Math.min(1,
+      (Number(s.boss.chainsByPlayer?.[p.id]) || 0) / 4)));
+    const team = ratios.reduce((sum, r) => sum + r, 0) / Math.max(1, ratios.length);
+    return 300 * team + 800 * team ** 4
+      + 100 * ratios.reduce((sum, r) => sum + r ** 4, 0) / Math.max(1, ratios.length);
+  }
   const value = Number(s.boss?.id==='matriarca_esmeralda' ? s.boss.bloom : s.boss?.danger || 0);
   const max = Number(s.boss?.maxDanger || 100);
   return 300 * (value / max) + 800 * (value / max) ** 4;
@@ -73,25 +82,61 @@ export function simulateBossMove(state, botIndex, move) {
     oldKind:classifyBossMeldKind(before),newKind:classifyBossMeldKind(next),cardsAdded:cards,isNewMeld:move.meldIndex==null});
   return s;
 }
-function deadlineProjection(s, botIndex) {
+function discardOpportunity(s, botIndex, card) {
+  let opportunity = card.joker || String(card.rank) === '2' ? 50 * reserveWeight(s) : 0;
+  for (const meld of s.teams[s.players[botIndex].teamId].melds) {
+    const after = [...meld, card];
+    if (isValidBossSequence(after)) opportunity = Math.max(opportunity,
+      15 + Math.max(0, teamFutureValue([after]) - teamFutureValue([meld])));
+  }
+  return opportunity;
+}
+
+function simulateDiscard(s, botIndex, card) {
+  const next = copy(s), player = next.players[botIndex];
+  player.hand = player.hand.filter(c => c.id !== card.id);
+  next.discard.push(card);
+  notifyBossCardDiscarded(next, player.id, card);
+  return next;
+}
+
+function deadlineProjection(s, botIndex, { planDiscard = true } = {}) {
   // app.js ends immediately on this canonical flag. Do not invent a later
   // punishment/heal after a contribution has already won the match.
   if(s.boss?.defeated&&!s.boss?.result)return {value:strategyValue(s,botIndex),state:s};
+  if (s.boss?.result) return {value:strategyValue(s,botIndex),state:s};
+  if (s.boss?.id === 'dominadora' && planDiscard) {
+    const p = s.players[botIndex];
+    const alternatives = p.hand.filter(c => c.id !== s.pickedDiscardCardId
+      && !isBossCardBlocked(s,p.id,c.id,'discard')).map(card => {
+      const projected = deadlineProjection(simulateDiscard(s,botIndex,card),botIndex,{planDiscard:false});
+      return {...projected, discardCardId:card.id,
+        value:projected.value - discardOpportunity(s,botIndex,card)
+          - cooperativeDiscardAdjustment(s,botIndex,card)};
+    }).sort((a,b) => b.value-a.value || a.discardCardId.localeCompare(b.discardCardId));
+    if (alternatives.length) return alternatives[0];
+  }
   const probe = copy(s);
   const round=probe.boss.roundNumber;
   completeBossPlayerTurn(probe,probe.players[botIndex].id,{deferNextBossTurn:true});
   // Evaluate announced collective obligations conservatively: teammates may
   // still help, but we cannot assume unseen hands solve the remaining work.
-  for (const p of probe.players) if (probe.boss.roundNumber===round
+  // Dominadora orders expire per player: do not invent a partner's failure
+  // using a hidden hand. Both existing bars still participate in dangerCost.
+  for (const p of probe.players) if (probe.boss.id !== 'dominadora' && probe.boss.roundNumber===round
     && !(probe.boss.playersActedThisRound || []).includes(p.id)) completeBossPlayerTurn(probe,p.id,{deferNextBossTurn:true});
   return {value:strategyValue(probe,botIndex),state:probe};
 }
-const deadlineValue=(s,i)=>deadlineProjection(s,i).value;
+const deadlineValue=(s,i)=>deadlineProjection(s,i,{planDiscard:false}).value;
 function objectiveDiagnostic(before,after,abilityId) {
-  const resource=s=>Number(s.boss.id==='matriarca_esmeralda'?s.boss.bloom:s.boss.danger)||0;
+  const resource=s=>s.boss.id==='dominadora'
+    ? s.players.reduce((sum,p)=>sum+(Number(s.boss.chainsByPlayer?.[p.id])||0)*12.5,0)
+    : Number(s.boss.id==='matriarca_esmeralda'?s.boss.bloom:s.boss.danger)||0;
   return {abilityId:abilityId||null,resourceWithoutAction:resource(before),
     resourceAfterAction:resource(after),lossWithoutAction:before.boss.result?.victory===false,
-    lossAfterAction:after.boss.result?.victory===false,weightedEnemyHealthDelta:health(before)-health(after)};
+    lossAfterAction:after.boss.result?.victory===false,weightedEnemyHealthDelta:health(before)-health(after),
+    ...(before.boss.id==='dominadora' ? {barsWithoutAction:{...before.boss.chainsByPlayer},
+      barsAfterAction:{...after.boss.chainsByPlayer}} : {})};
 }
 
 function wildcardCost(s,botIndex,move,cards,after) {
@@ -145,7 +190,20 @@ export function rankBossMoves(state, botIndex, moves, {limit=20}={}) {
     return {move, rough: teamFutureValue([[...base,...cards]]) - teamFutureValue([base]) + cards.length * 4};
   }).sort((a,b) => b.rough-a.rough
     || a.move.cardIds.join().localeCompare(b.move.cardIds.join()));
-  const shortlist=[...rough.slice(0,Math.ceil(limit*.6)),...rough.filter(p=>p.move.objective).slice(0,Math.floor(limit*.4))];
+  const ordinaryBudget=Math.ceil(limit*.6), objectiveBudget=Math.floor(limit*.4);
+  const discardOrder=publicState.boss.id==='dominadora' && (publicState.boss.activeOrders || [])
+    .find(o=>o.status==='active' && o.targetPlayerId===publicState.players[botIndex].id && o.type==='discard_suit');
+  // Reserve shortlist space, not a forced policy: expensive compliance still
+  // competes with disobedience. Long runs cannot crowd out every safe option.
+  const safeBudget=discardOrder ? Math.floor(ordinaryBudget/2) : 0;
+  const preserving=discardOrder ? rough.filter(({move})=>{
+    const spent=new Set([...move.cardIds,...(move.followups || []).flatMap(f=>f.cardIds)]);
+    return publicState.players[botIndex].hand.some(c=>!spent.has(c.id) && !c.joker
+      && c.suit===discardOrder.suit && c.id!==publicState.pickedDiscardCardId
+      && !isBossCardBlocked(publicState,publicState.players[botIndex].id,c.id,'discard'));
+  }).slice(0,safeBudget) : [];
+  const shortlist=[...rough.slice(0,ordinaryBudget-preserving.length),...preserving,
+    ...rough.filter(p=>p.move.objective).slice(0,objectiveBudget)];
   const unique=[...new Map(shortlist.map(p=>[String(p.move.meldIndex)+p.move.cardIds.join(),p])).values()];
   return unique.map(({move}) => {
     let next = simulateBossMove(publicState,botIndex,move);
@@ -160,7 +218,7 @@ export function rankBossMoves(state, botIndex, moves, {limit=20}={}) {
     }
     const projected=deadlineProjection(next,botIndex),deadlineDelta=projected.value-baseline.value;
     const score = deadlineDelta+terms.naturalBonus-wildcardPenalty;
-    return {move,score,next,diagnostics:{deadlineDelta,naturalBonus:terms.naturalBonus,wildcardPenalty,
+    return {move,score,next,diagnostics:{deadlineDelta,plannedDiscardCardId:projected.discardCardId || null,naturalBonus:terms.naturalBonus,wildcardPenalty,
       ...terms.wildcard,objective:objectiveDiagnostic(baseline.state,projected.state,publicState.boss.currentIntent?.abilityId),
       followupWildcardPenalty:wildcardPenalty-terms.wildcard.total,
       cleanPotentialDelta:teamFutureValue(next.teams[publicState.players[botIndex].teamId].melds)
@@ -222,7 +280,7 @@ export function rankBossDiscardPickups(state,botIndex,{maxCandidates=64}={}) {
     const score=deadlineDelta-isolationPenalty+terms.naturalBonus-terms.wildcard.total;
     results.push({intent:destination.meldIndex==null?{wants:true,action:'new',handIndexes:destination.handCardIds.map(id=>p.hand.findIndex(c=>c.id===id))}
       :{wants:true,action:'extend',meldIndex:destination.meldIndex,handIndexes:destination.handCardIds.map(id=>p.hand.findIndex(c=>c.id===id))},
-      quote,score, useful, isolated,diagnostics:{deadlineDelta,isolationPenalty,naturalBonus:terms.naturalBonus,
+      quote,score, useful, isolated,diagnostics:{deadlineDelta,plannedDiscardCardId:projected.discardCardId || null,isolationPenalty,naturalBonus:terms.naturalBonus,
         wildcardPenalty:terms.wildcard.total,...terms.wildcard,objective:objectiveDiagnostic(baseline.state,projected.state,s.boss.currentIntent?.abilityId),acquiredCount:quote.count,
         acquiredHandValue:cooperativeHandValue(after.hand,board)-cooperativeHandValue(p.hand.filter(c=>!destination.handCardIds.includes(c.id)),board),
         cleanPotentialDelta:teamFutureValue(board)-teamFutureValue(team.melds)}});
@@ -261,16 +319,9 @@ export function cooperativeDiscardAdjustment(state,botIndex,card) {
 export function rankBossDiscards(state,botIndex) {
   const s=bossObservableState(state,botIndex),p=s.players[botIndex],base=deadlineValue(s,botIndex);
   return p.hand.filter(c=>c.id!==s.pickedDiscardCardId && !isBossCardBlocked(s,p.id,c.id,'discard')).map(card=>{
-    const next=copy(s),player=next.players[botIndex];player.hand=player.hand.filter(c=>c.id!==card.id);next.discard.push(card);
-    notifyBossCardDiscarded(next,p.id,card);
-    let opportunity=card.joker || String(card.rank)==='2' ? 50*reserveWeight(s) : 0;
-    // A playable extension reaching discard may have been deliberately held to
-    // avoid an unsafe finish. Never treat that card as an expendable singleton.
-    for (const meld of s.teams[p.teamId].melds) {
-      const after=[...meld,card];
-      if (!isValidBossSequence(after)) continue;
-      opportunity=Math.max(opportunity,15+Math.max(0,teamFutureValue([after])-teamFutureValue([meld])));
-    }
-    return {cardId:card.id,score:deadlineValue(next,botIndex)-base-cooperativeDiscardAdjustment(s,botIndex,card)-opportunity};
+    const next=simulateDiscard(s,botIndex,card),projected=deadlineProjection(next,botIndex,{planDiscard:false});
+    const opportunity=discardOpportunity(s,botIndex,card);
+    return {cardId:card.id,score:projected.value-base-cooperativeDiscardAdjustment(s,botIndex,card)-opportunity,
+      diagnostics:{opportunity,objective:objectiveDiagnostic(s,projected.state,s.boss.currentIntent?.abilityId)}};
   }).sort((a,b)=>b.score-a.score || a.cardId.localeCompare(b.cardId));
 }

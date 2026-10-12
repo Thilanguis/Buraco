@@ -1601,19 +1601,21 @@ test('Matriarca inicia registrada com 2000 HP, Buraco Fechado e zero Florescimen
   assert.equal(state.boss.maxHp, 2000);
   assert.equal(state.boss.hp, 2000);
   assert.equal(state.boss.bloom, 0);
-  assert.equal(state.boss.maxDanger, 5);
+  assert.equal(state.boss.maxDanger, 10);
   assert.equal(state.variant, 'fechado');
   const intent = selectNextBossIntent(state);
   assert.ok(intent);
   assert.ok(intent.abilityId);
 });
 
-test('quinta Flor derrota uma vez e cura respeita o limite de cada fase', () => {
+test('décima Flor derrota uma vez e cura respeita o limite de cada fase', () => {
   const fatal = matriarchGame();
   assert.equal(changeMatriarchBloom(fatal, 4, 'teste', 'bloom-4').amount, 4);
   assert.equal(changeMatriarchBloom(fatal, 4, 'teste', 'bloom-4'), null);
   assert.equal(fatal.boss.bloom, 4);
-  changeMatriarchBloom(fatal, 1, 'teste final', 'bloom-5');
+  changeMatriarchBloom(fatal, 5, 'teste intermediário', 'bloom-9');
+  assert.equal(fatal.boss.result, null);
+  changeMatriarchBloom(fatal, 1, 'teste final', 'bloom-10');
   assert.equal(fatal.boss.result.reason, 'max_bloom');
   assert.equal(changeMatriarchBloom(fatal, 1, 'duplicado', 'bloom-6'), null);
 
@@ -1950,8 +1952,8 @@ test('Renascimento ocorre uma vez, inclusive no ataque final, e prioridades do b
 
   const priorities = matriarchGame();
   priorities.boss.phase = 3;
-  priorities.boss.bloom = 4;
-  priorities.boss.danger = 4;
+  priorities.boss.bloom = 9;
+  priorities.boss.danger = 9;
   priorities.boss.natureThreats = [{ id: 'urgent-seed', type: 'seed', targetPlayerId: 0, cardId: 'mat-0-3', status: 'active' }];
   const botPlan = getBossNaturePriorities(priorities, 0);
   assert.equal(botPlan.urgent, true);

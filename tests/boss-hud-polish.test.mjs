@@ -28,9 +28,9 @@ test('PASSIVA mostra regeneração nominal e debuffs sem trocar suas regras',()=
   assert.equal(daughterRegenerationChip({regeneration:25,cold:false}),'PASSIVA +25 HP');
   assert.equal(daughterRegenerationChip({regeneration:25,cold:true}),'PASSIVA +0 HP');
 });
-test('cinco Flores PNG, cores/abertura/perda seguem bloom real',()=>{
+test('dez Flores PNG, cores/abertura/perda seguem bloom real',()=>{
   const html=matriarchBloomFlowersHTML({bloom:2,previous:1,changed:true});
-  assert.equal((html.match(/<img /g)||[]).length,5);
+  assert.equal((html.match(/<img /g)||[]).length,10);
   assert.equal((html.match(/class="boss-lotus-flower open/g)||[]).length,2);
   assert.equal((html.match(/opening/g)||[]).length,1);
   assert.match(html,/Flor 3: apagada/);

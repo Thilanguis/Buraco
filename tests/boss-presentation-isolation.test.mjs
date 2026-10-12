@@ -66,7 +66,7 @@ test('categorias de resultado permanecem disponiveis sem tabela global compartil
 test('regra permanente do HUD fica isolada por chefe', () => {
   assert.equal(buildBossRuleSummary('banker', { boss: { maxDanger: 100 } }), '100 de Dívida = derrota imediata.');
   assert.match(buildBossRuleSummary('dominadora', { boss: {} }), /37,5 fica Sob Controle.*50 fica Dominado/);
-  assert.match(buildBossRuleSummary('matriarca_esmeralda', { boss: { maxDanger: 5 } }), /5 Flores = derrota/);
+  assert.match(buildBossRuleSummary('matriarca_esmeralda', { boss: { maxDanger: 10 } }), /10 Flores = derrota/);
   assert.match(buildBossRuleSummary('dimitrescu', { boss: { maxDanger: 100 } }), /100 de Sede.*Limpa reduz 4, Real reduz 8 e Ás-a-Ás reduz 12/);
   assert.match(buildBossRuleSummary('nehelenia', { boss: { maxDanger: 5 } }), /100 no Mundo do Espelho.*equipe perde.*evolução de canastra reduz esse valor em 4/);
   assert.equal(buildBossRuleSummary('inexistente', { boss: {} }), '');
@@ -76,7 +76,7 @@ test('resumo final do recurso fica isolado por chefe', () => {
   const common = { boss: { danger: 37, maxDanger: 100 }, players: [] };
   assert.deepEqual(getBossFinalDangerPresentation('banker', common), { label: 'Dívida final', value: '37 / 100' });
   assert.deepEqual(getBossFinalDangerPresentation('dimitrescu', common), { label: 'Sede final', value: '37 / 100' });
-  assert.deepEqual(getBossFinalDangerPresentation('matriarca_esmeralda', { boss: { danger: 3, maxDanger: 5 } }), { label: 'Florescimento final', value: '3 / 5' });
+  assert.deepEqual(getBossFinalDangerPresentation('matriarca_esmeralda', { boss: { danger: 3, maxDanger: 10 } }), { label: 'Florescimento final', value: '3 / 10' });
   assert.deepEqual(getBossFinalDangerPresentation('nehelenia', { boss: { danger: 4, maxDanger: 5 } }), { label: 'Mundo do Espelho', value: '80 / 100' });
   const dominatrix = { boss: { chainsByPlayer: { 0: 2, 1: 3 } }, players: [{ id: 0, name: 'Biel' }, { id: 1, name: 'BOT' }] };
   assert.deepEqual(getBossFinalDangerPresentation('dominadora', dominatrix), { label: 'Dominação final', value: 'Biel: 25/50 · BOT: 37.5/50' });

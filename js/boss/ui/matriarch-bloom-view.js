@@ -1,7 +1,8 @@
-// Presentation only; the engine owns bloom, relief and the five-flower limit.
+import { MATRIARCH_MAX_FLOWERS } from '../boss-balance.js';
+// Presentation only; the engine owns bloom, relief and the ten-flower limit.
 export const MATRIARCH_FLOWER_IMAGE = 'assets/images/matriarch-lotus.png';
 export function matriarchBloomFlowersHTML({ bloom, changed = false, previous = null }) {
-  return Array.from({ length: 5 }, (_, index) => {
+  return Array.from({ length: MATRIARCH_MAX_FLOWERS }, (_, index) => {
     const open = index < bloom;
     const opening = changed && previous != null && bloom > previous && index >= previous && open;
     const wilting = changed && previous != null && bloom < previous && index >= bloom && index < previous;

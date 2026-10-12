@@ -2,6 +2,7 @@
 import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './js/game/domination-strategy.js';
 import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint, observeBossPublicAction, bossStockOpportunityValue } from './js/game/bot-planner.js';
 import { rankBossMoves, rankBossDiscardPickups, rankBossDiscards, cooperativeBossPriorities, prepareBossStrategyState, canFinishBossAfterMeld } from './js/boss/boss-bot-strategy.js';
+import { MATRIARCH_MAX_FLOWERS } from './js/boss/boss-balance.js';
 
 // Main-thread scheduling only, never game information or a persistent plan.
 let bossYieldChannel=null;
@@ -929,8 +930,8 @@ export class BossBuracoBot {
         bloom = Math.max(bloom, flowerAlreadyApplied ? 0 : Math.min(1, Number(threat.bloomAmount) || 1));
         sidePenalty = Math.max(sidePenalty, (Number(threat.healAmount) || 0) / 5);
       }
-      if (!bloom && directObjective) bloom = boss.bloom >= 4 ? 1 : 0;
-      return this.bossResourceRiskScore(boss.bloom, boss.maxDanger || 5, bloom, sidePenalty);
+      if (!bloom && directObjective) bloom = boss.bloom >= MATRIARCH_MAX_FLOWERS - 1 ? 1 : 0;
+      return this.bossResourceRiskScore(boss.bloom, boss.maxDanger || MATRIARCH_MAX_FLOWERS, bloom, sidePenalty);
     }
 
     if (boss.id === 'dominadora') {

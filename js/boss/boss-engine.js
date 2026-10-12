@@ -1,7 +1,7 @@
 import { getBossDefinition, getBossDefinitionForMode } from './boss-registry.js';
 import { BOSS_DAMAGE_BY_KIND, DEBT_REDUCTION_BY_KIND } from './bosses/banker.js';
 import { buildBossActionPresentation } from './boss-presentation.js';
-import { getRestorativeDewHealing, MATRIARCH_GRAFT_PARTIAL_HEAL } from './boss-balance.js';
+import { getRestorativeDewHealing, MATRIARCH_GRAFT_PARTIAL_HEAL, MATRIARCH_MAX_FLOWERS } from './boss-balance.js';
 import {
   applyBossCardDamageMechanics,
   applyBossMeldContributionMechanics,
@@ -2096,8 +2096,13 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   boss.lastDamageReactionRound ||= 0;
   boss.healReaction ||= null;
   boss.lastHealReactionRound ||= 0;
-  boss.bloom = clamp(Number(boss.bloom ?? (boss.id === 'matriarca_esmeralda' ? boss.danger : 0)) || 0, 0, 5);
-  if (boss.id === 'matriarca_esmeralda') boss.danger = boss.bloom;
+  if (boss.id === 'matriarca_esmeralda') boss.maxDanger = MATRIARCH_MAX_FLOWERS;
+  boss.bloom = clamp(Number(boss.bloom ?? (boss.id === 'matriarca_esmeralda' ? boss.danger : 0)) || 0,
+    0, boss.id === 'matriarca_esmeralda' ? MATRIARCH_MAX_FLOWERS : 5);
+  if (boss.id === 'matriarca_esmeralda') {
+    boss.danger = boss.bloom;
+    confirmMatriarchBloomDefeat(boss);
+  }
   boss.natureThreats ||= [];
   boss.crimsonClot ||= null;
   boss.bloodiedDead ||= null;
@@ -2692,11 +2697,22 @@ function markNatureEventResolved(boss, eventId) {
   if (boss.resolvedNatureEventIds.length > 80) boss.resolvedNatureEventIds.splice(0, boss.resolvedNatureEventIds.length - 80);
 }
 
+function confirmMatriarchBloomDefeat(boss) {
+  if (boss.bloom >= MATRIARCH_MAX_FLOWERS && !boss.result) {
+    boss.result = {
+      victory: false,
+      reason: 'max_bloom',
+      title: 'Primavera Eterna',
+      detail: 'A décima Flor transformou a mesa no jardim da Matriarca.',
+    };
+  }
+}
+
 export function changeMatriarchBloom(gameState, amount, origin = 'Florescimento', eventId = null) {
   const boss = normalizeBossState(gameState);
   if (!boss || boss.id !== 'matriarca_esmeralda' || boss.result || !amount || natureEventWasResolved(boss, eventId)) return null;
   const before = boss.bloom;
-  boss.bloom = clamp(before + amount, 0, boss.maxDanger || 5);
+  boss.bloom = clamp(before + amount, 0, MATRIARCH_MAX_FLOWERS);
   boss.danger = boss.bloom;
   const applied = boss.bloom - before;
   if (!applied) return null;
@@ -2711,14 +2727,7 @@ export function changeMatriarchBloom(gameState, amount, origin = 'Florescimento'
     outcome: `${origin}: ${applied > 0 ? '+' : ''}${applied} Flor${Math.abs(applied) === 1 ? '' : 'es'}.`,
   });
   boss.lastBloomEventId = event.actionId;
-  if (boss.bloom >= boss.maxDanger && !boss.result) {
-    boss.result = {
-      victory: false,
-      reason: 'max_bloom',
-      title: 'Primavera Eterna',
-      detail: 'O quinto Florescimento transformou a mesa no jardim da Matriarca.',
-    };
-  }
+  confirmMatriarchBloomDefeat(boss);
   return event;
 }
 
@@ -3551,7 +3560,7 @@ export function getBossNaturePriorities(gameState, playerId) {
     .filter(({ meldId }) => meldId && meldIds.has(meldId))
     .map(({ meldIndex }) => meldIndex);
   return {
-    urgent: boss.bloom >= 4,
+    urgent: boss.bloom >= boss.maxDanger - 1,
     bloom: boss.bloom,
     markedCardIds,
     meldIndexes,
@@ -4276,7 +4285,7 @@ export function shouldBossBotTakeDiscard(gameState, playerId, { intent = null, n
   }
   const pile = (gameState.discard || []).filter(Boolean);
   const pileValue = pile.reduce((sum, card) => sum + botPileCardValue(card), 0);
-  if (naturePlan?.pollenOnDiscard && naturePlan.bloom >= 4) return false;
+  if (naturePlan?.pollenOnDiscard && naturePlan.bloom >= (boss.id === 'matriarca_esmeralda' ? boss.maxDanger - 1 : 4)) return false;
   if (!surcharge) return true;
   if (boss.danger + surcharge.amount >= boss.maxDanger) return false;
   const risk = (boss.danger + surcharge.amount) / Math.max(1, boss.maxDanger);

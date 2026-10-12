@@ -91,8 +91,8 @@ test('controle de recurso do laboratorio avanca os cinco chefes sem disparar der
 
   const matriarch = build('matriarca_esmeralda', 'living_seed').state;
   adjustBossDebugResource(matriarch, { bossId: 'matriarca_esmeralda', action: 'near' });
-  assert.equal(matriarch.boss.bloom, 4);
-  assert.equal(matriarch.boss.danger, 4);
+  assert.equal(matriarch.boss.bloom, 9);
+  assert.equal(matriarch.boss.danger, 9);
 
   const dimitrescu = build('dimitrescu', 'crimson_brand').state;
   adjustBossDebugResource(dimitrescu, { bossId: 'dimitrescu', action: 'near' });

@@ -5975,7 +5975,7 @@ function renderBossRangeMeters(anchor, meters = []) {
 const BOSS_GUIDE_CORE = Object.freeze({
   banker: '100 de Dívida = derrota. Limpa, Real e Ás-a-Ás reduzem a Dívida.',
   dominadora: 'Cada jogador tem uma barra de Dominação 0–50. Em 37,5 fica Sob Controle; em 50 fica Dominado. Os dois em 50 = derrota.',
-  matriarca_esmeralda: '5 Flores = derrota. Na Fase 3, pode renascer 1 vez gastando 1 Flor.',
+  matriarca_esmeralda: '10 Flores = derrota. Na Fase 3, pode renascer 1 vez gastando 1 Flor.',
   dimitrescu: '100 de Sede = derrota. Limpa/Real/Ás-a-Ás reduzem a Sede em 4/8/12.',
   nehelenia: 'Mundo do Espelho 100/100 = derrota. Os 5 Espelhos enchem gradualmente; Limpa/Real/Ás-a-Ás reduzem 4/8/12.',
 });

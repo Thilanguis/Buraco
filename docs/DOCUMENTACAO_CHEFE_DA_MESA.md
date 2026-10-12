@@ -1455,12 +1455,18 @@ Florescimento: 0..5
 ## 6.2 Condição especial
 
 
-- 0–4 Flores: partida continua;
-- quinta Flor: derrota imediata;
+- 0–9 Flores: partida continua;
+- décima Flor: derrota imediata;
 - Flores aumentam mesmo com HP cheio;
-- Flores não ultrapassam 5;
+- Flores não ultrapassam 10;
 - derrota confirma uma vez;
-- Renascimento não ocorre depois de derrota por quinta Flor.
+- Renascimento não ocorre depois de derrota por décima Flor.
+
+Atualização de 12/10/2026: [relatório do lote e testes](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.md).
+Saves ativos migram o teto para dez, mantendo o saldo,
+eventos e reduções incrementais. Saves já encerrados por cinco Flores continuam
+encerrados; a migração não reabre partidas. Não foram alterados HP, punições,
+curas, propagação, elegibilidade ou frequência de habilidades.
 
 
 ## 6.3 Remoção de Florescimento
@@ -2146,7 +2152,7 @@ Avalia:
 Prioriza:
 
 
-- quinta Flor;
+- décima Flor;
 - Semente jogável;
 - Raiz;
 - dois lados de Enxerto;
@@ -2258,8 +2264,8 @@ Mostrar:
 Mostrar:
 
 
-- Florescimento 0/5;
-- cinco flores;
+- Florescimento 0/10;
+- dez flores;
 - ameaças;
 - prazos;
 - consequência;
@@ -2468,7 +2474,7 @@ Em touch, tablet e `prefers-reduced-motion`:
 |---|---|---|---|---|---|---|
 | HP | 2650 | 2600 | 2000 | 2000 | 2400 | 2200 |
 | Perigo | Dívida coletiva | Dominação individual | Florescimento | Sede de Sangue | Mundo do Espelho (0–100) | Infecção (0–100) |
-| Derrota especial | Dívida 100 | ambos em 50/50 de Dominação | 5 Flores | Sede 100 | 5 Espelhos | Infecção 100 |
+| Derrota especial | Dívida 100 | ambos em 50/50 de Dominação | 10 Flores | Sede 100 | 5 Espelhos | Infecção 100 |
 | Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas | Infecção, zumbis persistentes e redirecionamento de dano |
 | Recuperação da equipe | redução de Dívida | Dominação -4/-8/-12 | poda por evolução | redução de Sede por canastra | Mundo do Espelho -4/-8/-12 | Infecção -4/-8/-12 por canastra |
 | Compra/lixo | Cofre, Tarifa, Bloqueio, Ágio | Dominação e controle | Pólen | Daniela, Morto profanado e Portas do Castelo | Espelho do Lixo | Zona Contaminada e Agarrador após compra |

@@ -1,3 +1,5 @@
+import { MATRIARCH_MAX_FLOWERS } from '../boss-balance.js';
+
 const SPEECHES = Object.freeze({
   living_seed: 'Eu só preciso de uma semente. O resto da mão fará o trabalho.',
   hungry_root: 'Minhas raízes não pedem muito. Só o bastante para continuarem vivas.',
@@ -233,7 +235,7 @@ export const matriarchBossPresentation = Object.freeze({
   id: 'matriarca_esmeralda',
   feminine: true,
   ruleSummary(gameState) {
-    const limit = Math.max(1, Number(gameState?.boss?.maxDanger || 5));
+    const limit = MATRIARCH_MAX_FLOWERS;
     return `${limit} Flores = derrota · Fase 3: 1 Renascimento com 300 HP ao consumir 1 Flor.`;
   },
   speech(abilityId, context = {}) {

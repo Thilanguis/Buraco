@@ -1,4 +1,4 @@
-import { MATRIARCH_GRAFT_PARTIAL_HEAL } from '../boss-balance.js';
+import { MATRIARCH_GRAFT_PARTIAL_HEAL, MATRIARCH_MAX_FLOWERS } from '../boss-balance.js';
 
 const ability = (id, name, weight, phases, describe) => ({ id, name, weight, phases, describe });
 
@@ -12,7 +12,7 @@ export const matriarchDefinition = Object.freeze({
   accent: '#34d399',
   maxHp: 2000,
   dangerType: 'bloom',
-  maxDanger: 5,
+  maxDanger: MATRIARCH_MAX_FLOWERS,
   phaseNames: Object.freeze({ 1: 'Germinacao', 2: 'Jardim Voraz', 3: 'Primavera Eterna' }),
   phaseTaunts: Object.freeze({
     1: 'Toda mesa pode virar um jardim. A de voces ja comecou a criar raizes.',

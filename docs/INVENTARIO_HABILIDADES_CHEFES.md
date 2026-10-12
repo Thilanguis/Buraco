@@ -77,6 +77,11 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 **Transbordamento:** se um jogador já estiver em **50/50 de Dominação** e receber mais pressão, o excesso resvala para o parceiro em qualquer fase. Se ambos estiverem em 50, a derrota especial é confirmada.
 
+**BOT (12/10/2026):** o ranking considera as duas barras e simula o descarte final
+no motor. Preserva o naipe ordenado quando o custo justifica, mas permite
+sacrifício estratégico; não obedece cegamente nem usa cartas ocultas do parceiro.
+Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.md).
+
 
 **Resistência:** Limpa reduz 4 pontos de Dominação, Real 8 no total e Ás-a-Ás 12 no total. Evoluções sucessivas acrescentam 4 por novo tier; o mesmo tier do mesmo jogo só conta uma vez. O alívio começa no jogador responsável e, se ele não tiver Dominação suficiente, o restante transborda para o parceiro.
 
@@ -86,7 +91,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 ## A Matriarca Esmeralda
 
-**Teto de burst:** uma ativação aplica no máximo +1 Flor, mesmo com falhas múltiplas. Trepadeiras: uma/duas falhas = +1; Enxerto: um lado = cura até 50 HP sem Flor/propagação comum, zero lados = +1 Flor e propagação; Florescimento Real: qualquer número de falhas = +1. Propagações independentes existentes permanecem. HP 2000, derrota em 5 Flores, alívio incremental por canastras, limites de cura e Renascimento F3 (1 Flor, 300 HP, 1x) preservados. Orvalho e Casulo não mudam.
+**Teto de burst:** uma ativação aplica no máximo +1 Flor, mesmo com falhas múltiplas. Trepadeiras: uma/duas falhas = +1; Enxerto: um lado = cura até 50 HP sem Flor/propagação comum, zero lados = +1 Flor e propagação; Florescimento Real: qualquer número de falhas = +1. Propagações independentes existentes permanecem. HP 2000, derrota em 10 Flores (limite atualizado em 12/10/2026), alívio incremental por canastras, limites de cura e Renascimento F3 (1 Flor, 300 HP, 1x) preservados. Orvalho e Casulo não mudam.
 
 
 **HP:** 2000. **Limite total de cura por rodada:** F1 100 / F2 150 / F3 200.
@@ -106,7 +111,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 | Coroa da Primavera | 3 | 3 | Marca uma ameaça natural; se ela falhar, prepara uma Raiz Fortalecida que exige cooperação. |
 
 
-**Condição especial de derrota:** a equipe perde quando o Florescimento chega a 5 Flores.
+**Condição especial de derrota:** a equipe perde quando o Florescimento chega a 10 Flores. De 0 a 9, continua. Saves encerrados sob o limite anterior de cinco não são reativados.
 
 
 **Renascimento (passiva):** na Fase 3, se a Matriarca cair a 0 HP com pelo menos **1 Flor** e ainda não tiver usado o efeito, ela consome **1 Flor** e retorna com **300 HP** uma vez. Não entra no sorteio normal; aparece no DevTools com peso 0 para teste manual.

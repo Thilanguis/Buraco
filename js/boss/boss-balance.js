@@ -1,4 +1,5 @@
 export const MATRIARCH_GRAFT_PARTIAL_HEAL = 50;
+export const MATRIARCH_MAX_FLOWERS = 10;
 
 export function getRestorativeDewHealing(phase, cardsPlayed) {
   const count = Math.max(0, Number(cardsPlayed) || 0);
