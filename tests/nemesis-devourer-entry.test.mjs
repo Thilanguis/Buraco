@@ -65,7 +65,7 @@ test('Two cards fail at round end and phase 3 persists Mutated with unchanged HP
   completeBossPlayerTurn(s, 0); completeBossPlayerTurn(s, 1);
   for (let i = 0; i < 15 && !p.resolved; i++) advanceBossTurn(s, (s.boss.bossFlow?.endsAt || 1000) + 1);
   assert.equal(p.entrySuccess, false); assert.equal(zombie(s).status, 'persistent');
-  assert.equal(zombie(s).mutated, true); assert.equal(zombie(s).hp, 260);
+  assert.equal(zombie(s).mutated, true); assert.equal(zombie(s).hp, 200);
 });
 test('A game created after announcement, including later feeding, never counts', () => {
   const s = fixture(); const p = announce(s);

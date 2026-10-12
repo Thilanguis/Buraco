@@ -15,6 +15,10 @@ import { CASTLE_BALANCE, LEGACY_CASTLE_BALANCE, livingDaughters, furyLevel, choo
 // Freeze the pre-approval baseline: historical reports must remain reproducible
 // after the game's defaults change to package B.
 export const EXPERIMENT_BASELINE = Object.freeze({ ...CASTLE_BALANCE, regeneration:50, anticoagulantRegeneration:25,
+  // Historical experiments use their original percent-on-original-HP losses;
+  // they must not silently inherit the current flat petrification package.
+  daughterHpFloor:300, maxHpLossByItem:null,
+  maxHpLossPercent:Object.freeze({dagger:.05,explosive:.1,cold_flask:.2,anticoagulant:.15,relic:.2}),
   itemEffectsVersion:1, daggerTransfer:.3, explosiveDamage:60, bleedAmount:null, bleedPercent:.1, bleedPermanent:false, bleedRounds:2 });
 
 export const STRATEGIES = ['direct','kill_one','kill_two','kill_three','dagger','explosive_anti','cold_bleed','hybrid'];
@@ -29,7 +33,7 @@ export const CANDIDATES = {
 export function castleDeal(seed,{legacy=false,...overrides}={}) {
   const rng=random(seed),deck=createDeck(['♠','♥','♦','♣'],['A','2','3','4','5','6','7','8','9','10','J','Q','K']);
   const boss=createBossState('dimitrescu',seed),rules={...EXPERIMENT_BASELINE,...overrides};
-  rules.maxHpLossPercent={...CASTLE_BALANCE.maxHpLossPercent,...overrides.maxHpLossPercent};
+  rules.maxHpLossPercent={...EXPERIMENT_BASELINE.maxHpLossPercent,...overrides.maxHpLossPercent};
   if(legacy){boss.castleItemRulesVersion=1;delete boss.castleItemRules;boss.castleDaughterBalanceVersion=2;}
   else boss.castleItemRules=rules;
   const hp=legacy?LEGACY_CASTLE_BALANCE.daughterHp:rules.daughterHp;

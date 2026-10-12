@@ -1,5 +1,6 @@
 // Strategy only. All legality, damage and deadline outcomes stay in the engine.
 import { bossObservableState, bossStockOpportunityValue, cooperativeHandValue, cooperativeHandMarginals, planPairIndexesWithTop } from '../game/bot-planner.js';
+import { hasUnspentCastleItem } from './dimitrescu-castle.js';
 import { applyBossMeldTransition, classifyBossMeldKind, isValidBossSequence,
   isBossCardNaturalInSequence, completeBossPlayerTurn, notifyBossCardDiscarded,
   quoteBossDiscardPickup, notifyBossDiscardTaken, notifyBossPurchaseCompleted,
@@ -37,7 +38,7 @@ function health(s) {
     + (s.boss?.combatEntities || []).filter(e=>['alive','persistent'].includes(e.status))
       .reduce((n, e) => n + Number(e.hp || 0) * .5, 0);
 }
-function dangerCost(s) {
+export function dangerCost(s) {
   if (s.boss?.result?.victory === false) return 100000;
   if (s.boss?.id === 'dominadora') {
     // Public fractional bars: four legacy chains = 50 points per cooperador.
@@ -323,5 +324,31 @@ export function rankBossDiscards(state,botIndex) {
     const opportunity=discardOpportunity(s,botIndex,card);
     return {cardId:card.id,score:projected.value-base-cooperativeDiscardAdjustment(s,botIndex,card)-opportunity,
       diagnostics:{opportunity,objective:objectiveDiagnostic(s,projected.state,s.boss.currentIntent?.abilityId)}};
-  }).sort((a,b)=>b.score-a.score || a.cardId.localeCompare(b.cardId));
+  }).sort((a,b)=>{
+    if(s.boss.id==='dimitrescu') {
+      // Items are retained even while temporarily unusable. The sole exception
+      // is a canonical terminal loss avoided by the competing discard.
+      const lossA=!!a.diagnostics.objective.lossAfterAction,lossB=!!b.diagnostics.objective.lossAfterAction;
+      if(lossA!==lossB)return Number(lossA)-Number(lossB);
+      const itemA=hasUnspentCastleItem(s,a.cardId),itemB=hasUnspentCastleItem(s,b.cardId);
+      if(itemA!==itemB)return Number(itemA)-Number(itemB);
+    }
+    return b.score-a.score || a.cardId.localeCompare(b.cardId);
+  });
+}
+
+// Shared recovery path. If full ranking fails, still retain canonical items
+// preferentially without forbidding an all-item hand from finishing its turn.
+export function selectBossRecoveryDiscardIndex(state,botIndex,blocked=null) {
+  const p=state?.players?.[botIndex];if(!p)return -1;
+  const legal=c=>c?.id && c.id!==state.pickedDiscardCardId
+    && !(blocked ? blocked(p.id,c.id,'discard') : isBossCardBlocked(state,p.id,c.id,'discard'));
+  if(state.boss?.id!=='dimitrescu')return p.hand.findIndex(legal);
+  try {
+    for(const choice of rankBossDiscards(state,botIndex)) {
+      const index=p.hand.findIndex(c=>c.id===choice.cardId&&legal(c));if(index>=0)return index;
+    }
+  } catch {} // Recovery must remain available even if strategic evaluation fails.
+  const common=p.hand.findIndex(c=>legal(c)&&!hasUnspentCastleItem(state,c.id));
+  return common>=0 ? common : p.hand.findIndex(legal);
 }

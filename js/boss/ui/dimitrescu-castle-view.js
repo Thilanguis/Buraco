@@ -1,4 +1,4 @@
-import { CASTLE_BALANCE, ITEM_DEFINITIONS, bloodLinkCapacity, bloodLinkRemaining, furyLevel, castleRules, castleItemHpLoss, daughterOriginalHp, hasCastleHemorrhage, castleBleedAmount, castleFrozen, usesGlobalCastleItems } from '../dimitrescu-castle.js';
+import { CASTLE_BALANCE, ITEM_DEFINITIONS, bloodLinkCapacity, bloodLinkRemaining, furyLevel, ladyTitheBlood, ladyTitheParameters, castleRules, castleItemHpLoss, daughterOriginalHp, hasCastleHemorrhage, castleBleedAmount, castleFrozen, usesGlobalCastleItems } from '../dimitrescu-castle.js';
 
 export function castleItemHelp(type, boss = {castleItemRulesVersion:2}) {
   const rules = castleRules(boss), modern = boss.castleItemRulesVersion === 2;
@@ -150,7 +150,9 @@ export function renderCastleHud({ document, hud, state, createHelp, cardFrontHTM
     fury.id = 'castleFury'; hud.querySelector('.boss-portrait').append(fury);
   }
   fury.textContent = ['NORMAL', 'FÚRIA I', 'FÚRIA II', 'FÚRIA FINAL'][level];
-  fury._furyHelp = `Agora: cura da Lady +${level * 10}% e +${level * CASTLE_BALANCE.furyBloodStep} Sede nas punições dela.\nCada filha derrotada acrescenta +10% à cura e +${CASTLE_BALANCE.furyBloodStep} Sede. As filhas e Sangue Impuro não recebem esse bônus. Cumprir objetivos continua evitando a punição.`;
+  const titheIntent=boss.currentIntent?.abilityId==='blood_tithe'?boss.currentIntent:null;
+  const titheTotal=ladyTitheBlood(boss,2*ladyTitheParameters(boss,titheIntent).heavyTithe,titheIntent);
+  fury._furyHelp = `Agora: cura da Lady +${level * 10}% e +${level * CASTLE_BALANCE.furyBloodStep} Sede nas punições gerais dela.\nTributo de Sangue: bônus coletivo +${ladyTitheBlood(boss,1,titheIntent)-1}, cobrado uma única vez. Duas mãos com 11+ cartas pagam +${titheTotal} neste estado.\nMarca Carmesim também aumenta sua base conforme a Fúria, sem ultrapassar o teto anterior. As filhas e Sangue Impuro não recebem esse bônus. Cumprir objetivos continua evitando a punição.`;
   if (!panel) { panel = document.createElement('section'); panel.id = 'dimitrescuCastlePanel'; hud.insertAdjacentElement('afterend', panel); }
   const target = boss.combatTargetsByPlayer[viewerId] || 'boss';
   const mainPortrait = hud.querySelector('.boss-portrait');

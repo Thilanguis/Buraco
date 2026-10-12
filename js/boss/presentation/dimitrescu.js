@@ -1,4 +1,4 @@
-import { ladyBloodBalance, furyHealing, furyBlood, furyLevel, CASTLE_BALANCE } from '../dimitrescu-castle.js';
+import { ladyBloodBalance, ladyTitheParameters, ladyTitheBlood, ladyCrimsonBrandBase, furyHealing, furyBlood, furyLevel, CASTLE_BALANCE } from '../dimitrescu-castle.js';
 const SPEECHES = Object.freeze({
   bela_hunt: 'Bela está entediada. Seja gentil e entretenha minha filha.',
   cassandra_feast: 'Cassandra já escolheu onde servir o jantar. Não a façam esperar.',
@@ -87,7 +87,7 @@ export const dimitrescuBossPresentation = Object.freeze({
       case 'daniela_swarm': return detailFields([['Filha', 'Daniela'], ['Carta contaminada', cardLabelAnywhere(gameState, payload.discardCardId)], ['Prazo', 'esta rodada'], ['Evitar o lixo', 'Sem punição'], ['Recolher o lixo', `Sede +${Number(intent.announcedPhase) === 3 ? 15 : 12}`]]);
       case 'blood_tithe': {
         const phase = Number(intent.announcedPhase) || 1;
-        const { mediumTithe: medium, heavyTithe: heavy } = ladyBloodBalance(phase);
+        const { mediumTithe: medium, heavyTithe: heavy } = ladyTitheParameters(gameState.boss,intent);
         const players = (gameState?.players || []).map((player) => {
           const cards = player.hand?.length || 0;
           const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
@@ -96,7 +96,7 @@ export const dimitrescuBossPresentation = Object.freeze({
         return detailFields([['Cobrança', 'cada jogador é avaliado separadamente no fim da rodada'], ...players, ['0–7 cartas', 'sem efeito'], ['8–10 cartas', `Sede +${medium} por jogador`], ['11+ cartas', `Sede +${heavy} por jogador`]]);
       }
       case 'red_wine': return detailFields([['Requisito', 'Lady ferida e Sede 20+'], ['Cura com Fúria', `${furyHealing(gameState.boss, payload.healAmount || 0)} HP`], ['Custo', `${payload.bloodCost || 15} de Sede`]]);
-      case 'crimson_brand': return detailFields([...(payload.marks || []).map((mark, index) => [`Marca ${index + 1}`, `${playerName(gameState, mark.playerId)} — ${cardLabelAnywhere(gameState, mark.cardId)}`]), ['Sucesso por marca', 'Sem punição'], ['Falha por marca', `Sede +${ladyBloodBalance(intent.announcedPhase).crimsonBrand}`]]);
+      case 'crimson_brand': return detailFields([...(payload.marks || []).map((mark, index) => [`Marca ${index + 1}`, `${playerName(gameState, mark.playerId)} — ${cardLabelAnywhere(gameState, mark.cardId)}`]), ['Sucesso por marca', 'Sem punição'], ['Falha por marca', `Sede +${ladyCrimsonBrandBase(gameState.boss,intent.announcedPhase,intent)} base; Fúria uma vez no total`]]);
       case 'cassandra_dead_feast': return detailFields([['Autora', 'Lady Dimitrescu'], ['Alvo', `Morto ${Number(payload.deadIndex) + 1}`], ['Ao tomar', `Sede +${furyBlood(gameState.boss, payload.bloodAmount || 0)} e cura ${furyHealing(gameState.boss, payload.healAmount || 0)} HP`], ['Purificação', `Canastra Real ou Ás-a-Ás: +${furyBlood(gameState.boss, 4)} Sede, sem cura`]]);
       case 'crimson_clot': return detailFields([['Proteção', `${payload.amount || 0}`], ['Romper', 'Sem punição'], ['Sobreviver', 'metade da proteção restante vira cura']]);
       case 'castle_lockdown': return detailFields([['Duração', 'rodada completa'], ['Restrição', 'ninguém pode pegar o lixo'], ['Compra permitida', 'somente do monte']]);
@@ -144,15 +144,15 @@ export const dimitrescuBossPresentation = Object.freeze({
       case 'daniela_swarm': return { instruction: '☣️ Não pegue o Lixo.', progress: payload.triggered ? '❌ Ativado' : '⬜ Seguro', consequence: payload.triggered ? 'Sede aumentou' : `Evitar: sem punição · Pegar +${Number(intent.announcedPhase) === 3 ? 15 : 12} Sede` };
       case 'blood_tithe': {
         const phase = Number(intent.announcedPhase) || 1;
-        const { mediumTithe: medium, heavyTithe: heavy } = ladyBloodBalance(phase);
+        const { mediumTithe: medium, heavyTithe: heavy } = ladyTitheParameters(gameState.boss,intent);
         const projected = (gameState?.players || []).reduce((sum, player) => {
           const cards = player.hand?.length || 0;
           return sum + (cards >= 11 ? heavy : cards >= 8 ? medium : 0);
         }, 0);
-        return { instruction: 'Reduza as duas mãos antes do fim da rodada.', progress: '', consequence: `Previsto: +${furyBlood(gameState.boss, projected)} Sede` };
+        return { instruction: 'Reduza as duas mãos antes do fim da rodada.', progress: '', consequence: `Previsto: +${ladyTitheBlood(gameState.boss, projected,intent)} Sede` };
       }
       case 'red_wine': return { instruction: `Troca ${payload.bloodCost || 15} Sede por cura.`, progress: `Sede ${gameState?.boss?.danger || 0}/100`, consequence: `Até +${furyHealing(gameState.boss, payload.healAmount || 0)} HP` };
-      case 'crimson_brand': return { instruction: 'Use cada carta marcada em um jogo.', progress: brandProgress(), consequence: `Falha agora: +${furyBlood(gameState.boss, (payload.marks || []).filter(m => m.status === 'active').length * ladyBloodBalance(intent.announcedPhase).crimsonBrand)} Sede` };
+      case 'crimson_brand': return { instruction: 'Use cada carta marcada em um jogo.', progress: brandProgress(), consequence: `Falha agora: +${furyBlood(gameState.boss, (payload.marks || []).filter(m => m.status === 'active').length * ladyCrimsonBrandBase(gameState.boss,intent.announcedPhase,intent))} Sede` };
       case 'cassandra_dead_feast': {
         const curse = gameState?.boss?.bloodiedDead;
         const active = curse?.status === 'active';
@@ -174,14 +174,14 @@ export const dimitrescuBossPresentation = Object.freeze({
   rangeMeters({ gameState, intent } = {}) {
     if (intent?.abilityId !== 'blood_tithe') return null;
     const phase = Number(intent.announcedPhase) || 1;
-    const { mediumTithe: medium, heavyTithe: heavy } = ladyBloodBalance(phase);
+    const { mediumTithe: medium, heavyTithe: heavy } = ladyTitheParameters(gameState.boss,intent);
     const players = (gameState?.players || []).map((player) => {
       const cards = player.hand?.length || 0;
       const amount = cards >= 11 ? heavy : cards >= 8 ? medium : 0;
       return { label: player.name || 'Jogador', value: cards, amount, tone: cards >= 11 ? 'danger' : cards >= 8 ? 'warning' : 'safe' };
     });
     const maxCards = Math.max(0, ...players.map((player) => player.value));
-    const projectedBlood = furyBlood(gameState.boss, players.reduce((sum, player) => sum + player.amount, 0));
+    const projectedBlood = ladyTitheBlood(gameState.boss, players.reduce((sum, player) => sum + player.amount, 0),intent);
     const maximum = Math.max(14, maxCards);
     const worstTone = players.some((player) => player.tone === 'danger') ? 'danger' : players.some((player) => player.tone === 'warning') ? 'warning' : 'safe';
     const playerSummary = players.map((player) => `${player.label} ${player.value}`).join(' · ');
@@ -201,11 +201,11 @@ export const dimitrescuBossPresentation = Object.freeze({
       case 'bela_hunt':
         return `${playerName(gameState, payload.targetPlayerId)}: jogue ${cardLabelAnywhere(gameState, payload.cardId)} legalmente até o fim do seu turno. Descartar não vale. Sucesso: sem punição; falha: +${phase === 3 ? 16 : 14} Sede.`;
       case 'blood_tithe':
-        return `Baixe cartas antes do fim da rodada! Cada mão paga:\n0–7 cartas: nada\n8–10: +${ladyBloodBalance(phase).mediumTithe} Sede\n11+: +${ladyBloodBalance(phase).heavyTithe} Sede\n${furyLevel(gameState.boss) ? `Fúria: +${furyLevel(gameState.boss) * CASTLE_BALANCE.furyBloodStep} ao total quando houver cobrança.` : 'Os dois jogadores são avaliados separadamente.'}`;
+        return `Baixe cartas antes do fim da rodada! Cada mão paga:\n0–7 cartas: nada\n8–10: +${ladyTitheParameters(gameState.boss,intent).mediumTithe} Sede\n11+: +${ladyTitheParameters(gameState.boss,intent).heavyTithe} Sede\nFúria: +${ladyTitheBlood(gameState.boss,1,intent)-1} uma única vez no total quando houver cobrança. Duas mãos com 11+ pagam +${ladyTitheBlood(gameState.boss,2*ladyTitheParameters(gameState.boss,intent).heavyTithe,intent)} neste estado.`;
       case 'red_wine':
         return `Lady consome ${payload.bloodCost || 15} de Sede para curar até ${furyHealing(gameState.boss, payload.healAmount || 0)} HP, já com Fúria. Não ultrapassa o HP máximo.`;
       case 'crimson_brand':
-        return `Jogue as cartas marcadas até o fim da rodada. Cada carta não usada causa +${ladyBloodBalance(phase).crimsonBrand} Sede.${furyLevel(gameState.boss) ? `\nFúria: +${furyLevel(gameState.boss) * CASTLE_BALANCE.furyBloodStep} ao total se alguma marca falhar.` : ''}\nDescartar não vale; usar a carta evita sua punição.`;
+        return `Jogue as cartas marcadas até o fim da rodada. Cada carta não usada causa +${ladyCrimsonBrandBase(gameState.boss,phase,intent)} Sede.${furyLevel(gameState.boss) ? `\nFúria: +${furyLevel(gameState.boss) * CASTLE_BALANCE.furyBloodStep} ao total se alguma marca falhar.` : ''}\nDescartar não vale; usar a carta evita sua punição.`;
       case 'cassandra_feast':
         return `Adicione 1 carta legal ao Jogo ${Number(payload.meldIndex) + 1} nesta rodada. Sucesso: sem punição; falha: +${phase === 3 ? 18 : 16} Sede.`;
       case 'daniela_swarm':

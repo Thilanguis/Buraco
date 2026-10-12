@@ -17,8 +17,9 @@ import {
   getBossMechanicsAdapter,
 } from './mechanics/boss-mechanics-registry.js';
 import { quoteBankerCreditLimit } from './mechanics/banker.js';
+import { rankCastleBotItems } from './castle-bot-strategy.js';
 import { isCombatEntityAlive } from './boss-combat.js';
-import { CASTLE_BALANCE, ladyBloodBalance, absorbBloodLink, furyHealing, furyBlood, startCastleRound, resolveDaughterPassive, sacrificeCastleItem, chooseCastleItem, castleFrozen } from './dimitrescu-castle.js';
+import { CASTLE_BALANCE, ladyBloodBalance, ladyTitheParameters, ladyTitheBlood, ladyCrimsonBrandBase, absorbBloodLink, furyHealing, furyBlood, startCastleRound, resolveDaughterPassive, sacrificeCastleItem, castleFrozen } from './dimitrescu-castle.js';
 export { distributeCastleItems } from './dimitrescu-castle.js';
 import { canReceiveNeheleniaIllusionLock } from './mechanics/nehelenia.js';
 import { normalizeBossSpecial, creditBossSpecial, consumeBossSpecial } from './boss-special.js';
@@ -165,7 +166,8 @@ function bossCardDamage(card) {
   if (!card) return 0;
   if (card.joker || card.rank === 'JOKER') return 20;
   const rank = String(card.rank);
-  if (rank === 'A' || rank === '2') return 15;
+  if (rank === 'A') return 15;
+  if (rank === '2') return 10;
   if (['8', '9', '10', 'J', 'Q', 'K'].includes(rank)) return 10;
   return ['3', '4', '5', '6', '7'].includes(rank) ? 5 : 0;
 }
@@ -964,7 +966,8 @@ export function useCastleItem(gameState, playerId, cardId, daughterId) {
 
 export function getCastleBotItem(gameState, playerId) {
   if (gameState.boss?.id !== 'dimitrescu') return null;
-  return chooseCastleItem(gameState, playerId, (cardId, daughterId) => canUseCastleItem(gameState, playerId, cardId, daughterId));
+  const best=rankCastleBotItems(gameState,playerId)[0];
+  return best ? {cardId:best.cardId,daughterId:best.daughterId} : null;
 }
 
 function buildDimitrescuCrimsonMarks(gameState) {
@@ -1537,7 +1540,7 @@ function createPayload(gameState, abilityId) {
       const healAmount = { 1: 140, 2: 200, 3: 260 }[boss.phase] || 140;
       return { healAmount, bloodCost: 15 };
     }
-    if (abilityId === 'crimson_brand') return { marks: buildDimitrescuCrimsonMarks(gameState) };
+    if (abilityId === 'crimson_brand') return { marks: buildDimitrescuCrimsonMarks(gameState), bloodPressureVersion: 2 };
     if (abilityId === 'cassandra_dead_feast') {
       const target = dimitrescuDeadCandidate(gameState);
       return {
@@ -1549,7 +1552,8 @@ function createPayload(gameState, abilityId) {
     if (abilityId === 'crimson_clot') return { amount: boss.phase === 3 ? 260 : 180 };
     if (abilityId === 'three_daughters') return { passiveVersion: 2 };
     if (abilityId === 'impure_blood') return { triggeredPlayerIds: [] };
-    if (abilityId === 'blood_tithe' || abilityId === 'castle_lockdown') return {};
+    if (abilityId === 'blood_tithe') return { bloodPressureVersion: 2 };
+    if (abilityId === 'castle_lockdown') return {};
   }
 
   if (boss.id === 'nehelenia') {
@@ -5562,7 +5566,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
         : 'O Enxame de Daniela já bebeu sangue quando o lixo foi recolhido.';
       resultData = { daughter: 'daniela', success, triggeredByPlayerId: intent.payload.triggeredByPlayerId ?? null };
     } else if (intent.abilityId === 'blood_tithe') {
-      const { mediumTithe, heavyTithe } = ladyBloodBalance(phase);
+      const { mediumTithe, heavyTithe } = ladyTitheParameters(boss,intent);
       const bands = gameState.players.map((player) => {
         const cards = player.hand?.length || 0;
         const amount = cards >= 11 ? heavyTithe : cards >= 8 ? mediumTithe : 0;
@@ -5580,7 +5584,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       });
       const successes = marks.filter((mark) => mark.status === 'success').length;
       const failures = marks.filter((mark) => mark.status === 'failed').length;
-      dangerDelta = failures * ladyBloodBalance(phase).crimsonBrand;
+      dangerDelta = failures * ladyCrimsonBrandBase(boss,phase,intent);
       outcome = `Marca Carmesim: ${successes} removida${successes === 1 ? '' : 's'}, ${failures} ainda sangrando${dangerDelta ? ` · Sede ${dangerDelta > 0 ? '+' : ''}${dangerDelta}` : ''}.`;
       resultData = { crimsonMarks: marks.map((mark) => ({ ...mark })), successes, failures };
     } else if (intent.abilityId === 'red_wine') {
@@ -5964,7 +5968,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
 
   if (boss.id === 'dimitrescu' && dangerDelta > 0) {
     const base = dangerDelta;
-    dangerDelta = furyBlood(boss, base);
+    dangerDelta = intent.abilityId === 'blood_tithe' ? ladyTitheBlood(boss,base,intent) : furyBlood(boss, base);
     if (dangerDelta > base) outcome += ` Com Fúria: +${dangerDelta} Sede no total.`;
   }
   const dangerBefore = boss.danger;

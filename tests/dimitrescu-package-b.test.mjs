@@ -12,12 +12,12 @@ const daughter=s=>s.boss.combatEntities[0];
 const close=s=>regenerateDaughters(s,()=>{},e=>s.boss.eventLog.push(e));
 function item(s,type,id=type){s.boss.castleItems||={};s.boss.castleItems[id]={type,consumed:false};s.players[0].hand.push(card(id));assert.ok(useCastleItem(s,0,id,'bela'));}
 
-test('pacote B: números finais e proteção/HP/petrificação preservados',()=>{
+test('pacote atual: números finais e proteção/HP preservados, petrificação 80/110/100/160/160',()=>{
   const s=game(),r=castleRules(s.boss);
   assert.deepEqual([r.daughterHp,r.regeneration,r.anticoagulantRegeneration,r.daggerTransfer,r.explosiveDamage,r.bleedAmount,r.bleedPermanent,r.coldMaxCharges],
     [500,20,10,.8,100,15,true,2]);
-  assert.deepEqual([s.boss.hp,s.boss.bloodLinkProtection,r.daughterHpFloor,r.linkPerDaughter,r.passiveBlood,r.furyBloodStep],[2000,1500,300,500,3,2]);
-  assert.deepEqual(r.maxHpLossPercent,{dagger:.05,explosive:.1,cold_flask:.2,anticoagulant:.15,relic:.2});
+  assert.deepEqual([s.boss.hp,s.boss.bloodLinkProtection,r.daughterHpFloor,r.linkPerDaughter,r.passiveBlood,r.furyBloodStep],[2000,1500,130,500,3,2]);
+  assert.deepEqual(r.maxHpLossByItem,{dagger:80,explosive:110,anticoagulant:100,cold_flask:160,relic:160});
   assert.deepEqual(castleRules(JSON.parse(JSON.stringify(s.boss))),CASTLE_BALANCE);
 });
 
@@ -78,8 +78,8 @@ test('morte por sangramento limpa efeito permanente e devolve cartas sem item um
 
 for(const hp of [500,100,40])test(`Explosivo 100: dano efetivo, limite e morte com HP ${hp}`,()=>{
   const s=game();daughter(s).hp=hp;item(s,'explosive');
-  const expected=Math.max(0,Math.min(hp,450)-100);
-  assert.equal(daughter(s).hp,expected);assert.equal(daughter(s).maxHp,450);
+  const expected=Math.max(0,Math.min(hp,390)-100);
+  assert.equal(daughter(s).hp,expected);assert.equal(daughter(s).maxHp,390);
   const e=s.boss.eventLog.find(e=>e.type==='castleItem');assert.equal(e.appliedDamage,Math.min(100,hp));
   assert.equal(daughter(s).status,expected?'alive':'dead');
   assert.equal(s.boss.bloodLinkProtection,expected?1500:1000);

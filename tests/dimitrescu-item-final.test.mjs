@@ -108,16 +108,16 @@ for(const hp of [300,40])test(`Relíquia+Adaga: base100 → efetivo${hp===40?40:
 
 for(const source of ['item','bleed','other'])test(`Relíquia não aumenta fonte ${source}`,()=>{
   const s=game();use(s,'relic');assert.equal(attack(s,100,source,source),100);
-  assert.equal(daughter(s).hp,300);assert.equal(s.boss.hp,2000);
+  assert.equal(daughter(s).hp,240);assert.equal(s.boss.hp,2000);
 });
 
 test('Relíquia permanente sem silenciar nem acumular bônus; Explosivo100/15 permanece independente',()=>{
   const s=game();startDimitrescuRound(s,{selectedDaughterId:'bela'});
   use(s,'relic','bela','r1');use(s,'relic','bela','r2');
   assert.equal(daughter(s).passive.status,'active');assert.equal(daughter(s).relicRound,null);
-  assert.equal(daughter(s).maxHp,300);assert.equal(attack(s,100),120);
-  use(s,'explosive');assert.equal(daughter(s).hp,80);
-  regenerateDaughters(s,()=>{},record(s));assert.equal(daughter(s).hp,85);
+  assert.equal(daughter(s).maxHp,180);assert.equal(attack(s,20),24);
+  use(s,'explosive');assert.equal(daughter(s).hp,30);
+  regenerateDaughters(s,()=>{},record(s));assert.equal(daughter(s).hp,35);
   assert.equal(daughter(s).relicAttackBonus,true);
   s.boss.roundNumber++;assert.equal(attack(s,10,'later'),12);
 });
@@ -133,7 +133,7 @@ test('snapshot/reload/undo preservam congelamento compartilhado e Relíquia sem 
   const s=game();use(s,'relic');const before=createUndoTransaction(s);
   use(s,'cold_flask','daniela');finish(s);const snap=JSON.parse(JSON.stringify(s));
   normalizeBossState(snap);assert.equal(snap.boss.castleFreeze.remainingTurns,1);
-  assert.equal(daughter(snap).relicAttackBonus,true);assert.equal(daughter(snap,'daniela').maxHp,400);
+  assert.equal(daughter(snap).relicAttackBonus,true);assert.equal(daughter(snap,'daniela').maxHp,340);
   const json=JSON.stringify(snap);normalizeBossState(snap);assert.equal(JSON.stringify(snap),json);
   const restored=restoreUndoTransaction(before).state;normalizeBossState(restored);
   assert.equal(castleFrozen(restored.boss),false);assert.equal(daughter(restored).relicAttackBonus,true);

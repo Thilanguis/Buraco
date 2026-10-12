@@ -28,7 +28,7 @@ const VARIANTS = Object.freeze({
   bot: { id: 'bot', label: 'Bot como responsavel' },
   reentry: { id: 'reentry', label: 'Repelido pode voltar' },
   avoid_repeat: { id: 'avoid_repeat', label: 'Evitar repetir repelido' },
-  phase_cap: { id: 'phase_cap', label: 'Teto de persistentes da fase preenchido' },
+  phase_cap: { id: 'phase_cap', label: 'Três zumbis persistentes presentes' },
   persistent_corpse: { id: 'persistent_corpse', label: 'Persistente e cadáver / reload' },
 });
 
@@ -434,7 +434,7 @@ function scenarioExpected(state, abilityId, variant) {
   };
   if (variant === 'failure' && state.boss?.id === 'matriarca_esmeralda') expected.threatStatus = 'failed';
   if (variant === 'external_cancel') expected.threatStatus = 'cancelled';
-  if (variant === 'no_target' || variant === 'phase_cap' || (variant === 'persistent_corpse' && state.boss.phase === 1)) {
+  if (variant === 'no_target' || variant === 'phase_cap') {
     expected.forcedAbilityRejected = abilityId;
     expected.fallbackSelected = true;
   }
@@ -485,7 +485,7 @@ function findSeedForTarget(state, abilityId, target) {
 }
 
 function scenarioInstructions(ability, variant, eligibility, state) {
-  if (!eligibility.eligible) return [`HABILIDADE: ${ability.name}`, `FASE: ${state.boss.phase}`, '', 'COMO TESTAR:', variant === 'phase_cap' ? 'O teto de persistentes da fase está cheio. Execute para confirmar a rejeição da Invasão e o fallback legal.' : 'O cenário não oferece alvo elegível. Execute para confirmar a rejeição e o fallback legal.', '', 'ESPERADO:', 'Outra habilidade elegível é anunciada; nenhuma entrada/reanimação é forçada fora das regras.'].join('\n');
+  if (!eligibility.eligible) return [`HABILIDADE: ${ability.name}`, `FASE: ${state.boss.phase}`, '', 'COMO TESTAR:', variant === 'phase_cap' ? 'Os três zumbis já estão persistentes. Execute para confirmar a rejeição da Invasão e o fallback legal.' : 'O cenário não oferece alvo elegível. Execute para confirmar a rejeição e o fallback legal.', '', 'ESPERADO:', 'Outra habilidade elegível é anunciada; nenhuma entrada/reanimação é forçada fora das regras.'].join('\n');
   if (ability.id === 'final_order') {
     return [
       'HABILIDADE: Ordem Final',
@@ -559,7 +559,7 @@ function buildStandardScenario(_sourceState, definition, ability, options = {}) 
 
   const eligibility = findSeedForTarget(state, ability.id, target);
   if (definition.id === 'dimitrescu') distributeCastleItems(state.boss, collectCardsWithZones(state).map(entry => entry.card));
-  const expectsNoTarget = variant === 'no_target' || variant === 'phase_cap' || (variant === 'persistent_corpse' && phase === 1);
+  const expectsNoTarget = variant === 'no_target' || variant === 'phase_cap';
   if (!expectsNoTarget && !eligibility.eligible) throw new Error(eligibility.reason);
   if (expectsNoTarget && eligibility.eligible) throw new Error(`${ability.name} ainda encontrou um alvo no cenario sem alvo.`);
   queueDebugBossAbility(state, ability.id);
@@ -844,7 +844,7 @@ export function validateBossDebugScenario(state, { bossId, abilityId, phase, var
   if (abilityId && !errors.length) {
     eligibility = inspectBossAbilityEligibility(state, abilityId, { debug: true });
     if (variant === 'no_target' && eligibility.eligible) errors.push(`${abilityId} encontrou alvo quando deveria usar fallback.`);
-    if (variant !== 'no_target' && variant !== 'phase_cap' && !(variant === 'persistent_corpse' && state.boss.phase === 1) && !eligibility.eligible) errors.push(eligibility.reason);
+    if (variant !== 'no_target' && variant !== 'phase_cap' && !eligibility.eligible) errors.push(eligibility.reason);
   }
   return {
     valid: errors.length === 0,

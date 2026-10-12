@@ -1,7 +1,7 @@
 // bot.js
 import { cleanDominationMelds, dominationOpeningCards, dominationStockEndgame } from './js/game/domination-strategy.js';
 import { isPlausibleSequenceTriple, planPairIndexesWithTop, plannerFingerprint, observeBossPublicAction, bossStockOpportunityValue } from './js/game/bot-planner.js';
-import { rankBossMoves, rankBossDiscardPickups, rankBossDiscards, cooperativeBossPriorities, prepareBossStrategyState, canFinishBossAfterMeld } from './js/boss/boss-bot-strategy.js';
+import { rankBossMoves, rankBossDiscardPickups, rankBossDiscards, selectBossRecoveryDiscardIndex, cooperativeBossPriorities, prepareBossStrategyState, canFinishBossAfterMeld } from './js/boss/boss-bot-strategy.js';
 import { MATRIARCH_MAX_FLOWERS } from './js/boss/boss-balance.js';
 
 // Main-thread scheduling only, never game information or a persistent plan.
@@ -322,6 +322,13 @@ export class BossBuracoBot {
           if (!state || state.finished || state.currentPlayer !== botIndex) return;
           me = state.players[botIndex];
         }
+        if(state.boss?.id==='dimitrescu') {
+          this.assertActive(engine,signal);
+          await engine.executeCastleItems?.(me.id);
+          state=engine.getState();
+          if(!state||state.finished||state.boss?.result||state.currentPlayer!==botIndex)return;
+          me=state.players[botIndex];
+        }
         engine.showMessage(`🤖 ${me.name} organizando as cartas...`);
 
         if (!engine.shouldSkipMelds?.(me.id)) {
@@ -366,11 +373,8 @@ export class BossBuracoBot {
         let recovered = false;
         if (s && s.players && s.players[botIndex]) {
           this.assertActive(engine, signal);
-          const fallbackIndex = s.players[botIndex].hand.findIndex((card) => (
-            card?.id
-            && card.id !== s.pickedDiscardCardId
-            && !engine.isCardBlocked?.(s.players[botIndex].id, card.id, 'discard')
-          ));
+          const fallbackIndex = selectBossRecoveryDiscardIndex(s,botIndex,
+            (id,cardId,action)=>engine.isCardBlocked?.(id,cardId,action));
           if (fallbackIndex >= 0) recovered = (await engine.executeDiscard(botIndex, fallbackIndex)) !== false;
           else if (typeof engine.recoverBotTurn === 'function') recovered = await engine.recoverBotTurn(botIndex);
         }
@@ -1701,6 +1705,13 @@ export class BossBuracoBot {
 
   static async processDiscard(botIndex, oppTeamId, engine, signal) {
     this.assertActive(engine, signal);
+    const beforeItems=engine.getState();
+    if(beforeItems?.boss?.id==='dimitrescu' && beforeItems.currentPlayer===botIndex) {
+      await engine.executeCastleItems?.(beforeItems.players[botIndex].id);
+      this.assertActive(engine,signal);
+      const afterItems=engine.getState();
+      if(afterItems?.finished||afterItems?.boss?.result||afterItems?.currentPlayer!==botIndex)return true;
+    }
     const state = engine.getState();
     if (!state || !state.players || !state.players[botIndex] || !state.teams) {
       if (typeof window !== 'undefined' && window.isClosingGame) return;

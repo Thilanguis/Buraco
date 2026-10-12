@@ -138,6 +138,7 @@ import { cardFrontHTML, suitClass, deckFaceClass } from './js/game/card-face.js'
 import { ITEM_DEFINITIONS } from './js/boss/dimitrescu-castle.js';
 import { renderCastleHud, castleItemHelp, castleItemChip, danielaDiscardActive } from './js/boss/ui/dimitrescu-castle-view.js';
 import { matriarchBloomFlowersHTML } from './js/boss/ui/matriarch-bloom-view.js';
+import { selectBossRecoveryDiscardIndex } from './js/boss/boss-bot-strategy.js';
 import { createResourceFeedbackPresenter } from './js/boss/ui/resource-feedback.js';
 import { createVisionHintEvaluator } from './js/game/domination-vision-hint.js';
 import { createVisionAlert } from './js/game/domination-vision-alert.js';
@@ -11437,9 +11438,12 @@ const botEngine = {
   getDimitrescuPriorities: (playerId) => getBossDimitrescuPriorities(state, playerId),
   async executeCastleItems(playerId) {
     for (let count = 0; count < 15; count++) {
-      const choice = getCastleBotItem(state, playerId);
-      if (!choice || !useCastleItem(state, playerId, choice.cardId, choice.daughterId)) break;
-      state.lastAction = { id: newActionId(), type: 'castleItem', playerId, ...choice };
+      const s=this.getState();
+      if(!s||s.finished||s.boss?.result||s.players[s.currentPlayer]?.id!==playerId)break;
+      if(!canPerformCommonGameAction(s)&&!this.canRunDuringDebugPause?.())break;
+      const choice = getCastleBotItem(s, playerId);
+      if (!choice || !useCastleItem(s, playerId, choice.cardId, choice.daughterId)) break;
+      s.lastAction = { id: newActionId(), type: 'castleItem', playerId, ...choice };
       renderAll(); await this.commitState();
     }
   },
@@ -11947,10 +11951,11 @@ const botEngine = {
     const me = s.players[botIndex];
     if (!me?.hand?.[cardIndex]) return false;
     if (isBossCardBlocked(s, me.id, me.hand[cardIndex]?.id, 'discard')) {
-      cardIndex = me.hand.findIndex((card) => !isBossCardBlocked(s, me.id, card?.id, 'discard') && card?.id !== s.pickedDiscardCardId);
+      cardIndex = selectBossRecoveryDiscardIndex(s,botIndex);
     }
     if (cardIndex < 0) return false;
     const card = me.hand[cardIndex];
+    if(card.id===s.pickedDiscardCardId)return false;
 
     const discardOrderEvents = notifyBossCardDiscarded(s, me.id, card);
     if (discardOrderEvents.length) s._pendingBossEvent = discardOrderEvents[discardOrderEvents.length - 1];
@@ -11992,7 +11997,11 @@ const botEngine = {
       if (!me.hand.length) return false;
     }
     normalizeBossState(s);
-    const legalIndex = me.hand.findIndex((card) => card?.id && card.id !== s.pickedDiscardCardId && !isBossCardBlocked(s, me.id, card.id, 'discard'));
+    if(s.boss?.id==='dimitrescu')await this.executeCastleItems(me.id);
+    const fresh=this.getState();
+    if(!fresh)return false;
+    if(fresh.finished||fresh.boss?.result||fresh.currentPlayer!==botIndex)return true;
+    const legalIndex = selectBossRecoveryDiscardIndex(fresh,botIndex);
     if (legalIndex < 0) return false;
     return this.executeDiscard(botIndex, legalIndex);
   },

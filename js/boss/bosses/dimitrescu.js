@@ -1,4 +1,4 @@
-import { CASTLE_BALANCE, ladyBloodBalance } from '../dimitrescu-castle.js';
+import { CASTLE_BALANCE, ladyBloodBalance, ladyTitheBalance } from '../dimitrescu-castle.js';
 const ability = (id, name, weight, phases, describe) => ({ id, name, weight, phases, describe });
 
 export const DIMITRESCU_BLOOD_RELIEF_BY_KIND = Object.freeze({
@@ -57,11 +57,11 @@ export const dimitrescuDefinition = Object.freeze({
   }),
   abilities: Object.freeze([
     ability('blood_tithe', 'Tributo de Sangue', 4, [1, 2, 3], ({ phase = 1 }) =>
-      `No fim da rodada, mãos grandes alimentam a Sede: 8–10 cartas +${ladyBloodBalance(phase).mediumTithe}; 11+ cartas +${ladyBloodBalance(phase).heavyTithe}, por jogador.`),
+      `No fim da rodada, cada mão com 8–10 cartas soma ${ladyTitheBalance.mediumTithe} Sede; com 11+ soma ${ladyTitheBalance.heavyTithe}. Fúria acrescenta 0/4/8/10 uma única vez ao total cobrado.`),
     ability('red_wine', 'Vinho Carmesim', 2, [1, 2, 3], ({ phase = 1 }) =>
       `Se estiver ferida e tiver ao menos 20 de Sede, Lady Dimitrescu consome 15 de Sede para se curar ${phase === 1 ? 140 : phase === 2 ? 200 : 260} HP.`),
     ability('crimson_brand', 'Marca Carmesim', 4, [1, 2, 3], ({ phase = 1 }) =>
-      `Lady marca uma carta de cada cooperador. Cada carta marcada usada legalmente evita a punição; cada marca que sobreviver à rodada aumenta a Sede em ${ladyBloodBalance(phase).crimsonBrand}.`),
+      'Lady marca uma carta de cada cooperador. Use-as em jogos para evitar a punição. A Sede por falha cresce com a Fúria, sem ultrapassar a cobrança máxima anterior.'),
     ability('cassandra_dead_feast', 'Banquete dos Mortos', 3, [2, 3], ({ phase = 2 }) =>
       `Lady profana o próximo Morto. Quando ele for tomado, ganha ${ladyBloodBalance(phase).deadFeast} de Sede e cura ${phase === 3 ? 130 : 90} HP, com bônus de Fúria; uma Canastra Real ou Ás-a-Ás reduz a profanação a +4 de Sede base e anula a cura.`),
     ability('crimson_clot', 'Coágulo Carmesim', 3, [2, 3], ({ phase = 2 }) =>

@@ -4,12 +4,13 @@ import { damageCombatEntity, isCombatEntityAlive } from './boss-combat.js';
 export const LEGACY_CASTLE_BALANCE = Object.freeze({ ladyHp: 2000, daughterHp: 450, linkPerDaughter: 500,
   regeneration: 50, anticoagulantRegeneration: 25, passiveBlood: 3, itemMaxHpLoss: 100,
   daughterHpFloor: 200, copiesPerItem: 3, daggerDamage: 50, explosiveDamage: 100, furyHealingStep: .1, furyBloodStep: 2 });
-export const CASTLE_BALANCE = Object.freeze({ ...LEGACY_CASTLE_BALANCE, daughterHp: 500, daughterHpFloor: 300,
+export const CASTLE_BALANCE = Object.freeze({ ...LEGACY_CASTLE_BALANCE, daughterHp: 500, daughterHpFloor: 130,
   regeneration: 20, anticoagulantRegeneration: 10,
   daggerDamage: 0, daggerTransfer: .80, explosiveDamage: 100, bleedAmount: 15, bleedPercent: .03,
   itemEffectsVersion: 2, relicAttackBonus: .20, freezeTurns: 2,
   bleedPermanent: true, bleedRounds: null, coldMaxCharges: 2,
-  maxHpLossPercent: Object.freeze({ dagger: .05, explosive: .10, cold_flask: .20, anticoagulant: .15, relic: .20 }) });
+  maxHpLossByItem: Object.freeze({ dagger: 80, explosive: 110, anticoagulant: 100, cold_flask: 160, relic: 160 }),
+  maxHpLossPercent: Object.freeze({ dagger: .16, explosive: .22, cold_flask: .32, anticoagulant: .20, relic: .32 }) });
 export const castleRules = boss => boss?.castleItemRulesVersion === 2 ? boss.castleItemRules || CASTLE_BALANCE : LEGACY_CASTLE_BALANCE;
 export const usesGlobalCastleItems = boss => boss?.castleItemRulesVersion === 2 && castleRules(boss).itemEffectsVersion === 2;
 export const castleFrozen = boss => usesGlobalCastleItems(boss) && boss.castleFreeze?.remainingTurns > 0;
@@ -39,7 +40,8 @@ export const hasCastleHemorrhage = daughter => !!(daughter.hemorrhage?.permanent
 export const castleBleedAmount = (boss, daughter = null) => castleRules(boss).bleedAmount
   ?? Math.round((daughter ? daughterOriginalHp(boss, daughter) : castleRules(boss).daughterHp) * castleRules(boss).bleedPercent);
 export const castleItemHpLoss = (boss, type, daughter = null) => boss?.castleItemRulesVersion === 2
-  ? Math.round((daughter ? daughterOriginalHp(boss, daughter) : castleRules(boss).daughterHp) * castleRules(boss).maxHpLossPercent[type])
+  ? castleRules(boss).maxHpLossByItem?.[type]
+    ?? Math.round((daughter ? daughterOriginalHp(boss, daughter) : castleRules(boss).daughterHp) * castleRules(boss).maxHpLossPercent[type])
   : LEGACY_CASTLE_BALANCE.itemMaxHpLoss;
 const LADY_BLOOD_BALANCE = Object.freeze({
   1: Object.freeze({ mediumTithe: 3, heavyTithe: 6, crimsonBrand: 5 }),
@@ -47,6 +49,15 @@ const LADY_BLOOD_BALANCE = Object.freeze({
   3: Object.freeze({ mediumTithe: 6, heavyTithe: 10, crimsonBrand: 9, deadFeast: 14 }),
 });
 export const ladyBloodBalance = phase => LADY_BLOOD_BALANCE[Number(phase)] || LADY_BLOOD_BALANCE[1];
+// Fury is applied once to the collective quote, not once per hand/mark.
+export const ladyTitheBalance = Object.freeze({ mediumTithe: 2, heavyTithe: 4 });
+export const ladyTitheParameters = (boss, intent) => intent?.payload?.bloodPressureVersion === 1
+  ? ladyBloodBalance(intent.announcedPhase) : ladyTitheBalance;
+export const ladyTitheBlood = (boss, amount, intent = null) => intent?.payload?.bloodPressureVersion === 1
+  ? furyBlood(boss, amount) : amount > 0 ? amount + [0,4,8,10][furyLevel(boss)] : 0;
+export const ladyCrimsonBrandBase = (boss, phase, intent = null) => intent?.payload?.bloodPressureVersion === 1
+  ? ladyBloodBalance(phase).crimsonBrand : Math.max(1,
+  Math.floor(ladyBloodBalance(phase).crimsonBrand * (.4 + .2 * furyLevel(boss)) + 1e-8));
 const item = (label, file, special) => Object.freeze({ label, image: `assets/images/items/${file}.png`, special });
 export const ITEM_DEFINITIONS = Object.freeze({
   dagger: item('Adaga', 'adaga', 'Vínculo Sangrento: 80% do dano dos seus ataques à filha também atinge a vida da Lady, ignorando as proteções.'),
@@ -55,13 +66,15 @@ export const ITEM_DEFINITIONS = Object.freeze({
   explosive: item('Explosivo', 'explosivo', 'Causa 100 de dano imediato. A filha perde 15 HP antes de regenerar no fim de cada rodada, até morrer. Outro Explosivo causa novo impacto, sem aumentar o sangramento.'),
   relic: item('Relíquia', 'reliquia', 'A filha recebe 20% mais dano dos ataques diretos até morrer. Não aumenta dano de Explosivo, hemorragia ou outros efeitos. Outra Relíquia não aumenta o bônus.'),
 });
-export const ITEM_COMMON_HELP = 'Cada item petrifica uma parte diferente da vida da filha (mínimo recuperável: 300). A carta fica presa a ela e volta ao fundo do Lixo na morte, sem item. Usar não encerra o turno: guarde uma carta para descartar.';
+export const hasUnspentCastleItem = (state,cardId) => state?.boss?.id === 'dimitrescu'
+  && !!ITEM_DEFINITIONS[state.boss.castleItems?.[cardId]?.type] && !state.boss.castleItems[cardId].consumed;
+export const ITEM_COMMON_HELP = 'Cada item petrifica uma parte diferente da vida da filha (mínimo recuperável: 130). A carta fica presa a ela e volta ao fundo do Lixo na morte, sem item. Usar não encerra o turno: guarde uma carta para descartar.';
 export const REMOVED_DAUGHTER_ABILITIES = new Set(['bela_hunt', 'cassandra_feast', 'daniela_swarm']);
 export const DAUGHTER_IDS = Object.freeze(['bela', 'cassandra', 'daniela']);
 export function createCastleState() {
   return { castleVersion: 1, castleDaughterBalanceVersion: 3, castleItemRulesVersion: 2, castleRebalanceVersion: 1, castleExplosiveBalanceVersion: 1,
-    castleItemEffectsVersion: 1, castleFreeze: null,
-    castleItemRules: { ...CASTLE_BALANCE, maxHpLossPercent: { ...CASTLE_BALANCE.maxHpLossPercent } },
+    castleItemEffectsVersion: 1, castlePetrificationBalanceVersion: 1, castleBloodPressureVersion: 2, castleFreeze: null,
+    castleItemRules: { ...CASTLE_BALANCE, maxHpLossByItem: {...CASTLE_BALANCE.maxHpLossByItem}, maxHpLossPercent: { ...CASTLE_BALANCE.maxHpLossPercent } },
     castleItems: null, castlePassiveRound: 0, castleRegeneratedRound: 0, castleSelectedDaughterIds: [], castleLastDaughterId: null,
     bloodLinkProtection: 1500, combatTargetsByPlayer: {}, combatEntities: DAUGHTER_IDS.map(id => ({ id, name: id[0].toUpperCase() + id.slice(1),
       portrait: `assets/images/boss-dimitrescu-${id}.png`, hp: CASTLE_BALANCE.daughterHp, maxHp: CASTLE_BALANCE.daughterHp,
@@ -156,6 +169,21 @@ export function normalizeCastle({ boss, gameState }) {
     }
     boss.castleItemEffectsVersion = 1;
     if (hadCold) freezeCastle(gameState, 'save_migration');
+  }
+  if (boss.castleItemRulesVersion === 2 && !boss.castlePetrificationBalanceVersion) {
+    // Future sacrifices use the new flat losses. Never reapply old sacrifices,
+    // restore HP, reroll cards or replay their effects during reload/undo.
+    boss.castleItemRules = {...castleRules(boss), daughterHpFloor:CASTLE_BALANCE.daughterHpFloor,
+      maxHpLossByItem:{...CASTLE_BALANCE.maxHpLossByItem}, maxHpLossPercent:{...CASTLE_BALANCE.maxHpLossPercent}};
+    boss.castlePetrificationBalanceVersion=1;
+  }
+  if (!boss.castleBloodPressureVersion) {
+    // Preserve a quote already announced by an old save until that intent ends.
+    if (['blood_tithe','crimson_brand'].includes(boss.currentIntent?.abilityId)) {
+      boss.currentIntent.payload ||= {};
+      boss.currentIntent.payload.bloodPressureVersion ??= 1;
+    }
+    boss.castleBloodPressureVersion=2;
   }
   const rules = castleRules(boss), modern = boss.castleItemRulesVersion === 2;
   for (const daughter of boss.combatEntities) {
@@ -343,37 +371,4 @@ export function chooseCastleDamageTarget(state, damage = 100) {
   // A lethal daughter strike also removes up to 500 protection; otherwise direct
   // attacks consume protection permanently instead of hitting the former HP floor.
   return daughters.filter(d => d.hp <= damage).sort((a, b) => a.hp - b.hp || a.id.localeCompare(b.id))[0]?.id || 'boss';
-}
-export function chooseCastleItem(state, playerId, canUse) {
-  const player = state.players.find(p => p.id === playerId), boss = state.boss;
-  if (!player || player.hand.length <= 2) return null;
-  const candidates = player.hand.filter(c => boss.castleItems?.[c.id] && !boss.castleItems[c.id].consumed)
-    .filter(c => boss.combatEntities.find(d => d.id === 'bela')?.passive?.cardId !== c.id
-      && !boss.currentIntent?.payload?.marks?.some(m => m.status === 'active' && m.cardId === c.id));
-  const modern = boss.castleItemRulesVersion === 2, rules = castleRules(boss), ranked = [];
-  for (const card of candidates.sort((a, b) => a.id.localeCompare(b.id))) {
-    // Preserve likely clean runs: sacrifice isolated cards, not an obvious same-suit run.
-    const nearby = player.hand.filter(c => c.id !== card.id && c.suit === card.suit && !c.joker);
-    if (!card.joker && card.rank !== '2' && nearby.length >= 2) continue;
-    if (card.joker || card.rank === '2') continue; // high meld value: keep wildcards.
-    for (const d of [...livingDaughters(boss)].sort((a, b) => a.hp - b.hp || a.id.localeCompare(b.id))) {
-      const type = boss.castleItems[card.id].type;
-      if (modern) {
-        const loss = Math.min(castleItemHpLoss(boss,type,d), d.maxHp - rules.daughterHpFloor);
-        const value = loss + (type === 'dagger' ? (d.daggerLink ? 0 : d.hp * rules.daggerTransfer)
-          // A finite evaluation horizon ranks a permanent bleed, not a mechanic cooldown.
-          : type === 'explosive' ? rules.explosiveDamage + (d.cold ? 1 : d.regeneration === rules.anticoagulantRegeneration ? .5 : .2) * castleBleedAmount(boss,d) * (rules.bleedPermanent ? 3 : rules.bleedRounds)
-          : type === 'anticoagulant' ? (d.regeneration === rules.anticoagulantRegeneration ? 0 : 75)
-          : type === 'cold_flask' ? (usesGlobalCastleItems(boss) ? (castleFrozen(boss) ? 20 : 90) : (d.coldCharges || 0) >= rules.coldMaxCharges ? 0 : 50)
-          : usesGlobalCastleItems(boss) ? (d.relicAttackBonus ? 0 : d.hp * rules.relicAttackBonus) : d.relicRound != null ? 0 : 40);
-        if (value > 0 && canUse(card.id,d.id)) ranked.push({cardId:card.id,daughterId:d.id,value});
-        continue;
-      }
-      if ((type === 'anticoagulant' && d.regeneration === rules.anticoagulantRegeneration) || (type === 'cold_flask' && d.cold)
-        || (type === 'relic' && d.relicRound != null)) continue;
-      if (canUse(card.id, d.id)) return { cardId: card.id, daughterId: d.id };
-    }
-  }
-  const best = ranked.sort((a,b) => b.value-a.value || a.cardId.localeCompare(b.cardId) || a.daughterId.localeCompare(b.daughterId))[0];
-  return best ? {cardId:best.cardId,daughterId:best.daughterId} : null;
 }

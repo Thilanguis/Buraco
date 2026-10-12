@@ -27,43 +27,43 @@ const record=s=>e=>(s.boss.eventLog.push(e),e);
 const close=s=>regenerateDaughters(s,()=>{},record(s));
 const attack=(s,amount,id='hit',target='bela')=>damageDaughter(s,d(s,target),amount,id,record(s),{source:'attack',playerId:0});
 
-test('v2 pacote B: 500/20, piso 300, Lady/PROT/Fúria inalterados e regras congeladas no snapshot',()=>{
+test('v2 pacote atual: 500/20, piso 130, Lady/PROT preservados e regras congeladas no snapshot',()=>{
   const s=game();assert.equal(s.boss.castleItemRulesVersion,2);assert.equal(s.boss.castleDaughterBalanceVersion,3);
   assert.deepEqual(s.boss.combatEntities.map(d=>[d.hp,d.maxHp,d.originalMaxHp,d.regeneration]),Array(3).fill([500,500,500,20]));
   assert.equal(s.boss.hp,2000);assert.equal(bloodLinkRemaining(s.boss),1500);assert.equal(furyBlood(s.boss,3),3);
   assert.deepEqual(castleRules(JSON.parse(JSON.stringify(s.boss))),CASTLE_BALANCE);
 });
-for(const [type,loss,hp] of [['dagger',25,475],['explosive',50,350],['cold_flask',100,400],['anticoagulant',75,425],['relic',100,400]]) {
+for(const [type,loss,hp] of [['dagger',80,420],['explosive',110,290],['cold_flask',160,340],['anticoagulant',100,400],['relic',160,340]]) {
   test(`${type}: perda aditiva do HP original, efeito distinto e descarte preservado`,()=>{
     const s=game(),turn=s.turnNumber;const e=sacrifice(s,type);
     assert.equal(d(s).maxHp,500-loss);assert.equal(d(s).hp,hp);assert.equal(e.itemType,type);
     assert.equal(s.boss.hp,2000);assert.equal(s.boss.danger,0);assert.equal(s.turnNumber,turn);assert.equal(s.hasDrawnThisTurn,true);
     assert.equal(d(s).sacrificedCards.length,1);assert.ok(s.players[0].hand.length>=1);
     assert.match(castleItemHelp(type,s.boss),new RegExp(`Petrifica ${loss} HP`));
-    assert.match(castleItemHelp(type,s.boss),/mínimo de 300/);
+    assert.match(castleItemHelp(type,s.boss),/mínimo de 130/);
   });
   test(`${type}: não causa dano pela redução de máximo quando já ferida`,()=>{
     const s=game();d(s).hp=180;sacrifice(s,type);
     assert.equal(d(s).hp,type==='explosive'?80:180);
   });
   test(`${type}: efeito especial funciona também no piso`,()=>{
-    const s=game();d(s).maxHp=300;d(s).hp=250;sacrifice(s,type);
-    assert.equal(d(s).maxHp,300);
+    const s=game();d(s).maxHp=130;d(s).hp=130;sacrifice(s,type);
+    assert.equal(d(s).maxHp,130);
     if(type==='dagger')assert.equal(d(s).daggerLink,true);
-    if(type==='explosive')assert.deepEqual([d(s).hp,d(s).hemorrhage.amount,d(s).hemorrhage.remaining,d(s).hemorrhage.permanent],[150,15,null,true]);
+    if(type==='explosive')assert.deepEqual([d(s).hp,d(s).hemorrhage.amount,d(s).hemorrhage.remaining,d(s).hemorrhage.permanent],[30,15,null,true]);
     if(type==='cold_flask')assert.equal(s.boss.castleFreeze.remainingTurns,2);
     if(type==='anticoagulant')assert.equal(d(s).regeneration,10);
     if(type==='relic')assert.equal(d(s).relicAttackBonus,true);
   });
 }
-test('Frio + Relíquia: piso exatamente 300, nunca cura ao aplicar nem ao reload',()=>{
-  const s=game();sacrifice(s,'cold_flask');sacrifice(s,'relic');assert.equal(d(s).maxHp,300);
-  const old=d(s).hp;normalizeBossState(s);assert.equal(d(s).maxHp,300);assert.equal(d(s).hp,old);
+test('Frio + Relíquia: máximo 180, nunca cura ao aplicar nem ao reload',()=>{
+  const s=game();sacrifice(s,'cold_flask');sacrifice(s,'relic');assert.equal(d(s).maxHp,180);
+  const old=d(s).hp;normalizeBossState(s);assert.equal(d(s).maxHp,180);assert.equal(d(s).hp,old);
 });
 for(const protection of [1500,0])test(`Adaga atravessa PROT ${protection} e Coágulo sem consumir nenhum`,()=>{
   const s=game();s.boss.bloodLinkProtection=protection;s.boss.crimsonClot={status:'active',remaining:180};
   sacrifice(s,'dagger');assert.equal(attack(s,200),200);
-  assert.equal(s.boss.hp,1840);assert.equal(d(s).hp,275);assert.equal(s.boss.bloodLinkProtection,protection);assert.equal(s.boss.crimsonClot.remaining,180);
+  assert.equal(s.boss.hp,1840);assert.equal(d(s).hp,220);assert.equal(s.boss.bloodLinkProtection,protection);assert.equal(s.boss.crimsonClot.remaining,180);
   const e=s.boss.eventLog.find(e=>e.type==='daggerTransfer');assert.deepEqual([e.amount,e.daughterDamage,e.targetId,e.sourceEntityId],[160,200,'boss','bela']);
   assert.equal(resourceFeedbackSteps(s.boss,e)[0].metric,'ladyHp');
 });
@@ -72,9 +72,9 @@ test('Adaga: overkill transmite apenas dano efetivo, morte remove vínculo e at�
   assert.equal(s.boss.hp,1984);assert.equal(s.boss.bloodLinkProtection,1000);assert.equal(d(s).daggerLink,false);assert.equal(furyLevel(s.boss),1);
   assert.equal(s.boss.eventLog.filter(e=>e.type==='daughterDeath').length,1);assert.equal(s.discard.at(-1).id,'top');
 });
-test('Adagas duplicadas: máximo 450/425, mas transmissão nunca 160%/240%',()=>{
+test('Adagas duplicadas: máximo 260 após três, mas transmissão nunca 160%/240%',()=>{
   const s=game();for(let i=0;i<3;i++)sacrifice(s,'dagger',`dag${i}`);
-  assert.equal(d(s).maxHp,425);attack(s,100);assert.equal(s.boss.hp,1920);
+  assert.equal(d(s).maxHp,260);attack(s,100);assert.equal(s.boss.hp,1920);
 });
 test('Adaga não transmite Explosivo, hemorragia nem outras fontes; sem ciclos',()=>{
   const s=game();sacrifice(s,'dagger');sacrifice(s,'explosive');close(s);
@@ -117,13 +117,13 @@ test('hemorragia letal: clampa dano, dispara morte/Fúria, sem regen/Adaga',()=>
 });
 test('compatibilidade histórica: Frio local guarda cargas na vida cheia, teto 2',()=>{
   const s=game();s.boss.castleItemRules.itemEffectsVersion=1;for(let i=0;i<3;i++)sacrifice(s,'cold_flask',`cold${i}`);
-  assert.equal(d(s).coldCharges,2);assert.equal(d(s).maxHp,300);close(s);assert.equal(d(s).coldCharges,2);
-  for(let i=1;i<=3;i++) {s.boss.roundNumber++;d(s).hp=200;close(s);assert.equal(d(s).hp,i<=2?200:220);}
+  assert.equal(d(s).coldCharges,2);assert.equal(d(s).maxHp,130);close(s);assert.equal(d(s).coldCharges,2);
+  for(let i=1;i<=3;i++) {s.boss.roundNumber++;d(s).hp=100;close(s);assert.equal(d(s).hp,i<=2?100:120);}
   assert.equal(d(s).cold,false);assert.equal(d(s).coldCharges,0);
 });
 test('Anticoagulante permanente/duplicado, sem reduzir abaixo de 10; cura no máximo recuperável',()=>{
   const s=game();for(let i=0;i<3;i++)sacrifice(s,'anticoagulant',`anti${i}`);
-  assert.equal(d(s).maxHp,300);assert.equal(d(s).regeneration,10);d(s).hp=290;close(s);assert.equal(d(s).hp,300);
+  assert.equal(d(s).maxHp,200);assert.equal(d(s).regeneration,10);d(s).hp=190;close(s);assert.equal(d(s).hp,200);
   assert.match(daughterRegenerationHelp(d(s)),/Vida completa/);
 });
 test('compatibilidade histórica: Relíquia espera oportunidade válida',()=>{

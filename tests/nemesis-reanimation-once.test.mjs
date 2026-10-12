@@ -26,14 +26,14 @@ test('one resurrection per zombie across phases, but another zombie may revive',
   assert.equal(candidate(gameState)?.entityId, 'grabber');
   revive(boss,gameState,'grabber');
   assert.equal(entity(boss,'grabber').revivals,1);
-  assert.equal(entity(boss,'grabber').hp,110);
+  assert.equal(entity(boss,'grabber').hp,90);
   assert.equal(candidate(gameState),null,'only one reanimation allowed during phase 2');
   kill(boss,'grabber');
   boss.phase=3;
   assert.equal(candidate(gameState)?.entityId, 'infected','skip dead zombie already revived once');
   revive(boss,gameState,'infected');
   assert.equal(entity(boss,'infected').revivals,1);
-  assert.equal(entity(boss,'infected').hp,120);
+  assert.equal(entity(boss,'infected').hp,95);
   assert.equal(candidate(gameState),null,'phase 3 also limited to one reanimation');
 });
 

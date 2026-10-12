@@ -252,7 +252,7 @@ function teamEntryPlan(state, helpers, kind, progress = {}) {
 
 function entryCandidates(state, helpers) {
   const boss = state.boss;
-  if (nemesisPersistentCount(boss) >= boss.phase) return [];
+  if (nemesisPersistentCount(boss) >= NEMESIS_ZOMBIES.length) return [];
   return boss.combatEntities.filter((entity) => ['absent', 'repelled'].includes(entity.status)).flatMap((entity) => {
     if (entity.id === 'grabber') {
       for (const player of preferredPlayers(state).filter((player) => entryPlayers(state).some((entry) => entry.id === player.id))) {
@@ -351,7 +351,7 @@ function buildPayload({ gameState: state, helpers }, abilityId) {
   }
   if (abilityId === 'viral_reanimation') {
     const entity = boss.combatEntities.find(canReanimateZombie);
-    return entity && nemesisPersistentCount(boss) < boss.phase && !boss.reanimationsByPhase[boss.phase] ? { ...base, entityId: entity.id } : null;
+    return entity && nemesisPersistentCount(boss) < NEMESIS_ZOMBIES.length && !boss.reanimationsByPhase[boss.phase] ? { ...base, entityId: entity.id } : null;
   }
   if (abilityId === 'rocket_launcher') {
     const melds = state.teams?.[0]?.melds || [];
@@ -448,7 +448,7 @@ export const nemesisBossMechanics = Object.freeze({
     return boss.combatEntities.map(entity => ({
       entityId: entity.id, eligible: candidates.has(entity.id),
       reason: candidates.has(entity.id) ? null
-        : nemesisPersistentCount(boss) >= boss.phase ? 'phase_cap'
+        : nemesisPersistentCount(boss) >= NEMESIS_ZOMBIES.length ? 'roster_full'
         : !['absent', 'repelled'].includes(entity.status) ? `lifecycle:${entity.status}`
         : !entryPlayers(gameState).length ? 'no_remaining_player'
         : entity.id === 'devourer' ? 'no_extendable_existing_game' : 'no_legal_mark_exit',
@@ -474,7 +474,7 @@ export const nemesisBossMechanics = Object.freeze({
     const payload = intent.payload;
     if (intent.abilityId === 'horde_invasion') resolveEntry(boss, intent, gameState);
     if (intent.abilityId === 'parasite_regeneration') payload.healed = healCombatEntity(alive(boss, payload.entityId), 100);
-    if (intent.abilityId === 'viral_reanimation' && nemesisPersistentCount(boss) < boss.phase && !boss.reanimationsByPhase[intent.announcedPhase]) {
+    if (intent.abilityId === 'viral_reanimation' && nemesisPersistentCount(boss) < NEMESIS_ZOMBIES.length && !boss.reanimationsByPhase[intent.announcedPhase]) {
       const entity = boss.combatEntities.find((entry) => entry.id === payload.entityId);
       // An already announced intent must also honor the per-zombie limit.
       if (canReanimateZombie(entity) && reviveCombatEntity(entity, boss.phase)) {
@@ -753,7 +753,8 @@ export const nemesisBossMechanics = Object.freeze({
     if (abilityId === 'horde_invasion') {
       const zombie = target.startsWith('zombie_') ? target.slice(7) : null;
       if (zombie) for (const entity of boss.combatEntities) if (entity.id !== zombie) { entity.status = 'corpse'; entity.hp = 0; }
-      if (variant === 'phase_cap') { for (const entity of boss.combatEntities.slice(0, boss.phase)) { entity.status = 'persistent'; entity.hp = entity.maxHp; } }
+      // Keep the old debug variant ID compatible; it now represents a full roster.
+      if (variant === 'phase_cap') { for (const entity of boss.combatEntities) { entity.status = 'persistent'; entity.hp = entity.maxHp; } }
       if (variant === 'reentry') boss.combatEntities[0].status = 'repelled';
       if (variant === 'avoid_repeat') { boss.combatEntities[0].status = 'repelled'; boss.lastRepelledZombieId = 'grabber'; }
       if (variant === 'persistent_corpse') { boss.combatEntities[0].status = 'persistent'; boss.combatEntities[1].status = 'corpse'; boss.combatEntities[1].hp = 0; }

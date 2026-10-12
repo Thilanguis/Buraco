@@ -92,7 +92,7 @@ test('objective modifiers emit one sound event with final clamped delta and no e
 test('creation, registry, menu and infection resource are integrated without active zombies', () => {
   const boss = createBossState('nemesis', 19);
   assert.equal(boss.hp, 2200); assert.equal(boss.danger, 0); assert.equal(boss.dangerType, 'infection');
-  assert.deepEqual(boss.combatEntities.map((entry) => [entry.id, entry.hp, entry.status, entry.mutated]), [['grabber', 220, 'absent', false], ['infected', 240, 'absent', false], ['devourer', 260, 'absent', false]]);
+  assert.deepEqual(boss.combatEntities.map((entry) => [entry.id, entry.hp, entry.status, entry.mutated]), [['grabber', 180, 'absent', false], ['infected', 190, 'absent', false], ['devourer', 200, 'absent', false]]);
   assert.equal(getBossDebugCatalog().find((entry) => entry.id === 'nemesis').abilities.length, 11);
   const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(index, /option value="nemesis"/); assert.match(index, /boss_nemesis/);
@@ -169,7 +169,7 @@ test('death immediately removes grab passive even with outstanding serialized lo
 
 test('F3 mutates living zombies; each zombie revives only once per match, in addition to phase quota', () => {
   const state = game('viral_reanimation', 2); activate(state);
-  assert.equal(entity(state, 'grabber').hp, 110); assert.equal(entity(state, 'grabber').revivals, 1);
+  assert.equal(entity(state, 'grabber').hp, 90); assert.equal(entity(state, 'grabber').revivals, 1);
   dead(state, 'grabber'); assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, false);
   state.boss.phase = 3; normalizeBossState(state);
   assert.equal(entity(state, 'devourer').mutated, true);
@@ -182,7 +182,7 @@ test('F3 mutates living zombies; each zombie revives only once per match, in add
   const intent = state.boss.currentIntent;
   assert.equal(intent.payload.entityId, 'infected');
   nemesisBossMechanics.resolveIntent({ boss: state.boss, gameState: state, intent });
-  assert.equal(entity(state, 'infected').mutated, true); assert.equal(entity(state, 'infected').hp, 120);
+  assert.equal(entity(state, 'infected').mutated, true); assert.equal(entity(state, 'infected').hp, 95);
   assert.equal(entity(state, 'infected').revivals, 1);
   assert.equal(entity(state, 'grabber').status, 'corpse');
   dead(state, 'infected');
@@ -422,7 +422,7 @@ test('final strike also honors explicit target and cannot spill damage', () => {
   const state = game(); state.boss.starsPlayerId = null;
   setBossDamageTarget(state, 0, 'grabber');
   const event = applyBossFinalStrike(state, 1000, 0);
-  assert.equal(event.damage, 100); assert.equal(event.appliedDamage, 100); assert.equal(entity(state, 'grabber').hp, 120); assert.equal(state.boss.hp, 2200);
+  assert.equal(event.damage, 100); assert.equal(event.appliedDamage, 100); assert.equal(entity(state, 'grabber').hp, 80); assert.equal(state.boss.hp, 2200);
   assert.equal(state.boss.result.victory, false); assert.equal(state.boss.starsPlayerId, null);
   assert.match(nemesisBossUi.finalStrikeWarning({ gameState: game(), playerId: 0 }) || '', /^$/);
   const selected = game(); selected.boss.combatTargetsByPlayer[0] = 'infected';
@@ -552,7 +552,7 @@ test('old living/dead snapshots migrate without resetting HP, selection, quota o
   state.boss.starsPlayerId = 1; state.boss.combatTargetsByPlayer[0] = 'grabber';
   state.boss.reanimationsByPhase[2] = 'kept'; state.boss.hordeBuff = { entityId: 'grabber', expiresRound: 6 };
   normalizeBossState(state);
-  assert.deepEqual(state.boss.combatEntities.map((entry) => [entry.status, entry.hp]), [['persistent', 91], ['corpse', 0], ['persistent', 230]]);
+  assert.deepEqual(state.boss.combatEntities.map((entry) => [entry.status, entry.hp]), [['persistent', 91], ['corpse', 0], ['persistent', 200]]);
   assert.equal(state.boss.starsPlayerId, 1); assert.equal(state.boss.combatTargetsByPlayer[0], 'grabber');
   assert.equal(state.boss.reanimationsByPhase[2], 'kept'); assert.equal(state.boss.hordeBuff.expiresRound, 6);
   const once = JSON.stringify(state.boss); normalizeBossState(state); assert.equal(JSON.stringify(state.boss), once);
@@ -582,7 +582,7 @@ test('repelled can reenter but is neither corpse nor regenerative/reanimation ta
   assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').payload.entityId, 'grabber');
   const intent = selectNextBossIntent(state, { debug: true, forcedAbilityId: 'horde_invasion' });
   nemesisBossMechanics.resolveIntent({ boss: state.boss, intent });
-  assert.equal(entity(state, 'grabber').status, 'persistent'); assert.equal(entity(state, 'grabber').hp, 220);
+  assert.equal(entity(state, 'grabber').status, 'persistent'); assert.equal(entity(state, 'grabber').hp, 180);
 });
 
 test('last repelled is not selected immediately while another legal entrant exists', () => {
@@ -592,11 +592,10 @@ test('last repelled is not selected immediately while another legal entrant exis
   assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').payload.entityId, 'grabber');
 });
 
-for (const phase of [1, 2, 3]) test(`phase ${phase}: persistent ceiling prevents invasion and revival`, () => {
+for (const phase of [1, 2, 3]) test(`phase ${phase}: full three-zombie roster prevents another invasion, corpse can reanimate`, () => {
   const state = fresh(); state.boss.phase = phase;
-  for (const entry of state.boss.combatEntities.slice(0, phase)) entry.status = 'persistent';
+  for (const entry of state.boss.combatEntities) entry.status = 'persistent';
   assert.equal(inspectBossAbilityEligibility(state, 'horde_invasion').eligible, false);
-  if (phase < 3) dead(state, state.boss.combatEntities[phase].id);
   assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation', { debug: true }).eligible, false);
   dead(state, 'grabber');
   if (phase >= 2) assert.equal(inspectBossAbilityEligibility(state, 'viral_reanimation').eligible, true);
@@ -751,7 +750,7 @@ for (const kind of ['grabber', 'infected', 'devourer']) test(`BOT plays real leg
 test('Laboratory caps, mixed states and anti-repeat variants prepare consistent real scenarios', () => {
   for (const phase of [1, 2, 3]) for (const target of ['auto', 'zombie_grabber', 'zombie_infected', 'zombie_devourer']) {
     const scenario = buildBossDebugScenario(null, { bossId: 'nemesis', abilityId: 'horde_invasion', phase, variant: 'phase_cap', target });
-    assert.equal(scenario.state.boss.combatEntities.filter((entry) => entry.status === 'persistent' && entry.hp > 0).length, phase);
+    assert.equal(scenario.state.boss.combatEntities.filter((entry) => entry.status === 'persistent' && entry.hp > 0).length, 3);
     assert.equal(scenario.expectedIntent, null); assert.equal(executeBossDebugScenarioVariant(scenario.state).executed, true);
   }
   for (const variant of ['reentry', 'avoid_repeat', 'persistent_corpse']) {

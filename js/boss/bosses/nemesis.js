@@ -1,7 +1,7 @@
 export const NEMESIS_ZOMBIES = Object.freeze([
-  Object.freeze({ id: 'grabber', name: 'Agarrador', maxHp: 220, passive: 'grab', portrait: 'assets/images/nemesis-agarrador.png' }),
-  Object.freeze({ id: 'infected', name: 'Infectado', maxHp: 240, passive: 'failure', portrait: 'assets/images/nemesis-infectado.png' }),
-  Object.freeze({ id: 'devourer', name: 'Devorador', maxHp: 260, passive: 'heal', portrait: 'assets/images/nemesis-devorador.png' }),
+  Object.freeze({ id: 'grabber', name: 'Agarrador', maxHp: 180, passive: 'grab', portrait: 'assets/images/nemesis-agarrador.png' }),
+  Object.freeze({ id: 'infected', name: 'Infectado', maxHp: 190, passive: 'failure', portrait: 'assets/images/nemesis-infectado.png' }),
+  Object.freeze({ id: 'devourer', name: 'Devorador', maxHp: 200, passive: 'heal', portrait: 'assets/images/nemesis-devorador.png' }),
 ]);
 export const NEMESIS_RELIEF = Object.freeze({ simple: 0, suja: 0, limpa: 4, real: 8, asas: 12 });
 export const NEMESIS_OBJECTIVE_BALANCE = Object.freeze({
