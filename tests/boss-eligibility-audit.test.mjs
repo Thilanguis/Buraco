@@ -41,8 +41,12 @@ test('physical marks exclude picked top, illegal last discard and grabbed play-o
   const payload=rules.inspectBossAbilityEligibility(state,'horde_invasion').payload;
   assert.deepEqual(payload.cardIds,['other']);
 });
-test('Invasion cap, corpse lifetime resurrection, wounded healing and persistent-only command remain mandatory',()=>{
-  const cap=fixture('nemesis',1,'active_zombies');assert.equal(rules.inspectBossAbilityEligibility(cap,'horde_invasion').eligible,false);
+test('Invasion is phase-independent but capped at three live zombies; revival and healing still require valid targets',()=>{
+  const phaseOne=fixture('nemesis',1,'active_zombies');
+  assert.equal(rules.inspectBossAbilityEligibility(phaseOne,'horde_invasion').eligible,true, 'zumbi ativo na fase 1 não impõe teto por fase');
+  const cap=fixture('nemesis',1,'active_zombies');
+  for (const zombie of cap.boss.combatEntities) { zombie.status='persistent'; zombie.hp=zombie.maxHp; }
+  assert.equal(rules.inspectBossAbilityEligibility(cap,'horde_invasion').eligible,false, 'três zumbis vivos impõem o limite global');
   const spent=fixture('nemesis',3,'spent_revives');assert.equal(rules.inspectBossAbilityEligibility(spent,'viral_reanimation').eligible,false);
   assert.equal(rules.inspectBossAbilityEligibility(spent,'horde_command').eligible,false);
   assert.equal(rules.inspectBossAbilityEligibility(spent,'parasite_regeneration').eligible,false);
@@ -111,6 +115,11 @@ test('Invasion diagnostics distinguish physical target, lifecycle and cap, not s
   assert.equal(details.find(d=>d.entityId==='grabber').eligible,true);
   assert.equal(details.find(d=>d.entityId==='infected').eligible,true);
   assert.equal(details.find(d=>d.entityId==='devourer').reason,'no_extendable_existing_game');
-  const cap=fixture('nemesis',1,'active_zombies');
-  assert.ok(rules.inspectBossAbilityEligibility(cap,'horde_invasion').details.every(d=>d.reason==='phase_cap'));
+  const phaseOne=fixture('nemesis',1,'active_zombies');
+  const candidates=rules.inspectBossAbilityEligibility(phaseOne,'horde_invasion');
+  assert.equal(candidates.eligible,true, 'invasão válida na fase 1, sem teto artificial por fase');
+  assert.ok(candidates.details.every(d=>d.reason!=='phase_cap'), 'nenhum diagnóstico legado phase_cap');
+  const full=fixture('nemesis',1,'active_zombies');
+  for(const zombie of full.boss.combatEntities){zombie.status='persistent'; zombie.hp=zombie.maxHp;}
+  assert.equal(rules.inspectBossAbilityEligibility(full,'horde_invasion').eligible,false, 'teto global de três zumbis');
 });

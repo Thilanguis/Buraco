@@ -39,14 +39,14 @@ test('sole required card is held before a costly deadline, but a low-risk clean 
   const make=points=>orderedScenario({points,melds:[run('table',['3','4','5','6','7','8'])],
     hand:[card('needed','9','♣'),card('spare','3','♦'),card('keep','K','♥')]});
   const move={meldIndex:0,cardIds:['needed']};
-  const critical=rankBossMoves(make([50,40]),0,[move])[0];
+  const critical=rankBossMoves(make([50,44]),0,[move])[0];
   assert.ok(critical.score<0);assert.equal(critical.diagnostics.objective.lossAfterAction,true);
   const low=rankBossMoves(make([0,0]),0,[move])[0];assert.ok(low.score>0);
   assert.equal(low.next.boss.activeOrders[0].ownOptionsConsumed,true);
   assert.ok(low.diagnostics.objective.resourceAfterAction>0);
 });
 test('shortlist cannot crowd out a legal move preserving the required discard',()=>{
-  const s=orderedScenario({points:[40,50],hand:[card('needed','9','♣'),card('heart:6','6','♥'),card('keep','K','♦')],
+  const s=orderedScenario({points:[44,50],hand:[card('needed','9','♣'),card('heart:6','6','♥'),card('keep','K','♦')],
     melds:[run('table',['3','4','5','6','7','8']),run('heart-table',['3','4','5'],'♥')]});
   const safe={meldIndex:1,cardIds:['heart:6']};
   const bad=Array.from({length:40},(_,i)=>({meldIndex:0,cardIds:['needed'],tag:i}));
@@ -55,7 +55,7 @@ test('shortlist cannot crowd out a legal move preserving the required discard',(
   assert.equal(rank[0].diagnostics.objective.lossAfterAction,false);
 });
 for(const index of [0,1])test(`production meld loop keeps sole ordered card until actual discard, index ${index}`,async()=>{
-  const points=index===0?[40,50]:[50,40];
+  const points=index===0?[44,50]:[50,44];
   const s=orderedScenario({points,index,
     hand:[card('needed','9','♣'),card('heart:6','6','♥'),card('keep','K','♦')],
     melds:[run('table',['3','4','5','6','7','8']),run('heart-table',['3','4','5'],'♥')]});
@@ -87,12 +87,13 @@ test('clean-run wildcard sacrifice is unattractive at low Domination but justifi
   };
   const move={meldIndex:0,cardIds:['wild']};
   assert.ok(rankBossMoves(make([0,0]),0,[move])[0].score<0);
-  const high=rankBossMoves(make([50,40]),0,[move])[0];assert.ok(high.score>0);
+  const high=rankBossMoves(make([50,44]),0,[move])[0];assert.ok(high.score>0);
   assert.equal(high.diagnostics.objective.lossWithoutAction,true);
   assert.equal(high.diagnostics.objective.lossAfterAction,false);
 });
-test('Lixo ranking projects the final discard: gaining clubs avoids defeat without hidden knowledge',()=>{
+test('Lixo ranking projects legacy announced +14 order: gaining clubs avoids defeat without hidden knowledge',()=>{
   const s=orderedScenario({points:[36,50],hand:[card('a','3','♥'),card('b','4','♥'),card('keep','K','♦')]});
+  s.boss.activeOrders[0].failureDominationPoints=14;
   s.boss.activeOrders[0].ownOptionsConsumed=true;s.discard=[card('rescue','K','♣'),card('top','5','♥')];
   s.hasDrawnThisTurn=false;
   const ranked=rankBossDiscardPickups(s,0);assert.ok(ranked.length);

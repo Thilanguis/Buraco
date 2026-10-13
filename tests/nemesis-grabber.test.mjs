@@ -313,13 +313,15 @@ test('Legacy current-turn lock survives without a new event, and stale locks can
   assert.equal(s.boss.grabbedByPlayer[0], undefined); assert.equal(isBossCardBlocked(s, 0, id), false);
 });
 
-for (const [id, half] of [['grabber',110],['infected',120],['devourer',130]]) test(`Revival uses new ${id} maximum and still consumes the phase quota`, () => {
+for (const [id, maximum] of [['grabber',180],['infected',190],['devourer',200]]) test(`Revival uses current ${id} maximum, half HP and still consumes the phase quota`, () => {
   const s = fixture(); s.boss.phase = 3;
   for (const e of s.boss.combatEntities) { e.status = 'absent'; e.hp = e.maxHp; }
   const e = s.boss.combatEntities.find(e => e.id === id); e.status = 'corpse'; e.hp = 0;
   const intent = { id: 'revive', abilityId: 'viral_reanimation', announcedPhase: 3, payload: { entityId: id } };
   nemesisBossMechanics.resolveIntent({ boss: s.boss, intent });
-  assert.equal(e.hp, half); assert.equal(e.status, 'persistent'); assert.equal(e.mutated, true);
+  assert.equal(e.maxHp, maximum, 'HP máximo oficial do zumbi');
+  assert.equal(e.hp, Math.ceil(maximum/2), 'reanimação com 50% do máximo');
+  assert.equal(e.status, 'persistent'); assert.equal(e.mutated, true);
   e.status = 'corpse'; e.hp = 0; nemesisBossMechanics.resolveIntent({ boss: s.boss, intent });
   assert.equal(e.hp, 0);
 });
@@ -330,7 +332,7 @@ test('Legacy maxima clamp without resetting combat lifecycle, low remaining HP, 
   const infected = s.boss.combatEntities[1]; infected.status = 'dead'; infected.hp = 0;
   s.boss.starsPlayerId = 1; s.boss.combatTargetsByPlayer[0] = 'grabber'; s.boss.reanimationsByPhase[2] = 'used';
   normalizeBossState(s);
-  assert.equal(s.boss.hp, 2200); assert.equal(s.boss.maxHp, 2200);
+  assert.equal(s.boss.hp, 2400); assert.equal(s.boss.maxHp, 2500);
   assert.equal(grabber(s).hp, 91); assert.equal(grabber(s).status, 'persistent'); assert.equal(s.boss.combatEntities[1].status, 'corpse');
   assert.equal(s.boss.combatTargetsByPlayer[0], 'grabber'); assert.equal(s.boss.starsPlayerId, 1); assert.equal(s.boss.reanimationsByPhase[2], 'used');
   assert.equal(s.boss.eventLog.length, 0);

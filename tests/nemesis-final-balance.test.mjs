@@ -48,8 +48,8 @@ test('Shared partial groups survive players/turns, no turn-end healing, no repla
   mechanics.onPlayerTurnEnd({boss:s.boss,gameState:s,playerId:0,recordBossEvent:()=>assert.fail('no queued heal')});
   const events=contribute(s,5,1,'second');assert.equal(events.length,2);assert.equal(s.boss.devourerFeed.credits,1);
   const clone=JSON.parse(JSON.stringify(s));assert.deepEqual(contribute(s,2,0,'third'),contribute(clone,2,0,'third'));
-  s.boss.hp=2195;const cap=contribute(s,12,1,'cap');assert.equal(cap.length,1);assert.equal(cap[0].amount,5);
-  assert.equal(s.boss.hp,2200);assert.equal(s.boss.devourerFeed.credits,0);
+  s.boss.hp=s.boss.maxHp-5;const cap=contribute(s,12,1,'cap');assert.equal(cap.length,1);assert.equal(cap[0].amount,5);
+  assert.equal(s.boss.hp,s.boss.maxHp);assert.equal(s.boss.devourerFeed.credits,0);
   s.boss.hp=2000;assert.deepEqual(contribute(s,0),[]);assert.equal(s.boss.hp,2000);
 });
 test('Death resets progress; revival baselines the table and preserves cure ID sequence',()=>{

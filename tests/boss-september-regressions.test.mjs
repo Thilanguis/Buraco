@@ -193,8 +193,12 @@ test('timeout antigo não substitui o controlador de uma sessão nova', async ()
 test('recuperação conclui a jogada depois de receber o segundo morto', async () => {
   const s = game('dominadora'); s.currentPlayer = 1; s.players[1].hand = []; s.deadChunksTaken[0] = 1;
   s.deadChunksMax = [2,0]; s.deadPiles = [cards('second-dead', ['3','4','5','6']), []];
+  let recoveryDiscardSelectorCalled = false;
   const context = { state: s, DEAD_CHUNK_SIZE: 11, sortHand() {}, processBossDeadReward() {}, normalizeBossState,
-    isBossCardBlocked, teamHasGoodCanastra: () => false, showMessage() {}, finishGame: async () => {} };
+    isBossCardBlocked, teamHasGoodCanastra: () => false, showMessage() {}, finishGame: async () => {},
+    // O fixture VM extrai apenas os métodos do app: injeta a dependência agora externa.
+    // Mantém o teste de Morto/recuperação isolado, sem impor estratégia de descarte.
+    selectBossRecoveryDiscardIndex: () => { recoveryDiscardSelectorCalled = true; return 0; } };
   const takeDead = app.slice(app.indexOf('function takeDeadIfAvailableForPlayer(p)'), app.indexOf('function canTeamTakeDeadNow'));
   const check = app.slice(app.indexOf('  async _checkBotMortoOrWin('), app.indexOf('  async executeMeldNew('));
   const recover = app.slice(app.indexOf('  async recoverBotTurn(botIndex)'), app.indexOf('\n};', app.indexOf('  async recoverBotTurn(botIndex)')));
@@ -202,5 +206,6 @@ test('recuperação conclui a jogada depois de receber o segundo morto', async (
   context.engine.getState = () => s;
   context.engine.executeDiscard = async (_i, index) => { s.discard.push(...s.players[1].hand.splice(index,1)); s.currentPlayer = 0; return true; };
   assert.equal(await context.engine.recoverBotTurn(1), true);
+  assert.equal(recoveryDiscardSelectorCalled, true, 'a recuperação usa o seletor injetado');
   assert.equal(s.deadChunksTaken[0], 2); assert.equal(s.discard.length, 1); assert.equal(s.players[1].hand.length, 3);
 });

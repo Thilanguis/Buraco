@@ -255,7 +255,7 @@ test('Etiqueta de Ferro ativa antes do turno dos jogadores e pune descarte de ou
 
   const events = notifyBossCardDiscarded(state, 0, state.players[0].hand[2]);
   assert.equal(events.at(-1)?.status, 'disobeyed');
-  assert.ok(Math.abs(getBossChains(state, 0) - 0.8) < 1e-9, 'falha F1 acrescenta 10/50');
+  assert.ok(Math.abs(getBossChains(state, 0) - 0.64) < 1e-9, 'falha F1 acrescenta 8/50');
 });
 
 test('Etiqueta de Ferro usa naipe e diferencia obediencia, desobediencia e cancelamento externo', () => {
@@ -292,7 +292,7 @@ test('Etiqueta de Ferro usa naipe e diferencia obediencia, desobediencia e cance
   const disobeyed = makeOrderState();
   notifyBossCardDiscarded(disobeyed, 0, disobeyed.players[0].hand[2]);
   assert.equal(disobeyed.boss.activeOrders[0].status, 'disobeyed');
-  assert.ok(Math.abs(getBossChains(disobeyed, 0) - 0.8) < 1e-9, 'falhar F1 custa 10/50');
+  assert.ok(Math.abs(getBossChains(disobeyed, 0) - 0.64) < 1e-9, 'falhar F1 custa 8/50');
 
   const cancelled = makeOrderState();
   cancelled.players[0].hand = cancelled.players[0].hand.filter((card) => card.suit !== '♥');
@@ -384,17 +384,17 @@ test('Juros Fixos usa somente tres contratos na proporcao 25/50/25 e media aprov
     selectedContracts += 1;
     counts[intent.payload.contractTier] += 1;
     assert.ok([
-      'mild:10:4',
-      'standard:12:5',
-      'severe:14:6',
+      'mild:8:4',
+      'standard:10:5',
+      'severe:12:6',
     ].includes(`${intent.payload.contractTier}:${intent.payload.fullDebt}:${intent.payload.guaranteedDebt}`));
   }
-  const average = (counts.mild * 10 + counts.standard * 12 + counts.severe * 14) / selectedContracts;
+  const average = (counts.mild * 8 + counts.standard * 10 + counts.severe * 12) / selectedContracts;
   assert.ok(selectedContracts > 3000);
   assert.ok(Math.abs(counts.mild / selectedContracts - 0.25) < 0.02);
   assert.ok(Math.abs(counts.standard / selectedContracts - 0.5) < 0.02);
   assert.ok(Math.abs(counts.severe / selectedContracts - 0.25) < 0.02);
-  assert.equal(average, 12);
+  assert.equal(average, 10);
 });
 
 test('contrato sorteado sobrevive a reload e Voltar sem novo sorteio', () => {

@@ -150,9 +150,9 @@ test('dano de canastra usa somente a diferenca e e idempotente com HP atual do B
   assert.equal(state.boss.hp, 2550);
 
   const upgrade = applyBossMeldTransition(state, { teamId: 0, meldIndex: 0, oldKind: 'suja', newKind: 'limpa', cardsAdded: [] });
-  assert.equal(upgrade.damage, 80);
+  assert.equal(upgrade.damage, 100);
   assert.equal(upgrade.debtReduction, 4);
-  assert.equal(state.boss.hp, 2470);
+  assert.equal(state.boss.hp, 2450);
 });
 
 test('contribuicao de dano por jogo usa meldId estavel e nao duplica apos reload', () => {
@@ -289,7 +289,7 @@ test('chefe resolve uma vez depois dos dois jogadores', () => {
   assert.equal(event.abilityId, 'fixed_interest');
   assert.equal(event.round, 1);
   assert.equal(typeof event.at, 'number');
-  assert.equal(state.boss.danger, 12);
+  assert.equal(state.boss.danger, 10);
   assert.equal(state.boss.roundNumber, 2);
   assert.equal(completeBossPlayerTurn(state, 1), null);
 });
@@ -402,7 +402,7 @@ test('estado recarregado preserva a idempotencia do dano', () => {
   const restored = JSON.parse(JSON.stringify(state));
   const duplicate = applyBossMeldTransition(restored, { teamId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'real', cardsAdded: [] });
   assert.equal(duplicate, null);
-  assert.equal(restored.boss.hp, 2350);
+  assert.equal(restored.boss.hp, 2150);
 });
 
 test('fase tres mantem habilidade de rodada ate os dois jogadores agirem', () => {
@@ -492,10 +492,10 @@ test('intencao anunciada permanece ate o fim da rodada', () => {
   assert.notEqual(state.boss.currentIntent?.id, 'announced');
 });
 
-test('Dominadora usa 2600 HP e bloqueia cartas individuais', () => {
+test('Dominadora usa 2800 HP e bloqueia cartas individuais', () => {
   const state = dominatrixGame();
   state.teams[0].melds = [[{ id: 'effect-base-5', rank: '5', suit: '♠' }, { id: 'effect-base-6', rank: '6', suit: '♠' }]];
-  assert.equal(state.boss.hp, 2600);
+  assert.equal(state.boss.hp, 2800);
   state.boss.currentIntent = { abilityId: 'collar', payload: { targetPlayerId: 0, cardId: 'd0-a' } };
   assert.equal(isBossCardBlocked(state, 0, 'd0-a', 'play'), true);
   assert.equal(isBossCardBlocked(state, 0, 'd0-a', 'discard'), true);
@@ -509,7 +509,7 @@ test('Dominadora usa 2600 HP e bloqueia cartas individuais', () => {
 
 test('HP máximo atualizado para Banqueiro e Dominadora', () => {
   assert.equal(game().boss.maxHp, 2650);
-  assert.equal(dominatrixGame().boss.maxHp, 2600);
+  assert.equal(dominatrixGame().boss.maxHp, 2800);
 });
 
 test('Dominação é individual e derrota a equipe somente quando ambos chegam a 50 pontos', () => {
@@ -546,38 +546,38 @@ test('Posse restaura o dano do jogo e uma carta legal reaplica o dano uma única
   const meld = ['3', '4', '5', '6', '7', '8', '9'].map((rank) => ({ id: `pos-${rank}`, rank, suit: '♠' }));
   state.teams[0].melds = [meld];
   const original = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: meld, isNewMeld: true });
-  assert.equal(original.damage, 225);
-  assert.equal(state.boss.hp, 2375);
+  assert.equal(original.damage, 245);
+  assert.equal(state.boss.hp, 2555);
   state.boss.currentIntent = { id: 'possession-order', abilityId: 'possession', name: 'Posse', duration: 'full_round', payload: { meldIndex: 0 } };
   completeBossPlayerTurn(state, 0);
   const possessionEvent = completeBossPlayerTurn(state, 1);
-  assert.equal(possessionEvent.suppressedDamage, 225);
-  assert.equal(state.boss.hp, 2600);
+  assert.equal(possessionEvent.suppressedDamage, 245);
+  assert.equal(state.boss.hp, 2800);
   const firstContribution = { id: 'pos-10', rank: '10', suit: '♠' };
   state.teams[0].melds[0].push(firstContribution);
   const progressEvent = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [firstContribution] });
   assert.equal(progressEvent.possessionReleased, false);
   assert.equal(progressEvent.cardDamage, 10);
-  assert.equal(state.boss.hp, 2590);
+  assert.equal(state.boss.hp, 2790);
   assert.equal(state.boss.possessions.length, 1);
   const secondContribution = { id: 'pos-j', rank: 'J', suit: '♠' };
   state.teams[0].melds[0].push(secondContribution);
   const breakEvent = applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [secondContribution] });
   assert.equal(breakEvent.possessionReleased, true);
-  assert.equal(breakEvent.possessionReappliedDamage, 225);
+  assert.equal(breakEvent.possessionReappliedDamage, 245);
   assert.equal(breakEvent.cardDamage, 10);
-  assert.equal(breakEvent.damage, 235);
+  assert.equal(breakEvent.damage, 255);
   assert.equal(state.boss.possessions.length, 0);
-  assert.equal(state.boss.hp, 2355);
+  assert.equal(state.boss.hp, 2535);
   assert.equal(applyBossMeldTransition(state, { teamId: 0, playerId: 1, meldIndex: 0, oldKind: 'limpa', newKind: 'limpa', cardsAdded: [secondContribution] }), null);
-  assert.equal(state.boss.hp, 2355);
+  assert.equal(state.boss.hp, 2535);
 });
 
 test('Limpa remove 4 pontos de Dominação de quem causou dano', () => {
   const state = dominatrixGame();
   state.boss.chainsByPlayer[0] = 2;
   const event = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
-  assert.equal(event.damage, 180);
+  assert.equal(event.damage, 200);
   assert.equal(event.chainsRemoved, 0.32);
   assert.equal(getBossChains(state, 0), 1.68);
 });
@@ -1524,7 +1524,7 @@ test('cartas causam dano individual uma vez sem aliviar Corrente', () => {
   const duplicate = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'simple', cardsAdded: cards });
   assert.equal(duplicate, null);
   const canastra = applyBossMeldTransition(state, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
-  assert.equal(canastra.canastraDamage, 180);
+  assert.equal(canastra.canastraDamage, 200);
   assert.equal(canastra.chainsRemoved, 0.32);
 });
 
@@ -1595,11 +1595,11 @@ test('reload libera fluxo de escolha obsoleto e preserva escolha real', () => {
   assert.equal(canBossPerformCommonAction(interrupted), true);
 });
 
-test('Matriarca inicia registrada com 2000 HP, Buraco Fechado e zero Florescimento', () => {
+test('Matriarca inicia registrada com 2300 HP, Buraco Fechado e zero Florescimento', () => {
   const state = matriarchGame();
   assert.equal(state.boss.id, 'matriarca_esmeralda');
-  assert.equal(state.boss.maxHp, 2000);
-  assert.equal(state.boss.hp, 2000);
+  assert.equal(state.boss.maxHp, 2300);
+  assert.equal(state.boss.hp, 2300);
   assert.equal(state.boss.bloom, 0);
   assert.equal(state.boss.maxDanger, 10);
   assert.equal(state.variant, 'fechado');
@@ -1670,7 +1670,7 @@ test('Semente usa alvo legal, resolve ao ser jogada e cancela alvo desaparecido 
   normalizeBossState(cancelled);
   assert.equal(getBossNatureThreats(cancelled).length, 0);
   assert.equal(cancelled.boss.bloom, 0);
-  assert.equal(cancelled.boss.hp, 2000);
+  assert.equal(cancelled.boss.hp, 2300);
 });
 
 test('limites de ameacas por fase impedem novas marcacoes', () => {
@@ -1868,10 +1868,10 @@ test('Casulo absorve, rompe e cura; Coroa encerra sem efeito extra quando a amea
   applyMatriarchAbility(cocoon, 'emerald_cocoon', { amount: 180 }, 3);
   const hit = applyBossMeldTransition(cocoon, { teamId: 0, playerId: 0, meldIndex: 0, cardsAdded: [{ id: 'cocoon-hit', rank: 'JOKER', suit: 'JOKER', joker: true }] });
   assert.equal(hit.absorbedDamage, 20);
-  assert.equal(cocoon.boss.hp, 2000);
+  assert.equal(cocoon.boss.hp, 2300);
   const breakEvent = applyBossMeldTransition(cocoon, { teamId: 0, playerId: 0, meldIndex: 0, oldKind: 'simple', newKind: 'limpa', cardsAdded: [] });
   assert.equal(breakEvent.cocoonBroken, true);
-  assert.equal(cocoon.boss.hp, 1820);
+  assert.equal(cocoon.boss.hp, 2100);
 
   const healing = matriarchGame();
   healing.boss.phase = 3;

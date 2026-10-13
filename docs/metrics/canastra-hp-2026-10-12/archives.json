@@ -1,0 +1,209 @@
+[
+  {
+    "path": "banker-current.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 12605893,
+    "normalizedBytes": 12625272,
+    "gzipBytes": 955081,
+    "sha256": "b10731d3cb3a842f0423f81a2a04bea48a5ce059a711613755dfcd2c03ded6a5",
+    "originalSha256": "ca6a3ec4edf236a190d14af693ae43e5762e6c866debe016831b08a5ca16e195"
+  },
+  {
+    "path": "banker-proposed.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 12551376,
+    "normalizedBytes": 12570749,
+    "gzipBytes": 953481,
+    "sha256": "e479de9ef2fd57ac541ad62634c53084d920ef3ffae54cde25dd13157e252016",
+    "originalSha256": "7d9319aed8846398e064a447853e8733f3d05dc0ea69459eadf5bd487a99b917"
+  },
+  {
+    "path": "dimitrescu-current.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 23064836,
+    "normalizedBytes": 23086369,
+    "gzipBytes": 1672842,
+    "sha256": "7730d04a06ce43afb6adde3abe245b1f9073834f017e3dcbea54491c1fe98c46",
+    "originalSha256": "04b45514408901ea5ec50623ecb50e61c5fb733525ccfb87665e72df07781f8d"
+  },
+  {
+    "path": "dimitrescu-proposed.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 22671854,
+    "normalizedBytes": 22691515,
+    "gzipBytes": 1653062,
+    "sha256": "51ce9b01a962bd397768964facabe1271684f390a9a35c51261af2de4c83868c",
+    "originalSha256": "875230f4169fa7bc5f7927d1ab75ee47a633fa016f9c04457b3bc24dfbeb9374"
+  },
+  {
+    "path": "dominadora-current.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 20759001,
+    "normalizedBytes": 20779677,
+    "gzipBytes": 1402423,
+    "sha256": "c0cbdda49c7435d31b9c70708981ef810e7531f4929be2f0d46c1be662f0a433",
+    "originalSha256": "83b8ccc2f5c273e39d31a70212a55be28ca56d5dd4811fc7372be955ec10e842"
+  },
+  {
+    "path": "dominadora-proposed.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 20380036,
+    "normalizedBytes": 20400669,
+    "gzipBytes": 1379059,
+    "sha256": "c175e920911d3aa97c7001faaef039c988ec34bbae5951a7b6ad743b50f64b6b",
+    "originalSha256": "74d672cc97b092733257c781b2e36698e06b2105c2ed91e692992afda4bb550b"
+  },
+  {
+    "path": "matriarca_esmeralda-current.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 16235180,
+    "normalizedBytes": 16255392,
+    "gzipBytes": 1133355,
+    "sha256": "d42b923932da5341460bfdb708f455209c6450673ab9aec311492e247e52c518",
+    "originalSha256": "daa7ffad919ebbad6e3674e9b3c23ad4ea44ceea2e47c0d0fcd681f57a4ebd61"
+  },
+  {
+    "path": "matriarca_esmeralda-proposed.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 16183446,
+    "normalizedBytes": 16203648,
+    "gzipBytes": 1131477,
+    "sha256": "c92e5e44ae2297d5f848b6671668a51e6391378482d8083a9ba04de0ede7fb95",
+    "originalSha256": "8ba99f1377aba0b954d09f24753e33d07163094786750b8a3a4badc83523b324"
+  },
+  {
+    "path": "nehelenia-current.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 10862719,
+    "normalizedBytes": 10881926,
+    "gzipBytes": 868730,
+    "sha256": "0daf4c788ed6ba67c97e730b606df6c23c93c9fe9ff7d27c7cf61b14e4651846",
+    "originalSha256": "3b20ea6577cffb0c820988efb163aed1d72629efb3dda072ad3a9346f5822d9a"
+  },
+  {
+    "path": "nehelenia-proposed.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 10828566,
+    "normalizedBytes": 10847767,
+    "gzipBytes": 868185,
+    "sha256": "a25eec32db971754c609c4624999014c903c1d9ffdf3325481500ca5ba64399c",
+    "originalSha256": "fb8a4f1fc28517b46444d3e379b88e9437cac33ea9eeb1eeb0bbc3c58d759ee2"
+  },
+  {
+    "path": "nemesis-current.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 22857589,
+    "normalizedBytes": 22879718,
+    "gzipBytes": 1416541,
+    "sha256": "d27bb4e49e66cb28b0170922a43f7e1323e91e7ff6b18729416c7aefa4914702",
+    "originalSha256": "48bf92e70f9f011c70dda800318b7223ee4fc17e6ae120c0b33e479d7984a65c"
+  },
+  {
+    "path": "nemesis-proposed.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 22410683,
+    "normalizedBytes": 22432718,
+    "gzipBytes": 1390949,
+    "sha256": "4f7e44784866b51372cb93537f279f405447b0602482fd3be7e8427ee55883be",
+    "originalSha256": "6be95b93fa9495c3071faa2c152b8d7b867c8545f4d0fa0f6e1a69e4e9f64e2f"
+  },
+  {
+    "path": "hp-candidates/dominadora-candidate.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 20619740,
+    "normalizedBytes": 20639524,
+    "gzipBytes": 1397773,
+    "sha256": "f6d7991a7019a3731dfc32938ec1b52ebcb73452fa96421b4951bd064874b99f",
+    "originalSha256": "adfc0b613e93c18464fcfe3e7840902cbcb230b3b19c2433d529756809ccdc44"
+  },
+  {
+    "path": "hp-candidates-other/banker-candidate.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 12569223,
+    "normalizedBytes": 12588565,
+    "gzipBytes": 955943,
+    "sha256": "e5ab52d918abc4b4ec1a5be8dae2293d41c27982f7dac4bf9b0395b9c97e0043",
+    "originalSha256": "1cbdf1f841e662411daa5b004cadafc4ced3440a1dff2b5db46f6a07667d1978"
+  },
+  {
+    "path": "hp-candidates-other/matriarca_esmeralda-candidate.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 16271043,
+    "normalizedBytes": 16290466,
+    "gzipBytes": 1138269,
+    "sha256": "956c8631af05850c2d787249f1598bc8db2fac9d94f2bc5e3a2ae2c909de93fc",
+    "originalSha256": "d33797e01a06d13fc12ea07e8b4aa199ea5e8e5ab9568e665e29b1c6e08bb742"
+  },
+  {
+    "path": "hp-candidates-other/nehelenia-candidate.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 10836271,
+    "normalizedBytes": 10853473,
+    "gzipBytes": 867320,
+    "sha256": "7e6033f7de0b28ec602bf01b7c676494f66d0b8099879d7b8b7a7a12367c7ab8",
+    "originalSha256": "dfb9d9ac617666ab8b79d0adf88d153f437781dfeeabf0f76ea46da9a38dc396"
+  },
+  {
+    "path": "hp-candidates-other/nemesis-candidate.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 22771472,
+    "normalizedBytes": 22791560,
+    "gzipBytes": 1412026,
+    "sha256": "5fda02dab66c945434128c920c7de69bfbf13a2029ad09926b0e6ba62fcb7b4c",
+    "originalSha256": "c94df3fa4eed504f8980e6a92892c2043c7dc6628790a0dcc2183ccba4ec99a8"
+  },
+  {
+    "path": "hp-refinement/dimitrescu-refined.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 22881501,
+    "normalizedBytes": 22901184,
+    "gzipBytes": 1667740,
+    "sha256": "3dc966497a202b5da91a39fbb3e72826bda2f42c3860ea5b599c084ab9b63e23",
+    "originalSha256": "24368d8324ce958e2cf5ed0d6256a7f689d53979f32664704939fa61badf6375"
+  },
+  {
+    "path": "hp-refinement/nemesis-refined.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 22793017,
+    "normalizedBytes": 22813111,
+    "gzipBytes": 1413823,
+    "sha256": "39d21fa4cface1cce67960e1aab429c462cf00cf1e686af7e51d02faf019fc8c",
+    "originalSha256": "a715835b20c2710342b2855a5f61db03cef26e1245a227c5459d5b18ec6fb273"
+  },
+  {
+    "path": "hp-supplement-bank/banker-candidate.jsonl.gz",
+    "rows": 80,
+    "originalBytes": 9785828,
+    "normalizedBytes": 9799580,
+    "gzipBytes": 741771,
+    "sha256": "26ab123699948f6558e9720b43e507852f28976f45139206555a2d21ce8c90a2",
+    "originalSha256": "baf254eb250f6b5e72b1e063a811093197141a99aa9c80fdf5aa34989a7e0864"
+  },
+  {
+    "path": "supplement-bank/banker-current.jsonl.gz",
+    "rows": 80,
+    "originalBytes": 9850902,
+    "normalizedBytes": 9866255,
+    "gzipBytes": 746017,
+    "sha256": "79386b76a72e40b026e2072dd132291fcb6bde2735759779ccefffdf05b907cc",
+    "originalSha256": "4e4ec3aa7cad611b23b1b6462f530403341f8638a75d81decfc805198f2ca759"
+  },
+  {
+    "path": "supplement-bank/banker-proposed.jsonl.gz",
+    "rows": 80,
+    "originalBytes": 9763890,
+    "normalizedBytes": 9779232,
+    "gzipBytes": 740430,
+    "sha256": "9020a254b22caba7041b344c8a30bde7e3d5d55f51cd0b7f646bc40bff7b6cc1",
+    "originalSha256": "2d28f7ff7d215db13242d5984a3b122e29c1cb92406a9eafe1d04de8d3cabf15"
+  },
+  {
+    "path": "hp-refinement-matriarch/matriarca_esmeralda-refined.jsonl.gz",
+    "rows": 100,
+    "originalBytes": 16249437,
+    "normalizedBytes": 16267655,
+    "gzipBytes": 1135440,
+    "sha256": "0046a14993bd7d5e6b8a17cc4b0b548ed9ea8a8a9294231f1f618d1e29728510",
+    "originalSha256": "0f746ac8a2aacee692856099697c0ff5d50d49dcfa3abba48ad042611a7dced9"
+  }
+]

@@ -181,7 +181,7 @@ for(const phase of [2,3])for(const fed of [0,1,2])test(`Enxerto F${phase}, ${fed
 });
 
 test('Enxerto parcial respeita teto de cura/HP e preserva saves antigos já anunciados',()=>{
-  for(const [used,hp,heal] of [[140,1700,10],[0,1995,5],[150,1700,0]]) {
+  for(const [used,hp,heal] of [[140,1700,10],[0,2295,5],[150,1700,0]]) {
     const s=fixture('matriarca_esmeralda','graft',2);activate(s);s.boss.hp=hp;s.boss.natureHealingThisRound=used;s.boss.natureHealingRound=s.boss.roundNumber;
     const t=s.boss.natureThreats.find(t=>t.type==='graft');t.fedMeldIds=[t.meldIds[0]];
     end(s,0);end(s,1);assert.equal(t.healApplied||0,heal);assert.equal(t.bloomApplied||0,0);

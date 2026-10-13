@@ -91,7 +91,7 @@ test('objective modifiers emit one sound event with final clamped delta and no e
 
 test('creation, registry, menu and infection resource are integrated without active zombies', () => {
   const boss = createBossState('nemesis', 19);
-  assert.equal(boss.hp, 2200); assert.equal(boss.danger, 0); assert.equal(boss.dangerType, 'infection');
+  assert.equal(boss.hp, 2500); assert.equal(boss.danger, 0); assert.equal(boss.dangerType, 'infection');
   assert.deepEqual(boss.combatEntities.map((entry) => [entry.id, entry.hp, entry.status, entry.mutated]), [['grabber', 180, 'absent', false], ['infected', 190, 'absent', false], ['devourer', 200, 'absent', false]]);
   assert.equal(getBossDebugCatalog().find((entry) => entry.id === 'nemesis').abilities.length, 11);
   const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -104,8 +104,8 @@ test('real engine math routes damage, never overflows and does not change S.T.A.
   const state = game(); state.boss.danger = 30;
   entity(state, 'grabber').hp = 50;
   const event = hit(state, { targetId: 'grabber', kind: 'real' });
-  assert.equal(event.damage, 300); assert.equal(event.appliedDamage, 50); assert.equal(event.targetId, 'grabber');
-  assert.equal(state.boss.hp, 2200); assert.equal(state.boss.danger, 22); assert.equal(state.boss.starsPlayerId, 0);
+  assert.equal(event.damage, 500); assert.equal(event.appliedDamage, 50); assert.equal(event.targetId, 'grabber');
+  assert.equal(state.boss.hp, 2500); assert.equal(state.boss.danger, 22); assert.equal(state.boss.starsPlayerId, 0);
   assert.equal(entity(state, 'grabber').status, 'corpse'); assert.equal(entity(state, 'grabber').diedAt != null, true);
   assert.equal(setBossDamageTarget(state, 0, 'grabber'), false);
 });
@@ -121,7 +121,7 @@ test('direct attacks assign and switch S.T.A.R.S.; target persists across reload
 test('incremental Limpa → Real → Asas relief is target-independent and idempotent', () => {
   const state = game(); state.boss.danger = 60;
   hit(state, { kind: 'limpa', targetId: 'devourer' }); assert.equal(state.boss.danger, 56);
-  hit(state, { kind: 'real', targetId: 'devourer', oldKind: 'limpa' }); assert.equal(state.boss.danger, 52);
+  hit(state, { kind: 'real', targetId: 'infected', oldKind: 'limpa' }); assert.equal(state.boss.danger, 52);
   hit(state, { kind: 'asas', targetId: 'boss', oldKind: 'real' }); assert.equal(state.boss.danger, 48);
   hit(state, { kind: 'asas', oldKind: 'asas' }); assert.equal(state.boss.danger, 48);
   const restored = simulateBossDebugReload(state); hit(restored, { kind: 'asas', oldKind: 'asas' }); assert.equal(restored.boss.danger, 48);
@@ -375,7 +375,7 @@ test('BOT chooses its actual damage target through the real engine and avoids le
   assert.equal(shouldBossBotTakeDiscard(state, 1, { intent: { wants: true } }), false);
   state.boss.bossFlow = null;
   const event = hit(state, { playerId: 1, kind: 'real' }); assert.equal(event.targetId, 'infected');
-  assert.equal(entity(state, 'infected').status, 'corpse'); assert.equal(state.boss.hp, 2200);
+  assert.equal(entity(state, 'infected').status, 'corpse'); assert.equal(state.boss.hp, 2500);
 });
 
 test('BOT uses a legal marked Tentacle exit when full failure would be lethal', async () => {
@@ -422,7 +422,7 @@ test('final strike also honors explicit target and cannot spill damage', () => {
   const state = game(); state.boss.starsPlayerId = null;
   setBossDamageTarget(state, 0, 'grabber');
   const event = applyBossFinalStrike(state, 1000, 0);
-  assert.equal(event.damage, 100); assert.equal(event.appliedDamage, 100); assert.equal(entity(state, 'grabber').hp, 80); assert.equal(state.boss.hp, 2200);
+  assert.equal(event.damage, 100); assert.equal(event.appliedDamage, 100); assert.equal(entity(state, 'grabber').hp, 80); assert.equal(state.boss.hp, 2500);
   assert.equal(state.boss.result.victory, false); assert.equal(state.boss.starsPlayerId, null);
   assert.match(nemesisBossUi.finalStrikeWarning({ gameState: game(), playerId: 0 }) || '', /^$/);
   const selected = game(); selected.boss.combatTargetsByPlayer[0] = 'infected';

@@ -1,0 +1,7 @@
+boss,hp_current,hp_recommended,suja,limpa,real,asas,nominal_extra,actual_extra_bonus,actual_extra_main_damage,wins_current,wins_proposed,wins_recommended,zero_asas,one_asas,two_asas,more_asas
+banker,2650,2750,1.26,2.02,0.12,0.06,97.40,95.40,90.95,1,7,4,94,6,0,0
+dominadora,2600,2900,3.97,2.29,0.33,0.19,216.30,196.30,174.70,1,17,7,82,17,1,0
+matriarca_esmeralda,2000,2400,3.28,1.60,0.11,0.06,87.00,101.00,85.72,0,5,1,95,4,1,0
+nehelenia,2400,2500,0.65,0.75,0.03,0.06,54.00,31.00,27.35,2,3,3,96,3,0,1
+nemesis,2200,2600,4.26,3.05,0.44,0.23,275.50,250.50,236.25,5,28,10,80,17,3,0
+dimitrescu,2000,2200,3.69,2.66,0.21,0.15,177.70,177.70,147.26,1,11,9,88,9,3,0

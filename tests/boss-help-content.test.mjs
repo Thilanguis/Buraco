@@ -55,7 +55,7 @@ test('ajuda usa explicacao editorial e nao duplica a descricao oficial', () => {
 });
 
 test('ajuda detalhada cobre também regras curtas que escondem consequência importante', () => {
-  assert.match(buildBossAbilityHelp(state('dimitrescu', 'crimson_brand', {}))?.text || '', /Cada carta não usada causa \+7 Sede/i);
+  assert.match(buildBossAbilityHelp(state('dimitrescu', 'crimson_brand', {}))?.text || '', /Cada carta não usada causa \+2 Sede/i);
   assert.match(buildBossAbilityHelp(state('banker', 'credit_block', {}))?.text || '', /ninguém pode recolher o Lixo/i);
   assert.match(buildBossAbilityHelp(state('matriarca_esmeralda', 'restorative_dew', {}))?.text || '', /cura prevista/i);
 });

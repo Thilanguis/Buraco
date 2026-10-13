@@ -57,7 +57,7 @@ test('cada chefe fixa sua identidade visual no menu cooperativo', () => {
   assert.match(matriarch, /tableTheme: 'feltro'/);
   assert.match(matriarch, /deckTheme: 'holografico'/);
   assert.match(matriarch, /accent: '#34d399'/);
-  assert.match(matriarch, /maxHp: 2000/);
+  assert.match(matriarch, /maxHp: 2300/);
   assert.match(matriarch, /dangerType: 'bloom'/);
   assert.match(app, /applyCooperativeBossPreset/);
   assert.match(app, /visualMenuBlock\.style\.display = cooperative \? 'none'/);

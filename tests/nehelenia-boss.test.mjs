@@ -141,6 +141,7 @@ test('Jogo Espelhado falso manda a carta ao fundo e Desorienta', () => {
   const event = resolveNeheleniaMirroredMeldChoice(state, player.id, fakeSlot, chosen.id);
   assert.equal(event.allowed, true);
   assert.equal(event.real, false);
+  assert.ok(Math.abs(state.boss.danger - 0.7) < 1e-9, 'reflexo falso aplica 14/100');
   assert.equal(state.stock.length, beforeStock + 1);
   assert.equal(state.stock[0].id, chosen.id, 'stock.pop compra do topo, portanto unshift é o fundo');
   assert.ok(state.boss.effects.some((effect) => effect.id === 'nehelenia_disoriented' && effect.playerId === player.id));
@@ -182,7 +183,7 @@ test('Siga o Reflexo considera zero um padrão válido e pune se o segundo baixa
   feed(state, 1, 1, 1);
   state.turnNumber += 1;
   completeBossPlayerTurn(state, 1);
-  assert.equal(state.boss.danger, 0.8, 'falhar em Siga o Reflexo acrescenta 16/100');
+  assert.equal(state.boss.danger, 0.6, 'falhar em Siga o Reflexo acrescenta 12/100');
 });
 
 test('Espelho do Lixo cria dois reflexos idênticos com escolha 50/50', () => {
@@ -216,9 +217,9 @@ test('Mundo do Espelho chega a 100 e Canastra Limpa recupera 4 antes disso', () 
   assert.ok(Math.abs(state.boss.danger - 3.8) < 1e-9, 'Limpa deve reduzir 4/100');
   assert.ok(Math.abs(relief.mirrorFragmentRelief - 0.2) < 1e-9);
 
-  // 84/100 + falha de Siga o Reflexo (+16) = 100/100.
-  state.boss.dreamMirrorMarksByPlayer = { 0: 2.1, 1: 2.1 };
-  state.boss.danger = 4.2;
+  // 88/100 + falha de Siga o Reflexo (+12) = 100/100.
+  state.boss.dreamMirrorMarksByPlayer = { 0: 2.2, 1: 2.2 };
+  state.boss.danger = 4.4;
   state.boss.result = null;
   state.boss.currentIntent = null;
   state.boss.playersActedThisRound = [];

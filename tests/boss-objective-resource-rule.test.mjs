@@ -26,8 +26,22 @@ function game(abilityId, payload, phase = 2, bossId = 'dimitrescu') {
     teams: [{ id: 0, playerIndexes: [0, 1], melds: [[]] }, { id: 1, playerIndexes: [], melds: [] }], boss };
 }
 
+// Valores do pacote de 12/10: duas faixas por jogador, Fúria somada uma vez
+// ao total positivo e Marca em 40/60/80/100% da base antiga (arredonda para baixo).
+// Não derivar as expectativas da função de produção: o teste deve acusar regressões.
+const TRIBUTO_BONUS_FURIA = [0, 4, 8, 10];
+const MARCA_BASE_ANTIGA = { 1: 5, 2: 7, 3: 9 };
+const MARCA_COEF = [0.4, 0.6, 0.8, 1.0];
+const tributo = (cardCounts, deaths) => {
+  const base = cardCounts.reduce((sum, cards) => sum + (cards >= 11 ? 4 : cards >= 8 ? 2 : 0), 0);
+  return base > 0 ? base + TRIBUTO_BONUS_FURIA[deaths] : 0;
+};
+const marca = (phase, failures, deaths) => {
+  const perFailure = Math.floor(MARCA_BASE_ANTIGA[phase] * MARCA_COEF[deaths]);
+  return failures > 0 ? failures * perFailure + 2 * deaths : 0;
+};
+
 for (const phase of [1, 2, 3]) {
-  const [medium, heavy, brand] = { 1: [3, 6, 5], 2: [4, 8, 7], 3: [6, 10, 9] }[phase];
   for (const deaths of [0, 1, 2, 3]) {
     const prepare = (id, payload) => {
       const state = game(id, payload, phase);
@@ -35,17 +49,18 @@ for (const phase of [1, 2, 3]) {
       for (const d of state.boss.combatEntities.slice(0, deaths)) { d.hp = 0; d.status = 'dead'; }
       return state;
     };
-    test(`Sede Lady F${phase}, ${deaths} mortes: Tributo/faixas, marcas, Fúria e HUD usam valores aprovados`, () => {
-      for (const [cards, base] of [[7, 0], [8, medium], [10, medium], [11, heavy]]) {
+    test(`Sede Lady F${phase}, ${deaths} mortes: Tributo/faixas, marcas, Fúria e HUD atuais`, () => {
+      for (const cards of [0, 7, 8, 10, 11, 15]) {
         const state = prepare('blood_tithe', {});
         state.players[0].hand = Array.from({ length: cards }, (_, i) => ({ id: `c${i}` }));
-        const expected = base ? base + deaths * 2 : 0;
+        const expected = tributo([cards, 0], deaths);
         assert.match(buildBossActionPresentation(state).consequence, new RegExp(`\\+${expected} Sede`));
         assert.equal(resolveIntent(state).dangerDelta, expected);
       }
       const state = prepare('crimson_brand', { marks: [{ status: 'active' }, { status: 'active' }] });
-      const expected = brand * 2 + deaths * 2;
-      assert.match(buildBossAbilityHelp(state).text, new RegExp(`Cada carta não usada causa \\+${brand} Sede`));
+      const perFailure = Math.floor(MARCA_BASE_ANTIGA[phase] * MARCA_COEF[deaths]);
+      const expected = marca(phase, 2, deaths);
+      assert.match(buildBossAbilityHelp(state).text, new RegExp(`Cada carta não usada causa \\+${perFailure} Sede`));
       assert.match(buildBossActionPresentation(state).consequence, new RegExp(`\\+${expected} Sede`));
       assert.equal(resolveIntent(state).dangerDelta, expected, 'Fúria uma vez por resolução, não por marca');
       const success = prepare('crimson_brand', { marks: [{ status: 'success' }] });
@@ -53,7 +68,7 @@ for (const phase of [1, 2, 3]) {
       const both = prepare('blood_tithe', {});
       both.players[0].hand = Array.from({ length: 8 }, (_, i) => ({ id: `a${i}` }));
       both.players[1].hand = Array.from({ length: 11 }, (_, i) => ({ id: `b${i}` }));
-      assert.equal(resolveIntent(both).dangerDelta, medium + heavy + deaths * 2, 'Fúria uma vez, não por jogador');
+      assert.equal(resolveIntent(both).dangerDelta, tributo([8, 11], deaths), 'Fúria uma vez, não por jogador');
     });
   }
 }
@@ -209,7 +224,7 @@ for (const phase of [1, 2, 3]) {
   });
   test(`Marca Carmesim F${phase}: sucesso parcial não desconta falha`, () => {
     const state = game('crimson_brand', { marks: [{ status: 'success' }, { status: 'active' }] }, phase);
-    assert.equal(resolveIntent(state).dangerDelta, { 1: 5, 2: 7, 3: 9 }[phase]);
+    assert.equal(resolveIntent(state).dangerDelta, marca(phase, 1, 0), 'somente a marca que falhou cobra Sede');
   });
   test(`Caçada de Bela F${phase}: punição preservada`, () => {
     assert.equal(resolveIntent(game('bela_hunt', { used: false }, phase)).dangerDelta, phase === 3 ? 16 : 14);
