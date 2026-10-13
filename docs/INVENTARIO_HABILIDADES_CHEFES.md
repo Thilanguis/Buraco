@@ -1,5 +1,7 @@
 # Inventário atual de habilidades dos chefes
 
+**Pacote vigente de 13/10/2026:** bônus de dano Suja100/Limpa200/Real500/Ás-a-Ás1000; HP Banqueiro2650, Dominadora2800, Matriarca2300, Lady2000, Nehelenia2400, Nemesis2500. Nerfs pontuais e compatibilidade em [balanceamento aplicado](BALANCEAMENTO_SEIS_CHEFES_2026-10-13.md). A meta futura de ~70% de vitórias dos chefes contra humanos competentes não foi medida.
+
 Catálogo vigente, não backlog. [Status do playtest](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md#resumo-executivo-do-checklist--estado-em-10102026) e [contexto de retomada](HANDOFF_DESENVOLVIMENTO_BURACO.md) ficam separados. Designs não aprovados não são habilidades implementadas.
 
 **Auditoria atual — 10/10/2026:** Dominadora 13, Nemesis 11, Nehelenia 11, Matriarca 10, Banqueiro 8 e Dimitrescu 8 habilidades oficiais. Elegibilidade e seleções reais por fase, cenários dirigidos e limitações estão em [BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md). Não foram adicionadas habilidades ou alterados pesos. As duas [propostas da Lady](PROPOSTAS_DIMITRESCU_2026-10-10.md) aguardam aprovação.
@@ -36,10 +38,10 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
-| Juros Fixos | 1, 2 e 3 | 5 | Sorteia um contrato 25/50/25. Fases 1–2 cobram 10/12/14 integral ou Cofre iniciando em 4/5/6; Fase 3 cobra 14/16/17 ou Cofre 6/7/8. Adiar o resgate acrescenta +2 por turno nas Fases 1–2 e +3 na Fase 3, até o valor integral. |
+| Juros Fixos | 1, 2 e 3 | 5 | Sorteia um contrato 25/50/25. Fases 1–2 cobram 8/10/12 integral ou Cofre iniciando em 4/5/6; Fase 3 cobra 12/14/15 ou Cofre 6/7/8. Adiar o resgate acrescenta +2 por turno nas Fases 1–2 e +3 na Fase 3, até o valor integral. |
 | Tarifa de Manutenção | 1, 2 e 3 | 3 | Cada cooperador recebe +1 Carta Financiada nas Fases 1–2 e +2 na Fase 3. A carta fica marcada como FINANCIADA e só quita a Tarifa se entrar em um jogo; descartá-la ou terminar o turno com ela na mão gera +5 ou +7 de Dívida, respectivamente. |
 | Bloqueio de Crédito | 1, 2 e 3 | 3 | Bloqueia a retirada do lixo durante a rodada. |
-| Auditoria de Naipe | 2 e 3 | 4 | Sorteia um naipe. A equipe precisa baixar 3 cartas dele na Fase 2 ou 4 na Fase 3. Sucesso evita a cobrança; falha adiciona +12 ou +16 de Dívida. |
+| Auditoria de Naipe | 2 e 3 | 4 | Sorteia um naipe. A equipe precisa baixar 3 cartas dele na Fase 2 ou 4 na Fase 3. Sucesso evita a cobrança; falha adiciona +10 ou +14 de Dívida. |
 | Penhora | 2 e 3 | 2 | Bloqueia temporariamente um jogo elegível da equipe até a próxima cobrança. |
 | Juros Compostos | 2 e 3 | 4 | No fechamento, usa faixas pelo total das mãos: Fase 2 = +6/+10/+14; Fase 3 = +8/+12/+16 para 0–7 / 8–13 / 14+ cartas. |
 | Limite de Crédito | 1, 2 e 3 | 4 | Define franquia compartilhada de cartas vindas da mão. Fases 1/2/3: franquia 3/2/1, custo por excedente +3/+4/+5 e teto +9/+12/+15. |
@@ -52,7 +54,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 ## A Dominadora
 
 
-**HP:** 2600.
+**HP:** 2800.
 
 
 | Habilidade | Fases | Peso | Funcionamento atual |
@@ -63,7 +65,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 | Troca Forçada | 2 e 3 | 4 | Troca uma carta útil/jogável entre os cooperadores; a carta recebida fica presa no próximo turno quando aplicável. |
 | Mãos Atadas | 2 e 3 | 4 | Cada jogador fica vinculado ao primeiro jogo que tocar na rodada; a equipe ainda compartilha no máximo 1 criação de jogo novo. |
 | Posse | 2 e 3 | 3 | Suspende o dano antigo de um jogo até os dois contribuírem ou ele evoluir; cartas novas ainda causam dano individual normal. |
-| Etiqueta de Ferro | 1, 2 e 3 | 4 | Ordena um naipe legal e escasso para o descarte. Cumprir custa +2/+2/+3; falhar custa +10/+12/+14. |
+| Etiqueta de Ferro | 1, 2 e 3 | 4 | Ordena um naipe legal e escasso para o descarte. Cumprir custa +2/+2/+3; falhar custa +8/+10/+12. |
 | Favorita | 2 e 3 | 4 | Pune o cooperador menos dominado com +8. F2/F3: protegida inalterada (0), sem recuperação. |
 | Dupla Coleira | 3 | 5 | Prende uma carta útil/jogável de cada cooperador durante a rodada. |
 | Separação | 3 | 4 | Depois que um jogador alimenta um jogo, o parceiro não pode tocar naquele mesmo jogo na rodada. |
@@ -91,10 +93,10 @@ Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.m
 
 ## A Matriarca Esmeralda
 
-**Teto de burst:** uma ativação aplica no máximo +1 Flor, mesmo com falhas múltiplas. Trepadeiras: uma/duas falhas = +1; Enxerto: um lado = cura até 50 HP sem Flor/propagação comum, zero lados = +1 Flor e propagação; Florescimento Real: qualquer número de falhas = +1. Propagações independentes existentes permanecem. HP 2000, derrota em 10 Flores (limite atualizado em 12/10/2026), alívio incremental por canastras, limites de cura e Renascimento F3 (1 Flor, 300 HP, 1x) preservados. Orvalho e Casulo não mudam.
+**Teto de burst:** uma ativação aplica no máximo +1 Flor, mesmo com falhas múltiplas. Trepadeiras: uma/duas falhas = +1; Enxerto: um lado = cura até 50 HP sem Flor/propagação comum, zero lados = +1 Flor e propagação; Florescimento Real: qualquer número de falhas = +1. Propagações independentes existentes permanecem. HP 2300, derrota em 10 Flores (limite atualizado em 12/10/2026), alívio incremental por canastras, limites de cura e Renascimento F3 (1 Flor, 300 HP, 1x) preservados. Orvalho e Casulo não mudam.
 
 
-**HP:** 2000. **Limite total de cura por rodada:** F1 100 / F2 150 / F3 200.
+**HP:** 2300. **Limite total de cura por rodada:** F1 100 / F2 150 / F3 200.
 
 
 | Habilidade | Fases | Peso | Funcionamento atual |
@@ -155,11 +157,11 @@ Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.m
 
 | Habilidade | Fases | Peso | Funcionamento atual |
 |---|---:|---:|---|
-| Jogo Espelhado | 1, 2 e 3 | 5 | Duplica fisicamente um jogo em dois reflexos idênticos. O alvo usa exatamente 1 carta legal em um reflexo. Errar ou ignorar envia a carta ao fundo do Monte, deixa o jogador **Desorientado** e acrescenta **+18** ao Mundo do Espelho. |
-| Siga o Reflexo | 1, 2 e 3 | 5 | O primeiro cooperador define, pelo turno inteiro, quantas cartas baixou; o segundo precisa terminar com a mesma quantidade, inclusive 0. Diferença acrescenta **+16**. |
-| Espelho do Lixo | 2 e 3 | 4 | Mostra dois reflexos idênticos do topo do Lixo, sem pista escondida. Errar acrescenta **+16** e sela o Lixo durante a rodada. |
+| Jogo Espelhado | 1, 2 e 3 | 5 | Duplica fisicamente um jogo em dois reflexos idênticos. O alvo usa exatamente 1 carta legal em um reflexo. Errar ou ignorar envia a carta ao fundo do Monte, deixa o jogador **Desorientado** e acrescenta **+14** ao Mundo do Espelho. |
+| Siga o Reflexo | 1, 2 e 3 | 5 | O primeiro cooperador define, pelo turno inteiro, quantas cartas baixou; o segundo precisa terminar com a mesma quantidade, inclusive 0. Diferença acrescenta **+12**. |
+| Espelho do Lixo | 2 e 3 | 4 | Mostra dois reflexos idênticos do topo do Lixo, sem pista escondida. Errar acrescenta **+12** e sela o Lixo durante a rodada. |
 | Prisão no Espelho | 1, 2 e 3 | 2 | Precisa de um cooperador já pressionado, outro para resgatá-lo e um jogo existente que aceite extensão. Não exige que o parceiro já tenha a carta necessária. Prioriza o mais pressionado. Sucesso liberta; falha acrescenta **+8/+10/+12** conforme a fase. |
-| Pesadelo Eterno | 3 | 5 | Mostra a ORIGINAL, cria dois reflexos e embaralha os três. Errar acrescenta **+24**. |
+| Pesadelo Eterno | 3 | 5 | Mostra a ORIGINAL, cria dois reflexos e embaralha os três. Errar acrescenta **+20**. |
 | Laço do Tigre | 1, 2 e 3 | 4 | Liga dois jogos; cada lado precisa receber carta. Falhar acrescenta **+12** e deixa garras persistentes no lado ignorado. |
 | Presa Marcada | 1, 2 e 3 | 3 | Marca um jogo; até resolvê-lo, o alvo não pode alimentar outro jogo existente. É controle puro, sem avanço direto do recurso. |
 | Olho do Falcão | 1, 2 e 3 | 3 | Exige descarte do naipe marcado; errar faz Hawk vigiar o topo e bloqueia o Lixo enquanto aquela carta permanecer no topo. |
@@ -183,7 +185,7 @@ Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.m
 
 **Objetivos atuais — 09/10/2026:** Caçada exige dano direto, mas não uma jogada pronta para entrar no sorteio. Extermínio congela S.T.A.R.S., parceiro e jogo existente extensível, sem provar os dois planos. Tentáculo/Barragem marcam cartas com saída individual legal por jogo ou descarte, sem garantir sucesso completo ou conjunto. Devorador exige jogo extensível, não a carta na mão; Infectado não exige duas contribuições prontas; Agarrador aceita marca descartável. INVADINDO sem HP/alvo; retrato seleciona Nemesis; ajuda/chips não mudam o alvo. Saves anunciados preservam o objetivo e IDs salvos.
 
-**HP:** 2200. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos: **três diferentes em qualquer fase**. Aparecer como ameaça ≠ persistir ≠ cadáver.
+**HP:** 2500. **Infecção:** 0–100; derrota imediata em 100. Usa a progressão compartilhada de fases. Partida nova sem zumbis ativos; teto de persistentes vivos: **três diferentes em qualquer fase**. Aparecer como ameaça ≠ persistir ≠ cadáver.
 
 | Habilidade (`id`) | Fases | Peso | Funcionamento atual |
 |---|---|---:|---|

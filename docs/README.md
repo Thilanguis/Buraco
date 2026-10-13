@@ -11,6 +11,8 @@ Esta pasta guarda **documentação permanente do projeto**. Ela não deve funcio
 
 ## Documentos atuais
 
+- [Balanceamento aplicado em 13/10/2026](BALANCEAMENTO_SEIS_CHEFES_2026-10-13.md): valores vigentes dos seis chefes, migração sem efeitos retroativos, correção do Cofre/BOT e resultados das regressões. Não confundir com os experimentos históricos de10/10 ou12/10.
+
 ### Mapa da revisão de 10/10/2026
 
 Não duplicar backlog entre relatórios e handoff. A divisão é:

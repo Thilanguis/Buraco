@@ -2,7 +2,11 @@
 
 Regras vigentes neste documento; status, pendências e homologação no [checklist-mestre](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md#resumo-executivo-do-checklist--estado-em-10102026); contexto no [handoff](HANDOFF_DESENVOLVIMENTO_BURACO.md). Origem Lixo do Especial e impacto100 do Explosivo já estão aplicados, sem decisão pendente.
 
-## Itens da Dimitrescu — lote final de 10/10/2026
+**Balanceamento vigente — 13/10/2026:** canastras Suja100/Limpa200/Real500/Ás-a-Ás1000; HP Banqueiro2650, Dominadora2800, Matriarca2300, Lady2000, Nehelenia2400, Nemesis2500. Penalidades pontuais de Nehelenia/Banqueiro/Dominadora atualizadas abaixo. [Relatório de aplicação e compatibilidade](BALANCEAMENTO_SEIS_CHEFES_2026-10-13.md). A meta futura de aproximadamente 70% de vitórias dos chefes contra dupla humana competente não é resultado medido. Notas datadas de pacotes anteriores são históricas.
+
+## Itens da Dimitrescu — registro histórico do lote de 10/10/2026
+
+As petrificações deste registro foram substituídas pelo pacote de12/10: Adaga80, Explosivo110, Anticoagulante100, Frasco160, Relíquia160 e piso130. A seção7 e o [pacote vigente](PACOTE_COOPERATIVO_E_BOT_ITENS_2026-10-12.md) têm precedência. O lote13/10 não mudou esses itens.
 
 Explosivo: 100 HP imediatos + 15 HP de sangramento por rodada até morrer, sem acumular; petrificação −50 HP máximo. Relíquia: petrifica100 e aumenta em20% somente ataques diretos, até a filha morrer. Frasco: petrifica100 somente no alvo e congela as três filhas por duas oportunidades consecutivas dos cooperadores, contando a atual. Reaplicar renova para duas, sem somar durações. Regen20/Anti10, Adaga80%, Lady/PROT./Sede/Fúria e demais itens preservados. Contrato detalhado na seção7 e [relatório deste lote](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md).
 
@@ -310,9 +314,9 @@ Dano individual não remove:
 | -------------- | ---------------------: |
 | Jogo simples   |                      0 |
 | Canastra suja  |                    100 |
-| Canastra limpa |                    180 |
-| Canastra real  |                    300 |
-| Ás-a-Ás        |                    450 |
+| Canastra limpa |                    200 |
+| Canastra real  |                    500 |
+| Ás-a-Ás        |                   1000 |
 
 
 O dano é incremental.
@@ -323,7 +327,7 @@ Exemplo:
 
 ```text
 Suja → Limpa
-180 − 100 = 80 de dano novo
+200 − 100 = 100 de dano novo
 ```
 
 
@@ -374,7 +378,7 @@ Cada jogo no modo Chefe da Mesa mostra contribuição acumulada.
 
 
 ```text
-💥 180
+💥 200
 ```
 
 
@@ -392,7 +396,7 @@ Não inclui dano potencial futuro.
 
 
 ```text
-💥 180   🪙 -4
+💥 200   🪙 -4
 ```
 
 
@@ -403,7 +407,7 @@ Mostra a redução real de Dívida produzida pelo jogo.
 
 
 ```text
-💥 180   ⛓️ -4
+💥 200   ⛓️ -4
 ```
 
 
@@ -414,7 +418,7 @@ Mostra pontos de Dominação realmente removidos por Resistência através daque
 
 
 ```text
-💥 180   🌸 -1
+💥 200   🌸 -1
 ```
 
 
@@ -521,9 +525,9 @@ Ao selecionar a habilidade, o motor sorteia um contrato fechado.
 
 | Contrato | Sem Garantia | Com Garantia | Chance |
 | -------- | -----------: | -----------: | -----: |
-| Leve     |          +10 |           +4 |    25% |
-| Padrão   |          +12 |           +5 |    50% |
-| Severo   |          +14 |           +6 |    25% |
+| Leve     |          +8 |           +4 |    25% |
+| Padrão   |          +10 |           +5 |    50% |
+| Severo   |          +12 |           +6 |    25% |
 
 
 ### Fase 3
@@ -531,9 +535,9 @@ Ao selecionar a habilidade, o motor sorteia um contrato fechado.
 
 | Contrato | Sem Garantia | Com Garantia | Chance |
 | -------- | -----------: | -----------: | -----: |
-| Leve     |          +14 |           +6 |    25% |
-| Padrão   |          +16 |           +7 |    50% |
-| Severo   |          +17 |           +8 |    25% |
+| Leve     |          +12 |           +6 |    25% |
+| Padrão   |          +14 |           +7 |    50% |
+| Severo   |          +15 |           +8 |    25% |
 
 
 Regras:
@@ -805,8 +809,8 @@ fases: 2 e 3
 
 | Fase | Exigência | Sucesso |      Falha |
 | ---- | --------: | ------: | ---------: |
-| 2    |  3 cartas | sem cobrança | Dívida +12 |
-| 3    |  4 cartas | sem cobrança | Dívida +16 |
+| 2    |  3 cartas | sem cobrança | Dívida +10 |
+| 3    |  4 cartas | sem cobrança | Dívida +14 |
 
 
 - somente cartas reais do naipe;
@@ -902,7 +906,7 @@ Chefe de controle direto, ordens, Dominação individual e perda de eficiência.
 
 
 ```text
-HP: 2600
+HP: 2800
 Dominação por jogador: 0..50
 Barra visual: 4 segmentos de 12,5 pontos por jogador
 ```
@@ -1115,8 +1119,8 @@ Se descartar outro naipe possuindo opção válida:
 
 
 - permitir;
-- Dominação +10 na F1;
-- +12 na F2;
+- Dominação +8 na F1;
+- +10 na F2;
 - +14 na F3.
 
 
@@ -1445,7 +1449,7 @@ Chefe de plantio, ocupação da mesa, propagação e Florescimento.
 ```text
 id: matriarca_esmeralda
 mode: boss_matriarca
-HP: 2000
+HP: 2300
 Florescimento: 0..5
 ```
 
@@ -2475,7 +2479,7 @@ Em touch, tablet e `prefers-reduced-motion`:
 
 | Característica | Banqueiro | Dominadora | Matriarca | Lady Dimitrescu | Rainha Nehelenia | Nemesis |
 |---|---|---|---|---|---|---|
-| HP | 2650 | 2600 | 2000 | 2000 | 2400 | 2200 |
+| HP | 2650 | 2800 | 2300 | 2000 | 2400 | 2500 |
 | Perigo | Dívida coletiva | Dominação individual | Florescimento | Sede de Sangue | Mundo do Espelho (0–100) | Infecção (0–100) |
 | Derrota especial | Dívida 100 | ambos em 50/50 de Dominação | 10 Flores | Sede 100 | 5 Espelhos | Infecção 100 |
 | Pressão | preços e recursos | ordens e eficiência | ameaças e propagação | sangue como recurso, filhas, cura e proteção | reflexos, memória, simetria e capangas | Infecção, zumbis persistentes e redirecionamento de dano |
@@ -2575,7 +2579,7 @@ O recurso é **coletivo**, mas o motor mantém a parcela atribuída a cada jogad
 - `100/100`: derrota imediata — Nehelenia fecha a equipe dentro do reflexo.
 
 
-As punições não entregam mais um Espelho inteiro por falha. Cada habilidade aplica sua própria pressão: Jogo Espelhado +18, Siga o Reflexo +16, Espelho do Lixo +16, Laço do Tigre +12 e Pesadelo Eterno +24.
+As punições não entregam mais um Espelho inteiro por falha. Cada habilidade aplica sua própria pressão: Jogo Espelhado +14, Siga o Reflexo +12, Espelho do Lixo +12, Laço do Tigre +12 e Pesadelo Eterno +20.
 
 
 A recuperação por canastra segue a régua comum:
@@ -2627,7 +2631,7 @@ O alvo seleciona exatamente 1 carta legal e toca em um dos reflexos:
 - **Desorientado:** não pode fazer novas baixadas naquele turno; ainda pode descartar e encerrar.
 
 
-Ignorar a ilusão até o fim do turno acrescenta **+18** ao Mundo do Espelho, assim como escolher o reflexo falso.
+Ignorar a ilusão até o fim do turno acrescenta **+14** ao Mundo do Espelho, assim como escolher o reflexo falso.
 
 
 Se o alvo já estiver sob **Presa Marcada** de Tiger em outro jogo, o **Jogo Espelhado** tem precedência temporária por ser a obrigação ativa do turno: o jogador pode alimentar somente o jogo espelhado até resolver a escolha. A Presa não é removida e volta a restringir os demais jogos imediatamente depois.
@@ -2664,7 +2668,7 @@ Regras:
 - o segundo jogador **não é bloqueado** por tentar passar do número;
 - ao fim do segundo turno, compara-se o total;
 - `segundo == padrão` = sucesso;
-- qualquer diferença, para mais ou para menos, = **+16 no Mundo do Espelho**.
+- qualquer diferença, para mais ou para menos, = **+12 no Mundo do Espelho**.
 
 
 ### Espelho do Lixo
@@ -2677,7 +2681,7 @@ O topo real do lixo é duplicado em **dois reflexos visualmente idênticos**.
 - não existe `X`, rachadura seletiva, brilho diferente ou qualquer pista;
 - a resposta é deliberadamente **50/50**;
 - acerto mantém o lixo disponível;
-- erro sela o lixo durante a rodada e acrescenta **+16 no Mundo do Espelho**.
+- erro sela o lixo durante a rodada e acrescenta **+12 no Mundo do Espelho**.
 
 
 O bot também não recebe a resposta secreta: escolhe um dos dois reflexos de forma determinística, mas sem consultar `correctOption`.
@@ -2711,7 +2715,7 @@ Todos mostram a mesma carta e nenhum recebe `X` ou pista falsa automática. O de
 
 
 - acerto: a ilusão quebra;
-- erro: **+24 no Mundo do Espelho**;
+- erro: **+20 no Mundo do Espelho**;
 - se isso alcançar `100/100`, o Mundo do Espelho encerra a batalha.
 
 
@@ -2801,16 +2805,16 @@ O estado interno continua compatível com a escala legada 0–4 em `chainsByPlay
 - os dois jogadores em 50/50: derrota especial.
 
 
-Pressões atuais de teste: Escolha Forçada F1 +6 ou ordem +2/falha +12, F2 +7 ou +3/+14, F3 +8 ou +3/+16; Exposição sucesso +1 e falha +9/+11/+13; Etiqueta +2/+2/+3 ao cumprir e +10/+12/+14 ao falhar; Favorita F2/F3 0/+8; Controle Absoluto +5; Quebra de Vontade +8 ou cura de até 180 HP; Ordem Final recusar +7, aceitar +2 e +6 por carta sorteada não usada.
+Pressões atuais de teste: Escolha Forçada F1 +6 ou ordem +2/falha +12, F2 +7 ou +3/+14, F3 +8 ou +3/+16; Exposição sucesso +1 e falha +9/+11/+13; Etiqueta +2/+2/+3 ao cumprir e +8/+10/+12 ao falhar; Favorita F2/F3 0/+8; Controle Absoluto +5; Quebra de Vontade +8 ou cura de até 180 HP; Ordem Final recusar +7, aceitar +2 e +6 por carta sorteada não usada.
 
 
 ### Nehelenia
 O estado continua compatível com 5 Espelhos, agora com preenchimento parcial. Cada Espelho equivale a 20 pontos do Mundo do Espelho.
 
 
-Pressões de teste: Jogo Espelhado erro/ignorar +18; Siga o Reflexo falha +16; Espelho do Lixo erro +16; Prisão no Espelho falha +8/+10/+12; Laço do Tigre falha +12; Pesadelo Eterno erro +24. Na Prisão, libertar o parceiro não altera o Mundo do Espelho.
+Pressões de teste: Jogo Espelhado erro/ignorar +14; Siga o Reflexo falha +12; Espelho do Lixo erro +12; Prisão no Espelho falha +8/+10/+12; Laço do Tigre falha +12; Pesadelo Eterno erro +20. Na Prisão, libertar o parceiro não altera o Mundo do Espelho.
 
-**Revisão de 04/10/2026:** os valores foram mantidos após comparação com a Dominadora. A Nehelenia alterna habilidades de pressão e de controle, usa uma barra coletiva de 100 pontos e recupera 4/8/12 pelas canastras; a pressão mais forte, +24, fica restrita à Fase 3. Não foi aplicado buff/nerf nesta revisão.
+**Registro histórico da revisão de 04/10/2026, anterior aos nerfs de13/10:** os valores foram mantidos após comparação com a Dominadora. A Nehelenia alterna habilidades de pressão e de controle, usa uma barra coletiva de 100 pontos e recupera 4/8/12 pelas canastras; a pressão mais forte daquela revisão, +24, ficava restrita à Fase 3. Não foi aplicado buff/nerf naquela revisão.
 
 
 O HUD mostra o preenchimento parcial da Dominação/Espelhos e o progresso numérico para tornar o risco legível.
@@ -2821,7 +2825,7 @@ Registro histórico de 08/10/2026 (valores superados pelo pacote de 12/10): Lady
 
 ### Nemesis — revisão experimental de 06/10/2026
 
-Durabilidade atual para teste: **Nemesis 2200 / Agarrador 180 / Infectado 190 / Devorador 200 HP**. Agarrador sorteia cartas da mão após a compra do jogador perseguido, do Monte ou do Lixo; troca o jogador por rodada. Pesos, punições, Infecção e demais chefes foram mantidos. Revisão atual: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINAL_NEMESIS_2026-10-09.md).
+Durabilidade atual para teste: **Nemesis 2500 / Agarrador 180 / Infectado 190 / Devorador 200 HP**. Agarrador sorteia cartas da mão após a compra do jogador perseguido, do Monte ou do Lixo; troca o jogador por rodada. Pesos, punições, Infecção e demais chefes foram mantidos. Revisão atual: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINAL_NEMESIS_2026-10-09.md).
 
 A estimativa de **~68,9%** é histórica, anterior à regra global do Lixo e a este rebalanceamento; não representa win rate atual. Não há novo percentual validado. A recalibração depende de testes de jogo, simulação ou telemetria posteriores.
 ---
@@ -2852,7 +2856,7 @@ A decoração é aplicada depois de renderizar a face, para não ser apagada por
 
 ## 16.1 Regra funcional
 
-Nemesis começa com **2200 HP** e **Infecção 0/100**. Usa os gatilhos e o fluxo de fases compartilhados do modo Chefe, sem progressão paralela. Chegar a **100 de Infecção encerra a batalha imediatamente**, inclusive por pegar o Lixo ou alimentar uma Zona de Impacto. Uma redução posterior na mesma ação não desfaz uma derrota já confirmada.
+Nemesis começa com **2500 HP** e **Infecção 0/100**. Usa os gatilhos e o fluxo de fases compartilhados do modo Chefe, sem progressão paralela. Chegar a **100 de Infecção encerra a batalha imediatamente**, inclusive por pegar o Lixo ou alimentar uma Zona de Impacto. Uma redução posterior na mesma ação não desfaz uma derrota já confirmada.
 
 A partida começa **sem zumbis ativos**. Os três zumbis só tentam entrar pela **Invasão da Horda**. Aparecer como ameaça não significa persistir: durante a entrada não há passiva nem alvo de dano. A falha deixa o zumbi persistente com HP máximo; sucesso o repele, sem Infecção extra e sem produzir cadáver.
 
@@ -2932,7 +2936,7 @@ INVADINDO não mostra HP de combate nem permite seleção. A arte principal do N
 
 Objetivos não precisam de plano viável para ser anunciados. O planner continua no BOT, no Laboratório ao executar sucesso e na proteção das travas do Agarrador, não como prova obrigatória da rotação. Tentáculo distingue jogo/descarte/falha; Barragem mantém três marcas e exigência de duas saídas; Extermínio mantém dano direto e contribuição do parceiro. Sem alvo obrigatório, a habilidade é inelegível; sem solução, pode ser sorteada e falhar. Pesos e consequências completas/parciais permanecem.
 
-Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. Registro histórico da revisão de UX anterior: HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados naquela rodada; somente a expectativa obsoleta da Prisão no Espelho foi ajustada. A revisão posterior de durabilidade desta seção passa o HP do Nemesis a 2200, sem alterar as demais regras.
+Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. Registro histórico da revisão de UX anterior: HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados naquela rodada; somente a expectativa obsoleta da Prisão no Espelho foi ajustada. A revisão posterior de durabilidade desta seção passa o HP do Nemesis a 2200, sem alterar as demais regras. O pacote de 13/10/2026 define o valor vigente em 2500 HP.
 
 Teste manual simultâneo em dois clientes reais ainda é necessário para confirmar o transporte Firebase, o layout completo da mesa e o balanceamento. A matriz automatizada e os resultados estão em `docs/NEMESIS_IMPLEMENTACAO.md`.
 # Regra global de recuperação da condição especial

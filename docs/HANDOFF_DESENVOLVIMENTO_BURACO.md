@@ -1,6 +1,8 @@
 # Handoff de desenvolvimento — Buraco
 
-Atualizado em 11/10/2026, após a validação do lote final de itens da Lady. Contexto de retomada, não especificação paralela nem autorização para iniciar tarefas.
+Atualizado em 13/10/2026, após o pacote aprovado dos seis chefes. Contexto de retomada, não especificação paralela nem autorização para iniciar tarefas.
+
+**Estado vigente:** bônus100/200/500/1000; HP Banqueiro2650, Dominadora2800, Matriarca2300, Nehelenia2400, Nemesis2500, Lady2000. Nerfs pontuais e Cofre/BOT aplicados; ledger de saves migra sem dano retroativo e cobranças já anunciadas são conservadas. [Relatório, testes e limitações](BALANCEAMENTO_SEIS_CHEFES_2026-10-13.md). Sem nova calibração massiva ou medida de70% contra humanos. Não reabrir P0/P1 nem alterar Especial ou mídia. Pacote de itens12/10 permanece vigente.
 
 ## Fonte de verdade e leitura
 
@@ -22,8 +24,8 @@ Este handoff substitui, para retomada atual, os blocos de estado/prioridades do 
 
 ## Decisões encerradas — não perguntar nem implementar novamente
 
-- Explosivo/Granada: **100 de impacto +15 de sangramento por rodada até morrer**, sem acumular; petrificação−50. Frasco petrifica100 no alvo e congela globalmente as três por duas oportunidades dos cooperadores, incluindo a atual; reaplicar renova para duas. Relíquia petrifica100 e dá+20% de dano recebido de ataques diretos, permanente/sem stack; não silencia nem amplia itens/hemorragia. Ordem Relíquia→clamp→Adaga80%. [Relatório do lote final](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md).
-- Lady2000 HP; filhas500 cada, piso recuperável300; regen20/Anti10; Adaga80% do dano efetivo de ataques à filha diretamente na vida da Lady. Não aplicar450 HP ou Adaga100% por conta própria.
+- Explosivo/Granada: **100 de impacto +15 de sangramento por rodada até morrer**, sem acumular. Petrificações aditivas: Adaga80, Explosivo110, Anticoagulante100, Frasco160 e Relíquia160. Frasco congela globalmente as três por duas oportunidades dos cooperadores, incluindo a atual; reaplicar renova para duas. Relíquia dá+20% de dano recebido de ataques diretos, permanente/sem stack; não silencia nem amplia itens/hemorragia. Ordem Relíquia→clamp→Adaga80%. [Pacote vigente de12/10](PACOTE_COOPERATIVO_E_BOT_ITENS_2026-10-12.md).
+- Lady2000 HP; filhas500 cada, piso recuperável130; regen20/Anti10; Adaga80% do dano efetivo de ataques à filha diretamente na vida da Lady. Não aplicar450 HP ou Adaga100% por conta própria.
 - Vínculo consumível:500 PROT. sustentados por filha viva,1500 iniciais; Coágulo→PROT.→HP. Morte remove até500 da proteção restante. Adaga conserva sua exceção de atravessar proteção. Sede/Fúria e outros itens não mudaram no último patch.
 - Saves v2 recebem `castleItemEffectsVersion:1`: convertem hemorragia ativa para15, Relíquias anexadas em bônus20% e Frio ainda ativo em duas oportunidades globais. Sem replay de impacto/petrificação/cura/tick; HP, consumo, anexos e PROT. preservados. Compatibilidade v1 permanece distinta.
 - Especial dos seis chefes: **exatamente cinco cartas do topo do Lixo**, mínimo cinco, bloqueios e reações respeitados. Lixo versus Monte já foi decidido explicitamente pelo usuário; não há divergência aberta.

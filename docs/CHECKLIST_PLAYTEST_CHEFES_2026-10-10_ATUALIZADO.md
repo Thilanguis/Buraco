@@ -1,5 +1,7 @@
 # CHECKLIST-MESTRE — Playtest dos chefes (10/10/2026)
 
+**Adendo implementado em 13/10/2026:** novo dano incremental 100/200/500/1000 e HPs2650/2800/2300/2400/2500/2000 (Banqueiro/Dominadora/Matriarca/Nehelenia/Nemesis/Lady), nerfs pontuais aprovados e compra do BOT sem tentativa de resgate do Cofre fechado. [Valores, testes e compatibilidade](BALANCEAMENTO_SEIS_CHEFES_2026-10-13.md). Não reabre os P0/P1 já concluídos. Homologação humana do novo pacote permanece pendente; meta ~70% de vitórias dos chefes não foi aferida. Os valores de itens de 10/10 abaixo são históricos: o pacote vigente de12/10 mantém Explosivo100+15 e petrificações80/110/100/160/160, preservados neste lote.
+
 **Ajuste final de 10/10/2026:** Explosivo/Granada causa **100 HP imediatos + 20 HP por rodada até a morte**, sem acumular sangramentos; petrificação −50 HP máximo, regen20/10 e Adaga80% preservados. Referências a impacto60 em experimentos abaixo são históricas, não valores atuais. Resultados anteriores não foram recalculados.
 
 ## Resumo executivo do checklist — estado em 10/10/2026
