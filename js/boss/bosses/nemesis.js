@@ -25,7 +25,7 @@ export const nemesisDefinition = Object.freeze({
   tableTheme: 'resident',
   deckTheme: 'resident',
   accent: '#bd563c',
-  maxHp: 2200,
+  maxHp: 2500,
   dangerType: 'infection',
   dangerLabel: 'INFECÇÃO',
   maxDanger: 100,

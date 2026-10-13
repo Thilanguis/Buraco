@@ -11681,10 +11681,12 @@ const botEngine = {
     const botVault = getBossVault(s, botIndex);
     if (botVault && (isBossVaultDrawRequired(s, botIndex) || shouldBossBotReclaimVault(s, botIndex))) {
       const vaultEvent = reclaimBossVault(s, botIndex);
-      if (!vaultEvent) return;
-      s.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: botIndex, bossEvent: vaultEvent, ts: Date.now() };
-      await this.commitState();
-      return;
+      if (vaultEvent) {
+        s.lastAction = { id: newActionId(), type: 'bossVaultReclaim', playerId: botIndex, bossEvent: vaultEvent, ts: Date.now() };
+        await this.commitState();
+        return;
+      }
+      if (!canPerformCommonGameAction(s)) return false;
     }
     const bossExtraCount = consumeBossExtraDraw(s, botIndex);
     const drawCount = ((s.mode === '1x1_duploMorto' || s.mode === '1x1_dominacao') && botIndex === 1 && !s.partialDraw ? 2 : 1) + bossExtraCount;

@@ -1,9 +1,9 @@
 export const BOSS_DAMAGE_BY_KIND = Object.freeze({
   simple: 0,
   suja: 100,
-  limpa: 180,
-  real: 300,
-  asas: 450,
+  limpa: 200,
+  real: 500,
+  asas: 1000,
 });
 
 export const DEBT_REDUCTION_BY_KIND = Object.freeze({

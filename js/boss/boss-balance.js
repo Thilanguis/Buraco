@@ -1,5 +1,12 @@
 export const MATRIARCH_GRAFT_PARTIAL_HEAL = 50;
 export const MATRIARCH_MAX_FLOWERS = 10;
+export const COOPERATIVE_BALANCE_VERSION = 2;
+export const NEHELENIA_FAILURE_POINTS = Object.freeze({
+  mirrored_meld: 14, follow_reflection: 12, discard_mirror: 12, eternal_nightmare: 20,
+});
+export function neheleniaFailurePoints(source, abilityId) {
+  return (source?.payload || source)?.failureMirrorPoints ?? NEHELENIA_FAILURE_POINTS[abilityId];
+}
 
 export function getRestorativeDewHealing(phase, cardsPlayed) {
   const count = Math.max(0, Number(cardsPlayed) || 0);

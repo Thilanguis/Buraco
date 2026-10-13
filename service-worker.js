@@ -1,4 +1,4 @@
-const CACHE_NAME = 'buraco-v308';
+const CACHE_NAME = 'buraco-v309';
 const ASSETS = [
   './js/boss/castle-bot-strategy.js',
   './js/audio-balance.js',

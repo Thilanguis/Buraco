@@ -48,15 +48,15 @@ export const neheleniaDefinition = Object.freeze({
   }),
   abilities: Object.freeze([
     ability('mirrored_meld', 'Jogo Espelhado', 5, [1, 2, 3], () =>
-      'Nehelenia cria dois reflexos. Escolher o falso envia a carta ao fundo, deixa o jogador Desorientado e avança +18 no Mundo do Espelho.'),
+      'Nehelenia cria dois reflexos. Escolher o falso envia a carta ao fundo, deixa o jogador Desorientado e avança +14 no Mundo do Espelho.'),
     ability('follow_reflection', 'Siga o Reflexo', 5, [1, 2, 3], () =>
-      'O segundo cooperador precisa igualar a quantidade baixada pelo primeiro; falhar avança +16 no Mundo do Espelho.'),
+      'O segundo cooperador precisa igualar a quantidade baixada pelo primeiro; falhar avança +12 no Mundo do Espelho.'),
     ability('discard_mirror', 'Espelho do Lixo', 4, [2, 3], () =>
-      'O topo do lixo aparece em dois reflexos idênticos. Errar sela o lixo e avança +16 no Mundo do Espelho.'),
+      'O topo do lixo aparece em dois reflexos idênticos. Errar sela o lixo e avança +12 no Mundo do Espelho.'),
     ability('mirror_prison', 'Prisão no Espelho', 2, [1, 2, 3], ({ failureMirrorPoints = 8 } = {}) =>
       `Nehelenia aprisiona quem está mais pressionado pelo Mundo do Espelho. O parceiro precisa alimentar um jogo válido; sucesso liberta sem penalidade, falha avança +${failureMirrorPoints}.`),
     ability('eternal_nightmare', 'Pesadelo Eterno', 5, [3], () =>
-      'A original e dois reflexos se misturam. Errar avança +24 no Mundo do Espelho.'),
+      'A original e dois reflexos se misturam. Errar avança +20 no Mundo do Espelho.'),
     ability('tiger_link', 'Laço do Tigre', 4, [1, 2, 3], () =>
       "Tiger's Eye liga dois jogos. Ignorar qualquer lado avança +12 no Mundo do Espelho e deixa as garras persistentes."),
     ability('tiger_prey', 'Presa Marcada', 3, [1, 2, 3], () =>

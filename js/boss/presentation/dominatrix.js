@@ -57,12 +57,12 @@ const ACTION_CATEGORIES = Object.freeze({
   interdict: 'Restricao ativa agora',
 });
 
-function dominatrixPressureText(phase = 1) {
+function dominatrixPressureText(phase = 1, source = {}) {
   const p = Number(phase) || 1;
   return {
     forcedChoice: p === 3 ? { direct: 8, obey: 3, fail: 16 } : p === 2 ? { direct: 7, obey: 3, fail: 14 } : { direct: 6, obey: 2, fail: 12 },
     exposure: { success: 1, fail: p === 3 ? 13 : p === 2 ? 11 : 9 },
-    etiquette: { obey: p === 3 ? 3 : 2, fail: p === 3 ? 14 : p === 2 ? 12 : 10 },
+    etiquette: { obey: p === 3 ? 3 : 2, fail: source?.failureDominationPoints ?? (p === 3 ? 12 : p === 2 ? 10 : 8) },
     finalOrder: { direct: 7, accept: 2, miss: 6 },
     absoluteControl: 5,
   };
@@ -142,7 +142,7 @@ export const dominatrixBossPresentation = Object.freeze({
         return { instruction: `Ordem às cegas ou +${pressure.direct} Dominação.`, progress: '', consequence: `Aceitar +${pressure.accept} · cartas só depois` };
       }
       case 'iron_etiquette': {
-        const pressure = dominatrixPressureText(intent.announcedPhase).etiquette;
+        const pressure = dominatrixPressureText(intent.announcedPhase, intent.payload).etiquette;
         return { instruction: `${target}: descarte ${payload.suitLabel}.`, progress: '⬜ 0/1', consequence: `Cumpre +${pressure.obey} · falha +${pressure.fail}` };
       }
       case 'interdict': return { instruction: `Jogo ${Number(payload.meldIndex) + 1}: não evolua.`, progress: '', consequence: 'Desobedecer: Dominação' };
@@ -169,7 +169,7 @@ export const dominatrixBossPresentation = Object.freeze({
       case 'favorite': return 'Nas Fases 2 e 3, o cooperador menos dominado recebe +8 Dominação. A protegida fica inalterada: ser poupada não recupera Dominação.';
       case 'double_collar': return 'Uma carta de cada jogador fica presa até o fim da rodada. As cartas com Coleira não podem ser jogadas nem descartadas.';
       case 'iron_etiquette': {
-        const pressure = dominatrixPressureText(intent.announcedPhase).etiquette;
+        const pressure = dominatrixPressureText(intent.announcedPhase, intent.payload).etiquette;
         return `Encerre seu turno descartando ${payload.suitLabel || 'o naipe indicado'}. Obedecer aumenta a Dominação em ${pressure.obey}; descartar outro naipe aumenta em ${pressure.fail}.`;
       }
       case 'absolute_control': return `Neste efeito, ${target} é tratado como Dominado durante o próximo turno: não pode pegar o Lixo nem criar jogo novo, mas pode comprar do Monte e alimentar jogos existentes. Também recebe Dominação +5.`;
@@ -254,7 +254,7 @@ export const dominatrixBossPresentation = Object.freeze({
       if (!order) return null;
       const target = playerName(gameState, order.targetPlayerId);
       const suit = order.suitLabel || order.suit || 'o naipe ordenado';
-      const pressure = dominatrixPressureText(order.announcedPhase || boss.phase).etiquette;
+      const pressure = dominatrixPressureText(order.announcedPhase || boss.phase, order).etiquette;
       const base = { category: order.status === 'active' ? 'Objetivo ativo' : 'Objetivo resolvido', name: 'Etiqueta de Ferro', speech: '', description: '', details: detailFields([['Alvo', target], ['Ordem', `descartar ${suit}`], ['Prazo', 'fim do turno do alvo']]) };
       if (order.status === 'active') return { ...base, instruction: `${target} deve encerrar o turno descartando ${suit}.`, progress: '⬜ 0/1 — Pendente', consequence: `Cumprir +${pressure.obey} · falhar +${pressure.fail}` };
       if (order.status === 'obeyed') return { ...base, instruction: `✅ ${target} cumpriu a Etiqueta de Ferro.`, progress: '✅ 1/1 — Concluído', consequence: `Dominação +${pressure.obey}` };

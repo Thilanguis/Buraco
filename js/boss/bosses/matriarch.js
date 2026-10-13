@@ -10,7 +10,7 @@ export const matriarchDefinition = Object.freeze({
   tableTheme: 'feltro',
   deckTheme: 'holografico',
   accent: '#34d399',
-  maxHp: 2000,
+  maxHp: 2300,
   dangerType: 'bloom',
   maxDanger: MATRIARCH_MAX_FLOWERS,
   phaseNames: Object.freeze({ 1: 'Germinacao', 2: 'Jardim Voraz', 3: 'Primavera Eterna' }),

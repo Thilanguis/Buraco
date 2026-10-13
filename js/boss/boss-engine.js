@@ -1,7 +1,8 @@
 import { getBossDefinition, getBossDefinitionForMode } from './boss-registry.js';
 import { BOSS_DAMAGE_BY_KIND, DEBT_REDUCTION_BY_KIND } from './bosses/banker.js';
 import { buildBossActionPresentation } from './boss-presentation.js';
-import { getRestorativeDewHealing, MATRIARCH_GRAFT_PARTIAL_HEAL, MATRIARCH_MAX_FLOWERS } from './boss-balance.js';
+import { getRestorativeDewHealing, MATRIARCH_GRAFT_PARTIAL_HEAL, MATRIARCH_MAX_FLOWERS,
+  COOPERATIVE_BALANCE_VERSION, NEHELENIA_FAILURE_POINTS, neheleniaFailurePoints } from './boss-balance.js';
 import {
   applyBossCardDamageMechanics,
   applyBossMeldContributionMechanics,
@@ -123,14 +124,14 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const MELD_TIER = Object.freeze({ simple: 0, suja: 0, limpa: 1, real: 2, asas: 3 });
 const BANKER_CONTRACTS = Object.freeze({
   early: Object.freeze([
-    Object.freeze({ tier: 'mild', fullDebt: 10, guaranteedDebt: 4 }),
-    Object.freeze({ tier: 'standard', fullDebt: 12, guaranteedDebt: 5 }),
-    Object.freeze({ tier: 'severe', fullDebt: 14, guaranteedDebt: 6 }),
+    Object.freeze({ tier: 'mild', fullDebt: 8, guaranteedDebt: 4 }),
+    Object.freeze({ tier: 'standard', fullDebt: 10, guaranteedDebt: 5 }),
+    Object.freeze({ tier: 'severe', fullDebt: 12, guaranteedDebt: 6 }),
   ]),
   late: Object.freeze([
-    Object.freeze({ tier: 'mild', fullDebt: 14, guaranteedDebt: 6 }),
-    Object.freeze({ tier: 'standard', fullDebt: 16, guaranteedDebt: 7 }),
-    Object.freeze({ tier: 'severe', fullDebt: 17, guaranteedDebt: 8 }),
+    Object.freeze({ tier: 'mild', fullDebt: 12, guaranteedDebt: 6 }),
+    Object.freeze({ tier: 'standard', fullDebt: 14, guaranteedDebt: 7 }),
+    Object.freeze({ tier: 'severe', fullDebt: 15, guaranteedDebt: 8 }),
   ]),
 });
 
@@ -291,9 +292,9 @@ const DOMINATRIX_PRESSURE = Object.freeze({
     3: Object.freeze({ success: 1, fail: 13 }),
   }),
   iron_etiquette: Object.freeze({
-    1: Object.freeze({ obey: 2, fail: 10 }),
-    2: Object.freeze({ obey: 2, fail: 12 }),
-    3: Object.freeze({ obey: 3, fail: 14 }),
+    1: Object.freeze({ obey: 2, fail: 8 }),
+    2: Object.freeze({ obey: 2, fail: 10 }),
+    3: Object.freeze({ obey: 3, fail: 12 }),
   }),
   final_order: Object.freeze({ direct: 7, accept: 2, miss: 6 }),
   absolute_control: Object.freeze({ apply: 5 }),
@@ -1424,7 +1425,7 @@ function createPayload(gameState, abilityId) {
   };
   if (abilityId === 'suit_audit') {
     const suit = SUITS[Math.floor(seededUnit(bossSeed(gameState, 17)) * SUITS.length) % SUITS.length];
-    return { suit: suit.value, suitLabel: suit.label, required: boss.phase === 3 ? 4 : 3, progress: 0, successDelta: 0, failureDelta: boss.phase === 3 ? 16 : 12 };
+    return { suit: suit.value, suitLabel: suit.label, required: boss.phase === 3 ? 4 : 3, progress: 0, successDelta: 0, failureDelta: boss.phase === 3 ? 14 : 10 };
   }
   if (abilityId === 'compound_interest') {
     return boss.phase === 3
@@ -1944,11 +1945,53 @@ export const BOSS_PRESENTATION_MS = Object.freeze({
   taunt: 4000,
 });
 
+function migrateCooperativeBalance(gameState) {
+  const boss = gameState.boss;
+  if (Number(boss.cooperativeBalanceVersion || 1) >= COOPERATIVE_BALANCE_VERSION) return;
+  // Raise the credited tier, not HP damage: a save never receives a retroactive
+  // bonus. The next evolution uses the new difference exactly once.
+  const credit = { 0: 0, 100: 100, 180: 200, 300: 500, 450: 1000 };
+  for (const entry of Object.values(boss.meldProgress || {}))
+    if (Object.hasOwn(credit, entry.damageValue)) entry.damageValue = credit[entry.damageValue];
+  const intent = boss.currentIntent;
+  const phase = Number(intent?.announcedPhase || boss.phase || 1);
+  if (boss.id === 'nehelenia') {
+    const legacy = { mirrored_meld: 18, follow_reflection: 16, discard_mirror: 16, eternal_nightmare: 24 };
+    if (intent && legacy[intent.abilityId] != null) {
+      intent.payload ||= {};
+      intent.payload.failureMirrorPoints ??= legacy[intent.abilityId];
+    }
+    for (const choice of boss.pendingChoices || [])
+      if (legacy[choice.type] != null) choice.failureMirrorPoints ??= legacy[choice.type];
+  }
+  if (boss.id === 'banker' && intent) {
+    intent.payload ||= {};
+    if (intent.abilityId === 'fixed_interest') intent.payload.fullDebt ??= intent.payload.amount ?? (phase === 3 ? 16 : 12);
+    if (intent.abilityId === 'suit_audit') intent.payload.failureDelta ??= phase === 3 ? 16 : 12;
+  }
+  if (boss.id === 'dominadora') {
+    const legacy = p => p === 3 ? 14 : p === 2 ? 12 : 10;
+    if (intent?.abilityId === 'iron_etiquette') {
+      intent.payload ||= {};
+      intent.payload.failureDominationPoints ??= legacy(phase);
+    }
+    for (const order of boss.activeOrders || [])
+      if (order.sourceAbilityId === 'iron_etiquette')
+        order.failureDominationPoints ??= legacy(Number(order.announcedPhase || boss.phase || 1));
+  }
+  if (!boss.result && !gameState.finished && ['dominadora', 'matriarca_esmeralda', 'nemesis'].includes(boss.id)) {
+    boss.maxHp = getBossDefinition(boss.id).maxHp;
+    boss.hp = clamp(boss.hp, 0, boss.maxHp); // Preserve wounds; never heal on reload.
+  }
+  boss.cooperativeBalanceVersion = COOPERATIVE_BALANCE_VERSION;
+}
+
 export function createBossState(id = 'banker', seed = Date.now()) {
   const definition = getBossDefinition(id);
   if (!definition) throw new Error(`Chefe desconhecido: ${id}`);
   return {
     version: 1,
+    cooperativeBalanceVersion: COOPERATIVE_BALANCE_VERSION,
     phaseModel: 'progress-v1',
     id: definition.id,
     hp: definition.maxHp,
@@ -2046,6 +2089,7 @@ export function normalizeBossState(gameState, { resolvingMeld = false } = {}) {
   if (!isBossMode(gameState)) return null;
   if (!gameState.boss) gameState.boss = createBossState(getBossDefinitionForMode(gameState.mode)?.id || 'banker');
   const boss = gameState.boss;
+  migrateCooperativeBalance(gameState);
   boss.effects ||= [];
   boss.chainsByPlayer ||= {};
   boss.choiceDrawnCardIdsByPlayer ||= {};
@@ -2409,7 +2453,14 @@ function eligibleAbilityCandidates(gameState, entries, { avoidLast = false, debu
   if (players.length < 2 || !allPlayersHaveTwoCards || !allPlayersHaveTwoPlayableCards) choices = choices.filter((entry) => entry.id !== 'final_order');
   if (players.length < 2) choices = choices.filter((entry) => entry.id !== 'favorite');
   const candidates = choices
-    .map((entry) => ({ entry, payload: createPayload(gameState, entry.id) }))
+    .map((entry) => {
+      const payload = createPayload(gameState, entry.id);
+      if (boss.id === 'nehelenia' && NEHELENIA_FAILURE_POINTS[entry.id] != null)
+        payload.failureMirrorPoints = NEHELENIA_FAILURE_POINTS[entry.id];
+      if (boss.id === 'dominadora' && entry.id === 'iron_etiquette')
+        payload.failureDominationPoints = dominatrixPressure(entry.id, boss.phase).fail;
+      return { entry, payload };
+    })
     .filter(({ entry, payload }) => {
       const valid = hasValidAbilityPayload(gameState, entry.id, payload);
       if (!valid && exclusions) exclusions[entry.id] = `payload:${entry.id}`;
@@ -3397,7 +3448,7 @@ export function resolveNeheleniaMirroredMeldChoice(gameState, playerId, slot, ca
     expiresAfterTurn: true,
     appliedAtRound: boss.roundNumber,
   });
-  const mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Jogo Espelhado', `mirrored_meld_fake_progress_${intent.id}`, 0.9);
+  const mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Jogo Espelhado', `mirrored_meld_fake_progress_${intent.id}`, neheleniaFailurePoints(intent, 'mirrored_meld') / 20);
   boss.actionSequence += 1;
   const event = recordEvent(boss, {
     type: 'mirrorDeception',
@@ -4057,7 +4108,7 @@ function finishDominatrixOrder(gameState, order, status, outcome, { addChain = f
     const obeyPoints = dominatrixPressure(order.sourceAbilityId, phase).obey || 0;
     dominationApplied = changeChains(gameState, order.targetPlayerId, dominationToChains(obeyPoints), `${order.sourceAbilityId}:${order.type}:obeyed`);
   } else if (addChain) {
-    const failPoints = dominatrixPressure(order.sourceAbilityId, phase).fail;
+    const failPoints = order.failureDominationPoints ?? dominatrixPressure(order.sourceAbilityId, phase).fail;
     const points = Number.isFinite(failPoints) ? failPoints : 12.5;
     dominationApplied = changeChains(gameState, order.targetPlayerId, dominationToChains(points), `${order.sourceAbilityId || 'order'}:${order.type}`);
   }
@@ -4516,7 +4567,7 @@ export function resolveBossChoice(gameState, playerId, option) {
       if (correct) outcome = `${target?.name || 'O alvo'} reconheceu o topo verdadeiro; o lixo continua disponível.`;
       else {
         boss.neheleniaDiscardSealRound = boss.roundNumber;
-        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Espelho do Lixo', `discard_mirror_${choice.id}`, 0.8);
+        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Espelho do Lixo', `discard_mirror_${choice.id}`, neheleniaFailurePoints(choice, 'discard_mirror') / 20);
         outcome = `${target?.name || 'O alvo'} escolheu um reflexo falso; o lixo ficou selado nesta rodada e o Mundo do Espelho avançou +${Math.round((mirrorEvent?.dangerDelta || 0) * 20 * 10) / 10}.`;
       }
     } else if (choice.type === 'shattered_mirror') {
@@ -4531,7 +4582,7 @@ export function resolveBossChoice(gameState, playerId, option) {
     } else if (choice.type === 'eternal_nightmare') {
       if (correct) outcome = `${target?.name || 'O alvo'} atravessou o Pesadelo Eterno sem perder o próprio reflexo.`;
       else {
-        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Pesadelo Eterno', `eternal_nightmare_${choice.id}`, 1.2);
+        mirrorEvent = stealNeheleniaDreamMirror(gameState, playerId, 'Pesadelo Eterno', `eternal_nightmare_${choice.id}`, neheleniaFailurePoints(choice, 'eternal_nightmare') / 20);
         outcome = mirrorEvent?.outcome || 'O Pesadelo Eterno venceu a escolha.';
       }
     } else return null;
@@ -5303,7 +5354,7 @@ export function shouldBossBotReclaimVault(gameState, playerId) {
   const vault = getBossVault(gameState, playerId);
   const quote = getBossVaultQuote(gameState, playerId);
   const player = gameState.players?.find((entry) => entry.id === playerId);
-  if (!vault || !quote || !player) return false;
+  if (!vault || !quote || quote.state !== 'open' || !player) return false;
   if (quote.forced) return true;
   const utility = botCardUtility(gameState, player, vault.card);
   // Carta útil volta cedo; carta ruim tende a acumular juros até a cobrança obrigatória.
@@ -5509,6 +5560,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       boss.activeOrders.push({
         id: `etiquette_${intent.id}`,
         sourceAbilityId: 'iron_etiquette',
+        failureDominationPoints: intent.payload.failureDominationPoints ?? dominatrixPressure('iron_etiquette', intent.announcedPhase || boss.phase).fail,
         announcedPhase: Number(intent.announcedPhase || boss.phase || 1),
         type: 'discard_suit',
         targetPlayerId: intent.payload.targetPlayerId,
@@ -5652,6 +5704,8 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
           shuffleFinalSlot: Number.isInteger(payload.shuffleFinalSlot) ? payload.shuffleFinalSlot : null,
           shuffleSeed: Number.isFinite(payload.shuffleSeed) ? payload.shuffleSeed : null,
           sourceAbilityId: intent.abilityId,
+          ...(NEHELENIA_FAILURE_POINTS[intent.abilityId] != null
+            ? { failureMirrorPoints: neheleniaFailurePoints(payload, intent.abilityId) } : {}),
         });
         outcome = `${intent.name}: ${gameState.players.find((player) => player.id === targetPlayerId)?.name || 'o alvo'} precisa identificar o reflexo correto antes de a rodada continuar.`;
       } else outcome = `${intent.name} não encontrou uma ilusão válida e terminou sem efeito.`;
@@ -5659,7 +5713,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
     } else if (intent.abilityId === 'mirrored_meld') {
       const success = !!payload.fed;
       let mirrorEvent = null;
-      if (!success && !payload.failed) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.targetPlayerId, 'Jogo Espelhado ignorado', `mirrored_meld_${intent.id}`, 0.9);
+      if (!success && !payload.failed) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.targetPlayerId, 'Jogo Espelhado ignorado', `mirrored_meld_${intent.id}`, neheleniaFailurePoints(payload, 'mirrored_meld') / 20);
       outcome = success
         ? `${gameState.players.find((player) => player.id === payload.targetPlayerId)?.name || 'O alvo'} encontrou o jogo verdadeiro e quebrou o reflexo.`
         : payload.failed
@@ -5671,7 +5725,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       const second = Math.max(0, Number(payload.secondPlayedCount) || 0);
       const success = second === first;
       let mirrorEvent = null;
-      if (!success) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.secondPlayerId, 'Siga o Reflexo', `follow_reflection_${intent.id}`, 0.8);
+      if (!success) mirrorEvent = stealNeheleniaDreamMirror(gameState, payload.secondPlayerId, 'Siga o Reflexo', `follow_reflection_${intent.id}`, neheleniaFailurePoints(payload, 'follow_reflection') / 20);
       const firstName = gameState.players.find((player) => player.id === payload.firstPlayerId)?.name || 'Primeiro jogador';
       const secondName = gameState.players.find((player) => player.id === payload.secondPlayerId)?.name || 'Segundo jogador';
       outcome = success
@@ -5917,7 +5971,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
       }
     }
   } else if (intent.abilityId === 'fixed_interest') {
-    const amount = intent.payload.fullDebt ?? intent.payload.amount ?? (intent.announcedPhase === 3 ? 16 : 12);
+    const amount = intent.payload.fullDebt ?? intent.payload.amount ?? (intent.announcedPhase === 3 ? 14 : 10);
     const collateralAmount = intent.payload.guaranteedDebt ?? intent.payload.collateralAmount ?? (intent.announcedPhase === 3 ? 7 : 5);
     const holder = (gameState.players || []).find((player) => player.id === intent.payload.holderPlayerId)
       || fixedInterestHolder(gameState)
@@ -5946,7 +6000,7 @@ function resolveIntent(gameState, { keepIntent = false, appliedAt = Date.now() }
   } else if (intent.abilityId === 'suit_audit') {
     const success = (intent.payload.progress || 0) >= intent.payload.required;
     // Objective success only avoids punishment, including legacy snapshot payloads.
-    dangerDelta = success ? 0 : (intent.payload.failureDelta ?? (intent.announcedPhase === 3 ? 16 : 12));
+    dangerDelta = success ? 0 : (intent.payload.failureDelta ?? (intent.announcedPhase === 3 ? 14 : 10));
     resultData = { success };
     outcome = success ? 'Auditoria concluída: sem cobrança.' : `Auditoria falhou: Dívida +${dangerDelta}.`;
   } else if (intent.abilityId === 'pledge') {

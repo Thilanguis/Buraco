@@ -411,7 +411,9 @@ export const nemesisBossMechanics = Object.freeze({
   normalize({ boss, gameState }) {
     normalizeCombatEntities(boss, NEMESIS_ZOMBIES, { lifecycle: true });
     boss.combatTargetsByPlayer ||= {}; boss.grabbedByPlayer ||= {}; boss.reanimationsByPhase ||= {};
-    boss.maxHp = nemesisDefinition.maxHp; boss.hp = Math.max(0, Math.min(boss.maxHp, boss.hp));
+    if (!boss.result && !gameState.finished) {
+      boss.maxHp = nemesisDefinition.maxHp; boss.hp = Math.max(0, Math.min(boss.maxHp, boss.hp));
+    }
     boss.grabbedTurnIds ||= [];
     const first = getNemesisGrabberTarget({ ...gameState, boss: { ...boss, roundNumber: 1 } });
     boss.grabberPursuit = { version: 1, playerIds: [first, ...gameState.players.filter(p => p.id !== first).map(p => p.id)] };

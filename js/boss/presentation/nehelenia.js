@@ -1,3 +1,5 @@
+import { neheleniaFailurePoints } from '../boss-balance.js';
+
 const SPEECHES = Object.freeze({
   false_image: 'A verdade é tão vulgar. Escolham algo mais bonito.',
   mirrored_meld: 'Seu jogo fica muito mais interessante quando vocês já não sabem qual é o verdadeiro.',
@@ -147,10 +149,10 @@ export const neheleniaBossPresentation = Object.freeze({
     const target = playerName(gameState, payload.targetPlayerId);
     switch (intent.abilityId) {
       case 'false_image': return { instruction: `${target}: ache o reflexo real.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: carta presa 1 turno' };
-      case 'mirrored_meld': return { instruction: `${playerName(gameState, payload.targetPlayerId)}: use 1 carta no reflexo.`, progress: mirrorProgress(gameState, intent, helpers), consequence: 'Erro: Mundo +18 · Desorientado' };
-      case 'follow_reflection': return { instruction: `${playerName(gameState, payload.firstPlayerId)} define · ${playerName(gameState, payload.secondPlayerId)} iguala.`, progress: mirrorProgress(gameState, intent, helpers), consequence: 'Falha: Mundo +16' };
+      case 'mirrored_meld': return { instruction: `${playerName(gameState, payload.targetPlayerId)}: use 1 carta no reflexo.`, progress: mirrorProgress(gameState, intent, helpers), consequence: `Erro: Mundo +${neheleniaFailurePoints(payload, intent.abilityId)} · Desorientado` };
+      case 'follow_reflection': return { instruction: `${playerName(gameState, payload.firstPlayerId)} define · ${playerName(gameState, payload.secondPlayerId)} iguala.`, progress: mirrorProgress(gameState, intent, helpers), consequence: `Falha: Mundo +${neheleniaFailurePoints(payload, intent.abilityId)}` };
       case 'dream_theft': return { instruction: `${target}: ache o reflexo real.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: perde o Espelho dos Sonhos' };
-      case 'discard_mirror': return { instruction: `${target}: escolha 1 reflexo do Lixo.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: Mundo +16 · Lixo selado' };
+      case 'discard_mirror': return { instruction: `${target}: escolha 1 reflexo do Lixo.`, progress: dreamMirrorSummary(gameState), consequence: `Erro: Mundo +${neheleniaFailurePoints(payload, intent.abilityId)} · Lixo selado` };
       case 'shattered_mirror': return { instruction: `${target}: ache o único falso.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: 2 cartas presas 1 turno' };
       case 'mirror_prison': {
         const trapped = playerName(gameState, payload.trappedPlayerId);
@@ -158,7 +160,7 @@ export const neheleniaBossPresentation = Object.freeze({
         const failure = Math.max(0, Number(payload.failureMirrorPoints) || 8);
         return { instruction: `${trapped} foi preso. ${rescuer}: alimente o Jogo ${Number(payload.meldIndex) + 1}.`, progress: mirrorProgress(gameState, intent, helpers), consequence: `Libertou: sem penalidade · Falhou: +${failure}` };
       }
-      case 'eternal_nightmare': return { instruction: `${target}: acompanhe a ORIGINAL.`, progress: dreamMirrorSummary(gameState), consequence: 'Erro: Mundo +24' };
+      case 'eternal_nightmare': return { instruction: `${target}: acompanhe a ORIGINAL.`, progress: dreamMirrorSummary(gameState), consequence: `Erro: Mundo +${neheleniaFailurePoints(payload, intent.abilityId)}` };
       case 'tiger_link': return { instruction: 'Alimente os 2 jogos ligados.', progress: mirrorProgress(gameState, intent, helpers), consequence: 'Falha: Mundo +12 · Garras persistem' };
       case 'tiger_prey': return { instruction: `${target}: alimente primeiro o Jogo ${Number(payload.meldIndex) + 1}.`, progress: mirrorProgress(gameState, intent, helpers), consequence: 'Até cumprir: outros jogos bloqueados' };
       case 'hawk_suit': return { instruction: `${target}: descarte ${payload.suitLabel || payload.suit}.`, progress: mirrorProgress(gameState, intent, helpers), consequence: 'Errar: Lixo bloqueado' };
@@ -177,11 +179,11 @@ export const neheleniaBossPresentation = Object.freeze({
     const payload = intent.payload || {};
     const target = playerName(gameState, payload.targetPlayerId);
     switch (intent.abilityId) {
-      case 'mirrored_meld': return `${target}: jogue uma carta no reflexo verdadeiro. Errar ou ignorar acrescenta 18 ao Mundo do Espelho. Ao errar, sua carta vai ao fundo do Monte e você fica Desorientado: só pode descartar neste turno. Se havia uma Presa Marcada, ela continua depois do espelho.`;
-      case 'follow_reflection': return `${playerName(gameState, payload.secondPlayerId)} precisa terminar o turno tendo jogado tantas cartas quanto ${playerName(gameState, payload.firstPlayerId)}. Se o primeiro não jogar nenhuma, o segundo também não deve jogar. Quantidades diferentes acrescentam 16 ao Mundo do Espelho.`;
-      case 'discard_mirror': return 'Escolha um dos dois reflexos do Lixo. Eles são iguais: não há pista para distinguir o verdadeiro. Errar acrescenta 16 ao Mundo do Espelho e fecha o Lixo até o fim da rodada.';
+      case 'mirrored_meld': return `${target}: jogue uma carta no reflexo verdadeiro. Errar ou ignorar acrescenta ${neheleniaFailurePoints(payload, intent.abilityId)} ao Mundo do Espelho. Ao errar, sua carta vai ao fundo do Monte e você fica Desorientado: só pode descartar neste turno. Se havia uma Presa Marcada, ela continua depois do espelho.`;
+      case 'follow_reflection': return `${playerName(gameState, payload.secondPlayerId)} precisa terminar o turno tendo jogado tantas cartas quanto ${playerName(gameState, payload.firstPlayerId)}. Se o primeiro não jogar nenhuma, o segundo também não deve jogar. Quantidades diferentes acrescentam ${neheleniaFailurePoints(payload, intent.abilityId)} ao Mundo do Espelho.`;
+      case 'discard_mirror': return `Escolha um dos dois reflexos do Lixo. Eles são iguais: não há pista para distinguir o verdadeiro. Errar acrescenta ${neheleniaFailurePoints(payload, intent.abilityId)} ao Mundo do Espelho e fecha o Lixo até o fim da rodada.`;
       case 'mirror_prison': return `${playerName(gameState, payload.rescuerPlayerId)}: adicione uma carta ao Jogo ${Number(payload.meldIndex) + 1} até o fim da rodada para libertar ${playerName(gameState, payload.trappedPlayerId)}. Se falhar, o Mundo do Espelho aumenta ${Math.max(0, Number(payload.failureMirrorPoints) || 8)}. Libertar evita a punição, mas não reduz a barra.`;
-      case 'eternal_nightmare': return 'Memorize a carta original e acompanhe sua posição enquanto as três cartas se misturam. Depois, toque nela. Escolher um reflexo falso acrescenta 24 ao Mundo do Espelho.';
+      case 'eternal_nightmare': return `Memorize a carta original e acompanhe sua posição enquanto as três cartas se misturam. Depois, toque nela. Escolher um reflexo falso acrescenta ${neheleniaFailurePoints(payload, intent.abilityId)} ao Mundo do Espelho.`;
       case 'tiger_link': return 'Adicione uma carta a cada jogo ligado nesta rodada. Se faltar em algum, o Mundo do Espelho aumenta 12 e as garras ficam nesse jogo. Depois, adicionar uma carta rompe as garras, mas essa carta não causa seu dano individual.';
       case 'tiger_prey': return `A Presa prende somente ${target}. Até esse jogador alimentar o jogo marcado, ele não pode alimentar outro jogo existente. O parceiro continua livre e a Presa atravessa rodadas até ser resolvida. Jogo Espelhado tem precedência temporária, mas não apaga a Presa.`;
       case 'hawk_suit': return `Se ${target} descartar outro naipe, Hawk passa a vigiar exatamente a carta descartada. Enquanto ela continuar no topo do Lixo, ninguém pode recolher a pilha. Um novo descarte tira a carta vigiada do topo e encerra o bloqueio.`;
@@ -206,7 +208,7 @@ export const neheleniaBossPresentation = Object.freeze({
     if (choice.type === 'discard_mirror') instruction = `${target}: escolha 1 dos 2 reflexos do Lixo.`;
     if (choice.type === 'dream_theft') instruction = `${target}: reconheça sua carta real antes que Nehelenia roube seu Espelho dos Sonhos.`;
     if (choice.type === 'eternal_nightmare') instruction = `${target}: acompanhe a ORIGINAL após o embaralhamento.`;
-    const consequence = choice.type === 'dream_theft' || choice.type === 'eternal_nightmare' ? 'Erro → Mundo +24' : choice.type === 'discard_mirror' ? 'Erro → Mundo +16 · Lixo selado' : 'Erro → cartas presas por 1 turno';
+    const consequence = choice.type === 'dream_theft' ? 'Erro → Mundo +24' : choice.type === 'eternal_nightmare' ? `Erro → Mundo +${neheleniaFailurePoints(choice, choice.type)}` : choice.type === 'discard_mirror' ? `Erro → Mundo +${neheleniaFailurePoints(choice, choice.type)} · Lixo selado` : 'Erro → cartas presas por 1 turno';
     return {
       category: 'Escolha obrigatoria agora', name: names[choice.type] || 'Decisao obrigatoria', speech: '', description: '',
       details: detailFields([['Alvo', target], ['Reflexos', labels.join(' · ')], ['Regra', findFake ? 'encontre o reflexo falso' : 'encontre a imagem verdadeira']]),

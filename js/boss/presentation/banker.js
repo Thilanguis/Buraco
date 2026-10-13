@@ -49,7 +49,7 @@ export const bankerBossPresentation = Object.freeze({
     const payload = intent.payload || {};
     const phase = gameState?.boss?.phase || 1;
     if (intent.abilityId === 'fixed_interest') {
-      const fullDebt = payload.fullDebt ?? payload.amount ?? (phase === 3 ? 16 : 12);
+      const fullDebt = payload.fullDebt ?? payload.amount ?? (phase === 3 ? 14 : 10);
       const guaranteedDebt = payload.guaranteedDebt ?? payload.collateralAmount ?? (phase === 3 ? 7 : 5);
       const interestStep = payload.interestStep ?? (phase === 3 ? 3 : 2);
       return [
@@ -68,7 +68,7 @@ export const bankerBossPresentation = Object.freeze({
       `Meta: ${payload.required} cartas de ${payload.suitLabel}`,
       `Progresso: ${payload.progress || 0}/${payload.required}`,
       'Sucesso: sem cobrança',
-      `Falha: +${payload.failureDelta ?? (phase === 3 ? 16 : 12)} de Dívida`,
+      `Falha: +${payload.failureDelta ?? (phase === 3 ? 14 : 10)} de Dívida`,
     ];
     if (intent.abilityId === 'pledge') return [`Jogo bloqueado: ${payload.meldIndex == null ? 'nenhum' : `#${Number(payload.meldIndex) + 1}`}`, 'Não pode receber cartas nesta rodada'];
     if (intent.abilityId === 'compound_interest') {
