@@ -1,6 +1,12 @@
 # CHECKLIST DE REGRESSÕES E ATUALIZAÇÕES — BURACO
 
-**Ajuste final de 10/10/2026:** Explosivo/Granada causa **100 HP imediatos + 20 HP por rodada até a morte**, sem acumular sangramentos; petrificação −50 HP máximo, regen20/10 e Adaga80% preservados. Referências a impacto60 em experimentos abaixo são históricas, não valores atuais. Resultados anteriores não foram recalculados.
+**Referência vigente — 13/10/2026:** valores e mecânicas atuais na [documentação funcional](DOCUMENTACAO_CHEFE_DA_MESA.md); status no [checklist de playtest](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md). Relatos/valores datados abaixo são rastreabilidade histórica, não autorização para reverter pacotes posteriores.
+
+Explosivo vigente100+15 permanente sem stack; petrificações80/110/100/160/160 e piso130; Frasco global por duas oportunidades e Relíquia+20%. Canastras100/200/500/1000, HPs e nerfs conforme a especificação. Seis PNGs/MP3s do Especial e barra ao lado do X já implementados; homologação humana/hardware permanece separada.
+
+Os21 relatórios datados foram reunidos no [histórico único](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md). Métricas em.docs/metrics e.docs/experiments preservadas. Ao atualizar, conferir regra/ajuda/cotação/ledger de save em conjunto; não repetir bônus, dano, curas ou penalidades retroativamente.
+
+**Registro histórico de 10/10/2026, anterior aos itens atuais:** Explosivo/Granada causa **100 HP imediatos + 20 HP por rodada até a morte**, sem acumular sangramentos; petrificação −50 HP máximo, regen20/10 e Adaga80% preservados. Referências a impacto60 em experimentos abaixo são históricas, não valores atuais. Resultados anteriores não foram recalculados.
 
 ### Pacote consolidado / Especial do Lixo — 10/10/2026
 
@@ -11,9 +17,10 @@
 - [x] HUD compacto, mouse/toque/teclado, referências de carta com destaque focal, reduced motion e cleanup do animatic. A animação não segura a ação confirmada, inclusive em aba de fundo.
 - [x] Regressões de P0 e pacote B preservadas; nenhuma habilidade proposta adicionada à rotação.
 - [ ] Homologação Firebase autenticada com dois clientes, tablets físicos e ritmo com humanos competentes. Testes de storage substituto não comprovam Firebase real.
-- [ ] Aprovar P3-06 (barrinha e arte/animação heroica dos seis universos) e duas propostas da Lady antes de implementar esses designs.
+- [x] P3-06: barra ao lado do X e seis PNGs/MP3s implementados posteriormente; não voltar ao animatic provisório.
+- [ ] P3-06: aceite final em hardware/playtest humano; duas propostas da Lady ainda exigem aprovação antes de implementação.
 
-Dados e evidências atuais: [relatório consolidado](PACOTE_CONSOLIDADO_CHEFES_2026-10-10.md) e [ritmo/variedade](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md). Os resultados dos lotes abaixo são históricos.
+Dados e evidências históricos desse lote: [relatório consolidado](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-pacote-consolidado-chefes-2026-10-10) e [ritmo/variedade](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-balanceamento-seis-chefes-2026-10-10). Os resultados dos lotes abaixo são históricos.
 
 ### Ajuste final Nemesis — 09/10/2026
 
@@ -23,7 +30,7 @@ Dados e evidências atuais: [relatório consolidado](PACOTE_CONSOLIDADO_CHEFES_2
 - [x] Ambos jogadores, jogo novo/extensão, IDs repetidos/reorganização, morte/reanimação, resultado/HP zero, snapshots/reload/undo. `devourerHealSequence` persistida distingue curas; fim de turno não drena fila. Feed v1 mantém resto módulo 3, descarta grupos legados sem curar no load.
 - [x] AGARRA + ALVO em chips distintos; CURA20/35/50 sem x/3 no rótulo e três segmentos. Ajuda sem quota antiga. Eventos reais separados na fila visual existente, sem replay por render/reload. Desktop/tablet/mobile e reduced motion.
 
-Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINAL_NEMESIS_2026-10-09.md).
+Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-ajuste-final-nemesis-2026-10-09).
 
 ### Carga visível do Devorador — histórico anterior ao ajuste final
 
@@ -42,7 +49,7 @@ Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINA
 
 ### Elegibilidade e variedade dos seis chefes — 09/10/2026
 
-- [x] Classificar cada habilidade como A (alvo/segurança obrigatórios), B (prova excessiva) ou C (alvo real sem garantia de sucesso). Relatório `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md` substitui exigências históricas de solução pronta no anúncio do Nemesis.
+- [x] Classificar cada habilidade como A (alvo/segurança obrigatórios), B (prova excessiva) ou C (alvo real sem garantia de sucesso). Relatório [AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-auditoria-elegibilidade-chefes-2026-10-09) substitui exigências históricas de solução pronta no anúncio do Nemesis.
 - [x] Caçada/Extermínio impossíveis podem falhar; Tentáculo/Barragem mantêm 2/3 marcas com saída individual legal, não prova de saídas conjuntas. S.T.A.R.S./papéis/jogo congelados. Agarrador continua protegendo soluções existentes após compra; não vira filtro para anunciar desafios.
 - [x] Invasão: Infectado não exige plano de duas contribuições; Devorador precisa de jogo estruturalmente extensível, não carta na mão; Agarrador pode marcar carta descartável. Falha persiste/Mutado na F3, sem Infecção adicional. Teto, cadáver, uma reanimação por zumbi e quota por fase preservados.
 - [x] Prisão/Laço preservam parceiros/pressão/jogos extensíveis, sem solução antecipada. Presa/Reflexo Invertido/Vigilância/ilusões, Coleiras/Exposição/ordens, sementes e descarte por naipe preservam validações de bloqueio e alvo realmente executável.
@@ -58,7 +65,7 @@ Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINA
 - [x] Projeção resolve somente as consequências da rodada atual: `deferNextBossTurn:true` apenas em cópias, padrão false no jogo real. Não gerar a próxima habilidade com mão oculta em todo candidato; pico do Nemesis reproduzido no perfil. Vitória canônica letal não recebe punição futura. Seis chefes preservam fechamento/fluxo padrão.
 - [x] Auditoria de coringas distingue 2 natural, alternativa natural legal dominadora, benefício observado e não comprovado. Testar desperdício dirigido e coringa útil, sem proibição universal; rejeitada penalidade mais forte que reduziu progresso. Cooperação continua pública, sem sacrificar sequência própria por pista fraca.
 - [x] A/B isolado de toda a árvore JS da primeira revisão f0d4551, 64 execuções/8 sementes. Adaptador espelha vitória imediata da aplicação; completa/protegida segue cotação, inclusive Lixo unitário. Resultados de jogo iguais na amostra, zero vitórias em ambas; nenhum ganho de vitória/preservação comprovado. Não comparar com o encerramento incompleto do experimento histórico.
-- [x] Focados174/174, ampla1228/1228. Edge1920/1376/390px CPU1×/4×/6×, 324 medições e fallback real: mão50 móvel1196→774ms média, mas muitos destinos ficaram mais lentos e P95 desktop piorou. Média/P95/pior, desperdício limitado e derrotas registrados em `BOT_COOPERATIVO_CHEFE_2026-10-09.md`; não ocultar regressões nem declarar UI sem bloqueio.
+- [x] Focados174/174, ampla1228/1228. Edge1920/1376/390px CPU1×/4×/6×, 324 medições e fallback real: mão50 móvel1196→774ms média, mas muitos destinos ficaram mais lentos e P95 desktop piorou. Média/P95/pior, desperdício limitado e derrotas registrados em [BOT_COOPERATIVO_CHEFE_2026-10-09.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-bot-cooperativo-chefe-2026-10-09); não ocultar regressões nem declarar UI sem bloqueio.
 - [ ] Esgotamento continua na amostra; validar humano competente, aparelhos físicos, partidas completas dos demais chefes e dois clientes Firebase reais. Não transformar zero dominados em prova de eficiência nem usar o parceiro roteirizado como win rate humano. Sem commit/push/deploy automático.
 
 ### Inteligência cooperativa do BOT Chefe — 09/10/2026
@@ -66,7 +73,7 @@ Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINA
 - [x] Planejador único com informação pública: mão do parceiro e cartas futuras ocultas inclusive BOT+BOT; histórico público curto, reserva de cartas e oportunidade cooperativa conservadora. Lixo usa cotação canônica por destino real, sem veto automático por pilha grande.
 - [x] Compara consequências canônicas em cópias com custo de coringas/limpas; preserva descarte/Mortos e verifica Ataque Final após contribuição. Guarda assíncrona inclui chefe/restrições/recursos/ações e token do Worker. Mecânicas, balanceamento e BOT clássico intactos.
 - [x] Suíte ampla 1204/1204; cenários determinísticos Lixo20/50, Monte30/15/8/0, informação oculta/cancelamento e regressões. Edge com Worker real em 1920/1376/390px e CPU1×/4×/6×; stress de 50 cartas chega a1163ms mobile emulado.
-- [x] Comparação antiga/nova com mesmas sementes e 108IDs, incluindo ganhos e regressões: mais dano/limpas no agregado, mas gasto de Joker maior e uma derrota extra por esgotamento na Matriarca. Método, métricas e comandos em `BOT_COOPERATIVO_CHEFE_2026-10-09.md`.
+- [x] Comparação antiga/nova com mesmas sementes e 108IDs, incluindo ganhos e regressões: mais dano/limpas no agregado, mas gasto de Joker maior e uma derrota extra por esgotamento na Matriarca. Método, métricas e comandos em [BOT_COOPERATIVO_CHEFE_2026-10-09.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-bot-cooperativo-chefe-2026-10-09).
 - [ ] Playtest humano competente, aparelhos físicos, outros chefes em batalhas completas e dois clientes Firebase reais. Não declarar win rate nem superioridade uniforme com base no parceiro roteirizado/amostra pequena.
 
 ### Polimento HUD — Enxerto, Flores e PASSIVA — 08/10/2026
@@ -83,7 +90,7 @@ Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINA
 - [x] Frio guarda carga na vida cheia, bloqueia apenas cura efetiva, teto2. Anticoagulante permanente25 sem stack. Relíquia espera oportunidade válida, não consome sem candidato/não selecionada e não acumula supressões em duplicatas; As Três Filhas continua funcionando.
 - [x] Ajuda atual/legacy usa a regra da partida; vínculo/hemorragia separados de PASSIVA. HP original, máximo recuperável/petrificação; transferência vermelha até retrato da Lady e número no HP real; sangramento vermelho antes de regen verde na filha. Toque/teclado/Escape/clique fora/reduced motion e replay verificados em 1920/1376/390px.
 - [x] BOT escolhe item/alvo investido e golpe letal direto, preservando coringas/cartas obrigatórias/descarte. Laboratório usa versão nova e conserva 108 IDs/15 itens. `castleItemRulesVersion:2`/configuração e versão filhas3 persistem; saves sem versão continuam v1/450/piso200 sem reinterpretar consumidos.
-- [x] Execução inicial1112/1112; regressões focadas/ampla, compatibilidade de saves e experimento canônico reproduzível. Comparações completas em `REWORK_ITENS_DIMITRESCU_2026-10-08.md`.
+- [x] Execução inicial1112/1112; regressões focadas/ampla, compatibilidade de saves e experimento canônico reproduzível. Comparações completas em [REWORK_ITENS_DIMITRESCU_2026-10-08.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-rework-itens-dimitrescu-2026-10-08).
 - [ ] Meta70% (65–75%) contra dupla competente ainda não validada: política gulosa não é evidência suficiente. Playtest humano e dois clientes Firebase reais permanecem necessários. Não inventar percentual atual.
 
 ### Rework Nemesis/Enxerto e regeneração visual — 08/10/2026
@@ -94,7 +101,7 @@ Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINA
 - [x] Enxerto novo: dois lados sem efeito; um lado cura até 50 HP, sem Flor nem propagação comum; zero lados +1 Flor e propagação posterior. Cura limitada por rodada/HP máximo, Coroa mantém reação própria. Save antigo sem `partialHeal` conclui pela regra salva; canastra não reabre quota de Flores.
 - [x] PASSIVA das três filhas explica regeneração 50/25/Frio/máximo/morte/vida cheia, não CAÇADA/BANQUETE/LIXO. Evento real `daughterRegen` gera +50/+25/+20 sobre cada retrato, sem novo cálculo de HP/Sede. Deduplicação, baseline de reload/reconexão, undo, três simultâneas, texto acessível e reduced motion verificados.
 - [x] Suítes focadas e ampla; browser local desktop/tablet/mobile e cinco tamanhos Nemesis. Calibração reproduzível de partidas completas e sensibilidades documentadas sem confundir política gulosa com dupla competente.
-- [ ] Playtest humano competente e dois clientes Firebase reais; medir 65%–75% antes de declarar balanceamento validado. Relatório: `REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md`.
+- [ ] Playtest humano competente e dois clientes Firebase reais; medir 65%–75% antes de declarar balanceamento validado. Relatório: [REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-rework-nemesis-matriarca-e-ux-dimitrescu-2026-10-08).
 
 ### Cura do Devorador e passivas das filhas no DevTools — 08/10/2026
 
@@ -144,7 +151,7 @@ Resultados completos e limites: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINA
 - [ ] Fúria por morte 0/1/2/3: cura da Lady ×1/1,1/1,2/1,3 (floor, máximo HP); ofensiva própria +0/1/2/3 por evento positivo. Vinho/Coágulo/Banquete e HUD projetado coerentes. Passivas +3/regen/custo Vinho/máximos não escalam. Banquete funciona com Cassandra morta.
 - [ ] Cada morte individual gera um flash/áudio (`what-have-you-done-to-my-daughter.mp3`), três mortes = três eventos; sem replay por reload/render. Quatro habilidades antigas fora de catálogo/pools/intro; cancelar intent legado sem punição/duplicação. Não inventar itens retroativos em saves pré-rework.
 - [ ] BOT considera Vínculo, regen, itens/custo da carta e Fúria futura, sem desperdício de dano bloqueado; mesmo guard/pipeline do humano. Preservar matemática/alívio por canastra e demais chefes.
-- [ ] Rodar `dimitrescu-castle.test.mjs`, chefes/integração focados, `dimitrescu-castle.browser.mjs` e ampla; conferir assets precacheados, git diff/check e alteração manual do Nemesis preservada. Calibração experimental, nunca inventar win rate. Contrato: `REWORK_DIMITRESCU_2026-10-07.md`.
+- [ ] Rodar `dimitrescu-castle.test.mjs`, chefes/integração focados, `dimitrescu-castle.browser.mjs` e ampla; conferir assets precacheados, git diff/check e alteração manual do Nemesis preservada. Calibração experimental, nunca inventar win rate. Contrato: [REWORK_DIMITRESCU_2026-10-07.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-rework-dimitrescu-2026-10-07).
 
 **Status:** documento permanente de prevenção de regressões  
 **Criado em:** 05/10/2026  
@@ -811,7 +818,7 @@ Este checklist deve ser tratado como **documentação permanente de manutenção
 - Rodar `tests/boss-objective-resource-rule.test.mjs`, testes de alívio, chefes e suíte ampla. Comparar falhas com baseline e registrar testes bloqueados.
 - Helpers do Nemesis ficam em faixa externa abaixo do HUD, como Filhas/Capangas. Validar altura do HUD, chips INVADINDO/ATIVO e ajuda contida nos cinco viewports.
 
-Revisão de 05/10/2026: fonte de verdade exclusivamente local por instrução expressa; sem operações no Google Drive. Detalhes em `REVISAO_OBJETIVOS_CHEFES.md`.
+Revisão de 05/10/2026: fonte de verdade exclusivamente local por instrução expressa; sem operações no Google Drive. Detalhes em [REVISAO_OBJETIVOS_CHEFES.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-revisao-objetivos-chefes).
 
 ## 22. Ajudas ancoradas e marcações de jogos
 
@@ -863,7 +870,7 @@ Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O
 - [ ] Manter o orçamento do HUD: se o texto estourar, corrigir a apresentação, não aumentar silenciosamente o limite do teste. Validar nos viewports do browser test.
 - [ ] Conferir cura anunciada contra mecânica: Pólen até 30 HP; Colheita 0–7 nada, 8–10 cura 50, 11+ cura 80 e +1 Flor. Corrigir somente texto quando o motor já estiver certo.
 
-Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. Nenhuma regra de balanceamento foi revertida.
+Resultado e classificação desta revisão: [LIMPEZA_SUITE_2026-10-06.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-limpeza-suite-2026-10-06). Nenhuma regra de balanceamento foi revertida.
 
 ## 25. Lixo protegido dos chefes e UX do Nemesis — 06/10/2026
 
@@ -875,7 +882,7 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 - [ ] BOT: plano do objetivo, extensão genérica, tríades/worker e panic dump não usam Agarradas; recalcular após compra, conseguir jogar/descarte sem deadlock. Não mudar heurística de alvo.
 - [ ] Compra repetida/reload/snapshot/undo não duplicam restrição/evento/pulso; saves antigos preservam lifecycle, quota/alvo e HP baixo, limitando HP acima dos novos máximos sem reset da partida.
 - [ ] Preservar Infecção, pesos, cura/bônus/regen, regra global do Lixo, alívio por canastra e demais cinco chefes. Dano em zumbi sem overflow nem troca de S.T.A.R.S.; Comando continua no zumbi reforçado.
-- [ ] Executar Nemesis/compra/BOT focados, browser nos cinco viewports e suíte ampla. Registrar estimativa ~68,9% apenas como histórico anterior à regra global do Lixo e a este patch, nunca percentual atual. Referência: `BALANCEAMENTO_NEMESIS.md`.
+- [ ] Executar Nemesis/compra/BOT focados, browser nos cinco viewports e suíte ampla. Registrar estimativa ~68,9% apenas como histórico anterior à regra global do Lixo e a este patch, nunca percentual atual. Referência: [BALANCEAMENTO_NEMESIS.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-balanceamento-nemesis).
 
 - [ ] Decreto contra Escravo BOT: testar bloqueio antes da compra e durante a janela de reação. BOT compra do Monte, sem coletar o Lixo. `BOT_PLAN_STALE` em sessão/turno ainda válidos retoma a recuperação após concluir a operação do Decreto; cancelamento real, troca de turno ou saída da sessão não podem comprar/descartar. Não deixar `lastBotTurnPlayed` travar um turno com plano invalidado. Cobertura: `domination-decree-bot-resume.test.mjs`.
 
@@ -892,7 +899,7 @@ Resultado e classificação desta revisão: `docs/LIMPEZA_SUITE_2026-10-06.md`. 
 - [ ] Objetivos comprovam rota real no planner: Tentáculo distingue jogo completo/descarte parcial; Barragem prova duas saídas conjuntas; Caçada dano direto, Extermínio dano do S.T.A.R.S. + contribuição do parceiro, congelados e conjuntamente legais. Sem plano → inelegível/fallback. Saves v1 preservam objetivo já anunciado.
 - [ ] Rodar regra do Lixo, handlers humano/BOT, Nemesis, laboratório, integração e suíte ampla; browser nos cinco viewports. Medir proximidade do popover entre bordas, não a partir do centro de um chip largo.
 
-Relatório e limitações: `REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md`. Sem novo balanceamento, commit, deploy ou Google Drive.
+Relatório e limitações: [REGRA_LIXO_E_UX_NEMESIS_2026-10-06.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-regra-lixo-e-ux-nemesis-2026-10-06). Sem novo balanceamento, commit, deploy ou Google Drive.
 
 ### Feedback de dano por alvo — Nemesis (06/10/2026)
 

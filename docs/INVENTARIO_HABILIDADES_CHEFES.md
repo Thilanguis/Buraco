@@ -1,34 +1,14 @@
-# Inventário atual de habilidades dos chefes
+# Inventário de habilidades dos chefes — vigente
 
-**Pacote vigente de 13/10/2026:** bônus de dano Suja100/Limpa200/Real500/Ás-a-Ás1000; HP Banqueiro2650, Dominadora2800, Matriarca2300, Lady2000, Nehelenia2400, Nemesis2500. Nerfs pontuais e compatibilidade em [balanceamento aplicado](BALANCEAMENTO_SEIS_CHEFES_2026-10-13.md). A meta futura de ~70% de vitórias dos chefes contra humanos competentes não foi medida.
+Conferido em 13/10/2026. Este é o catálogo curto de habilidades realmente ativas; [documentação funcional](DOCUMENTACAO_CHEFE_DA_MESA.md) contém arquitetura, regras detalhadas, itens, apresentação e compatibilidade. [Checklist](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md) concentra pendências; [histórico](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md) guarda experimentos e propostas, sem reabrir tarefas concluídas.
 
-Catálogo vigente, não backlog. [Status do playtest](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md#resumo-executivo-do-checklist--estado-em-10102026) e [contexto de retomada](HANDOFF_DESENVOLVIMENTO_BURACO.md) ficam separados. Designs não aprovados não são habilidades implementadas.
+Bônus de dano por canastra100/200/500/1000, além das cartas; evoluções somente por diferença. HPs atuais aparecem nas seções abaixo. Especial não é habilidade sorteada: carga25/50/100 por jogo físico, custo 100, cinco do topo do Lixo, mínimo cinco e bloqueios/reações preservados. Os seis personagens/áudios já foram integrados.
 
-**Auditoria atual — 10/10/2026:** Dominadora 13, Nemesis 11, Nehelenia 11, Matriarca 10, Banqueiro 8 e Dimitrescu 8 habilidades oficiais. Elegibilidade e seleções reais por fase, cenários dirigidos e limitações estão em [BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md). Não foram adicionadas habilidades ou alterados pesos. As duas [propostas da Lady](PROPOSTAS_DIMITRESCU_2026-10-10.md) aguardam aprovação.
+Catálogos: Dominadora13, Nemesis11, Nehelenia11, Matriarca10 (+Renascimento passivo), Banqueiro8 e Lady8. Pesos são os pesos-base do sorteio; elegibilidade e alvos continuam validados no motor. Duas propostas da Lady não foram adicionadas. Meta 70% contra humanos é futura, não resultado medido.
 
-**Especial universal não é habilidade sorteada do chefe:** saldo compartilhado por canastra 25/50/100, diferenças por evolução, custo 100 e usos repetidos. Exatamente cinco do topo do Lixo, mínimo cinco, bloqueios e reações preservados; o humano escolhe beneficiário. Não pontua novamente por render/reload. Não aumenta a contagem dos catálogos.
+### Regra de apresentação
 
-**Números locais de 12/10/2026:** filhas500/piso130; petrificação fixa Adaga80, Explosivo110, Anti100, Frasco160, Relíquia160; regen20/Anti10; Adaga80%; Explosivo100+15 permanente; Relíquia+20%; Frasco global por duas oportunidades. Lady2000, PROT.1500, Sede100. Tributo coletivo8/12/16/18 na Fúria0/1/2/3 com duas mãos11+. BOT usa/preserva itens pelo registro canônico, inclusive na recuperação. Ver [pacote atual](PACOTE_COOPERATIVO_E_BOT_ITENS_2026-10-12.md).
-
-**Elegibilidade revisada em 09/10/2026:** desafios podem ser impossíveis de cumprir com a mão atual. Preservam-se fase, recursos, alvos reais, saída legal das marcas e segurança dos bloqueios. A última habilidade só sai do sorteio se houver outra realmente elegível. Pesos e consequências não mudaram. Classificação individual dos seis chefes e comparação reproduzível: `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`.
-
-
-**Registro histórico de 08/10/2026, anterior ao pacote de 12/10: itens v2 da Dimitrescu e filhas 500 HP/piso 300 em partidas novas. Pesos, Sede/Fúria e os reworks anteriores de Nemesis/Enxerto permanecem. Meta de 65%–75% ainda depende de playtest competente. Relatórios: `REWORK_ITENS_DIMITRESCU_2026-10-08.md` e `REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md`.**
-
-
-Este arquivo lista apenas habilidades que realmente participam da rotação atual. O peso é o peso-base usado no sorteio quando a habilidade está elegível; elegibilidade e alvos ainda são validados pelo motor.
-
-**Pacote de 07/10/2026:** batida fixa de 100 pelo pipeline oficial; Devorador persistente usa contador coletivo (detalhes abaixo). Espelho do Lixo respeita bloqueios canônicos, incluindo Hawk. REFLEXO MORTO não recebe illusion lock; sobreposições legadas preservam o descarte. Imagem Falsa/Espelho Estilhaçado continuam fora da rotação; apenas seus caminhos legados foram protegidos. Pólen enterrado sinaliza a pilha, não o topo normal. HPs, pesos, Infecção e demais valores de cura/punição permanecem.
-
-**Regra permanente:** cumprir objetivos não reduz a condição especial do chefe; evita a punição. Sucessos não descontam falhas de outros objetivos. Alívio por canastra e gastos próprios do chefe por vantagem permanecem. Correções auditadas em `REVISAO_OBJETIVOS_CHEFES.md`. Na revisão experimental posterior, foram alterados os HPs do Nemesis e dos zumbis e a passiva do Agarrador, conforme `BALANCEAMENTO_NEMESIS.md`; pesos, punições, Infecção, fases e demais chefes não foram alterados nessa revisão.
-
-
-### Regra de apresentação no HUD
-
-Ajuda oficial abre junto ao próprio `?`, com ponteiro e ajuste ao viewport. Textos usam blocos curtos sem eliminar prazos/exceções. Marcações de jogos envolvem só as cartas, nunca Canastra/Limpa. No Nemesis, Horda/Ômega e duração ficam no painel amarelo; alvo/retorno ↩ ficam na arte principal, sem faixas soltas em volta dos zumbis.
-
-O painel principal mostra somente objetivo, progresso e consequência curta. A explicação completa, termos ambíguos e exceções ficam no botão **?**. Referências de carta como `6♥` e `Q♣` recebem destaque maior e cor por naipe. Essa regra vale para **todos os chefes**, não apenas para a Nehelenia.
-
+HUD em linhas curtas, ajuda junto ao `?`, toque/teclado e referências de carta com ênfase somente no valor+naipe. Não ampliar chip inteiro, espaçamento da mão ou PNG do Espelho. Distinguir habilidade atual de efeito persistente. Itens da mão selecionam aplicação direta na filha; ajuda detalhada é um controle separado.
 
 ## O Banqueiro
 
@@ -82,7 +62,7 @@ O painel principal mostra somente objetivo, progresso e consequência curta. A e
 **BOT (12/10/2026):** o ranking considera as duas barras e simula o descarte final
 no motor. Preserva o naipe ordenado quando o custo justifica, mas permite
 sacrifício estratégico; não obedece cegamente nem usa cartas ocultas do parceiro.
-Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.md).
+Ver [relatório e reproduções](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-balanceamento-dominadora-matriarca-2026-10-12).
 
 
 **Resistência:** Limpa reduz 4 pontos de Dominação, Real 8 no total e Ás-a-Ás 12 no total. Evoluções sucessivas acrescentam 4 por novo tier; o mesmo tier do mesmo jogo só conta uma vez. O alívio começa no jogador responsável e, se ele não tiver Dominação suficiente, o restante transborda para o parceiro.
@@ -119,11 +99,11 @@ Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.m
 **Renascimento (passiva):** na Fase 3, se a Matriarca cair a 0 HP com pelo menos **1 Flor** e ainda não tiver usado o efeito, ela consome **1 Flor** e retorna com **300 HP** uma vez. Não entra no sorteio normal; aparece no DevTools com peso 0 para teste manual.
 ## Lady Dimitrescu
 
-**Itens v2 — estado atual:** Lady **2000 HP**, três filhas permanentes **500/500**, regen própria **20** no fim da rodada. Sede0–100; derrota especial100. Vínculo adiciona **1500 PROT. consumíveis** inicialmente, capacidade500 por filha viva. Coágulo absorve primeiro, depois PROT.; excedente atinge HP. Morte retira até500 restantes, sem dano automático à vida. Não recarrega; zero expõe Lady mesmo com filhas vivas. Adaga transmite dano direto à vida real, sem consumir proteções. Saves v1 mantêm450/piso200 e efeitos antigos.
+**Itens v2 — estado atual:** Lady **2000 HP**, três filhas permanentes **500/500**, regen própria **20** no fim da rodada. Sede 0–100; derrota especial100. Vínculo adiciona **1500 PROT. consumíveis** inicialmente, capacidade500 por filha viva. Coágulo absorve primeiro, depois PROT.; excedente atinge HP. Morte retira até500 restantes, sem dano automático à vida. Não recarrega; zero expõe Lady mesmo com filhas vivas. Adaga transmite dano direto à vida real, sem consumir proteções. Saves v1 mantêm450/piso 200 e efeitos antigos.
 
 | Habilidade da Lady | Fases | Peso | Funcionamento base |
 |---|---:|---:|---|
-| Tributo de Sangue | 1, 2 e 3 | 4 | Por jogador: 8–10 cartas +2; 11+ +4. Bônus coletivo de Fúria0/1/2/3: +0/+4/+8/+10 uma vez. Duas mãos11+: +8/+12/+16/+18. Sucesso não reduz Sede. |
+| Tributo de Sangue | 1, 2 e 3 | 4 | Por jogador: 8–10 cartas +2; 11+ +4. Bônus coletivo de Fúria 0/1/2/3: +0/+4/+8/+10 uma vez. Duas mãos 11+: +8/+12/+16/+18. Sucesso não reduz Sede. |
 | Vinho Carmesim | 1, 2 e 3 | 2 | Ferida e Sede 20+: consome 15 para cura 140/200/260, multiplicada pela Fúria. |
 | Marca Carmesim | 1, 2 e 3 | 4 | Uma carta jogável por cooperador. Cada sucesso evita punição; base por marca F1 2/3/4/5, F2 2/4/5/7, F3 3/5/7/9 conforme a Fúria, mais bônus coletivo +0/2/4/6 uma vez. Teto anterior preservado. |
 | Banquete dos Mortos | 2 e 3 | 3 | Da Lady, independente de Cassandra. Morto profanado: +10/+14 Sede e cura 90/130. Real/Ás-a-Ás: base +4 e sem cura. |
@@ -136,13 +116,13 @@ Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.m
 
 **Fúria:** 0/1/2/3 filhas mortas = NORMAL/I/II/FINAL. Cura da Lady ×1/1,10/1,20/1,30 (arredondada para baixo), Sede ofensiva própria +0/2/4/6 por evento positivo. Não altera passivas +3, Sangue Impuro (máximo +6), regen das filhas, custo do Vinho nem HP máximo.
 
-**Itens:**15 cartas físicas aleatórias, três de cada tipo. Perdas fixas aditivas sobre500 originais: Adaga80; Explosivo110; Frasco160; Anticoagulante100; Relíquia160; piso130, sem dano extra quando já ferida abaixo do máximo. Adaga transmite80% do ataque efetivo, ignorando PROT./Coágulo, sem acumular. Explosivo100+15 permanente sem stack. Anti mantém regen10. Relíquia aumenta ataques diretos em20% antes do clamp e da Adaga, sem silenciar ou acumular. Frasco congela as três, bloqueando regen e passivas por duas oportunidades de turno, cancelando objetivos pendentes sem punição; reaplicação renova a duração. Sacrifício não encerra turno; anexos voltam ao fundo do Lixo na morte, sem item reutilizável. Contrato e testes: [lote final](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md); experimentos anteriores permanecem históricos.
+**Itens:**15 cartas físicas aleatórias, três de cada tipo. Perdas fixas aditivas sobre500 originais: Adaga 80; Explosivo 110; Frasco 160; Anticoagulante 100; Relíquia 160; piso 130, sem dano extra quando já ferida abaixo do máximo. Adaga transmite80% do ataque efetivo, ignorando PROT./Coágulo, sem acumular. Explosivo 100+15 permanente sem stack. Anti mantém regen 10. Relíquia aumenta ataques diretos em 20% antes do clamp e da Adaga, sem silenciar ou acumular. Frasco congela as três, bloqueando regen e passivas por duas oportunidades de turno, cancelando objetivos pendentes sem punição; reaplicação renova a duração. Sacrifício não encerra turno; anexos voltam ao fundo do Lixo na morte, sem item reutilizável. Contrato e testes: [lote final](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-lote-final-itens-dimitrescu-2026-10-10); experimentos anteriores permanecem históricos.
 
 **Retiradas da rotação:** Caçada de Bela, Banquete de Cassandra e Enxame de Daniela; identidade absorvida pelas passivas. As Três Filhas retorna reformulada, sem a antiga cobrança +8; payload antigo é cancelado com segurança. Demais pesos-base mantidos.
 
 **Apresentação:** retrato da Lady seleciona o alvo como no Nemesis, sem botão abaixo das filhas. HP numérico nas filhas; regen na ajuda, sem chip REGEN +50. Cada filha viva tem um chip clicável de passiva: CAÇADA, BANQUETE ou LIXO +3. Não escolhida: neutro; escolhida: destacado, com carta/jogo no mesmo chip. Sem chip separado de falha ou resultado: explicação completa no popover. Debuffs de item à parte. PNG do item é clicável na mão, sem botão textual; Bela usa borda/identificador periférico. Fotos da Lady continuam por fase; chip/aura de Fúria independente. Áudio individual de morte: `what-have-you-done-to-my-daughter.mp3`. Painel compacto dos cinco itens com ajuda oficial por clique/toque.
 
-**Canastras:** Limpa -4, Real -8, Ás-a-Ás -12, apenas diferença do novo tier; nenhum sucesso de objetivo concede redução. Contrato completo: [REWORK_DIMITRESCU_2026-10-07.md](REWORK_DIMITRESCU_2026-10-07.md). Números experimentais, sem win rate medido.
+**Canastras:** Limpa -4, Real -8, Ás-a-Ás -12, apenas diferença do novo tier; nenhum sucesso de objetivo concede redução. Contrato completo: [REWORK_DIMITRESCU_2026-10-07.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-rework-dimitrescu-2026-10-07). Números experimentais, sem win rate medido.
 
 
 
@@ -203,7 +183,7 @@ Ver [relatório e reproduções](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.m
 
 **Lifecycle:** `absent → entering → repelled` no sucesso; `absent/repelled → entering → persistent → corpse` após falha e morte real. Repelido pode tentar entrar novamente. Somente persistente vivo tem passiva/seleção de dano. Saves antigos vivos/mortos migram sem reset de HP ou da batalha.
 
-**Zumbis persistentes:** Agarrador 180 HP: persegue um jogador por rodada e alterna na seguinte; primeiro alvo sorteado por seed e ordem persistida. Só após a compra do perseguido sorteia 1/2 cartas (normal/Mutado), +1 com Horda. Não prioriza jogáveis/coringas/2/ordem da mão. Trava apenas jogo até o fim do turno; descarte livre. Mantém proteção canônica de soluções existentes/saída legal, sem exigir sucesso antecipado para anunciar objetivos. Chip separado `ALVO: nome real`. Infectado 190 HP: +2/+4 por falha positiva, Horda +2; sem bônus retroativo da invasão. Devorador 200 HP: cada três IDs novos da equipe na mesa cura 20/35 HP, Horda +15 (35/50 finais). Sem limite por turno/jogada, cooldown ou teto de ativações: 12 cartas dão quatro curas. Jogos novos/extensões e ambos jogadores contam; só créditos parciais 0–2 permanecem. HP máximo limita apenas a cura efetiva; grupos completos são consumidos inclusive com vida cheia. Cada cura tem ID persistido distinto. Morte/reanimação zeram progresso, não sequência de eventos. Feed v1 migra conservando resto módulo 3 e IDs, descartando grupos antigos sem cura retroativa. F3 muta vivos/novas persistências/reanimados. Reanimação: 90/95/100 HP, mantendo as quotas de fase/lifecycle e teto de três em qualquer fase. HUD: `CURA 20/35/50`, três segmentos verdes e contador numérico só no help. [Relatório e evidências](AJUSTE_FINAL_NEMESIS_2026-10-09.md).
+**Zumbis persistentes:** Agarrador 180 HP: persegue um jogador por rodada e alterna na seguinte; primeiro alvo sorteado por seed e ordem persistida. Só após a compra do perseguido sorteia 1/2 cartas (normal/Mutado), +1 com Horda. Não prioriza jogáveis/coringas/2/ordem da mão. Trava apenas jogo até o fim do turno; descarte livre. Mantém proteção canônica de soluções existentes/saída legal, sem exigir sucesso antecipado para anunciar objetivos. Chip separado `ALVO: nome real`. Infectado 190 HP: +2/+4 por falha positiva, Horda +2; sem bônus retroativo da invasão. Devorador 200 HP: cada três IDs novos da equipe na mesa cura 20/35 HP, Horda +15 (35/50 finais). Sem limite por turno/jogada, cooldown ou teto de ativações: 12 cartas dão quatro curas. Jogos novos/extensões e ambos jogadores contam; só créditos parciais 0–2 permanecem. HP máximo limita apenas a cura efetiva; grupos completos são consumidos inclusive com vida cheia. Cada cura tem ID persistido distinto. Morte/reanimação zeram progresso, não sequência de eventos. Feed v1 migra conservando resto módulo 3 e IDs, descartando grupos antigos sem cura retroativa. F3 muta vivos/novas persistências/reanimados. Reanimação: 90/95/100 HP, mantendo as quotas de fase/lifecycle e teto de três em qualquer fase. HUD: `CURA 20/35/50`, três segmentos verdes e contador numérico só no help. [Relatório e evidências](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-ajuste-final-nemesis-2026-10-09).
 
 **Dano e alívio:** alvo escolhido antes da jogada entre Nemesis e zumbis vivos, inclusive no ataque final; não há transbordamento. Limpa/Real/Ás-a-Ás aliviam −4/−8/−12 no total incremental por jogo, mesmo atacando zumbi. Dano direto ao Nemesis troca S.T.A.R.S.; dano em zumbi não.
 

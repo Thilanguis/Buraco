@@ -1,106 +1,80 @@
 # DOCUMENTAÇÃO — CHEFE DA MESA
 
-Regras vigentes neste documento; status, pendências e homologação no [checklist-mestre](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md#resumo-executivo-do-checklist--estado-em-10102026); contexto no [handoff](HANDOFF_DESENVOLVIMENTO_BURACO.md). Origem Lixo do Especial e impacto100 do Explosivo já estão aplicados, sem decisão pendente.
+Especificação funcional vigente, conferida no código local em 13/10/2026. Valores experimentais e relatos antigos estão no [histórico consolidado](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md); não competem com esta regra. [Inventário de habilidades](INVENTARIO_HABILIDADES_CHEFES.md) reúne o catálogo; [checklist](CHECKLIST_PLAYTEST_CHEFES_2026-10-10_ATUALIZADO.md) concentra status e homologação.
 
-**Balanceamento vigente — 13/10/2026:** canastras Suja100/Limpa200/Real500/Ás-a-Ás1000; HP Banqueiro2650, Dominadora2800, Matriarca2300, Lady2000, Nehelenia2400, Nemesis2500. Penalidades pontuais de Nehelenia/Banqueiro/Dominadora atualizadas abaixo. [Relatório de aplicação e compatibilidade](BALANCEAMENTO_SEIS_CHEFES_2026-10-13.md). A meta futura de aproximadamente 70% de vitórias dos chefes contra dupla humana competente não é resultado medido. Notas datadas de pacotes anteriores são históricas.
+## Valores aprovados
 
-## Itens da Dimitrescu — registro histórico do lote de 10/10/2026
+Canastras: Suja100, Limpa200, Real500, Ás-a-Ás1000, além das cartas. Evoluções acrescentam somente diferenças 100/300/500, sem repetir IDs. Carta2=10, Ás15, Joker20.
 
-As petrificações deste registro foram substituídas pelo pacote de12/10: Adaga80, Explosivo110, Anticoagulante100, Frasco160, Relíquia160 e piso130. A seção7 e o [pacote vigente](PACOTE_COOPERATIVO_E_BOT_ITENS_2026-10-12.md) têm precedência. O lote13/10 não mudou esses itens.
+| Chefe | HP |
+| --- | ---: |
+| Banqueiro | 2650 |
+| Dominadora | 2800 |
+| Matriarca Esmeralda | 2300 |
+| Nehelenia | 2400 |
+| Nemesis | 2500 |
+| Lady Dimitrescu | 2000 |
 
-Explosivo: 100 HP imediatos + 15 HP de sangramento por rodada até morrer, sem acumular; petrificação −50 HP máximo. Relíquia: petrifica100 e aumenta em20% somente ataques diretos, até a filha morrer. Frasco: petrifica100 somente no alvo e congela as três filhas por duas oportunidades consecutivas dos cooperadores, contando a atual. Reaplicar renova para duas, sem somar durações. Regen20/Anti10, Adaga80%, Lady/PROT./Sede/Fúria e demais itens preservados. Contrato detalhado na seção7 e [relatório deste lote](LOTE_FINAL_ITENS_DIMITRESCU_2026-10-10.md).
+Nehelenia: Jogo Espelhado14, Siga o Reflexo12, Espelho do Lixo12, Pesadelo Eterno20. Banqueiro: Juros integrais F1/F2=8/10/12 e F3=12/14/15; Auditoria10/14. Dominadora: falha da Etiqueta8/10/12; obediência2/2/3. As seções de cada chefe detalham as outras regras, que não foram alteradas por esse pacote.
 
-## Especial cooperativo vigente — 10/10/2026
+Lady: filhas 500, piso recuperável130; petrificação Adaga 80/Explosivo 110/Anticoagulante 100/Frasco 160/Relíquia 160; impacto 100+hemorragia 15 permanente sem stack; Adaga 80%, regen 20/Anti10, Frasco global temporário, Relíquia+20%. PROT. 1500, Sede/Fúria e quinze itens preservados.
 
-Implementação local compartilhada pelos seis chefes. A correção posterior do usuário substitui a origem “Monte” do brief consolidado: **exatamente cinco cartas físicas do topo do Lixo**. Com zero a quatro cartas, não ativa nem gasta pontos. O Monte não é usado.
+A referência futura de aproximadamente 70% de vitórias dos chefes contra humanos competentes não é resultado medido. Evidência de BOT não é win rate humano.
 
-A equipe ganha 25 por Limpa, 50 por Real e 100 por Ás-a-Ás. Um jogo físico pontua somente a categoria máxima que alcançou; evolução acrescenta apenas a diferença de 25/50/75. O saldo não tem teto: cada ativação gasta 100, guarda excedente e permite recarregar e usar novamente. Não exige fase, Mortos, Monte baixo ou mão pequena.
+## Compatibilidade do balanceamento de 13/10
 
-Um humano escolhe qual cooperador recebe as cartas, inclusive o BOT. O BOT não gasta automaticamente. A compra normal continua separada. O Especial não cria obrigação nova de jogar imediatamente o topo; objetivos e restrições já existentes continuam valendo. A cotação/uso obrigatório da compra normal e o Lixo protegido não foram alterados fora do Especial.
+`cooperativeBalanceVersion:2` registra a normalização única do pacote.
 
-**Bloqueios e reações:** validar o usuário e o beneficiário contra os bloqueios canônicos de retirada. Daniela cobra sua primeira retirada efetiva uma única vez; Pólen reage se a carta contaminada estiver entre as cinco, mesmo enterrada; Ágio cobra a primeira retirada da rodada; Espelho acompanha as cartas físicas e suas consequências existentes. Itens permanecem nas cartas até seu uso real. Não consome financiamento nem dispara Agarrador como se fosse a compra normal; esses continuam ligados à compra normal do turno.
+- Nos saves antigos, créditos de bônus180/300/450 passam a200/500/1000 **somente no ledger**, sem causar dano retroativo. Mantêm-se IDs já danificados, contribuições, alívios de recursos, estatísticas e eventos. Uma Limpa antiga que já causou180 não recebe mais20 ao abrir o save; se evoluir para Real, acrescenta300.
+- Habilidades já anunciadas conservam sua cobrança original. Juros/Auditoria preservam o payload; ordens antigas da Etiqueta e ilusões pendentes recebem o valor antigo explícito quando necessário. Novas ativações usam os valores deste pacote. Ajuda/HUD leem o valor persistido, não um número divergente do cálculo.
+- Partidas antigas em andamento dos três chefes cujo HP mudou recebem o novo máximo, preservando o HP absoluto restante e limitando-o ao máximo. Não há cura ao carregar. Partidas encerradas não são reabertas nem têm seu HP máximo histórico reescrito.
+- Serialização, reload, normalização repetida e Voltar foram cobertos. Não foram alterados schema/regras do Firebase; não foi realizado teste com clientes Firebase autenticados nesta etapa.
 
-**Persistência:** ledger por ID canônico do jogo, migration de categorias já conquistadas uma vez em saves antigos, IDs de ação resolvida e revisão autoritativa. Especial e commits comuns do modo Chefe comparam a revisão: dois pedidos da mesma revisão não podem gastar a mesma carga, e um escritor atrasado não pode apagar cartas recebidas. Rejeição não gasta nada. Undo restaura cartas, saldo e efeitos juntos; a gravação da restauração usa a revisão vigente, não volta a revisão para trás. Se uma reação encerrar a partida, resultado e histórico são gravados na mesma transação.
+## Apresentação e interação atuais
 
-**Apresentação:** barra funcional compacta ao lado do X, nos controles do jogador, fora do HUD/retrato do chefe; ajuda e escolha de destinatário, toque/teclado e movimento reduzido. Animatic provisório de cinco silhuetas do Lixo à mão, sem bloquear jogadas enquanto o navegador o anima. Arte heroica definitiva depende de aprovação no P3-06. Testes transacionais usam um substituto de armazenamento; **Firebase real e tablets físicos ainda precisam de homologação**.
+### Itens da mão — Lady
 
-Relatórios: [pacote consolidado](PACOTE_CONSOLIDADO_CHEFES_2026-10-10.md), [comparação e variedade](BALANCEAMENTO_SEIS_CHEFES_2026-10-10.md). As notas anteriores permanecem como histórico dos respectivos lotes.
+Toque principal no ícone seleciona o item; toque no retrato de uma filha elegível aplica imediatamente pelo fluxo canônico, sem popover de alvos nem confirmação extra. A filha morta/inválida não aceita aplicação; motivo de impedimento deve ser visível. Seleção normal da carta permanece independente.
 
-**Etapa 1 do playtest — 10/10/2026:** nos seis chefes, jogadores humanos não têm limite individual de turno, autoplay ou punição por timeout. O tempo total da partida continua contando. A recuperação de BOT travado usa um watchdog separado, somente no cliente anfitrião, respeitando pausa, escolhas pendentes e sessão atual; os cronômetros dos demais modos permanecem. Itens da mão conservam seus cliques após atualização da carta, explicam impedimentos de uso e mantêm símbolo no Lixo até o consumo real. Relatório e limites da validação: `ETAPA_1_PLAYTEST_P0_2026-10-10.md`. Balanceamento e Especial Cooperativo não foram implementados neste lote.
+Mesmo item cancela, outro troca, Escape/toque fora cancelam sem consumir. Um pequeno `?` separado conserva ajuda completa. No modo de item, o retrato aplica o item em vez de escolher alvo de dano; ao sair, restaura o comportamento anterior. A seleção é local e não é salva: limpa em turno/partida/pausa/undo/reload, morte, consumo e perda de elegibilidade. Reutiliza `getCastleItemUseStatus`, `canUseCastleItem` e `useCastleItem`, sem duplicar regras.
 
-**Auditoria de elegibilidade — 09/10/2026:** uma habilidade pode aparecer mesmo sem solução na mão dos jogadores. Falha mantém a consequência existente. Nemesis remove provas completas de Caçada/Extermínio/Invasão e provas conjuntas de Barragem; cartas marcadas continuam exigindo saída individual legal. Prisão/Laço da Nehelenia preservam jogos reais extensíveis, não solução antecipada. Bloqueios, fases, recursos e lifecycle continuam protegidos. Sorteio evita a última habilidade somente havendo outra elegível. Nenhum peso, HP, valor de recurso ou política estratégica do BOT mudou. Relatório: `AUDITORIA_ELEGIBILIDADE_CHEFES_2026-10-09.md`.
+Rótulos têm até duas linhas, sem mudar tamanho ou espaçamento das cartas: Explosivo 100 DANO/SANGRA15; AdagaVÍNCULO/80%; FrascoCONGELA/AS3; RelíquiaDANO/+20%; AnticoagulanteREGEN/20→10. Valores vêm das regras do save. Emblemas de itens não consumidos permanecem na mão, mesa, Lixo e voo; itens consumidos não voltam a ser utilizáveis. Versos ocultos não revelam item/face.
 
-**Polimento visual de 08/10/2026:** Enxerto mostra jogos alimentados numa barra0–2 com as três faixas de consequência, sem lista textual compactada. As cinco Flores usam a PNG `matriarch-lotus.png`, fosca quando apagada e com cor original quando ativa. PASSIVA e ADAGA permanecem consultáveis e refletem os valores da partida. Esse polimento não alterou balanceamento; os números foram posteriormente atualizados pelo pacote B abaixo.
+### Especial Cooperativo — regra e apresentação
 
-**Pacote B aplicado e atualizado pelo lote final de itens:** filhas500, regen20/Anti10, Adaga80%; Explosivo100+15 permanente; Relíquia+20% de ataque; Frasco global por dois turnos dos cooperadores. Lady/PROT., Sede, Fúria e petrificação preservados. Referências de carta nos chips mantêm ênfase apenas no valor+naipe. Implementação local, sem publicação. As medições anteriores na `ETAPA_2_DIMITRESCU_2026-10-10.md` são históricas; este lote não recalculou taxa de vitória.
+Barra ao lado do X nos controles do jogador, nunca no retrato do chefe. Saldo compartilhado por jogo físico: Limpa25, Real50, Ás-a-Ás100; evoluções acrescentam a diferença e não repetem crédito. Saldo guarda excedente; cada uso gasta100 e pode ser repetido. Humano escolhe beneficiário, inclusive BOT; BOT não gasta automaticamente.
 
+Retira exatamente cinco cartas do topo do Lixo, nunca do Monte. Com menos de cinco, não ativa nem gasta. Compra normal é separada. Respeita bloqueios do usuário/beneficiário e reações de Daniela, Pólen, Ágio e Espelho, preservando IDs e itens. Não cria obrigação nova de encaixar imediatamente o topo como uma compra normal. Fluxo autoritativo compara revisão, deduplica eventos e restaura cartas/carga/efeitos juntos no undo; rejeição não produz animação nem gasto.
 
-## Status da documentação
+As seis PNGs e seis MP3s fornecidos já estão integrados. Ada/Dimitrescu, Jill/Nemesis, Sailor/Nehelenia e os personagens de Banqueiro, Dominadora e Matriarca usam o mesmo quadro de referência da Jill1200×1800 com `object-fit: contain`; não esticar, recomprimir ou modificar originais. Mapeamento em `js/boss/ui/cooperative-special-assets.js`, artes em `assets/images/special/` e sons em `assets/sfx/special/`.
 
+Duração centralizada em `SPECIAL_PRESENTATION`, atualmente3000ms: entrada750ms, pausa1500ms e saída750ms. Cinco versos começam aos900ms; voo900ms/carta, intervalo75ms, última chegada2100ms. Imagem inválida/lenta (400ms) ou falta de área segura mantém o voo como fallback. Overlay cosmético com `pointer-events: none`, sem alterar layout real nem aguardar para liberar o action gate ou snapshots.
 
-**Revisada contra o workspace local atual — 08/10/2026, incluindo itens v2/filhas 500/piso 300 da Dimitrescu e preservando objetivos distintos do Nemesis, Enxerto parcial e ajuda/regeneração visual anteriores. Calibração de 65%–75% ainda não validada; comparações e limitações em `REWORK_ITENS_DIMITRESCU_2026-10-08.md` e `REWORK_NEMESIS_MATRIARCA_E_UX_DIMITRESCU_2026-10-08.md`.**
+Cada cliente apresenta uma vez o ID confirmado; baseline/reload, snapshots duplicados, reconexão e undo não repetem. Som inicia no cue de entrada, ou junto do voo fallback, não na chegada. Mute geral interrompe; música desligada ainda permite SFX. `prefers-reduced-motion` dispensa PNG, voo e áudio de entrada, mas concede normalmente as cartas. Saída/troca de partida, undo, evento obsoleto, resize e aba oculta cancelam elementos, timers e som; falha de asset/autoplay não afeta gameplay.
 
-### Compatibilidade de estados — 07/10/2026
+### Áudio
+
+Ganhos por arquivo em `js/audio-balance.js`, sem editar os masters. Política de energia RMS com gate, não LUFS: efeitos/falas−22dBFS; música/aberturas−28 (6dB abaixo); cartas−30; coração−32. Ganho máximo4× e pico amostrado limitado a−3dBFS por arquivo. Não é garantia sobre a soma de efeitos simultâneos ou volume percebido em qualquer aparelho.
+
+Web Audio aplica um único ganho calibrado; fallback nativo limita volume a1, podendo deixar masters baixos mais discretos. Fades/ducking, mute, modo só efeitos e ordem de reprodução permanecem. Validação física/auditiva ainda deve ser feita em playtest; os dados medidos originais ficam no histórico.
+
+### DevTools
+
+Ferramentas DEV autorizadas intervêm independentemente do turno normal/BOT, sem dar essa permissão aos controles comuns. Compras, descartes, canastras e cenário usam o jogador selecionado. Mutações serializam entre si, interrompem automação/operações antigas e usam congelamento temporário próprio antes do save; não aguardam a jogada/trava normal.
+
+Somente Congelar/Descongelar altera pausa manual. Comandos preservam pausa escolhida anteriormente e retomam partida que estava rodando. Identidade da partida, revisão concorrente e regras de acesso continuam valendo; não há sobrescrita cega do Firebase. Permissão manual do BOT é exclusiva de teste; undo/reset do laboratório não alteram o undo normal. Resultados DEV são marcados como teste. Limitações da trava de acesso em [devtools-firebase](devtools-firebase.md).
+
+## Compatibilidade permanente e fonte de verdade
 
 - Nehelenia: REFLEXO MORTO impede jogar, mas permite descartar. A seleção de illusion lock exclui essas cartas; saves sobrepostos removem somente esse lock conflitante. Espelho do Lixo usa o bloqueio canônico; objetivo legado incompatível é encerrado sem punição e sem escolha pendente.
 - Matriarca: Pólen acompanha o `discardCardId` real. No topo, marca a carta; enterrado, mostra apenas “PÓLEN NA PILHA”. Retirar só um topo normal não ativa a punição; adquirir a carta contaminada continua ativando a regra existente.
 - Nemesis (atualizado em 09/10/2026): `devourerFeed` v2 guarda IDs únicos e progresso parcial da equipe. Não existe limite por turno: cada grupo de 3 cartas novas cura 20/35 HP, Reforçado +15, limitado apenas à vida máxima. 12 cartas dão 4 curas imediatas; só 0–2 créditos atravessam turnos. `devourerHealSequence` garante eventos distintos persistidos, sem duplicação por reload/sync. Fim de turno não gera cura. Morte/reanimação zeram progresso; feed v1 mantém resto módulo 3 e IDs, descarta grupos completos antigos sem curar no load. Sem feed, registra a mesa antiga e começa em zero. Undo restaura contador/IDs/sequência juntos. A entrada da Invasão continua sendo outra regra.
 
-**Regra permanente de objetivos:** cumprir uma habilidade nunca reduz Dívida, Dominação, Flores, Sede, Mundo do Espelho ou Infecção. O sucesso evita sua punição; a falha mantém a punição aprovada. Sucessos parciais não descontam falhas de outros objetivos. Canastras continuam concedendo todo o alívio aprovado. Gastos do próprio chefe por cura/renascimento são outra categoria e permanecem. Custos positivos de escolhas/obediência não foram rebalanceados nesta revisão. Auditoria detalhada: `REVISAO_OBJETIVOS_CHEFES.md`.
+**Regra permanente de objetivos:** cumprir uma habilidade nunca reduz Dívida, Dominação, Flores, Sede, Mundo do Espelho ou Infecção. O sucesso evita sua punição; a falha mantém a punição aprovada. Sucessos parciais não descontam falhas de outros objetivos. Canastras continuam concedendo todo o alívio aprovado. Gastos do próprio chefe por cura/renascimento são outra categoria e permanecem. Custos positivos de escolhas/obediência não foram rebalanceados nesta revisão. Auditoria detalhada: [REVISAO_OBJETIVOS_CHEFES.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-revisao-objetivos-chefes).
 
-
-Esta documentação reúne o funcionamento geral do modo **Chefe da Mesa** e as regras aprovadas de:
-
-
-- **O Banqueiro**;
-- **A Dominadora**;
-- **A Matriarca Esmeralda**;
-- **Lady Dimitrescu**;
-- **Rainha Nehelenia**;
-- **Nemesis**.
-
-
-Ela substitui as versões anteriores em que a Matriarca aparecia como planejada e em que as habilidades antigas da Dominadora e do Banqueiro ainda estavam descritas.
-
-
-### Fonte de verdade atual
-
-
-A rotação que vale no jogo é a registrada em:
-
-
-- `js/boss/bosses/banker.js`;
-- `js/boss/bosses/dominatrix.js`;
-- `js/boss/bosses/matriarch.js`;
-- `js/boss/bosses/dimitrescu.js`;
-- `js/boss/bosses/nehelenia.js`;
-- `js/boss/bosses/nemesis.js` e seus adapters em `mechanics/`, `presentation/` e `ui/`;
-- validações e resolução em `js/boss/boss-engine.js`.
-
-
-O resumo enxuto e atualizado das habilidades ativas está em `docs/INVENTARIO_HABILIDADES_CHEFES.md`. O HUD da partida usa a mesma lista de definições do registro de chefes para exibir **Habilidades do chefe**, evitando manter uma segunda lista manual de nomes/fases na interface.
-
-
-### Estado técnico da base revisada
-
-
-A documentação não fixa mais uma contagem histórica de testes, porque a suíte evolui junto com o projeto. Alterações no modo Chefe devem ser validadas principalmente pelos testes `boss-*.test.mjs`, pelos testes de integração e por uma partida manual em dois clientes quando houver mudança de sincronização ou apresentação.
-
-
-A auditoria funcional identificou comportamentos que também fazem parte da regra final descrita neste documento:
-
-
-- Dívida máxima por Limite de Crédito encerra a partida imediatamente;
-- Limite de Crédito conta apenas cartas originadas da mão;
-- contribuições novas em jogo possuído causam dano individual normalmente;
-- bot deve avaliar custo e benefício, não apenas evitar resultados letais.
-
-
-Uma partida manual simultânea em dois dispositivos reais continua recomendada para validar Firebase, animações e experiência em tablet.
-
+Definições em `js/boss/bosses/*.js`, motor em `js/boss/boss-engine.js`, adaptadores em `mechanics/`, ajuda em `presentation/` e apresentação em `ui/`. As regras abaixo mantêm os detalhes de cada mecânica. Alterar documentação não autoriza patch, simulação, commit, push, deploy ou escrita remota.
 
 ---
-
 
 # 1. Estrutura geral
 
@@ -1467,7 +1441,7 @@ Florescimento: 0..5
 - derrota confirma uma vez;
 - Renascimento não ocorre depois de derrota por décima Flor.
 
-Atualização de 12/10/2026: [relatório do lote e testes](BALANCEAMENTO_DOMINADORA_MATRIARCA_2026-10-12.md).
+Atualização de 12/10/2026: [relatório do lote e testes](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-balanceamento-dominadora-matriarca-2026-10-12).
 Saves ativos migram o teto para dez, mantendo o saldo,
 eventos e reduções incrementais. Saves já encerrados por cinco Flores continuam
 encerrados; a migração não reabre partidas. Não foram alterados HP, punições,
@@ -2003,7 +1977,7 @@ Vitória da Matriarca:
 
 # 7. Lady Dimitrescu
 
-Rework de itens v2 de 08/10/2026 para partidas novas. Contrato, comparações e validação: [REWORK_ITENS_DIMITRESCU_2026-10-08.md](REWORK_ITENS_DIMITRESCU_2026-10-08.md). Registro histórico v1: [REWORK_DIMITRESCU_2026-10-07.md](ARQUIVO_HISTORICO/REWORK_DIMITRESCU_2026-10-07.md).
+Rework de itens v2 de 08/10/2026 para partidas novas. Contrato, comparações e validação: [REWORK_ITENS_DIMITRESCU_2026-10-08.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-rework-itens-dimitrescu-2026-10-08). Registro histórico v1: [REWORK_DIMITRESCU_2026-10-07.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-rework-dimitrescu-2026-10-07).
 
 ## 7.1 Identidade e Vínculo de Sangue
 
@@ -2051,7 +2025,7 @@ Rodada normal escolhe exatamente uma filha viva com RNG/seed canônico, evitando
 - **Cassandra — mesa:** marca jogo existente com contribuição legal concreta disponível à equipe. Qualquer cooperador pode alimentá-lo até o fim da rodada; falha +3 Sede. Sem candidato, não marca nem pune.
 - **Daniela — Lixo:** primeira retirada efetiva da equipe na rodada, protegida ou completa, +3 Sede uma vez. Monte ou ausência de retirada não punem.
 
-No fim da rodada, obrigações pendentes resolvem, depois hemorragia e, se sobreviver, regeneração. Cada filha viva recupera até **20 HP próprios**, nunca HP da Lady. Frio bloqueia a próxima regeneração que recuperaria HP, guardando a carga na vida cheia (até 2 cargas); Anticoagulante reduz permanentemente para 10, sem acumular.
+No fim da rodada, obrigações pendentes resolvem, depois hemorragia e, se sobreviver, regeneração. Cada filha viva recupera até **20 HP próprios**, nunca HP da Lady. Frasco congela globalmente as três filhas por duas oportunidades consecutivas dos cooperadores, incluindo a atual; bloqueia passivas e regen enquanto ativo, mesmo na vida cheia. Reaplicar renova para duas, sem somar duração. Anticoagulante reduz permanentemente para10, sem acumular.
 
 O chip **PASSIVA** explica somente essa regeneração permanente, inclusive quando a filha não foi selecionada; CAÇADA/BANQUETE/LIXO continuam com sua própria ajuda. O evento real `daughterRegen` mostra um número verde sobre o retrato correto (+20, +10 ou cura efetiva menor). Frio, vida cheia, morte e cura zero não animam. As três curas podem aparecer juntas, sem viajar para HP/Sede da Lady; `actionId` e baseline do HUD impedem replay em render/reload/reconexão/undo. Movimento reduzido mantém texto acessível sem deslocamento.
 
@@ -2070,10 +2044,10 @@ Cada item reduz o máximo por um valor fixo, aditivo sobre os **500 HP originais
 | Adaga | 80 HP | Vínculo permanente enquanto viva: 80% do dano efetivo de ataques também fere o HP real da Lady, sem consumir PROT./Coágulo. Duplicatas petrificam mais 80, sem somar porcentagem. |
 | Frasco Congelante | 160 HP no alvo | Congela as três: sem regen ou passivas individuais por duas oportunidades de turno dos cooperadores, incluindo a atual. Renova para duas, sem acumular. Cancela objetivos pendentes sem punição; As Três Filhas não contorna o congelamento. |
 | Anticoagulante | 100 HP | Regen 20→10 permanente, sem acumular. Duplicatas ainda petrificam. |
-| Explosivo | 110 HP | Impacto100; hemorragia15 antes da regen por rodada até morrer. Reaplicar causa novo impacto, sem somar sangramento nem tick extra na mesma rodada. Não aciona Adaga nem bônus de Relíquia. |
+| Explosivo | 110 HP | Impacto100; hemorragia 15 antes da regen por rodada até morrer. Reaplicar causa novo impacto, sem somar sangramento nem tick extra na mesma rodada. Não aciona Adaga nem bônus de Relíquia. |
 | Relíquia | 160 HP | Recebe20% mais dano dos ataques diretos até morrer; sem acumular. Não silencia nem bloqueia regen; não amplia dano de itens/hemorragia/indireto. Duplicatas ainda petrificam e anexam carta. |
 
-Ataque com Relíquia: dano-base→bônus20% (inteiro arredondado para baixo)→limite de HP restante→Adaga80% do efetivo (arredondado para baixo). Base100→120→96 na Lady; filha40→40→32 na Lady. Hemorragia mata pelo caminho canônico de morte/Fúria/remoção de PROT. Não transmite Adaga. A morte da Lady por transmissão encerra a batalha mesmo com PROT. restante. Congelamento não impede hemorragia, ataques, habilidades próprias da Lady ou outros itens. Expira após as consequências do segundo turno; objetivos cancelados não voltam, só recebe nova tarefa na próxima seleção normal. HUD mostra gelo azul e CONGELADA nas sobreviventes, hemorragia−15, HP/máximo recuperável/petrificação; movimento reduzido deixa o gelo estático.
+Ataque com Relíquia: dano-base→bônus20% (inteiro arredondado para baixo)→limite de HP restante→Adaga 80% do efetivo (arredondado para baixo). Base100→120→96 na Lady; filha40→40→32 na Lady. Hemorragia mata pelo caminho canônico de morte/Fúria/remoção de PROT. Não transmite Adaga. A morte da Lady por transmissão encerra a batalha mesmo com PROT. restante. Congelamento não impede hemorragia, ataques, habilidades próprias da Lady ou outros itens. Expira após as consequências do segundo turno; objetivos cancelados não voltam, só recebe nova tarefa na próxima seleção normal. HUD mostra gelo azul e CONGELADA nas sobreviventes, hemorragia−15, HP/máximo recuperável/petrificação; movimento reduzido deixa o gelo estático.
 
 PNGs reais centralizados em `ITEM_DEFINITIONS`, sobrepostos à face sem ocultar cantos nem interceptar clique. HUD oferece “ITENS DO CASTELO”, cinco artes e ajuda opcional oficial. Filhas mostram HP/máximo, barra, regen, efeitos, obrigação e cartas sacrificadas reais.
 
@@ -2096,9 +2070,9 @@ Valores abaixo são **bases**; Fúria soma ao evento ofensivo positivo e multipl
 
 ## 7.7 Persistência e calibração
 
-IDs de item, consumo, anexos, HP/regen, passivas, congelamento compartilhado/turnos resolvidos, bônus de Relíquia, vínculo de Adaga, hemorragia/último tick, alvo e eventos persistem em snapshot/reload/undo. Partidas v2 novas salvam `castleItemEffectsVersion:1` e regras `itemEffectsVersion:2`. Saves v2 anteriores migram uma vez: hemorragia ativa passa a15, Relíquia anexada a filha viva passa a bônus permanente20%; Frio antigo ainda ativo vira congelamento global de duas oportunidades a partir da retomada, sem acumular cargas antigas. Não repete petrificação, impacto, cura ou tick; preserva HP, anexos/consumo, último tick e PROT. Objetivos anteriormente cancelados não são punidos retroativamente. Ausência de versão de itens continua v1:450/50/25, piso200, efeitos históricos; não recebe itens/vínculo/hemorragia novos retroativamente. Saves pré-castelo não sorteiam itens. Undo restaura tudo junto e normaliza a versão aprovada. Laboratório novo usa este lote; experimentos históricos pinam suas regras antigas explicitamente.
+IDs de item, consumo, anexos, HP/regen, passivas, congelamento compartilhado/turnos resolvidos, bônus de Relíquia, vínculo de Adaga, hemorragia/último tick, alvo e eventos persistem em snapshot/reload/undo. Partidas v2 novas salvam `castleItemEffectsVersion:1` e regras `itemEffectsVersion:2`. Saves v2 anteriores migram uma vez: hemorragia ativa passa a15, Relíquia anexada a filha viva passa a bônus permanente20%; Frio antigo ainda ativo vira congelamento global de duas oportunidades a partir da retomada, sem acumular cargas antigas. Não repete petrificação, impacto, cura ou tick; preserva HP, anexos/consumo, último tick e PROT. Objetivos anteriormente cancelados não são punidos retroativamente. Ausência de versão de itens continua v1:450/50/25, piso 200, efeitos históricos; não recebe itens/vínculo/hemorragia novos retroativamente. Saves pré-castelo não sorteiam itens. Undo restaura tudo junto e normaliza a versão aprovada. Laboratório novo usa este lote; experimentos históricos pinam suas regras antigas explicitamente.
 
-Pacote de 12/10: `castlePetrificationBalanceVersion:1` atualiza somente perdas futuras e piso130 em saves modernos. Máximos já petrificados, ferimentos, anexos e ticks não são recalculados. `castleBloodPressureVersion:2` marca a nova cobrança; um Tributo/Marca já anunciado no save antigo recebe `payload.bloodPressureVersion:1` e mantém sua cotação até terminar. Novos anúncios usam versão2.
+Pacote de 12/10: `castlePetrificationBalanceVersion:1` atualiza somente perdas futuras e piso 130 em saves modernos. Máximos já petrificados, ferimentos, anexos e ticks não são recalculados. `castleBloodPressureVersion:2` marca a nova cobrança; um Tributo/Marca já anunciado no save antigo recebe `payload.bloodPressureVersion:1` e mantém sua cotação até terminar. Novos anúncios usam versão2.
 
 Números centralizados em `js/boss/dimitrescu-castle.js`. Este é um experimento de troca de poder, não win rate comprovado. Meta geral 65–75% (aproximadamente 70%) permanece apenas alvo de calibração.
 
@@ -2814,18 +2788,18 @@ O estado continua compatível com 5 Espelhos, agora com preenchimento parcial. C
 
 Pressões de teste: Jogo Espelhado erro/ignorar +14; Siga o Reflexo falha +12; Espelho do Lixo erro +12; Prisão no Espelho falha +8/+10/+12; Laço do Tigre falha +12; Pesadelo Eterno erro +20. Na Prisão, libertar o parceiro não altera o Mundo do Espelho.
 
-**Registro histórico da revisão de 04/10/2026, anterior aos nerfs de13/10:** os valores foram mantidos após comparação com a Dominadora. A Nehelenia alterna habilidades de pressão e de controle, usa uma barra coletiva de 100 pontos e recupera 4/8/12 pelas canastras; a pressão mais forte daquela revisão, +24, ficava restrita à Fase 3. Não foi aplicado buff/nerf naquela revisão.
+**Registro histórico da revisão de 04/10/2026, anterior aos nerfs de 13/10:** os valores foram mantidos após comparação com a Dominadora. A Nehelenia alterna habilidades de pressão e de controle, usa uma barra coletiva de 100 pontos e recupera 4/8/12 pelas canastras; a pressão mais forte daquela revisão, +24, ficava restrita à Fase 3. Não foi aplicado buff/nerf naquela revisão.
 
 
 O HUD mostra o preenchimento parcial da Dominação/Espelhos e o progresso numérico para tornar o risco legível.
 
 ### Dimitrescu — rework experimental de 07/10/2026
 
-Registro histórico de 08/10/2026 (valores superados pelo pacote de 12/10): Lady 2000 / filhas 500 cada / regen 50 / 15 itens distintos / piso 300 / Vínculo 1500–0 / Fúria preservada. Saves v1 mantêm configuração histórica 450/piso200. Não há percentual atual contra dupla competente medido; meta 65–75% é só alvo, não resultado. Comparações e limites do simulador: `REWORK_ITENS_DIMITRESCU_2026-10-08.md`; centralização em `js/boss/dimitrescu-castle.js`. Demais chefes não foram rebalanceados neste passe.
+Registro histórico de 08/10/2026 (valores superados pelo pacote de 12/10): Lady 2000 / filhas 500 cada / regen 50 / 15 itens distintos / piso 300 / Vínculo 1500–0 / Fúria preservada. Saves v1 mantêm configuração histórica 450/piso 200. Não há percentual atual contra dupla competente medido; meta 65–75% é só alvo, não resultado. Comparações e limites do simulador: [REWORK_ITENS_DIMITRESCU_2026-10-08.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-rework-itens-dimitrescu-2026-10-08); centralização em `js/boss/dimitrescu-castle.js`. Demais chefes não foram rebalanceados neste passe.
 
 ### Nemesis — revisão experimental de 06/10/2026
 
-Durabilidade atual para teste: **Nemesis 2500 / Agarrador 180 / Infectado 190 / Devorador 200 HP**. Agarrador sorteia cartas da mão após a compra do jogador perseguido, do Monte ou do Lixo; troca o jogador por rodada. Pesos, punições, Infecção e demais chefes foram mantidos. Revisão atual: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](AJUSTE_FINAL_NEMESIS_2026-10-09.md).
+Durabilidade atual para teste: **Nemesis 2500 / Agarrador 180 / Infectado 190 / Devorador 200 HP**. Agarrador sorteia cartas da mão após a compra do jogador perseguido, do Monte ou do Lixo; troca o jogador por rodada. Pesos, punições, Infecção e demais chefes foram mantidos. Revisão atual: [AJUSTE_FINAL_NEMESIS_2026-10-09.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-ajuste-final-nemesis-2026-10-09).
 
 A estimativa de **~68,9%** é histórica, anterior à regra global do Lixo e a este rebalanceamento; não representa win rate atual. Não há novo percentual validado. A recalibração depende de testes de jogo, simulação ou telemetria posteriores.
 ---
@@ -2878,9 +2852,9 @@ No Buraco Fechado, a restrição acontece depois da jogada obrigatória da compr
 
 O contador do Devorador usa `devourerFeed.version=2` e IDs únicos por carta. `devourerTurnIds` não limita mais a passiva. Cada grupo consome três créditos, inclusive com HP cheio (não cria animação de cura zero), e incrementa `devourerHealSequence`, preservada entre morte/reanimação. IDs de evento `devourer:v2:N` distinguem curas da mesma jogada e persistem em snapshot/undo/sync. Não cura com chefe derrotado, HP zero, resultado terminal ou partida encerrada. Morte/reanimação zeram o progresso e registram a mesa existente sem creditá-la novamente.
 
-Migração: feed v1 conserva `credits % 3` e os IDs já contados, descarta os grupos completos pendentes (`discardedLegacyCredits`) e não cura ao carregar. Exemplo: 8 créditos antigos viram 2; 6 são descartados. Sem feed, inicia em zero e registra a mesa antiga. Normalização repetida não muda HP nem gera eventos. Detalhes, números e evidências no [relatório do ajuste final](AJUSTE_FINAL_NEMESIS_2026-10-09.md).
+Migração: feed v1 conserva `credits % 3` e os IDs já contados, descarta os grupos completos pendentes (`discardedLegacyCredits`) e não cura ao carregar. Exemplo: 8 créditos antigos viram 2; 6 são descartados. Sem feed, inicia em zero e registra a mesa antiga. Normalização repetida não muda HP nem gera eventos. Detalhes, números e evidências no [relatório do ajuste final](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-ajuste-final-nemesis-2026-10-09).
 
-A migração mantém HP restante abaixo dos novos máximos, limitando apenas valores acima deles, sem reiniciar a batalha ou restaurar HP perdido. Reanimação usa metade dos máximos atuais: Agarrador 110, Infectado 120, Devorador 130; quota, teto e retorno Mutado na F3 permanecem. Decisão de balanceamento: `BALANCEAMENTO_NEMESIS.md`.
+A migração mantém HP restante abaixo dos novos máximos, limitando apenas valores acima deles, sem reiniciar a batalha ou restaurar HP perdido. Reanimação usa metade dos máximos atuais: Agarrador 110, Infectado 120, Devorador 130; quota, teto e retorno Mutado na F3 permanecem. Decisão de balanceamento: [BALANCEAMENTO_NEMESIS.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-balanceamento-nemesis).
 
 Ao morrer, o zumbi perde sua passiva imediatamente, fica como cadáver no estado e deixa de aparecer nas escolhas de ataque. **Não há transbordamento de dano nem alívio de Infecção pela morte**. Cadáveres continuam visíveis; só os que ainda não foram reanimados nesta partida podem ser alvo da Reanimação Viral.
 
@@ -2938,7 +2912,7 @@ Objetivos não precisam de plano viável para ser anunciados. O planner continua
 
 Derrota: somente `max_infection` mostra **Infecção Total**; falha do ataque final mostra **Nemesis sobreviveu**, exaustão mostra **Recursos esgotados**. Registro histórico da revisão de UX anterior: HP 2600, Infecção 0–100, S.T.A.R.S., redução 4/8/12 e regras dos demais chefes foram preservados naquela rodada; somente a expectativa obsoleta da Prisão no Espelho foi ajustada. A revisão posterior de durabilidade desta seção passa o HP do Nemesis a 2200, sem alterar as demais regras. O pacote de 13/10/2026 define o valor vigente em 2500 HP.
 
-Teste manual simultâneo em dois clientes reais ainda é necessário para confirmar o transporte Firebase, o layout completo da mesa e o balanceamento. A matriz automatizada e os resultados estão em `docs/NEMESIS_IMPLEMENTACAO.md`.
+Teste manual simultâneo em dois clientes reais ainda é necessário para confirmar o transporte Firebase, o layout completo da mesa e o balanceamento. A matriz automatizada e os resultados estão em [NEMESIS_IMPLEMENTACAO.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-nemesis-implementacao).
 # Regra global de recuperação da condição especial
 
 Cumprir uma habilidade nunca reduz a condição especial de vitória do chefe. O sucesso apenas evita a punição. A recuperação concedida aos jogadores ocorre somente através das canastras aprovadas. Sucesso parcial evita apenas a punição correspondente. Vale para Dívida, Dominação, Flores, Sede, Mundo do Espelho, Infecção e recursos futuros, incluindo efeitos automáticos de habilidades. Somente gastos internos explicitamente aprovados do chefe são exceções, como Vinho Carmesim e Renascimento.
@@ -2949,4 +2923,4 @@ Os cenários sem alvo de Pesadelo Eterno, Laço do Tigre, Olho do Falcão, Mão 
 
 Os textos de Pólen do Lixo e do resumo de ameaça da Colheita foram alinhados aos valores já documentados nas seções 6.12/6.13: 30 / 50 / 80 HP. A mecânica não mudou. Extermínio S.T.A.R.S. teve somente sua consequência compacta encurtada para respeitar o orçamento existente do HUD; detalhes e punições permanecem intactos.
 
-Execução, arquivos e classificação dos achados: `docs/LIMPEZA_SUITE_2026-10-06.md`.
+Execução, arquivos e classificação dos achados: [LIMPEZA_SUITE_2026-10-06.md](ARQUIVO_HISTORICO/HISTORICO_CHEFES_2026-10.md#arquivo-limpeza-suite-2026-10-06).
